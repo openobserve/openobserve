@@ -17,12 +17,6 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
-pub struct QueryParamProxyURL {
-    #[serde(alias = "proxy-token")]
-    pub proxy_token: String,
-}
-
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct PathParamProxyURL {
     pub target_url: String,
     pub org_id: String,
@@ -31,28 +25,6 @@ pub struct PathParamProxyURL {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_query_param_proxy_url() {
-        let proxy_url = QueryParamProxyURL {
-            proxy_token: "test-token".to_string(),
-        };
-
-        assert_eq!(proxy_url.proxy_token, "test-token");
-    }
-
-    #[test]
-    fn test_query_param_proxy_url_default() {
-        let proxy_url = QueryParamProxyURL::default();
-        assert_eq!(proxy_url.proxy_token, "");
-    }
-
-    #[test]
-    fn test_query_param_proxy_url_alias() {
-        let json = r#"{"proxy-token": "test-token"}"#;
-        let proxy_url: QueryParamProxyURL = serde_json::from_str(json).unwrap();
-        assert_eq!(proxy_url.proxy_token, "test-token");
-    }
 
     #[test]
     fn test_path_param_proxy_url() {

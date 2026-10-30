@@ -32,12 +32,15 @@ import {
   DropdownMenuContent,
 } from "reka-ui";
 import { computed, inject, onBeforeUnmount, provide, ref, watch, type Ref } from "vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import {
   O_DROPDOWN_NESTED_KEY,
   type DropdownNestedRegistry,
   setActiveOverlay,
   clearActiveOverlay,
 } from "./ODropdown.context";
+
+const { lgUp } = useBreakpoint();
 
 const props = withDefaults(defineProps<DropdownProps>(), {
   modal: false,
@@ -50,6 +53,12 @@ const props = withDefaults(defineProps<DropdownProps>(), {
 const emit = defineEmits<DropdownEmits>();
 
 defineSlots<DropdownSlots>();
+
+// Match the nested drawer/dialog layer (6000 + depth*1000) so a portaled menu
+// sits above the surface that owns it instead of a fixed z-6000.
+const drawerDepth = inject<number>("o2DrawerDepth", 0);
+const dialogDepth = inject<number>("o2DialogDepth", 0);
+const contentZIndex = computed(() => 6000 + Math.max(drawerDepth, dialogDepth) * 1000);
 
 // Vue boolean-casts absent `open` prop to `false`, which would lock
 // DropdownMenuRoot into controlled-closed mode. We manage state ourselves
@@ -286,14 +295,16 @@ onBeforeUnmount(() => {
         :align="align"
         :side-offset="sideOffset"
         :hide-when-detached="true"
+        :collision-padding="lgUp ? 0 : 8"
         @pointer-down-outside="handlePointerDownOutside"
         @focus-outside="handleFocusOutside"
+        @close-auto-focus="(event: Event) => emit('close-auto-focus', event)"
+        :style="{ zIndex: contentZIndex }"
         :class="[
-          // Layout + stacking — overlay layer 6000 (clears header 2000; ties with
-          // drawer/dialog content broken by later DOM order). See tokens/base.css.
-          'z-6000 min-w-40 p-1',
+          'min-w-40 p-1 max-lg:max-w-[calc(100vw-1rem)]',
+          'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
           // Surface
-          'bg-dropdown-bg border-dropdown-border rounded-default border shadow-md',
+          'bg-dropdown-bg rounded-default shadow-overlay border border-transparent',
           // Typography
           'text-dropdown-item-text text-sm',
           // Animation — clip-path reveal: the menu is unveiled at full size from

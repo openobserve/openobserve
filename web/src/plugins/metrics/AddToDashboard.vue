@@ -13,10 +13,17 @@
     <OForm
       id="add-to-dashboard-form"
       :schema="addToDashboardSchema"
-      :default-values="addToDashboardDefaults()"
+      :default-values="addToDashboardDefaults(defaultPanelTitle)"
       @submit="onSubmit"
     >
       <div class="add-dashboard-form-card-section flex flex-col gap-4">
+        <OBanner
+          v-if="notice"
+          variant="info"
+          dense
+          :content="notice"
+          data-test="add-to-dashboard-notice"
+        />
         <!-- select folder or create new folder and select -->
         <SelectFolderDropdown @folder-selected="updateActiveFolderId" />
 
@@ -49,20 +56,21 @@
 import { computed, defineComponent, ref, watch, type Ref, type PropType } from "vue";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
-import { useI18n } from "vue-i18n";
-import { getFoldersList, getPanelId } from "@/utils/commons";
-import { addPanel } from "@/utils/commons";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { getFoldersList, getPanelId, addPanel } from "@/utils/commons";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
 import SelectDashboardDropdown from "@/components/dashboards/SelectDashboardDropdown.vue";
 import SelectTabDropdown from "@/components/dashboards/SelectTabDropdown.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { useRouter } from "vue-router";
 import useNotifications from "@/composables/useNotifications";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import analytics from "@/services/product_analytics";
 import {
-  addToDashboardSchema,
+  makeAddToDashboardSchema,
   addToDashboardDefaults,
   type AddToDashboardForm,
 } from "./AddToDashboard.schema";
@@ -76,6 +84,7 @@ export default defineComponent({
     ODialog,
     OForm,
     OFormInput,
+    OBanner,
   },
   props: {
     open: {
@@ -96,6 +105,16 @@ export default defineComponent({
       type: Array as PropType<any[]>,
       default: () => [],
     },
+    /** A note shown above the form, such as what a copied panel keeps. */
+    notice: {
+      type: String as unknown as PropType<I18nText>,
+      default: undefined,
+    },
+    /** A caller that already knows what the panel shows names it, so the user need not. */
+    defaultPanelTitle: {
+      type: String,
+      default: "",
+    },
   },
   emits: ["save", "update:open"],
   setup(props, { emit }) {
@@ -112,7 +131,8 @@ export default defineComponent({
 
     const activeFolderId = ref("default");
     const activeTabId: any = ref(null);
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
+    const addToDashboardSchema = makeAddToDashboardSchema(t);
 
     const { showErrorNotification, showConfictErrorNotificationWithRefreshBtn } =
       useNotifications();
@@ -121,7 +141,7 @@ export default defineComponent({
     // component mounted only on first open). Avoids an eager API call on page load.
     // On close, reset the non-form dropdown state (folder/dashboard/tab). The
     // form-owned `panelTitle` needs no manual reset — ODialog unmounts the body
-    // on close and re-seeds via `:default-values="addToDashboardDefaults()"` on reopen.
+    // on close and re-seeds via `:default-values` on reopen.
     watch(
       () => props.open,
       async (isOpen) => {
@@ -157,6 +177,8 @@ export default defineComponent({
       let dismiss = function () {};
 
       const multi = props.panels && props.panels.length > 0;
+      // Counted per write: a later panel failing does not undo the ones already saved.
+      let written = 0;
       try {
         dismiss = toast({
           message: multi
@@ -175,6 +197,7 @@ export default defineComponent({
             panelData.id = getPanelId();
             if (!panelData.title) panelData.title = panelTitle;
             await addPanel(store, dashboardId, panelData, folderId, tabId);
+            written++;
           }
         } else {
           dashboardPanelData.value.data.id = getPanelId();
@@ -182,6 +205,7 @@ export default defineComponent({
           dashboardPanelData.value.data.title = panelTitle;
           // to create panel dashboard id, paneldata and folderId is required
           await addPanel(store, dashboardId, dashboardPanelData.value.data, folderId, tabId);
+          written++;
         }
         toast({
           message: multi
@@ -199,11 +223,13 @@ export default defineComponent({
             error?.response?.data?.message ??
               error?.message ??
               t("metrics.addToDashboardPage.errorAddingPanel"),
+            t,
           );
         } else {
           showErrorNotification(error?.message ?? t("metrics.addToDashboardPage.errorAddingPanel"));
         }
       } finally {
+        if (written > 0) analytics.track("panel_added_to_dashboard", { panel_count: written });
         dismiss();
         emit("save");
       }
@@ -238,7 +264,7 @@ export default defineComponent({
       t,
       getImageURL,
       // Options-API setup(): template only sees what's returned here, so the
-      // Zod schema import MUST be exposed or `:schema` resolves to undefined
+      // built schema MUST be exposed or `:schema` resolves to undefined
       // (which silently disables validation).
       addToDashboardSchema,
       addToDashboardDefaults,

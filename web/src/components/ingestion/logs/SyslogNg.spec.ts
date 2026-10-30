@@ -44,10 +44,10 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
-// Mock CopyContent component
-vi.mock("@/components/CopyContent.vue", () => ({
+// Mock CredentialCodeBlock component
+vi.mock("@/components/ingestion/CredentialCodeBlock.vue", () => ({
   default: {
-    name: "CopyContent",
+    name: "CredentialCodeBlock",
     template: '<div data-test="copy-content">Copy Content Mock</div>',
     props: ["content"],
   },
@@ -407,7 +407,7 @@ describe("SyslogNg.vue Comprehensive Coverage", () => {
       expect(wrapper.find(".p-3").exists()).toBe(true);
     });
 
-    it("should render CopyContent component with correct content prop", () => {
+    it("should render CredentialCodeBlock component with correct content prop", () => {
       const wrapper = mount(SyslogNg, {
         props: {
           currOrgIdentifier: "test-org",
@@ -421,7 +421,7 @@ describe("SyslogNg.vue Comprehensive Coverage", () => {
         },
       });
 
-      const copyContentComponent = wrapper.findComponent({ name: "CopyContent" });
+      const copyContentComponent = wrapper.findComponent({ name: "CredentialCodeBlock" });
       expect(copyContentComponent.exists()).toBe(true);
       expect(copyContentComponent.props("content")).toBe(wrapper.vm.content);
     });
@@ -564,7 +564,7 @@ describe("SyslogNg.vue Comprehensive Coverage", () => {
   });
 
   describe("Component Registration", () => {
-    it("should register CopyContent component", () => {
+    it("should register CredentialCodeBlock component", () => {
       const wrapper = mount(SyslogNg, {
         props: {
           currOrgIdentifier: "test-org",
@@ -578,7 +578,7 @@ describe("SyslogNg.vue Comprehensive Coverage", () => {
         },
       });
 
-      const copyContentComponent = wrapper.findComponent({ name: "CopyContent" });
+      const copyContentComponent = wrapper.findComponent({ name: "CredentialCodeBlock" });
       expect(copyContentComponent.exists()).toBe(true);
     });
   });

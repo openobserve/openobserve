@@ -14,24 +14,37 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // Service mocks must be hoisted above all imports
-vi.mock("@/services/alert_destination", () => ({
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+      delete: vi.fn(),
+      update: vi.fn(),
+    },
+  });
+});
+
+vi.mock("@/services/slack", () => ({ default: { listInstallations: vi.fn() } }));
+vi.mock("@/services/oncall", () => ({
   default: {
-    list: vi.fn(),
-    delete: vi.fn(),
+    listTeams: vi.fn(() => Promise.resolve({ data: [{ id: "t1", name: "payments" }] })),
+    getTeamChannel: vi.fn(() =>
+      Promise.resolve({
+        data: { team_id: "t1", destinations: ["oncall-room-slack"], source: "team" },
+      }),
+    ),
   },
 }));
 
-vi.mock("@/services/alert_templates", () => ({
-  default: {
-    list: vi.fn(),
-  },
-}));
-
-vi.mock("@/composables/useActions", () => ({
-  default: () => ({
-    getAllActions: vi.fn().mockResolvedValue({}),
-  }),
-}));
+vi.mock("@/services/alert_templates", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/utils/zincutils", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
@@ -57,6 +70,7 @@ vi.mock("@/composables/usePrebuiltDestinations", () => ({
 }));
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import { mount, flushPromises } from "@vue/test-utils";
 import AlertsDestinationList from "./AlertsDestinationList.vue";
 import destinationService from "@/services/alert_destination";
@@ -64,8 +78,24 @@ import templateService from "@/services/alert_templates";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import {
+  readEditorDraft,
+  writeEditorDraft,
+  type EditorDraftScope,
+} from "@/utils/drafts/editorDraftStore";
+import slack from "@/services/slack";
+import { queryClient } from "@/composables/query/queryClient";
+import { installationView } from "@/test/unit/helpers/slack";
+import { clickIn } from "@/test/unit/helpers/draftDom";
 
 // ── stubs ────────────────────────────────────────────────────────────────────
+
+const cellValue = (columns: any[], id: string, row: any) => {
+  const col = columns.find((c) => c.id === id);
+  if (col?.accessorFn) return col.accessorFn(row);
+  if (col?.accessorKey) return row[col.accessorKey];
+  return "";
+};
 
 const OTableStub = {
   name: "OTable",
@@ -77,13 +107,28 @@ const OTableStub = {
     selection: { default: "none" },
   },
   emits: ["update:selected-ids"],
+  methods: {
+    urlOf(row: any) {
+      return cellValue(this.columns, "url", row);
+    },
+    methodOf(row: any) {
+      return cellValue(this.columns, "method", row);
+    },
+  },
   template: `
     <div data-test="o-table-stub">
       <slot name="toolbar" />
       <slot name="empty" />
       <slot name="actions" />
-      <slot name="bottom" :totalRows="data ? data.length : 0" />
+      <slot name="selection-actions" />
       <template v-for="row in data" :key="row.name">
+        <slot name="cell-name" :row="row" />
+        <div :data-test="'destination-url-' + row.name">
+          <slot name="cell-url" :row="row">{{ urlOf(row) }}</slot>
+        </div>
+        <div :data-test="'destination-method-' + row.name">
+          <slot name="cell-method" :row="row">{{ methodOf(row) }}</slot>
+        </div>
         <slot name="cell-type" :row="row" />
         <slot name="cell-actions" :row="row" />
       </template>
@@ -93,7 +138,7 @@ const OTableStub = {
 
 const ConfirmDialogStub = {
   name: "ConfirmDialog",
-  props: ["modelValue", "title", "message"],
+  props: ["modelValue", "title", "message", "messageKeypath", "messageName", "okVariant"],
   emits: ["update:ok", "update:cancel", "update:modelValue"],
   template: '<div data-test="confirm-dialog-stub" :data-open="modelValue" />',
 };
@@ -117,13 +162,14 @@ const makeTemplate = (idx: number) => ({
 
 // ── mount helper ─────────────────────────────────────────────────────────────
 
-function mountComponent() {
+function mountComponent({ realConfirm = false } = {}) {
   return mount(AlertsDestinationList, {
+    attachTo: realConfirm ? document.body : undefined,
     global: {
       plugins: [i18n, store, router],
       stubs: {
         OTable: OTableStub,
-        ConfirmDialog: ConfirmDialogStub,
+        ConfirmDialog: realConfirm ? false : ConfirmDialogStub,
         AddDestination: { template: '<div data-test="add-destination-stub" />' },
         ImportDestination: { template: '<div data-test="import-destination-stub" />' },
         NoData: { template: '<div data-test="no-data-stub" />' },
@@ -153,6 +199,7 @@ describe("AlertsDestinationList", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetListViewState();
 
     // Reset router state
     (router as any).currentRoute.value.query = {};
@@ -181,11 +228,11 @@ describe("AlertsDestinationList", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("renders the list title", async () => {
+    it("titles itself with the SECTION, so the peer tabs never move", async () => {
+      // Identical on all four alerting pages — see TemplateList.spec.ts.
       wrapper = mountComponent();
       await flushPromises();
-      const title = wrapper.find(".app-page-header h1");
-      expect(title.exists()).toBe(true);
+      expect(wrapper.find(".app-page-header h1").text()).toBe("Alerts");
     });
 
     it("renders the table when no editor is open", async () => {
@@ -222,6 +269,14 @@ describe("AlertsDestinationList", () => {
       wrapper = mountComponent();
       await flushPromises();
       expect(destinationService.list).toHaveBeenCalled();
+    });
+
+    it("asks for include_usage, so its own request shares the dependency graph's cache entry", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      expect(destinationService.list).toHaveBeenCalledWith(
+        expect.objectContaining({ include_usage: true }),
+      );
     });
 
     it("calls templateService.list on mount", async () => {
@@ -370,6 +425,14 @@ describe("AlertsDestinationList", () => {
 
       expect((wrapper.vm as any).confirmDelete.visible).toBe(true);
       expect((wrapper.vm as any).confirmDelete.data.name).toBe(dest.name);
+      await flushPromises();
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find(
+          (c: any) => c.props("messageKeypath") === "alert_destinations.deleteDestinationMessage",
+        );
+      expect(dialog!.props("messageName")).toBe(dest.name);
+      expect(dialog!.props("okVariant")).toBe("destructive");
     });
 
     it("calls destinationService.delete with correct args on deleteDestination()", async () => {
@@ -388,6 +451,26 @@ describe("AlertsDestinationList", () => {
       );
     });
 
+    it("drops the deleted row in place, without refetching the list", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const before = [...(wrapper.vm as any).destinations];
+      const dest = before[0];
+      (destinationService.list as any).mockClear();
+
+      (wrapper.vm as any).confirmDelete.data = dest;
+      (wrapper.vm as any).deleteDestination();
+      await flushPromises();
+
+      // A refetch would blank the table behind its spinner and a loading toast
+      // for a row the server has already confirmed gone.
+      expect(destinationService.list).not.toHaveBeenCalled();
+      const after = (wrapper.vm as any).destinations;
+      expect(after).toHaveLength(before.length - 1);
+      expect(after.map((d: any) => d.name)).not.toContain(dest.name);
+    });
+
     it("resets confirmDelete on cancelDeleteDestination()", async () => {
       wrapper = mountComponent();
       await flushPromises();
@@ -397,6 +480,99 @@ describe("AlertsDestinationList", () => {
 
       expect((wrapper.vm as any).confirmDelete.visible).toBe(false);
       expect((wrapper.vm as any).confirmDelete.data).toBeNull();
+    });
+  });
+
+  describe("drafts", () => {
+    interface BulkDeleteVm {
+      handleSelectedIdsUpdate: (ids: string[]) => void;
+      bulkDeleteDestinations: () => Promise<void>;
+    }
+    const scope = (entityId: string | null): EditorDraftScope => ({
+      kind: "alert_destination",
+      org: "default",
+      entityId,
+      userEmail: "example@gmail.com",
+    });
+
+    beforeEach(() => {
+      localStorage.clear();
+      writeEditorDraft(scope(null), { data: {} });
+      writeEditorDraft(scope("destination-2"), { data: {} });
+    });
+
+    afterEach(() => localStorage.clear());
+
+    it("marks the Add button and the drafted row only", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const add = wrapper.get('[data-test="alert-destination-list-add-alert-btn"]');
+      expect(add.find('[data-test="alert-destination-list-add-draft-dot"]').exists()).toBe(true);
+      expect(add.attributes("aria-label")).toContain("unsaved draft");
+      expect(
+        wrapper.find('[data-test="alert-destination-list-destination-2-draft-dot"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="alert-destination-list-destination-1-draft-dot"]').exists(),
+      ).toBe(false);
+    });
+
+    const deleteFromRow = async (name: string) => {
+      await wrapper!
+        .get(`[data-test="alert-destination-list-${name}-delete-destination"]`)
+        .trigger("click");
+      await flushPromises();
+      clickIn("confirm-dialog", "o-dialog-primary-btn");
+      await flushPromises();
+    };
+
+    it("drops a deleted destination's draft and keeps it when the delete fails", async () => {
+      wrapper = mountComponent({ realConfirm: true });
+      await flushPromises();
+
+      vi.mocked(destinationService.delete).mockRejectedValueOnce({ response: { status: 500 } });
+      await deleteFromRow("destination-2");
+      expect(destinationService.delete).toHaveBeenCalledTimes(1);
+      expect(readEditorDraft(scope("destination-2"))).not.toBeNull();
+
+      await deleteFromRow("destination-2");
+      expect(destinationService.delete).toHaveBeenCalledTimes(2);
+      expect(readEditorDraft(scope("destination-2"))).toBeNull();
+      expect(readEditorDraft(scope(null))).not.toBeNull();
+    });
+
+    it("drops drafts of bulk-deleted names the refetch no longer lists, on an unrecognised response", async () => {
+      writeEditorDraft(scope("destination-1"), { data: {} });
+      wrapper = mountComponent();
+      await flushPromises();
+      const vm = wrapper.vm as unknown as BulkDeleteVm;
+      vm.handleSelectedIdsUpdate(["destination-1", "destination-2"]);
+
+      vi.mocked(destinationService.bulkDelete).mockResolvedValueOnce({ data: {} } as never);
+      vi.mocked(destinationService.list).mockResolvedValue({
+        data: [makeDestination(1), makeDestination(3)],
+      } as never);
+      await vm.bulkDeleteDestinations();
+      await flushPromises();
+
+      expect(readEditorDraft(scope("destination-2"))).toBeNull();
+      expect(readEditorDraft(scope("destination-1"))).not.toBeNull();
+      expect(readEditorDraft(scope(null))).not.toBeNull();
+    });
+
+    it("keeps every bulk-delete draft when the fallback refetch fails", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const vm = wrapper.vm as unknown as BulkDeleteVm;
+      vm.handleSelectedIdsUpdate(["destination-2"]);
+
+      vi.mocked(destinationService.bulkDelete).mockResolvedValueOnce({ data: {} } as never);
+      vi.mocked(destinationService.list).mockRejectedValue({ response: { status: 500 } });
+      await vm.bulkDeleteDestinations();
+      await flushPromises();
+
+      expect(readEditorDraft(scope("destination-2"))).not.toBeNull();
     });
   });
 
@@ -427,6 +603,13 @@ describe("AlertsDestinationList", () => {
 
       (wrapper.vm as any).openBulkDeleteDialog();
       expect((wrapper.vm as any).confirmBulkDelete).toBe(true);
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find(
+          (c: any) =>
+            c.props("title") === i18n.global.t("alert_destinations.deleteDestinationsTitle"),
+        );
+      expect(dialog!.props("okVariant")).toBe("destructive");
     });
   });
 
@@ -461,6 +644,497 @@ describe("AlertsDestinationList", () => {
       wrapper = mountComponent();
       await flushPromises();
       expect(wrapper.find('[data-test="destination-import"]').exists()).toBe(true);
+    });
+  });
+
+  // Email destinations store recipients in emails[]; URL shows them and Method stays blank.
+  describe("email destination URL and method cells", () => {
+    const emailDest = makeDestination(4, {
+      name: "email-ops",
+      type: "email",
+      url: "",
+      method: "post",
+      emails: ["alerts@example.com", "oncall@example.com"],
+    });
+    const lowerPutDest = makeDestination(5, { name: "lower-put", method: "put" });
+
+    beforeEach(async () => {
+      (destinationService.list as any).mockResolvedValue({
+        data: [makeDestination(1), emailDest, lowerPutDest],
+      });
+      wrapper = mountComponent();
+      await flushPromises();
+    });
+
+    it("renders email recipients in the URL cell instead of an empty URL", () => {
+      const urlCell = wrapper!.find('[data-test="destination-url-email-ops"]');
+      expect(urlCell.exists()).toBe(true);
+      expect(urlCell.text()).toBe("alerts@example.com, oncall@example.com");
+    });
+
+    it("does not render a meaningless post method for email destinations", () => {
+      const methodCell = wrapper!.find('[data-test="destination-method-email-ops"]');
+      expect(methodCell.exists()).toBe(true);
+      expect(methodCell.text().toLowerCase()).not.toBe("post");
+      expect(methodCell.text().trim()).toBe("");
+    });
+
+    it("still renders URL and method for HTTP destinations", () => {
+      expect(wrapper!.find('[data-test="destination-url-destination-1"]').text()).toBe(
+        "https://example.com/hook-1",
+      );
+      expect(wrapper!.find('[data-test="destination-method-destination-1"]').text()).toBe("POST");
+    });
+
+    it("shows a lowercase stored method in uppercase", () => {
+      expect(wrapper!.find('[data-test="destination-method-lower-put"]').text()).toBe("PUT");
+    });
+
+    it("labels the column URL / Recipients, not URL", () => {
+      const table = wrapper!.findComponent({ name: "OTable" });
+      const urlCol = table.props("columns").find((c: any) => c.id === "url");
+      expect(urlCol?.header).toBe("URL / Recipients");
+    });
+  });
+
+  // ── pagination restoration ──────────────────────────────────────────────────
+  // OTable is stubbed in this harness (see OTableStub above), so the actual
+  // TanStack pageIndex restoration (setTimeout(0) + OTable restorePage) cannot
+  // be exercised end-to-end here. These tests cover what IS reachable: seeding
+  // currentPage from the URL, and that navigating to/from the add/edit/import
+  // views preserves the `page` query param instead of stripping it.
+
+  describe("pagination restoration", () => {
+    it("seeds currentPage from the URL's page query param", async () => {
+      (router as any).currentRoute.value.query = { page: "3" };
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect((wrapper.vm as any).currentPage).toBe(3);
+    });
+
+    it("defaults currentPage to 1 when no page query param is present", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect((wrapper.vm as any).currentPage).toBe(1);
+    });
+
+    it("onPageChange updates currentPage and replaces the URL, preserving other query params", async () => {
+      (router as any).currentRoute.value.query = { org_identifier: "test-org" };
+      wrapper = mountComponent();
+      await flushPromises();
+      const replaceSpy = vi.spyOn(router, "replace");
+
+      (wrapper.vm as any).onPageChange(3);
+
+      expect((wrapper.vm as any).currentPage).toBe(3);
+      expect(replaceSpy).toHaveBeenCalledWith({
+        query: { org_identifier: "test-org", page: "3" },
+      });
+    });
+
+    it("onPageChange is a no-op on the URL when the page hasn't actually changed", async () => {
+      (router as any).currentRoute.value.query = { page: "1" };
+      wrapper = mountComponent();
+      await flushPromises();
+      const replaceSpy = vi.spyOn(router, "replace");
+
+      (wrapper.vm as any).onPageChange(1);
+
+      expect(replaceSpy).not.toHaveBeenCalled();
+    });
+
+    it("waits for the Review destination to load before opening its editor", async () => {
+      queryClient.clear();
+      let resolveList!: (value: { data: unknown[] }) => void;
+      vi.mocked(destinationService.list).mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveList = resolve;
+          }),
+      );
+      const destination = makeDestination(1);
+      router.currentRoute.value = {
+        ...router.currentRoute.value,
+        query: {
+          action: "update",
+          name: destination.name,
+          slack_app_installation: "inst-test",
+          slack_app_refusal: "shared_channel_unconfirmed",
+        },
+      };
+      wrapper = mountComponent();
+      await flushPromises();
+      expect(wrapper!.vm.showDestinationEditor).toBe(false);
+      resolveList({ data: [destination] });
+      await flushPromises();
+      expect(wrapper!.vm.showDestinationEditor).toBe(true);
+      expect(wrapper!.vm.editingDestination.name).toBe(destination.name);
+    });
+
+    it("opens the destination editor when Review changes the current list route", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const name = wrapper!.vm.destinations[0].name;
+      router.currentRoute.value = {
+        ...router.currentRoute.value,
+        query: {
+          action: "update",
+          name,
+          slack_app_installation: "inst-test",
+          slack_app_refusal: "shared_channel_unconfirmed",
+        },
+      };
+      await flushPromises();
+      expect(wrapper!.vm.showDestinationEditor).toBe(true);
+      expect(wrapper!.vm.editingDestination.name).toBe(name);
+      const nextName = wrapper!.vm.destinations[1].name;
+      router.currentRoute.value = {
+        ...router.currentRoute.value,
+        query: {
+          action: "update",
+          name: nextName,
+          slack_app_installation: "inst-test",
+          slack_app_refusal: "oncall_room_unconfirmed",
+        },
+      };
+      await flushPromises();
+      expect(wrapper!.vm.showDestinationEditor).toBe(true);
+      expect(wrapper!.vm.editingDestination.name).toBe(nextName);
+    });
+
+    it("editDestination(null) preserves the page query param when opening the add form", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      (router as any).currentRoute.value.query = { page: "3", org_identifier: "test-org" };
+      const pushSpy = vi.spyOn(router, "push");
+
+      (wrapper.vm as any).editDestination(null);
+
+      const pushedQuery = pushSpy.mock.calls[0][0].query;
+      expect(pushedQuery.page).toBe("3");
+      expect(pushedQuery.action).toBe("add");
+    });
+
+    it("editDestination(row) preserves the page query param when opening the edit form", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      (router as any).currentRoute.value.query = { page: "3", org_identifier: "test-org" };
+      const pushSpy = vi.spyOn(router, "push");
+      const dest = (wrapper.vm as any).destinations[0];
+
+      (wrapper.vm as any).editDestination(dest);
+
+      const pushedQuery = pushSpy.mock.calls[0][0].query;
+      expect(pushedQuery.page).toBe("3");
+      expect(pushedQuery.action).toBe("update");
+      expect(pushedQuery.name).toBe(dest.name);
+    });
+
+    it("toggleDestinationEditor drops action/name but keeps page when closing the editor", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      (wrapper.vm as any).showDestinationEditor = true;
+      (router as any).currentRoute.value.query = {
+        action: "update",
+        name: "destination-1",
+        page: "3",
+        org_identifier: "test-org",
+      };
+      const pushSpy = vi.spyOn(router, "push");
+
+      (wrapper.vm as any).toggleDestinationEditor();
+
+      const pushedQuery = pushSpy.mock.calls[0][0].query;
+      expect(pushedQuery.page).toBe("3");
+      expect(pushedQuery.action).toBeUndefined();
+      expect(pushedQuery.name).toBeUndefined();
+    });
+
+    it("drops every Review param on cancel, so a later Edit opens the normal form", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const dest = wrapper!.vm.destinations[0];
+      const review = {
+        action: "update",
+        name: dest.name,
+        page: "3",
+        org_identifier: "test-org",
+        slack_app_installation: "inst-test",
+        slack_app_refusal: "oncall_room_unconfirmed",
+        slack_app_team: "Test team",
+        slack_app_room: "oncall-test",
+      };
+      const reviewKeys = (query: Record<string, unknown>) =>
+        Object.keys(query).filter((key) => key.startsWith("slack_app_"));
+      wrapper!.vm.showDestinationEditor = true;
+      router.currentRoute.value = { ...router.currentRoute.value, query: { ...review } };
+      const pushSpy = vi.spyOn(router, "push");
+
+      wrapper!.vm.toggleDestinationEditor();
+      const closed = pushSpy.mock.calls[0][0].query;
+      expect(reviewKeys(closed)).toEqual([]);
+      expect(closed.page).toBe("3");
+
+      router.currentRoute.value = { ...router.currentRoute.value, query: { ...review } };
+      wrapper!.vm.editDestination(dest);
+      const edited = pushSpy.mock.calls[1][0].query;
+      expect(edited.action).toBe("update");
+      expect(edited.name).toBe(dest.name);
+      expect(reviewKeys(edited)).toEqual([]);
+    });
+
+    it("drops the Review params once its save closes the editor, so a later Edit opens the normal form", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const [reviewed, other] = wrapper!.vm.destinations;
+      router.currentRoute.value = {
+        ...router.currentRoute.value,
+        query: {
+          action: "update",
+          name: reviewed.name,
+          slack_app_installation: "inst-test",
+          slack_app_refusal: "shared_channel_unconfirmed",
+        },
+      };
+      await flushPromises();
+      expect(wrapper!.vm.showDestinationEditor).toBe(true);
+      const pushSpy = vi.spyOn(router, "push");
+      const editor = wrapper!.findComponent('[data-test="add-destination-stub"]');
+      editor.vm.$emit("get:destinations");
+      editor.vm.$emit("cancel:hideform");
+      expect(wrapper!.vm.showDestinationEditor).toBe(false);
+      const closed = pushSpy.mock.calls.at(-1)![0].query;
+      expect(Object.keys(closed).filter((key) => key.startsWith("slack_app_"))).toEqual([]);
+      router.currentRoute.value = { ...router.currentRoute.value, query: closed };
+      await flushPromises();
+      expect(wrapper!.vm.showDestinationEditor).toBe(false);
+
+      wrapper!.vm.editDestination(other);
+      await flushPromises();
+      const edited = pushSpy.mock.calls.at(-1)![0].query;
+      expect(edited).toMatchObject({ action: "update", name: other.name });
+      expect(Object.keys(edited).filter((key) => key.startsWith("slack_app_"))).toEqual([]);
+      expect(wrapper!.vm.editingDestination.name).toBe(other.name);
+    });
+
+    it("keeps the Review params while the route itself opens the switch form", async () => {
+      queryClient.clear();
+      let resolveList!: (value: { data: unknown[] }) => void;
+      vi.mocked(destinationService.list).mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveList = resolve;
+          }),
+      );
+      const destination = makeDestination(1);
+      router.currentRoute.value = {
+        ...router.currentRoute.value,
+        query: {
+          action: "update",
+          name: destination.name,
+          slack_app_installation: "inst-test",
+          slack_app_refusal: "shared_channel_unconfirmed",
+        },
+      };
+      const pushSpy = vi.spyOn(router, "push");
+      wrapper = mountComponent();
+      await flushPromises();
+      resolveList({ data: [destination] });
+      await flushPromises();
+      expect(wrapper!.vm.showDestinationEditor).toBe(true);
+      const opened = pushSpy.mock.calls.at(-1)![0].query;
+      expect(opened.slack_app_installation).toBe("inst-test");
+      expect(opened.slack_app_refusal).toBe("shared_channel_unconfirmed");
+    });
+
+    it("importDestination preserves the page query param", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      (router as any).currentRoute.value.query = { page: "3", org_identifier: "test-org" };
+      const pushSpy = vi.spyOn(router, "push");
+
+      (wrapper.vm as any).importDestination();
+
+      const pushedQuery = pushSpy.mock.calls[0][0].query;
+      expect(pushedQuery.page).toBe("3");
+      expect(pushedQuery.action).toBe("import");
+    });
+  });
+
+  describe("view state restore", () => {
+    it("restores search, tab, page size and sort", () => {
+      useListViewState("alertDestinations", {
+        filterQuery: "slack",
+        tab: "custom",
+        pageSize: 50,
+        sortBy: "name",
+        sortOrder: "desc",
+      });
+      wrapper = mountComponent();
+      const vm = wrapper.vm as any;
+      expect(vm.filterQuery).toBe("slack");
+      expect(vm.activeTab).toBe("custom");
+      expect(vm.pageSize).toBe(50);
+      expect(vm.sortBy).toBe("name");
+      expect(vm.sortOrder).toBe("desc");
+    });
+
+    it("saves changes to the view state", async () => {
+      wrapper = mountComponent();
+      const vm = wrapper.vm as any;
+      vm.filterQuery = "abc";
+      vm.activeTab = "prebuilt";
+      vm.pageSize = 100;
+      await vm.$nextTick();
+      const saved: any = useListViewState("alertDestinations", {});
+      expect(saved.filterQuery).toBe("abc");
+      expect(saved.tab).toBe("prebuilt");
+      expect(saved.pageSize).toBe(100);
+    });
+  });
+  describe("templates load denied", () => {
+    it("falls back to no templates without an unhandled rejection on a 403", async () => {
+      const { queryClient } = await import("@/composables/query/queryClient");
+      queryClient.clear();
+      (templateService.list as any).mockRejectedValue({ response: { status: 403 } });
+      (destinationService.list as any).mockResolvedValue({ data: [] });
+      const unhandled = vi.fn();
+      process.on("unhandledRejection", unhandled);
+
+      const w: any = mountComponent();
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      process.off("unhandledRejection", unhandled);
+      expect(unhandled.mock.calls.map(([reason]) => reason)).not.toContainEqual({
+        response: { status: 403 },
+      });
+      expect(w.vm.templates).toEqual([]);
+      w.unmount();
+    });
+  });
+
+  // ── Slack app rows (MK-6a, without Last send) ──────────────────────────────
+
+  describe("Slack app and Slack webhook rows", () => {
+    const HOOK = "https://hooks.slack.com/services/T0SAMPLE01/B000/xyz";
+    const appRow = (over: any = {}) => ({
+      name: "sre-prod-slack",
+      type: "slack_app",
+      template: "prebuilt_slack",
+      installation_id: "inst-1",
+      channel_id: "C9",
+      channel_name: "sre-prod",
+      buttons: true,
+      mention: "default",
+      refire_reuse_minutes: 30,
+      auto_investigate: "off",
+      shared_channel_confirmed: false,
+      oncall_room_confirmed: false,
+      ...over,
+    });
+    const hookRow = (name: string, team = "T0SAMPLE01") => ({
+      name,
+      type: "http",
+      url: HOOK,
+      method: "post",
+      template: "prebuilt_slack",
+      metadata: {
+        prebuilt_type: "slack",
+        slack_team_id: team,
+        slack_channel_id: "C1",
+        credential_channel: "#payments",
+      },
+    });
+    const previous = { url: HOOK, method: "post", skip_tls_verify: false, metadata: {} };
+    const zo = (store.state as any).zoConfig;
+    let slackWas: unknown;
+
+    beforeEach(async () => {
+      queryClient.clear();
+      slackWas = zo.slack_enabled;
+      zo.slack_enabled = true;
+      vi.mocked(slack.listInstallations).mockResolvedValue({
+        data: { installations: [installationView()] },
+      } as any);
+      (destinationService.update as any).mockResolvedValue({});
+      (destinationService.list as any).mockResolvedValue({
+        data: [
+          appRow(),
+          appRow({ name: "switched-slack", previous_webhook: previous }),
+          hookRow("payments-slack"),
+          hookRow("other-team-slack", "T0OTHER"),
+          hookRow("oncall-room-slack"),
+        ],
+      });
+      wrapper = mountComponent();
+      await flushPromises();
+      await flushPromises();
+    });
+
+    afterEach(() => {
+      zo.slack_enabled = slackWas;
+    });
+
+    const text = (test: string) => wrapper!.find(`[data-test="${test}"]`);
+
+    it("lists Slack app rows, tagged Slack app and Two-way, with #channel · workspace", () => {
+      expect((wrapper!.vm as any).visibleRows.map((r: any) => r.name)).toContain("sre-prod-slack");
+      expect(text("destination-type-badge-slack-app-sre-prod-slack").text()).toContain("Slack app");
+      expect(text("destination-type-two-way-sre-prod-slack").text()).toContain("Two-way");
+      expect(text("destination-url-sre-prod-slack").text()).toBe("#sre-prod · Acme Corp");
+      expect(text("destination-method-sre-prod-slack").text().trim()).toBe("");
+    });
+
+    it("has no Last send column", () => {
+      const table = wrapper!.findComponent({ name: "OTable" });
+      const ids = table.props("columns").map((c: any) => c.id);
+      expect(ids).not.toContain("last_send");
+      expect(wrapper!.text()).not.toContain("Last send");
+      const urlCol = table.props("columns").find((c: any) => c.id === "url");
+      expect(urlCol?.header).toBe("URL / recipients / channel");
+    });
+
+    it("labels webhook rows Slack webhook and offers the switch only for a connected team", () => {
+      expect(text("destination-type-badge-slack-webhook-payments-slack").text()).toContain(
+        "Slack webhook",
+      );
+      expect(text("destination-switch-to-app-payments-slack").exists()).toBe(true);
+      expect(text("destination-switch-to-app-other-team-slack").exists()).toBe(false);
+      expect(text("destination-switch-to-app-sre-prod-slack").exists()).toBe(false);
+      expect(text("destination-switch-to-app-oncall-room-slack").exists()).toBe(false);
+    });
+
+    it("switches a webhook row in place, keeping its name and webhook", async () => {
+      await text("destination-switch-to-app-payments-slack").trigger("click");
+      await flushPromises();
+      expect(destinationService.update).toHaveBeenCalledTimes(1);
+      const call = (destinationService.update as any).mock.calls[0][0];
+      expect(call).toMatchObject({
+        org_identifier: "default",
+        destination_name: "payments-slack",
+        data: {
+          name: "payments-slack",
+          type: "slack_app",
+          installation_id: "inst-1",
+          channel_id: "C1",
+          channel_name: "payments",
+          previous_webhook: { url: HOOK },
+        },
+      });
+    });
+
+    it("switches back only a row that kept its webhook", async () => {
+      expect(text("destination-switch-back-sre-prod-slack").exists()).toBe(false);
+      await text("destination-switch-back-switched-slack").trigger("click");
+      await flushPromises();
+      const call = (destinationService.update as any).mock.calls[0][0];
+      expect(call).toMatchObject({
+        destination_name: "switched-slack",
+        data: { name: "switched-slack", type: "http", url: HOOK },
+      });
     });
   });
 });

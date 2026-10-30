@@ -66,7 +66,8 @@ onMounted(async () => {
 
 <template>
   <CreateBrowserTestSkeleton v-if="resolvedType === null" :rows="10" />
-  <CreateBrowserTest v-else-if="resolvedType === 'browser'" :edit-id="editId" />
+  <!-- Keyed on the id: parent and child share this route record, so a param-only push would reuse the instance. -->
+  <CreateBrowserTest v-else-if="resolvedType === 'browser'" :key="editId" :edit-id="editId" />
   <CreateProtocolCheck
     v-else
     :key="resolvedType"

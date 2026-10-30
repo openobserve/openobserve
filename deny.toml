@@ -50,6 +50,7 @@ exceptions = [
     { name = "usage_reporting", allow = ["AGPL-3.0"] },
     { name = "vortex", allow = ["AGPL-3.0"] },
     { name = "vortex-datafusion", allow = ["AGPL-3.0"] },
+    { name = "metrics_index", allow = ["AGPL-3.0"] },
     { name = "config", allow = ["AGPL-3.0"] },
     { name = "infra", allow = ["AGPL-3.0"] },
     { name = "ingester", allow = ["AGPL-3.0"] },

@@ -15,34 +15,20 @@
 
 // Shared pieces for the host-agent cards (Linux, Windows). Both install the same
 // OpenObserve agent from the openobserve/agents repo and differ only by shell,
-// script path and what the agent collects — so the environment choice
-// (generic host vs AWS EC2), the EC2 IAM prerequisite and the detection config
-// live here rather than being duplicated in both cards.
+// script path and what the agent collects — so the install code block, the
+// detection config and the troubleshooting rows live here rather than being
+// duplicated in both cards.
 
-import { getImageURL } from "@/utils/zincutils";
-import type { CardSubstitutions, RichCardDetect, RichCardExtras } from "../types";
+import { type I18nKey, type TranslateFn } from "@/types/i18n";
+
+import type { CardSubstitutions, RichCardDetect, RichCardExtras, RichCardStep } from "../types";
 import { applySubs, applySubsMasked } from "../subs";
+
+/** Slugs whose detection triggers the Host Metrics dashboard auto-import. */
+export const HOST_AGENT_SLUGS = new Set(["linux", "windows", "macos"]);
 
 /** Base of the agent install scripts, e.g. `${AGENTS_REPO}/linux/install.sh`. */
 export const AGENTS_REPO = "https://raw.githubusercontent.com/openobserve/agents/main";
-
-/** Environment the agent is installed onto — drives the script path. */
-export type AgentEnv = "generic" | "ec2";
-
-/**
- * The EC2 variants read the instance's Name tag and use it as the host
- * identifier, which needs an instance role — without it the agent installs but
- * every host shows up under its opaque instance id instead.
- */
-export const EC2_IAM_NOTE =
-  "Requires an IAM role on the instance with ec2:DescribeTags and ec2:DescribeInstances, so the agent can read the Name tag and use it as the host identifier.";
-
-/** Icon shown on the generic/EC2 toggle. */
-export const envIcons = () => ({
-  ec2: getImageURL("images/ingestion/aws.svg"),
-  linux: getImageURL("images/common/linux.svg"),
-  windows: getImageURL("images/common/windows.svg"),
-});
 
 /** Build a code block whose `[BASIC_PASSCODE]`-equivalent token is masked. */
 export function agentCode(template: string, subs: CardSubstitutions, lang: string) {
@@ -53,23 +39,31 @@ export function agentCode(template: string, subs: CardSubstitutions, lang: strin
   };
 }
 
-/**
- * Host metrics land as one stream per metric (`system_cpu_time`, …), so — like
- * the database cards — detection is keyword/existence based rather than a COUNT
- * over one stream.
- *
- * TODO(detect): confirm the agent's emitted metric prefix on the ingest side;
- * this assumes the OTel hostmetrics receiver's `system.*` naming.
- */
+// OTLP ingest names streams format_stream_name(metric.name), so hostmetrics' system.* metrics land as system_* streams (otlp.rs:193, schema.rs:283-284)
 export const hostMetricsDetect: RichCardDetect = {
   streamType: "metrics",
   match: "keyword",
-  streamName: "system",
+  streamName: "system_",
   filter: "",
 };
 
-// The agents repo ships a single uninstall script per OS — there is no EC2-specific
-// one — so an EC2 install is removed by the same command as a generic one.
+/** Step 3 of the host-agent cards: ticks on detect, its button opens the auto-imported dashboard. */
+export function dashboardReadyStep(t: TranslateFn): RichCardStep {
+  return {
+    id: "dashboard",
+    titleKey: "ingestion.setupCard.dashboardReadyTitle",
+    descriptionKey: "ingestion.setupCard.dashboardReadyDesc",
+    chip: { kind: "run", labelKey: "ingestion.setupCard.chipDashboard" },
+    completeOn: "detect",
+    action: {
+      id: "view-host-dashboard",
+      label: t("ingestion.setupCard.viewHostDashboard"),
+      icon: "dashboard",
+      showOnDetect: true,
+    },
+  };
+}
+
 const unixUninstall = (dir: "linux" | "mac") =>
   `curl -O ${AGENTS_REPO}/${dir}/uninstall.sh \\
   && chmod +x uninstall.sh \\
@@ -79,12 +73,10 @@ const winUninstall = `Invoke-WebRequest -Uri ${AGENTS_REPO}/windows/uninstall.ps
 .\\uninstall.ps1`;
 
 /** What each OS's uninstall script actually removes, so the copy matches reality. */
-const UNINSTALL_DESC: Record<AgentOs, string> = {
-  linux:
-    "Run with `sudo`. Stops and disables the systemd service, then removes the unit file, the binary, the config and the `openobserve-agent` user.",
-  mac: "Run with `sudo`. Stops both launchd daemons — the agent and the unified log bridge — then removes their plists, the binary, the config and the agent's logs.",
-  windows:
-    "Run in **PowerShell as Administrator**. Stops the agent service and deletes its install directory.",
+const UNINSTALL_DESC_KEY: Record<AgentOs, I18nKey> = {
+  linux: "ingestion.setupCard.uninstallAgentDescLinux",
+  mac: "ingestion.setupCard.uninstallAgentDescMac",
+  windows: "ingestion.setupCard.uninstallAgentDescWindows",
 };
 
 /** Host OS an agent card targets — picks the uninstall script and shell. */
@@ -98,8 +90,8 @@ export type AgentOs = "linux" | "mac" | "windows";
  */
 export function agentUninstall(os: AgentOs): NonNullable<RichCardExtras["uninstall"]> {
   return {
-    label: "Uninstall the Agent",
-    description: UNINSTALL_DESC[os],
+    labelKey: "ingestion.setupCard.uninstallAgentLabel",
+    descriptionKey: UNINSTALL_DESC_KEY[os],
     code: {
       lang: os === "windows" ? "powershell" : "bash",
       raw: os === "windows" ? winUninstall : unixUninstall(os),
@@ -110,29 +102,32 @@ export function agentUninstall(os: AgentOs): NonNullable<RichCardExtras["uninsta
 /**
  * Troubleshooting rows common to the host agents.
  *
- * `includeEc2` drops the instance-id row for agents that ship no EC2 variant
+ * `includeEc2` drops the instance-id row for agents with no EC2 support
  * (macOS), where an EC2-only symptom would just be noise.
  */
 export function sharedAgentTroubleshooting(
+  t: TranslateFn,
   serviceHint: string,
   { includeEc2 = true }: { includeEc2?: boolean } = {},
 ): NonNullable<RichCardExtras["troubleshooting"]> {
   return [
     {
-      q: "The install script runs but no data arrives",
-      a: `Check the agent is running with ${serviceHint}. A 401 in its logs means the ingestion token is stale — re-copy the command from this page, which always carries this organization's current token.`,
+      q: t("ingestion.setupCard.agentTroubleNoDataQ"),
+      a: t("ingestion.setupCard.agentTroubleNoDataA", { hint: serviceHint }),
     },
     ...(includeEc2
       ? [
           {
-            q: "Hosts show up under an instance id instead of a name",
-            a: `That is the EC2 variant without its IAM role. ${EC2_IAM_NOTE} Attach the role, then restart the agent.`,
+            q: t("ingestion.setupCard.agentTroubleInstanceIdQ"),
+            a: t("ingestion.setupCard.agentTroubleInstanceIdA", {
+              iamNote: t("ingestion.setupCard.ec2IamNote"),
+            }),
           },
         ]
       : []),
     {
-      q: "The endpoint is unreachable from the host",
-      a: "The agent needs outbound access to this OpenObserve endpoint. Confirm with `curl -v` from the host itself — a proxy or egress firewall is the usual cause.",
+      q: t("ingestion.setupCard.agentTroubleUnreachableQ"),
+      a: t("ingestion.setupCard.agentTroubleUnreachableA"),
     },
   ];
 }

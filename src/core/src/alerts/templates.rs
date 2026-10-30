@@ -20,8 +20,10 @@
 // callers in this module keep working without a long path.
 use config::{
     DEFAULT_ORG,
-    meta::destinations::{Template, TemplateType},
-    prebuilt_loader::is_prebuilt_template_name,
+    meta::{
+        alerts::content_spec::ContentSpec,
+        destinations::{Template, TemplateKind, TemplateType},
+    },
 };
 use db::{
     self,
@@ -29,11 +31,57 @@ use db::{
     authz::{remove_ownership, set_ownership},
 };
 
-use crate::{auth::is_ofga_unsupported, common::meta::authz::Authz};
+use crate::{
+    alerts::notifications::default_template::{
+        DEFAULT_CONTENT_TEMPLATE_NAME, is_reserved_template_name,
+    },
+    auth::is_ofga_unsupported,
+    common::meta::authz::Authz,
+};
+
+pub const DOWNTIME_TEMPLATE: &str = "prebuilt_downtime";
+pub const DOWNTIME_EMAIL_TEMPLATE: &str = "prebuilt_downtime_email";
+pub const DOWNTIME_EMAIL_TITLE: &str = "OpenObserve downtime {downtime_name}: {downtime_event}";
+
+const DOWNTIME_HTTP_BODY: &str = r#"{"text": "Downtime {downtime_name}: {downtime_event}. {downtime_starts_at} to {downtime_ends_at}, muting {downtime_counts}. {downtime_url}", "downtime": {"name": "{downtime_name}", "event": "{downtime_event}", "reason": "{downtime_reason}", "starts_at": "{downtime_starts_at}", "ends_at": "{downtime_ends_at}", "targets": "{downtime_targets}", "counts": "{downtime_counts}", "url": "{downtime_url}", "org": "{org_name}"}}"#;
+const DOWNTIME_EMAIL_BODY: &str = r#"<h3>Downtime {downtime_name}: {downtime_event}</h3><p>Window: {downtime_starts_at} to {downtime_ends_at}</p><p>Covers {downtime_targets}, muting {downtime_counts}.</p><p>Reason: {downtime_reason}</p><p>Organization: {org_name}</p><p><a href="{downtime_url}">Open downtimes in OpenObserve</a></p>"#;
+
+/// Sticky-kind rule (design §6.2): create defaults absent→Custom; update
+/// preserves the existing kind when the client didn't specify one.
+pub(crate) fn resolve_kind(
+    requested: Option<TemplateKind>,
+    existing: Option<TemplateKind>,
+    create: bool,
+) -> TemplateKind {
+    match requested {
+        Some(k) => k,
+        None if create => TemplateKind::Custom,
+        None => existing.unwrap_or(TemplateKind::Custom),
+    }
+}
+
+// Only root may reach a shared `default` template through another org's path.
+pub(crate) fn write_org(
+    path_org: &str,
+    existing_org: &str,
+    is_root: bool,
+) -> Result<String, TemplateError> {
+    if existing_org == path_org || is_root {
+        Ok(existing_org.to_string())
+    } else {
+        Err(TemplateError::NotFound)
+    }
+}
+
+/// The org a saved template's ownership tuple names, which org deletion looks up.
+pub(crate) fn ownership_of(saved: &Template) -> (&str, Authz) {
+    (&saved.org_id, Authz::new(&saved.name))
+}
 
 pub async fn save(
     name: &str,
     mut template: Template,
+    requested_kind: Option<TemplateKind>,
     create: bool,
     is_root: bool,
 ) -> Result<Template, TemplateError> {
@@ -51,13 +99,8 @@ pub async fn save(
     if template.name.contains('/') || is_ofga_unsupported(&template.name) {
         return Err(TemplateError::InvalidName);
     }
-    if let TemplateType::Email { title } = &template.template_type
-        && title.is_empty()
-    {
-        return Err(TemplateError::EmptyTitle);
-    }
 
-    if is_prebuilt_template_name(&template.name) {
+    if is_reserved_template_name(&template.name) {
         if create {
             // Nobody may create a new template with a reserved name — it would
             // shadow or conflict with the system-managed record.
@@ -70,25 +113,45 @@ pub async fn save(
         }
     }
 
-    match db::alerts::templates::get(&template.org_id, &template.name).await {
+    let existing = match db::alerts::templates::get(&template.org_id, &template.name).await {
         Ok(existing) => {
             if create {
                 return Err(TemplateError::AlreadyExists);
-            } else {
-                template.org_id = existing.org_id; // since org can be default
             }
+            template.org_id = write_org(&template.org_id, &existing.org_id, is_root)?;
+            Some(existing)
         }
         Err(_) => {
             if !create {
                 return Err(TemplateError::NotFound);
             }
+            None
         }
+    };
+
+    let existing_kind = existing.as_ref().map(|e| e.kind);
+    template.kind = resolve_kind(requested_kind, existing_kind, create);
+
+    if template.kind == TemplateKind::Content {
+        let spec = ContentSpec::parse(&template.body)
+            .map_err(|e| TemplateError::InvalidContentSpec(e.to_string()))?;
+        // Reject an unsupported link scheme HERE rather than neutralizing it
+        // on every send: the author gets a fixable error instead of a
+        // template whose link silently never works (#13742).
+        spec.validate().map_err(TemplateError::InvalidContentSpec)?;
+    } else if let TemplateType::Email { title } = &template.template_type
+        && title.is_empty()
+    {
+        // Content templates have no email-title concept — the renderer owns
+        // the subject — so this validation only applies to custom templates.
+        return Err(TemplateError::EmptyTitle);
     }
 
     template.is_default = template.org_id.eq(DEFAULT_ORG);
     let saved = db::alerts::templates::set(template).await?;
     if name.is_empty() {
-        set_ownership(&saved.name, "templates", Authz::new(&saved.name)).await;
+        let (owner, object) = ownership_of(&saved);
+        set_ownership(owner, "templates", object).await;
     }
     Ok(saved)
 }
@@ -119,25 +182,84 @@ pub async fn list(
 }
 
 pub async fn delete(org_id: &str, name: &str, is_root: bool) -> Result<(), TemplateError> {
-    if !is_root && is_prebuilt_template_name(name) {
+    if !is_root && is_reserved_template_name(name) {
         return Err(TemplateError::PrebuiltReadOnly(name.to_string()));
     }
-    db::alerts::templates::delete(org_id, name).await?;
-    remove_ownership(org_id, "templates", Authz::new(name)).await;
+    let existing = db::alerts::templates::get(org_id, name).await?;
+    let owner = write_org(org_id, &existing.org_id, is_root)?;
+    let owners = owners_to_disown(&owner, name).await?;
+    db::alerts::templates::delete(&owner, name).await?;
+    for owner in owners {
+        remove_ownership(&owner, "templates", Authz::new(name)).await;
+    }
     Ok(())
+}
+
+pub(crate) const PREBUILT_REVISION_KEY: &str = "prebuilt_templates_revision";
+
+pub fn downtime_templates() -> [Template; 2] {
+    let template = |name: &str, body: &str, template_type| Template {
+        id: None,
+        org_id: DEFAULT_ORG.to_string(),
+        name: name.to_string(),
+        is_default: true,
+        template_type,
+        body: body.to_string(),
+        kind: TemplateKind::Custom,
+    };
+    [
+        template(DOWNTIME_TEMPLATE, DOWNTIME_HTTP_BODY, TemplateType::Http),
+        template(
+            DOWNTIME_EMAIL_TEMPLATE,
+            DOWNTIME_EMAIL_BODY,
+            TemplateType::Email {
+                title: DOWNTIME_EMAIL_TITLE.to_string(),
+            },
+        ),
+    ]
+}
+
+pub fn is_downtime_template_name(name: &str) -> bool {
+    name == DOWNTIME_TEMPLATE || name == DOWNTIME_EMAIL_TEMPLATE
+}
+
+/// Reseed gate (design §6.3): overwrite a stored prebuilt template when the
+/// shipped revision is newer, or when revisions are equal but the stored
+/// body/type drifted — equal-revision drift is the old-binary-revert
+/// signature (an old node's overwrite code reverts body/type but never
+/// touches the revision record). Never downgrade.
+pub(crate) fn should_apply_prebuilt(shipped: u32, applied: u32, drifted: bool) -> bool {
+    shipped > applied || (shipped == applied && drifted)
 }
 
 /// Ensures system prebuilt templates exist in the database.
 /// Creates templates in DEFAULT_ORG if they don't exist.
 /// Uses distributed lock to prevent race conditions in distributed mode.
 pub async fn ensure_system_templates() -> Result<(), anyhow::Error> {
-    use config::prebuilt_loader::get_prebuilt_template;
+    use config::{
+        meta::system_settings::{SettingScope, SystemSetting},
+        prebuilt_loader::get_prebuilt_template,
+    };
+    use db::system_settings;
     use infra::dist_lock;
 
     let lock_key = "/system/templates/init";
 
     // Acquire distributed lock to ensure only one instance initializes templates
     let locker = dist_lock::lock(lock_key, 0).await?;
+
+    let shipped_rev = config::prebuilt_loader::get_prebuilt_revision();
+    let applied_rev: u32 = match system_settings::get(
+        &SettingScope::System,
+        None,
+        None,
+        PREBUILT_REVISION_KEY,
+    )
+    .await
+    {
+        Ok(Some(s)) => s.setting_value.as_u64().unwrap_or(0) as u32,
+        _ => 0,
+    };
 
     let prebuilt_types = vec![
         "slack",
@@ -154,77 +276,118 @@ pub async fn ensure_system_templates() -> Result<(), anyhow::Error> {
     let mut updated_count = 0;
     let mut skipped_count = 0;
 
-    for prebuilt_type in prebuilt_types {
-        if let Some(mut template) = get_prebuilt_template(prebuilt_type) {
-            // Set org_id to DEFAULT_ORG for global visibility
-            template.org_id = DEFAULT_ORG.to_string();
+    let prebuilt = prebuilt_types
+        .into_iter()
+        .filter_map(get_prebuilt_template)
+        .chain(seeded_downtime_templates());
+    for mut template in prebuilt {
+        // Set org_id to DEFAULT_ORG for global visibility
+        template.org_id = DEFAULT_ORG.to_string();
 
-            // Check if template already exists
-            match db::alerts::templates::get(DEFAULT_ORG, &template.name).await {
-                Ok(existing) => {
-                    // System templates are protected from user edits, so the
-                    // prebuilt definition is the source of truth. Refresh the
-                    // stored copy when it has drifted (e.g. a shipped fix to the
-                    // body/title) so existing installs pick up the correction.
-                    if existing.body != template.body
-                        || existing.template_type != template.template_type
-                    {
-                        // Preserve the stored id so this is an update, not an insert.
-                        template.id = existing.id;
-                        match db::alerts::templates::set(template.clone()).await {
-                            Ok(_) => {
-                                updated_count += 1;
-                                log::info!(
-                                    "[TEMPLATES] Updated system template '{}' in {}",
-                                    template.name,
-                                    DEFAULT_ORG
-                                );
-                            }
-                            Err(e) => {
-                                log::error!(
-                                    "[TEMPLATES] Failed to update system template '{}': {}",
-                                    template.name,
-                                    e
-                                );
-                            }
-                        }
-                    } else {
-                        skipped_count += 1;
-                        log::debug!(
-                            "[TEMPLATES] System template '{}' already up to date in {}",
-                            template.name,
-                            DEFAULT_ORG
-                        );
-                    }
-                }
-                Err(TemplateError::NotFound) => {
-                    // Template doesn't exist, create it
+        // Check if template already exists
+        match db::alerts::templates::get(DEFAULT_ORG, &template.name).await {
+            Ok(existing) => {
+                // System templates are protected from user edits, so the
+                // prebuilt definition is the source of truth. Refresh the
+                // stored copy when it has drifted (e.g. a shipped fix to the
+                // body/title) so existing installs pick up the correction —
+                // but only when the reseed gate says to (revision-gated, see
+                // `should_apply_prebuilt`).
+                let drifted = existing.body != template.body
+                    || existing.template_type != template.template_type;
+                if should_apply_prebuilt(shipped_rev, applied_rev, drifted) && drifted {
+                    // Preserve the stored id so this is an update, not an insert.
+                    template.id = existing.id;
                     match db::alerts::templates::set(template.clone()).await {
                         Ok(_) => {
-                            created_count += 1;
+                            updated_count += 1;
                             log::info!(
-                                "[TEMPLATES] Created system template '{}' in {}",
+                                "[TEMPLATES] Updated system template '{}' in {}",
                                 template.name,
                                 DEFAULT_ORG
                             );
                         }
                         Err(e) => {
                             log::error!(
-                                "[TEMPLATES] Failed to create system template '{}': {}",
+                                "[TEMPLATES] Failed to update system template '{}' in {}: {}",
                                 template.name,
+                                DEFAULT_ORG,
                                 e
                             );
                         }
                     }
-                }
-                Err(e) => {
-                    log::error!(
-                        "[TEMPLATES] Error checking system template '{}': {}",
+                } else {
+                    skipped_count += 1;
+                    log::debug!(
+                        "[TEMPLATES] System template '{}' already up to date in {}",
                         template.name,
-                        e
+                        DEFAULT_ORG
                     );
                 }
             }
+            Err(TemplateError::NotFound) => {
+                // Template doesn't exist, create it
+                match db::alerts::templates::set(template.clone()).await {
+                    Ok(_) => {
+                        created_count += 1;
+                        log::info!(
+                            "[TEMPLATES] Created system template '{}' in {}",
+                            template.name,
+                            DEFAULT_ORG
+                        );
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "[TEMPLATES] Failed to create system template '{}' in {}: {}",
+                            template.name,
+                            DEFAULT_ORG,
+                            e
+                        );
+                    }
+                }
+            }
+            Err(e) => {
+                log::error!(
+                    "[TEMPLATES] Error checking system template '{}' in {}: {}",
+                    template.name,
+                    DEFAULT_ORG,
+                    e
+                );
+            }
+        }
+    }
+    // Seed the compiled-in default content template's DB copy — same
+    // dist_lock + revision-gate scope as the prebuilt loop above, so it
+    // converges on the same startup pass rather than racing it.
+    if let Err(e) = super::notifications::default_template::ensure_default_content_template(
+        shipped_rev,
+        applied_rev,
+    )
+    .await
+    {
+        log::error!("[TEMPLATES] Failed to seed '{DEFAULT_CONTENT_TEMPLATE_NAME}': {e}");
+    }
+
+    // Record the newly-applied revision so future startups don't re-overwrite
+    // already-converged templates. Only advance forward, never downgrade.
+    if shipped_rev > applied_rev {
+        let now = chrono::Utc::now().timestamp_micros();
+        let setting = SystemSetting {
+            id: None,
+            scope: SettingScope::System,
+            org_id: None,
+            user_id: None,
+            setting_key: PREBUILT_REVISION_KEY.to_string(),
+            setting_category: Some("alerts".to_string()),
+            setting_value: serde_json::json!(shipped_rev),
+            description: Some("Applied revision of shipped prebuilt alert templates".to_string()),
+            created_at: now,
+            updated_at: now,
+            created_by: None,
+            updated_by: None,
+        };
+        if let Err(e) = system_settings::set(&setting).await {
+            log::error!("[TEMPLATES] Failed to record prebuilt template revision: {e}");
         }
     }
 
@@ -240,4 +403,194 @@ pub async fn ensure_system_templates() -> Result<(), anyhow::Error> {
     );
 
     Ok(())
+}
+
+/// Owners whose template tuple a delete removes; a legacy tuple a live org shares stays.
+async fn owners_to_disown(org_id: &str, name: &str) -> Result<Vec<String>, TemplateError> {
+    let name = name.to_string();
+    let mut owners =
+        db::alerts::templates::tuple_owners(org_id, std::slice::from_ref(&name)).await?;
+    Ok(owners.remove(&name).unwrap_or_default())
+}
+
+fn seeded_downtime_templates() -> Vec<Template> {
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .downtimes
+        .enabled
+    {
+        return downtime_templates().into();
+    }
+    vec![]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The global meta store CI configures through `ZO_META_STORE`, migrated once per binary.
+    async fn meta_store() -> bool {
+        static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return false;
+        }
+        ONCE.get_or_init(|| async {
+            infra::db_init().await.expect("meta store");
+            infra::table::migrate().await.expect("migrations");
+        })
+        .await;
+        true
+    }
+
+    #[tokio::test]
+    async fn test_single_delete_disowns_only_tracked_owners_and_an_unshared_legacy_tuple() {
+        if !meta_store().await {
+            return;
+        }
+        let suffix = config::utils::time::now_micros();
+        let (org, other) = (format!("t_sd_org_{suffix}"), format!("t_sd_other_{suffix}"));
+        let (solo, shared) = (
+            format!("t_sd_solo_{suffix}"),
+            format!("t_sd_shared_{suffix}"),
+        );
+        for (owner, name) in [(&org, &solo), (&org, &shared), (&other, &shared)] {
+            let [mut template, _] = downtime_templates();
+            template.org_id = owner.to_string();
+            template.name = name.to_string();
+            infra::table::templates::put(template).await.unwrap();
+        }
+        infra::table::organizations::add(
+            &other,
+            &other,
+            config::meta::organization::OrganizationType::Custom,
+        )
+        .await
+        .unwrap();
+        let solo_owners = owners_to_disown(&org, &solo).await.unwrap();
+        let shared_owners = owners_to_disown(&org, &shared).await.unwrap();
+        infra::table::templates::delete_by_org(&org).await.unwrap();
+        infra::table::templates::delete_by_org(&other)
+            .await
+            .unwrap();
+        infra::table::organizations::remove(&other).await.unwrap();
+
+        // Without OpenFGA there are no tuples, so the delete looks up no owners.
+        let tracked = |owners: &[&str]| -> Vec<String> {
+            if !db::authz::tracks_ownership() {
+                return vec![];
+            }
+            owners.iter().map(|o| o.to_string()).collect()
+        };
+        assert_eq!(solo_owners, tracked(&[org.as_str(), solo.as_str()]));
+        assert_eq!(shared_owners, tracked(&[org.as_str()]));
+    }
+
+    #[test]
+    fn test_new_template_ownership_names_its_org() {
+        let [mut template, _] = downtime_templates();
+        template.org_id = "acme".to_string();
+        template.name = "tpl_acme".to_string();
+        let (owner, object) = ownership_of(&template);
+        assert_eq!((owner, object.obj_id.as_str()), ("acme", "tpl_acme"));
+        #[cfg(feature = "enterprise")]
+        {
+            let tuples = db::authz::ownership_tuples(owner, "templates", &object);
+            let shapes: Vec<_> = tuples
+                .iter()
+                .map(|t| (t.user.as_str(), t.relation.as_str(), t.object.as_str()))
+                .collect();
+            assert_eq!(shapes, [("org:acme", "owningOrg", "template:tpl_acme")]);
+        }
+    }
+
+    #[test]
+    fn test_downtime_templates_are_reserved_and_use_only_downtime_variables() {
+        let [http, email] = downtime_templates();
+        assert_eq!(http.template_type, TemplateType::Http);
+        assert!(matches!(email.template_type, TemplateType::Email { .. }));
+        assert!(serde_json::from_str::<serde_json::Value>(&http.body).is_ok());
+        for t in [&http, &email] {
+            assert!(is_downtime_template_name(&t.name));
+            assert!(
+                super::super::notifications::default_template::is_reserved_template_name(&t.name)
+            );
+            assert!(!t.body.contains("{alert_"));
+        }
+        assert!(!is_downtime_template_name("prebuilt_slack_downtime"));
+    }
+
+    #[test]
+    fn test_should_apply_prebuilt_gate() {
+        // shipped newer than applied: always apply
+        assert!(should_apply_prebuilt(1, 0, false));
+        assert!(should_apply_prebuilt(2, 1, true));
+        // equal revisions: apply only on drift (old-node revert self-heal)
+        assert!(!should_apply_prebuilt(1, 1, false));
+        assert!(should_apply_prebuilt(1, 1, true));
+        // shipped older (downgrade): never apply
+        assert!(!should_apply_prebuilt(1, 2, false));
+        assert!(!should_apply_prebuilt(1, 2, true));
+    }
+
+    #[test]
+    fn test_write_org_keeps_the_path_org_for_non_root() {
+        assert_eq!(write_org("acme", "acme", false).unwrap(), "acme");
+        assert!(matches!(
+            write_org("acme", DEFAULT_ORG, false),
+            Err(TemplateError::NotFound)
+        ));
+        assert_eq!(write_org("acme", DEFAULT_ORG, true).unwrap(), DEFAULT_ORG);
+    }
+
+    #[tokio::test]
+    async fn test_save_non_root_update_of_a_default_template_is_not_found() {
+        let name = "tpl_scope_shared";
+        let shared = Template {
+            org_id: DEFAULT_ORG.to_string(),
+            name: name.to_string(),
+            body: "shared".to_string(),
+            template_type: TemplateType::Http,
+            ..Default::default()
+        };
+        common::infra::config::ALERTS_TEMPLATES.insert(format!("{DEFAULT_ORG}/{name}"), shared);
+        let mut mine = Template {
+            org_id: "tpl_scope_acme".to_string(),
+            name: name.to_string(),
+            body: "mine".to_string(),
+            template_type: TemplateType::Http,
+            ..Default::default()
+        };
+        let err = save(name, mine.clone(), None, false, false)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, TemplateError::NotFound), "{err}");
+        mine.org_id = DEFAULT_ORG.to_string();
+        let err = save(name, mine, None, true, false).await.unwrap_err();
+        assert!(matches!(err, TemplateError::AlreadyExists), "{err}");
+    }
+
+    #[tokio::test]
+    async fn test_delete_non_root_of_a_default_template_is_not_found() {
+        let name = "tpl_scope_shared_delete";
+        let shared = Template {
+            org_id: DEFAULT_ORG.to_string(),
+            name: name.to_string(),
+            body: "shared".to_string(),
+            template_type: TemplateType::Http,
+            ..Default::default()
+        };
+        common::infra::config::ALERTS_TEMPLATES.insert(format!("{DEFAULT_ORG}/{name}"), shared);
+        let err = delete("tpl_scope_acme", name, false).await.unwrap_err();
+        assert!(matches!(err, TemplateError::NotFound), "{err}");
+    }
+
+    #[test]
+    fn test_resolve_kind_sticky() {
+        use TemplateKind::*;
+        assert_eq!(resolve_kind(None, None, true), Custom); // old-shape create
+        assert_eq!(resolve_kind(Some(Content), None, true), Content); // explicit create
+        assert_eq!(resolve_kind(None, Some(Content), false), Content); // sticky update
+        assert_eq!(resolve_kind(Some(Custom), Some(Content), false), Custom); // explicit downgrade
+    }
 }

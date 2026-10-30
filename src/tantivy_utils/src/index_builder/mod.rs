@@ -15,7 +15,6 @@
 
 mod parallel;
 mod reader;
-mod sequential;
 use std::{collections::HashMap, sync::Arc};
 
 use arrow::array::{
@@ -29,14 +28,20 @@ use config::{
     get_config, tantivy::tokenizer::O2_TOKENIZER, utils::inverted_index::to_tantivy_name,
 };
 use hashbrown::HashSet;
-use infra::storage;
+use infra::storage::{self, StorageTier};
 
 use crate::puffin_directory::{PROP_ROW_GROUP_SIZE, writer::PuffinDirWriter};
 
+#[derive(Debug, Clone, Copy)]
+pub struct TantivyIndexOptions<'a> {
+    pub caller: &'a str,
+    pub org_id: &'a str,
+    pub data_file_name: &'a str,
+    pub storage_tier: StorageTier,
+}
+
 pub async fn create_tantivy_index(
-    caller: &str,
-    org_id: &str,
-    parquet_file_name: &str,
+    options: TantivyIndexOptions<'_>,
     fts_fields: &[String],
     index_fields: &[String],
     schema: Arc<Schema>,
@@ -44,8 +49,8 @@ pub async fn create_tantivy_index(
 ) -> Result<usize, anyhow::Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
-    let caller = format!("[{caller}:JOB]");
-    let file_format = FileFormat::from_extension(parquet_file_name).unwrap_or_default();
+    let caller = format!("[{}:JOB]", options.caller);
+    let file_format = FileFormat::from_extension(options.data_file_name).unwrap_or_default();
     let thread_num = cfg.compact.tantivy_builder_thread_num;
 
     let Some(index_schema) = build_tantivy_schema(fts_fields, index_fields, &schema) else {
@@ -53,11 +58,8 @@ pub async fn create_tantivy_index(
     };
 
     let dir = PuffinDirWriter::new();
-    let index = if thread_num > 1 {
-        parallel::build_index(dir.clone(), file_format, buf, index_schema, thread_num).await?
-    } else {
-        sequential::build_index(dir.clone(), file_format, buf, index_schema).await?
-    };
+    let index =
+        parallel::build_index(dir.clone(), file_format, buf, index_schema, thread_num).await?;
     if index.is_none() {
         return Ok(0);
     }
@@ -69,7 +71,7 @@ pub async fn create_tantivy_index(
     let index_size = puffin_bytes.len();
 
     // write fst bytes into disk
-    let Some(idx_file_name) = to_tantivy_name(parquet_file_name) else {
+    let Some(idx_file_name) = to_tantivy_name(options.data_file_name) else {
         return Ok(0);
     };
 
@@ -82,9 +84,9 @@ pub async fn create_tantivy_index(
         log::info!("file: {idx_file_name} file_data::disk::set success");
     }
 
-    // the index file is stored in the same account as the parquet file
-    let account = storage::get_account(org_id, parquet_file_name).unwrap_or_default();
-    match storage::put(&account, &idx_file_name, buf).await {
+    // the index file is stored in the same account and tier as the data file
+    let account = storage::get_account(options.org_id, options.data_file_name).unwrap_or_default();
+    match storage::put_with_tier(&account, &idx_file_name, buf, options.storage_tier).await {
         Ok(_) => {
             log::info!(
                 "{caller} generated tantivy index file: {idx_file_name}, size {index_size}, took: {} ms",
@@ -99,10 +101,10 @@ pub async fn create_tantivy_index(
     Ok(index_size)
 }
 
-/// Bundle of the tantivy schema and the per-row metadata both build paths need.
+/// Bundle of the tantivy schema and the per-row metadata the chunk builders need.
 ///
-/// Built once by [`build_tantivy_schema`] and shared by the
-/// sequential and parallel builders so they don't each rebuild the schema.
+/// Built once by [`build_tantivy_schema`] and cloned into every chunk worker
+/// so they don't each rebuild the schema.
 #[derive(Clone)]
 pub(super) struct TantivyIndexSchema {
     /// The built tantivy schema.
@@ -115,7 +117,7 @@ pub(super) struct TantivyIndexSchema {
     pub(super) fts_field: Option<tantivy::schema::Field>,
 }
 
-/// Builds the tantivy `Schema` shared by both index-build paths.
+/// Builds the tantivy `Schema` shared by every chunk of an index build.
 ///
 /// Returns `None` when there are no fields to index (configured fields don't
 /// intersect with the stream schema).
@@ -168,7 +170,7 @@ fn build_tantivy_schema(
                 .set_tokenizer("raw")
                 .set_fieldnorms(false),
         )
-        .set_fast(None);
+        .set_fast(tantivy::tokenizer::RAW_TOKENIZER_NAME);
     for field in index_fields_filtered.iter() {
         if field == TIMESTAMP_COL_NAME {
             continue;
@@ -281,7 +283,7 @@ pub(super) mod tests {
     use super::*;
 
     /// Helper function to create test record batches.
-    /// Shared with [`super::sequential`] and [`super::parallel`] test modules.
+    /// Shared with the [`super::parallel`] test module.
     pub(in crate::index_builder) fn create_test_batch(
         num_rows: usize,
         include_timestamp: bool,
@@ -324,8 +326,7 @@ pub(super) mod tests {
     }
 
     /// Helper: serializes `batches` to an in-memory parquet file and returns
-    /// the raw bytes. Shared by both the stream-based and the new
-    /// row_group-direct parallel tests.
+    /// the raw bytes.
     pub(in crate::index_builder) async fn create_test_parquet_bytes(
         batches: Vec<RecordBatch>,
     ) -> bytes::Bytes {
@@ -389,9 +390,12 @@ pub(super) mod tests {
 
         // Test that create_tantivy_index returns 0 for empty data
         let result = create_tantivy_index(
-            "test_caller",
-            "default",
-            "test_file.parquet",
+            TantivyIndexOptions {
+                caller: "test_caller",
+                org_id: "default",
+                data_file_name: "test_file.parquet",
+                storage_tier: StorageTier::Default,
+            },
             &["content".to_string()],
             &["status".to_string()],
             empty_batch.schema(),
@@ -410,9 +414,12 @@ pub(super) mod tests {
 
         // Test that create_tantivy_index returns 0 when no fields to index
         let result = create_tantivy_index(
-            "test_caller",
-            "default",
-            "test_file.parquet",
+            TantivyIndexOptions {
+                caller: "test_caller",
+                org_id: "default",
+                data_file_name: "test_file.parquet",
+                storage_tier: StorageTier::Default,
+            },
             &[], // No FTS fields
             &[], // No index fields
             batch.schema(),
@@ -431,9 +438,12 @@ pub(super) mod tests {
 
         // Test with an invalid parquet filename that won't convert to tantivy filename
         let result = create_tantivy_index(
-            "test_caller",
-            "default",
-            "invalid_filename", // This won't convert to a valid tantivy filename
+            TantivyIndexOptions {
+                caller: "test_caller",
+                org_id: "default",
+                data_file_name: "invalid_filename", // won't convert to a Tantivy name
+                storage_tier: StorageTier::Default,
+            },
             &["content".to_string()],
             &["status".to_string()],
             batch.schema(),
@@ -447,6 +457,6 @@ pub(super) mod tests {
 
     // Note: Full testing of create_tantivy_index with storage operations would require
     // mocking the storage layer, which is complex for unit tests. The main logic is
-    // tested in sequential::build_index. Integration tests would be more appropriate
+    // tested in parallel::build_index. Integration tests would be more appropriate
     // for testing the full create_tantivy_index function with actual storage operations.
 }

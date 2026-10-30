@@ -41,12 +41,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           table-id="org-management-list"
           :show-global-filter="false"
           :loading="loading"
+          :forbidden="forbidden"
         >
           <template #toolbar>
             <OSearchInput
               data-test="org-management-search-input"
               v-model="filterQuery"
-              class="no-border o2-search-input w-64"
+              class="no-border o2-search-input w-64 max-md:w-auto max-md:flex-1"
               :placeholder="t('settings.searchOrgs')"
             />
           </template>
@@ -81,22 +82,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-ai_credits_total="{ row }">
             {{ formatCredits(row.credits_limit) }}
           </template>
+          <template #cell-browser_steps_used="{ row }">
+            {{ formatCredits(row.browser_steps_used) }}
+          </template>
+          <template #cell-browser_steps_total="{ row }">
+            {{ formatCredits(row.browser_steps_limit) }}
+          </template>
+          <template #cell-protocol_steps_used="{ row }">
+            {{ formatCredits(row.protocol_steps_used) }}
+          </template>
+          <template #cell-protocol_steps_total="{ row }">
+            {{ formatCredits(row.protocol_steps_limit) }}
+          </template>
+          <template #cell-status_steps_used="{ row }">
+            {{ formatCredits(row.status_steps_used) }}
+          </template>
+          <template #cell-status_steps_total="{ row }">
+            {{ formatCredits(row.status_steps_limit) }}
+          </template>
+          <template #cell-status="{ row }">
+            <OBadge
+              :variant="
+                row.status === 'pending_deletion' || row.status === 'deleting'
+                  ? 'warning'
+                  : 'success-soft'
+              "
+              size="sm"
+            >
+              {{ statusLabel(row) }}
+            </OBadge>
+          </template>
           <template #cell-actions="{ row }">
             <div class="flex items-center justify-center gap-1">
               <OButton
                 variant="ghost"
                 size="icon-xs-circle"
                 icon-left="paid"
-                aria-label="Set AI Credits"
-                data-test="org-management-set-ai-credits-btn"
-                @click.stop="toggleAiCreditsDialog(row)"
+                class="max-md:hidden"
+                :aria-label="t('settings.organizationManagementPage.setUsageLimits')"
+                data-test="org-management-set-usage-limits-btn"
+                @click.stop="toggleUsageLimitsDialog(row)"
               >
-                <OTooltip content="Set AI Credits" />
+                <OTooltip :content="t('settings.organizationManagementPage.setUsageLimits')" />
               </OButton>
               <OButton
                 variant="ghost"
                 size="icon-xs-circle"
                 icon-left="event"
+                class="max-md:hidden"
                 data-test="otg-management-extend-trial-btn"
                 @click.stop="toggleExtendTrialDialog(row)"
               >
@@ -107,6 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-xs-circle"
                 icon-left="note-add"
+                class="max-md:hidden"
                 data-test="org-management-add-contract-btn"
                 @click.stop="toggleContractDialog(row, 'create')"
               >
@@ -117,6 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-xs-circle"
                 icon-left="event"
+                class="max-md:hidden"
                 data-test="org-management-extend-contract-btn"
                 @click.stop="toggleContractDialog(row, 'extend')"
               >
@@ -127,6 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost-destructive"
                 size="icon-xs-circle"
                 icon-left="block"
+                class="max-md:hidden"
                 data-test="org-management-revoke-contract-btn"
                 @click.stop="confirmRevokeContract(row)"
               >
@@ -137,6 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-xs-circle"
                 icon-left="cloud-upload"
+                class="max-md:hidden"
                 data-test="org-management-storage-enable-btn"
                 @click.stop="toggleOrgStorage(row)"
               >
@@ -153,6 +190,112 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OTooltip :content="t('settings.organizationManagementPage.storageEnabled')" />
               </OButton>
+              <OButton
+                v-if="row.status === 'deleting'"
+                variant="ghost"
+                size="icon-xs-circle"
+                icon-left="history"
+                class="max-md:hidden"
+                data-test="org-management-cleanup-tasks-btn"
+                @click.stop="viewCleanupTasks(row)"
+              >
+                <OTooltip :content="t('iam.listOrganizations.viewDeletionProgress')" />
+              </OButton>
+              <OButton
+                v-if="row.status === 'pending_deletion'"
+                variant="ghost"
+                size="icon-xs-circle"
+                icon-left="undo"
+                class="max-md:hidden"
+                data-test="org-management-resurrect-btn"
+                @click.stop="resurrectOrganization(row)"
+              >
+                <OTooltip :content="t('organization.resurrect')" />
+              </OButton>
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    :aria-label="t('common.moreActions')"
+                    icon-left="more-vert"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    class="md:hidden"
+                    data-test="org-management-row-more-actions"
+                    @click.stop
+                  />
+                </template>
+                <ODropdownItem
+                  icon-left="paid"
+                  class="md:hidden"
+                  data-test="org-management-set-usage-limits-btn-menu"
+                  @select="toggleUsageLimitsDialog(row)"
+                >
+                  <span>{{ t("settings.organizationManagementPage.setUsageLimits") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="event"
+                  class="md:hidden"
+                  data-test="otg-management-extend-trial-btn-menu"
+                  @select="toggleExtendTrialDialog(row)"
+                >
+                  <span>{{ t("settings.extendTrial") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="row.billing_provider === '-'"
+                  icon-left="note-add"
+                  class="md:hidden"
+                  data-test="org-management-add-contract-btn-menu"
+                  @select="toggleContractDialog(row, 'create')"
+                >
+                  <span>{{ t("settings.organizationManagementPage.addContract") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="row.billing_provider === 'no_op'"
+                  icon-left="event"
+                  class="md:hidden"
+                  data-test="org-management-extend-contract-btn-menu"
+                  @select="toggleContractDialog(row, 'extend')"
+                >
+                  <span>{{ t("settings.organizationManagementPage.extendContract") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="row.billing_provider === 'no_op'"
+                  icon-left="block"
+                  variant="destructive"
+                  class="md:hidden"
+                  data-test="org-management-revoke-contract-btn-menu"
+                  @select="confirmRevokeContract(row)"
+                >
+                  <span>{{ t("settings.organizationManagementPage.revoke") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="!row.org_storage_enabled"
+                  icon-left="cloud-upload"
+                  class="md:hidden"
+                  data-test="org-management-storage-enable-btn-menu"
+                  @select="toggleOrgStorage(row)"
+                >
+                  <span>{{ t("settings.organizationManagementPage.enableStorage") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="row.status === 'deleting'"
+                  icon-left="history"
+                  class="md:hidden"
+                  data-test="org-management-cleanup-tasks-btn-menu"
+                  @select="viewCleanupTasks(row)"
+                >
+                  <span>{{ t("iam.listOrganizations.viewDeletionProgress") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="row.status === 'pending_deletion'"
+                  icon-left="undo"
+                  class="md:hidden"
+                  data-test="org-management-resurrect-btn-menu"
+                  @select="resurrectOrganization(row)"
+                >
+                  <span>{{ t("organization.resurrect") }}</span>
+                </ODropdownItem>
+              </ODropdown>
             </div>
           </template>
         </OTable>
@@ -205,37 +348,91 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OForm>
     </ODialog>
 
-    <!-- AI Credit Allowance Dialog -->
+    <!-- Usage Allowance Dialog — one tab per quota pool, so a new pool becomes a
+         new tab rather than another glyph in the Actions column. -->
     <ODialog
-      data-test="organization-management-ai-credits-dialog"
-      v-model:open="aiCreditsPrompt"
+      data-test="organization-management-usage-limits-dialog"
+      v-model:open="usageLimitsPrompt"
       size="sm"
-      :title="`Set AI Credits for ${aiCreditsDataRow?.name}`"
-      sub-title="Set the organization's lifetime AI credit allowance."
+      :title="usageLimitsTitle"
+      :sub-title="usageLimitsSubtitle"
       :secondary-button-label="t('common.cancel')"
-      primary-button-label="Save Credits"
-      form-id="org-ai-credits-form"
-      @click:secondary="aiCreditsPrompt = false"
+      :primary-button-label="usageLimitsPrimaryLabel"
+      :form-id="usageLimitsFormId"
+      @click:secondary="usageLimitsPrompt = false"
     >
-      <OForm
-        id="org-ai-credits-form"
-        :schema="aiCreditsSchema"
-        :default-values="aiCreditsFormDefaults"
-        @submit="submitAiCredits"
-      >
-        <div class="flex flex-col gap-3">
-          <OFormInput
-            name="creditsLimit"
-            type="number"
-            data-test="ai-credits-limit-input"
-            label="Total AI Credits"
-            required
+      <div class="flex flex-col gap-3">
+        <OTabs v-model="usageLimitsTab" dense bordered data-test="org-management-usage-limits-tabs">
+          <OTab
+            name="ai_credits"
+            :label="t('settings.organizationManagementPage.aiCreditsTab')"
+            data-test="org-management-set-ai-credits-btn"
           />
-          <div class="text-text-secondary text-xs">
-            Currently used: {{ formatCredits(aiCreditsDataRow?.credits_used) }} credits
+          <OTab
+            name="synthetics_browser_steps"
+            :label="t('settings.organizationManagementPage.syntheticsBrowserStepsTab')"
+            data-test="org-management-set-synthetics-browser-steps-btn"
+          />
+          <OTab
+            name="synthetics_protocol_steps"
+            :label="t('settings.organizationManagementPage.syntheticsProtocolStepsTab')"
+            data-test="org-management-set-synthetics-protocol-steps-btn"
+          />
+          <OTab
+            name="synthetics_status_protocol"
+            :label="t('settings.organizationManagementPage.syntheticsStatusStepsTab')"
+            data-test="org-management-set-synthetics-status-steps-btn"
+          />
+        </OTabs>
+
+        <!-- One OForm per pool (own schema, own submit). v-if, so only the active
+             tab's form is mounted and the dialog's form-id has a single target. -->
+        <OForm
+          v-if="usageLimitsTab === 'ai_credits'"
+          id="org-ai-credits-form"
+          :schema="aiCreditsSchema"
+          :default-values="aiCreditsFormDefaults"
+          @submit="submitAiCredits"
+        >
+          <div class="flex flex-col gap-3">
+            <OFormInput
+              name="creditsLimit"
+              type="number"
+              data-test="ai-credits-limit-input"
+              :label="t('settings.organizationManagementPage.totalAiCredits')"
+              required
+            />
+            <div class="text-text-secondary text-xs">
+              {{ t("settings.organizationManagementPage.currentlyUsedLabel") }}
+              {{ formatCredits(usageLimitsRow?.credits_used) }}
+              {{ t("settings.organizationManagementPage.credits") }}
+            </div>
           </div>
-        </div>
-      </OForm>
+        </OForm>
+
+        <OForm
+          v-else
+          id="org-synthetics-steps-form"
+          :schema="syntheticsStepsSchema"
+          :default-values="syntheticsStepsFormDefaults"
+          @submit="submitSyntheticsSteps"
+        >
+          <div class="flex flex-col gap-3">
+            <OFormInput
+              name="stepsLimit"
+              type="number"
+              data-test="synthetics-steps-limit-input"
+              :label="stepsInputLabel"
+              required
+            />
+            <div class="text-text-secondary text-xs">
+              {{ t("settings.organizationManagementPage.currentlyUsedLabel") }}
+              {{ formatCredits(stepsUsed) }}
+              {{ t("settings.organizationManagementPage.steps") }}
+            </div>
+          </div>
+        </OForm>
+      </div>
     </ODialog>
 
     <!-- External Contract Dialog -->
@@ -292,12 +489,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </OForm>
     </ODialog>
+
+    <OrgCleanupTasksDialog
+      :open="showCleanupDialog"
+      :org-id="cleanupTargetOrg.id"
+      :org-name="cleanupTargetOrg.name"
+      @update:open="showCleanupDialog = $event"
+    />
   </div>
 </template>
 <script lang="ts">
 import { ref, onMounted, watch, defineComponent, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OrgCleanupTasksDialog from "@/components/iam/organizations/OrgCleanupTasksDialog.vue";
 import { timestampToTimezoneDate, getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -307,8 +513,12 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import orgStorageService from "@/services/org_storage";
@@ -320,46 +530,97 @@ import { isInputFocused } from "@/utils/keyboardShortcuts";
 import {
   makeContractSchema,
   aiCreditsDefaults,
-  aiCreditsSchema,
+  makeAiCreditsSchema,
   contractDefaults,
-  extendTrialSchema,
+  makeExtendTrialSchema,
+  makeSyntheticsStepsSchema,
+  syntheticsStepsDefaults,
   type AiCreditsForm,
+  type SyntheticsStepsForm,
   type ContractForm,
   type ExtendTrialForm,
 } from "./OrganizationManagement.schema";
+
+/** Backend TrialQuotaPool keys — also the usage-allowance dialog's tab names. */
+type QuotaPool =
+  | "ai_credits"
+  | "synthetics_browser_steps"
+  | "synthetics_protocol_steps"
+  | "synthetics_status_protocol";
 
 export default defineComponent({
   name: "PageAlerts",
   components: {
     OPageLayout,
     OEmptyState,
+    OBadge,
+    OrgCleanupTasksDialog,
     OButton,
     ODialog,
+    ODropdown,
+    ODropdownItem,
     OTooltip,
     OForm,
     OFormInput,
     OSearchInput,
     OTable,
+    OTab,
+    OTabs,
   },
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const { confirm } = useConfirmDialog();
 
     const extendTrialDataRow = ref();
     const extendedTrial = ref(1);
     const loading = ref(false);
+    const forbidden = ref(false);
     const extendTrialPrompt = ref(false);
     const tabledata = ref<any>([]);
     const resultTotal = ref(0);
     const filterQuery = ref("");
+    const showCleanupDialog = ref(false);
+    const cleanupTargetOrg = ref({ id: "", name: "" });
 
-    // AI credit allowance state
-    const aiCreditsPrompt = ref(false);
-    const aiCreditsDataRow = ref<any>({});
+    // Usage allowance state — one dialog for every quota pool, the active tab
+    // naming the pool. Tab names are the backend TrialQuotaPool keys.
+    const usageLimitsPrompt = ref(false);
+    const usageLimitsRow = ref<any>({});
+    const usageLimitsTab = ref<QuotaPool>("ai_credits");
+    const isAiCreditsTab = computed(() => usageLimitsTab.value === "ai_credits");
+    // The three step grants are independent, so the tabs differ only in which pair
+    // of row fields they read and write, and in their wording.
+    const isBrowserStepsTab = computed(() => usageLimitsTab.value === "synthetics_browser_steps");
+    const isStatusStepsTab = computed(() => usageLimitsTab.value === "synthetics_status_protocol");
+    const STEP_FIELDS: Record<string, { used: string; limit: string }> = {
+      synthetics_browser_steps: { used: "browser_steps_used", limit: "browser_steps_limit" },
+      synthetics_protocol_steps: { used: "protocol_steps_used", limit: "protocol_steps_limit" },
+      synthetics_status_protocol: { used: "status_steps_used", limit: "status_steps_limit" },
+    };
+    const stepFields = computed(
+      () => STEP_FIELDS[usageLimitsTab.value] ?? STEP_FIELDS.synthetics_protocol_steps,
+    );
+    const stepsInputLabel = computed(() => {
+      if (isBrowserStepsTab.value) {
+        return t("settings.organizationManagementPage.totalBrowserSteps");
+      }
+      return isStatusStepsTab.value
+        ? t("settings.organizationManagementPage.totalStatusSteps")
+        : t("settings.organizationManagementPage.totalProtocolSteps");
+    });
+    const stepsUsed = computed(() => usageLimitsRow.value?.[stepFields.value.used] ?? 0);
+    const stepsTitleKey = computed((): I18nKey => {
+      if (isBrowserStepsTab.value) {
+        return "settings.setSyntheticsBrowserStepsFor";
+      }
+      return isStatusStepsTab.value
+        ? "settings.setSyntheticsStatusStepsFor"
+        : "settings.setSyntheticsProtocolStepsFor";
+    });
     const aiCreditsFormDefaults = computed(() =>
-      aiCreditsDefaults(aiCreditsDataRow.value?.credits_limit ?? 0),
+      aiCreditsDefaults(usageLimitsRow.value?.credits_limit ?? 0),
     );
 
     // Contract management state
@@ -371,14 +632,47 @@ export default defineComponent({
     //    resolves to undefined and validation silently no-ops). ───────────────
     // The contract message is mode-aware; the dialog body remounts on open
     // (reka-ui), so a freshly-mounted <OForm> always reads the current schema.
-    const contractSchema = computed(() => makeContractSchema(contractMode.value));
+    const contractSchema = computed(() => makeContractSchema(t, contractMode.value));
+    const extendTrialSchema = makeExtendTrialSchema(t);
+    const aiCreditsSchema = makeAiCreditsSchema(t);
+
+    const syntheticsStepsFormDefaults = computed(() =>
+      syntheticsStepsDefaults(usageLimitsRow.value?.[stepFields.value.limit] ?? 0),
+    );
+    const syntheticsStepsSchema = makeSyntheticsStepsSchema(t);
+
+    // Title, subtitle, save label and submit target all follow the active tab,
+    // so each pool keeps the exact wording it had as a standalone dialog.
+    const usageLimitsTitle = computed(() =>
+      isAiCreditsTab.value
+        ? t("settings.setAiCreditsFor", { name: usageLimitsRow.value?.name })
+        : t(stepsTitleKey.value, { name: usageLimitsRow.value?.name }),
+    );
+    const usageLimitsSubtitle = computed(() => {
+      if (isAiCreditsTab.value) {
+        return t("settings.organizationManagementPage.setAiCreditsSubtitle");
+      }
+      // The status grant is the one pool that resets, so it cannot borrow the
+      // lifetime wording the other two share.
+      return isStatusStepsTab.value
+        ? t("settings.organizationManagementPage.setSyntheticsStatusStepsSubtitle")
+        : t("settings.organizationManagementPage.setSyntheticsStepsSubtitle");
+    });
+    const usageLimitsPrimaryLabel = computed(() =>
+      isAiCreditsTab.value
+        ? t("settings.organizationManagementPage.saveCredits")
+        : t("settings.organizationManagementPage.saveSteps"),
+    );
+    const usageLimitsFormId = computed(() =>
+      isAiCreditsTab.value ? "org-ai-credits-form" : "org-synthetics-steps-form",
+    );
 
     // Extend-trial week count is bridged from the pill grid into the form below.
     // Dynamic defaults (project the current pill value) → a typed computed.
     const extendTrialFormRef = ref<any>(null);
-    const extendTrialDefaults = computed(
-      (): ExtendTrialForm => ({ extendedTrial: extendedTrial.value }),
-    );
+    const extendTrialDefaults = computed((): ExtendTrialForm => ({
+      extendedTrial: extendedTrial.value,
+    }));
 
     // Keep the form's copy of the bridged pill value in sync (the pill grid is a
     // custom control, not an <input>, so it is bridged via setFieldValue — the
@@ -432,6 +726,16 @@ export default defineComponent({
         meta: { align: "left" },
       },
       {
+        id: "status",
+        header: t("iam.listOrganizations.status"),
+        accessorKey: "status",
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.status,
+        meta: { align: "left" },
+      },
+      {
         id: "billing_provider",
         header: t("settings.organizationManagementPage.provider"),
         accessorKey: "billing_provider",
@@ -443,7 +747,7 @@ export default defineComponent({
       },
       {
         id: "ai_credits_used",
-        header: "AI Credits Used",
+        header: t("settings.organizationManagementPage.aiCreditsUsed"),
         accessorKey: "credits_used",
         sortable: true,
         resizable: true,
@@ -453,8 +757,68 @@ export default defineComponent({
       },
       {
         id: "ai_credits_total",
-        header: "AI Credits Total",
+        header: t("settings.organizationManagementPage.aiCreditsTotal"),
         accessorKey: "credits_limit",
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.count,
+        meta: { align: "right" },
+      },
+      {
+        id: "browser_steps_used",
+        header: t("settings.organizationManagementPage.browserStepsUsed"),
+        accessorKey: "browser_steps_used",
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.count,
+        meta: { align: "right" },
+      },
+      {
+        id: "browser_steps_total",
+        header: t("settings.organizationManagementPage.browserStepsTotal"),
+        accessorKey: "browser_steps_limit",
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.count,
+        meta: { align: "right" },
+      },
+      {
+        id: "protocol_steps_used",
+        header: t("settings.organizationManagementPage.protocolStepsUsed"),
+        accessorKey: "protocol_steps_used",
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.count,
+        meta: { align: "right" },
+      },
+      {
+        id: "protocol_steps_total",
+        header: t("settings.organizationManagementPage.protocolStepsTotal"),
+        accessorKey: "protocol_steps_limit",
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.count,
+        meta: { align: "right" },
+      },
+      {
+        id: "status_steps_used",
+        header: t("settings.organizationManagementPage.statusStepsUsed"),
+        accessorKey: "status_steps_used",
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.count,
+        meta: { align: "right" },
+      },
+      {
+        id: "status_steps_total",
+        header: t("settings.organizationManagementPage.statusStepsTotal"),
+        accessorKey: "status_steps_limit",
         sortable: true,
         resizable: true,
         hideable: true,
@@ -496,7 +860,7 @@ export default defineComponent({
         header: t("settings.actions"),
         isAction: true,
         pinned: "right",
-        size: 240,
+        size: 300,
         meta: { align: "center", actionCount: 5 },
       },
     ];
@@ -525,6 +889,7 @@ export default defineComponent({
 
     const getData = () => {
       loading.value = true;
+      forbidden.value = false;
       const dismiss = toast({
         variant: "loading",
         message: t("settings.organizationManagementPage.loadingData"),
@@ -544,6 +909,12 @@ export default defineComponent({
               billing_provider: responseData[i].billing_provider || "-",
               credits_used: Number(responseData[i].credits_used ?? 0),
               credits_limit: Number(responseData[i].credits_limit ?? 0),
+              browser_steps_used: Number(responseData[i].browser_steps_used ?? 0),
+              browser_steps_limit: Number(responseData[i].browser_steps_limit ?? 0),
+              protocol_steps_used: Number(responseData[i].protocol_steps_used ?? 0),
+              protocol_steps_limit: Number(responseData[i].protocol_steps_limit ?? 0),
+              status_steps_used: Number(responseData[i].status_steps_used ?? 0),
+              status_steps_limit: Number(responseData[i].status_steps_limit ?? 0),
               created_at: timestampToTimezoneDate(responseData[i].created_at, "UTC", "yyyy-MM-dd"),
               trial_expires_at: timestampToTimezoneDate(
                 responseData[i].trial_expires_at,
@@ -553,6 +924,9 @@ export default defineComponent({
               contract_end_date: responseData[i].contract_end_date || 0,
               contract_end_date_display: formatMicrosToDate(responseData[i].contract_end_date),
               org_storage_enabled: responseData[i].org_storage_enabled || false,
+              status: responseData[i].status ?? "active",
+              deleted_at: responseData[i].deleted_at ?? null,
+              grace_period_days: responseData[i].grace_period_days ?? null,
             });
           }
 
@@ -564,7 +938,8 @@ export default defineComponent({
         .catch((error) => {
           loading.value = false;
           dismiss();
-          if (error.status != 403) {
+          forbidden.value = error?.status === 403 || error?.response?.status === 403;
+          if (!forbidden.value) {
             toast({
               variant: "error",
               message:
@@ -576,43 +951,78 @@ export default defineComponent({
         });
     };
 
+    const viewCleanupTasks = (row: any) => {
+      cleanupTargetOrg.value = { id: row.identifier, name: row.name };
+      showCleanupDialog.value = true;
+    };
+
+    const statusLabel = (row: any): string => {
+      if (row.status === "pending_deletion") return pendingLabel(row);
+      if (row.status === "deleting") return t("organization.statusDeleting");
+      if (row.status === "active") return t("organization.statusActive");
+      return row.status;
+    };
+
+    const pendingLabel = (row: any): string => {
+      if (!row.deleted_at || !row.grace_period_days) return t("organization.pendingDeletion");
+      // deleted_at is micros → ms
+      const deletedAtMs = row.deleted_at / 1000;
+      const windowMs = row.grace_period_days * 86400 * 1000;
+      const msLeft = deletedAtMs + windowMs - Date.now();
+      const daysLeft = Math.max(0, Math.ceil(msLeft / 86400000));
+      return `${t("organization.pendingDeletion")} — ${t("organization.daysLeft", { n: daysLeft })}`;
+    };
+
+    const resurrectOrganization = async (row: any) => {
+      try {
+        await OrganizationServices.resurrect_org(store.state.zoConfig.meta_org, row.identifier);
+        toast({ variant: "success", message: t("iam.listOrganizations.organizationResurrected") });
+        getData();
+      } catch (e: any) {
+        toast({
+          variant: "error",
+          message: e?.response?.data?.message || t("iam.listOrganizations.failedToResurrect"),
+        });
+      }
+    };
+
     const toggleExtendTrialDialog = (row: any) => {
       extendTrialPrompt.value = true;
       extendTrialDataRow.value = row;
     };
 
-    const toggleAiCreditsDialog = (row: any) => {
-      aiCreditsDataRow.value = row;
-      aiCreditsPrompt.value = true;
+    const toggleUsageLimitsDialog = (row: any, pool: QuotaPool = "ai_credits") => {
+      usageLimitsRow.value = row;
+      usageLimitsTab.value = pool;
+      usageLimitsPrompt.value = true;
     };
 
-    const submitAiCredits = async (value: AiCreditsForm) => {
+    // The two pools differ only in which field the form carries, which row
+    // fields the response updates, and the copy. Everything else — the loading
+    // toast, the request, the close, the error path — is the same, so it lives
+    // here once.
+    const submitUsageLimit = async (
+      pool: QuotaPool,
+      limit: number,
+      apply: (used: number, granted: number) => void,
+      copy: { pending: I18nText; success: I18nText; failure: I18nText },
+    ) => {
       loading.value = true;
-      const dismiss = toast({
-        variant: "loading",
-        message: "Updating AI credits...",
-        timeout: 0,
-      });
+      const dismiss = toast({ variant: "loading", message: copy.pending, timeout: 0 });
 
       try {
-        const response = await OrganizationServices.set_ai_usage_limit(
+        const response = await OrganizationServices.set_quota_usage_limit(
           store.state.selectedOrganization.identifier,
-          {
-            org_id: aiCreditsDataRow.value.identifier,
-            credits_limit: Number(value.creditsLimit),
-          },
+          pool,
+          { org_id: usageLimitsRow.value.identifier, limit },
         );
-        aiCreditsDataRow.value.credits_used = response.data.credits_used;
-        aiCreditsDataRow.value.credits_limit = response.data.credits_limit;
-        aiCreditsPrompt.value = false;
-        toast({
-          variant: "success",
-          message: "AI credits updated successfully.",
-        });
+        apply(response.data.used, response.data.limit);
+        usageLimitsPrompt.value = false;
+        toast({ variant: "success", message: copy.success });
       } catch (error: any) {
         toast({
           variant: "error",
-          message: error.response?.data?.message || "Failed to update AI credits.",
+          message: error.response?.data?.message || copy.failure,
           timeout: 5000,
         });
       } finally {
@@ -620,6 +1030,38 @@ export default defineComponent({
         dismiss();
       }
     };
+
+    const submitAiCredits = (value: AiCreditsForm) =>
+      submitUsageLimit(
+        "ai_credits",
+        Number(value.creditsLimit),
+        (used, granted) => {
+          usageLimitsRow.value.credits_used = used;
+          usageLimitsRow.value.credits_limit = granted;
+        },
+        {
+          pending: t("toastMessages.settings.updatingAiCredits"),
+          success: t("toastMessages.settings.aiCreditsUpdatedSuccessfully"),
+          failure: t("settings.updateAiCreditsFailed"),
+        },
+      );
+
+    const submitSyntheticsSteps = (value: SyntheticsStepsForm) =>
+      submitUsageLimit(
+        usageLimitsTab.value,
+        Number(value.stepsLimit),
+        (used, granted) => {
+          // Written through the active tab's field pair: applying one grant's
+          // response to the other would overstate it and strand the real one.
+          usageLimitsRow.value[stepFields.value.used] = used;
+          usageLimitsRow.value[stepFields.value.limit] = granted;
+        },
+        {
+          pending: t("toastMessages.settings.updatingSyntheticsSteps"),
+          success: t("toastMessages.settings.syntheticsStepsUpdatedSuccessfully"),
+          failure: t("settings.updateSyntheticsStepsFailed"),
+        },
+      );
 
     const getTimestampInMicroseconds = (weeks: number) =>
       (Date.now() + weeks * 7 * 24 * 60 * 60 * 1000) * 1000;
@@ -712,7 +1154,9 @@ export default defineComponent({
     const confirmRevokeContract = async (row: any) => {
       const ok = await confirm({
         title: t("settings.organizationManagementPage.revokeConfirmTitle"),
-        message: t("settings.organizationManagementPage.revokeConfirmMessage", { name: row.name }),
+        messageKeypath: "settings.organizationManagementPage.revokeConfirmMessage",
+        messageName: row.name,
+        confirmVariant: "destructive",
       });
       if (ok) {
         const metaOrg = store.state.selectedOrganization.identifier;
@@ -871,16 +1315,28 @@ export default defineComponent({
       resultTotal,
       tabledata,
       loading,
+      forbidden,
       extendedTrial,
       extendTrialPrompt,
       toggleExtendTrialDialog,
       extendTrialDataRow,
-      aiCreditsPrompt,
-      aiCreditsDataRow,
+      usageLimitsPrompt,
+      usageLimitsRow,
+      usageLimitsTab,
+      usageLimitsTitle,
+      usageLimitsSubtitle,
+      usageLimitsPrimaryLabel,
+      usageLimitsFormId,
+      toggleUsageLimitsDialog,
       aiCreditsFormDefaults,
       aiCreditsSchema,
-      toggleAiCreditsDialog,
       submitAiCredits,
+      isBrowserStepsTab,
+      stepsInputLabel,
+      stepsUsed,
+      syntheticsStepsFormDefaults,
+      syntheticsStepsSchema,
+      submitSyntheticsSteps,
       updateTrialPeriod,
       getData,
       getTimestampInMicroseconds,
@@ -896,6 +1352,12 @@ export default defineComponent({
       filterQuery,
       filterData,
       visibleRows,
+      showCleanupDialog,
+      cleanupTargetOrg,
+      viewCleanupTasks,
+      pendingLabel,
+      statusLabel,
+      resurrectOrganization,
       store,
       // Form wiring (Options-API: schemas/defaults MUST be returned so :schema
       // resolves and validation runs).

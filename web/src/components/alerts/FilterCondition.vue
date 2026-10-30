@@ -27,7 +27,7 @@
           data-test="alert-conditions-toggle-operator-btn"
           variant="ghost"
           size="icon-circle-sm"
-          class="text-button-primary! h-6.5 flex-shrink-0 hover:bg-[color-mix(in_srgb,var(--color-button-primary)_10%,transparent)]!"
+          class="text-button-primary! hover:bg-button-primary/10! h-6.5 flex-shrink-0"
           @click="toggleOperator"
         >
           <OIcon name="restart-alt" size="sm" />
@@ -38,7 +38,7 @@
     <!-- All consumers render in FORM MODE: the three controls are name=-owned
              by the TanStack form — no v-model, no manual error refs; schema errors
              surface post-submit via the OForm* wrappers (R3). -->
-    <div class="ml-0">
+    <div class="ms-0">
       <OFormSelect
         :name="`${namePrefix}.column`"
         :options="filteredFields"
@@ -59,9 +59,9 @@
       <!-- Reveal-on-hover: the column select is narrow and long field names
            (e.g. `gen_ai_system`) truncate. Show the full value on hover
            regardless of AI-chat mode — truncation happens in every mode. -->
-      <OTooltip v-if="condition.column" :content="condition.column" />
+      <OTooltip v-if="condition.column" :content="columnDisplay" />
     </div>
-    <div class="ml-0">
+    <div class="ms-0">
       <OFormSelect
         :name="`${namePrefix}.operator`"
         :options="triggerOperators"
@@ -71,12 +71,25 @@
         ]"
         :searchable="false"
         data-test="alert-conditions-operator-select"
-        @update:model-value="() => emits('input:update', 'conditions', condition)"
+        @update:model-value="onOperatorChange"
       />
       <OTooltip v-if="condition.operator" :content="condition.operator" />
     </div>
-    <div class="ml-0">
+    <div v-if="!isUnaryOperator(condition.operator)" class="ms-0">
+      <OFormCombobox
+        v-if="valueSuggestions"
+        :name="`${namePrefix}.value`"
+        :items="valueSuggestions.options.value"
+        :placeholder="t('common.value')"
+        :help-text="valueSuggestions.hint.value"
+        :class="[
+          inputWidth ? inputWidth : store.state.isAiChatEnabled ? 'w-27.5' : computedValueWidth,
+        ]"
+        data-test="alert-conditions-value-combobox"
+        @update:model-value="() => emits('input:update', 'conditions', condition)"
+      />
       <OFormInput
+        v-else
         :name="`${namePrefix}.value`"
         :placeholder="t('common.value')"
         :class="[
@@ -94,6 +107,7 @@
 import OButton from "@/lib/core/Button/OButton.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormCombobox from "@/lib/forms/Combobox/OFormCombobox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 const props = defineProps({
@@ -113,8 +127,8 @@ const props = defineProps({
     required: true,
   },
   label: {
-    type: String,
-    default: "",
+    type: String as unknown as PropType<I18nText>,
+    default: raw(""),
     required: true,
   },
   depth: {
@@ -154,15 +168,28 @@ const props = defineProps({
     default: "",
     required: false,
   },
+  /** Operator values to offer; falls back to ConditionBuilder's, then to the full list. */
+  operators: {
+    type: Array as PropType<string[]>,
+    default: undefined,
+    required: false,
+  },
 });
 
-import { ref, computed, watch, inject } from "vue";
-import { useI18n } from "vue-i18n";
+import { ref, computed, watch, inject, type PropType } from "vue";
+import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import type { SelectOptionInput } from "@/lib/forms/Select/OSelect.types";
+import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
+import {
+  ALL_CONDITION_OPERATORS,
+  CONDITION_OPERATORS_KEY,
+  CONDITION_VALUE_SUGGEST_KEY,
+  siblingAndPairs,
+} from "./conditionOperators";
 
-var triggerOperators: any = ref(["=", "!=", ">=", "<=", ">", "<", "Contains", "NotContains"]);
-const emits = defineEmits(["add", "remove", "input:update", "add-group"]);
+const emits = defineEmits(["input:update"]);
 
 const filteredFields = ref<any[]>(props.streamFields as any[]);
 
@@ -180,23 +207,44 @@ watch(
 
 const store = useStore();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // The injected OForm — condition values are name-bound to it (form mode is the
 // only mode now); also used to write the AND/OR toggle below.
 const form = inject(FORM_CONTEXT_KEY, null);
 
-const deleteApiHeader = (field: any) => {
-  emits("remove", field);
-  emits("input:update", "conditions", field);
-};
+const allOperators: SelectOptionInput[] = ALL_CONDITION_OPERATORS;
 
-const addApiHeader = (groupId: string) => {
-  emits("add", groupId);
-};
+const injectedOperators = inject(CONDITION_OPERATORS_KEY, null);
+const triggerOperators = computed<SelectOptionInput[]>(() => {
+  const allowed = props.operators ?? injectedOperators?.value;
+  if (!allowed) return allOperators;
+  return allOperators.filter((op) =>
+    allowed.includes(typeof op === "object" && op !== null ? String(op.value) : String(op)),
+  );
+});
 
-const addGroupApiHeader = (groupId: string) => {
-  emits("add-group", groupId);
+// The provider narrows by the other rows, so it reads the whole tree from the form root.
+const valueSuggest = inject(CONDITION_VALUE_SUGGEST_KEY, null);
+const rootName = props.namePrefix.match(/^[^.[]+/)?.[0] ?? "";
+const rootTree =
+  valueSuggest && form && rootName
+    ? form.useStore((s: { values?: Record<string, unknown> }) => s.values?.[rootName])
+    : null;
+const valueSuggestions = valueSuggest
+  ? valueSuggest(
+      () => String(props.condition.column ?? ""),
+      () => String(props.condition.value ?? ""),
+      () => siblingAndPairs(rootTree?.value, props.condition.id),
+    )
+  : null;
+
+// Null checks take no value; drop a stale one so it can't leak into the payload.
+const onOperatorChange = (operator: unknown) => {
+  if (isUnaryOperator(operator)) {
+    form?.setFieldValue(`${props.namePrefix}.value`, "");
+  }
+  emits("input:update", "conditions", props.condition);
 };
 
 const computedLabel = computed(() => {
@@ -222,6 +270,13 @@ const toggleOperator = () => {
   emits("input:update", "conditions", props.condition);
 };
 
+// Show the option's display label (e.g. `meta.alert_name`) in the tooltip, not the
+// stored/flattened value (`meta_alert_name`); fall back to the raw value for custom columns.
+const columnDisplay = computed(() => {
+  const match = allColumns().find((c: any) => c.value === props.condition.column);
+  return match?.label || props.condition.column;
+});
+
 const computedInputWidth = computed(() => {
   return (
     props.inputWidth || (store.state.isAiChatEnabled ? "" : "xl:min-w-50 lg:min-w-22.5 lg:w-fit")
@@ -241,8 +296,14 @@ const filterColumns = (val: string) => {
     filteredFields.value = base;
   } else {
     const value = val.toLowerCase();
+    // Match the label too: workflow fields display dotted (`meta.alert_name`) but store
+    // flattened (`meta_alert_name`), so value-only matching finds nothing for what's shown.
     filteredFields.value = base.filter(
-      (column: any) => column.value.toLowerCase().indexOf(value) > -1,
+      (column: any) =>
+        column.value.toLowerCase().indexOf(value) > -1 ||
+        String(column.label ?? "")
+          .toLowerCase()
+          .indexOf(value) > -1,
     );
   }
 };

@@ -1,17 +1,46 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const { createReportViaApi } = require('../../pages/reportsPages/reportCreation.js');
+const { createDashboardViaApi } = require('../../pages/dashboardPages/dashCreation.js');
+const { createDashboardReportViaApi } = require('../../pages/reportsPages/reportCreation.js');
 
 const timestamp = Date.now();
 const BULK_FOLDER = `bulk_test_folder_${timestamp}`;
 const REPORT_1 = `bulk_report_1_${timestamp}`;
 const REPORT_2 = `bulk_report_2_${timestamp}`;
 const REPORT_3 = `bulk_report_3_${timestamp}`;
+// Own the dashboard our reports bind to. createReportViaApi used to attach them
+// to an arbitrary existing dashboard and auto-create stray e2e_setup_dashboard_*
+// that nothing ever deleted.
+const DASH_PREFIX = 'bulk_test_dash_';
+const DASHBOARD_NAME = `${DASH_PREFIX}${timestamp}`;
 
 test.describe("Report Bulk Operations", () => {
   test.describe.configure({ mode: 'serial' });
   let pm;
+  let dashboardId = null;
+  let dashboardTabId = 'default';
+
+  // Create our dashboard once, lazily, and bind every report in this file to it.
+  async function ensureDashboard() {
+    if (dashboardId) return dashboardId;
+    const res = await createDashboardViaApi(pm.apiCleanup, DASHBOARD_NAME);
+    if (!res.success) throw new Error(`Setup: failed to create dashboard: ${res.error}`);
+    dashboardId = res.dashboard.dashboard_id;
+    dashboardTabId = res.dashboard.tabs?.[0]?.tab_id || 'default';
+    return dashboardId;
+  }
+
+  // cached:false keeps a destination set, so the report lands in the Scheduled tab.
+  async function createReport(name) {
+    await ensureDashboard();
+    return createDashboardReportViaApi(pm.apiCleanup, {
+      reportName: name,
+      dashboardId,
+      tabId: dashboardTabId,
+      cached: false,
+    });
+  }
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
@@ -35,7 +64,7 @@ test.describe("Report Bulk Operations", () => {
     tag: ['@reportBulkOps', '@smoke', '@P0']
   }, async ({ page }) => {
     testLogger.info('Creating a report via API to ensure table is non-empty');
-    const result = await createReportViaApi(pm.apiCleanup, REPORT_1);
+    const result = await createReport(REPORT_1);
     if (!result.success) {
       throw new Error(`Setup: failed to create report: ${result.error}`);
     }
@@ -44,6 +73,8 @@ test.describe("Report Bulk Operations", () => {
     await pm.reportFoldersPage.expectReportVisibleInTable(REPORT_1);
 
     testLogger.info('Selecting all reports via header checkbox');
+    // select-all ticks whatever the table shows — narrow it to this run's own reports.
+    await pm.reportFoldersPage.searchReports(String(timestamp));
     await pm.reportFoldersPage.selectAllReports();
     await pm.reportFoldersPage.expectBulkButtonsVisible();
 
@@ -62,8 +93,8 @@ test.describe("Report Bulk Operations", () => {
     await pm.reportFoldersPage.createFolder(BULK_FOLDER);
     await pm.reportFoldersPage.expectFolderTabVisible(BULK_FOLDER);
 
-    const r1 = await createReportViaApi(pm.apiCleanup, `${REPORT_1}_move`);
-    const r2 = await createReportViaApi(pm.apiCleanup, `${REPORT_2}_move`);
+    const r1 = await createReport(`${REPORT_1}_move`);
+    const r2 = await createReport(`${REPORT_2}_move`);
     if (!r1.success || !r2.success) {
       throw new Error('Setup: failed to create reports for bulk move test');
     }
@@ -72,6 +103,8 @@ test.describe("Report Bulk Operations", () => {
     await pm.reportFoldersPage.clickFolderTab('default');
 
     testLogger.info('Selecting all reports and initiating bulk move');
+    // select-all ticks whatever the table shows — narrow it to this run's own reports.
+    await pm.reportFoldersPage.searchReports(String(timestamp));
     await pm.reportFoldersPage.selectAllReports();
     await pm.reportFoldersPage.clickBulkMove();
 
@@ -98,8 +131,8 @@ test.describe("Report Bulk Operations", () => {
     tag: ['@reportBulkOps', '@functional', '@P1']
   }, async ({ page }) => {
     testLogger.info('Creating reports for bulk delete test');
-    const r1 = await createReportViaApi(pm.apiCleanup, `${REPORT_2}_del`);
-    const r2 = await createReportViaApi(pm.apiCleanup, `${REPORT_3}_del`);
+    const r1 = await createReport(`${REPORT_2}_del`);
+    const r2 = await createReport(`${REPORT_3}_del`);
     if (!r1.success || !r2.success) {
       throw new Error('Setup: failed to create reports for bulk delete test');
     }
@@ -108,6 +141,8 @@ test.describe("Report Bulk Operations", () => {
     await pm.reportFoldersPage.expectReportVisibleInTable(`${REPORT_2}_del`);
 
     testLogger.info('Selecting all reports and clicking bulk delete');
+    // select-all ticks whatever the table shows — narrow it to this run's own reports.
+    await pm.reportFoldersPage.searchReports(String(timestamp));
     await pm.reportFoldersPage.selectAllReports();
     await pm.reportFoldersPage.clickBulkDelete();
 
@@ -127,7 +162,7 @@ test.describe("Report Bulk Operations", () => {
     tag: ['@reportBulkOps', '@edge', '@P2']
   }, async ({ page }) => {
     testLogger.info('Creating a report to verify cancel behaviour');
-    const r1 = await createReportViaApi(pm.apiCleanup, `${REPORT_3}_cancel`);
+    const r1 = await createReport(`${REPORT_3}_cancel`);
     if (!r1.success) {
       throw new Error('Setup: failed to create report for cancel test');
     }
@@ -136,6 +171,8 @@ test.describe("Report Bulk Operations", () => {
     await pm.reportFoldersPage.expectReportVisibleInTable(`${REPORT_3}_cancel`);
 
     testLogger.info('Selecting reports and clicking bulk delete then cancelling');
+    // select-all ticks whatever the table shows — narrow it to this run's own reports.
+    await pm.reportFoldersPage.searchReports(String(timestamp));
     await pm.reportFoldersPage.selectAllReports();
     await pm.reportFoldersPage.clickBulkDelete();
     await pm.reportFoldersPage.cancelBulkDelete();
@@ -155,7 +192,7 @@ test.describe("Report Bulk Operations", () => {
     await pm.reportFoldersPage.createFolder(cancelFolder);
     await pm.reportFoldersPage.expectFolderTabVisible(cancelFolder);
 
-    const r1 = await createReportViaApi(pm.apiCleanup, `${REPORT_1}_cancel_move`);
+    const r1 = await createReport(`${REPORT_1}_cancel_move`);
     if (!r1.success) {
       throw new Error('Setup: failed to create report');
     }
@@ -164,6 +201,8 @@ test.describe("Report Bulk Operations", () => {
     await pm.reportFoldersPage.clickFolderTab('default');
 
     testLogger.info('Opening bulk move dialog and cancelling');
+    // select-all ticks whatever the table shows — narrow it to this run's own reports.
+    await pm.reportFoldersPage.searchReports(String(timestamp));
     await pm.reportFoldersPage.selectAllReports();
     await pm.reportFoldersPage.clickBulkMove();
     await pm.reportFoldersPage.cancelMove();
@@ -175,5 +214,19 @@ test.describe("Report Bulk Operations", () => {
     // Cleanup
     await pm.apiCleanup.deleteReport(`${REPORT_1}_cancel_move`);
     await pm.reportFoldersPage.deleteFolderIfExists(cancelFolder);
+  });
+
+  // ===== CLEANUP =====
+
+  test("Cleanup: Remove the dashboard this spec created", {
+    tag: ['@reportBulkOps', '@cleanup']
+  }, async ({ page }) => {
+    const dashboards = await pm.apiCleanup.fetchDashboardsInFolder('default');
+    const ourDashboards = dashboards.filter(d => d.title && d.title.startsWith(DASH_PREFIX));
+    for (const dash of ourDashboards) {
+      await pm.apiCleanup.deleteDashboard(dash.dashboard_id, dash.folder_id || 'default');
+      testLogger.info(`Deleted test dashboard: ${dash.title}`);
+    }
+    testLogger.info('Cleanup completed');
   });
 });

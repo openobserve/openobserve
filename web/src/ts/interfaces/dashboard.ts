@@ -40,3 +40,55 @@ export interface SeriesObject {
   data: Array<number | null>;
   [key: string]: any;
 }
+
+export type AnnotationSourceMode = "builder" | "sql";
+
+/** AND/OR condition tree, the alerts condition-builder shape (FilterGroup.vue's v2 format). */
+export type AnnotationConditionLogicalOperator = "AND" | "OR";
+
+export interface AnnotationConditionLeaf {
+  id?: string;
+  filterType: "condition";
+  column: string;
+  operator: string;
+  value: string;
+  logicalOperator: AnnotationConditionLogicalOperator;
+}
+
+export interface AnnotationConditionGroup {
+  groupId?: string;
+  filterType: "group";
+  logicalOperator: AnnotationConditionLogicalOperator;
+  conditions: Array<AnnotationConditionLeaf | AnnotationConditionGroup>;
+}
+
+/** A dashboard-level query whose rows become annotation markers on time-series panels. */
+export interface AnnotationSource {
+  id: string;
+  name: string;
+  color?: string | null;
+  enabled: boolean;
+  mode: AnnotationSourceMode;
+  streamType: string;
+  stream: string;
+  filters: AnnotationConditionGroup;
+  query?: string | null;
+  title: string;
+  description?: string | null;
+  endTimeField?: string | null;
+  /** Panel ids to draw on; absent means every time-series panel, empty means none. */
+  panels?: string[] | null;
+}
+
+/** One marker produced by an annotation source row, in the shape the chart converters draw. */
+export interface QueryAnnotationMarker {
+  start_time: number;
+  end_time: number | null;
+  title: string;
+  text: string;
+  source: {
+    id: string;
+    name: string;
+    color: string;
+  };
+}

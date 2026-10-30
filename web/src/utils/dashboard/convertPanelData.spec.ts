@@ -280,9 +280,37 @@ describe("convertPanelData", () => {
         mockAnnotations,
       );
 
-      expect(runJavaScriptCode).toHaveBeenCalledWith(panelSchema, mockData);
+      expect(runJavaScriptCode).toHaveBeenCalledWith(panelSchema, mockData, undefined);
       expect(result.chartType).toBe("custom_chart");
       expect(result).toHaveProperty("customData");
+    });
+
+    it("passes the chart context through to the sandbox", async () => {
+      const panelSchema = { type: "custom_chart", queries: [{ query: "SELECT * FROM test" }] };
+      const context = {
+        variables: { service: "api" },
+        timeRange: { start: 1, end: 2 },
+        timezone: "UTC",
+        theme: "light" as const,
+      };
+
+      const { runJavaScriptCode } = await import("./convertCustomChartData");
+      await convertPanelData(
+        panelSchema,
+        mockData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations,
+        false,
+        undefined,
+        context,
+      );
+
+      expect(runJavaScriptCode).toHaveBeenCalledWith(panelSchema, mockData, context);
     });
 
     it("should handle custom chart type with no data", async () => {
@@ -292,19 +320,20 @@ describe("convertPanelData", () => {
       };
       const emptyData = [];
 
-      await expect(
-        convertPanelData(
-          panelSchema,
-          emptyData,
-          mockStore,
-          mockChartPanelRef,
-          mockHoveredSeriesState,
-          mockResultMetaData,
-          mockMetadata,
-          mockChartPanelStyle,
-          mockAnnotations,
-        ),
-      ).rejects.toThrow("No data found");
+      const result = await convertPanelData(
+        panelSchema,
+        emptyData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations,
+      );
+
+      // No rows is an empty state, not an error; the renderer shows "No Data"
+      expect(result).toEqual({});
     });
 
     it("should handle custom chart type with invalid JavaScript result", async () => {
@@ -385,19 +414,20 @@ describe("convertPanelData", () => {
       };
       const emptyData = [];
 
-      await expect(
-        convertPanelData(
-          panelSchema,
-          emptyData,
-          mockStore,
-          mockChartPanelRef,
-          mockHoveredSeriesState,
-          mockResultMetaData,
-          mockMetadata,
-          mockChartPanelStyle,
-          mockAnnotations,
-        ),
-      ).rejects.toThrow("No data found");
+      const result = await convertPanelData(
+        panelSchema,
+        emptyData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations,
+      );
+
+      // No rows is an empty state, not an error; the renderer shows "No Data"
+      expect(result).toEqual({});
     });
 
     it("should handle custom chart with missing queries", async () => {
@@ -728,6 +758,7 @@ describe("convertPanelData", () => {
         mockChartPanelStyle,
         mockAnnotations,
         false,
+        undefined,
       );
     });
 
@@ -1007,6 +1038,7 @@ describe("convertPanelData", () => {
         mockChartPanelStyle,
         mockAnnotations,
         true,
+        undefined,
       );
     });
 
@@ -1079,6 +1111,7 @@ describe("convertPanelData", () => {
         expect.anything(),
         expect.anything(),
         false,
+        undefined,
       );
     });
 
@@ -1293,7 +1326,7 @@ describe("convertPanelData", () => {
         mockAnnotations,
       );
 
-      expect(runJavaScriptCode).toHaveBeenCalledWith(panelSchema, promqlData);
+      expect(runJavaScriptCode).toHaveBeenCalledWith(panelSchema, promqlData, undefined);
       expect(result.chartType).toBe("custom_chart");
     });
   });

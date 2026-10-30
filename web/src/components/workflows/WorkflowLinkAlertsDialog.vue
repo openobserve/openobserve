@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -149,11 +149,13 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 import alertsService from "@/services/alerts";
+import { saveAlertMutation } from "@/services/alerts.queries";
+import { useMutation } from "@tanstack/vue-query";
 
 const props = defineProps<{ workflowId: string; workflowName: string }>();
 const emit = defineEmits<{ (e: "close"): void; (e: "linked"): void }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 const orgId = () => store.state.selectedOrganization.identifier as string;
@@ -223,7 +225,7 @@ const folderOptions = computed(() => {
     if (!byId.has(a.folder_id)) byId.set(a.folder_id, a.folder_name);
   }
   return [...byId.entries()]
-    .map(([value, label]) => ({ label, value }))
+    .map(([value, label]) => ({ label: raw(label), value }))
     .sort((x, y) => {
       if (x.value === "default") return -1;
       if (y.value === "default") return 1;
@@ -235,7 +237,7 @@ const folderOptions = computed(() => {
 const alertOptions = computed(() =>
   alerts.value
     .filter((a) => a.folder_id === selectedFolder.value)
-    .map((a) => ({ label: a.name, value: a.alert_id })),
+    .map((a) => ({ label: raw(a.name), value: a.alert_id })),
 );
 
 // The alerts dropdown only edits the CURRENT folder's slice of the global
@@ -268,6 +270,8 @@ const clearAll = () => {
 // Link = for each selected alert: GET the full alert, add this workflow id to
 // its `workflows`, PUT it back (v2 GET returns the Alert model; the v2 update
 // body flattens that same model, so it round-trips cleanly).
+const linkAlert = useMutation(() => saveAlertMutation(orgId(), () => true));
+
 const linkSelected = async () => {
   if (!selected.value.length || linking.value) return;
   linking.value = true;
@@ -282,7 +286,7 @@ const linkSelected = async () => {
       const wfs: string[] = Array.isArray(alert.workflows) ? alert.workflows : [];
       if (!wfs.includes(props.workflowId)) wfs.push(props.workflowId);
       alert.workflows = wfs;
-      await alertsService.update_by_alert_id(org, alert, byId.get(alertId)?.folder_id);
+      await linkAlert.mutateAsync({ payload: alert, folderId: byId.get(alertId)?.folder_id });
       ok += 1;
     } catch (e) {
       failed += 1;
@@ -297,7 +301,7 @@ const linkSelected = async () => {
     });
   } else if (ok && failed) {
     toast({
-      message: t("workflow.linkAlerts.linkPartial", { ok, failed }),
+      message: t("workflow.linkAlerts.linkPartial", { count: ok, failed }),
       variant: "warning",
     });
   } else {

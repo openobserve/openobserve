@@ -1,0 +1,158 @@
+[
+  {
+    "id": "tcl-led-batch-classifies-as-update",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "BEGIN; UPDATE accounts SET balance = balance - 250 WHERE id = 77421; COMMIT"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "BEGIN; UPDATE accounts SET balance = balance - ? WHERE id = ?; COMMIT",
+      "operation": "UPDATE",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_accounts_tcl_batch",
+    "literals": ["250", "77421"],
+    "source": "authored"
+  },
+  {
+    "id": "heterogeneous-batch-is-batch-op",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "INSERT INTO audit_log (msg) VALUES ($1); UPDATE stats SET n = n + 1 WHERE k = $2"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "INSERT INTO audit_log (msg) VALUES (?); UPDATE stats SET n = n + ? WHERE k = ?",
+      "operation": "BATCH",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_hetero_batch",
+    "literals": [],
+    "source": "authored"
+  },
+  {
+    "id": "repeated-block-batch-collapses-x3",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "INSERT INTO items (sku, qty) VALUES (@p0, @p1); INSERT INTO items (sku, qty) VALUES (@p2, @p3); INSERT INTO items (sku, qty) VALUES (@p4, @p5)"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "INSERT INTO items (sku, qty) VALUES (?)",
+      "operation": "INSERT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": 3
+    },
+    "fingerprint_class": "pg_items_insert",
+    "literals": [],
+    "source": "authored"
+  },
+  {
+    "id": "multi-row-values-collapse",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "INSERT INTO items (sku, qty) VALUES ($1, $2), ($3, $4), ($5, $6)"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "INSERT INTO items (sku, qty) VALUES (?)",
+      "operation": "INSERT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_items_insert",
+    "literals": [],
+    "source": "authored"
+  },
+  {
+    "id": "generated-savepoint-name-a",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "SAVEPOINT sp_c4d5e6f7"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SAVEPOINT sp_?",
+      "operation": "SAVEPOINT",
+      "stmt_class": "transaction-control",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_savepoint_generated",
+    "literals": ["c4d5e6f7"],
+    "source": "authored"
+  },
+  {
+    "id": "generated-savepoint-name-b",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "SAVEPOINT sp_a1b2c3d4"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SAVEPOINT sp_?",
+      "operation": "SAVEPOINT",
+      "stmt_class": "transaction-control",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_savepoint_generated",
+    "literals": ["a1b2c3d4"],
+    "source": "authored"
+  }
+]

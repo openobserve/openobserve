@@ -79,6 +79,15 @@ const ODrawerStub = {
   emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
 };
 
+// The annotation tab's own behaviour is covered in AnnotationSettings.spec.ts.
+vi.mock("@/components/dashboards/settings/AnnotationSettings.vue", () => ({
+  default: {
+    name: "AnnotationSettings",
+    template: '<div data-test="annotation-settings-mock">AnnotationSettings</div>',
+    emits: ["save"],
+  },
+}));
+
 // Mock getImageURL utility
 vi.mock("../../utils/zincutils", () => ({
   getImageURL: vi.fn((path: string) => `mocked-${path}`),
@@ -308,6 +317,19 @@ describe("DashboardSettings.vue", () => {
 
       const tabsSettings = wrapper.findComponent({ name: "TabsSettings" });
       expect(tabsSettings.exists()).toBe(true);
+    });
+
+    it("renders the Annotations tab as the fourth tab and refreshes when it saves", async () => {
+      wrapper = mountComponent();
+
+      expect(wrapper.find('[data-test="dashboard-settings-annotation-tab"]').exists()).toBe(true);
+      (wrapper.vm as unknown as { activeTab: string }).activeTab = "annotationSettings";
+      await wrapper.vm.$nextTick();
+
+      const annotationSettings = wrapper.findComponent({ name: "AnnotationSettings" });
+      expect(annotationSettings.exists()).toBe(true);
+      await annotationSettings.vm.$emit("save");
+      expect(wrapper.emitted("refresh")).toHaveLength(1);
     });
   });
 

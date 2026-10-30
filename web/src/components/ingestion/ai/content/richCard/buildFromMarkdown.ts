@@ -32,8 +32,12 @@ import type {
 import { parseFrontmatter } from "./parseFrontmatter";
 import { applySubs, applySubsMasked } from "@/components/ingestion/setupCard/subs";
 import { resolveAICardLogo } from "../index";
+import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 
 const str = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
+// Card copy is authored in the content repo's markdown, not in the locale files,
+// so it is deliberately untranslated here (`raw`) rather than looked up via `t`.
+const rawStr = (v: unknown): I18nText | undefined => (typeof v === "string" ? raw(v) : undefined);
 
 /** Maps md `stream_type` to the detect streamType union (else traces). */
 const STREAM_TYPES: Record<string, "logs" | "metrics" | "traces"> = {
@@ -43,34 +47,35 @@ const STREAM_TYPES: Record<string, "logs" | "metrics" | "traces"> = {
 };
 const trimTrailing = (s: string) => s.replace(/\n+$/, "");
 
-function buildStep(raw: any, slug: string, i: number, subs: CardSubstitutions): RichCardStep {
-  const code = raw?.code
+// Param is named `src`, not `raw`, so it doesn't shadow the `raw()` i18n helper.
+function buildStep(src: any, slug: string, i: number, subs: CardSubstitutions): RichCardStep {
+  const code = src?.code
     ? (() => {
-        const text = trimTrailing(String(raw.code.text ?? ""));
+        const text = trimTrailing(String(src.code.text ?? ""));
         const hasToken = text.includes("{token}");
         return {
-          lang: str(raw.code.lang) ?? "",
+          lang: str(src.code.lang) ?? "",
           raw: applySubs(text, subs),
           masked: hasToken ? applySubsMasked(text, subs) : undefined,
-          filename: str(raw.code.filename),
-          downloadEnv: !!raw.code.download_env,
+          filename: str(src.code.filename),
+          downloadEnv: !!src.code.download_env,
         };
       })()
     : undefined;
 
-  const completeOn: StepCompleteOn = raw?.complete_on === "detect" ? "detect" : "copy";
+  const completeOn: StepCompleteOn = src?.complete_on === "detect" ? "detect" : "copy";
 
   return {
-    id: str(raw?.id) ?? `${slug}-${i + 1}`,
-    title: str(raw?.title) ?? `Step ${i + 1}`,
-    description: str(raw?.description) ?? "",
-    chip: raw?.chip ? { kind: raw.chip.kind, label: String(raw.chip.label) } : undefined,
+    id: str(src?.id) ?? `${slug}-${i + 1}`,
+    title: raw(str(src?.title) ?? `Step ${i + 1}`),
+    description: raw(str(src?.description) ?? ""),
+    chip: src?.chip ? { kind: src.chip.kind, label: raw(String(src.chip.label)) } : undefined,
     code,
-    note: str(raw?.note),
-    pills: Array.isArray(raw?.pills) ? raw.pills.map(String) : undefined,
+    note: rawStr(src?.note),
+    pills: Array.isArray(src?.pills) ? src.pills.map(String) : undefined,
     completeOn,
-    required: !!raw?.required,
-    detectionAnchor: !!raw?.detection_anchor,
+    required: !!src?.required,
+    detectionAnchor: !!src?.detection_anchor,
   };
 }
 
@@ -79,6 +84,7 @@ export function buildFromMarkdown(
   slug: string,
   md: string,
   subs: CardSubstitutions,
+  t: TranslateFn,
 ): RichCardContent | null {
   const { data } = parseFrontmatter(md);
   // A `detect:` block is what marks an integration as rich-card-enabled.
@@ -94,24 +100,25 @@ export function buildFromMarkdown(
 
   return {
     provider: {
+      id: slug,
       name: str(card.name) ?? slug,
-      tagline: str(card.tagline) ?? "",
+      tagline: raw(str(card.tagline) ?? ""),
       // Logo from the md frontmatter, resolved to a bundled asset URL (or an
       // absolute URL as-is). A manifest `logo` overrides at render; with neither,
       // the card shows a lettered monogram. `logo_dark` is used only in dark mode.
       logo: resolveAICardLogo(slug, str(card.logo)),
       logoDark: resolveAICardLogo(slug, str(card.logo_dark)) || undefined,
       tone: str(card.tone) ?? "#d97757",
-      runtime: str(card.runtime),
-      setupTime: str(card.setup_time),
+      runtime: rawStr(card.runtime),
+      setupTime: rawStr(card.setup_time),
     },
     steps: steps.map((s, i) => buildStep(s, slug, i, subs)),
     streamInput: si
       ? {
-          label: str(si.label) ?? "Stream Name",
+          label: rawStr(si.label) ?? t("ingestion.setupCard.streamNameLabel"),
           default: str(si.default) ?? "default",
-          placeholder: str(si.placeholder),
-          help: str(si.help),
+          placeholder: rawStr(si.placeholder),
+          help: rawStr(si.help),
         }
       : undefined,
     detect: {
@@ -128,11 +135,11 @@ export function buildFromMarkdown(
       installs: Array.isArray(extras.installs) ? extras.installs.map(String) : undefined,
       envVars: Array.isArray(extras.env_vars) ? extras.env_vars.map(String) : undefined,
       fixSnippet: str(data.fix_snippet),
-      fixTitle: str(data.fix_title),
-      fixBody: str(data.fix_body),
+      fixTitle: rawStr(data.fix_title),
+      fixBody: rawStr(data.fix_body),
       fixLang: str(data.fix_lang),
       troubleshooting: Array.isArray(data.troubleshooting)
-        ? data.troubleshooting.map((t: any) => ({ q: String(t.q), a: String(t.a) }))
+        ? data.troubleshooting.map((t: any) => ({ q: raw(String(t.q)), a: raw(String(t.a)) }))
         : undefined,
     },
     docUrl: str(data.doc_url),

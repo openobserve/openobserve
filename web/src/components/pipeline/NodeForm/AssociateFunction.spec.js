@@ -198,7 +198,7 @@ describe("AssociateFunction.vue (drawer chrome)", () => {
     const wrapper = createWrapper();
     await wrapper.find('[data-test="cancel-btn"]').trigger("click");
     expect(wrapper.vm.dialog.show).toBe(true);
-    expect(wrapper.vm.dialog.title).toBe("Discard Changes");
+    expect(wrapper.vm.dialog.title).toBe("Discard changes");
     expect(wrapper.vm.pipelineObj.userSelectedNode).toEqual({});
   });
 

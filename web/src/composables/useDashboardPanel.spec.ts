@@ -8,6 +8,18 @@ import queryService from "@/services/search";
 import * as zincutils from "@/utils/zincutils";
 import * as sqlUtils from "@/utils/query/sqlUtils";
 import * as panelValidation from "@/utils/dashboard/panelValidation";
+import enLocale from "@/locales/languages/en-US.json";
+
+// Resolve straight from the en-US catalogue rather than the vue-i18n composer.
+// vue-i18n instruments message resolution via window.performance under
+// NODE_ENV !== "production", which this file mock graph leaves unavailable, so
+// composer.t() throws here (it works in every other spec). Assertions still
+// check the real shipped copy.
+const t = ((key: string, named?: Record<string, unknown>) => {
+  const msg = key.split(".").reduce<any>((a, k) => (a == null ? a : a[k]), enLocale as any);
+  if (typeof msg !== "string") return key;
+  return named ? msg.replace(/{(\w+)}/g, (_m: string, k: string) => String(named[k] ?? "")) : msg;
+}) as any;
 
 // Mock Vue lifecycle hooks to avoid warnings
 vi.mock("vue", async () => {
@@ -23,8 +35,14 @@ vi.mock("vue", async () => {
 vi.mock("vuex");
 vi.mock("./useNotifications");
 vi.mock("./dashboard/useValuesWebSocket");
-vi.mock("@/services/stream");
-vi.mock("@/services/search");
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { automockService } = await import("@/test/unit/helpers/mockService");
+  return automockService(await importOriginal());
+});
+vi.mock("@/services/search", async (importOriginal) => {
+  const { automockService } = await import("@/test/unit/helpers/mockService");
+  return automockService(await importOriginal());
+});
 vi.mock("@/utils/zincutils");
 vi.mock("@/utils/query/sqlUtils");
 vi.mock("@/utils/dashboard/convertDataIntoUnitValue");
@@ -125,7 +143,7 @@ describe("useDashboardPanel", () => {
 
   describe("Basic Initialization", () => {
     it("should initialize composable successfully", () => {
-      const { dashboardPanelData } = useDashboardPanelData();
+      const { dashboardPanelData } = useDashboardPanelData("dashboard", t);
 
       expect(dashboardPanelData).toBeDefined();
       expect(dashboardPanelData.data).toBeDefined();
@@ -146,19 +164,19 @@ describe("useDashboardPanel", () => {
     });
 
     it("should initialize table_pagination as false by default", () => {
-      const { dashboardPanelData } = useDashboardPanelData();
+      const { dashboardPanelData } = useDashboardPanelData("dashboard", t);
 
       expect(dashboardPanelData.data.config.table_pagination).toBe(false);
     });
 
     it("should initialize table_pagination_rows_per_page as null by default", () => {
-      const { dashboardPanelData } = useDashboardPanelData();
+      const { dashboardPanelData } = useDashboardPanelData("dashboard", t);
 
       expect(dashboardPanelData.data.config.table_pagination_rows_per_page).toBeNull();
     });
 
     it("should initialize pagination config alongside other table config", () => {
-      const { dashboardPanelData } = useDashboardPanelData();
+      const { dashboardPanelData } = useDashboardPanelData("dashboard", t);
       const config = dashboardPanelData.data.config;
 
       // Verify pagination config exists with other table config
@@ -174,7 +192,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
     });
 
     it("should have all expected functions", () => {
@@ -201,6 +219,19 @@ describe("useDashboardPanel", () => {
       panel.resetDashboardPanelData();
 
       expect(panel.dashboardPanelData.data.title).toBe("");
+    });
+
+    it("starts a new panel in auto axis label mode", () => {
+      panel.resetDashboardPanelData();
+      expect(panel.dashboardPanelData.data.config.axis_label_mode).toBe("auto");
+    });
+
+    it("puts a loaded panel without a mode into auto", async () => {
+      const config = { ...panel.dashboardPanelData.data.config };
+      delete config.axis_label_mode;
+      panel.dashboardPanelData.data.config = config;
+      await nextTick();
+      expect(panel.dashboardPanelData.data.config.axis_label_mode).toBe("auto");
     });
 
     it("should generate labels from names", () => {
@@ -247,7 +278,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
       panel.dashboardPanelData.meta.stream.selectedStreamFields = [
         { name: "timestamp", type: "Utf8" },
         { name: "level", type: "Utf8" },
@@ -312,7 +343,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
       panel.dashboardPanelData.meta.stream.selectedStreamFields = [
         { name: "latitude", type: "Float64" },
         { name: "longitude", type: "Float64" },
@@ -364,7 +395,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
     });
 
     it("should have promqlMode computed property", () => {
@@ -399,7 +430,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
     });
 
     it("should have validation computed properties", () => {
@@ -424,7 +455,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
     });
 
     it("should get result schema", async () => {
@@ -503,7 +534,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
     });
 
     it("should update array aliases", () => {
@@ -559,7 +590,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
     });
 
     it("should handle empty field operations", () => {
@@ -609,7 +640,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
       panel.dashboardPanelData.meta.stream.selectedStreamFields = [
         { name: "timestamp", type: "Utf8" },
         { name: "level", type: "Utf8" },
@@ -645,7 +676,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
       panel.dashboardPanelData.meta.stream.selectedStreamFields = [
         { name: "level", type: "Utf8" },
         { name: "service", type: "Utf8" },
@@ -712,7 +743,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
       panel.dashboardPanelData.meta.stream.selectedStreamFields = [
         { name: "timestamp", type: "Utf8" },
         { name: "level", type: "Utf8" },
@@ -753,7 +784,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
       panel.dashboardPanelData.meta.stream.selectedStreamFields = [
         { name: "timestamp", type: "Utf8" },
         { name: "level", type: "Utf8" },
@@ -803,7 +834,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
       panel.dashboardPanelData.meta.stream.selectedStreamFields = [
         { name: "timestamp", type: "Utf8" },
         { name: "latitude", type: "Float64" },
@@ -867,7 +898,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
       panel.dashboardPanelData.meta.stream.selectedStreamFields = [
         { name: "timestamp", type: "Utf8" },
         { name: "level", type: "Utf8" },
@@ -939,7 +970,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
       panel.dashboardPanelData.meta.stream.selectedStreamFields = [
         { name: "timestamp", type: "Utf8" },
         { name: "level", type: "Utf8" },
@@ -1009,7 +1040,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
       panel.dashboardPanelData.meta.stream.selectedStreamFields = [
         { name: "timestamp", type: "Utf8" },
         { name: "level", type: "Utf8" },
@@ -1068,7 +1099,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
       panel.dashboardPanelData.meta.stream.selectedStreamFields = [
         { name: "timestamp", type: "Utf8" },
         { name: "level", type: "Utf8" },
@@ -1142,7 +1173,7 @@ describe("useDashboardPanel", () => {
 
   describe("Dashboard Panel State Management", () => {
     it("should handle panel layout and configuration changes", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test layout changes
       const originalQueryIndex = panel.dashboardPanelData.layout.currentQueryIndex;
@@ -1168,7 +1199,7 @@ describe("useDashboardPanel", () => {
 
   describe("Error Boundary and Edge Cases", () => {
     it("should handle WebSocket connection and disconnection", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test WebSocket operations if available
       try {
@@ -1204,7 +1235,7 @@ describe("useDashboardPanel", () => {
 
   describe("Data Transformation and Formatting", () => {
     it("should handle data formatting and unit conversions", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test unit conversion and formatting
       panel.dashboardPanelData.data.config.unit = "bytes";
@@ -1234,7 +1265,7 @@ describe("useDashboardPanel", () => {
 
   describe("Panel Configuration and Layout", () => {
     it("should handle panel size and position configurations", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test panel layout properties
       panel.dashboardPanelData.layout.h = 400;
@@ -1270,7 +1301,7 @@ describe("useDashboardPanel", () => {
 
   describe("Advanced Query Operations", () => {
     it("should handle complex query operations and transformations", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test different chart types with specific requirements
       panel.dashboardPanelData.data.type = "pie";
@@ -1317,7 +1348,7 @@ describe("useDashboardPanel", () => {
 
   describe("Stream and Schema Management", () => {
     it("should handle stream selection and schema operations", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test stream configuration
       panel.dashboardPanelData.meta.stream.selectedStream = {
@@ -1376,7 +1407,7 @@ describe("useDashboardPanel", () => {
 
   describe("Computed Properties and Watchers", () => {
     it("should test computed properties and reactive behavior", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test promqlMode computed property with different query types
       panel.dashboardPanelData.data.queryType = "sql";
@@ -1426,7 +1457,7 @@ describe("useDashboardPanel", () => {
 
   describe("Time Range and Date Handling", () => {
     it("should handle time range configurations and date operations", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test time range settings
       panel.dashboardPanelData.data.queries[0].config.startTime = 1640995200000; // Jan 1, 2022
@@ -1464,7 +1495,7 @@ describe("useDashboardPanel", () => {
 
   describe("Complex Function Invocations", () => {
     it("should execute complex functions with different parameters and conditions", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test with different pageKey types to trigger different code paths
       const dashboardPanel = useDashboardPanelData("dashboard");
@@ -1532,7 +1563,7 @@ describe("useDashboardPanel", () => {
 
   describe("Panel Drag and Drop Operations", () => {
     it("should handle drag and drop field operations and state management", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test setting drag state
       panel.dashboardPanelData.meta.dragAndDrop.dragging = true;
@@ -1581,7 +1612,7 @@ describe("useDashboardPanel", () => {
 
   describe("Meta State and Search Operations", () => {
     it("should handle meta state changes and search functionality", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test search around data meta properties
       if (!panel.dashboardPanelData.meta.searchAroundData) {
@@ -1633,7 +1664,7 @@ describe("useDashboardPanel", () => {
 
   describe("Field Validation and Chart Constraints", () => {
     it("should enforce chart type field constraints and validate operations", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test table chart type with unlimited fields
       panel.dashboardPanelData.data.type = "table";
@@ -1699,7 +1730,7 @@ describe("useDashboardPanel", () => {
 
   describe("Custom Query and SQL Operations", () => {
     it("should handle custom queries and SQL parsing operations", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test custom query mode
       panel.dashboardPanelData.data.queries[0].customQuery = true;
@@ -1776,7 +1807,7 @@ describe("useDashboardPanel", () => {
 
   describe("Dashboard Layout and Panel Management", () => {
     it("should handle dashboard layout properties and panel management", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test layout coordinates and dimensions
       panel.dashboardPanelData.layout.i = "panel-1";
@@ -1843,7 +1874,7 @@ describe("useDashboardPanel", () => {
 
   describe("Advanced Chart Configuration", () => {
     it("should handle advanced chart configurations and options", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test treemap chart configuration
       panel.dashboardPanelData.data.type = "treemap";
@@ -1934,7 +1965,7 @@ describe("useDashboardPanel", () => {
 
   describe("WebSocket and Real-time Operations", () => {
     it("should handle WebSocket connections and real-time data operations", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test WebSocket connection states
       panel.dashboardPanelData.meta.connection = {
@@ -2020,7 +2051,7 @@ describe("useDashboardPanel", () => {
 
   describe("resetFields Function", () => {
     it("should reset all fields to default values", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Add some fields first
       panel.addXAxisItem({ name: "timestamp" });
@@ -2057,7 +2088,7 @@ describe("useDashboardPanel", () => {
     });
 
     it("should reset filter to default structure", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Verify filter is reset to default structure
       if (typeof panel.resetFields === "function") {
@@ -2076,7 +2107,7 @@ describe("useDashboardPanel", () => {
     });
 
     it("should work with different query indexes", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test with current query index
       const currentIndex = panel.dashboardPanelData.layout.currentQueryIndex;
@@ -2091,7 +2122,7 @@ describe("useDashboardPanel", () => {
 
   describe("setFieldsBasedOnChartTypeValidation Function", () => {
     it("should handle table chart type by merging breakdown fields into x fields", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test data for table chart
       const testFields = {
@@ -2114,7 +2145,7 @@ describe("useDashboardPanel", () => {
     });
 
     it("should handle different field formats (string vs object)", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test with string fields
       const stringFields = {
@@ -2143,7 +2174,7 @@ describe("useDashboardPanel", () => {
     });
 
     it("should handle different chart types correctly", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       const testFields = {
         x: [{ name: "timestamp" }],
@@ -2169,7 +2200,7 @@ describe("useDashboardPanel", () => {
     });
 
     it("should handle empty or null field arrays", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       const emptyFields = {
         x: null,
@@ -2190,7 +2221,7 @@ describe("useDashboardPanel", () => {
     });
 
     it("should call addXAxisItem, addYAxisItem, addZAxisItem functions appropriately", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test that the add functions exist and are callable
       expect(typeof panel.addXAxisItem).toBe("function");
@@ -2207,7 +2238,7 @@ describe("useDashboardPanel", () => {
     });
 
     it("should handle fields with missing name/column properties", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       const fieldsWithValidProps = {
         x: [{ name: "valid_field" }, { column: "valid_column" }],
@@ -2243,7 +2274,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
       panel.dashboardPanelData.meta.stream.selectedStreamFields = [
         { name: "timestamp", type: "Utf8" },
         { name: "level", type: "Utf8" },
@@ -2385,7 +2416,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
 
       // Mock date time
       panel.dashboardPanelData.meta.dateTime = {
@@ -3241,7 +3272,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
     });
 
     it("should handle complex selectedStreamFieldsBasedOnUserDefinedSchema conditions", () => {
@@ -3347,7 +3378,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
     });
 
     it("should handle line chart specific configurations", () => {
@@ -3474,7 +3505,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
     });
 
     it("should test addBreakDownAxisItem functionality", () => {
@@ -3815,7 +3846,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
     });
 
     // Tests 51-60: Map chart operations
@@ -4151,7 +4182,7 @@ describe("useDashboardPanel", () => {
 
     it("should handle memory cleanup", () => {
       // Test that objects can be properly garbage collected
-      let tempPanel = useDashboardPanelData();
+      let tempPanel = useDashboardPanelData("dashboard", t);
       tempPanel.addXAxisItem({ name: "temp_field" });
       tempPanel = null;
 
@@ -4532,7 +4563,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
       // useDashboardPanelData() returns shared singleton state, so reset the
       // active query index between tests — otherwise a test that selects a
       // non-zero query tab (e.g. the resetAggregationFunction multi-query
@@ -5644,7 +5675,7 @@ describe("useDashboardPanel", () => {
         panel.dashboardPanelData.data.queries[0].fields.x[
           panel.dashboardPanelData.data.queries[0].fields.x.length - 1
         ];
-      expect(field.label).toBe("custom_x_field");
+      expect(field.label).toBe("");
       expect(field.alias).toBe("custom_x_field");
 
       // Reset custom query
@@ -5662,7 +5693,7 @@ describe("useDashboardPanel", () => {
         panel.dashboardPanelData.data.queries[0].fields.breakdown[
           panel.dashboardPanelData.data.queries[0].fields.breakdown.length - 1
         ];
-      expect(field.label).toBe("custom_breakdown");
+      expect(field.label).toBe("");
       expect(field.alias).toBe("custom_breakdown");
 
       // Reset custom query

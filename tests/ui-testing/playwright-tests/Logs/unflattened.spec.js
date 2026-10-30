@@ -253,7 +253,7 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.closeButton.click();
 
     testLogger.info('Re-ingesting data with updated schema (Store Original Data ON)');
-    await ingestion(page);
+    await ingestion(page, 'e2e_automate', { force: true });
 
     // Deterministic readiness gate: poll the search API until _o2_id is queryable
     // instead of sleeping a fixed interval and hoping indexing has caught up.
@@ -279,9 +279,12 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.unflattenedTab.click();
     await page.waitForTimeout(500);
 
+    // Switching to the unflattened tab re-renders the drawer, so the close
+    // button node detaches mid-click ("element was detached from the DOM") and
+    // a bare .click() times out unrecoverably on CI. Use the resilient helper
+    // (Escape fallback + wait-for-hidden) instead.
     testLogger.info('Closing log detail dialog');
-    await pageManager.unflattenedPage.closeDialog.waitFor();
-    await pageManager.unflattenedPage.closeDialog.click();
+    await pageManager.unflattenedPage.closeLogDetailDrawerIfOpen();
 
     // Cleanup: Toggle Store Original Data back OFF
     testLogger.info('Cleanup: Toggling Store Original Data back OFF');
@@ -352,7 +355,7 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.closeButton.click();
 
     testLogger.info('Re-ingesting data with updated schema (Store Original Data ON)');
-    await ingestion(page);
+    await ingestion(page, 'e2e_automate', { force: true });
 
     // Deterministic readiness gate: poll the search API until _o2_id is queryable
     // instead of a fixed 15s sleep + UI re-ingestion retry loop. This was the
@@ -422,9 +425,12 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.unflattenedTab.click();
     await page.waitForTimeout(500);
 
+    // Switching to the unflattened tab re-renders the drawer, so the close
+    // button node detaches mid-click ("element was detached from the DOM") and
+    // a bare .click() times out unrecoverably on CI. Use the resilient helper
+    // (Escape fallback + wait-for-hidden) instead.
     testLogger.info('Closing log detail dialog');
-    await pageManager.unflattenedPage.closeDialog.waitFor();
-    await pageManager.unflattenedPage.closeDialog.click();
+    await pageManager.unflattenedPage.closeLogDetailDrawerIfOpen();
 
     testLogger.info('Toggling Store Original Data back OFF to clean up');
     await page.goto(`${process.env.ZO_BASE_URL}/web/streams?org_identifier=${getOrgIdentifier()}`);
@@ -454,7 +460,7 @@ test.describe("Unflattened testcases", () => {
 
     await page.waitForTimeout(500);
     testLogger.info('Ingesting data with Store Original Data OFF');
-    await ingestion(page);
+    await ingestion(page, 'e2e_automate', { force: true });
     testLogger.info('Data ingestion completed, waiting 3s for indexing');
     await page.waitForTimeout(3000);
 

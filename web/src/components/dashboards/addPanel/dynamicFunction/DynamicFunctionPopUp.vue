@@ -3,11 +3,11 @@
 <template>
   <div data-test="dynamic-function-popup-root" class="flex flex-col">
     <!-- Body -->
-    <div :class="fullMode ? 'flex min-h-0' : 'flex flex-col'">
+    <div :class="fullMode ? 'flex min-h-0 max-md:flex-col' : 'flex flex-col'">
       <!-- Property pane -->
       <div
-        class="flex w-52 shrink-0 flex-col gap-3.5 p-3"
-        :class="fullMode ? 'border-border-default border-e' : ''"
+        class="flex w-52 shrink-0 flex-col gap-3.5 p-3 max-md:w-full"
+        :class="fullMode ? 'border-border-default border-e max-md:border-e-0 max-md:border-b' : ''"
       >
         <div class="text-compact font-semibold" data-test="dynamic-function-popup-property-label">
           {{ t("dashboard.dynamicFunctionPopUp.property") }}
@@ -143,6 +143,7 @@
               </div>
 
               <OButton
+                :aria-label="t('common.cancel')"
                 variant="outline"
                 size="icon"
                 class="shrink-0"
@@ -177,7 +178,7 @@ import { ref, computed, watch, nextTick } from "vue";
 import RawQueryBuilder from "./RawQueryBuilder.vue";
 import SelectFunction from "./SelectFunction.vue";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
@@ -222,7 +223,7 @@ export default {
   },
   emits: ["update:modelValue"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const fields = ref(props.modelValue);
 
     // if functionName property is missing for build type, selected function Name will be None -> null

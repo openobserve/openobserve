@@ -144,7 +144,10 @@ const BUG_9754_TEST_LOGS = [
   }
 ];
 
-const STREAM_NAME = 'e2e_highlighting_test';
+// Per-run unique suffix: the fixed name collided with concurrent shared-org runs, so ingestion
+// hit "stream [e2e_highlighting_test] is being deleted" (another run's cleanup mid-flight). Keep
+// the e2e_ prefix so prefix-based cleanup still catches it.
+const STREAM_NAME = 'e2e_highlighting_test_' + Math.random().toString(36).slice(2, 7);
 
 // Runs in serial mode because the tests share the e2e_highlighting_test stream (the @setup
 // test ingests data the later tests query). Serial mode means a failed test retries the

@@ -5,7 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
      beside it stays live; j/k step through that list without closing. -->
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -71,7 +71,7 @@ const emit = defineEmits<{
   next: [];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const TONE_CHIP: Record<DrawerTone, string> = {
   critical: "bg-icon-chip-error-bg text-icon-chip-error-text",
@@ -206,7 +206,7 @@ const shownFacts = computed(() =>
             <slot name="actions" />
             <div
               v-if="index !== null && total"
-              class="border-border-default rounded-default ml-1 flex items-center border"
+              class="border-border-default rounded-default ms-1 flex items-center border"
             >
               <OButton
                 variant="ghost"

@@ -74,16 +74,8 @@ fn create_synthetics_table() -> TableCreateStatement {
                 .not_null()
                 .primary_key(),
         )
-        .col(
-            ColumnDef::new(Synthetics::OrgId)
-                .string_len(100)
-                .not_null(),
-        )
-        .col(
-            ColumnDef::new(Synthetics::FolderId)
-                .char_len(27)
-                .not_null(),
-        )
+        .col(ColumnDef::new(Synthetics::OrgId).string_len(100).not_null())
+        .col(ColumnDef::new(Synthetics::FolderId).char_len(27).not_null())
         .col(
             ColumnDef::new(Synthetics::TzOffset)
                 .integer()
@@ -96,45 +88,43 @@ fn create_synthetics_table() -> TableCreateStatement {
                 .from(Synthetics::Table, Synthetics::FolderId)
                 .to(Folders::Table, Folders::Id),
         )
-        .col(
-            ColumnDef::new(Synthetics::Name)
-                .string_len(256)
-                .not_null(),
-        )
+        .col(ColumnDef::new(Synthetics::Name).string_len(256).not_null())
         .col(
             ColumnDef::new(Synthetics::SyntheticsType)
                 .string_len(32)
                 .not_null(),
         )
         .col(ColumnDef::new(Synthetics::Target).text().not_null())
-        .col(ColumnDef::new(Synthetics::Description).text().not_null().default(""))
+        .col(
+            ColumnDef::new(Synthetics::Description)
+                .text()
+                .not_null()
+                .default(""),
+        )
         // Tags: JSON array of strings — supports filter-by-tag queries.
         .col(ColumnDef::new(Synthetics::Tags).json().not_null())
         .col(ColumnDef::new(Synthetics::Config).json().not_null())
         // Frequency stored as JSON: { type, interval, cron }
         .col(ColumnDef::new(Synthetics::Frequency).json().not_null())
-        .col(
-            ColumnDef::new(Synthetics::Locations)
-                .json()
-                .not_null(),
-        )
+        .col(ColumnDef::new(Synthetics::Locations).json().not_null())
         .col(
             ColumnDef::new(Synthetics::Enabled)
                 .boolean()
                 .not_null()
                 .default(SimpleExpr::Value(Value::Bool(Some(true)))),
         )
-        .col(
-            ColumnDef::new(Synthetics::Destinations)
-                .json()
-                .not_null(),
-        )
+        .col(ColumnDef::new(Synthetics::Destinations).json().not_null())
         // Extra monitor settings: retries, cooldown, rum toggles, etc. (no secrets here).
         .col(ColumnDef::new(Synthetics::Settings).json().not_null())
-        // Single secrets column — JSON blob with per-value AESenc:<base64> encryption using org DEK.
-        // Shape: { "auth": {...}, "cookies": [...], "variables": [...] }
+        // Single secrets column — JSON blob with per-value AESenc:<base64> encryption using org
+        // DEK. Shape: { "auth": {...}, "cookies": [...], "variables": [...] }
         // All three are optional; new secret types can be added without a migration.
-        .col(ColumnDef::new(Synthetics::Secrets).text().not_null().default("{}"))
+        .col(
+            ColumnDef::new(Synthetics::Secrets)
+                .text()
+                .not_null()
+                .default("{}"),
+        )
         // Scheduler fields — managed by the synthetics scheduler, not by the client.
         .col(
             ColumnDef::new(Synthetics::NextRunAt)
@@ -154,11 +144,7 @@ fn create_synthetics_table() -> TableCreateStatement {
                 .not_null()
                 .default(0i32),
         )
-        .col(
-            ColumnDef::new(Synthetics::Owner)
-                .string_len(256)
-                .null(),
-        )
+        .col(ColumnDef::new(Synthetics::Owner).string_len(256).null())
         .col(
             ColumnDef::new(Synthetics::CreatedAt)
                 .big_integer()

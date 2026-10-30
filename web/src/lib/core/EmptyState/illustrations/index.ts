@@ -35,6 +35,7 @@ import EmptyConstellation from "./EmptyConstellation.vue";
 import EmptyObservatory from "./EmptyObservatory.vue";
 import EmptyDataScene from "./EmptyDataScene.vue";
 import EmptyBox from "./EmptyBox.vue";
+import EmptyLock from "./EmptyLock.vue";
 import EmptyBoard from "./EmptyBoard.vue";
 import EmptyHourglass from "./EmptyHourglass.vue";
 import EmptyConnect from "./EmptyConnect.vue";
@@ -60,6 +61,7 @@ export const illustrations = {
   // ---- object / metaphor illustrations (the DEFAULT — no character) --------
   "no-results": EmptyNoResults,
   box: EmptyBox,
+  lock: EmptyLock,
   board: EmptyBoard,
   hourglass: EmptyHourglass,
   connect: EmptyConnect,

@@ -7,12 +7,15 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 import { computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+
+const { t } = useI18nTyped();
 
 const store = useStore();
 const router = useRouter();
@@ -42,9 +45,9 @@ const SOLUTIONS: {
   },
 ];
 
-const current = computed(() => SOLUTIONS.find(s => s.key === mode.value) ?? SOLUTIONS[0]);
+const current = computed(() => SOLUTIONS.find((s) => s.key === mode.value) ?? SOLUTIONS[0]);
 
-function switchTo(solution: typeof SOLUTIONS[0]) {
+function switchTo(solution: (typeof SOLUTIONS)[0]) {
   if (solution.key === mode.value) return;
   store.commit("setSolutionMode", solution.key);
   router.push({
@@ -69,7 +72,7 @@ function switchTo(solution: typeof SOLUTIONS[0]) {
       </OButton>
     </template>
 
-    <div class="solution-switcher-header">Solution</div>
+    <div class="solution-switcher-header">{{ t("solutionSwitcher.title") }}</div>
 
     <ODropdownItem
       v-for="solution in SOLUTIONS"
@@ -82,25 +85,20 @@ function switchTo(solution: typeof SOLUTIONS[0]) {
           class="solution-ico"
           :class="solution.key === 'security' ? 'solution-ico--sec' : 'solution-ico--obs'"
         >
-          <OIcon :name="solution.icon" style="width:16px;height:16px" />
+          <OIcon :name="solution.icon" size="sm" />
         </div>
         <div class="solution-text">
           <span class="solution-label">{{ solution.label }}</span>
           <span class="solution-desc">{{ solution.description }}</span>
         </div>
-        <OIcon
-          v-if="solution.key === mode"
-          name="task-alt"
-          class="text-accent shrink-0"
-          style="width:14px;height:14px"
-        />
+        <OIcon v-if="solution.key === mode" name="task-alt" class="text-accent size-3.5 shrink-0" />
       </div>
     </ODropdownItem>
 
     <ODropdownSeparator />
     <div class="solution-switcher-footer">
-      <OIcon name="info-outline" style="width:12px;height:12px;opacity:0.5" />
-      <span>Switch products without losing your place</span>
+      <OIcon name="info-outline" size="xs" class="opacity-50" />
+      <span>{{ t("solutionSwitcher.hint") }}</span>
     </div>
   </ODropdown>
 </template>
@@ -108,29 +106,29 @@ function switchTo(solution: typeof SOLUTIONS[0]) {
 <style scoped>
 .solution-switcher-btn {
   font-weight: 650;
-  letter-spacing: -0.1px;
+  letter-spacing: -0.00625rem;
 }
 
 .solution-switcher-header {
-  padding: 6px 14px 4px;
-  font-size: 10.5px;
+  padding: 0.375rem 0.875rem 0.25rem;
+  font-size: 0.65625rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.03125rem;
   opacity: 0.5;
 }
 
 .solution-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-width: 220px;
+  gap: 0.625rem;
+  min-width: 13.75rem;
 }
 
 .solution-ico {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -161,25 +159,25 @@ body.body--dark .solution-ico--sec {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 0.0625rem;
 }
 
 .solution-label {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 650;
 }
 
 .solution-desc {
-  font-size: 11px;
+  font-size: 0.6875rem;
   opacity: 0.55;
 }
 
 .solution-switcher-footer {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 14px 8px;
-  font-size: 11px;
+  gap: 0.375rem;
+  padding: 0.375rem 0.875rem 0.5rem;
+  font-size: 0.6875rem;
   opacity: 0.45;
 }
 </style>

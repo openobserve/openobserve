@@ -21,6 +21,8 @@
 // The install + init steps share the "pkg" variant group: picking NPM or CDN
 // on either step switches both, so the two read as one coherent path.
 
+import { raw, type TranslateFn } from "@/types/i18n";
+
 import { getImageURL } from "@/utils/zincutils";
 import type { RichCardContent, RichCardStepVariant } from "../types";
 
@@ -28,7 +30,7 @@ import type { RichCardContent, RichCardStepVariant } from "../types";
  * Pinned browser SDK release the CDN URLs point at — bump in one place.
  * Pinning (vs @latest) gives immutable CDN caching and no surprise upgrades.
  */
-export const RUM_SDK_VERSION = "0.3.4";
+export const RUM_SDK_VERSION = "0.4.3";
 
 const CDN_HOST = "https://browsersdk.openobserve.ai";
 const cdnUrl = (bundle: string) => `${CDN_HOST}/${RUM_SDK_VERSION}/${bundle}`;
@@ -135,12 +137,12 @@ openobserveRum.startSessionReplayRecording();`;
 
 // ── CDN variant ──────────────────────────────────────────────────────────────
 
-// Datadog-style async loader: creates an OO_RUM / OO_LOGS stub with an onReady
+// Standard RUM-agent async loader: creates an O2_RUM / O2_LOGS stub with an onReady
 // queue, then injects the bundle with `async` so it downloads in parallel and
 // never blocks parsing or first paint. Queued callbacks run when it lands.
 const cdnLoader = (globalName: string, src: string) => `  (function (h, o, u, n, d) {
     h = h[d] = h[d] || { q: [], onReady: function (c) { h.q.push(c); } };
-    d = o.createElement(u); d.async = 1; d.src = n;
+    d = o.createElement(u); d.async = 1; d.src = n; d.crossOrigin = 'anonymous';
     n = o.getElementsByTagName(u)[0]; n.parentNode.insertBefore(d, n);
   })(window, document, 'script', '${src}', '${globalName}');`;
 
@@ -156,22 +158,22 @@ const cdnInstall = (
 <!-- Async loaders: both bundles download in parallel without blocking
      rendering. init calls queued via onReady() run as each bundle arrives. -->
 <script>
-${cdnLoader("OO_RUM", cdnUrl("openobserve-rum.js"))}
-${cdnLoader("OO_LOGS", cdnUrl("openobserve-logs.js"))}
+${cdnLoader("O2_RUM", cdnUrl("openobserve-rum.js"))}
+${cdnLoader("O2_LOGS", cdnUrl("openobserve-logs.js"))}
 </script>`;
 
 const cdnInit = (subs: RumCardSubs, token: string) => `<script>
   var options = ${indent(optionsBlock(subs, token), 2).trimStart()};
 
-  OO_RUM.onReady(function () {
-    OO_RUM.init({
+  O2_RUM.onReady(function () {
+    O2_RUM.init({
 ${indent(RUM_INIT_FIELDS, 4)},
     });
-    OO_RUM.startSessionReplayRecording();
+    O2_RUM.startSessionReplayRecording();
   });
 
-  OO_LOGS.onReady(function () {
-    OO_LOGS.init({
+  O2_LOGS.onReady(function () {
+    O2_LOGS.init({
 ${indent(LOGS_INIT_FIELDS, 4)},
     });
   });
@@ -179,33 +181,33 @@ ${indent(LOGS_INIT_FIELDS, 4)},
 
 // ── card ─────────────────────────────────────────────────────────────────────
 
-export default function rumCard(subs: RumCardSubs): RichCardContent {
+export default function rumCard(subs: RumCardSubs, t: TranslateFn): RichCardContent {
   const nodeIcon = getImageURL("images/ingestion/nodejs.svg");
 
   const installVariants: RichCardStepVariant[] = [
     {
       id: "npm",
-      label: "NPM",
+      label: raw("NPM"),
       icon: nodeIcon,
       code: { lang: "bash", raw: NPM_INSTALL },
-      note: "Prefer NPM when you own the build — the SDK ships inside your bundle, versions move with your lockfile, and your CSP stays first-party.",
+      note: t("ingestion.setupCard.rumNpmInstallNote"),
     },
     {
       id: "cdn",
-      label: "CDN",
+      label: raw("CDN"),
       code: {
         lang: "html",
         filename: "index.html",
         raw: cdnInstall(subs),
       },
-      note: `Paste at the top of <head>. Pinned to v${RUM_SDK_VERSION} for immutable caching; async + preconnect keep it off the critical rendering path. For strict CSP, self-host the two bundles instead.`,
+      note: t("ingestion.setupCard.rumCdnInstallNote", { version: RUM_SDK_VERSION }),
     },
   ];
 
   const initVariants: RichCardStepVariant[] = [
     {
       id: "npm",
-      label: "NPM",
+      label: raw("NPM"),
       icon: nodeIcon,
       code: {
         lang: "javascript",
@@ -213,39 +215,38 @@ export default function rumCard(subs: RumCardSubs): RichCardContent {
         raw: npmInit(subs, subs.rumToken),
         masked: npmInit(subs, subs.rumTokenMasked),
       },
-      note: "Run this in your app entry (main.js / index.js) before the app mounts, so early errors and first-paint timings are captured.",
+      note: t("ingestion.setupCard.rumNpmInitNote"),
     },
     {
       id: "cdn",
-      label: "CDN",
+      label: raw("CDN"),
       code: {
         lang: "html",
         filename: "index.html",
         raw: cdnInit(subs, subs.rumToken),
         masked: cdnInit(subs, subs.rumTokenMasked),
       },
-      note: "Keep this right after the loader in <head>. onReady() queues init until each bundle arrives — nothing blocks rendering.",
+      note: t("ingestion.setupCard.rumCdnInitNote"),
     },
   ];
 
   return {
     provider: {
-      name: "Real User Monitoring",
-      tagline:
-        "Capture sessions, errors, Web Vitals and session replay from your web application — your RUM token is already filled in below.",
+      id: "rum",
+      name: t("ingestion.setupCard.providerNameRum"),
+      tagline: t("ingestion.setupCard.rumTagline"),
       logo: getImageURL("images/common/monitoring.svg"),
       tone: "#3f7994",
-      runtime: "Browser",
-      setupTime: "~2 min",
-      metaBadges: ["Sessions", "Errors", "Web Vitals", "Session Replay"],
+      runtime: t("ingestion.setupCard.runtimeBrowser"),
+      setupTime: t("ingestion.setupCard.setupTime2Min"),
+      metaBadges: [t("rum.sessions"), t("rum.errors"), t("rum.webVitals"), t("rum.sessionReplay")],
     },
     steps: [
       {
         id: "install",
-        title: "Add the SDK to Your App",
-        description:
-          "Pick how the SDK ships: bundle it with **NPM**, or drop the **CDN** loader into your HTML `<head>` — no build step needed.",
-        chip: { kind: "terminal", label: "Install" },
+        titleKey: "ingestion.setupCard.rumInstallTitle",
+        descriptionKey: "ingestion.setupCard.rumInstallDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipInstall" },
         completeOn: "copy",
         required: true,
         variantGroup: "pkg",
@@ -253,10 +254,9 @@ export default function rumCard(subs: RumCardSubs): RichCardContent {
       },
       {
         id: "init",
-        title: "Initialize RUM + Logs",
-        description:
-          "Both SDKs are initialized with this org's values — copy as-is, then adjust `service`, `env` and `applicationId` to describe your app. The `clientToken` ships to visitors' browsers by design (NPM bundles it, CDN inlines it) — it can only write RUM events, and you can rotate it from this page's header anytime.",
-        chip: { kind: "editor", label: "Editor" },
+        titleKey: "ingestion.setupCard.rumInitTitle",
+        descriptionKey: "ingestion.setupCard.rumInitDesc",
+        chip: { kind: "editor", labelKey: "ingestion.setupCard.chipEditor" },
         completeOn: "copy",
         required: true,
         variantGroup: "pkg",
@@ -264,13 +264,19 @@ export default function rumCard(subs: RumCardSubs): RichCardContent {
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description:
-          "Open your app in a browser, click around for a few seconds, then hit Test — RUM events land in the `_rumdata` stream.",
-        chip: { kind: "traces", label: "RUM" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyRumDesc",
+        chip: { kind: "traces", label: raw("RUM") },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Sessions", "Page Views", "User Actions", "Errors", "Web Vitals", "Session Replay"],
+        pills: [
+          t("rum.sessions"),
+          t("ingestion.setupCard.pillPageViews"),
+          t("ingestion.setupCard.pillUserActions"),
+          t("rum.errors"),
+          t("rum.webVitals"),
+          t("rum.sessionReplay"),
+        ],
       },
     ],
     // Every session emits `view` events on init, so their presence in _rumdata
@@ -281,9 +287,8 @@ export default function rumCard(subs: RumCardSubs): RichCardContent {
       filter: "type = 'view'",
     },
     extras: {
-      fixTitle: "Allow The SDK In Your Content Security Policy",
-      fixBody:
-        "If your app runs but nothing arrives, the browser most likely blocked the SDK or its requests — usually a Content-Security-Policy or an ad-blocker. Allow the CDN and your OpenObserve endpoint, then reload:",
+      fixTitle: t("ingestion.setupCard.rumFixTitle"),
+      fixBody: t("ingestion.setupCard.rumFixBody"),
       fixLang: "yaml",
       fixSnippet: `Content-Security-Policy:
   script-src 'self' ${CDN_HOST};
@@ -291,32 +296,37 @@ export default function rumCard(subs: RumCardSubs): RichCardContent {
   worker-src 'self' blob:;`,
       troubleshooting: [
         {
-          q: "The scripts load but no data arrives",
-          a: `Check the browser console and network tab. A Content-Security-Policy must allow \`script-src ${CDN_HOST}\` (CDN setup), \`connect-src ${subs.endpoint}\` and \`worker-src blob:\` — session replay records in a web worker.`,
+          q: t("ingestion.setupCard.rumTroubleNoDataQ"),
+          a: t("ingestion.setupCard.rumTroubleNoDataA", {
+            cdnHost: CDN_HOST,
+            endpoint: subs.endpoint,
+          }),
         },
         {
-          q: "Requests are blocked by ad-blockers or privacy extensions",
-          a: "Some blockers filter third-party analytics scripts. Self-hosting the two bundles on your own origin (copy them from the CDN at deploy time) keeps everything first-party and avoids this entirely — it also lets you add Subresource Integrity hashes.",
+          q: t("ingestion.setupCard.rumTroubleBlockersQ"),
+          a: t("ingestion.setupCard.rumTroubleBlockersA"),
         },
         {
-          q: "Is it safe that the token is visible in my page source?",
-          a: "Yes — the `clientToken` is a client-side token by design, like every browser RUM product's. NPM setups expose it inside the JS bundle and CDN setups inline it in the HTML; DevTools reveals it either way. It can only **write** RUM events — it grants no read access and is separate from the ingestion passcode. If someone abuses it to send fake events, regenerate it from this page's header and redeploy your app.",
+          q: t("ingestion.setupCard.rumTroubleTokenVisibleQ"),
+          a: t("ingestion.setupCard.rumTroubleTokenVisibleA"),
         },
         {
-          q: "RUM requests return 401 or 403",
-          a: "The `clientToken` is this org's **RUM token** — not the ingestion passcode. If it was rotated, regenerate it from this page's header and update your app.",
+          q: t("ingestion.setupCard.rumTrouble401Q"),
+          a: t("ingestion.setupCard.rumTrouble401A"),
         },
         {
-          q: "My OpenObserve endpoint is plain HTTP",
-          a: `Browsers refuse mixed content and the SDK defaults to HTTPS — keep \`insecureHTTP: ${subs.insecureHTTP}\` (already set from this org's endpoint) so uploads use the right scheme.`,
+          q: t("ingestion.setupCard.rumTroublePlainHttpQ"),
+          a: t("ingestion.setupCard.rumTroublePlainHttpA", {
+            insecureHTTP: subs.insecureHTTP,
+          }),
         },
         {
-          q: "Session replays look blank or over-masked",
-          a: "`defaultPrivacyLevel` controls what replay captures: `'allow'` records everything, `'mask-user-input'` hides form input, `'mask'` hides all text. Pick the strictest level your privacy policy requires.",
+          q: t("ingestion.setupCard.rumTroubleMaskedQ"),
+          a: t("ingestion.setupCard.rumTroubleMaskedA"),
         },
         {
-          q: "Will the SDK slow my site down?",
-          a: "No — the bundles load with `async` off the critical rendering path, `preconnect` warms DNS/TLS before the first upload, and events are batched before sending. Lower `sessionReplaySampleRate` if you want to bound replay overhead further.",
+          q: t("ingestion.setupCard.rumTroublePerfQ"),
+          a: t("ingestion.setupCard.rumTroublePerfA"),
         },
       ],
     },

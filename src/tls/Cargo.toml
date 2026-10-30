@@ -17,7 +17,3 @@ reqwest.workspace = true
 rustls.workspace = true
 rustls-native-certs.workspace = true
 webpki-roots.workspace = true
-x509-parser.workspace = true
-
-[dev-dependencies]
-rcgen.workspace = true

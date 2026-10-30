@@ -23,16 +23,9 @@ import {
 import type { PromQLResponse } from "./types";
 
 // Mock the legendBuilder module
-vi.mock("./legendBuilder", () => ({
-  getPromqlLegendName: vi.fn((metric, template) => {
-    if (template) {
-      return template.replace(/\{\{(\w+)\}\}/g, (_, key) => metric[key] || "");
-    }
-    return Object.entries(metric)
-      .map(([k, v]) => `${k}="${v}"`)
-      .join(",");
-  }),
-}));
+// The REAL namer, so this path cannot drift from the one the line/bar charts
+// use — the two disagreeing is exactly the bug this spec now guards.
+vi.unmock("./legendBuilder");
 
 describe("dataProcessor", () => {
   describe("processPromQLData", () => {
@@ -53,7 +46,7 @@ describe("dataProcessor", () => {
         queries: [
           {
             config: {
-              promql_legend: "{{job}}",
+              promql_legend: "{job}",
             },
           },
         ],
@@ -87,6 +80,60 @@ describe("dataProcessor", () => {
       expect(result[0].series[0].values).toHaveLength(2);
       expect(result[0].timestamps).toHaveLength(2);
       expect(result[0].queryIndex).toBe(0);
+    });
+
+    // Line/bar go through convertPromQLData; pie, table, heatmap and the rest come
+    // here. Naming them differently means flipping a panel's type silently
+    // rewrites its legend, its tooltip and its per-series colour keys.
+    it("names series the same way the line and bar path does", async () => {
+      const searchQueryData: PromQLResponse[] = [
+        {
+          status: "success",
+          resultType: "matrix",
+          result: [
+            { metric: { __name__: "up", pod: "api-1", job: "k8s" }, values: [[1609459200, "1"]] },
+            { metric: { __name__: "up", pod: "api-2", job: "k8s" }, values: [[1609459200, "1"]] },
+          ],
+        },
+      ] as any;
+      const noTemplate = { ...mockPanelSchema, queries: [{ config: {} }] };
+
+      const result = await processPromQLData(searchQueryData, noTemplate, mockStore);
+
+      expect(result[0].series.map((entry: any) => entry.name)).toEqual(["api-1", "api-2"]);
+    });
+
+    it("names a formula's label-less series after the formula, not {}", async () => {
+      const searchQueryData = [
+        { status: "success", resultType: "matrix", result: [{ metric: {}, values: [[1, "1"]] }] },
+      ] as any;
+      const formula = { ...mockPanelSchema, queries: [{ config: { formula: "B / A * 100" } }] };
+
+      const result = await processPromQLData(searchQueryData, formula, mockStore);
+
+      expect(result[0].series[0].name).toBe("B / A * 100");
+    });
+
+    it("names an input's label-less series after its letter in a panel with a formula", async () => {
+      const unlabelled = () => ({
+        status: "success",
+        resultType: "matrix",
+        result: [{ metric: {}, values: [[1, "1"]] }],
+      });
+      const searchQueryData = [unlabelled(), unlabelled(), unlabelled()] as any;
+      const queries = [
+        { config: { ref: "A" } },
+        { config: { ref: "B" } },
+        { config: { formula: "B / A" } },
+      ];
+
+      const result = await processPromQLData(
+        searchQueryData,
+        { ...mockPanelSchema, queries },
+        mockStore,
+      );
+
+      expect(result.map((query: any) => query.series[0].name)).toEqual(["A", "B", "B / A"]);
     });
 
     it("should process OpenObserve format (direct result)", async () => {
@@ -193,6 +240,62 @@ describe("dataProcessor", () => {
       const processedResult = await processPromQLData(searchQueryData, mockPanelSchema, mockStore);
 
       expect(processedResult[0].series).toHaveLength(50);
+    });
+
+    it("keeps a shifted series only when its primary survives the series limit (stacked)", async () => {
+      // Shifted series re-use their primaries' metric objects, reordered and with one missing.
+      const metrics = ["a", "b", "c", "d", "e", "f", "g"].map((job) => ({ job }));
+      const primary = metrics.map((metric) => ({ metric, values: [[1000, "1"]] }));
+      const shifted = [6, 5, 4, 3, 2, 1].map((i) => ({
+        metric: metrics[i],
+        values: [[1000, "2"]],
+      }));
+      const searchQueryData: PromQLResponse[] = [{ result: primary }, { result: shifted }] as any;
+
+      const processed = await processPromQLData(
+        searchQueryData,
+        { ...mockPanelSchema, type: "stacked", config: { promql_series_limit: 5 } },
+        mockStore,
+        { parentQueryIndex: [0, 0], nameSuffixes: ["", "1 day ago"] },
+      );
+
+      expect(processed[0].series.map((s: any) => s.metric.job)).toEqual(["a", "b", "c", "d", "e"]);
+      expect(processed[1].series.map((s: any) => s.metric.job)).toEqual(["e", "d", "c", "b"]);
+      expect(processed.map((q: any) => q.nameSuffix)).toEqual([undefined, "1 day ago"]);
+    });
+
+    it("keeps whole histograms under the series limit in histogram mode and reports the ones dropped", async () => {
+      const buckets = ["1", "2", "+Inf"];
+      // Interleaved, as Prometheus returns them, so a plain slice would cut every histogram short.
+      const result = buckets.flatMap((le) =>
+        ["a", "b", "c"].map((pod) => ({ metric: { le, pod }, values: [[1000, "1"]] })),
+      );
+      const processed = await processPromQLData(
+        [{ result }] as any,
+        {
+          ...mockPanelSchema,
+          type: "heatmap",
+          config: { promql_series_limit: 7, heatmap_mode: "prometheus_histogram" },
+        },
+        mockStore,
+      );
+
+      const kept = processed[0].series.map((s: any) => `${s.metric.pod}${s.metric.le}`);
+      expect(kept.sort()).toEqual(["a+Inf", "a1", "a2", "b+Inf", "b1", "b2"]);
+      expect(processed[0].histogramsLimited).toEqual({ shown: 2, total: 3 });
+    });
+
+    it("slices plain heatmaps by series, as before", async () => {
+      const result = ["1", "2"].flatMap((le) =>
+        ["a", "b"].map((pod) => ({ metric: { le, pod }, values: [[1000, "1"]] })),
+      );
+      const processed = await processPromQLData(
+        [{ result }] as any,
+        { ...mockPanelSchema, type: "heatmap", config: { promql_series_limit: 3 } },
+        mockStore,
+      );
+      expect(processed[0].series).toHaveLength(3);
+      expect(processed[0].histogramsLimited).toBeUndefined();
     });
 
     it("should use default series limit when not specified", async () => {
@@ -571,6 +674,34 @@ describe("dataProcessor", () => {
 
     it("should return last for unknown aggregation type", () => {
       expect(applyAggregation(values, "unknown" as any)).toBe(50);
+    });
+
+    it("skips NaN and infinite samples instead of returning NaN", () => {
+      const mixed: Array<[number, string]> = [
+        [1, "4"],
+        [2, "NaN"],
+        [3, "+Inf"],
+        [4, "-Inf"],
+        [5, "8"],
+      ];
+      expect(applyAggregation(mixed, "avg")).toBe(6);
+      expect(applyAggregation(mixed, "max")).toBe(8);
+      expect(applyAggregation(mixed, "min")).toBe(4);
+      expect(applyAggregation(mixed, "sum")).toBe(12);
+      expect(applyAggregation(mixed, "range")).toBe(4);
+      expect(applyAggregation(mixed, "diff")).toBe(4);
+      expect(applyAggregation(mixed, "first")).toBe(4);
+      expect(applyAggregation(mixed, "last")).toBe(8);
+      expect(applyAggregation(mixed, "count")).toBe(5);
+    });
+
+    it("returns NaN when no sample is finite", () => {
+      const none: Array<[number, string]> = [
+        [1, "NaN"],
+        [2, "+Inf"],
+      ];
+      expect(applyAggregation(none, "avg")).toBeNaN();
+      expect(applyAggregation(none, "max")).toBeNaN();
     });
   });
 });

@@ -16,71 +16,131 @@
     <!-- Two-column body -->
     <div class="flex h-full min-h-0 flex-1 overflow-hidden">
       <!-- ── Left: Inputs ── -->
-      <div class="flex w-85 shrink-0 flex-col gap-5 overflow-y-auto py-5 pr-5 pl-6">
+      <div class="flex w-85 shrink-0 flex-col gap-5 overflow-y-auto py-5 ps-6 pe-5">
         <!-- Model Name -->
+        <OInput
+          v-model="testModelName"
+          :label="t('modelPricing.modelNameInput')"
+          :help-text="t('modelPricing.modelNameHint')"
+          :placeholder="
+            t('settings.testModelMatchDialog.modelNamePlaceholder', {
+              example: raw('gpt-4-turbo'),
+            })
+          "
+          required
+          clearable
+          autofocus
+          data-test="test-match-model-input"
+          @keydown.enter="onModelNameEnter"
+        >
+          <template #icon-left>
+            <OIcon name="smart-toy" size="sm" class="shrink-0 opacity-[0.35]" />
+          </template>
+        </OInput>
+
+        <!-- Optional UTC time — lets peak / off-peak tiers be tested directly -->
         <div class="flex flex-col gap-1.5">
-          <label class="text-compact text-text-heading font-semibold"
-            >{{ t("modelPricing.modelNameInput") }}
-            <span class="text-status-error-text">*</span></label
+          <OTime
+            v-model="testAtTime"
+            :label="t('modelPricing.testAtTimeLabel')"
+            :help-text="t('modelPricing.testAtTimeHint')"
+            format24
+            clearable
+            data-test="test-match-time-input"
+          />
+          <OText v-if="testAtTimeLocalHint" variant="meta" data-test="test-match-time-local-hint">
+            {{ t("modelPricing.localTimeHint", { range: testAtTimeLocalHint }) }}
+          </OText>
+        </div>
+
+        <div class="flex flex-col gap-1.5" data-test="test-match-attributes">
+          <OText variant="label">{{ t("modelPricing.testAttributesLabel") }}</OText>
+          <OText variant="meta">{{ t("modelPricing.testAttributesHint") }}</OText>
+          <div
+            v-for="(attr, aIdx) in testAttributes"
+            :key="aIdx"
+            class="flex items-end gap-1.5"
+            :data-test="`test-match-attribute-row-${aIdx}`"
           >
-          <div class="mb-0.5 text-xs leading-normal opacity-50">
-            {{ t("modelPricing.modelNameHint") }}
+            <OInput
+              v-model="attr.key"
+              :label="t('modelPricing.testAttributeKey')"
+              :placeholder="
+                t('modelPricing.ruleKeysPlaceholder', {
+                  example: raw('openai.response.service_tier'),
+                })
+              "
+              size="sm"
+              class="min-w-0 flex-1"
+              :data-test="`test-match-attribute-key-${aIdx}`"
+            />
+            <OInput
+              v-model="attr.value"
+              :label="t('modelPricing.testAttributeValue')"
+              :placeholder="t('modelPricing.ruleValuesPlaceholder', { example: raw('flex') })"
+              size="sm"
+              class="min-w-0 flex-1"
+              :data-test="`test-match-attribute-value-${aIdx}`"
+            />
+            <OButton
+              variant="ghost"
+              size="icon-xs-sq"
+              type="button"
+              :aria-label="t('modelPricing.testRemoveAttribute')"
+              :data-test="`test-match-attribute-remove-${aIdx}`"
+              @click="removeAttribute(aIdx)"
+            >
+              <OIcon name="close" size="xs" />
+              <OTooltip :side-offset="4" :content="t('modelPricing.testRemoveAttribute')" />
+            </OButton>
           </div>
-          <OInput
-            ref="modelInputRef"
-            v-model="testModelName"
-            :placeholder="t('settings.testModelMatchDialog.modelNamePlaceholder')"
-            data-test="test-match-model-input"
+          <OButton
+            variant="outline"
+            size="sm-action"
+            type="button"
+            class="self-start"
+            data-test="test-match-attribute-add"
+            @click="addAttribute"
           >
-            <template #icon-left>
-              <OIcon name="smart-toy" size="sm" class="shrink-0 opacity-[0.35]" />
-            </template>
-            <template #icon-right>
-              <OButton
-                v-if="testModelName"
-                variant="ghost"
-                size="icon"
-                class="opacity-[0.35] hover:opacity-70"
-                @click="clearAndFocus"
-                data-test="test-match-clear-btn"
-              >
-                <OIcon name="close" size="xs" />
-              </OButton>
-            </template>
-          </OInput>
+            {{ t("modelPricing.testAddAttribute") }}
+          </OButton>
         </div>
       </div>
 
       <!-- ── Vertical divider ── -->
-      <div class="bg-card-glass-border w-px shrink-0"></div>
+      <OSeparator vertical />
 
       <!-- ── Right: Live Results ── -->
-      <div class="flex-1 overflow-y-auto py-5 pr-6 pl-5">
+      <div class="flex-1 overflow-y-auto py-5 ps-5 pe-6">
         <transition name="tmm-fade" mode="out-in">
           <!-- Empty state -->
           <div
             v-if="!testModelName"
             key="empty"
-            class="flex h-full min-h-50 flex-col items-center justify-center gap-2.5"
+            class="flex h-full min-h-50 items-center justify-center"
             data-test="test-match-empty"
           >
-            <OIcon name="manage-search" size="xl" class="opacity-[0.12]" />
-            <div class="text-compact text-center opacity-[0.35]">
-              {{ t("modelPricing.enterModelName") }}
-            </div>
+            <OEmptyState
+              size="inline"
+              icon="manage-search"
+              hide-action
+              :title="t('modelPricing.enterModelName')"
+            />
           </div>
 
           <!-- Typed but not yet tested -->
           <div
             v-else-if="testResult === null"
             key="waiting"
-            class="flex h-full min-h-50 flex-col items-center justify-center gap-2.5"
+            class="flex h-full min-h-50 items-center justify-center"
             data-test="test-match-waiting"
           >
-            <OIcon name="ads-click" size="xl" class="opacity-[0.12]" />
-            <div class="text-compact text-center opacity-[0.35]">
-              {{ t("modelPricing.clickToTest") }}
-            </div>
+            <OEmptyState
+              size="inline"
+              icon="ads-click"
+              hide-action
+              :title="t('modelPricing.clickToTest')"
+            />
           </div>
 
           <!-- No Match -->
@@ -90,34 +150,25 @@
             class="flex flex-col gap-3"
             data-test="test-match-no-result"
           >
-            <div
-              class="rounded-default bg-banner-error-soft-bg border-banner-error-soft-border flex items-center gap-3 border px-3.5 py-3"
-            >
-              <div
-                class="rounded-default bg-status-error-bg text-status-error-text flex h-8 w-8 shrink-0 items-center justify-center"
-              >
-                <OIcon name="error-outline" size="md" />
+            <OBanner variant="error-soft" icon="error-outline" inline-actions>
+              <div class="text-compact font-bold">
+                {{ t("modelPricing.noMatchFound") }}
               </div>
-              <div>
-                <div class="text-compact text-status-error-text font-bold">
-                  {{ t("modelPricing.noMatchFound") }}
-                </div>
-                <div class="mt-0.5 text-xs opacity-70">
-                  {{
-                    t("modelPricing.noMatchDesc", {
-                      modelName: testModelName,
-                    })
-                  }}
-                </div>
+              <div class="mt-0.5 text-xs opacity-70">
+                {{
+                  t("modelPricing.noMatchDesc", {
+                    modelName: testModelName,
+                  })
+                }}
               </div>
-            </div>
+            </OBanner>
             <div
               class="rounded-default bg-surface-panel border-card-glass-border border px-3.5 py-3"
             >
               <div class="text-2xs mb-1.5 font-semibold opacity-55">
                 {{ t("modelPricing.troubleshootingTitle") }}
               </div>
-              <ul class="m-0 pl-4 text-xs leading-[1.9] opacity-60">
+              <ul class="m-0 ps-4 text-xs leading-[1.9] opacity-60">
                 <li>{{ t("modelPricing.tip1") }}</li>
                 <li>{{ t("modelPricing.tip2") }}</li>
                 <li>{{ t("modelPricing.tip3") }}</li>
@@ -128,33 +179,38 @@
           <!-- Match Found -->
           <div v-else key="match" class="flex flex-col gap-3" data-test="test-match-result">
             <!-- Match status -->
-            <div
-              class="rounded-default bg-banner-success-bg border-banner-success-border flex items-center gap-3 border px-3.5 py-3"
+            <OBanner
+              :variant="isApproximateMatch ? 'warning' : 'success'"
+              :icon="isApproximateMatch ? 'warning' : 'check-circle'"
+              inline-actions
             >
+              <div class="text-compact font-bold">
+                {{
+                  isApproximateMatch
+                    ? t("modelPricing.approximateMatchFound")
+                    : t("modelPricing.matchFound")
+                }}
+              </div>
+              <div class="mt-0.5 text-xs opacity-70">
+                <OCode truncate>{{ testResult.matched.name }}</OCode>
+              </div>
               <div
-                class="rounded-default bg-status-success-bg text-status-success-text flex h-8 w-8 shrink-0 items-center justify-center"
+                v-if="isApproximateMatch"
+                class="mt-0.5 text-xs opacity-70"
+                data-test="test-match-approximate"
               >
-                <OIcon name="check-circle" size="md" />
+                {{ t("modelPricing.approximateMatchDesc", { modelName: testModelName }) }}
               </div>
-              <div class="min-w-0 flex-1">
-                <div class="text-compact text-status-success-text font-bold">
-                  {{ t("modelPricing.matchFound") }}
-                </div>
-                <div class="mt-0.5 truncate text-xs opacity-70">
-                  <code
-                    class="rounded-default bg-banner-success-bg border-banner-success-border inline border px-1.5 py-px font-mono text-xs font-semibold text-inherit"
-                    >{{ testResult.matched.name }}</code
-                  >
-                </div>
-              </div>
-              <OTag
-                type="modelSource"
-                :value="testResult.matched.source || 'org'"
-                class="text-2xs ml-auto shrink-0 font-semibold"
-              >
-                {{ sourceLabel(testResult.matched) }}
-              </OTag>
-            </div>
+              <template #actions>
+                <OTag
+                  type="modelSource"
+                  :value="testResult.matched.source || 'org'"
+                  class="text-2xs shrink-0 font-semibold"
+                >
+                  {{ sourceLabel(testResult.matched) }}
+                </OTag>
+              </template>
+            </OBanner>
 
             <!-- Priority flow -->
             <div
@@ -198,14 +254,39 @@
                   </div>
                   <div class="text-2xs mt-0.5 opacity-50" v-if="matchedTierDef?.condition">
                     {{ t("settings.testModelMatchDialog.condition") }}
-                    <code
-                      class="tmm-cost-tier-desc-code rounded-default bg-surface-subtle text-2xs px-1 py-px"
+                    <OCode
                       >{{ matchedTierDef.condition.usage_key }}
                       {{ operatorSymbol(matchedTierDef.condition.operator) }}
-                      {{ matchedTierDef.condition.value }}</code
+                      {{ matchedTierDef.condition.value }}</OCode
                     >
                   </div>
-                  <div class="text-2xs mt-0.5 opacity-50" v-else>
+                  <div
+                    class="text-2xs mt-0.5 flex items-center gap-1 opacity-50"
+                    v-if="matchedTierWindows.length"
+                    data-test="test-match-tier-windows"
+                  >
+                    <OIcon name="schedule" size="xs" />
+                    <span class="font-mono">{{ formatUtcWindows(matchedTierWindows) }}</span>
+                    <span v-if="matchedTierWindowsLocal" class="font-mono">{{
+                      matchedTierWindowsLocal
+                    }}</span>
+                  </div>
+                  <div
+                    v-for="(rule, rIdx) in matchedTierRules"
+                    :key="rIdx"
+                    class="text-2xs mt-0.5 opacity-50"
+                    data-test="test-match-tier-rule"
+                  >
+                    <OCode>{{ formatTierRule(rule, t) }}</OCode>
+                  </div>
+                  <div
+                    class="text-2xs mt-0.5 opacity-50"
+                    v-if="
+                      !matchedTierDef?.condition &&
+                      !matchedTierWindows.length &&
+                      !matchedTierRules.length
+                    "
+                  >
                     {{ t("modelPricing.defaultPricingTier") }}
                   </div>
                 </div>
@@ -229,14 +310,17 @@
                 >
                   <span class="text-2xs font-mono font-semibold">{{ row.key }}</span>
                   <span class="text-right font-semibold tabular-nums"
-                    >${{ formatRate(row.rate) }}</span
+                    >{{ t("modelPricing.currencySymbol") }}{{ formatRate(row.rate) }}</span
                   >
                 </div>
               </div>
-              <div v-else class="flex items-center gap-1.75 p-3.5 text-xs italic opacity-40">
-                <OIcon name="info-outline" size="sm" />
-                {{ t("modelPricing.noPricingForTier") }}
-              </div>
+              <OEmptyState
+                v-else
+                size="inline"
+                icon="info-outline"
+                hide-action
+                :title="t('modelPricing.noPricingForTier')"
+              />
             </div>
           </div>
         </transition>
@@ -246,22 +330,38 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from "vue";
-import { useI18n } from "vue-i18n";
+import { ref, computed, watch, onBeforeUnmount } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import modelPricingService from "@/services/model_pricing";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCode from "@/lib/core/Code/OCode.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OTime from "@/lib/forms/Time/OTime.vue";
+import {
+  operatorSymbol,
+  formatTierRule,
+  formatUtcWindows,
+  formatUtcWindowsInTz,
+  utcMinuteToTzHhmm,
+  minuteOfDayToHhmm,
+  timezoneAbbr,
+} from "@/utils/formatters";
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
 });
 const emit = defineEmits(["update:modelValue"]);
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier || "");
 
@@ -271,29 +371,69 @@ const internalValue = computed({
 });
 
 const testModelName = ref("");
-const modelInputRef = ref<any>(null);
+// Optional `HH:MM` UTC time-of-day to test at; empty = "right now". Lets a
+// peak / off-peak tier be exercised without waiting for its window.
+const testAtTime = ref("");
+// Blank keys are not sent, so a half-typed row never changes the result.
+const testAttributes = ref<Array<{ key: string; value: string }>>([]);
 
-function clearAndFocus() {
-  testModelName.value = "";
-  nextTick(() => modelInputRef.value?.focus());
+function addAttribute() {
+  testAttributes.value = [...testAttributes.value, { key: "", value: "" }];
 }
 
-// Reset state and focus on open
+function removeAttribute(idx: number) {
+  testAttributes.value = testAttributes.value.filter((_, i) => i !== idx);
+}
+
+function attributesPayload(): Record<string, string> | undefined {
+  const out: Record<string, string> = {};
+  for (const attr of testAttributes.value) {
+    const key = attr.key.trim();
+    if (key) out[key] = attr.value.trim();
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+// Reset on open. Focus is OInput's `autofocus`, not a ref call — OInput is
+// `<script setup>` with no defineExpose, so it has no focus() to reach for.
 watch(internalValue, (val) => {
   if (val) {
     testResult.value = null;
+    hasRun.value = false;
     testModelName.value = "";
-    nextTick(() => {
-      setTimeout(() => modelInputRef.value?.focus(), 100);
-    });
+    testAtTime.value = "";
+    testAttributes.value = [];
   }
 });
 
 // ── Backend test API ──────────────────────────────────────────────────────────
 
 const testResult = ref<any>(null);
+// Kept apart from testResult so a failed call does not stop later automatic reruns.
+const hasRun = ref(false);
+let requestSeq = 0;
+let attributeTimer: ReturnType<typeof setTimeout> | undefined;
+
+// The instant the backend resolves `valid_from` and any recurring UTC window
+// (peak / off-peak rates) against: today at the chosen UTC time, or "right now"
+// when no time is picked. Without it a peak-hour tier could never be shown.
+function testTimestampMicros(): number {
+  const m = /^(\d{2}):(\d{2})/.exec(testAtTime.value || "");
+  if (!m) return Date.now() * 1000;
+  const now = new Date();
+  return (
+    Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      Number(m[1]),
+      Number(m[2]),
+    ) * 1000
+  );
+}
 
 async function callTestApi() {
+  const seq = ++requestSeq;
   if (!testModelName.value) {
     testResult.value = null;
     return;
@@ -302,11 +442,12 @@ async function callTestApi() {
     const res = await modelPricingService.test(orgIdentifier.value, {
       model_name: testModelName.value,
       usage: undefined,
-      timestamp: null,
+      timestamp: testTimestampMicros(),
+      attributes: attributesPayload(),
     });
-    testResult.value = res.data;
+    if (seq === requestSeq) testResult.value = res.data;
   } catch {
-    testResult.value = null;
+    if (seq === requestSeq) testResult.value = null;
   }
 }
 
@@ -315,13 +456,39 @@ const testing = ref(false);
 async function runTest() {
   if (!testModelName.value) return;
   testing.value = true;
+  hasRun.value = true;
   await callTestApi();
   testing.value = false;
 }
 
+// Mirrors the Test match button, which is disabled while a test is running; an IME Enter only commits text.
+function onModelNameEnter(event: KeyboardEvent) {
+  if (event.isComposing || testing.value) return;
+  runTest();
+}
+
 watch(testModelName, (val) => {
-  if (!val) testResult.value = null;
+  if (!val) {
+    testResult.value = null;
+    hasRun.value = false;
+  }
 });
+
+// A shown result answers "what applies at the tested time" — keep it honest by
+// re-running when that time changes rather than displaying a stale tier.
+watch(testAtTime, () => {
+  if (hasRun.value && testModelName.value) callTestApi();
+});
+// Watching the serialized payload ignores edits that do not change what is sent; the debounce avoids a request per keystroke.
+watch(
+  () => JSON.stringify(attributesPayload() ?? {}),
+  () => {
+    clearTimeout(attributeTimer);
+    if (!hasRun.value || !testModelName.value) return;
+    attributeTimer = setTimeout(callTestApi, 300);
+  },
+);
+onBeforeUnmount(() => clearTimeout(attributeTimer));
 
 // ── Derived display values ────────────────────────────────────────────────────
 
@@ -339,6 +506,9 @@ function sortedPriceEntries(prices: Record<string, number>): [string, number][] 
 
 const winnerSource = computed(() => testResult.value?.matched?.source || null);
 
+// The pattern matched only part of the model name, so the price may belong to another model.
+const isApproximateMatch = computed(() => testResult.value?.match_kind === "approximate");
+
 const matchFlowSteps = computed(() => [
   { key: "org", label: t("settings.testModelMatchDialog.stepYourOrg"), icon: "person" },
   { key: "meta_org", label: t("settings.testModelMatchDialog.stepGlobal"), icon: "corporate-fare" },
@@ -349,6 +519,9 @@ const matchedTierDef = computed(() => {
   const result = testResult.value;
   if (!result?.matched) return null;
   const tiers: any[] = result.matched.tiers || [];
+  if (Number.isInteger(result.tier_index) && tiers[result.tier_index]) {
+    return tiers[result.tier_index];
+  }
   return tiers.find((t: any) => (t.name || "Default") === result.tier) || tiers[0] || null;
 });
 
@@ -361,17 +534,30 @@ const pricingRows = computed(() => {
   }));
 });
 
-function operatorSymbol(op: string) {
-  const map: Record<string, string> = {
-    gt: ">",
-    gte: "≥",
-    lt: "<",
-    lte: "≤",
-    eq: "=",
-    neq: "≠",
-  };
-  return map[op] || op;
-}
+const matchedTierWindows = computed<Array<{ start_minute: number; end_minute: number }>>(
+  () => matchedTierDef.value?.utc_windows ?? [],
+);
+
+const matchedTierRules = computed<any[]>(() => matchedTierDef.value?.rules ?? []);
+
+// "· 06:30–09:30, 11:30–15:30 IST" — the matched tier's hours in the user's
+// timezone. Empty when the user's timezone is UTC (nothing to convert).
+const matchedTierWindowsLocal = computed(() => {
+  const local = formatUtcWindowsInTz(matchedTierWindows.value, store.state.timezone);
+  return local ? `· ${local}` : "";
+});
+
+/** The chosen test time shown in the user's timezone (empty when unset, or when
+ *  the timezone matches UTC and the conversion would just repeat the input). */
+const testAtTimeLocalHint = computed(() => {
+  const m = /^(\d{2}):(\d{2})/.exec(testAtTime.value || "");
+  if (!m) return "";
+  const tz = store.state.timezone;
+  const minute = Number(m[1]) * 60 + Number(m[2]);
+  const local = utcMinuteToTzHhmm(minute, tz);
+  if (!local || local === minuteOfDayToHhmm(minute)) return "";
+  return `${local} ${timezoneAbbr(tz)}`;
+});
 
 function sourceLabel(model: any) {
   if (!model.source || model.source === "org")

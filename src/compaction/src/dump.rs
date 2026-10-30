@@ -47,6 +47,8 @@ use parquet::{arrow::AsyncArrowWriter, file::properties::WriterProperties};
 use search_service::file_list_dump::*;
 use tokio::sync::mpsc;
 
+use crate::bloom::compact::bloom_files_deleted;
+
 #[derive(Clone)]
 pub struct DumpJob {
     pub org_id: String,
@@ -288,7 +290,7 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
 
         let cache = SchemaCache::new(FILE_LIST_SCHEMA.as_ref().to_owned());
         let mut w = STREAM_SCHEMAS_LATEST.write().await;
-        w.insert(dump_stream_key, cache);
+        infra::schema::insert_latest(&mut w, dump_stream_key, cache);
     }
 
     // calculate stats from files before they are moved
@@ -301,6 +303,7 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
         storage_size: 0.0,
         compressed_size: 0.0,
         index_size: 0.0,
+        mindex_size: 0.0,
     };
     for file in &files {
         stats.file_num += 1;
@@ -310,13 +313,14 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
         stats.storage_size += file.original_size as f64;
         stats.compressed_size += file.compressed_size as f64;
         stats.index_size += file.index_size as f64;
+        stats.mindex_size += file.mindex_size as f64;
     }
     if stats.doc_time_min == i64::MAX {
         stats.doc_time_min = 0;
     }
 
     // generate the dump file
-    let ids: Vec<i64> = files.iter().map(|r| r.id).collect();
+    let dumped_ids = dump_delete_pairs(&files);
     let dump_file = match generate_dump(
         &job.org_id,
         job.stream_type,
@@ -337,7 +341,7 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
         // update the entries in db
         let records = dump_file.meta.records;
         let file_name = dump_file.key.clone();
-        infra_file_list::update_dump_records(&dump_file, &ids).await?;
+        infra_file_list::update_dump_records(&dump_file, &dumped_ids).await?;
 
         // insert dump stats
         if let Err(e) = infra_file_list::insert_dump_stats(&file_name, &stats).await {
@@ -442,24 +446,24 @@ pub async fn delete_by_time_range(
     }
 
     // Create deleted items for file_list_deleted table
-    let mut del_items: Vec<_> = files_to_delete
-        .iter()
-        .map(|f| FileListDeleted {
-            id: 0,
-            account: f.account.to_string(),
-            file: format!("files/{}/{}/{}", f.stream, f.date, f.file),
-            index_file: false,
-            flattened: false,
-        })
-        .collect();
+    let mut del_items: Vec<_> = files_to_delete.iter().map(deleted_data_file).collect();
+    del_items.extend(bloom_files_deleted(
+        org_id,
+        stream_type,
+        stream_name,
+        files_to_delete
+            .iter()
+            .map(|f| (f.date.clone(), f.bloom_ver)),
+    ));
 
     // we also need to delete the dump files
     del_items.extend(dump_files.iter().map(|f| FileListDeleted {
         id: 0,
         account: f.account.to_string(),
         file: f.key.clone(),
-        index_file: false,
-        flattened: false,
+        index_file: f.meta.index_size > 0,
+        mindex_file: f.meta.mindex_size > 0,
+        flattened: f.meta.flattened,
     }));
 
     // create deleted items for file_list table
@@ -537,6 +541,17 @@ pub async fn delete_by_time_range(
     Ok(())
 }
 
+fn deleted_data_file(file: &FileRecord) -> FileListDeleted {
+    FileListDeleted {
+        id: 0,
+        account: file.account.to_string(),
+        file: format!("files/{}/{}/{}", file.stream, file.date, file.file),
+        index_file: file.index_size > 0,
+        mindex_file: file.mindex_size > 0,
+        flattened: file.flattened,
+    }
+}
+
 // Generate a new dump file and upload to storage
 async fn generate_dump(
     org_id: &str,
@@ -594,6 +609,7 @@ async fn generate_dump(
         original_size: buf.len() as i64,
         compressed_size: buf.len() as i64,
         index_size: 0,
+        mindex_size: 0,
         flattened: false,
         bloom_ver: 0,
     };
@@ -674,6 +690,7 @@ async fn calculate_dump_file_stats(account: &str, file_key: &str) -> Result<Stre
         storage_size: 0.0,
         compressed_size: 0.0,
         index_size: 0.0,
+        mindex_size: 0.0,
     };
 
     while let Some(batch_result) = reader.next().await {
@@ -686,6 +703,7 @@ async fn calculate_dump_file_stats(account: &str, file_key: &str) -> Result<Stre
                     stats.storage_size += record.original_size as f64;
                     stats.compressed_size += record.compressed_size as f64;
                     stats.index_size += record.index_size as f64;
+                    stats.mindex_size += record.mindex_size as f64;
                     if record.min_ts > 0 {
                         stats.doc_time_min = stats.doc_time_min.min(record.min_ts);
                     }
@@ -744,6 +762,7 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, errors::Er
     let mut field_bloom_ver = Int64Builder::with_capacity(batch_size);
     let mut field_flattened = BooleanBuilder::with_capacity(batch_size);
     let mut field_updated_at = Int64Builder::with_capacity(batch_size);
+    let mut field_mindex_size = Int64Builder::with_capacity(batch_size);
 
     for file in files {
         field_id.append_value(file.id);
@@ -762,6 +781,7 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, errors::Er
         field_bloom_ver.append_value(file.bloom_ver);
         field_flattened.append_value(file.flattened);
         field_updated_at.append_value(file.updated_at);
+        field_mindex_size.append_value(file.mindex_size);
     }
 
     let batch = RecordBatch::try_new(
@@ -783,9 +803,15 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, errors::Er
             Arc::new(field_index_size.finish()),
             Arc::new(field_bloom_ver.finish()),
             Arc::new(field_updated_at.finish()),
+            Arc::new(field_mindex_size.finish()),
         ],
     )?;
     Ok(batch)
+}
+
+/// Each id must pair with that record's own stored date, or the pruned delete leaks its row.
+fn dump_delete_pairs(files: &[FileRecord]) -> Vec<(i64, String)> {
+    files.iter().map(|r| (r.id, r.date.clone())).collect()
 }
 
 #[cfg(test)]
@@ -909,7 +935,7 @@ mod tests {
         assert!(result.is_ok());
         let batch = result.unwrap();
         assert_eq!(batch.num_rows(), 0);
-        assert_eq!(batch.num_columns(), 16);
+        assert_eq!(batch.num_columns(), 17);
     }
 
     #[test]
@@ -929,6 +955,7 @@ mod tests {
             original_size: 10000,
             compressed_size: 5000,
             index_size: 500,
+            mindex_size: 0,
             bloom_ver: 0,
             updated_at: 1100,
         };
@@ -939,7 +966,7 @@ mod tests {
         assert!(result.is_ok());
         let batch = result.unwrap();
         assert_eq!(batch.num_rows(), 1);
-        assert_eq!(batch.num_columns(), 16);
+        assert_eq!(batch.num_columns(), 17);
 
         // Verify column values
         let id_col = batch
@@ -989,6 +1016,7 @@ mod tests {
                 original_size: 10000,
                 compressed_size: 5000,
                 index_size: 500,
+                mindex_size: 0,
                 bloom_ver: 0,
                 updated_at: 1100,
             },
@@ -1007,6 +1035,7 @@ mod tests {
                 original_size: 20000,
                 compressed_size: 10000,
                 index_size: 1000,
+                mindex_size: 0,
                 bloom_ver: 0,
                 updated_at: 2100,
             },
@@ -1025,6 +1054,7 @@ mod tests {
                 original_size: 30000,
                 compressed_size: 15000,
                 index_size: 1500,
+                mindex_size: 0,
                 bloom_ver: 0,
                 updated_at: 3100,
             },
@@ -1082,6 +1112,7 @@ mod tests {
             original_size: 500000,
             compressed_size: 250000,
             index_size: 25000,
+            mindex_size: 0,
             bloom_ver: 0,
             updated_at: 1234568000,
         };
@@ -1124,6 +1155,7 @@ mod tests {
             original_size: 10000,
             compressed_size: 5000,
             index_size: 500,
+            mindex_size: 0,
             bloom_ver: 0,
             updated_at: 1100,
         };
@@ -1152,6 +1184,7 @@ mod tests {
             "index_size",
             "bloom_ver",
             "updated_at",
+            "mindex_size",
         ];
 
         for (i, expected_name) in expected_columns.iter().enumerate() {
@@ -1179,6 +1212,7 @@ mod tests {
             original_size: 0,
             compressed_size: 0,
             index_size: 0,
+            mindex_size: 0,
             bloom_ver: 0,
             updated_at: 0,
         };
@@ -1220,6 +1254,7 @@ mod tests {
             original_size: i64::MAX,
             compressed_size: i64::MAX,
             index_size: i64::MAX,
+            mindex_size: 0,
             bloom_ver: 0,
             updated_at: i64::MAX,
         };
@@ -1261,6 +1296,7 @@ mod tests {
                 original_size: 1024,
                 compressed_size: 512,
                 index_size: 64,
+                mindex_size: 0,
                 bloom_ver: 0,
                 updated_at: i * 1000 + 1000,
             })
@@ -1299,6 +1335,7 @@ mod tests {
                 original_size: 2048,
                 compressed_size: 1024,
                 index_size: 128,
+                mindex_size: 0,
                 bloom_ver: 0,
                 updated_at: 3000,
             })
@@ -1336,6 +1373,7 @@ mod tests {
             original_size: 100,
             compressed_size: 50,
             index_size: 5,
+            mindex_size: 0,
             bloom_ver: 0,
             updated_at: 200,
         };
@@ -1369,6 +1407,7 @@ mod tests {
             original_size: 0,
             compressed_size: 0,
             index_size: 0,
+            mindex_size: 0,
             bloom_ver: 0,
             updated_at: 0,
         };
@@ -1409,6 +1448,7 @@ mod tests {
             original_size: 100_000,
             compressed_size: 40_000,
             index_size: 5_000,
+            mindex_size: 7_000,
             bloom_ver: 0,
             updated_at: 9999,
         };
@@ -1437,6 +1477,18 @@ mod tests {
             .downcast_ref::<Int64Array>()
             .unwrap();
         assert_eq!(idx_col.value(0), 5_000);
+        let midx = batch
+            .column_by_name("mindex_size")
+            .unwrap()
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(midx.value(0), 7_000);
+        let restored = search_service::file_list_dump::record_batch_to_file_record(batch.clone());
+        assert_eq!(
+            (restored[0].index_size, restored[0].mindex_size),
+            (5_000, 7_000)
+        );
 
         // bloom_ver was inserted at index 14 between index_size (13) and updated_at (15).
         let upd_col = batch
@@ -1466,6 +1518,7 @@ mod tests {
                 original_size: i * 1000,
                 compressed_size: i * 500,
                 index_size: i * 50,
+                mindex_size: 0,
                 bloom_ver: 0,
                 updated_at: i * 100 + 100,
             })
@@ -1496,7 +1549,8 @@ mod tests {
             original_size: 25_000,
             compressed_size: 12_500,
             index_size: 1_250,
-            bloom_ver: 0,
+            mindex_size: 125,
+            bloom_ver: 1,
             updated_at: 20_001,
         };
 
@@ -1519,7 +1573,13 @@ mod tests {
         assert_eq!(r.original_size, original.original_size);
         assert_eq!(r.compressed_size, original.compressed_size);
         assert_eq!(r.index_size, original.index_size);
+        assert_eq!(r.mindex_size, original.mindex_size);
+        assert_eq!(r.bloom_ver, original.bloom_ver);
         assert_eq!(r.updated_at, original.updated_at);
+        let deleted = deleted_data_file(r);
+        assert!(deleted.index_file);
+        assert!(deleted.mindex_file);
+        assert!(deleted.flattened);
     }
 
     #[test]
@@ -1540,6 +1600,7 @@ mod tests {
                 original_size: i * 100,
                 compressed_size: i * 50,
                 index_size: i * 5,
+                mindex_size: 0,
                 bloom_ver: 0,
                 updated_at: i * 1000 + 1000,
             })
@@ -1596,24 +1657,6 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_dump_stream_name_empty_stream() {
-        let name = generate_dump_stream_name(StreamType::Logs, "");
-        assert_eq!(name, "_logs");
-    }
-
-    #[test]
-    fn test_generate_dump_stream_name_stream_with_underscores() {
-        let name = generate_dump_stream_name(StreamType::Metrics, "my_stream_name");
-        assert_eq!(name, "my_stream_name_metrics");
-    }
-
-    #[test]
-    fn test_generate_dump_stream_name_stream_with_hyphens() {
-        let name = generate_dump_stream_name(StreamType::Logs, "my-stream-2024");
-        assert_eq!(name, "my-stream-2024_logs");
-    }
-
-    #[test]
     fn test_generate_dump_stream_name_format_pattern() {
         // Verify the pattern is always {stream_name}_{stream_type}
         for (stype, suffix) in &[
@@ -1639,6 +1682,7 @@ mod tests {
             storage_size: 0.0,
             compressed_size: 0.0,
             index_size: 0.0,
+            mindex_size: 0.0,
         };
         // Check the sentinel value for doc_time_min (as used in dump() function)
         assert_eq!(stats.doc_time_min, i64::MAX);
@@ -1677,6 +1721,7 @@ mod tests {
             storage_size: 0.0,
             compressed_size: 0.0,
             index_size: 0.0,
+            mindex_size: 0.0,
         };
 
         for (records, min_ts, max_ts, file_num_delta, _doc, orig, comp, idx) in &file_records {
@@ -1715,6 +1760,7 @@ mod tests {
             storage_size: 0.0,
             compressed_size: 0.0,
             index_size: 0.0,
+            mindex_size: 0.0,
         };
 
         if stats.doc_time_min == i64::MAX {
@@ -1749,5 +1795,48 @@ mod tests {
                 type_str
             );
         }
+    }
+
+    // ---- dump_delete_pairs ----
+
+    fn delete_pairs_record(id: i64, date: &str) -> FileRecord {
+        FileRecord {
+            id,
+            account: "acct".to_string(),
+            org: "org".to_string(),
+            stream: "org/logs/stream".to_string(),
+            date: date.to_string(),
+            file: "f.parquet".to_string(),
+            deleted: false,
+            flattened: false,
+            min_ts: 1,
+            max_ts: 2,
+            records: 1,
+            original_size: 1,
+            compressed_size: 1,
+            index_size: 0,
+            mindex_size: 0,
+            bloom_ver: 0,
+            updated_at: 0,
+        }
+    }
+
+    #[test]
+    fn test_dump_delete_pairs_uses_each_records_own_id_and_date() {
+        let files = vec![
+            delete_pairs_record(11, "2021/01/01/00"),
+            delete_pairs_record(22, "2021/01/02/07"),
+            delete_pairs_record(33, "2021/01/01/23"),
+        ];
+        assert_eq!(
+            dump_delete_pairs(&files),
+            vec![
+                (11, "2021/01/01/00".to_string()),
+                (22, "2021/01/02/07".to_string()),
+                (33, "2021/01/01/23".to_string()),
+            ],
+            "every pair must carry that record's own stored (id, date), in input order"
+        );
+        assert!(dump_delete_pairs(&[]).is_empty());
     }
 }

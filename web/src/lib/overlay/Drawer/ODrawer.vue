@@ -20,11 +20,17 @@ import {
   provide,
   nextTick,
   useAttrs,
+  onActivated,
+  onDeactivated,
 } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
 import { FORM_SUBMIT_STATE_KEY } from "@/lib/forms/Form/OForm.types";
+import { useI18nTyped } from "@/types/i18n";
+import useBreakpoint from "@/composables/useBreakpoint";
+
+const { t } = useI18nTyped();
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -42,7 +48,7 @@ const props = withDefaults(defineProps<DrawerProps>(), {
   showClose: true,
   width: undefined,
   seamless: false,
-  modal: true,
+  primaryButtonDataTest: "o-drawer-primary-btn",
   primaryButtonVariant: "primary",
   secondaryButtonVariant: "outline",
   neutralButtonVariant: "ghost",
@@ -54,6 +60,9 @@ const props = withDefaults(defineProps<DrawerProps>(), {
   neutralButtonLoading: false,
   lazy: true,
   portalTarget: undefined,
+  anchor: undefined,
+  anchorEdge: "top",
+  modal: true,
 });
 
 const emit = defineEmits<DrawerEmits>();
@@ -61,6 +70,9 @@ const emit = defineEmits<DrawerEmits>();
 defineSlots<DrawerSlots>();
 
 const slots = useSlots();
+
+const ESCAPE_KEEPS_OPEN =
+  "input, textarea, select, [contenteditable], [data-reka-popper-content-wrapper]";
 
 // Mirrors the same controlled/uncontrolled pattern as ODialog — Vue
 // boolean-casts an absent `open` prop to `false`, locking reka-ui into
@@ -74,21 +86,67 @@ watch(
   },
 );
 
+// A kept-alive view's portal stays in <body> when the view is away, so it hides then and returns open.
+const hostAway = ref(false);
+// An inline drawer's DOM moves with its host, so only a portaled one needs hiding.
+const shown = computed(() => internalOpen.value && (props.inline || !hostAway.value));
+
+// Remounting on return re-records focus from wherever navigation left it, so keep the opener.
+let openedFrom: HTMLElement | null = null;
+let awaySinceOpen = false;
+watch(
+  internalOpen,
+  (open) => {
+    if (!open) return;
+    openedFrom = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    awaySinceOpen = false;
+  },
+  { immediate: true },
+);
+onDeactivated(() => {
+  hostAway.value = true;
+  if (internalOpen.value && !shown.value) awaySinceOpen = true;
+});
+onActivated(() => (hostAway.value = false));
+
+function handleCloseAutoFocus(event: Event) {
+  if (hostAway.value || awaySinceOpen) event.preventDefault();
+  const target = hostAway.value ? null : props.returnFocusTo?.();
+  if (target?.isConnected) {
+    event.preventDefault();
+    awaySinceOpen = false;
+    target.scrollIntoView({ block: "nearest" });
+    target.focus({ preventScroll: true });
+  } else if (!hostAway.value && awaySinceOpen) {
+    awaySinceOpen = false;
+    if (openedFrom?.isConnected) openedFrom.focus();
+  }
+  emit("after-close");
+}
+
 function handleOpenChange(v: boolean) {
+  if (!v && props.closeGuard?.() === false) return;
+  setOpen(v);
+}
+
+function setOpen(v: boolean) {
   internalOpen.value = v;
   emit("update:open", v);
 }
 
 function handleEscapeKeyDown(e: KeyboardEvent) {
-  if (props.persistent) {
+  const target = e.target instanceof Element ? e.target : null;
+  // A non-modal drawer sits beside live controls, so Escape there belongs to the field or open listbox.
+  const keepsOpen = !props.modal && target?.closest(ESCAPE_KEEPS_OPEN);
+  // A vetoed Escape must also cancel the library's own dismiss, or it closes on a second guard call.
+  if (props.persistent || keepsOpen || props.closeGuard?.() === false) {
     e.preventDefault();
     return;
   }
-  handleOpenChange(false);
+  setOpen(false);
 }
 
 function handleInteractOutside(e: Event) {
-  // Non-modal: the page behind is live, so a click there is the page's to handle.
   if (props.persistent || !props.modal) {
     e.preventDefault();
     return;
@@ -173,19 +231,19 @@ const sizeClasses = computed(() => {
   if (props.width) return "max-w-none";
   switch (props.size) {
     case "sm":
-      return "w-[min(360px,100vw)]";
+      return "w-[min(22.5rem,100vw)]";
     case "md":
-      return "w-[min(480px,100vw)]";
+      return "w-[min(30rem,100vw)]";
     case "lg":
-      return "w-[min(640px,100vw)]";
+      return "w-[min(40rem,100vw)]";
     case "xl":
-      return "w-[min(800px,100vw)]";
+      return "w-[min(50rem,100vw)]";
     case "xxl":
-      return "w-[min(1000px,100vw)]";
+      return "w-[min(62.5rem,100vw)]";
     case "full":
       return "w-screen";
     default:
-      return "w-[min(480px,100vw)]";
+      return "w-[min(30rem,100vw)]";
   }
 });
 
@@ -193,12 +251,49 @@ const sizeClasses = computed(() => {
 const isContained = computed(() => !!props.portalTarget);
 
 // Explicit width override — vw when full-viewport, % when container-scoped
+const { isMobile } = useBreakpoint();
+
+// Measured, not CSS: the drawer is portaled to <body>, away from its anchor row.
+const anchorTop = ref(0);
+function measureAnchor() {
+  const a = props.anchor;
+  const el = typeof a === "string" ? document.querySelector<HTMLElement>(a) : a;
+  const rect = el?.getBoundingClientRect();
+  anchorTop.value = rect
+    ? Math.max(0, Math.round(props.anchorEdge === "bottom" ? rect.bottom : rect.top))
+    : 0;
+}
+watchEffect(
+  (cleanup) => {
+    if (!shown.value || !props.anchor) {
+      anchorTop.value = 0;
+      return;
+    }
+    measureAnchor();
+    window.addEventListener("resize", measureAnchor);
+    cleanup(() => window.removeEventListener("resize", measureAnchor));
+  },
+  // The anchor can be swapped in the same tick, so measure only once it is in the DOM.
+  { flush: "post" },
+);
+const anchorStyle = computed(() => {
+  const style: Record<string, string> = {};
+  if (anchorTop.value > 0) {
+    style.top = `${anchorTop.value}px`;
+    style.height = `calc(100% - ${anchorTop.value}px)`;
+  }
+  return style;
+});
+const overlayStyle = computed(() => ({ zIndex: overlayZIndex.value, ...anchorStyle.value }));
+
 const contentStyle = computed(() => {
   const style: Record<string, string | number> = {
     zIndex: contentZIndex.value,
+    ...anchorStyle.value,
   };
   if (props.width != null) {
-    style.width = isContained.value ? `${props.width}%` : `${props.width}vw`;
+    const w = isMobile.value ? Math.min(100, Math.max(88, props.width)) : props.width;
+    style.width = isContained.value ? `${w}%` : `${w}vw`;
   }
   return style;
 });
@@ -206,31 +301,45 @@ const contentStyle = computed(() => {
 // ── Auto-focus logic ─────────────────────────────────────────────────────────
 const bodyRef = ref<HTMLElement | null>(null);
 const primaryBtnRef = ref<InstanceType<typeof OButton> | null>(null);
+const AUTOFOCUS_TEXT_FIELDS = [
+  'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="range"]):not([type="color"]):not([disabled])',
+  "textarea:not([disabled])",
+].join(", ");
+const AUTOFOCUS_COMBOBOX = '[role="combobox"]:not([disabled]):not([aria-disabled="true"])';
+
+function findAutoFocusTarget(root: Element): HTMLElement | null {
+  const scan = (selector: string): HTMLElement[] => {
+    const nested = Array.from(root.querySelectorAll<HTMLElement>(selector));
+    return root.matches(selector) ? [root as HTMLElement, ...nested] : nested;
+  };
+  const textField = scan(AUTOFOCUS_TEXT_FIELDS).find(
+    (el) => !el.closest('.o-select, [role="combobox"], [role="listbox"], [data-no-autofocus]'),
+  );
+  if (textField) return textField;
+  return scan(AUTOFOCUS_COMBOBOX).find((el) => !el.closest("[data-no-autofocus]")) ?? null;
+}
 
 function handleOpenAutoFocus(event: Event) {
   event.preventDefault();
+  // The panel is still translated off-screen by the slide-in, so a scrolling focus would drag a contained portal target sideways.
   nextTick(() => {
     const body = bodyRef.value;
-    if (body) {
-      const candidates = body.querySelectorAll<HTMLElement>(
-        [
-          'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="range"]):not([type="color"]):not([disabled])',
-          "textarea:not([disabled])",
-        ].join(", "),
-      );
-      const firstField = Array.from(candidates).find(
-        (el) => !el.closest('.o-select, [role="combobox"], [role="listbox"], [data-no-autofocus]'),
-      );
-      if (firstField) {
-        firstField.focus();
-        return;
-      }
+    const field = body ? findAutoFocusTarget(body) : null;
+    if (field) {
+      field.focus({ preventScroll: true });
+      return;
     }
-    // No form field found → focus primary button (confirm dialog pattern)
+    const autofocus = body?.querySelector<HTMLElement>("[autofocus]");
+    if (autofocus) {
+      autofocus.focus({ preventScroll: true });
+      return;
+    }
     const btnEl = (primaryBtnRef.value as any)?.$el as HTMLElement | undefined;
     if (btnEl) {
-      btnEl.focus();
+      btnEl.focus({ preventScroll: true });
+      return;
     }
+    body?.closest<HTMLElement>("[data-o2-drawer]")?.focus({ preventScroll: true });
   });
 }
 
@@ -250,7 +359,7 @@ function handleOpenAutoFocus(event: Event) {
 // body is below document in the DOM, this prevents the events from reaching
 // FocusScope's document-level handlers.
 watchEffect((cleanup) => {
-  if (!internalOpen.value) return;
+  if (!shown.value) return;
 
   function isPortalElement(el: Element | null): boolean {
     return !!el?.closest("[data-reka-popper-content-wrapper]");
@@ -288,7 +397,8 @@ const {
   detach: detachShadow,
 } = useScrollShadow(bodyRef);
 
-watch(internalOpen, (open) => {
+// The body unmounts while a kept-alive host is away, so its listeners follow what is shown.
+watch(shown, (open) => {
   if (open) {
     nextTick(() => {
       attachShadow();
@@ -301,13 +411,18 @@ watch(internalOpen, (open) => {
 </script>
 
 <template>
-  <DialogRoot :open="internalOpen" :modal="modal" @update:open="handleOpenChange">
+  <DialogRoot :open="shown" :modal="modal" @update:open="handleOpenChange">
     <!-- Trigger slot — omit when controlling via v-model:open -->
     <DialogTrigger v-if="hasTrigger" as-child>
       <slot name="trigger" />
     </DialogTrigger>
 
-    <DialogPortal :to="props.portalTarget ?? 'body'">
+    <DialogPortal
+      v-if="!inline || internalOpen"
+      :to="props.portalTarget ?? 'body'"
+      :disabled="inline"
+      :force-mount="inline ? true : undefined"
+    >
       <!-- Overlay / scrim — same z-index as ODialog -->
       <DialogOverlay
         data-test="o-drawer-overlay"
@@ -318,11 +433,12 @@ watch(internalOpen, (open) => {
           'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
           'data-[state=closed]:duration-120 data-[state=open]:duration-120',
         ]"
-        :style="{ zIndex: overlayZIndex }"
+        :style="overlayStyle"
       />
 
       <!-- Drawer panel -->
       <DialogContent
+        :force-mount="inline ? true : undefined"
         data-o2-drawer
         :data-test="parentDataTest || 'o-drawer-panel'"
         :style="contentStyle"
@@ -360,13 +476,14 @@ watch(internalOpen, (open) => {
         @escape-key-down="handleEscapeKeyDown"
         @interact-outside="handleInteractOutside"
         @open-auto-focus="handleOpenAutoFocus"
+        @close-auto-focus="handleCloseAutoFocus"
       >
         <!-- Accessibility: hidden title required by Reka UI -->
         <DialogTitle class="sr-only absolute">
-          {{ ariaLabel ?? title ?? "Drawer" }}
+          {{ ariaLabel ?? title ?? t("common.drawer") }}
         </DialogTitle>
         <DialogDescription class="sr-only absolute">
-          {{ ariaLabel ?? title ?? "Drawer" }}
+          {{ ariaLabel ?? title ?? t("common.drawer") }}
         </DialogDescription>
 
         <!-- ── Header ───────────────────────────────────────── -->
@@ -386,23 +503,21 @@ watch(internalOpen, (open) => {
 
           <!-- CASE 2: Default / structured layout -->
           <template v-else>
-            <!-- Title + subtitle block — fixed width, never grows -->
-            <div v-if="title || subTitle" class="min-w-0 shrink-0">
-              <span
+            <!-- Below lg a subtitle longer than the panel must truncate, or it pushes the close button off screen. -->
+            <div v-if="title || subTitle" class="min-w-0 shrink-0 max-lg:shrink">
+              <OTruncatedText
                 v-if="title"
-                class="text-dialog-header-text block truncate text-base font-semibold"
+                class="text-dialog-header-text block text-base font-semibold"
                 :data-test="titleDataTest"
               >
                 {{ title }}
-                <!-- Full title on hover (styled), so a truncated title is never lost. -->
-                <OTooltip :content="title" />
-              </span>
-              <span
+              </OTruncatedText>
+              <OTruncatedText
                 v-if="subTitle"
-                class="text-dialog-content-text mt-0.5 block truncate text-xs opacity-70"
+                class="text-dialog-content-text mt-0.5 block text-xs opacity-70"
               >
                 {{ subTitle }}
-              </span>
+              </OTruncatedText>
             </div>
 
             <!-- #header-left sub-slot — grows to fill space if present -->
@@ -426,7 +541,7 @@ watch(internalOpen, (open) => {
           <DialogClose v-if="showClose" as-child>
             <button
               type="button"
-              aria-label="Close drawer"
+              :aria-label="t('components.drawer.closeDrawer')"
               data-test="o-drawer-close-btn"
               @mousedown.prevent
               :class="[
@@ -467,11 +582,9 @@ watch(internalOpen, (open) => {
             'min-h-0 flex-1 overflow-x-hidden overflow-y-auto',
             'text-dialog-content-text',
             bodyPaddingClass,
-            canScrollUp && '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1)]',
-            canScrollDown && '[box-shadow:inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
-            canScrollUp &&
-              canScrollDown &&
-              '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1),inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
+            canScrollUp && 'shadow-scroll-top',
+            canScrollDown && 'shadow-scroll-bottom',
+            canScrollUp && canScrollDown && 'shadow-scroll-both',
           ]"
         >
           <template v-if="!props.lazy || internalOpen">
@@ -524,7 +637,7 @@ watch(internalOpen, (open) => {
               <OButton
                 v-if="primaryButtonLabel"
                 ref="primaryBtnRef"
-                data-test="o-drawer-primary-btn"
+                :data-test="primaryButtonDataTest"
                 :variant="primaryButtonVariant"
                 size="sm-action"
                 :type="formId ? 'submit' : 'button'"

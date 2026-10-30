@@ -1,4 +1,4 @@
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import JsonPreview from "@/plugins/logs/JsonPreview.vue";
 import i18n from "@/locales";
@@ -56,13 +56,17 @@ const ODialogStub = {
 };
 
 // Mock services
-vi.mock("@/services/search", () => ({
-  default: {
-    search: vi.fn(),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      search: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/utils/zincutils", () => ({
+vi.mock("@/utils/zincutils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/zincutils")>()),
   getImageURL: vi.fn(() => "mock-image-url"),
   getUUID: vi.fn(() => "mock-uuid-123"),
   generateTraceContext: vi.fn(() => ({
@@ -248,6 +252,11 @@ describe("JsonPreview Component", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
+    it("should let a field's value shrink so long values wrap inside the row", () => {
+      const valueCell = wrapper.find('[data-test="log-expand-detail-key-field1"]');
+      expect(valueCell.classes()).toContain("min-w-0");
+    });
+
     it("should have correct component name", () => {
       expect(wrapper.vm.$options.name).toBe("JsonPreview");
     });
@@ -385,9 +394,15 @@ describe("JsonPreview Component", () => {
       expect(wrapper.emitted("addFieldToTable")[0]).toEqual(["field1"]);
     });
 
-    it("should emit view-trace event", () => {
+    // Regression — issue #13708: the event used to be emitted with no payload,
+    // so listeners bound by reference (`@view-trace="redirectToTraces"`) got
+    // `undefined` and threw "Cannot read properties of undefined (reading
+    // '_timestamp')". The log being previewed must ride along, exactly like
+    // the sibling `show-correlation` emit does.
+    it("should emit view-trace event with the previewed log", () => {
       wrapper.vm.redirectToTraces();
       expect(wrapper.emitted("view-trace")).toBeTruthy();
+      expect(wrapper.emitted("view-trace")[0]).toEqual([mockValue]);
     });
 
     it("should emit sendToAiChat event", () => {
@@ -629,6 +644,13 @@ describe("JsonPreview Component", () => {
   });
 
   describe("Field Operations", () => {
+    it("offers include/exclude for schema fields in every stream and for _stream_name", () => {
+      expect(wrapper.vm.canFilterOnField("field1")).toBe(true);
+      expect(wrapper.vm.canFilterOnField("field3")).toBe(false);
+      expect(wrapper.vm.canFilterOnField("nested")).toBe(false);
+      expect(wrapper.vm.canFilterOnField("_stream_name")).toBe(true);
+    });
+
     it("should return correct label for adding field to table", () => {
       wrapper.vm.searchObj.data.stream.selectedFields = ["field1"];
 
@@ -1067,6 +1089,61 @@ describe("JsonPreview Component", () => {
       expect(result[0].resolvedUrl).toBe("https://traces.example.com/trace-abc-123");
     });
 
+    it("never puts a held filter's raw text into a cross-link query", async () => {
+      store.state.zoConfig.enable_cross_linking = true;
+      const { data, meta } = wrapper.vm.searchObj;
+      const saved = {
+        query: data.query,
+        crossLinkQuery: data.crossLinkQuery,
+        streamResults: data.streamResults,
+        selectedStream: data.stream.selectedStream,
+        sqlMode: meta.sqlMode,
+      };
+      data.crossLinks = {
+        stream_links: [
+          {
+            name: "Query",
+            url: "https://example.com/q?sql=${query}",
+            fields: [{ name: "trace_id", alias: "field1" }],
+          },
+        ],
+        org_links: [],
+      };
+      data.stream.selectedStream = ["stream1"];
+      data.streamResults = {
+        list: [
+          {
+            name: "stream1",
+            schema: [
+              { name: "body", type: "Utf8" },
+              { name: "status", type: "Int64" },
+              { name: "is_error", type: "Boolean" },
+            ],
+            settings: { full_text_search_keys: ["body"] },
+          },
+        ],
+      };
+      meta.sqlMode = false;
+      data.query = "status=500 -404 AND is_error";
+      data.crossLinkQuery = "";
+      await wrapper.setProps({ value: { ...mockValue, field1: "val123" } });
+      try {
+        expect(wrapper.vm.getCrossLinksForField("field1")[0].resolvedUrl).toBe(
+          "https://example.com/q?sql=",
+        );
+        data.query = "status=500";
+        expect(wrapper.vm.getCrossLinksForField("field1")[0].resolvedUrl).toBe(
+          "https://example.com/q?sql=status%3D500",
+        );
+      } finally {
+        data.query = saved.query;
+        data.crossLinkQuery = saved.crossLinkQuery;
+        data.streamResults = saved.streamResults;
+        data.stream.selectedStream = saved.selectedStream;
+        meta.sqlMode = saved.sqlMode;
+      }
+    });
+
     it("should fall back to org links when stream does not cover the field", async () => {
       store.state.zoConfig.enable_cross_linking = true;
       wrapper.vm.searchObj.data.crossLinks = mockCrossLinks;
@@ -1124,7 +1201,33 @@ describe("JsonPreview Component", () => {
       const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
       wrapper.vm.openCrossLink("https://example.com/trace/123");
 
-      expect(openSpy).toHaveBeenCalledWith("https://example.com/trace/123", "_blank");
+      // `noopener,noreferrer` stops the opened tab reaching back via
+      // window.opener and strips the referrer.
+      expect(openSpy).toHaveBeenCalledWith(
+        "https://example.com/trace/123",
+        "_blank",
+        "noopener,noreferrer",
+      );
+      openSpy.mockRestore();
+    });
+
+    // See the DetailTable twin: the RESOLVED url is guarded, because links
+    // saved before validation existed are still in the DB and a substituted
+    // field VALUE can carry a hostile scheme.
+    it("does not open a cross-link whose resolved url is unsafe", () => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+
+      for (const hostile of [
+        "javascript:alert(document.cookie)",
+        "data:text/html,<script>alert(1)</script>",
+        "file:///etc/passwd",
+        "http://",
+        "not a url",
+      ]) {
+        wrapper.vm.openCrossLink(hostile);
+      }
+
+      expect(openSpy).not.toHaveBeenCalled();
       openSpy.mockRestore();
     });
 
@@ -1183,6 +1286,205 @@ describe("JsonPreview Component", () => {
 
       const result = wrapper.vm.getCrossLinksForField("field1");
       expect(result).toEqual([]);
+    });
+  });
+
+  // The View Trace action is shared with DetailTable's row-detail drawer, which
+  // renders its own copy in the drawer header (hence `hideViewTrace`) and fills
+  // the previewed record in an async created() hook, so the preview mounts with
+  // an empty `value` and only receives the record later (hence the watcher).
+  describe("View Trace action visibility", () => {
+    const streamSelectSelector = '[data-test="log-search-index-list-select-stream"]';
+    const viewTraceBtnSelector = '[data-test="trace-view-logs-btn"]';
+    const recordWithTraceId = { ...mockValue, trace_id: "test-trace-id" };
+
+    let traceWrapper: any = null;
+
+    const mountPreview = (props: Record<string, any> = {}) =>
+      mount(JsonPreview, {
+        props: { value: recordWithTraceId, mode: "sidebar", ...props },
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            AppTabs: true,
+            CodeQueryEditor: true,
+            ODialog: ODialogStub,
+            OButton: true,
+            ODropdown: true,
+            ODropdownItem: true,
+            ODropdownSeparator: true,
+            OSelect: true,
+            OIcon: true,
+            OInput: true,
+            OSpinner: true,
+            OTooltip: true,
+            LogsHighLighting: true,
+            ChunkedContent: true,
+            EqualIcon: true,
+            NotEqualIcon: true,
+          },
+        },
+      });
+
+    beforeEach(() => {
+      // Everything the gate needs: traces menu visible, service streams off,
+      // and traces streams available for the picker.
+      store.state.hiddenMenus = new Set();
+      store.state.zoConfig.service_streams_enabled = false;
+      mockGetStreams.mockResolvedValue({
+        list: [{ name: "trace-stream1" }, { name: "trace-stream2" }],
+      });
+    });
+
+    afterEach(() => {
+      traceWrapper?.unmount();
+      traceWrapper = null;
+    });
+
+    describe("hideViewTrace prop", () => {
+      it("should default hideViewTrace to false", () => {
+        traceWrapper = mountPreview();
+
+        expect(traceWrapper.props("hideViewTrace")).toBe(false);
+      });
+
+      it("should render the stream picker and the button when the gate passes", async () => {
+        traceWrapper = mountPreview();
+        await flushPromises();
+
+        expect(traceWrapper.vm.showViewTraceBtn).toBeTruthy();
+        expect(traceWrapper.vm.tracesStreams).toEqual(["trace-stream1", "trace-stream2"]);
+        expect(traceWrapper.find(streamSelectSelector).exists()).toBe(true);
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(true);
+      });
+
+      it("should hide the stream picker and the button when hideViewTrace is true", async () => {
+        traceWrapper = mountPreview({ hideViewTrace: true });
+        await flushPromises();
+
+        // The gate itself still passes — only the prop hides the action.
+        expect(traceWrapper.vm.showViewTraceBtn).toBeTruthy();
+        expect(traceWrapper.vm.tracesStreams.length).toBeGreaterThan(0);
+        expect(traceWrapper.find(streamSelectSelector).exists()).toBe(false);
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
+      });
+
+      it("should stay hidden with hideViewTrace even when value arrives late", async () => {
+        traceWrapper = mountPreview({ value: {}, hideViewTrace: true });
+        await flushPromises();
+
+        await traceWrapper.setProps({ value: recordWithTraceId });
+        await flushPromises();
+
+        expect(traceWrapper.vm.showViewTraceBtn).toBeTruthy();
+        expect(traceWrapper.find(streamSelectSelector).exists()).toBe(false);
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
+      });
+    });
+
+    describe("value watcher", () => {
+      it("should hide the action while value is still empty", async () => {
+        traceWrapper = mountPreview({ value: {} });
+        await flushPromises();
+
+        expect(traceWrapper.vm.showViewTraceBtn).toBeFalsy();
+        expect(mockGetStreams).not.toHaveBeenCalled();
+        expect(traceWrapper.find(streamSelectSelector).exists()).toBe(false);
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
+      });
+
+      it("should show the action once value is populated after mount", async () => {
+        traceWrapper = mountPreview({ value: {} });
+        await flushPromises();
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
+
+        await traceWrapper.setProps({ value: recordWithTraceId });
+        await flushPromises();
+
+        expect(traceWrapper.vm.showViewTraceBtn).toBeTruthy();
+        expect(mockGetStreams).toHaveBeenCalledWith("traces", false);
+        expect(traceWrapper.vm.tracesStreams).toEqual(["trace-stream1", "trace-stream2"]);
+        expect(traceWrapper.find(streamSelectSelector).exists()).toBe(true);
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(true);
+      });
+
+      it("should render the action while the traces streams are still loading", async () => {
+        let resolveStreams: (value: any) => void = () => {};
+        mockGetStreams.mockImplementation(
+          () =>
+            new Promise((resolve) => {
+              resolveStreams = resolve;
+            }),
+        );
+
+        traceWrapper = mountPreview({ value: {} });
+        await traceWrapper.setProps({ value: recordWithTraceId });
+        await nextTick();
+
+        // No streams have arrived yet: the loading flag alone keeps it rendered.
+        expect(traceWrapper.vm.tracesStreams).toEqual([]);
+        expect(traceWrapper.vm.isTracesStreamsLoading).toBe(true);
+        expect(traceWrapper.find(streamSelectSelector).exists()).toBe(true);
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(true);
+
+        resolveStreams({ list: [{ name: "trace-stream1" }] });
+        await flushPromises();
+
+        expect(traceWrapper.vm.isTracesStreamsLoading).toBe(false);
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(true);
+      });
+
+      it("should hide the action again when value is emptied", async () => {
+        traceWrapper = mountPreview();
+        await flushPromises();
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(true);
+
+        await traceWrapper.setProps({ value: {} });
+        await flushPromises();
+
+        expect(traceWrapper.vm.showViewTraceBtn).toBeFalsy();
+        expect(traceWrapper.find(streamSelectSelector).exists()).toBe(false);
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
+      });
+
+      it("should hide the action when the new value carries no trace id", async () => {
+        traceWrapper = mountPreview();
+        await flushPromises();
+
+        await traceWrapper.setProps({ value: { ...mockValue } });
+        await flushPromises();
+
+        expect(traceWrapper.vm.showViewTraceBtn).toBeFalsy();
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
+      });
+
+      it("should not refetch the traces streams on every value change", async () => {
+        traceWrapper = mountPreview({ value: {} });
+        await traceWrapper.setProps({ value: recordWithTraceId });
+        await flushPromises();
+        expect(mockGetStreams).toHaveBeenCalledTimes(1);
+
+        await traceWrapper.setProps({
+          value: { ...recordWithTraceId, trace_id: "another-trace-id" },
+        });
+        await flushPromises();
+
+        expect(mockGetStreams).toHaveBeenCalledTimes(1);
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(true);
+      });
+
+      it("should keep the action hidden when the traces menu is hidden", async () => {
+        store.state.hiddenMenus = new Set(["traces"]);
+        traceWrapper = mountPreview({ value: {} });
+
+        await traceWrapper.setProps({ value: recordWithTraceId });
+        await flushPromises();
+
+        expect(traceWrapper.vm.showViewTraceBtn).toBe(false);
+        expect(mockGetStreams).not.toHaveBeenCalled();
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
+      });
     });
   });
 });

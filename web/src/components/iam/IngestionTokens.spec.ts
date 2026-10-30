@@ -24,14 +24,19 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import IngestionTokens from "@/components/iam/IngestionTokens.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import ConfirmDialogProvider from "@/components/ConfirmDialogProvider.vue";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
-vi.mock("@/services/organizations", () => ({
-  default: {
-    list_org_ingestion_tokens: vi.fn(() => Promise.resolve({ data: { data: [] } })),
-    create_org_ingestion_token: vi.fn(),
-    enable_disable_org_ingestion_token: vi.fn(),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list_org_ingestion_tokens: vi.fn(() => Promise.resolve({ data: { data: [] } })),
+      create_org_ingestion_token: vi.fn(),
+      enable_disable_org_ingestion_token: vi.fn(),
+    },
+  });
+});
 
 const { mockToast } = vi.hoisted(() => ({ mockToast: vi.fn() }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: mockToast }));
@@ -121,6 +126,7 @@ describe("IngestionTokens — Create Token form", () => {
       expect(getForm(wrapper).props("defaultValues")).toEqual({
         name: "",
         description: "",
+        splunk_token: false,
       });
     });
 
@@ -160,7 +166,7 @@ describe("IngestionTokens — Create Token form", () => {
       expect(organizationsService.create_org_ingestion_token).toHaveBeenCalledTimes(1);
       expect(organizationsService.create_org_ingestion_token).toHaveBeenCalledWith(
         store.state.selectedOrganization.identifier,
-        { name: "my-token", description: "for ingestion" },
+        { name: "my-token", description: "for ingestion", splunk_token: false },
       );
     });
 
@@ -175,7 +181,7 @@ describe("IngestionTokens — Create Token form", () => {
 
       expect(organizationsService.create_org_ingestion_token).toHaveBeenCalledWith(
         store.state.selectedOrganization.identifier,
-        { name: "only-name", description: "" },
+        { name: "only-name", description: "", splunk_token: false },
       );
     });
   });
@@ -196,6 +202,27 @@ describe("IngestionTokens — Create Token form", () => {
       expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
     });
 
+    it("carries the Splunk token back for the reveal dialog", async () => {
+      vi.spyOn(store, "dispatch").mockResolvedValue(undefined as any);
+      vi.mocked(organizationsService.create_org_ingestion_token).mockResolvedValue({
+        data: { data: { token: "tok_abc", splunk_token: "7b3d9f2c-4a11-4e55-9c8b-2f6a01c34d90" } },
+      } as any);
+
+      await getNameInput(wrapper).setValue("my-token");
+      await submitForm(wrapper);
+
+      expect(wrapper.vm.revealedToken).toEqual({
+        name: "my-token",
+        token: "tok_abc",
+        splunk_token: "7b3d9f2c-4a11-4e55-9c8b-2f6a01c34d90",
+      });
+    });
+
+    it("points the HEC URL at the server root, never under a base URI", () => {
+      expect(wrapper.vm.hecUrl).toBe(`${window.location.origin}/services/collector`);
+      expect(wrapper.vm.hecUrl).toContain("/services/collector");
+    });
+
     it("shows an error toast and keeps the dialog open on failure", async () => {
       vi.mocked(organizationsService.create_org_ingestion_token).mockRejectedValue({
         response: { data: { message: "boom" } },
@@ -209,5 +236,37 @@ describe("IngestionTokens — Create Token form", () => {
       );
       expect(wrapper.vm.showRevealedDialog).toBe(false);
     });
+  });
+});
+
+describe("IngestionTokens — revoke Splunk HEC token confirm", () => {
+  it("names the token in bold in the real provider with a destructive button", async () => {
+    vi.mocked(organizationsService.list_org_ingestion_tokens).mockResolvedValue({
+      data: { data: [] },
+    } as any);
+    const wrapper = mountComp();
+    const ProviderDialogStub = {
+      name: "ODialog",
+      props: ["open", "title", "primaryButtonVariant"],
+      template: `<div data-test-stub="provider-dialog"><slot /></div>`,
+    };
+    const provider = mount(ConfirmDialogProvider, {
+      global: { plugins: [i18n], stubs: { ODialog: ProviderDialogStub } },
+    });
+    await flushPromises();
+
+    const pending = (wrapper.vm as any).setSplunkToken("edge-forwarder", false);
+    await flushPromises();
+    const name = provider.find('[data-test="confirm-dialog-provider-name"]');
+    expect(name.text()).toBe("edge-forwarder");
+    expect(name.classes()).toContain("font-semibold");
+    expect(provider.findComponent(ProviderDialogStub).props("primaryButtonVariant")).toBe(
+      "destructive",
+    );
+
+    useConfirmDialog().handleCancel();
+    await pending;
+    provider.unmount();
+    wrapper.unmount();
   });
 });

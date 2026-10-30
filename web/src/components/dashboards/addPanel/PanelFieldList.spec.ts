@@ -210,6 +210,60 @@ describe("FieldList", () => {
     });
   });
 
+  // ── Default stream for a new dashboard panel ────────────────────────
+
+  describe("Default stream", () => {
+    afterEach(() => {
+      localStorage.clear();
+    });
+
+    const mountWithoutStream = (pageKey: string, editMode = false) => {
+      mockReturn.dashboardPanelData.data.queries[0].fields.stream = "";
+      wrapper = mountComponent({ pageKey, props: { editMode } });
+      mockReturn.dashboardPanelData.meta.stream.streamResults = [...mockStreamResults];
+    };
+
+    it("opens a new dashboard panel on the stream the last panel was saved with", async () => {
+      localStorage.setItem("oo_dashboard_panel_stream_logs_test-org", "error_logs");
+      mountWithoutStream("dashboard");
+      await flushPromises();
+      expect(mockReturn.dashboardPanelData.data.queries[0].fields.stream).toBe("error_logs");
+    });
+
+    it("falls back to the last explored logs stream", async () => {
+      localStorage.setItem("oo_selected_stream_logs_test-org", JSON.stringify(["error_logs"]));
+      mountWithoutStream("dashboard");
+      await flushPromises();
+      expect(mockReturn.dashboardPanelData.data.queries[0].fields.stream).toBe("error_logs");
+    });
+
+    it("skips an internal stream and prefers one with data when nothing is remembered", async () => {
+      mockReturn.dashboardPanelData.data.queries[0].fields.stream = "";
+      wrapper = mountComponent({ pageKey: "dashboard" });
+      mockReturn.dashboardPanelData.meta.stream.streamResults = [
+        { name: "_agent_signals", stream_type: "logs", stats: { doc_num: 1, doc_time_max: 9 } },
+        { name: "app_logs", stream_type: "logs", stats: { doc_num: 0 } },
+        { name: "error_logs", stream_type: "logs", stats: { doc_num: 3, doc_time_max: 5 } },
+      ];
+      await flushPromises();
+      expect(mockReturn.dashboardPanelData.data.queries[0].fields.stream).toBe("error_logs");
+    });
+
+    it("keeps the first stream when editing a saved panel", async () => {
+      localStorage.setItem("oo_dashboard_panel_stream_logs_test-org", "error_logs");
+      mountWithoutStream("dashboard", true);
+      await flushPromises();
+      expect(mockReturn.dashboardPanelData.data.queries[0].fields.stream).toBe("app_logs");
+    });
+
+    it("keeps the first stream outside dashboards", async () => {
+      localStorage.setItem("oo_dashboard_panel_stream_logs_test-org", "error_logs");
+      mountWithoutStream("build");
+      await flushPromises();
+      expect(mockReturn.dashboardPanelData.data.queries[0].fields.stream).toBe("app_logs");
+    });
+  });
+
   // ── Stream Type Selection ───────────────────────────────────────────
 
   describe("Stream Type Selection", () => {
@@ -243,6 +297,23 @@ describe("FieldList", () => {
       expect(fields.stream).toBe("");
       expect(fields.stream_type).toBe("metrics");
     });
+
+    const streamTypeValues = (w: VueWrapper) =>
+      (
+        w.findComponent('[data-test="index-dropdown-stream_type"]').props("options") as {
+          value: string;
+        }[]
+      ).map((o) => o.value);
+
+    it("offers enrichment tables on the dashboard page", () => {
+      wrapper = mountComponent({ pageKey: "dashboard" });
+      expect(streamTypeValues(wrapper)).toEqual(["logs", "metrics", "traces", "enrichment_tables"]);
+    });
+
+    it.each(["logs", "build"])("does not offer enrichment tables on the %s page", (pageKey) => {
+      wrapper = mountComponent({ pageKey });
+      expect(streamTypeValues(wrapper)).toEqual(["logs", "metrics", "traces"]);
+    });
   });
 
   // ── Stream List Loading ─────────────────────────────────────────────
@@ -269,6 +340,18 @@ describe("FieldList", () => {
 
       expect(mockGetStreams).toHaveBeenCalledWith("metrics", false);
       expect(mockReturn.dashboardPanelData.meta.stream.streamResultsType).toBe("metrics");
+    });
+
+    it("loads enrichment tables when that stream type is picked", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      mockGetStreams.mockClear();
+
+      currentFields().stream_type = "enrichment_tables";
+      await flushPromises();
+
+      expect(mockGetStreams).toHaveBeenCalledWith("enrichment_tables", false);
+      expect(mockReturn.dashboardPanelData.meta.stream.streamResultsType).toBe("enrichment_tables");
     });
 
     it("does not refetch the stream list when only the selected stream changes", async () => {
@@ -428,7 +511,9 @@ describe("FieldList", () => {
       // With 250 page size, only 250 fields + 1 group header should be rendered
       const rows = wrapper.findAll('[data-test^="o-field-list-row-"]');
       expect(rows.length).toBeLessThanOrEqual(250);
-    });
+      // Mounting 250 rows takes ~600ms locally but overruns the 5s default under
+      // CI coverage instrumentation on a loaded runner.
+    }, 20000);
   });
 
   // ── Field Actions ───────────────────────────────────────────────────
@@ -876,6 +961,21 @@ describe("FieldList", () => {
       await flushPromises();
 
       expect(mockGetStreams).toHaveBeenCalledWith("metrics", false);
+    });
+
+    // Logs → Visualize with no stream picked on the logs page: the select is the
+    // user's own here, so deferring left it on "No options found" with no way out.
+    it("fetches in build edit mode even when stream is blank", async () => {
+      currentQuery().fields.stream = "";
+      currentQuery().fields.stream_type = "logs";
+
+      wrapper = mountComponent({
+        pageKey: "build",
+        props: { editMode: true },
+      });
+      await flushPromises();
+
+      expect(mockGetStreams).toHaveBeenCalledWith("logs", false);
     });
 
     it("fetches when the stream is set before mount (the seeded-parent case)", async () => {

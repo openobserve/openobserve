@@ -330,7 +330,10 @@ describe("VariableAdHocValueSelector", () => {
     it("should render tooltip on add button", () => {
       const addButton = wrapper.find('[data-test="dashboard-variable-adhoc-add-selector"]');
       expect(addButton.exists()).toBe(true);
-      const tooltip = wrapper.findComponent({ name: "OTooltip" });
+      // Scoped to the add button: OSelect renders its own OTooltip
+      // internally for the operator label, so an unscoped lookup can match
+      // that one instead (e.g. "!=") rather than the add button's tooltip.
+      const tooltip = addButton.findComponent({ name: "OTooltip" });
 
       if (tooltip.exists()) {
         expect(tooltip.props("content")).toBe("Add Dynamic Filter");

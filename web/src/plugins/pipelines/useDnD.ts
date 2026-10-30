@@ -20,6 +20,7 @@ import { watch, reactive } from "vue";
 import { detectCycle } from "@/composables/flow/detectCycle";
 import { makeEdge } from "@/composables/flow/makeEdge";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import type { TranslateFn, I18nText } from "@/types/i18n";
 
 const dialogObj = {
   show: false,
@@ -59,12 +60,12 @@ const defaultObject = {
   },
   dialog: dialogObj,
   nodeTypes: [] as Array<{
-    label: string;
+    label: I18nText;
     icon: string;
     isSectionHeader: boolean;
     subtype?: string;
     io_type?: string;
-    tooltip?: string;
+    tooltip?: I18nText;
   }>,
   // Node rail open/closed. Lives here rather than in PipelineEditor because the
   // toggle sits in Vue Flow's control stack (PipelineFlow) while the rail it
@@ -107,7 +108,7 @@ const defaultObject = {
 const pipelineObj = reactive(Object.assign({}, defaultObject));
 
 export { pipelineObj };
-export default function useDragAndDrop() {
+export default function useDragAndDrop(t: TranslateFn) {
   const { screenToFlowCoordinate, onNodesInitialized, updateNode } = useVueFlow();
 
   watch(
@@ -171,7 +172,7 @@ export default function useDragAndDrop() {
   function onDrop(event: any, offSet: any = { x: 0, y: 0 }) {
     if (pipelineObj.hasInputNode && pipelineObj.draggedNode.io_type == "input") {
       toast({
-        message: "Only 1 source node is allowed",
+        message: t("toastMessages.pipelines.only1SourceNodeIsAllowed"),
         variant: "warning",
       });
       return;
@@ -237,7 +238,7 @@ export default function useDragAndDrop() {
       (connection.sourceHandle === "output" && connection.targetHandle === "output")
     ) {
       toast({
-        message: "Same type of edges / nodes cannot be connected",
+        message: t("toastMessages.pipelines.sameTypeOfEdgesNodesCannot"),
         variant: "warning",
       });
       return;
@@ -247,7 +248,7 @@ export default function useDragAndDrop() {
     );
     if (isConnectionAlreadyAvailable) {
       toast({
-        message: "Only one Incoming Edge to the node is allowed",
+        message: t("toastMessages.pipelines.onlyOneIncomingEdgeToThe"),
         variant: "warning",
       });
       return;
@@ -256,7 +257,7 @@ export default function useDragAndDrop() {
     const isCycle = detectCycle(pipelineObj.currentSelectedPipeline.edges, connection);
     if (isCycle) {
       toast({
-        message: "Adding this edge will create a cycle in the pipeline",
+        message: t("toastMessages.pipelines.addingThisEdgeWillCreateA"),
         variant: "warning",
       });
       return;
@@ -329,7 +330,7 @@ export default function useDragAndDrop() {
           if (detectCycle(pipelineObj.currentSelectedPipeline.edges, edge)) {
             toast({
               variant: "warning",
-              message: "Adding this edge will create a cycle in the pipeline",
+              message: t("toastMessages.pipelines.addingThisEdgeWillCreateA"),
             });
           } else {
             pipelineObj.currentSelectedPipeline.edges = [

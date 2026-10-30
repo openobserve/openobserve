@@ -17,6 +17,11 @@ set -uo pipefail
 : "${STREAM:?STREAM required}"
 SUITE="${SUITE:-}"
 CONCLUSION="${CONCLUSION:-}"
+# Prefix that identifies e2e shard jobs by name (drives the run-doc shard tallies and the
+# per-shard rows in <STREAM>_shards). Default matches OSS/regression shard jobs
+# ("e2e / <folder>"); alpha1 passes SHARD_PREFIX="alpha1-e2e / " because its shard jobs are
+# named "alpha1-e2e / <folder>". The trailing space is significant (it separates the module).
+SHARD_PREFIX="${SHARD_PREFIX:-e2e / }"
 
 if [ -z "${O2_REPORTING_INGEST_BASE:-}" ] || [ -z "${O2_REPORTING_AUTH:-}" ]; then
   echo "::notice::O2_REPORTING_* secrets not set — skipping metrics ingest"; exit 0
@@ -69,15 +74,28 @@ fi
 
 WORKFLOW_TAG="test"; [ "$STREAM" = "ci_regression" ] && WORKFLOW_TAG="regression"
 
-# Build-job duration + shard tallies from this attempt's jobs, added to the run doc:
-#   build_duration_sec  — wall-clock of the "build_binary" job (null if absent)
-#   shards_total/passed/failed/skipped — counts of the "e2e / *" shard jobs by conclusion
-# Shard jobs are matched by the "e2e /" name prefix; the build job by exact name "build_binary".
-# Suites without these jobs (e.g. API) get null/0 — harmless, those panels just stay empty.
+# Build/runtime-ready duration + shard tallies from this attempt's jobs:
+#   build_duration_sec         — wall-clock of BUILD_JOB_NAME (default
+#                                "build_binary"; empty when built in another run)
+#   runtime_ready_duration_sec — wall-clock of RUNTIME_READY_JOB_NAME when set
+#   shards_total/passed/failed/skipped — counts of the shard jobs by conclusion
+# Shard jobs are matched by the SHARD_PREFIX name prefix (default "e2e /", alpha1 overrides
+# to "alpha1-e2e / "); duration jobs are matched by exact configured names.
+# Suites without a matching job get null — harmless, those panels just stay empty.
 JOBDUR='if (.completed_at and .started_at) then ((.completed_at|fromdateiso8601)-(.started_at|fromdateiso8601)) else null end'
-BUILD_DUR=$(printf '%s' "$THIS_JOBS" | jq "[.jobs[]|select(.name==\"build_binary\")]|.[0]|if . then ($JOBDUR) else null end" 2>/dev/null)
-[ -n "$BUILD_DUR" ] || BUILD_DUR=null
-SHARDS=$(printf '%s' "$THIS_JOBS" | jq -c '[.jobs[]|select(.name|startswith("e2e /"))] as $s
+BUILD_JOB_NAME="${BUILD_JOB_NAME-build_binary}"
+RUNTIME_READY_JOB_NAME="${RUNTIME_READY_JOB_NAME:-}"
+BUILD_DUR=null
+if [ -n "$BUILD_JOB_NAME" ]; then
+  BUILD_DUR=$(printf '%s' "$THIS_JOBS" | jq --arg job_name "$BUILD_JOB_NAME" "[.jobs[]|select(.name==\$job_name and .conclusion==\"success\")]|.[0]|if . then ($JOBDUR) else null end" 2>/dev/null)
+  [ -n "$BUILD_DUR" ] || BUILD_DUR=null
+fi
+RUNTIME_READY_DUR=null
+if [ -n "$RUNTIME_READY_JOB_NAME" ]; then
+  RUNTIME_READY_DUR=$(printf '%s' "$THIS_JOBS" | jq --arg job_name "$RUNTIME_READY_JOB_NAME" "[.jobs[]|select(.name==\$job_name)]|.[0]|if . then ($JOBDUR) else null end" 2>/dev/null)
+  [ -n "$RUNTIME_READY_DUR" ] || RUNTIME_READY_DUR=null
+fi
+SHARDS=$(printf '%s' "$THIS_JOBS" | jq -c --arg pfx "$SHARD_PREFIX" '[.jobs[]|select(.name|startswith($pfx))] as $s
   | {shards_total:($s|length),
      shards_passed:([$s[]|select(.conclusion=="success")]|length),
      shards_failed:([$s[]|select(.conclusion=="failure")]|length),
@@ -89,7 +107,7 @@ printf '%s' "$RUN_JSON" | jq \
   --arg repo "$GITHUB_REPOSITORY" --arg run_id "$GITHUB_RUN_ID" --arg attempt "$ATT" \
   --arg run_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${ATT}" \
   --argjson final "${FINAL_DUR:-0}" --argjson total "${TOTAL_DUR:-0}" \
-  --argjson build "$BUILD_DUR" --argjson shards "$SHARDS" \
+  --argjson build "$BUILD_DUR" --argjson runtime_ready "$RUNTIME_READY_DUR" --argjson shards "$SHARDS" \
   '($attempt|tonumber) as $a |
    {
      _timestamp: ((.run_started_at // .created_at | fromdateiso8601) * 1000000 | floor),
@@ -103,6 +121,7 @@ printf '%s' "$RUN_JSON" | jq \
      final_duration_sec: ($final|round), total_duration_sec: ($total|round),
      retry_wasted_sec: (($total-$final)|round),
      build_duration_sec: ($build | if .==null then null else round end),
+     runtime_ready_duration_sec: ($runtime_ready | if .==null then null else round end),
      shards_total: ($shards.shards_total // null), shards_passed: ($shards.shards_passed // null),
      shards_failed: ($shards.shards_failed // null), shards_skipped: ($shards.shards_skipped // null)
    }' > "$PAYLOAD_FILE" 2>/dev/null || { echo "::warning::payload build failed"; exit 0; }
@@ -121,16 +140,16 @@ bash "$(dirname "$0")/o2-report.sh" "$STREAM" "$PAYLOAD_FILE"
 
 # For runs with e2e shard jobs (UI), also emit one row per shard to <STREAM>_shards so dashboards
 # can break down per-shard duration / slowest shard / per-module health (mirrors ci_regression_shards).
-# API runs have no "e2e /" jobs, so this is a no-op there. Row schema:
-#   run_id, repo, suite, workflow, ingest_source, shard_name, module (shard minus "e2e / "),
+# API runs have no matching shard jobs, so this is a no-op there. Row schema:
+#   run_id, repo, suite, workflow, ingest_source, shard_name, module (shard minus SHARD_PREFIX),
 #   conclusion, duration_sec. _timestamp left unset -> ingest time (aligned with the run doc).
 # Notes: THIS_JOBS is the jobs API object {jobs:[...]}, piped in (so .jobs[]); workflow:"test" is
 # fixed to match the run doc's tag; duration clamped to >=0 to guard against runner clock skew.
 SHARD_FILE=$(mktemp "${TMPDIR:-/tmp}/o2_shards.XXXXXX")
-shard_rows=$(printf '%s' "$THIS_JOBS" | jq -c --arg repo "$GITHUB_REPOSITORY" --arg run_id "$GITHUB_RUN_ID" --arg suite "$SUITE" \
-  '[.jobs[]? | select(.name|startswith("e2e /")) | {
+shard_rows=$(printf '%s' "$THIS_JOBS" | jq -c --arg repo "$GITHUB_REPOSITORY" --arg run_id "$GITHUB_RUN_ID" --arg suite "$SUITE" --arg pfx "$SHARD_PREFIX" \
+  '[.jobs[]? | select(.name|startswith($pfx)) | {
      run_id:$run_id, repo:$repo, suite:$suite, workflow:"test", ingest_source:"live",
-     shard_name:.name, module:(.name|sub("^e2e / ";"")), conclusion:.conclusion,
+     shard_name:.name, module:(.name|sub("^"+$pfx;"")), conclusion:.conclusion,
      duration_sec: (if (.completed_at and .started_at) then ([((.completed_at|fromdateiso8601)-(.started_at|fromdateiso8601)|floor), 0] | max) else null end)
    }]' 2>/dev/null) && printf '%s' "$shard_rows" > "$SHARD_FILE" || { echo '[]' > "$SHARD_FILE"; echo "::warning::shard-row extraction failed — skipping ${STREAM}_shards"; }
 if [ "$(jq 'length' "$SHARD_FILE" 2>/dev/null || echo 0)" -gt 0 ]; then

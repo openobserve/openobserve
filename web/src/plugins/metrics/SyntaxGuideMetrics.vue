@@ -25,7 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="sqlmode ? 'sql-mode' : 'normal-mode'"
       >
         <OIcon name="help" size="sm" />
-        {{ t("search.syntaxGuideLabel") }}
+        <!-- Icon-only on phones so the editor header keeps its actions on one row. -->
+        <span class="max-md:sr-only">{{ t("search.syntaxGuideLabel") }}</span>
       </OButton>
     </template>
     <div>
@@ -36,11 +37,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="border-dropdown-separator my-1 border-t" />
         <div class="answers">
           <div class="mb-1.25">
-            <div class="ml-1.25 text-xs">
+            <div class="ms-1.25 text-xs">
               <ul class="mt-2.5 mb-0 px-2.5 text-sm leading-[1.4375rem]">
                 <!-- The prose is translated; the PromQL samples beside it are
                      NOT — they are syntax, and a translated `rate(...)` would be
                      a query that does not run. -->
+                <!-- eslint-disable vue/no-bare-strings-in-template -->
                 <li>
                   {{ t("metrics.syntaxGuide.instantVector") }}
                   <span class="bg-highlight-bg rounded-default px-1.25"
@@ -65,6 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("metrics.syntaxGuide.rate") }}
                   <span class="bg-highlight-bg rounded-default px-1.25">rate(metric_name[5m])</span>
                 </li>
+                <!-- eslint-enable vue/no-bare-strings-in-template -->
               </ul>
             </div>
           </div>
@@ -79,9 +82,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="border-dropdown-separator my-1 border-t" />
         <div class="answers">
           <div class="mb-1.25">
-            <div class="ml-1.25 text-xs">
+            <div class="ms-1.25 text-xs">
               <ul class="mt-2.5 mb-0 px-2.5 text-sm leading-[1.4375rem]">
                 <!-- As above: prose translated, SQL samples left literal. -->
+                <!-- eslint-disable vue/no-bare-strings-in-template -->
                 <li>
                   {{ t("metrics.syntaxGuide.sqlFullText") }}
                   <span class="bg-highlight-bg rounded-default px-1.25"
@@ -114,6 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >SELECT extract_ip(log) FROM <b>stream</b> WHERE code=200</span
                   >
                 </li>
+                <!-- eslint-enable vue/no-bare-strings-in-template -->
                 <li>
                   {{ t("metrics.syntaxGuide.sqlMoreExamples") }}
                   <a
@@ -134,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -150,7 +155,7 @@ export default defineComponent({
     },
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     return {
       t,

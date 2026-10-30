@@ -18,8 +18,8 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import i18n from "@/locales";
 
-// Mock segment analytics to prevent real tracking calls
-vi.mock("@/services/segment_analytics", () => ({
+// Mock product analytics to prevent real tracking calls
+vi.mock("@/services/product_analytics", () => ({
   default: { track: vi.fn() },
 }));
 
@@ -143,7 +143,7 @@ describe("IngestTraces (Index.vue)", () => {
       wrapper.vm.copyToClipboardFn(mockElement);
       await flushPromises();
 
-      expect(copyToClipboard).toHaveBeenCalledWith("some text to copy", {
+      expect(copyToClipboard).toHaveBeenCalledWith("some text to copy", expect.any(Function), {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,

@@ -19,7 +19,7 @@ use arrow_schema::SchemaRef;
 use async_trait::async_trait;
 use datafusion::{
     catalog::Session,
-    common::Result,
+    common::{Result, project_schema},
     datasource::TableProvider,
     logical_expr::{Expr, TableProviderFilterPushDown, TableType},
     physical_plan::{ExecutionPlan, empty::EmptyExec, union::UnionExec},
@@ -56,7 +56,9 @@ impl TableProvider for NewUnionTable {
         limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
         if self.tables.is_empty() {
-            return Ok(Arc::new(EmptyExec::new(self.schema())));
+            // Honor projection so filters use the correct column indices even for empty scans.
+            let projected_schema = project_schema(&self.schema, projection)?;
+            return Ok(Arc::new(EmptyExec::new(projected_schema)));
         }
         if self.tables.len() == 1 {
             return self.tables[0].scan(state, projection, filters, limit).await;
@@ -86,7 +88,7 @@ mod tests {
     use datafusion::{
         datasource::{TableProvider, TableType},
         logical_expr::TableProviderFilterPushDown,
-        prelude::Expr,
+        prelude::{Expr, SessionContext},
         scalar::ScalarValue,
     };
 
@@ -94,6 +96,53 @@ mod tests {
 
     fn test_schema() -> SchemaRef {
         Arc::new(Schema::new(vec![Field::new("val", DataType::Int64, false)]))
+    }
+
+    fn metrics_schema() -> SchemaRef {
+        Arc::new(Schema::new(vec![
+            Field::new("unused_label", DataType::Utf8View, true),
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("trace_stream", DataType::Utf8View, true),
+            Field::new("value", DataType::Float64, true),
+        ]))
+    }
+
+    #[tokio::test]
+    async fn test_empty_scan_projection() -> Result<()> {
+        let schema = metrics_schema();
+        let table = NewUnionTable::new(schema.clone(), vec![]);
+        let ctx = SessionContext::new();
+        for projection in [None, Some(vec![3, 1]), Some(vec![])] {
+            let plan = table
+                .scan(&ctx.state(), projection.as_ref(), &[], None)
+                .await?;
+            let expected = match projection {
+                Some(indices) => Arc::new(schema.project(&indices)?),
+                None => schema.clone(),
+            };
+            assert_eq!(plan.schema(), expected);
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_empty_scan_with_timestamp_filter() -> Result<()> {
+        let ctx = SessionContext::new();
+        ctx.register_table(
+            "metrics",
+            Arc::new(NewUnionTable::new(metrics_schema(), vec![])),
+        )?;
+        // An unprojected schema makes the timestamp filter compare Utf8View with Int64.
+        let batches = ctx
+            .sql("SELECT trace_stream, value FROM metrics WHERE _timestamp > 123")
+            .await?
+            .collect()
+            .await?;
+        assert_eq!(
+            batches.iter().map(|batch| batch.num_rows()).sum::<usize>(),
+            0
+        );
+        Ok(())
     }
 
     #[test]

@@ -16,15 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <IngestionContent>
-    <CopyContent class="copy-content-container-cls" :content="content" />
+    <CredentialCodeBlock slug="cloudwatch-metrics" :content="content" />
     <IngestionDocLink
       href="https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-metric-streams-setup-datalake.html"
     >
-      to explore the process of setting up a CloudWatch custom metric stream with Data Firehose to
-      OpenObserve. You may choose JSON or OpenTelemetry 1.0 as the output format.</IngestionDocLink
+      {{ t("ingestion.cloudwatchMetrics.docLinkText") }}</IngestionDocLink
     >
     <div class="italic">
-      Note: Output is available under Logs with stream name 'cloudwatch_metrics'.
+      {{ t("ingestion.cloudwatchMetrics.outputNote") }}
     </div>
   </IngestionContent>
 </template>
@@ -34,9 +33,10 @@ import { defineComponent, ref } from "vue";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
 import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincutils";
-import CopyContent from "@/components/CopyContent.vue";
+import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
+import { useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
   name: "cloudwatchMetrics",
@@ -48,8 +48,9 @@ export default defineComponent({
       type: String,
     },
   },
-  components: { CopyContent, IngestionContent, IngestionDocLink },
+  components: { CredentialCodeBlock, IngestionContent, IngestionDocLink },
   setup() {
+    const { t } = useI18nTyped();
     const store = useStore();
     const endpoint: any = ref({
       url: "",
@@ -65,6 +66,7 @@ export default defineComponent({
     const content = `HTTP Endpoint: ${endpoint.value.url}/aws/${store.state.selectedOrganization.identifier}/cloudwatch_metrics/_kinesis_firehose
 Access Key: [BASIC_PASSCODE]`;
     return {
+      t,
       store,
       config,
       endpoint,

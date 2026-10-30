@@ -30,13 +30,27 @@ vi.mock("@/utils/zincutils", () => ({
   getImageURL: (p: string) => p,
   getUUID: () => "uuid",
 }));
-vi.mock("@/services/workflows", () => ({ default: {} }));
+vi.mock("@/services/workflows", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), { default: {} });
+});
 
 const pickerSubmit = vi.fn();
 vi.mock("@/components/flow/forms/FunctionPicker.vue", () => ({
   default: {
     name: "FunctionPicker",
-    props: ["initialName", "initialAfterFlatten", "sampleEvents", "language", "defaultCode"],
+    // Object form (not an array): boolean props must be typed Boolean so a shorthand
+    // attribute coerces to `true` instead of surfacing as `""`.
+    props: {
+      initialName: {},
+      initialRawFn: {},
+      initialAfterFlatten: {},
+      sampleEvents: { type: Array },
+      language: {},
+      defaultCode: {},
+      optional: { type: Boolean, default: false },
+      createButton: { type: Boolean, default: false },
+    },
     emits: ["expand"],
     methods: {
       submit: (...args: any[]) => pickerSubmit(...args),
@@ -47,7 +61,6 @@ vi.mock("@/components/flow/forms/FunctionPicker.vue", () => ({
 
 import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
 import { buildTestSample } from "@/plugins/workflows/testSample";
-import { buildIncidentSample } from "@/plugins/workflows/incidentSample";
 import WorkflowFunction from "./WorkflowFunction.vue";
 
 // The "Events" sample comes from the CURRENT trigger's kind, so seed a trigger
@@ -84,10 +97,21 @@ describe("WorkflowFunction", () => {
       expect(picker(wrapper).exists()).toBe(true);
     });
 
-    it("passes an empty initial-name and after-flatten=true by default", () => {
+    it("renders the picker as optional (empty selection = dummy node)", () => {
+      const wrapper = createWrapper();
+      expect(picker(wrapper).props("optional")).toBe(true);
+    });
+
+    it("uses single-screen mode (create-button, no mode switch)", () => {
+      const wrapper = createWrapper();
+      expect(picker(wrapper).props("createButton")).toBe(true);
+    });
+
+    it("passes an empty initial-name and after-flatten=false by default", () => {
       const wrapper = createWrapper();
       expect(picker(wrapper).props("initialName")).toBe("");
-      expect(picker(wrapper).props("initialAfterFlatten")).toBe(true);
+      // Workflow function nodes default After-Flatten to false ([RBF]).
+      expect(picker(wrapper).props("initialAfterFlatten")).toBe(false);
     });
 
     it("seeds initial-name / after-flatten from the saved node data", () => {
@@ -100,21 +124,31 @@ describe("WorkflowFunction", () => {
       expect(picker(wrapper).props("initialAfterFlatten")).toBe(false);
     });
 
-    it("defaults after-flatten to true when only a name is saved", () => {
+    it("seeds initial-raw-fn from a saved inline (nameless) node", () => {
+      workflowObj.currentSelectedNodeData = {
+        id: "n1",
+        data: { node_type: "function", name: "", raw_fn: "() => 1", after_flatten: true },
+      } as any;
+      const wrapper = createWrapper();
+      expect(picker(wrapper).props("initialName")).toBe("");
+      expect(picker(wrapper).props("initialRawFn")).toBe("() => 1");
+    });
+
+    it("defaults after-flatten to false when only a name is saved", () => {
       workflowObj.currentSelectedNodeData = {
         id: "n1",
         data: { node_type: "function", name: "redact" },
       } as any;
       const wrapper = createWrapper();
-      expect(picker(wrapper).props("initialAfterFlatten")).toBe(true);
+      expect(picker(wrapper).props("initialAfterFlatten")).toBe(false);
     });
 
     it("seeds the inline editor with the fired-alert sample for an alert trigger", () => {
       seedTrigger("alert_fired");
       const wrapper = createWrapper();
       const events = picker(wrapper).props("sampleEvents");
-      expect(events).toEqual(buildTestSample());
-      // the envelope the trigger emits: { meta: {...}, data: [ row ] }
+      // One element holding the single event `row` is bound to; the wire builder keeps
+      // its own batch array (pinned in testSample.spec.ts).
       expect(events[0]).toHaveProperty("meta.alert_name");
       expect(Array.isArray(events[0].data)).toBe(true);
     });
@@ -123,7 +157,6 @@ describe("WorkflowFunction", () => {
       seedTrigger("incident_event");
       const wrapper = createWrapper();
       const events = picker(wrapper).props("sampleEvents");
-      expect(events).toEqual(buildIncidentSample());
       expect(events[0]).toHaveProperty("meta.incident_id");
       expect(events[0]).toHaveProperty("meta.event_type");
     });
@@ -193,6 +226,112 @@ describe("WorkflowFunction", () => {
       pickerSubmit.mockResolvedValue(undefined);
       const wrapper = createWrapper();
       await expect((wrapper.vm as any).submit()).resolves.toBeNull();
+    });
+
+    it("proxies an inline raw_fn payload and flags incomplete (empty name)", async () => {
+      workflowObj.currentSelectedNodeData = { id: "f1", data: { node_type: "function" } } as any;
+      pickerSubmit.mockResolvedValue({ name: "", raw_fn: "() => 2", after_flatten: true });
+      const wrapper = createWrapper();
+      await expect((wrapper.vm as any).submit()).resolves.toEqual({
+        name: "",
+        raw_fn: "() => 2",
+        after_flatten: true,
+      });
+      // raw_fn has an empty name → treated the same as a dummy (blocks Publish).
+      expect(workflowObj.currentSelectedNodeData.meta?.incomplete).toBe("true");
+    });
+  });
+
+  // Dummy-node model (C1): no "Set up later" toggle. An empty picker result saves
+  // the node as a placeholder (empty name + meta.incomplete); a real selection
+  // clears it. submit() always defers to the (optional) picker.
+  describe("dummy-node placeholder (no toggle)", () => {
+    it("does not render a 'Set up later' toggle", () => {
+      const wrapper = createWrapper();
+      expect(wrapper.find('[data-test="workflow-function-set-up-later"]').exists()).toBe(false);
+    });
+
+    it("flags meta.incomplete when the picker returns an empty function name", async () => {
+      workflowObj.currentSelectedNodeData = {
+        id: "f1",
+        data: { node_type: "function" },
+      } as any;
+      pickerSubmit.mockResolvedValue({ name: "", after_flatten: false });
+      const wrapper = createWrapper();
+      await expect((wrapper.vm as any).submit()).resolves.toEqual({
+        name: "",
+        after_flatten: false,
+      });
+      expect(workflowObj.currentSelectedNodeData.meta?.incomplete).toBe("true");
+    });
+
+    it("clears meta.incomplete when a real function is chosen", async () => {
+      workflowObj.currentSelectedNodeData = {
+        id: "f1",
+        data: { node_type: "function" },
+        meta: { incomplete: "true" },
+      } as any;
+      pickerSubmit.mockResolvedValue({ name: "redact", after_flatten: false });
+      const wrapper = createWrapper();
+      await expect((wrapper.vm as any).submit()).resolves.toEqual({
+        name: "redact",
+        after_flatten: false,
+      });
+      expect(workflowObj.currentSelectedNodeData.meta?.incomplete).toBeUndefined();
+    });
+  });
+
+  // F8b(a): `row` inside a workflow function is ONE event, not the batch array —
+  // the seed comment says so (`row.meta.processed = true`). The Events panel must
+  // show that same single event, or authors write `row[0].dummy` to match what
+  // they see. Display only: the wire format stays a batch array.
+  describe("Events panel shows the single event `row` is bound to", () => {
+    // The prop stays an ARRAY: TestFunction gates on `.length` and falls back to a
+    // generic log sample for a non-array, silently discarding the payload. One element,
+    // so the panel shows the single event `row` is bound to.
+    it("hands the picker a one-element array holding the single event", () => {
+      seedTrigger("alert_fired");
+      const wrapper = createWrapper();
+      const events = picker(wrapper).props("sampleEvents");
+
+      expect(Array.isArray(events)).toBe(true);
+      expect(events).toHaveLength(1);
+      expect(events[0]).toEqual(buildTestSample()[0]);
+    });
+
+    it("shows the alert event's own meta/data at the top level", () => {
+      seedTrigger("alert_fired");
+      const events = picker(createWrapper()).props("sampleEvents");
+
+      expect(events[0]).toHaveProperty("meta.alert_name");
+      // the inner data[] is the real query rows — it stays
+      expect(Array.isArray(events[0].data)).toBe(true);
+      expect(events[0].data.length).toBeGreaterThan(0);
+    });
+
+    it("hands the picker a one-element array for an incident trigger", () => {
+      seedTrigger("incident_event");
+      const events = picker(createWrapper()).props("sampleEvents");
+
+      expect(events).toHaveLength(1);
+      expect(events[0]).toHaveProperty("meta.incident_id");
+      expect(events[0]).toHaveProperty("meta.event_type");
+    });
+
+    // F8b(c): incidents always send `&[]` as data (src/core/src/incidents.rs:211), so
+    // an always-empty `data: []` in the panel is pure noise that invites `row.data[0]`.
+    it("drops the always-empty data[] from the displayed incident event", () => {
+      seedTrigger("incident_event");
+      const events = picker(createWrapper()).props("sampleEvents");
+
+      expect(events[0]).not.toHaveProperty("data");
+      expect(Object.keys(events[0])).toEqual(["meta"]);
+    });
+
+    it("still seeds nothing when the workflow has no trigger", () => {
+      workflowObj.currentSelectedWorkflow.nodes = [];
+      const events = picker(createWrapper()).props("sampleEvents");
+      expect(events == null || (Array.isArray(events) && events.length === 0)).toBe(true);
     });
   });
 });

@@ -55,36 +55,15 @@ pub fn get_val(attr_val: &Option<&AnyValue>) -> json::Value {
     }
 }
 
-pub fn get_severity_value(severity_number: i32) -> String {
-    match severity_number {
-        0 => "Unspecified",
-        1 => "Trace",
-        2 => "Trace2",
-        3 => "Trace3",
-        4 => "Trace4",
-        5 => "Debug",
-        6 => "Debug2",
-        7 => "Debug3",
-        8 => "Debug4",
-        9 => "Info",
-        10 => "Info2",
-        11 => "Info3",
-        12 => "Info4",
-        13 => "Warn ",
-        14 => "Warn2",
-        15 => "Warn3",
-        16 => "Warn4",
-        17 => "Error",
-        18 => "Error2",
-        19 => "Error3",
-        20 => "Error4",
-        21 => "Fatal",
-        22 => "Fatal2",
-        23 => "Fatal3",
-        24 => "Fatal4",
-        _ => "Unspecified",
-    }
-    .into()
+/// OTel short name of a `SeverityNumber`; `None` for UNSPECIFIED and out-of-range values.
+pub fn get_severity_value(severity_number: i32) -> Option<&'static str> {
+    const NAMES: [&str; 24] = [
+        "TRACE", "TRACE2", "TRACE3", "TRACE4", "DEBUG", "DEBUG2", "DEBUG3", "DEBUG4", "INFO",
+        "INFO2", "INFO3", "INFO4", "WARN", "WARN2", "WARN3", "WARN4", "ERROR", "ERROR2", "ERROR3",
+        "ERROR4", "FATAL", "FATAL2", "FATAL3", "FATAL4",
+    ];
+    let idx = usize::try_from(severity_number).ok()?.checked_sub(1)?;
+    NAMES.get(idx).copied()
 }
 
 /// Extracts the data point's value. Returns `None` when it carries none -- an absent value
@@ -107,14 +86,6 @@ pub fn get_exemplar_val(attr_val: &Option<exemplar::Value>) -> json::Value {
         },
         None => json::Value::Null,
     }
-}
-
-pub fn get_val_for_attr(attr_val: json::Value) -> json::Value {
-    let local_val = attr_val.as_object().unwrap();
-    if let Some((_key, value)) = local_val.into_iter().next() {
-        return serde_json::Value::String(super::get_string_value(value));
-    };
-    ().into()
 }
 
 pub fn get_val_with_type_retained(attr_val: &Option<&AnyValue>) -> json::Value {
@@ -292,37 +263,18 @@ mod tests {
 
     #[test]
     fn test_get_severity_value() {
-        // Test all severity levels
-        assert_eq!(get_severity_value(0), "Unspecified");
-        assert_eq!(get_severity_value(1), "Trace");
-        assert_eq!(get_severity_value(2), "Trace2");
-        assert_eq!(get_severity_value(3), "Trace3");
-        assert_eq!(get_severity_value(4), "Trace4");
-        assert_eq!(get_severity_value(5), "Debug");
-        assert_eq!(get_severity_value(6), "Debug2");
-        assert_eq!(get_severity_value(7), "Debug3");
-        assert_eq!(get_severity_value(8), "Debug4");
-        assert_eq!(get_severity_value(9), "Info");
-        assert_eq!(get_severity_value(10), "Info2");
-        assert_eq!(get_severity_value(11), "Info3");
-        assert_eq!(get_severity_value(12), "Info4");
-        assert_eq!(get_severity_value(13), "Warn ");
-        assert_eq!(get_severity_value(14), "Warn2");
-        assert_eq!(get_severity_value(15), "Warn3");
-        assert_eq!(get_severity_value(16), "Warn4");
-        assert_eq!(get_severity_value(17), "Error");
-        assert_eq!(get_severity_value(18), "Error2");
-        assert_eq!(get_severity_value(19), "Error3");
-        assert_eq!(get_severity_value(20), "Error4");
-        assert_eq!(get_severity_value(21), "Fatal");
-        assert_eq!(get_severity_value(22), "Fatal2");
-        assert_eq!(get_severity_value(23), "Fatal3");
-        assert_eq!(get_severity_value(24), "Fatal4");
-
-        // Test out of range values
-        assert_eq!(get_severity_value(-1), "Unspecified");
-        assert_eq!(get_severity_value(25), "Unspecified");
-        assert_eq!(get_severity_value(100), "Unspecified");
+        assert_eq!(get_severity_value(1), Some("TRACE"));
+        assert_eq!(get_severity_value(4), Some("TRACE4"));
+        assert_eq!(get_severity_value(5), Some("DEBUG"));
+        assert_eq!(get_severity_value(9), Some("INFO"));
+        assert_eq!(get_severity_value(13), Some("WARN"));
+        assert_eq!(get_severity_value(17), Some("ERROR"));
+        assert_eq!(get_severity_value(18), Some("ERROR2"));
+        assert_eq!(get_severity_value(21), Some("FATAL"));
+        assert_eq!(get_severity_value(24), Some("FATAL4"));
+        assert_eq!(get_severity_value(0), None);
+        assert_eq!(get_severity_value(-1), None);
+        assert_eq!(get_severity_value(25), None);
     }
 
     #[test]
@@ -362,37 +314,6 @@ mod tests {
         // Test None case
         let resp = get_exemplar_val(&None);
         assert!(resp.is_null());
-    }
-
-    #[test]
-    fn test_get_val_for_attr() {
-        // Test with string value
-        let attr_val = json::json!({
-            "key1": "test_value"
-        });
-        let resp = get_val_for_attr(attr_val);
-        assert_eq!(resp.as_str().unwrap(), "test_value");
-
-        // Test with numeric value
-        let attr_val = json::json!({
-            "key2": 42
-        });
-        let resp = get_val_for_attr(attr_val);
-        assert_eq!(resp.as_str().unwrap(), "42");
-
-        // Test with boolean value
-        let attr_val = json::json!({
-            "key3": true
-        });
-        let resp = get_val_for_attr(attr_val);
-        assert_eq!(resp.as_str().unwrap(), "true");
-
-        // Test with float value
-        let attr_val = json::json!({
-            "key4": std::f32::consts::PI
-        });
-        let resp = get_val_for_attr(attr_val);
-        assert_eq!(resp.as_str().unwrap(), "3.1415927");
     }
 
     #[test]

@@ -114,21 +114,44 @@ describe("en-US locale file", () => {
   });
 
   it("keeps the Data Sources sidebar labels as strings", () => {
-    // Rendered directly by Recommended.vue and the Ingestion search index — if
-    // any becomes an object, that tab shows its raw key path instead of a name.
+    // Rendered by Recommended.vue — if either becomes an object, that tab shows
+    // its raw key path instead of a name.
+    //
+    // Only these two are catalogue-driven. The platform names that used to be
+    // listed here (azure, kubernetes, windows, linux, awsconfig, gcpconfig) are
+    // product nouns with one correct form worldwide, so they moved to raw()
+    // literals in ingestionSearchIndex.ts and no longer have keys to guard.
     const { ingestion } = JSON.parse(raw);
-    for (const key of [
-      "azure",
-      "kubernetes",
-      "windows",
-      "linux",
-      "awsconfig",
-      "gcpconfig",
-      "tracesotlp",
-      "rum",
-    ]) {
+    for (const key of ["tracesotlp", "rum"]) {
       expect(typeof ingestion[key], `ingestion.${key}`).toBe("string");
       expect(ingestion[key].length).toBeGreaterThan(0);
     }
+  });
+
+  // features.json holds its i18n keys as plain JSON strings, invisible to any
+  // static scan — a dead-key sweep would delete them. This is the only guard.
+  it("keeps every i18n key referenced by features.json", () => {
+    const locale = JSON.parse(raw);
+    const lookup = (key: string) =>
+      key.split(".").reduce<any>((o, part) => (o == null ? undefined : o[part]), locale);
+
+    const { features } = JSON.parse(
+      readFileSync(resolve(__dirname, "../constants/features.json"), "utf8"),
+    );
+
+    const missing: string[] = [];
+    for (const feature of features) {
+      const candidates = [
+        feature.nameKey,
+        feature.descriptionKey,
+        ...Object.values(feature.availability ?? {}),
+      ];
+      for (const value of candidates) {
+        if (typeof value !== "string" || !value.includes(".")) continue;
+        if (typeof lookup(value) !== "string") missing.push(value);
+      }
+    }
+
+    expect(missing).toEqual([]);
   });
 });

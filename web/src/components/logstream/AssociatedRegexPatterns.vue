@@ -1,4 +1,5 @@
 <template>
+  <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
   <div style="width: 60vw; height: calc(100vh - 59px)" :class="'bg-surface-base'">
     <div class="flex flex-nowrap items-center justify-between px-4 py-2">
       <div class="flex items-center">
@@ -16,6 +17,7 @@
       </div>
       <div class="col-auto">
         <OButton
+          :aria-label="t('common.close')"
           data-test="associated-regex-patterns-close-btn"
           @click="$emit('closeDialog')"
           variant="ghost"
@@ -40,6 +42,7 @@
               clearable
             />
           </div>
+          <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
           <div style="height: calc(100vh - 130px)" class="overflow-y-auto">
             <div class="pattern-list-wrapper">
               <OCollapsible
@@ -74,10 +77,9 @@
                     "
                     @click="handlePatternClick(row)"
                   >
-                    <span
-                      class="regex-pattern-name max-w-[10vw] truncate overflow-hidden whitespace-nowrap normal-case!"
-                      >{{ row.pattern_name }}</span
-                    >
+                    <OTruncatedText class="regex-pattern-name max-w-[10vw] normal-case!">{{
+                      row.pattern_name
+                    }}</OTruncatedText>
                     <OIcon name="check" size="xs" />
                   </li>
                 </ul>
@@ -107,10 +109,9 @@
                     "
                     @click="handlePatternClick(row)"
                   >
-                    <span
-                      class="regex-pattern-name max-w-[10vw] truncate overflow-hidden whitespace-nowrap normal-case!"
-                      >{{ row.pattern_name }}</span
-                    >
+                    <OTruncatedText class="regex-pattern-name max-w-[10vw] normal-case!">{{
+                      row.pattern_name
+                    }}</OTruncatedText>
                     <OIcon v-if="checkIfPatternIsApplied(row.pattern_id)" name="check" size="xs" />
                   </li>
                 </ul>
@@ -121,6 +122,7 @@
       </div>
       <OSeparator vertical />
       <!-- here we will have the right side section -->
+      <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
       <div class="flex w-[75%] flex-col" style="height: calc(100vh - 59px)">
         <div class="flex-1 overflow-y-auto pt-3">
           <div
@@ -130,7 +132,7 @@
             <img
               data-test="associated-regex-patterns-no-pattern-image"
               :src="getImageURL('images/regex_pattern/no_applied_pattern.svg')"
-              style="width: 125px"
+              style="width: 7.8125rem"
               alt=""
             />
             <span
@@ -336,9 +338,17 @@
                       />
                       <div
                         v-else
-                        class="bg-surface-base flex h-27.75 flex-col items-center justify-center [border-bottom:1px_solid_var(--color-border-default)] [border-left:1px_solid_var(--color-border-default)] [border-right:1px_solid_var(--color-border-default)]"
+                        class="bg-surface-base border-border-default flex h-27.75 flex-col items-center justify-center border-s border-e border-b"
                       >
-                        <div v-if="!testLoading && outputString.length === 0">
+                        <div
+                          v-if="!testLoading && testedPolicy === 'DropField'"
+                          data-test="associated-regex-patterns-field-dropped"
+                        >
+                          <span class="text-text-secondary text-center text-xs font-[400]">
+                            {{ t("regex_patterns.field_dropped") }}
+                          </span>
+                        </div>
+                        <div v-else-if="!testLoading && outputString.length === 0">
                           <OIcon name="lightbulb" size="md" class="text-icon-color" />
                           <span class="text-text-secondary text-center text-xs font-[400]">
                             {{ t("regex_patterns.click_test_input_hint") }}
@@ -399,7 +409,7 @@ import regexPatternsService from "@/services/regex_pattern";
 import { convertUnixToDateFormat, getImageURL } from "@/utils/zincutils";
 import { debounce } from "lodash-es";
 import { useToast } from "@/lib/feedback/Toast/useToast";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import FullViewContainer from "../functions/FullViewContainer.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -412,6 +422,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 export interface PatternAssociation {
   field: string;
@@ -435,6 +446,7 @@ export default defineComponent({
     OCheckbox,
     OIcon,
     OCollapsible,
+    OTruncatedText,
   },
   props: {
     data: {
@@ -450,7 +462,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const filterPattern = ref("");
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const allPatterns = ref([]);
     const selectedPatterns = ref<any[]>([]);
     const listLoading = ref(false);
@@ -499,6 +511,8 @@ export default defineComponent({
     const testLoading = ref(false);
     const showWarningDialogToRemovePattern = ref(false);
     const outputString = ref("");
+    // Drop returns "", so an empty output alone cannot tell "not run" from "dropped".
+    const testedPolicy = ref<string | null>(null);
     const expandState = ref({
       regexTestString: true,
       outputString: false,
@@ -508,19 +522,30 @@ export default defineComponent({
       try {
         expandState.value.outputString = true;
         outputString.value = "";
+        testedPolicy.value = null;
         testLoading.value = true;
+        const sentPolicy = policy.value;
+        const sentString = testString.value;
         const response = await regexPatternsService.test(
           store.state.selectedOrganization.identifier,
           userClickedPattern.value.pattern,
-          [testString.value],
-          policy.value,
+          [sentString],
+          sentPolicy,
         );
         outputString.value = response.data.results[0];
+        // An edit during the request already cleared the marker; do not restore it for old inputs.
+        if (
+          outputString.value === "" &&
+          policy.value === sentPolicy &&
+          testString.value === sentString
+        ) {
+          testedPolicy.value = sentPolicy;
+        }
       } catch (error) {
         const e = error as { response?: { data?: { message?: string } } };
         toast({
           variant: "error",
-          message: e.response?.data?.message || t("regex_patterns.failed_to_test_string"),
+          message: raw(e.response?.data?.message || t("regex_patterns.failed_to_test_string")),
         });
       } finally {
         testLoading.value = false;
@@ -591,6 +616,9 @@ export default defineComponent({
         appliedPatternsMap.value = new Map(props.data.map((p: any) => [p.pattern_id, p]));
       },
     );
+    watch([policy, testString], () => {
+      testedPolicy.value = null;
+    });
     watch(
       () => policy.value,
       (newVal) => {
@@ -658,7 +686,9 @@ export default defineComponent({
         toast({
           variant: "error",
           message:
-            e?.response?.data?.message || e?.data?.message || "Error fetching regex patterns",
+            raw(e?.response?.data?.message) ||
+            raw(e?.data?.message) ||
+            t("toastMessages.logstream.errorFetchingRegexPatterns"),
         });
       } finally {
         listLoading.value = false;
@@ -772,6 +802,7 @@ export default defineComponent({
     const resetInputValues = () => {
       testString.value = "";
       outputString.value = "";
+      testedPolicy.value = null;
       expandState.value.outputString = false;
       expandState.value.regexTestString = true;
     };
@@ -836,6 +867,7 @@ export default defineComponent({
       testLoading,
       testStringOutput,
       outputString,
+      testedPolicy,
       expandState,
       outlinedLightbulb: "lightbulb",
       resetInputValues,

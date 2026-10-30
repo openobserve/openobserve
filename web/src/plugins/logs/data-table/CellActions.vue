@@ -1,42 +1,43 @@
 <template>
+  <!-- Flow content: OTable's hover-action toolbar owns the surface and the
+       positioning, so this is just the button row. -->
   <div
-    class="field_overlay table-cell-actions rounded-default absolute top-[50%] right-0 flex! h-full! max-h-10! translate-y-[-50%] items-center justify-center px-2"
-    :class="backgroundClass"
-    :title="row[column.id]"
-    :data-test="`log-add-data-from-column-${row[column.id]}`"
+    class="field_overlay table-cell-actions flex items-center"
+    :title="cellValue"
+    :data-test="`log-add-data-from-column-${cellValue}`"
   >
     <span class="mx-1">
       <OButton
         variant="ghost"
         size="icon-xs-circle"
-        @click.prevent.stop="copyLogToClipboard(row[column.id])"
+        @click.prevent.stop="copyLogToClipboard(cellValue)"
         :title="t('logs.cellActions.copy')"
       >
         <OIcon name="content-copy" size="xs" />
       </OButton>
     </span>
-    <span v-if="isStreamField && !hideSearchTermActions" class="mr-1">
+    <span v-if="isStreamField && !hideSearchTermActions" class="me-1">
       <OButton
         variant="ghost"
         size="icon-xs-circle"
-        @click.prevent.stop="addSearchTerm(column.id, row[column.id], 'include')"
-        :data-test="`log-details-include-field-${row[column.id]}`"
+        @click.prevent.stop="addSearchTerm(column.id, cellValue, 'include')"
+        :data-test="`log-details-include-field-${cellValue}`"
         :title="t('logs.cellActions.includeTerm')"
       >
-        <OIcon name="" style="height: 8px; width: 8px">
+        <OIcon name="" style="height: 0.5rem; width: 0.5rem">
           <EqualIcon class="size-full" />
         </OIcon>
       </OButton>
     </span>
-    <span v-if="isStreamField && !hideSearchTermActions" class="mr-1">
+    <span v-if="isStreamField && !hideSearchTermActions" class="me-1">
       <OButton
         variant="ghost"
         size="icon-xs-circle"
-        @click.prevent.stop="addSearchTerm(column.id, row[column.id], 'exclude')"
+        @click.prevent.stop="addSearchTerm(column.id, cellValue, 'exclude')"
         :title="t('logs.cellActions.excludeTerm')"
-        :data-test="`log-details-exclude-field-${row[column.id]}`"
+        :data-test="`log-details-exclude-field-${cellValue}`"
       >
-        <OIcon name="" style="height: 8px; width: 8px">
+        <OIcon name="" style="height: 0.5rem; width: 0.5rem">
           <NotEqualIcon class="size-full" />
         </OIcon>
       </OButton>
@@ -45,11 +46,10 @@
      then we show some options there we need this  -->
     <O2AIContextAddBtn
       v-if="!hideAi"
-      @send-to-ai-chat="sendToAiChat(JSON.stringify(row[column.id]))"
-      class="border border-solid border-white"
-      :size="'6px'"
-      :imageHeight="'16px'"
-      :imageWidth="'16px'"
+      @send-to-ai-chat="sendToAiChat(JSON.stringify(cellValue))"
+      class="size-6! border border-solid border-white"
+      :imageHeight="'14'"
+      :imageWidth="'14'"
     />
   </div>
 </template>
@@ -57,7 +57,8 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { PropType } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
+import { isFilterableLogField } from "@/utils/logs/streamNameColumn";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
@@ -86,9 +87,18 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  /** Rendered cell value, for columns with nothing under `row[column.id]` (logs' `source`). */
+  value: {
+    type: null as unknown as PropType<unknown>,
+    default: undefined,
+  },
 });
 
-const { t } = useI18n();
+const cellValue = computed(() =>
+  props.value === undefined ? props.row[props.column.id] : props.value,
+);
+
+const { t } = useI18nTyped();
 
 const emit = defineEmits(["copy", "addSearchTerm", "addFieldToTable", "sendToAiChat"]);
 
@@ -99,13 +109,11 @@ const addSearchTerm = (field: string, field_value: string | number | boolean, ac
   emit("addSearchTerm", field, field_value, action);
 };
 
-const backgroundClass = "bg-surface-base";
 const sendToAiChat = (value: any) => {
   emit("sendToAiChat", value);
 };
 
-const isStreamField = computed(() => {
-  const field: any = props.selectedStreamFields?.find((item: any) => item.name === props.column.id);
-  return field?.isSchemaField ?? false;
-});
+const isStreamField = computed(() =>
+  isFilterableLogField(props.column.id, props.selectedStreamFields),
+);
 </script>

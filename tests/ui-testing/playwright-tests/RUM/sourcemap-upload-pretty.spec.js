@@ -9,7 +9,7 @@
  *
  *   1. Upload the fixture sourcemaps group (API, in beforeAll — the Upload
  *      FORM itself, required-field validation and the upload happy path are
- *      already covered by GeneralTests/rum-form-validation.spec.js and are
+ *      already covered by RUM/rum-form-validation.spec.js and are
  *      NOT repeated here).
  *   2. Verify the Source Maps list shows the group; verify the backend
  *      contracts unique to this suite: invalid-zip rejection and duplicate
@@ -50,12 +50,15 @@ const AUTH_HEADER = basicAuthHeader(email, password);
 
 const FIXTURE_DIR = path.resolve(__dirname, '../../fixtures/sourcemaps');
 const manifest = require(path.join(FIXTURE_DIR, 'manifest.json'));
+const { ingestBase } = require('../utils/ingest-url.js');
 
 const RUN_ID = Date.now();
 // Unique per run: duplicate uploads are rejected by the backend, so a stable
 // service name would break reruns against the same instance.
 const SERVICE = `e2e-smap-${RUN_ID}`;
 const NOMAP_SERVICE = `e2e-smap-nomap-${RUN_ID}`;
+// Unique filename so this "no sourcemap" case can't collide with a sibling's map for the shared bundle (prod uses unique hashed names).
+const NOMAP_FILE = `main.nomap-${RUN_ID}.js`;
 // Dedicated group for the delete-flow test. Its stack trace must NEVER be
 // translated before the group is deleted: the backend memoizes translations
 // in an in-process LRU keyed by the exact (service, version, env) params of
@@ -63,22 +66,25 @@ const NOMAP_SERVICE = `e2e-smap-nomap-${RUN_ID}`;
 // translation under a different param combination keeps resolving from stale
 // cache forever (see CACHE in src/core/src/service/db/sourcemaps.rs).
 const DELMAP_SERVICE = `e2e-smap-del-${RUN_ID}`;
+// Own filename too: the shared bundle stays mapped by SERVICE, so a post-delete lookup that omits `service` would still resolve.
+const DELMAP_FILE = `main.del-${RUN_ID}.js`;
 const VERSION = '1.0.0-e2e';
 const ENV = 'e2e';
 
 // Generated at test time from the committed dist/ text files (see beforeAll).
 let zipBuffer;
+let delZipBuffer;
 let zipPath;
 let invalidZipPath;
 
 /** Build the raw browser-style stacktrace string for a manifest error. */
-function fixtureStack(errorKey) {
+function fixtureStack(errorKey, sourceFile = manifest.bundle) {
   const e = manifest.errors[errorKey];
-  return `${e.message}\n    at fn @ ${manifest.bundleUrlPrefix}/${manifest.bundle}:1:${e.generatedColumn}`;
+  return `${e.message}\n    at fn @ ${manifest.bundleUrlPrefix}/${sourceFile}:1:${e.generatedColumn}`;
 }
 
 /** SDK-shaped RUM error event pointing at the fixture bundle. */
-function fixtureErrorEvent(errorKey, service, index = 0) {
+function fixtureErrorEvent(errorKey, service, index = 0, sourceFile = manifest.bundle) {
   const e = manifest.errors[errorKey];
   const [type, ...msg] = e.message.split(': ');
   return {
@@ -88,7 +94,7 @@ function fixtureErrorEvent(errorKey, service, index = 0) {
     error: {
       message: msg.join(': '),
       type,
-      stack: fixtureStack(errorKey),
+      stack: fixtureStack(errorKey, sourceFile),
       source: 'source',
       is_crash: false,
       resource: { url: `${manifest.bundleUrlPrefix}/` },
@@ -104,14 +110,14 @@ function fixtureErrorEvent(errorKey, service, index = 0) {
 }
 
 /** Upload the fixture sourcemaps zip for a service via the REST API. */
-async function uploadFixtureGroup(page, service) {
+async function uploadFixtureGroup(page, service, buffer = zipBuffer) {
   const res = await page.request.post(`${BASE}/api/${ORG}/sourcemaps`, {
     headers: { Authorization: AUTH_HEADER },
     multipart: {
       service,
       version: VERSION,
       env: ENV,
-      file: { name: manifest.zip, mimeType: 'application/zip', buffer: zipBuffer },
+      file: { name: manifest.zip, mimeType: 'application/zip', buffer },
     },
   });
   expect(res.ok(), `sourcemaps upload for ${service} should succeed (HTTP ${res.status()})`).toBe(true);
@@ -119,7 +125,7 @@ async function uploadFixtureGroup(page, service) {
 
 /** Ingest events into _rumdata and wait until they are searchable. */
 async function ingestFixtureErrors(page, events, service) {
-  const res = await page.request.post(`${BASE}/api/${ORG}/_rumdata/_json`, {
+  const res = await page.request.post(`${ingestBase(BASE)}/api/${ORG}/_rumdata/_json`, {
     headers: { Authorization: AUTH_HEADER, 'Content-Type': 'application/json' },
     data: events,
   });
@@ -174,6 +180,11 @@ test.describe('Sourcemap Upload & Pretty Stack Trace', () => {
       { name: manifest.bundle, content: bundle },
       { name: `${manifest.bundle}.map`, content: map },
     ]);
+    // Same fixture contents; the backend takes source_file_name from the zip entry names.
+    delZipBuffer = buildZip([
+      { name: DELMAP_FILE, content: bundle },
+      { name: `${DELMAP_FILE}.map`, content: map },
+    ]);
     zipPath = createTempFile(manifest.zip, zipBuffer);
     invalidZipPath = createTempFile(
       manifest.invalidZip,
@@ -181,7 +192,7 @@ test.describe('Sourcemap Upload & Pretty Stack Trace', () => {
     );
 
     // Upload the main fixture group once via the API. The Upload FORM happy
-    // path is covered by GeneralTests/rum-form-validation.spec.js.
+    // path is covered by RUM/rum-form-validation.spec.js.
     const page = await browser.newPage();
     await uploadFixtureGroup(page, SERVICE);
     await page.close();
@@ -333,7 +344,7 @@ test.describe('Sourcemap Upload & Pretty Stack Trace', () => {
     tag: ['@rum', '@sourcemapPretty', '@ui', '@P0'],
   }, async ({ page }) => {
     const pm = new PageManager(page);
-    await ingestFixtureErrors(page, [fixtureErrorEvent('referenceError', NOMAP_SERVICE)], NOMAP_SERVICE);
+    await ingestFixtureErrors(page, [fixtureErrorEvent('referenceError', NOMAP_SERVICE, 0, NOMAP_FILE)], NOMAP_SERVICE);
     await openErrorDetail(pm, NOMAP_SERVICE);
 
     await pm.rumPage.clickPrettyTab();
@@ -357,8 +368,9 @@ test.describe('Sourcemap Upload & Pretty Stack Trace', () => {
     // note above): translating this stack before the delete would poison the
     // backend's translation cache and keep resolving after the group is gone,
     // making the fallback assertion flaky-by-design.
-    await uploadFixtureGroup(page, DELMAP_SERVICE);
-    await ingestFixtureErrors(page, [fixtureErrorEvent('typeError', DELMAP_SERVICE)], DELMAP_SERVICE);
+    await uploadFixtureGroup(page, DELMAP_SERVICE, delZipBuffer);
+    const event = fixtureErrorEvent('typeError', DELMAP_SERVICE, 0, DELMAP_FILE);
+    await ingestFixtureErrors(page, [event], DELMAP_SERVICE);
 
     // Delete the group through the real UI flow (the page object waits for
     // the backing DELETE response before asserting the row is gone).
@@ -385,7 +397,7 @@ test.describe('Sourcemap Upload & Pretty Stack Trace', () => {
     const translateRes = await page.request.post(`${BASE}/api/${ORG}/sourcemaps/stacktrace`, {
       headers: { Authorization: AUTH_HEADER, 'Content-Type': 'application/json' },
       data: {
-        stacktrace: fixtureStack('typeError'),
+        stacktrace: fixtureStack('typeError', DELMAP_FILE),
         service: DELMAP_SERVICE,
         version: VERSION,
         env: ENV,

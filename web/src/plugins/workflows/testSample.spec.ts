@@ -18,6 +18,7 @@ import {
   buildTestSample,
   buildTestSampleText,
   buildFlatTestSample,
+  buildTestDisplaySample,
 } from "@/plugins/workflows/testSample";
 import { TRIGGER_META_VARS } from "@/plugins/workflows/alertFields";
 
@@ -308,5 +309,32 @@ describe("type-based fallbacks for unmapped meta fields", () => {
       level: "info",
       log: "test message for openobserve",
     });
+  });
+});
+
+// F8b(a)/(c): the DISPLAY payload is the single event `row` is actually bound to.
+// Unlike the incident sample, the alert sample KEEPS its inner data[] — those are
+// real query rows the function iterates, not an always-empty placeholder.
+describe("buildTestDisplaySample — single event, inner data[] retained", () => {
+  it("returns one event object, not the batch array", () => {
+    const shown = buildTestDisplaySample();
+    expect(Array.isArray(shown)).toBe(false);
+    expect(shown).toEqual(buildTestSample()[0]);
+  });
+
+  it("KEEPS the inner data[] — real query rows, not an empty placeholder", () => {
+    const shown = buildTestDisplaySample() as { data: unknown[] };
+    expect(shown).toHaveProperty("data");
+    expect(shown.data).toHaveLength(2);
+  });
+
+  it("exposes meta and data at the top level (what `row.meta.x` resolves against)", () => {
+    const shown = buildTestDisplaySample() as Record<string, unknown>;
+    expect(Object.keys(shown).sort()).toEqual(["data", "meta"]);
+    expect(shown).toHaveProperty("meta.alert_name", "High Error Rate");
+  });
+
+  it("leaves the wire sample as a one-element batch array", () => {
+    expect(buildTestSample()).toHaveLength(1);
   });
 });

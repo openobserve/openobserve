@@ -318,7 +318,9 @@ export function overlayNewDataOnOldOptions(
 
   // Recalculate legend to include all visible series
   if (merged.legend) {
-    const allNames = merged.series.filter((s: any) => s?.name).map((s: any) => s?.name);
+    const allNames = merged.series
+      .filter((s: any) => s?.name && !s._hiddenFromLegend)
+      .map((s: any) => s?.name);
     if (Array.isArray(merged.legend)) {
       merged.legend.forEach((l: any) => {
         if (l.data) l.data = allNames;

@@ -15,27 +15,160 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="searchdetaildialog flex h-full flex-col flex-nowrap" data-test="dialog-box">
+  <div
+    class="searchdetaildialog flex h-full flex-col flex-nowrap"
+    :class="severityBorderClass"
+    data-test="dialog-box"
+    data-no-autofocus
+  >
     <!-- Single Tab Row -->
     <div class="flex shrink-0 items-center justify-between">
       <div class="-mb-0.75 flex items-center gap-2">
-        <OTabs v-model="tab" align="left" reorderable @reorder="onTabReorder">
-          <!-- Correlation tabs are only present when service streams are enabled
-               and an enterprise license is active; see availableTabs. -->
+        <OTabs
+          :model-value="tab"
+          align="left"
+          reorderable
+          @update:model-value="onTabChange"
+          @reorder="onTabReorder"
+        >
+          <!-- Host-injected leading tabs (e.g. Insights) shown before the built-in tabs. -->
           <OTab
-            v-for="tabItem in tabOrder"
-            :key="tabItem.name"
-            :data-test="tabItem.dataTest"
-            :name="tabItem.name"
-            :label="tabItem.label"
+            v-for="lt in leadingTabs"
+            :key="lt.name"
+            :data-test="lt.dataTest"
+            :name="lt.name"
+            :label="lt.label"
+            :icon="lt.icon"
           />
+          <!-- Correlation tabs are present whenever service streams are
+               enabled; shown locked (not hidden) without an enterprise
+               license — see availableTabs. -->
+          <template v-for="tabItem in tabOrder" :key="tabItem.name">
+            <OTab
+              :data-test="tabItem.dataTest"
+              :name="tabItem.name"
+              :label="tabItem.label"
+              :suffix-icon="tabItem.locked ? 'lock' : undefined"
+            />
+          </template>
         </OTabs>
       </div>
-      <div class="flex shrink-0 items-center gap-2 pr-3">
+      <div class="flex shrink-0 items-center gap-2 pe-3">
+        <OPopover v-if="!embedded" align="end" :aria-label="t('logs.severity.popoverAriaLabel')">
+          <template #trigger>
+            <OTag
+              type="logLevel"
+              :value="severity.level"
+              :label="severityTagLabel"
+              clickable
+              data-test="log-detail-severity-badge"
+              :data-severity-source="severity.source"
+            />
+          </template>
+          <div
+            class="flex w-72 flex-col gap-1.5 px-3 py-2.5 text-xs"
+            data-test="log-detail-severity-popover"
+          >
+            <span class="text-text-heading font-semibold">{{
+              t("logs.severity.popoverTitle", { level: severityTagLabel })
+            }}</span>
+            <span class="text-text-secondary text-2xs">{{ t("logs.severity.evidence") }}</span>
+            <i18n-t
+              v-if="severity.source === 'field' || severity.source === 'http'"
+              keypath="logs.severity.fromField"
+              tag="span"
+              scope="global"
+              class="text-text-heading"
+            >
+              <template #field>
+                <code class="font-mono">{{ raw(severity.field) }}</code>
+                {{ raw(severityFieldValue) }}
+              </template>
+            </i18n-t>
+            <template v-else-if="severity.source === 'message'">
+              <i18n-t
+                keypath="logs.severity.inferredFrom"
+                tag="span"
+                scope="global"
+                class="text-text-heading"
+              >
+                <template #field>
+                  <code class="font-mono">{{ raw(severity.field) }}</code>
+                </template>
+              </i18n-t>
+              <span class="text-text-heading">{{ t("logs.severity.notSearchable") }}</span>
+            </template>
+            <span v-else-if="severity.notFetched" class="text-text-heading">{{
+              t("logs.severity.notInSelectedColumns")
+            }}</span>
+            <i18n-t
+              v-else-if="severity.field"
+              keypath="logs.severity.noLevelWordInField"
+              tag="span"
+              scope="global"
+              class="text-text-heading"
+              data-test="log-detail-severity-no-level-word"
+            >
+              <template #field>
+                <code class="font-mono">{{ raw(severity.field) }}</code>
+              </template>
+            </i18n-t>
+            <span v-else class="text-text-heading" data-test="log-detail-severity-no-text-field">{{
+              t("logs.severity.noLevelField")
+            }}</span>
+          </div>
+        </OPopover>
+        <div
+          v-if="!embedded && lineLink.kind !== 'hidden'"
+          class="flex shrink-0 items-center"
+          data-test="log-detail-copy-line-link"
+        >
+          <OTooltip :content="lineLinkTooltip" />
+          <OButton
+            data-test="log-detail-copy-line-link-btn"
+            variant="outline"
+            size="xs"
+            icon-left="link"
+            :disabled="lineLink.kind === 'disabled' || pageLoading"
+            focusable-unavailable
+            :loading="lineLinkBusy"
+            @click="copyLineLink(modelValue, 'drawer')"
+          >
+            {{ t("search.linePermalink.copyLink") }}
+            <template #unavailable-reason>{{ lineLinkTooltip }}</template>
+          </OButton>
+          <LogLineLinkPopover source="drawer" />
+        </div>
         <O2AIContextAddBtn
           data-test="logs-detail-ai-context-btn"
           @sendToAiChat="sendToAiChat(JSON.stringify(rowData))"
         />
+        <!-- Lives in the header rather than inside the JSON tab so the action
+             stays reachable from every tab. JsonPreview is told to hide its own
+             copy via `hide-view-trace`. -->
+        <div
+          v-if="showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)"
+          class="flex shrink-0 items-center gap-2"
+        >
+          <OSelect
+            data-test="log-detail-view-trace-stream-select"
+            v-model="searchObj.meta.selectedTraceStream"
+            :options="tracesStreams"
+            class="w-40! shrink-0"
+            :loading="isTracesStreamsLoading"
+            :disabled="isTracesStreamsLoading"
+            size="sm"
+          />
+          <OButton
+            data-test="log-detail-view-trace-btn"
+            size="xs"
+            variant="outline"
+            icon-left="account-tree"
+            :disabled="pageLoading"
+            @click="viewTrace"
+            >{{ t("search.viewTrace") }}</OButton
+          >
+        </div>
         <OSwitch
           v-show="tab === 'table'"
           data-test="log-detail-wrap-values-toggle-btn"
@@ -51,10 +184,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       :class="[
-        'flex min-h-0 flex-1 flex-col',
+        'relative flex min-h-0 flex-1 flex-col',
         tab.startsWith('correlated-') ? 'full-height-panels overflow-hidden' : 'overflow-y-auto',
       ]"
+      :aria-busy="pageLoading ? 'true' : undefined"
     >
+      <div
+        v-if="pageLoading"
+        class="bg-dialog-bg/80 text-text-secondary absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 text-sm"
+        data-test="log-detail-page-loading"
+      >
+        <OSpinner size="lg" />
+        <span>{{ t("logs.rowNav.loadingPage", { page: pageLoadingPage }) }}</span>
+      </div>
       <OTabPanels
         data-test="log-detail-tab-container"
         v-model="tab"
@@ -62,6 +204,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         grow
         :class="tab.startsWith('correlated-') ? 'overflow-hidden!' : 'overflow-y-auto!'"
       >
+        <OTabPanel v-for="lt in leadingTabs" :key="lt.name" :name="lt.name">
+          <slot :name="`panel-${lt.name}`" />
+        </OTabPanel>
         <OTabPanel name="json">
           <OCardSection data-test="log-detail-json-content" class="px-page-edge mb-6 pt-2">
             <JsonPreview
@@ -69,6 +214,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               show-copy-button
               mode="sidebar"
               hide-view-related
+              hide-view-trace
+              :hide-search-term-actions="embedded"
+              :hide-add-field-to-table="embedded"
               :highlight-query="highlightQuery"
               :should-wrap-values="shouldWrapValues"
               @copy="copyContentToClipboard"
@@ -111,12 +259,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
               <template #cell-field="{ value }">
-                <div
-                  :data-test="`log-detail-${value}-key`"
-                  class="text-status-error-text text-left"
-                >
+                <!-- `log-key` (assets/styles/log-highlighting.css) is the same class the
+                     JSON tab puts on its keys, so both tabs stay one color in both themes. -->
+                <span :data-test="`log-detail-${value}-key`" class="log-key text-left">
                   {{ value }}
-                </div>
+                </span>
               </template>
 
               <template #cell-value="{ row }">
@@ -145,8 +292,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                       <ODropdownItem
                         v-if="
-                          searchObj.data.stream.selectedStreamFields.some((item: any) =>
-                            item.name === row.field ? item.isSchemaField : '',
+                          isFilterableLogField(
+                            row.field,
+                            searchObj.data.stream.selectedStreamFields,
                           )
                         "
                         data-test="log-details-include-field-btn"
@@ -157,8 +305,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </ODropdownItem>
                       <ODropdownItem
                         v-if="
-                          searchObj.data.stream.selectedStreamFields.some((item: any) =>
-                            item.name === row.field ? item.isSchemaField : '',
+                          isFilterableLogField(
+                            row.field,
+                            searchObj.data.stream.selectedStreamFields,
                           )
                         "
                         data-test="log-details-exclude-field-btn"
@@ -167,7 +316,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <template #icon-left><NotEqualIcon class="size-2.5" /></template>
                         {{ t("common.excludeSearchTerm") }}
                       </ODropdownItem>
-                      <template v-if="row.field !== store.state.zoConfig.timestamp_column">
+                      <template
+                        v-if="row.field !== store.state.zoConfig.timestamp_column && !embedded"
+                      >
                         <ODropdownItem
                           v-if="
                             !searchObj.data.stream.selectedFields.includes(row.field.toString())
@@ -233,13 +384,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="getContentSize(row.value) > 50000"
                       :data="row.value"
                       :field-key="`detail_${row.field}`"
-                      :query-string="highlightQuery"
+                      :query-string="scopeHighlightQuery(highlightQuery, row.field)"
                       :simple-mode="false"
                     /><LogsHighLighting
                       v-else
                       :data="getDisplayValue(row.field, row.value)"
                       :show-braces="false"
-                      :query-string="highlightQuery"
+                      :query-string="scopeHighlightQuery(highlightQuery, row.field)"
                     /></pre>
                   </div>
                 </div>
@@ -262,6 +413,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :source-stream="correlationProps.sourceStream"
             :source-type="correlationProps.sourceType"
             :available-dimensions="correlationProps.availableDimensions"
+            :semantic-groups="correlationProps.semanticGroups"
             :fts-fields="correlationProps.ftsFields"
             :time-range="correlationProps.timeRange"
             :hide-view-related-button="true"
@@ -338,6 +490,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="correlationProps"
             mode="embedded-tabs"
             external-active-tab="traces"
+            :shortcuts-active="tab === 'correlated-traces'"
             :service-name="correlationProps.serviceName"
             :matched-dimensions="correlationProps.matchedDimensions"
             :additional-dimensions="correlationProps.additionalDimensions"
@@ -376,32 +529,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabPanels>
     </div>
 
-    <!-- Navigation buttons for log details (show only on JSON/Table tabs) -->
-    <OSeparator v-if="tab === 'json' || tab === 'table'" />
+    <!-- Navigation buttons for log details (show only on JSON/Table tabs; hidden when embedded) -->
+    <OSeparator v-if="!embedded && (tab === 'json' || tab === 'table')" />
     <OCardSection
-      v-if="tab === 'json' || tab === 'table'"
+      v-if="!embedded && (tab === 'json' || tab === 'table')"
       class="px-page-edge bg-dialog-bg sticky bottom-0 z-10 py-4"
     >
-      <div class="flex flex-nowrap items-center justify-between">
-        <div class="w-1/12">
+      <div class="flex flex-nowrap items-center justify-between max-md:flex-wrap max-md:gap-2">
+        <div class="w-1/12 max-md:w-auto">
           <OButton
             data-test="log-detail-previous-detail-btn"
             variant="outline"
             size="sm-action"
-            :disabled="currentIndex <= 0"
+            :disabled="prevDisabled"
+            focusable-unavailable
+            :loading="pageLoading && pageLoadingDirection === 'prev'"
             @click="$emit('showPrevDetail', false, true)"
-            ><OIcon name="navigate-before" size="sm" class="mr-1" />{{
-              t("common.previous")
-            }}</OButton
           >
+            <OTooltip :content="prevTooltip" shortcut-id="logsPrevRow" />
+            <OIcon name="navigate-before" size="sm" class="me-1" />{{ t("common.previous") }}
+            <OShortcut
+              id="logsPrevRow"
+              class="ms-1.5 max-md:hidden"
+              data-test="log-detail-previous-detail-btn-kbd"
+            />
+            <template #unavailable-reason>{{ prevTooltip }}</template>
+          </OButton>
         </div>
         <div
           v-show="
             streamType !== 'enrichment_tables' &&
-            searchObj.data.stream.selectedStream.length <= 1 &&
+            canSearchAroundStream &&
             hasAggregationQuery == false
           "
-          class="flex items-center gap-2"
+          class="flex items-center gap-2 max-md:order-last max-md:basis-full max-md:justify-center"
         >
           <label class="font-bold whitespace-nowrap">{{ t("common.noOfRecords") }}</label>
           <OSelect
@@ -409,11 +570,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="recordSizeOptions"
             size="md"
             class="select-noof-records"
+            :disabled="pageLoading"
           />
           <OButton
             data-test="logs-detail-table-search-around-btn"
             variant="outline"
             size="sm-action"
+            :disabled="pageLoading"
             @click="searchTimeBoxed(rowData, selectedRelativeValue)"
             >{{ t("common.searchAround") }}</OButton
           >
@@ -423,10 +586,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="log-detail-next-detail-btn"
             variant="outline"
             size="sm-action"
-            :disabled="currentIndex >= totalLength - 1"
+            :disabled="nextDisabled"
+            focusable-unavailable
+            :loading="pageLoading && pageLoadingDirection === 'next'"
             @click="$emit('showNextDetail', true, false)"
-            >{{ t("common.next") }}<OIcon name="navigate-next" size="sm" class="ml-1"
-          /></OButton>
+          >
+            <OTooltip :content="nextTooltip" shortcut-id="logsNextRow" />
+            {{ t("common.next") }}
+            <OShortcut
+              id="logsNextRow"
+              class="ms-1.5 max-md:hidden"
+              data-test="log-detail-next-detail-btn-kbd"
+            />
+            <OIcon name="navigate-next" size="sm" class="ms-1" />
+            <template #unavailable-reason>{{ nextTooltip }}</template>
+          </OButton>
         </div>
       </div>
     </OCardSection>
@@ -439,8 +613,17 @@ import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
-import { defineComponent, ref, reactive, onBeforeMount, computed, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import {
+  defineComponent,
+  ref,
+  reactive,
+  onBeforeMount,
+  onMounted,
+  computed,
+  watch,
+  type PropType,
+} from "vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
@@ -453,9 +636,15 @@ import JsonPreview from "./JsonPreview.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
-import { extractStatusFromLog } from "@/utils/logs/statusParser";
+import { resolveLogSeverity, type KnownLogSeverityLevel } from "@/utils/logs/statusParser";
+import useLogSeverity from "@/composables/useLogs/useLogSeverity";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import { resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
+import { crossLinkQueryText } from "@/composables/useLogs/freeTextSearch";
+import useViewTraceAction from "@/composables/useLogs/useViewTraceAction";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -466,11 +655,33 @@ import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrel
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import config from "@/aws-exports";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
+import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import LogLineLinkPopover from "@/plugins/logs/LogLineLinkPopover.vue";
+import { lineLinkBusy, useLogLineLink } from "@/composables/useLogs/useLogLineLink";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import { isSafeNavigableUrl } from "@/utils/safeUrl";
+import { isFilterableLogField, STREAM_NAME_FIELD } from "@/utils/logs/streamNameColumn";
+import { scopeHighlightQuery } from "@/composables/useTextHighlighter";
+const SEVERITY_BORDER_CLASSES: Record<KnownLogSeverityLevel, string> = {
+  emergency: "border-log-severity-emergency-indicator",
+  alert: "border-log-severity-alert-indicator",
+  critical: "border-log-severity-critical-indicator",
+  error: "border-log-severity-error-indicator",
+  warning: "border-log-severity-warning-indicator",
+  notice: "border-log-severity-notice-indicator",
+  info: "border-log-severity-info-indicator",
+  debug: "border-log-severity-debug-indicator",
+  trace: "border-log-severity-trace-indicator",
+  ok: "border-log-severity-ok-indicator",
+};
+
 const defaultValue: any = () => {
   return {
     data: {},
@@ -501,9 +712,14 @@ export default defineComponent({
     ODropdownSeparator,
     OSwitch,
     OSpinner,
+    OShortcut,
+    OTooltip,
+    LogLineLinkPopover,
     OIcon,
     OTable,
     OSearchInput,
+    OTag,
+    OPopover,
   },
   emits: [
     "showPrevDetail",
@@ -517,6 +733,7 @@ export default defineComponent({
     "closeTable",
     "show-correlation",
     "load-correlation", // New event for lazy loading correlation data
+    "update:tab",
   ],
   props: {
     modelValue: {
@@ -555,6 +772,47 @@ export default defineComponent({
       type: String,
       default: "json",
     },
+    // Host-injected leading tabs (e.g. an Insights tab) rendered before JSON via a
+    // `#panel-<name>` slot; lets a consumer present one unified tab bar when embedded.
+    leadingTabs: {
+      type: Array as PropType<
+        Array<{ name: string; label: any; dataTest?: string; icon?: string }>
+      >,
+      default: () => [],
+    },
+    // Embedded mode: the host owns navigation, so hide the built-in prev/next footer.
+    embedded: {
+      type: Boolean,
+      default: false,
+    },
+    hasPrevPage: {
+      type: Boolean,
+      default: false,
+    },
+    hasNextPage: {
+      type: Boolean,
+      default: false,
+    },
+    pageLoading: {
+      type: Boolean,
+      default: false,
+    },
+    pageLoadingDirection: {
+      type: String as PropType<"next" | "prev" | null>,
+      default: null,
+    },
+    pageLoadingPage: {
+      type: Number,
+      default: 0,
+    },
+    navDisabledReason: {
+      type: String as PropType<"resultsChanged" | "notInPage" | "loading" | null>,
+      default: null,
+    },
+    pageEdgeReason: {
+      type: String as unknown as PropType<I18nText | null>,
+      default: null,
+    },
   },
   methods: {
     toggleIncludeSearchTerm(
@@ -580,31 +838,74 @@ export default defineComponent({
     },
   },
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const rowData: any = ref({});
     const router = useRouter();
     const store = useStore();
     const { isDark } = useTheme();
     const tableDropdownOpenMap = reactive<Record<string, boolean>>({});
     const tab = ref(props.initialTab || "json");
+    // Must precede the immediate initialTab watcher, which reads it during setup.
+    const correlationAccess = computed(() =>
+      checkFeatureAccess("correlation", buildFeatureGateContext(store.state.zoConfig)),
+    );
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+
     const selectedRelativeValue = ref<number>(10);
-    const recordSizeOptions = ref<Array<{ label: string; value: number }>>([
-      { label: "10", value: 10 },
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "200", value: 200 },
-      { label: "500", value: 500 },
-      { label: "1000", value: 1000 },
+    const recordSizeOptions = ref<Array<{ label: I18nText; value: number }>>([
+      { label: raw("10"), value: 10 },
+      { label: raw("20"), value: 20 },
+      { label: raw("50"), value: 50 },
+      { label: raw("100"), value: 100 },
+      { label: raw("200"), value: 200 },
+      { label: raw("500"), value: 500 },
+      { label: raw("1000"), value: 1000 },
     ]);
     const shouldWrapValues: any = ref(true);
     const { searchObj } = searchState();
+    const { lineLinkState, copyLineLink } = useLogLineLink();
+    const lineLink = computed(() => lineLinkState(props.modelValue));
+    const lineLinkTooltip = computed(() =>
+      props.pageLoading
+        ? t("logs.rowNav.loadingPage", { page: props.pageLoadingPage })
+        : lineLink.value.kind === "disabled"
+          ? lineLink.value.reason
+          : t("search.linePermalink.copyLinkTooltip"),
+    );
+
+    // The View Trace action is rendered in this component's header row (not
+    // inside JsonPreview) so it stays reachable from every tab. Gate on
+    // `modelValue`, which is a prop and therefore available during setup —
+    // `rowData` is only filled by the async created() hook below.
+    const {
+      tracesStreams,
+      isTracesStreamsLoading,
+      showViewTraceBtn,
+      setViewTraceBtn: setViewTraceBtnFor,
+    } = useViewTraceAction(t, searchObj);
+
+    watch(
+      () => props.modelValue,
+      (record) => {
+        setViewTraceBtnFor(record);
+      },
+      { immediate: true },
+    );
     const { fnParsedSQL, hasAggregation } = logsUtils();
 
     // Watch for initialTab prop changes to update tab
     watch(
       () => props.initialTab,
       (newInitialTab) => {
+        // Defense in depth: a locked correlation tab is disabled in the UI,
+        // but a caller could still pass one directly as `initialTab`.
+        if (
+          newInitialTab &&
+          newInitialTab.startsWith("correlated-") &&
+          !correlationAccess.value.allowed
+        ) {
+          return;
+        }
         if (newInitialTab) {
           tab.value = newInitialTab;
         }
@@ -621,6 +922,7 @@ export default defineComponent({
           newRowData &&
           Object.keys(newRowData).length > 0 &&
           tab.value.startsWith("correlated-") &&
+          correlationAccess.value.allowed &&
           !props.correlationProps
         ) {
           // Emit the original modelValue (not flattened rowData) as it has _timestamp
@@ -633,6 +935,16 @@ export default defineComponent({
     // Watch for tab changes - load correlation data when user clicks a correlation tab
     watch(tab, (newTab, oldTab) => {
       const isCorrelationTab = newTab.startsWith("correlated-");
+
+      // Defense in depth: `onTabChange` is what actually keeps a locked
+      // correlation tab from becoming active on click, but `tab` could still
+      // be reassigned programmatically/via devtools — bounce back rather
+      // than load data.
+      if (isCorrelationTab && !correlationAccess.value.allowed) {
+        tab.value = oldTab && !oldTab.startsWith("correlated-") ? oldTab : "json";
+        return;
+      }
+      emit("update:tab", newTab);
 
       // Only emit if switching TO a correlation tab AND we don't have data yet
       // Skip if this is the initial load (oldTab is undefined) as rowData watcher handles it
@@ -690,9 +1002,31 @@ export default defineComponent({
       return hasAggregation(parsedSQL?.columns);
     });
 
-    // Compute status color for the top border
-    const statusColor = computed(() => {
-      return extractStatusFromLog(rowData.value).color;
+    // Search around runs on one stream; with several selected, the hit's _stream_name picks it.
+    const canSearchAroundStream = computed(
+      () =>
+        searchObj.data.stream.selectedStream.length <= 1 || !!rowData.value?.[STREAM_NAME_FIELD],
+    );
+
+    const { rowSeverity } = useLogSeverity();
+    const severity = computed(() =>
+      props.embedded ? resolveLogSeverity(props.modelValue) : rowSeverity(props.modelValue),
+    );
+    const severityTagLabel = computed(() => {
+      const label = resolveBadgeLabel("logLevel", severity.value.level);
+      return severity.value.source === "message"
+        ? t("logs.severity.inferredLabel", { level: label })
+        : label;
+    });
+    const severityFieldValue = computed(() => {
+      const value = severity.value.field ? props.modelValue?.[severity.value.field] : undefined;
+      return value === undefined ? "" : `(${String(value)})`;
+    });
+    const severityBorderClass = computed(() => {
+      if (props.embedded) return "";
+      const { level } = severity.value;
+      if (level === "unknown") return "border-t-3 border-border-default";
+      return `border-t-3 border-solid ${SEVERITY_BORDER_CLASSES[level]}`;
     });
 
     // Check if service streams feature is enabled
@@ -700,13 +1034,24 @@ export default defineComponent({
       return store.state.zoConfig.service_streams_enabled !== false;
     });
 
+    // OTabs is controlled (`:model-value`), so refusing to advance `tab` here
+    // is what keeps a locked correlation tab from becoming active — clicking
+    // it opens the upgrade dialog instead of switching.
+    function onTabChange(name: string | number) {
+      if (String(name).startsWith("correlated-") && !correlationAccess.value.allowed) {
+        openUpgradeDialog();
+        return;
+      }
+      tab.value = String(name);
+    }
+
     // Tab bar is drag-to-reorder (same pattern as the home page): the list of
     // tabs that *may* be shown is derived from config, while the user's chosen
     // order lives in localStorage.
     const LS_TAB_ORDER_KEY = "o2_log_detail_tab_order";
 
     const availableTabs = computed(() => {
-      const tabs = [
+      const tabs: DetailTab[] = [
         {
           name: "json",
           label: t("common.json"),
@@ -718,29 +1063,33 @@ export default defineComponent({
           dataTest: "log-detail-table-tab",
         },
       ];
-      if (serviceStreamsEnabled.value && config.isEnterprise === "true") {
+      if (serviceStreamsEnabled.value) {
+        const locked = !correlationAccess.value.allowed;
         tabs.push(
           {
             name: "correlated-logs",
             label: t("correlation.correlatedLogs"),
             dataTest: "correlated-logs-tab",
+            locked,
           },
           {
             name: "correlated-metrics",
             label: t("correlation.correlatedMetrics"),
             dataTest: "correlated-metrics-tab",
+            locked,
           },
           {
             name: "correlated-traces",
             label: t("correlation.correlatedTraces"),
             dataTest: "correlated-traces-tab",
+            locked,
           },
         );
       }
       return tabs;
     });
 
-    type DetailTab = { name: string; label: string; dataTest: string };
+    type DetailTab = { name: string; label: I18nText; dataTest: string; locked?: boolean };
 
     const loadTabOrder = (): DetailTab[] => {
       try {
@@ -809,6 +1158,38 @@ export default defineComponent({
       window.localStorage.setItem(LS_TAB_ORDER_KEY, JSON.stringify(order.map((t) => t.name)));
     };
 
+    onMounted(() => emit("update:tab", tab.value));
+
+    const NAV_DISABLED_KEYS = {
+      resultsChanged: "logs.rowNav.resultsChanged",
+      notInPage: "logs.rowNav.notInPage",
+      loading: "logs.rowNav.loadingResults",
+    } as const;
+
+    const atFirst = computed(() => props.currentIndex <= 0 && !props.hasPrevPage);
+    const atLast = computed(
+      () => props.currentIndex >= props.totalLength - 1 && !props.hasNextPage,
+    );
+    const prevDisabled = computed(
+      () => props.pageLoading || !!props.navDisabledReason || atFirst.value,
+    );
+    const nextDisabled = computed(
+      () => props.pageLoading || !!props.navDisabledReason || atLast.value,
+    );
+
+    const navTooltip = (atEdge: boolean, fallback: I18nText, edge: I18nText): I18nText => {
+      if (props.pageLoading) return t("logs.rowNav.loadingPage", { page: props.pageLoadingPage });
+      if (props.navDisabledReason) return t(NAV_DISABLED_KEYS[props.navDisabledReason]);
+      if (atEdge) return props.pageEdgeReason ?? edge;
+      return fallback;
+    };
+    const prevTooltip = computed(() =>
+      navTooltip(atFirst.value, t("logs.rowNav.previousLog"), t("traces.rowNav.firstResult")),
+    );
+    const nextTooltip = computed(() =>
+      navTooltip(atLast.value, t("logs.rowNav.nextLog"), t("traces.rowNav.lastResult")),
+    );
+
     onBeforeMount(() => {
       if (window.localStorage.getItem("wrap-log-details") === null) {
         window.localStorage.setItem("wrap-log-details", "true");
@@ -844,7 +1225,7 @@ export default defineComponent({
     };
 
     const copyContentToClipboard = (log: any) => {
-      copyToClipboard(JSON.stringify(log), {
+      copyToClipboard(JSON.stringify(log), t, {
         successMessage: t("logs.detailTable.contentCopiedSuccessfully"),
         timeout: 1000,
       });
@@ -910,7 +1291,7 @@ export default defineComponent({
     ): string => {
       const startTime = searchObj.data.datetime?.startTime || 0;
       const endTime = searchObj.data.datetime?.endTime || 0;
-      const query = searchObj.data.crossLinkQuery || searchObj.data.query || "";
+      const query = crossLinkQueryText(searchObj, store.state.zoConfig);
 
       return urlTemplate
         .replace(/\$\{field\.__name\}/g, encodeURIComponent(String(fieldName)))
@@ -922,7 +1303,9 @@ export default defineComponent({
     };
 
     const openCrossLink = (url: string) => {
-      window.open(url, "_blank");
+      // Guard the RESOLVED url — see JsonPreview.vue's twin for the reasoning.
+      if (!isSafeNavigableUrl(url)) return;
+      window.open(url, "_blank", "noopener,noreferrer");
     };
 
     const viewTrace = () => {
@@ -962,7 +1345,10 @@ export default defineComponent({
 
     const createRegexPatternFromLogs = (key: string, value: any) => {
       emit("closeTable");
-      const promptToBeAdded = `Create a regex pattern for ${key} field that contains the following value: "${value}" from the ${searchObj.data.stream.selectedStream[0]} stream`;
+      // Prompt text handed to the assistant — model input, deliberately English.
+      const promptToBeAdded = raw(
+        `Create a regex pattern for ${key} field that contains the following value: "${value}" from the ${searchObj.data.stream.selectedStream[0]} stream`,
+      );
       router.push({
         path: "/settings/regex_patterns",
         query: {
@@ -1016,15 +1402,25 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       store,
       router,
+      lineLink,
+      lineLinkTooltip,
+      lineLinkBusy,
+      copyLineLink,
       rowData,
       tab,
+      prevDisabled,
+      nextDisabled,
+      prevTooltip,
+      nextTooltip,
       flattenJSONObject,
       selectedRelativeValue,
       recordSizeOptions,
       getImageURL,
       tableDropdownOpenMap,
+      isFilterableLogField,
       shouldWrapValues,
       toggleWrapLogDetails,
       copyContentToClipboard,
@@ -1034,16 +1430,26 @@ export default defineComponent({
       searchObj,
       multiStreamFields,
       viewTrace,
+      tracesStreams,
+      isTracesStreamsLoading,
+      showViewTraceBtn,
       hasAggregationQuery,
+      canSearchAroundStream,
+      scopeHighlightQuery,
       sendToAiChat,
       addSearchTerm,
       closeTable,
       showCorrelation,
-      statusColor,
+      severity,
+      severityTagLabel,
+      severityFieldValue,
+      severityBorderClass,
       tableColumns,
       tableRows,
       detailSearchQuery,
       serviceStreamsEnabled,
+      correlationAccess,
+      onTabChange,
       tabOrder,
       onTabReorder,
       config,
@@ -1102,7 +1508,9 @@ export default defineComponent({
 
 .o2-schema-table :deep(thead th),
 .o2-schema-table :deep(tbody td) {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table cell divider must not scale with text or it smears at fractional zoom */
   border-right: 1px solid var(--color-card-glass-border);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table cell divider must not scale with text or it smears at fractional zoom */
   border-bottom: 1px solid var(--color-card-glass-border);
 }
 

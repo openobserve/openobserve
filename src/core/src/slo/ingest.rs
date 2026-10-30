@@ -51,6 +51,12 @@ pub struct OffGrid;
 pub enum RejectReason {
     OffGrid,
     Observation(ObservationError),
+    /// Two PromQL series carried an aggregate for the same slice and group, so
+    /// there is no single value to classify. Unlike the count sources, which
+    /// legitimately sum a finer series grain onto the group grain, an aggregate
+    /// has no combining rule — two p95s neither add nor average to a p95 — so
+    /// the slice is refused rather than answered arbitrarily.
+    AmbiguousSeries,
 }
 
 /// One row as the search returned it, already keyed.
@@ -184,6 +190,7 @@ pub fn build_slices(sli: &SliConfig, rows: Vec<QueryRow>, params: &PassParams) -
             good,
             total,
             rev: params.rev,
+            corrected_by: None,
         });
     }
 
@@ -241,6 +248,7 @@ pub fn fill_missing(sli: &SliConfig, present: &[SliceRow], params: &PassParams) 
                     good: 0.0,
                     total: fill_total,
                     rev: params.rev,
+                    corrected_by: None,
                 });
             }
             t += params.slice_interval_secs;
@@ -255,19 +263,22 @@ pub fn fill_missing(sli: &SliConfig, present: &[SliceRow], params: &PassParams) 
 /// ratios weights a 3-event group the same as a 30,000-event one, which is how
 /// a tiny group's bad minute can swamp the real number.
 pub fn exact_rollup(slices: &[SliceRow], params: &PassParams) -> Vec<SliceRow> {
-    let mut by_slice: std::collections::BTreeMap<i64, (f64, f64)> = Default::default();
+    let mut by_slice: std::collections::BTreeMap<i64, (f64, f64, Option<&String>)> =
+        Default::default();
     for s in slices {
         // Guard against a caller passing rollup rows back in.
         if s.group_key.is_empty() {
             continue;
         }
-        let e = by_slice.entry(s.slice_start).or_insert((0.0, 0.0));
+        let e = by_slice.entry(s.slice_start).or_insert((0.0, 0.0, None));
         e.0 += s.good;
         e.1 += s.total;
+        // The chart reads the rollup, so it carries the first group row's correction.
+        e.2 = e.2.or(s.corrected_by.as_ref());
     }
     by_slice
         .into_iter()
-        .map(|(slice_start, (good, total))| SliceRow {
+        .map(|(slice_start, (good, total, corrected_by))| SliceRow {
             slo_id: params.slo_id.clone(),
             definition_generation: params.definition_generation,
             group_key: String::new(),
@@ -275,6 +286,7 @@ pub fn exact_rollup(slices: &[SliceRow], params: &PassParams) -> Vec<SliceRow> {
             good,
             total,
             rev: params.rev,
+            corrected_by: corrected_by.cloned(),
         })
         .collect()
 }
@@ -430,6 +442,44 @@ mod tests {
         assert_eq!(r.rejected.len(), 1);
     }
 
+    // ===================== alert SLI (S-16) ===============================
+
+    fn alert_sli() -> SliConfig {
+        SliConfig::Alert {
+            alert_id: "a1".into(),
+        }
+    }
+
+    /// The ledger reader already produced good/total **seconds**, so nothing
+    /// here reclassifies them. Classifying again would apply a time-slice
+    /// comparator to a coverage figure.
+    #[test]
+    fn an_alert_row_becomes_a_slice_verbatim() {
+        let r = build_slices(&alert_sli(), vec![row(0, "", 240.0, 300.0)], &params());
+        assert_eq!(r.slices.len(), 1);
+        assert_eq!((r.slices[0].good, r.slices[0].total), (240.0, 300.0));
+        assert_eq!(r.slices[0].group_key, "");
+    }
+
+    /// A boundary slice carries fractional seconds — the alert SLI is the only
+    /// type that produces partially-covered slices, and rounding them would
+    /// quietly change the SLI.
+    #[test]
+    fn a_partially_covered_alert_slice_keeps_its_fractional_seconds() {
+        let r = build_slices(&alert_sli(), vec![row(300, "", 41.5, 272.25)], &params());
+        assert_eq!(r.slices.len(), 1);
+        assert_eq!((r.slices[0].good, r.slices[0].total), (41.5, 272.25));
+    }
+
+    /// The ingest boundary still applies: more good than total would put the
+    /// SLI above 100%, so the row is refused rather than clamped here.
+    #[test]
+    fn an_alert_row_with_more_good_than_total_is_rejected() {
+        let r = build_slices(&alert_sli(), vec![row(0, "", 301.0, 300.0)], &params());
+        assert!(r.slices.is_empty());
+        assert_eq!(r.rejected.len(), 1);
+    }
+
     // ===================== gap fill (D48) =================================
 
     /// For a count SLI an empty bucket is real information: zero traffic. It
@@ -444,6 +494,7 @@ mod tests {
             good: 5.0,
             total: 5.0,
             rev: 7,
+            corrected_by: None,
         }];
         let filled = fill_missing(&count_sli(), &present, &params());
         assert_eq!(filled.len(), 2, "buckets 300 and 600");
@@ -481,6 +532,7 @@ mod tests {
                 good: 1.0,
                 total: 1.0,
                 rev: 7,
+                corrected_by: None,
             },
             SliceRow {
                 slo_id: SLO.into(),
@@ -490,6 +542,7 @@ mod tests {
                 good: 1.0,
                 total: 1.0,
                 rev: 7,
+                corrected_by: None,
             },
         ];
         let filled = fill_missing(&count_sli(), &present, &params());
@@ -511,6 +564,7 @@ mod tests {
                 good: 30_000.0,
                 total: 30_000.0,
                 rev: 7,
+                corrected_by: None,
             },
             SliceRow {
                 slo_id: SLO.into(),
@@ -520,6 +574,7 @@ mod tests {
                 good: 0.0,
                 total: 3.0,
                 rev: 7,
+                corrected_by: None,
             },
         ];
         let rollup = exact_rollup(&slices, &params());
@@ -543,6 +598,7 @@ mod tests {
             good,
             total,
             rev: 7,
+            corrected_by: None,
         };
         let rollup = exact_rollup(&[mk(0, 1.0, 2.0), mk(300, 3.0, 4.0)], &params());
         assert_eq!(rollup.len(), 2);
@@ -561,9 +617,57 @@ mod tests {
             good,
             total,
             rev: 7,
+            corrected_by: None,
         };
         let rollup = exact_rollup(&[mk("region=eu", 1.0, 2.0), mk("", 1.0, 2.0)], &params());
         assert_eq!((rollup[0].good, rollup[0].total), (1.0, 2.0));
+    }
+
+    #[test]
+    fn a_grouped_slo_with_a_correction_shows_it_on_the_rollup_row() {
+        let mk = |group: &str, slice_start, corrected_by: Option<&str>| SliceRow {
+            slo_id: SLO.into(),
+            definition_generation: 1,
+            group_key: group.to_string(),
+            slice_start,
+            good: 0.0,
+            total: 0.0,
+            rev: 7,
+            corrected_by: corrected_by.map(str::to_string),
+        };
+        let rollup = exact_rollup(
+            &[
+                mk("region=eu", 0, Some("dt")),
+                mk("region=us", 0, Some("dt")),
+                mk("region=eu", 300, None),
+                mk("region=us", 300, Some("other")),
+                mk("region=eu", 600, None),
+            ],
+            &params(),
+        );
+        assert_eq!(rollup[0].corrected_by.as_deref(), Some("dt"));
+        assert_eq!(
+            rollup[1].corrected_by.as_deref(),
+            Some("other"),
+            "a slice any group row corrected shows the band"
+        );
+        assert_eq!(rollup[2].corrected_by, None);
+    }
+
+    #[test]
+    fn group_rows_with_different_corrections_give_the_rollup_the_first() {
+        let mk = |group: &str, corrected_by: &str| SliceRow {
+            slo_id: SLO.into(),
+            definition_generation: 1,
+            group_key: group.to_string(),
+            slice_start: 0,
+            good: 0.0,
+            total: 0.0,
+            rev: 7,
+            corrected_by: Some(corrected_by.to_string()),
+        };
+        let rollup = exact_rollup(&[mk("region=eu", "a"), mk("region=us", "b")], &params());
+        assert_eq!(rollup[0].corrected_by.as_deref(), Some("a"));
     }
 
     // ===================== group cap ======================================
@@ -636,6 +740,7 @@ mod absent_is_bad_fill_tests {
             good: 300.0,
             total: 300.0,
             rev: 7,
+            corrected_by: None,
         }
     }
 

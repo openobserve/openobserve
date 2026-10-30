@@ -12,11 +12,14 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 // Mock the services and composables
-vi.mock("@/services/search", () => ({
-  default: {
-    search: vi.fn(),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      search: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
@@ -199,7 +202,7 @@ describe("Query Component", () => {
       await wrapper.vm.openCancelDialog();
 
       expect(wrapper.vm.dialog.show).toBe(true);
-      expect(wrapper.vm.dialog.title).toBe("Discard Changes");
+      expect(wrapper.vm.dialog.title).toBe("Discard changes");
       expect(wrapper.vm.dialog.message).toBe("Are you sure you want to cancel routing changes?");
     });
 

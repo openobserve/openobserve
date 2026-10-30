@@ -16,8 +16,11 @@
 import { reactive, ref, type Ref, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-// import { useI18n } from "vue-i18n";
+import { gt, raw, type I18nText } from "@/types/i18n";
 import type { SearchRequestPayload, ParsedSQLResult } from "@/ts/interfaces";
+import { resetTransient } from "@/utils/logs/transientSearchKeys";
+import type { FreeTextBlocked, FreeTextDecorations } from "@/composables/useLogs/freeTextSearch";
+import type { PageLoad, PageRequest } from "@/utils/pageCrossing";
 import {
   DEFAULT_LOGS_CONFIG,
   DEFAULT_SEARCH_DEBUG_DATA,
@@ -39,12 +42,12 @@ export interface CrossLink {
 export interface Transform {
   name?: string;
   function?: string;
-  content?: string;
+  content?: I18nText;
   id?: string;
   [key: string]: unknown;
 }
 
-// The currently applied transform/action; spread from a source item at runtime.
+// The currently applied transform; spread from a source item at runtime.
 export interface SelectedTransform {
   id?: string;
   name?: string;
@@ -52,14 +55,8 @@ export interface SelectedTransform {
   [key: string]: unknown;
 }
 
-// An action entry shown in the action selector.
-export interface ActionItem {
-  name: string;
-  id: string;
-}
-
 export interface RefreshTimeItem {
-  label: string;
+  label: I18nText;
   value: number;
 }
 
@@ -73,13 +70,34 @@ export interface SearchConfig {
   refreshTimes: RefreshTimeItem[][];
 }
 
+/**
+ * The values the histogram summary is built from, kept alongside the rendered
+ * sentence so a second view can present them differently.
+ *
+ * SearchResult's chips read THESE, never `chartParams.title` — parsing the title
+ * apart only worked while it was hardcoded English.
+ */
+export interface HistogramTitleParts {
+  start: number;
+  end: number;
+  /** Formatted, may carry a "+" suffix when the total is a lower bound. */
+  total: string;
+  took: number;
+  /** Logs mode only — "Scan Size" or its delta variant, already translated. */
+  scanLabel?: I18nText;
+  /** Logs mode only — formatted size, may carry the same "+" suffix. */
+  scanSize?: string;
+}
+
 export interface HistogramData {
   xData: number[];
   yData: number[];
   breakdownField: string | null;
   breakdownSeries: Map<string, number[]> | null;
   chartParams: {
-    title: string;
+    title: I18nText;
+    /** Structured source of `title`; null when there is nothing to summarise. */
+    titleParts: HistogramTitleParts | null;
     unparsed_x_data: unknown[];
     timezone: string;
   };
@@ -123,6 +141,9 @@ export interface ResultGrid {
   columns: unknown[];
   colOrder: { [key: string]: string[] };
   colSizes: { [key: string]: unknown };
+  hitsSettled?: boolean;
+  pageRequest?: PageRequest | null;
+  pageLoad?: PageLoad | null;
 }
 
 export interface SearchAroundData {
@@ -139,7 +160,7 @@ export interface SearchObjectData {
   errorCode: number;
   countErrorMsg: string;
   filterErrMsg: string;
-  missingStreamMessage: string;
+  missingStreamMessage: I18nText;
   additionalErrorMsg?: string;
   savedViewFilterFields?: string;
   stream: StreamData;
@@ -165,8 +186,6 @@ export interface SearchObjectData {
   transformType: string;
   selectedTransform: SelectedTransform | null;
   selectedFunction?: { name?: string; function?: string } | null;
-  actions: ActionItem[];
-  actionId: string | null;
   // Polymorphic: used both flat (startTime/endTime) and nested
   // (relative.period.label) with unguarded deep access, so kept as any.
   datetime: any;
@@ -190,6 +209,9 @@ export interface SearchObjectData {
     column?: number;
     error: string;
   }>;
+  freeTextBlocked?: FreeTextBlocked | null;
+  freeTextExcluded?: string[];
+  freeTextDecorations?: FreeTextDecorations | null;
 }
 
 export interface SearchObject {
@@ -243,6 +265,18 @@ const streamSchemaFieldsIndexMapping = ref<{ [key: string]: number }>({});
 // Incremented each time extractFields() starts; guards against applying stale schema responses
 const schemaRequestToken = ref(0);
 
+// Values seen in the current results, for autocomplete; shared because one composable fills it and the page reads it.
+const fieldValues = ref<Record<string, Set<unknown>>>({});
+
+// Emptied in place: the query editor keeps a reference to this object between its debounced updates.
+const clearFieldValues = (): void => {
+  if (!fieldValues.value) {
+    fieldValues.value = {};
+    return;
+  }
+  for (const key of Object.keys(fieldValues.value)) delete fieldValues.value[key];
+};
+
 /**
  * Reactive state management for logs functionality
  * Contains all reactive state variables used across logs components
@@ -250,10 +284,7 @@ const schemaRequestToken = ref(0);
 export const searchState = () => {
   const store = useStore();
   const router = useRouter();
-  // const { t } = useI18n();
-
-  // Field values reference
-  const fieldValues = ref();
+  // const { t } = useI18nTyped();
 
   // Notification message reference
   const notificationMsg = ref("");
@@ -297,6 +328,7 @@ export const searchState = () => {
           refreshInterval: 0,
         }),
       );
+      resetTransient(searchObj as unknown as Record<string, unknown>);
 
       // Initialize data with default histogram structure
       searchObj.data = JSON.parse(
@@ -311,6 +343,7 @@ export const searchState = () => {
             breakdownSeries: null,
             chartParams: {
               title: "",
+              titleParts: null,
               unparsed_x_data: [],
               timezone: "",
             },
@@ -326,6 +359,9 @@ export const searchState = () => {
       // Restore cached query results and histogram data
       searchObj.data.queryResults = JSON.parse(JSON.stringify(state.data.queryResults));
       searchObj.data.sortedQueryResults = JSON.parse(JSON.stringify(state.data.sortedQueryResults));
+      searchObj.data.resultGrid.pageRequest = null;
+      searchObj.data.resultGrid.pageLoad = null;
+      searchObj.data.resultGrid.hitsSettled = true;
       // Restore histogram — breakdownSeries was serialized as an entries array
       // (Map is not JSON-serializable), so reconstruct the Map here.
       const savedBreakdown = state.data.histogram.breakdownSeries;
@@ -356,13 +392,14 @@ export const searchState = () => {
    */
   const resetSearchObj = (): void => {
     // Reset error message and stream data
-    searchObj.data.errorMsg = "No stream found in selected organization!";
+    searchObj.data.errorMsg = gt("search.noStreamFoundInOrganization");
     searchObj.data.stream.streamLists = [];
     searchObj.data.stream.selectedStream = [];
     searchObj.data.stream.selectedStreamFields = [];
 
     // Clear query results
     searchObj.data.queryResults = {};
+    clearFieldValues();
     searchObj.data.sortedQueryResults = [];
 
     // Reset histogram to default state
@@ -372,7 +409,8 @@ export const searchState = () => {
       breakdownField: null,
       breakdownSeries: null,
       chartParams: {
-        title: "",
+        title: raw(""),
+        titleParts: null,
         unparsed_x_data: [],
         timezone: "",
       },
@@ -455,6 +493,7 @@ export const searchState = () => {
     searchObj.data.stream.selectedStream = [];
     searchObj.data.stream.selectedStreamFields = [];
     searchObj.data.stream.selectedFields = [];
+    clearFieldValues();
     // The FTS system-pick marker belongs to the cleared selection.
     searchObj.meta.isFtsDefaultColumn = false;
 
@@ -485,6 +524,7 @@ export const searchState = () => {
     initialQueryPayload,
     streamSchemaFieldsIndexMapping,
     fieldValues,
+    clearFieldValues,
     notificationMsg,
     ftsFields,
     initialLogsState,

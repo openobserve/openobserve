@@ -13,12 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::LazyLock;
+use std::{
+    collections::{HashMap, HashSet},
+    ops::ControlFlow,
+    sync::LazyLock,
+};
 
-use datafusion::sql::{TableReference, parser::DFParser, resolve::resolve_table_references};
+use datafusion::{
+    common::TableReference,
+    sql::{parser::DFParser, resolve::resolve_table_references},
+};
 use serde::{Deserialize, Serialize};
 use sqlparser::{
-    ast::{Expr, SelectItem, SetExpr, Statement},
+    ast::{
+        BinaryOperator, Expr, ObjectName, ObjectNamePart, Select, SelectItem, SetExpr, Statement,
+        TableFactor, TableWithJoins, Value, Visit, VisitMut, Visitor, VisitorMut,
+    },
     dialect::PostgreSqlDialect,
     keywords::ALL_KEYWORDS,
     parser::Parser,
@@ -29,6 +39,7 @@ use super::stream::StreamType;
 
 pub const MAX_LIMIT: i64 = 100000;
 pub const MAX_OFFSET: i64 = 100000;
+const MAX_WHERE_SQL_BYTES: usize = 128 * 1024;
 
 pub static SQL_RESERVED_KEYWORDS: LazyLock<Vec<String>> = LazyLock::new(|| {
     ALL_KEYWORDS
@@ -90,7 +101,7 @@ pub fn resolve_stream_names(sql: &str) -> Result<Vec<String>, anyhow::Error> {
     let dialect = &PostgreSqlDialect {};
     let statement = DFParser::parse_sql_with_dialect(sql, dialect)?
         .pop_back()
-        .ok_or(anyhow::anyhow!("Failed to parse sql"))?;
+        .ok_or_else(|| anyhow::anyhow!("Failed to parse sql"))?;
     let (table_refs, _) = resolve_table_references(&statement, true)?;
     let mut tables = Vec::new();
     for table in table_refs {
@@ -103,13 +114,297 @@ pub fn resolve_stream_names_with_type(sql: &str) -> Result<Vec<TableReference>, 
     let dialect = &PostgreSqlDialect {};
     let statement = DFParser::parse_sql_with_dialect(sql, dialect)?
         .pop_back()
-        .ok_or(anyhow::anyhow!("Failed to parse sql"))?;
+        .ok_or_else(|| anyhow::anyhow!("Failed to parse sql"))?;
     let (table_refs, _) = resolve_table_references(&statement, true)?;
     let mut tables = Vec::new();
     for table in table_refs {
         tables.push(table);
     }
     Ok(tables)
+}
+
+/// Both forms of a query's WHERE, produced from a single parse.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct WhereInfo {
+    /// Top-level (outer, for CTEs) WHERE as a string, verbatim; "" if none.
+    pub where_clause: String,
+    /// Per-stream WHERE for a JOIN (`{stream -> scoped WHERE}`, alias-stripped);
+    /// empty for non-joins.
+    pub where_by_stream: HashMap<String, String>,
+}
+
+/// Parse `sql` once and return both the full outer WHERE (single-stream base filter)
+/// and the per-stream join WHERE. "" / empty for no-WHERE / unparseable.
+pub fn extract_where(sql: &str) -> WhereInfo {
+    let mut info = WhereInfo::default();
+    // Reject pathologically large input before any recursive traversal (parse, Display, visitors).
+    if sql.len() > MAX_WHERE_SQL_BYTES {
+        return info;
+    }
+    let dialect = PostgreSqlDialect {};
+    let Ok(statements) = Parser::parse_sql(&dialect, sql) else {
+        return info;
+    };
+    for statement in statements {
+        if let Statement::Query(query) = statement {
+            // Full outer WHERE, verbatim (single-stream panels use this directly).
+            if let Some(w) = where_from_set_expr(query.body.as_ref()) {
+                info.where_clause = w;
+            }
+            // Per-stream WHERE — only for joins (2+ streams).
+            if let Some(select) = outer_select(query.body.as_ref())
+                && let Some(selection) = &select.selection
+            {
+                let (alias_to_stream, streams) = from_streams(&select.from);
+                if streams.len() >= 2 {
+                    let conjuncts = split_and(selection);
+                    for stream in &streams {
+                        // Keep conjuncts whose referenced streams ⊆ {stream} (empty set =
+                        // unqualified columns, kept for every stream), then strip qualifiers.
+                        let kept: Vec<String> = conjuncts
+                            .iter()
+                            .filter(|c| {
+                                conjunct_streams(c, &alias_to_stream)
+                                    .iter()
+                                    .all(|s| s == stream)
+                            })
+                            .map(|c| {
+                                let mut e = (*c).clone();
+                                let _ = VisitMut::visit(&mut e, &mut QualifierStripper);
+                                e.to_string()
+                            })
+                            .collect();
+                        if !kept.is_empty() {
+                            info.where_by_stream
+                                .insert(stream.clone(), kept.join(" AND "));
+                        }
+                    }
+                }
+            }
+            return info;
+        }
+    }
+    info
+}
+
+/// The equality conditions that hold in every case where this SQL matches.
+///
+/// An aggregating alert returns a row with no identity columns, so the only
+/// remaining evidence of where it was looking is the alert's own text. On-call
+/// routing reads that evidence to decide who gets woken.
+///
+/// The honest answer is: only the equalities reachable through `AND` from the
+/// top of the WHERE.
+///
+/// ```text
+/// a = '1' AND b = '2'                → a, b
+/// a = '1' OR  b = '2'                → nothing; the firing could be either
+/// a = '1' AND (b = '2' OR c = '3')   → a only
+/// a = '1' AND NOT b = '2'            → a only; a NOT subtree is not a conjunct
+/// a = '1' AND a = '2'                → nothing; no row satisfies both
+/// ```
+///
+/// String literals only: a dimension is a name, and admitting numbers would let
+/// `http_status = 500` present itself as an identity. Sorted by column, so two
+/// callers on one alert cannot disagree.
+pub fn guaranteed_equalities(sql: &str) -> Vec<(String, String)> {
+    if sql.len() > MAX_WHERE_SQL_BYTES {
+        return Vec::new();
+    }
+    let Ok(statements) = Parser::parse_sql(&PostgreSqlDialect {}, sql) else {
+        return Vec::new();
+    };
+    // `None` marks a column two conjuncts disagree about.
+    let mut found: HashMap<String, Option<String>> = HashMap::new();
+    for statement in statements {
+        let Statement::Query(query) = statement else {
+            continue;
+        };
+        // The OUTER select, so a CTE's or a subquery's WHERE cannot be mistaken
+        // for the one that decides which rows the alert saw.
+        let Some(selection) = outer_select(query.body.as_ref()).and_then(|s| s.selection.as_ref())
+        else {
+            break;
+        };
+        for conjunct in split_and(selection) {
+            let Some((column, value)) = equality_of(conjunct) else {
+                continue;
+            };
+            match found.get(&column) {
+                Some(Some(seen)) if *seen != value => {
+                    found.insert(column, None);
+                }
+                Some(None) => {}
+                _ => {
+                    found.insert(column, Some(value));
+                }
+            }
+        }
+        break;
+    }
+    let mut out: Vec<(String, String)> = found
+        .into_iter()
+        .filter_map(|(column, value)| value.map(|v| (column, v)))
+        .collect();
+    out.sort();
+    out
+}
+
+/// One conjunct, if it is `column = 'literal'`. Either operand order.
+fn equality_of(expr: &Expr) -> Option<(String, String)> {
+    let Expr::BinaryOp {
+        left,
+        op: BinaryOperator::Eq,
+        right,
+    } = expr
+    else {
+        return None;
+    };
+    let column = column_name(left).or_else(|| column_name(right))?;
+    let value = string_literal(right).or_else(|| string_literal(left))?;
+    Some((column, value))
+}
+
+/// The bare column name, with any table qualifier dropped.
+fn column_name(expr: &Expr) -> Option<String> {
+    match expr {
+        Expr::Identifier(id) => Some(id.value.clone()),
+        Expr::CompoundIdentifier(ids) => ids.last().map(|id| id.value.clone()),
+        _ => None,
+    }
+}
+
+fn string_literal(expr: &Expr) -> Option<String> {
+    match expr {
+        Expr::Value(v) => match &v.value {
+            Value::SingleQuotedString(s) | Value::DoubleQuotedString(s) => Some(s.clone()),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// WHERE of a query body, unwrapping parenthesized SELECT; None for UNION/set-ops.
+fn where_from_set_expr(body: &SetExpr) -> Option<String> {
+    match body {
+        SetExpr::Select(select) => select.selection.as_ref().map(|e| e.to_string()),
+        SetExpr::Query(query) => where_from_set_expr(query.body.as_ref()),
+        _ => None,
+    }
+}
+
+/// Innermost SELECT of a body, unwrapping parenthesized queries.
+fn outer_select(body: &SetExpr) -> Option<&Select> {
+    match body {
+        SetExpr::Select(select) => Some(select),
+        SetExpr::Query(query) => outer_select(query.body.as_ref()),
+        _ => None,
+    }
+}
+
+/// Last identifier of an object name (the stream/table name).
+fn object_name_last(name: &ObjectName) -> String {
+    match name.0.last() {
+        Some(ObjectNamePart::Identifier(id)) => id.value.clone(),
+        _ => String::new(),
+    }
+}
+
+/// (alias/table -> stream, distinct stream names) from the FROM + JOIN clauses.
+fn from_streams(from: &[TableWithJoins]) -> (HashMap<String, String>, Vec<String>) {
+    let mut map = HashMap::new();
+    let mut streams = Vec::new();
+    for twj in from {
+        let factors = std::iter::once(&twj.relation).chain(twj.joins.iter().map(|j| &j.relation));
+        for factor in factors {
+            if let TableFactor::Table { name, alias, .. } = factor {
+                let stream = object_name_last(name);
+                if stream.is_empty() {
+                    continue;
+                }
+                if !streams.contains(&stream) {
+                    streams.push(stream.clone());
+                }
+                if let Some(a) = alias {
+                    map.insert(a.name.value.clone(), stream.clone());
+                }
+                map.insert(stream.clone(), stream.clone());
+            }
+        }
+    }
+    (map, streams)
+}
+
+fn split_and(expr: &Expr) -> Vec<&Expr> {
+    const MAX_CONJUNCTS: usize = 1024;
+    let mut out: Vec<&Expr> = Vec::new();
+    let mut stack: Vec<&Expr> = vec![expr];
+    while let Some(e) = stack.pop() {
+        if out.len() >= MAX_CONJUNCTS {
+            break;
+        }
+        match e {
+            Expr::BinaryOp {
+                left,
+                op: BinaryOperator::And,
+                right,
+            } => {
+                stack.push(right);
+                stack.push(left);
+            }
+            Expr::Nested(inner) => stack.push(inner),
+            other => out.push(other),
+        }
+    }
+    out
+}
+
+/// The set of streams a conjunct's qualified columns reference (via `alias_to_stream`).
+fn conjunct_streams(expr: &Expr, alias_to_stream: &HashMap<String, String>) -> HashSet<String> {
+    let mut v = StreamRefs {
+        alias_to_stream,
+        streams: HashSet::new(),
+    };
+    let _ = expr.visit(&mut v);
+    v.streams
+}
+
+struct StreamRefs<'a> {
+    alias_to_stream: &'a HashMap<String, String>,
+    streams: HashSet<String>,
+}
+
+impl Visitor for StreamRefs<'_> {
+    type Break = ();
+    fn pre_visit_expr(&mut self, expr: &Expr) -> ControlFlow<Self::Break> {
+        if let Expr::CompoundIdentifier(ids) = expr
+            && ids.len() >= 2
+        {
+            let qualifier = &ids[ids.len() - 2].value;
+            let stream = self
+                .alias_to_stream
+                .get(qualifier)
+                .cloned()
+                .unwrap_or_else(|| qualifier.clone());
+            self.streams.insert(stream);
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+/// Strips the table qualifier off every column ref (`a.col` -> `col`).
+struct QualifierStripper;
+
+impl VisitorMut for QualifierStripper {
+    type Break = ();
+    fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
+        if let Expr::CompoundIdentifier(ids) = expr
+            && let Some(last) = ids.last()
+        {
+            *expr = Expr::Identifier(last.clone());
+        }
+        ControlFlow::Continue(())
+    }
 }
 
 pub trait TableReferenceExt {
@@ -168,6 +463,111 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_where_where_clause_field() {
+        let wc = |sql: &str| extract_where(sql).where_clause;
+
+        // Basic WHERE is returned without the leading keyword.
+        assert_eq!(
+            wc("SELECT a FROM t WHERE level = 'error' AND status = 500"),
+            "level = 'error' AND status = 500",
+        );
+
+        // No WHERE → empty string.
+        assert_eq!(wc("SELECT a FROM t GROUP BY a"), "");
+
+        // Unparseable input → empty string, never a panic.
+        assert_eq!(wc("not a query"), "");
+
+        // The OUTER WHERE of a CTE query is returned (not the CTE's inner WHERE).
+        assert_eq!(
+            wc("WITH c AS (SELECT id FROM t WHERE inner_flag = 1) \
+                SELECT id FROM c WHERE outer_flag = 2"),
+            "outer_flag = 2",
+        );
+
+        // JOIN: the JOIN is in FROM, so the full WHERE (both stream aliases) is returned.
+        assert_eq!(
+            wc("SELECT a.svc, b.region FROM stream_a a \
+                JOIN stream_b b ON a.id = b.id WHERE a.env = 'prod' AND b.tier = 'gold'"),
+            "a.env = 'prod' AND b.tier = 'gold'",
+        );
+
+        // Subquery in WHERE is rendered verbatim, subquery included.
+        assert_eq!(
+            wc("SELECT a FROM t WHERE id IN (SELECT id FROM u WHERE x = 1)"),
+            "id IN (SELECT id FROM u WHERE x = 1)",
+        );
+
+        // Parenthesized top-level SELECT is unwrapped to its WHERE.
+        assert_eq!(wc("(SELECT a FROM t WHERE flag = 1)"), "flag = 1");
+
+        // UNION has one WHERE per branch → no single clause, empty string.
+        assert_eq!(
+            wc("SELECT a FROM t WHERE x = 1 UNION SELECT a FROM u WHERE y = 2"),
+            "",
+        );
+    }
+
+    #[test]
+    fn test_extract_where_by_stream() {
+        let wbs = |sql: &str| extract_where(sql).where_by_stream;
+
+        // Each stream keeps its own conjuncts, alias-stripped.
+        let m = wbs(
+            "SELECT a.svc, b.region FROM stream_a a JOIN stream_b b ON a.id = b.id \
+             WHERE a.env = 'prod' AND b.tier = 'gold'",
+        );
+        assert_eq!(m.get("stream_a").map(String::as_str), Some("env = 'prod'"));
+        assert_eq!(m.get("stream_b").map(String::as_str), Some("tier = 'gold'"));
+
+        // A cross-stream conjunct (a.x = b.y) is dropped from both streams.
+        let m2 = wbs("SELECT a.x FROM stream_a a JOIN stream_b b ON a.id = b.id \
+             WHERE a.x = b.y AND a.env = 'prod'");
+        assert_eq!(m2.get("stream_a").map(String::as_str), Some("env = 'prod'"));
+        assert!(!m2.contains_key("stream_b"));
+
+        // Single-stream query → empty (the caller uses where_clause instead).
+        assert!(wbs("SELECT a FROM logs WHERE x = 1").is_empty());
+
+        // Unparseable → empty, never a panic.
+        assert!(wbs("not a query").is_empty());
+    }
+
+    #[test]
+    fn test_extract_where_rejects_oversized_input() {
+        let mut sql = String::from("SELECT * FROM logs WHERE ");
+        sql.push_str(&"a = 1 AND ".repeat(30_000));
+        sql.push_str("a = 1");
+        assert!(sql.len() > MAX_WHERE_SQL_BYTES);
+        let info = extract_where(&sql);
+        assert_eq!(info.where_clause, "");
+        assert!(info.where_by_stream.is_empty());
+    }
+
+    #[test]
+    fn test_split_and_is_capped_and_iterative() {
+        // A deep AND chain (parsed iteratively by sqlparser) is flattened by an iterative walk and
+        // capped, so it can neither overflow the stack nor return an unbounded conjunct list.
+        let mut sql = String::from("SELECT x FROM t WHERE ");
+        sql.push_str(&"a = 1 AND ".repeat(3000));
+        sql.push_str("a = 1");
+        let dialect = PostgreSqlDialect {};
+        let stmts = Parser::parse_sql(&dialect, &sql).unwrap();
+        let Statement::Query(q) = &stmts[0] else {
+            panic!("expected query");
+        };
+        let selection = outer_select(q.body.as_ref())
+            .and_then(|s| s.selection.as_ref())
+            .expect("selection");
+        let conjuncts = split_and(selection);
+        assert_eq!(
+            conjuncts.len(),
+            1024,
+            "conjuncts must be capped at MAX_CONJUNCTS"
+        );
+    }
+
+    #[test]
     fn test_table_reference_get_stream_type_with_schema() {
         let sql = "select * from \"metrics\".cpu_usage";
         let refs = resolve_stream_names_with_type(sql).unwrap();
@@ -192,6 +592,25 @@ mod tests {
         let sql = "select * from \"logs\".events";
         let names = resolve_stream_names(sql).unwrap();
         assert_eq!(names, vec!["events"]);
+    }
+
+    #[test]
+    fn test_resolve_stream_names_deeply_nested_calls_parse_quickly() {
+        // Unpatched sqlparser 0.62 re-parses every function argument under PostgreSqlDialect.
+        let sql = format!(
+            "SELECT {}view_url{} AS k FROM \"_rumdata\"",
+            "lower(".repeat(30),
+            ")".repeat(30)
+        );
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = tx.send(resolve_stream_names(&sql));
+        });
+        let names = rx
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .expect("nested calls must not parse in exponential time")
+            .unwrap();
+        assert_eq!(names, vec!["_rumdata"]);
     }
 
     #[test]
@@ -251,5 +670,97 @@ mod tests {
         assert_eq!(names.len(), 2);
         assert!(names.contains(&"events".to_string()));
         assert!(names.contains(&"alerts".to_string()));
+    }
+
+    /// The truth table `guaranteed_equalities` exists to satisfy. Every row here
+    /// is a routing decision, so a value that is not actually guaranteed pages
+    /// the wrong team with total confidence.
+    #[test]
+    fn test_guaranteed_equalities_only_admits_what_must_be_true() {
+        let cases: &[(&str, &[(&str, &str)])] = &[
+            // Plain conjunction: everything holds.
+            ("SELECT count(*) FROM t WHERE a = '1'", &[("a", "1")]),
+            (
+                "SELECT count(*) FROM t WHERE a = '1' AND b = '2'",
+                &[("a", "1"), ("b", "2")],
+            ),
+            // An OR means the firing could have been either side, so neither is
+            // evidence of anything.
+            ("SELECT count(*) FROM t WHERE a = '1' OR b = '2'", &[]),
+            (
+                "SELECT count(*) FROM t WHERE a = '1' AND (b = '2' OR c = '3')",
+                &[("a", "1")],
+            ),
+            // Nested ANDs are still ANDs, however deep.
+            (
+                "SELECT count(*) FROM t WHERE a = '1' AND (b = '2' AND c = '3')",
+                &[("a", "1"), ("b", "2"), ("c", "3")],
+            ),
+            // A negated subtree is not a conjunct.
+            ("SELECT count(*) FROM t WHERE NOT a = '1'", &[]),
+            (
+                "SELECT count(*) FROM t WHERE a = '1' AND NOT b = '2'",
+                &[("a", "1")],
+            ),
+            // Not equalities at all.
+            ("SELECT count(*) FROM t WHERE a != '1'", &[]),
+            ("SELECT count(*) FROM t WHERE a LIKE 'x%'", &[]),
+            ("SELECT count(*) FROM t WHERE a > '1'", &[]),
+            // Two values for one column: an OR cannot make both true, and an AND
+            // means no row matches at all. Either way there is nothing to say
+            // about `a` — and emphatically not "whichever came last".
+            ("SELECT count(*) FROM t WHERE a = '1' OR a = '2'", &[]),
+            ("SELECT count(*) FROM t WHERE a = '1' AND a = '2'", &[]),
+            // The same value twice is not a conflict.
+            (
+                "SELECT count(*) FROM t WHERE a = '1' AND a = '1'",
+                &[("a", "1")],
+            ),
+            // Literal on the left reads the same as literal on the right.
+            ("SELECT count(*) FROM t WHERE '1' = a", &[("a", "1")]),
+            // A table qualifier is not part of the dimension name.
+            ("SELECT count(*) FROM t WHERE t.a = '1'", &[("a", "1")]),
+            // Numbers are not identities. `http_status = 500` is a threshold.
+            ("SELECT count(*) FROM t WHERE a = 500", &[]),
+            // No WHERE, and unparseable input, are both "nothing known".
+            ("SELECT count(*) FROM t", &[]),
+            ("this is not sql", &[]),
+        ];
+        for (sql, want) in cases {
+            let got = guaranteed_equalities(sql);
+            let want: Vec<(String, String)> = want
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect();
+            assert_eq!(got, want, "for: {sql}");
+        }
+    }
+
+    /// The bug this replaced: `sql.find("where")` matched the first `where` in
+    /// the string, which in a CTE is the inner one. Routing then identified the
+    /// alert by a filter that never selected the rows it fired on.
+    #[test]
+    fn test_guaranteed_equalities_reads_the_outer_where_not_a_ctes() {
+        let sql = "WITH x AS (SELECT * FROM a WHERE k8s_cluster = 'dev') \
+                   SELECT count(*) FROM x WHERE k8s_cluster = 'prod'";
+        assert_eq!(
+            guaranteed_equalities(sql),
+            vec![("k8s_cluster".to_string(), "prod".to_string())],
+            "the outer WHERE is the one that decided which rows fired"
+        );
+    }
+
+    /// A column whose name merely contains the word is not a WHERE clause, and a
+    /// string literal containing it is not one either.
+    #[test]
+    fn test_guaranteed_equalities_is_not_fooled_by_the_word_where() {
+        assert_eq!(
+            guaranteed_equalities("SELECT count(*) FROM nowhere_logs WHERE service = 'api'"),
+            vec![("service".to_string(), "api".to_string())]
+        );
+        assert_eq!(
+            guaranteed_equalities("SELECT count(*) FROM t WHERE msg = 'somewhere else'"),
+            vec![("msg".to_string(), "somewhere else".to_string())]
+        );
     }
 }

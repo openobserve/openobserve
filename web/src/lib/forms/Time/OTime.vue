@@ -3,8 +3,11 @@
 
 import type { TimeProps, TimeEmits, TimeSlots } from "./OTime.types";
 import { computed, ref, useAttrs, useId, watch } from "vue";
-import { PopoverRoot, PopoverTrigger, PopoverContent } from "reka-ui";
+import { PopoverRoot, PopoverTrigger, PopoverPortal, PopoverContent } from "reka-ui";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+
+const { t } = useI18nTyped();
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -23,6 +26,7 @@ const props = withDefaults(defineProps<TimeProps>(), {
   readonly: false,
   clearable: false,
   withSeconds: false,
+  format24: false,
 });
 
 const emit = defineEmits<TimeEmits>();
@@ -77,6 +81,9 @@ const SVG_CX = 110;
 const SVG_CY = 110;
 const NUM_RADIUS = 82;
 const HAND_RADIUS = 68;
+// 24-hour face: 13–00 sit on a second ring inside the 1–12 ring.
+const NUM_RADIUS_INNER = 50;
+const HAND_RADIUS_INNER = 38;
 
 function calcPos(index: number, total: number, radius: number) {
   const angle = (index / total) * 2 * Math.PI - Math.PI / 2;
@@ -88,39 +95,60 @@ function calcPos(index: number, total: number, radius: number) {
 
 interface ClockNum {
   value: number;
-  label: string;
+  label: I18nText;
   x: number;
   y: number;
+  inner?: boolean;
 }
+
+// Screen-reader label for a clock-face number ("7 hour", "05 minute"). One
+// whole-sentence key per mode — the mode noun can't be appended to the number,
+// since word order differs across languages.
+const clockNumberKey = computed<I18nKey>(() =>
+  clockMode.value === "hour"
+    ? "common.clockNumberHour"
+    : clockMode.value === "minute"
+      ? "common.clockNumberMinute"
+      : "common.clockNumberSecond",
+);
 
 const clockNumbers = computed((): ClockNum[] => {
   if (clockMode.value === "hour") {
-    return Array.from({ length: 12 }, (_, i) => {
+    const outer = Array.from({ length: 12 }, (_, i): ClockNum => {
       const h = i + 1;
       const index = h % 12;
       const pos = calcPos(index, 12, NUM_RADIUS);
-      return { value: h, label: String(h), ...pos };
+      return { value: h, label: raw(String(h)), ...pos };
     });
+    if (!props.format24) return outer;
+    // Inner ring: 13..23 then 00 (midnight) at the 12-o'clock position.
+    const inner = Array.from({ length: 12 }, (_, i): ClockNum => {
+      const h = i === 11 ? 0 : i + 13;
+      const index = (i + 1) % 12;
+      const pos = calcPos(index, 12, NUM_RADIUS_INNER);
+      return { value: h, label: raw(String(h).padStart(2, "0")), ...pos, inner: true };
+    });
+    return [...outer, ...inner];
   }
   return Array.from({ length: 12 }, (_, i) => {
     const pos = calcPos(i, 12, NUM_RADIUS);
-    return { value: i * 5, label: String(i * 5).padStart(2, "0"), ...pos };
+    return { value: i * 5, label: raw(String(i * 5).padStart(2, "0")), ...pos };
   });
 });
 
 const handPos = computed(() => {
-  let index: number;
   if (clockMode.value === "hour") {
-    index = internalHour.value % 12;
-  } else {
-    const val = clockMode.value === "minute" ? internalMinute.value : internalSecond.value;
-    index = Math.floor(val / 5) % 12;
+    const index = internalHour.value % 12;
+    const onInnerRing = props.format24 && (internalHour.value === 0 || internalHour.value >= 13);
+    return calcPos(index, 12, onInnerRing ? HAND_RADIUS_INNER : HAND_RADIUS);
   }
-  return calcPos(index, 12, HAND_RADIUS);
+  const val = clockMode.value === "minute" ? internalMinute.value : internalSecond.value;
+  return calcPos(Math.floor(val / 5) % 12, 12, HAND_RADIUS);
 });
 
 function isClockNumSelected(num: ClockNum): boolean {
   if (clockMode.value === "hour") {
+    if (props.format24) return internalHour.value === num.value;
     return (internalHour.value % 12 || 12) === num.value;
   }
   const val = clockMode.value === "minute" ? internalMinute.value : internalSecond.value;
@@ -132,9 +160,12 @@ function onClockClick(num: ClockNum) {
   if (props.disabled || props.readonly) return;
 
   if (clockMode.value === "hour") {
-    const h12 = num.value;
-    const h24 = isAM.value ? (h12 === 12 ? 0 : h12) : h12 === 12 ? 12 : h12 + 12;
-    internalHour.value = h24;
+    if (props.format24) {
+      internalHour.value = num.value;
+    } else {
+      const h12 = num.value;
+      internalHour.value = isAM.value ? (h12 === 12 ? 0 : h12) : h12 === 12 ? 12 : h12 + 12;
+    }
     clockMode.value = "minute";
     emitCurrentValue();
   } else if (clockMode.value === "minute") {
@@ -177,7 +208,11 @@ function emitCurrentValue() {
 }
 
 // ── Header display ─────────────────────────────────────────────
-const displayHour = computed(() => String(internalHour.value % 12 || 12).padStart(2, "0"));
+const displayHour = computed(() =>
+  props.format24
+    ? String(internalHour.value).padStart(2, "0")
+    : String(internalHour.value % 12 || 12).padStart(2, "0"),
+);
 const displayMinute = computed(() => String(internalMinute.value).padStart(2, "0"));
 const displaySecond = computed(() => String(internalSecond.value).padStart(2, "0"));
 
@@ -188,14 +223,46 @@ function handleClear(e: Event) {
   emit("clear");
 }
 
-// ── Native time input handler ───────────────────────────────
-function handleNativeTimeChange(e: Event) {
-  const val = (e.target as HTMLInputElement).value;
+// ── 24-hour text input handler ──────────────────────────────
+// Parses `HH:MM` (seconds optional with `withSeconds`) on commit; anything
+// unparseable reverts the field to the last good value instead of emitting.
+function handleText24Change(e: Event) {
+  const el = e.target as HTMLInputElement;
+  const val = el.value.trim();
   if (!val) {
     emit("update:modelValue", "");
     emit("change", "");
     return;
   }
+  const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(val);
+  const h = m ? Number(m[1]) : NaN;
+  const min = m ? Number(m[2]) : NaN;
+  const s = m ? Number(m[3] ?? 0) : NaN;
+  if (!m || h > 23 || min > 59 || s > 59) {
+    el.value = props.modelValue ?? "";
+    return;
+  }
+  internalHour.value = h;
+  internalMinute.value = min;
+  internalSecond.value = s;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const str = props.withSeconds ? `${pad(h)}:${pad(min)}:${pad(s)}` : `${pad(h)}:${pad(min)}`;
+  // Normalise the visible text too ("7:5" → "07:05").
+  el.value = str;
+  emit("update:modelValue", str);
+  emit("change", str);
+}
+
+// ── Native time input handler ───────────────────────────────
+function handleNativeTimeChange(e: Event) {
+  const typed = (e.target as HTMLInputElement).value;
+  if (!typed) {
+    emit("update:modelValue", "");
+    emit("change", "");
+    return;
+  }
+  // A value set without seconds (autofill, scripted input) must still read as HH:MM:SS downstream.
+  const val = props.withSeconds && /^\d{2}:\d{2}$/.test(typed) ? `${typed}:00` : typed;
   const parts = val.split(":").map(Number);
   internalHour.value = parts[0] ?? 0;
   internalMinute.value = parts[1] ?? 0;
@@ -218,7 +285,7 @@ const fieldClasses = computed(() => [
     ? "border-datepicker-error-border"
     : "border-datepicker-border hover:border-datepicker-hover-border",
   "focus-within:border-datepicker-focus-border",
-  "focus-within:ring-[0.125rem] focus-within:ring-accent/25",
+  "focus-within:ring-[0.125rem] focus-within:ring-focus-ring-accent",
   props.disabled
     ? "bg-datepicker-disabled-bg border-datepicker-disabled-border opacity-60 cursor-not-allowed"
     : "",
@@ -261,12 +328,34 @@ const fieldClasses = computed(() => [
           tabindex="-1"
           class="text-datepicker-icon flex shrink-0 cursor-pointer items-center ps-3 outline-none select-none focus-visible:opacity-80"
           :disabled="disabled || undefined"
-          aria-label="Open time picker"
+          :aria-label="t('components.time.openTimePicker')"
         >
           <OIcon name="schedule" size="sm" />
         </PopoverTrigger>
 
+        <!-- 24h mode: a plain text field, because the native time input renders
+             in the OS locale's clock (often 12-hour AM/PM) with no override. -->
         <input
+          v-if="format24"
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
+          :value="modelValue ?? ''"
+          :tabindex="inputTabindex"
+          :placeholder="placeholder ?? raw('HH:MM')"
+          :maxlength="withSeconds ? 8 : 5"
+          :disabled="disabled || undefined"
+          :readonly="readonly || undefined"
+          :class="[
+            'text-datepicker-text min-w-0 flex-1 bg-transparent ps-2 outline-none',
+            clearable ? 'pe-2' : 'pe-3',
+          ]"
+          @change="handleText24Change"
+          @focus="emit('focus', $event)"
+          @blur="emit('blur', $event)"
+        />
+        <input
+          v-else
           type="time"
           :value="modelValue ?? ''"
           :tabindex="inputTabindex"
@@ -286,7 +375,7 @@ const fieldClasses = computed(() => [
           v-if="clearable && modelValue"
           type="button"
           tabindex="-1"
-          aria-label="Clear"
+          :aria-label="t('components.time.clear')"
           class="text-datepicker-icon flex items-center pe-2 transition-colors hover:opacity-80"
           @click="handleClear"
         >
@@ -304,49 +393,34 @@ const fieldClasses = computed(() => [
         </button>
       </div>
 
-      <PopoverContent
-        :side-offset="4"
-        align="start"
-        :class="[
-          'rounded-default bg-datepicker-popup-bg border-datepicker-popup-border z-60 overflow-hidden border shadow-md outline-none',
-          withSeconds ? 'w-64' : 'w-56',
-        ]"
-        data-test="otime-popup"
-      >
-        <!-- Time display + AM/PM pill (no heavy header band) -->
-        <div class="flex items-center justify-between px-4 pt-4 pb-2">
-          <!-- Segmented time display -->
-          <div class="flex items-end gap-0.5">
-            <button
-              type="button"
-              :class="[
-                'rounded-default ring-offset-surface-base focus-visible:ring-datepicker-focus-ring border-b-2 px-1 pb-0.5 text-2xl font-semibold tabular-nums ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
-                clockMode === 'hour'
-                  ? 'text-datepicker-day-selected-bg border-datepicker-day-selected-bg'
-                  : 'text-datepicker-heading-text hover:text-datepicker-day-selected-bg border-transparent',
-              ]"
-              :aria-label="`Hour: ${displayHour}`"
-              @click="clockMode = 'hour'"
-            >
-              {{ displayHour }}
-            </button>
-            <span class="text-datepicker-weekday-text pb-0.5 text-2xl font-semibold select-none"
-              >:</span
-            >
-            <button
-              type="button"
-              :class="[
-                'rounded-default ring-offset-surface-base focus-visible:ring-datepicker-focus-ring border-b-2 px-1 pb-0.5 text-2xl font-semibold tabular-nums ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
-                clockMode === 'minute'
-                  ? 'text-datepicker-day-selected-bg border-datepicker-day-selected-bg'
-                  : 'text-datepicker-heading-text hover:text-datepicker-day-selected-bg border-transparent',
-              ]"
-              :aria-label="`Minute: ${displayMinute}`"
-              @click="clockMode = 'minute'"
-            >
-              {{ displayMinute }}
-            </button>
-            <template v-if="withSeconds">
+      <PopoverPortal>
+        <PopoverContent
+          :side-offset="4"
+          align="start"
+          :class="[
+            'rounded-default bg-datepicker-popup-bg border-datepicker-popup-border z-10001 overflow-hidden border shadow-md outline-none',
+            'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
+            withSeconds ? 'w-64' : 'w-56',
+          ]"
+          data-test="otime-popup"
+        >
+          <!-- Time display + AM/PM pill (no heavy header band) -->
+          <div class="flex items-center justify-between px-4 pt-4 pb-2">
+            <!-- Segmented time display -->
+            <div class="flex items-end gap-0.5">
+              <button
+                type="button"
+                :class="[
+                  'rounded-default ring-offset-surface-base focus-visible:ring-datepicker-focus-ring border-b-2 px-1 pb-0.5 text-2xl font-semibold tabular-nums ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
+                  clockMode === 'hour'
+                    ? 'text-datepicker-day-selected-bg border-datepicker-day-selected-bg'
+                    : 'text-datepicker-heading-text hover:text-datepicker-day-selected-bg border-transparent',
+                ]"
+                :aria-label="t('common.hourWithValue', { value: displayHour })"
+                @click="clockMode = 'hour'"
+              >
+                {{ displayHour }}
+              </button>
               <span class="text-datepicker-weekday-text pb-0.5 text-2xl font-semibold select-none"
                 >:</span
               >
@@ -354,168 +428,193 @@ const fieldClasses = computed(() => [
                 type="button"
                 :class="[
                   'rounded-default ring-offset-surface-base focus-visible:ring-datepicker-focus-ring border-b-2 px-1 pb-0.5 text-2xl font-semibold tabular-nums ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
-                  clockMode === 'second'
+                  clockMode === 'minute'
                     ? 'text-datepicker-day-selected-bg border-datepicker-day-selected-bg'
                     : 'text-datepicker-heading-text hover:text-datepicker-day-selected-bg border-transparent',
                 ]"
-                :aria-label="`Second: ${displaySecond}`"
-                @click="clockMode = 'second'"
+                :aria-label="t('common.minuteWithValue', { value: displayMinute })"
+                @click="clockMode = 'minute'"
               >
-                {{ displaySecond }}
+                {{ displayMinute }}
               </button>
-            </template>
+              <template v-if="withSeconds">
+                <span class="text-datepicker-weekday-text pb-0.5 text-2xl font-semibold select-none"
+                  >:</span
+                >
+                <button
+                  type="button"
+                  :class="[
+                    'rounded-default ring-offset-surface-base focus-visible:ring-datepicker-focus-ring border-b-2 px-1 pb-0.5 text-2xl font-semibold tabular-nums ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
+                    clockMode === 'second'
+                      ? 'text-datepicker-day-selected-bg border-datepicker-day-selected-bg'
+                      : 'text-datepicker-heading-text hover:text-datepicker-day-selected-bg border-transparent',
+                  ]"
+                  :aria-label="t('common.secondWithValue', { value: displaySecond })"
+                  @click="clockMode = 'second'"
+                >
+                  {{ displaySecond }}
+                </button>
+              </template>
+            </div>
+
+            <!-- AM / PM horizontal pill (12-hour mode only) -->
+            <div
+              v-if="!format24"
+              class="rounded-default border-datepicker-border ms-3 flex shrink-0 overflow-hidden border"
+            >
+              <button
+                type="button"
+                :class="[
+                  'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring px-2.5 py-1 text-xs font-medium ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
+                  isAM
+                    ? 'bg-datepicker-day-selected-bg text-datepicker-day-selected-text'
+                    : 'text-datepicker-weekday-text hover:bg-datepicker-clock-hover-bg',
+                ]"
+                :aria-label="t('components.time.am')"
+                @click="setAM"
+              >
+                {{ t("components.time.am") }}
+              </button>
+              <div class="bg-datepicker-border w-px shrink-0" aria-hidden="true" />
+              <button
+                type="button"
+                :class="[
+                  'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring px-2.5 py-1 text-xs font-medium ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
+                  !isAM
+                    ? 'bg-datepicker-day-selected-bg text-datepicker-day-selected-text'
+                    : 'text-datepicker-weekday-text hover:bg-datepicker-clock-hover-bg',
+                ]"
+                :aria-label="t('components.time.pm')"
+                @click="setPM"
+              >
+                {{ t("components.time.pm") }}
+              </button>
+            </div>
           </div>
 
-          <!-- AM / PM horizontal pill -->
-          <div
-            class="rounded-default border-datepicker-border ms-3 flex shrink-0 overflow-hidden border"
-          >
-            <button
-              type="button"
-              :class="[
-                'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring px-2.5 py-1 text-xs font-medium ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
-                isAM
-                  ? 'bg-datepicker-day-selected-bg text-datepicker-day-selected-text'
-                  : 'text-datepicker-weekday-text hover:bg-datepicker-clock-hover-bg',
-              ]"
-              aria-label="AM"
-              @click="setAM"
-            >
-              AM
-            </button>
-            <div class="bg-datepicker-border w-px shrink-0" aria-hidden="true" />
-            <button
-              type="button"
-              :class="[
-                'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring px-2.5 py-1 text-xs font-medium ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
-                !isAM
-                  ? 'bg-datepicker-day-selected-bg text-datepicker-day-selected-text'
-                  : 'text-datepicker-weekday-text hover:bg-datepicker-clock-hover-bg',
-              ]"
-              aria-label="PM"
-              @click="setPM"
-            >
-              PM
-            </button>
-          </div>
-        </div>
-
-        <!-- Clock face SVG -->
-        <div class="flex justify-center px-3 pb-1">
-          <svg
-            viewBox="0 0 220 220"
-            width="200"
-            height="200"
-            role="img"
-            :aria-label="`Select ${clockMode}`"
-            data-test="otime-clock-face"
-          >
-            <circle
-              cx="110"
-              cy="110"
-              r="100"
-              class="fill-datepicker-clock-face-bg stroke-datepicker-popup-border"
-              stroke-width="1"
-            />
-            <line
-              x1="110"
-              y1="110"
-              :x2="handPos.x"
-              :y2="handPos.y"
-              class="stroke-datepicker-clock-hand"
-              stroke-width="2"
-              stroke-linecap="round"
-            />
-            <circle cx="110" cy="110" r="4" class="fill-datepicker-clock-hand" />
-            <g
-              v-for="num in clockNumbers"
-              :key="num.value"
-              role="button"
-              tabindex="0"
-              :aria-label="`${num.label} ${clockMode}`"
-              :aria-pressed="isClockNumSelected(num)"
-              class="group cursor-pointer"
-              @click="onClockClick(num)"
-              @keydown.enter.prevent="onClockClick(num)"
-              @keydown.space.prevent="onClockClick(num)"
+          <!-- Clock face SVG -->
+          <div class="flex justify-center px-3 pb-1">
+            <svg
+              viewBox="0 0 220 220"
+              width="200"
+              height="200"
+              role="img"
+              :aria-label="t('common.selectMode', { mode: clockMode })"
+              data-test="otime-clock-face"
             >
               <circle
-                :cx="num.x"
-                :cy="num.y"
-                r="15"
-                :class="
-                  isClockNumSelected(num)
-                    ? 'fill-datepicker-clock-selected-bg'
-                    : 'group-hover:fill-datepicker-clock-hover-bg fill-transparent'
-                "
+                cx="110"
+                cy="110"
+                r="100"
+                class="fill-datepicker-clock-face-bg stroke-datepicker-popup-border"
+                stroke-width="1"
               />
-              <text
-                :x="num.x"
-                :y="num.y"
-                text-anchor="middle"
-                dominant-baseline="central"
-                font-size="13"
-                class="pointer-events-none select-none"
-                :class="
-                  isClockNumSelected(num)
-                    ? 'fill-datepicker-clock-selected-text'
-                    : 'fill-datepicker-day-text'
-                "
+              <line
+                x1="110"
+                y1="110"
+                :x2="handPos.x"
+                :y2="handPos.y"
+                class="stroke-datepicker-clock-hand"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+              <circle cx="110" cy="110" r="4" class="fill-datepicker-clock-hand" />
+              <g
+                v-for="num in clockNumbers"
+                :key="num.value"
+                role="button"
+                tabindex="0"
+                :aria-label="t(clockNumberKey, { number: num.label })"
+                :aria-pressed="isClockNumSelected(num)"
+                class="group cursor-pointer"
+                @click="onClockClick(num)"
+                @keydown.enter.prevent="onClockClick(num)"
+                @keydown.space.prevent="onClockClick(num)"
               >
-                {{ num.label }}
-              </text>
-            </g>
-          </svg>
-        </div>
-
-        <!-- Footer: step dots + Close -->
-        <div class="flex items-center justify-between px-4 pb-3">
-          <div class="flex items-center gap-1.5" role="group" aria-label="Step">
-            <button
-              type="button"
-              :class="[
-                'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring rounded-full ring-offset-1 transition-all outline-none focus-visible:ring-2',
-                clockMode === 'hour'
-                  ? 'bg-datepicker-day-selected-bg h-2 w-4'
-                  : 'bg-datepicker-border hover:bg-datepicker-weekday-text size-2',
-              ]"
-              aria-label="Hour"
-              @click="clockMode = 'hour'"
-            />
-            <button
-              type="button"
-              :class="[
-                'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring rounded-full ring-offset-1 transition-all outline-none focus-visible:ring-2',
-                clockMode === 'minute'
-                  ? 'bg-datepicker-day-selected-bg h-2 w-4'
-                  : 'bg-datepicker-border hover:bg-datepicker-weekday-text size-2',
-              ]"
-              aria-label="Minute"
-              @click="clockMode = 'minute'"
-            />
-            <button
-              v-if="withSeconds"
-              type="button"
-              :class="[
-                'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring rounded-full ring-offset-1 transition-all outline-none focus-visible:ring-2',
-                clockMode === 'second'
-                  ? 'bg-datepicker-day-selected-bg h-2 w-4'
-                  : 'bg-datepicker-border hover:bg-datepicker-weekday-text size-2',
-              ]"
-              aria-label="Second"
-              @click="clockMode = 'second'"
-            />
+                <circle
+                  :cx="num.x"
+                  :cy="num.y"
+                  :r="num.inner ? 13 : 15"
+                  :class="
+                    isClockNumSelected(num)
+                      ? 'fill-datepicker-clock-selected-bg'
+                      : 'group-hover:fill-datepicker-clock-hover-bg fill-transparent'
+                  "
+                />
+                <text
+                  :x="num.x"
+                  :y="num.y"
+                  text-anchor="middle"
+                  dominant-baseline="central"
+                  :font-size="num.inner ? 11 : 13"
+                  class="pointer-events-none select-none"
+                  :class="
+                    isClockNumSelected(num)
+                      ? 'fill-datepicker-clock-selected-text'
+                      : num.inner
+                        ? 'fill-datepicker-weekday-text'
+                        : 'fill-datepicker-day-text'
+                  "
+                >
+                  {{ num.label }}
+                </text>
+              </g>
+            </svg>
           </div>
-          <button
-            type="button"
-            class="text-datepicker-day-selected-bg ring-offset-surface-base focus-visible:ring-datepicker-focus-ring text-xs font-medium ring-offset-1 transition-[box-shadow] duration-150 outline-none hover:opacity-80 focus-visible:ring-2"
-            data-test="otime-close"
-            @click="popoverOpen = false"
-          >
-            Close
-          </button>
-        </div>
-      </PopoverContent>
+
+          <!-- Footer: step dots + Close -->
+          <div class="flex items-center justify-between px-4 pb-3">
+            <div
+              class="flex items-center gap-1.5"
+              role="group"
+              :aria-label="t('components.time.step')"
+            >
+              <button
+                type="button"
+                :class="[
+                  'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring rounded-full ring-offset-1 transition-all outline-none focus-visible:ring-2',
+                  clockMode === 'hour'
+                    ? 'bg-datepicker-day-selected-bg h-2 w-4'
+                    : 'bg-datepicker-border hover:bg-datepicker-weekday-text size-2',
+                ]"
+                :aria-label="t('components.time.hour')"
+                @click="clockMode = 'hour'"
+              />
+              <button
+                type="button"
+                :class="[
+                  'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring rounded-full ring-offset-1 transition-all outline-none focus-visible:ring-2',
+                  clockMode === 'minute'
+                    ? 'bg-datepicker-day-selected-bg h-2 w-4'
+                    : 'bg-datepicker-border hover:bg-datepicker-weekday-text size-2',
+                ]"
+                :aria-label="t('components.time.minute')"
+                @click="clockMode = 'minute'"
+              />
+              <button
+                v-if="withSeconds"
+                type="button"
+                :class="[
+                  'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring rounded-full ring-offset-1 transition-all outline-none focus-visible:ring-2',
+                  clockMode === 'second'
+                    ? 'bg-datepicker-day-selected-bg h-2 w-4'
+                    : 'bg-datepicker-border hover:bg-datepicker-weekday-text size-2',
+                ]"
+                :aria-label="t('components.time.second')"
+                @click="clockMode = 'second'"
+              />
+            </div>
+            <button
+              type="button"
+              class="text-datepicker-day-selected-bg ring-offset-surface-base focus-visible:ring-datepicker-focus-ring text-xs font-medium ring-offset-1 transition-[box-shadow] duration-150 outline-none hover:opacity-80 focus-visible:ring-2"
+              data-test="otime-close"
+              @click="popoverOpen = false"
+            >
+              {{ t("common.close") }}
+            </button>
+          </div>
+        </PopoverContent>
+      </PopoverPortal>
     </PopoverRoot>
 
     <div v-if="effectiveError || helpText" class="flex items-center gap-2">

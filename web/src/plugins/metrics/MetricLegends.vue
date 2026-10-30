@@ -8,7 +8,8 @@
         class="metric-legends-button"
       >
         <OIcon name="category" size="sm" />
-        <span>{{ t("search.legendLabel") }}</span>
+        <!-- Icon-only on phones so the editor header keeps its actions on one row. -->
+        <span class="max-md:sr-only">{{ t("search.legendLabel") }}</span>
       </OButton>
     </template>
     <div class="px-2 pt-1.5 pb-1">
@@ -23,7 +24,7 @@
             :key="metric"
             :data-test="`metrics-legends-item-${metric}`"
           >
-            <OIcon :name="icon" size="md" class="mr-1" />
+            <OIcon :name="icon" size="md" class="me-1" />
             <span>{{ metric }}</span>
           </div>
         </div>
@@ -34,7 +35,7 @@
 
 <script lang="ts">
 import { defineComponent } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -44,7 +45,7 @@ export default defineComponent({
   name: "MetricLegends",
   components: { OButton, OIcon, ODropdown },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
 
     const metricsIconMapping: Record<string, string> = {

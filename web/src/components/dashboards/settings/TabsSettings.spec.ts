@@ -25,9 +25,18 @@ vi.mock("../../../utils/commons", () => ({
   updateDashboard: vi.fn(),
 }));
 
+const mockT = vi.hoisted(() => vi.fn((key: string) => key));
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
-    t: (key: string) => key,
+    t: mockT,
+  }),
+}));
+
+const mockOpenConflict = vi.fn();
+vi.mock("@/composables/dashboard/useDashboardSaveConflict", () => ({
+  useDashboardSaveConflict: () => ({
+    isConflict: (error: any) => error?.response?.status === 409,
+    openConflict: mockOpenConflict,
   }),
 }));
 
@@ -127,6 +136,54 @@ describe("TabsSettings", () => {
     if (wrapper) {
       wrapper.unmount();
     }
+  });
+
+  describe("save conflict descriptions", () => {
+    const conflict = { response: { status: 409 } };
+
+    const mountWithFreshDashboard = async () => {
+      const dashboard = JSON.parse(JSON.stringify(mockDashboardData));
+      const { getDashboard } = await import("../../../utils/commons");
+      vi.mocked(getDashboard).mockResolvedValue(dashboard);
+      wrapper = createWrapper();
+      await waitForComponent(wrapper);
+      return dashboard;
+    };
+
+    it("names the tab's old name in a rename, read before editTab changes it", async () => {
+      const dashboard = await mountWithFreshDashboard();
+      const { editTab } = await import("../../../utils/commons");
+      vi.mocked(editTab).mockImplementationOnce(async (...args: any[]) => {
+        dashboard.tabs[0].name = args[4].name;
+        throw conflict;
+      });
+      wrapper.vm.editTabId = "tab1";
+      wrapper.vm.editTabObj.data = { tabId: "tab1", name: "Renamed" };
+
+      await wrapper.vm.saveEdit();
+
+      expect(mockT).toHaveBeenCalledWith("dashboard.saveConflict.change.renamedTab", {
+        from: "Tab 1",
+        to: "Renamed",
+      });
+      expect(mockOpenConflict).toHaveBeenCalled();
+    });
+
+    it("names the deleted tab, read before deleteTab removes it", async () => {
+      const dashboard = await mountWithFreshDashboard();
+      const { deleteTab } = await import("../../../utils/commons");
+      vi.mocked(deleteTab).mockImplementationOnce(async () => {
+        dashboard.tabs.splice(1, 1);
+        throw conflict;
+      });
+      wrapper.vm.tabIdToBeDeleted = "tab2";
+
+      await wrapper.vm.confirmDelete();
+
+      expect(mockT).toHaveBeenCalledWith("dashboard.saveConflict.change.deletedTab", {
+        name: "Tab 2",
+      });
+    });
   });
 
   describe("Component Initialization", () => {

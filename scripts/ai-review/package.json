@@ -5,7 +5,9 @@
   "description": "Multi-agent AI code review system for OpenObserve PRs",
   "type": "module",
   "scripts": {
-    "review": "node run-review.mjs"
+    "review": "node run-review.mjs",
+    "test": "node --test test/*.test.mjs",
+    "test:integration": "node --test test/integration/*.test.mjs"
   },
   "engines": {
     "node": ">=20.0.0"

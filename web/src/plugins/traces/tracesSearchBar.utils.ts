@@ -19,6 +19,8 @@
  * mounting the full SFC (which pulls in monaco / vuex).
  */
 
+import { parseCalendarToken } from "@/utils/dashboard/calendarPeriods";
+
 /** Subset of `searchObj.data.datetime` that the comparison cares about. */
 export interface DatetimeSnapshot {
   startTime: number | string;
@@ -69,7 +71,17 @@ export function isDatetimeChanged(
   if (!prev) return true;
   const isRelative = !!value.relativeTimePeriod;
   if (isRelative) {
-    return prev.relativeTimePeriod !== value.relativeTimePeriod || prev.type === "absolute";
+    if (prev.relativeTimePeriod !== value.relativeTimePeriod || prev.type === "absolute")
+      return true;
+    // A calendar period's start moves with the timezone, so the same token can name another window.
+    const prevStart = Number(prev.startTime);
+    const nextStart = Number(value.startTime);
+    return (
+      parseCalendarToken(value.relativeTimePeriod) !== null &&
+      Number.isFinite(prevStart) &&
+      Number.isFinite(nextStart) &&
+      prevStart !== nextStart
+    );
   }
   return prev.startTime !== value.startTime || prev.endTime !== value.endTime;
 }

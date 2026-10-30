@@ -13,8 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { raw } from "@/types/i18n";
+
 import { useLocalWrapContent } from "@/utils/zincutils";
 import { TimePeriodUnit } from "@/ts/interfaces";
+import type { PageLoad, PageRequest, PendingPageSelection } from "@/utils/pageCrossing";
 
 /**
  * Maximum number of search retries before giving up
@@ -105,6 +108,8 @@ export const DEFAULT_LOGS_CONFIG = {
   meta: {
     logsVisualizeToggle: "logs" as const,
     buildModeQueryEditorDisabled: false, // true when in build mode and customQuery is false
+    // One-shot hand-off of a saved view's builder chart to BuildQueryPage; not persisted.
+    savedBuildConfig: null as any,
     refreshInterval: 0 as number,
     refreshIntervalLabel: "Off",
     refreshHistogram: false,
@@ -113,7 +118,7 @@ export const DEFAULT_LOGS_CONFIG = {
     showHistogram: true,
     showPatterns: false,
     showDetailTab: false,
-    showTransformEditor: false, // by default function / actions editor should be hidden
+    showTransformEditor: false, // by default function editor should be hidden
     searchApplied: false,
     toggleSourceWrap: useLocalWrapContent() ? JSON.parse(useLocalWrapContent()) : false,
     histogramDirtyFlag: false,
@@ -142,7 +147,9 @@ export const DEFAULT_LOGS_CONFIG = {
       chartInterval: "1 second",
       chartKeyFormat: "HH:mm:ss",
       navigation: {
-        currentRowIndex: 0,
+        currentRowIndex: 0 as number | null,
+        selectionActive: false,
+        pendingPageSelection: null as PendingPageSelection | null,
       },
       showPagination: true,
     },
@@ -157,13 +164,25 @@ export const DEFAULT_LOGS_CONFIG = {
     selectedTraceStream: "",
     showSearchScheduler: false,
     toggleFunction: false, // DEPRECATED use showTransformEditor instead
-    isActionsEnabled: false,
     resetPlotChart: false,
     clearCache: false,
     liveMode: localStorage.getItem("oo_toggle_auto_run") === "true",
+    executed: null as any,
+    pendingExecution: null as any,
+    executedPatterns: null as any,
+    executedPanel: null as any,
+    autoRunBlocked: null as any,
+    consentedScope: null as any,
+    runPending: false,
+    runOutcome: {} as any,
+    editorDirty: false,
+    freeTextScan: {} as any,
   },
   data: {
     query: "" as any,
+    freeTextBlocked: null as any,
+    freeTextExcluded: [] as string[],
+    freeTextDecorations: null as any,
     histogramQuery: "" as any,
     parsedQuery: {} as any,
     countErrorMsg: "",
@@ -177,7 +196,7 @@ export const DEFAULT_LOGS_CONFIG = {
       column?: number;
       error: string;
     }>,
-    missingStreamMessage: "",
+    missingStreamMessage: raw(""),
     additionalErrorMsg: "",
     savedViewFilterFields: "",
     hasSearchDataTimestampField: false,
@@ -211,11 +230,13 @@ export const DEFAULT_LOGS_CONFIG = {
       columns: [] as any[],
       colOrder: {} as any,
       colSizes: {} as any,
+      hitsSettled: true,
+      pageRequest: null as PageRequest | null,
+      pageLoad: null as PageLoad | null,
     },
     histogramInterval: 0 as any,
     transforms: [] as any[],
     transformType: "function",
-    actions: [] as any[],
     selectedTransform: null as any,
     queryResults: [] as any[],
     sortedQueryResults: [] as any[],
@@ -227,6 +248,7 @@ export const DEFAULT_LOGS_CONFIG = {
       breakdownSeries: null,
       chartParams: {
         title: "",
+        titleParts: null,
         unparsed_x_data: [],
         timezone: "",
       },
@@ -267,7 +289,6 @@ export const DEFAULT_LOGS_CONFIG = {
     lastHistogramTraceId: "" as string,
     isOperationCancelled: false,
     searchRetriesCount: {} as { [key: string]: number },
-    actionId: null,
     crossLinks: { stream_links: [], org_links: [] },
     crossLinkQuery: "",
     highlightQuery: "",
@@ -306,6 +327,9 @@ export const DEFAULT_SEARCH_DEBUG_DATA = {
   extractFieldsEndTime: 0,
   extractFieldsWithAPI: "",
 };
+
+export const BREAKDOWN_EMPTY_VALUE = "";
+export const BREAKDOWN_EMPTY_LABEL = "(empty)";
 
 // Type definitions for constants
 export type IntervalMapKey = keyof typeof INTERVAL_MAP;

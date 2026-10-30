@@ -1,10 +1,12 @@
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { gt, type TranslateFn } from "@/types/i18n";
 
 export function parseJson(value: string, label: string) {
   try {
     return JSON.parse(value);
   } catch {
-    throw new Error(`${label} must be valid JSON`);
+    // Module scope, no setup context — `gt` resolves against the active locale.
+    throw new Error(gt("onlineEvals.validation.mustBeValidJson", { label }));
   }
 }
 
@@ -40,10 +42,10 @@ export function formatTemplateVariable(variable: string) {
   return `{{ ${variable} }}`;
 }
 
-export function defaultTestValue(variable: string) {
-  if (variable === "input") return "The capital of France is Paris, located on the Seine river.";
-  if (variable === "output") return "Paris is the capital of France.";
-  if (variable === "context") return "France country profile: Paris is the capital city.";
+export function defaultTestValue(variable: string, t: TranslateFn) {
+  if (variable === "input") return t("onlineEvals.scorerTestSampleInput");
+  if (variable === "output") return t("onlineEvals.scorerTestSampleOutput");
+  if (variable === "context") return t("onlineEvals.scorerTestSampleContext");
   if (variable === "metadata") return "{}";
   if (variable === "trace.id") return "test_trace_123";
   if (variable === "span.id") return "test_span_456";
@@ -70,10 +72,24 @@ export function formatDate(value: number) {
   });
 }
 
+/** "12s ago" / "5m ago" / "3h ago" / "2d ago"; "—" for a future or invalid time. */
+export function relativeTime(timestampMs: number, t: TranslateFn): string {
+  const diff = Date.now() - timestampMs;
+  if (diff < 0 || !Number.isFinite(diff)) return "—";
+  const sec = Math.floor(diff / 1000);
+  if (sec < 60) return t("refreshButton.secondsAgo", { sec });
+  const min = Math.floor(sec / 60);
+  if (min < 60) return t("refreshButton.minutesAgo", { min });
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return t("refreshButton.hoursAgo", { h: hr });
+  const day = Math.floor(hr / 24);
+  return t("onlineEvals.quality.overview.relativeTime.daysAgo", { day });
+}
+
 export function statusClass(status: string) {
   return {
     "is-good": ["active", "default", "configured"].includes(status),
-    "is-warn": ["draft", "paused", "degraded"].includes(status),
+    "is-warn": ["draft", "paused"].includes(status),
     "is-muted": ["archived", "inactive"].includes(status),
   };
 }

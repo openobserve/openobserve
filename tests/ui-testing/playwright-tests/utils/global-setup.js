@@ -6,6 +6,7 @@ const testLogger = require('./test-logger.js');
 const metricsIngestion = require('./metrics-ingestion.js');
 const { ingestTraces } = require('./trace-ingestion.js');
 const { ingestRumErrors } = require('./rum-error-ingestion.js');
+const { ingestBase } = require('./ingest-url.js');
 
 /**
  * Global setup for all tests - handles authentication and test data ingestion
@@ -89,11 +90,13 @@ async function globalSetup() {
     // Wait for login to complete — look for navigation or success indicators.
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
-    // Verify login success by checking for the home menu item — the home
-    // route is "/" so the resulting data-test contains a literal slash.
-    await page.locator('[data-test="menu-link-/-item"]').waitFor({
+    // Verify login success by checking for the main nav rail — the current
+    // rail no longer renders per-route `menu-link-*` items (see #13659, which
+    // made the same fix in enhanced-baseFixtures.js).
+    // Deployed hosts take ~13s after sign-in to mount the shell, so 10s failed every run there.
+    await page.locator('[data-test="navbar-main-nav"]').waitFor({
       state: 'visible',
-      timeout: 10000,
+      timeout: 30000,
     });
     
     testLogger.info('Global login authentication successful');
@@ -127,6 +130,11 @@ async function globalSetup() {
       testLogger.info('Starting RUM error data ingestion');
       await ingestRumErrors(page, 3); // Ingest 3 different error types
       testLogger.info('RUM error data ingestion completed');
+
+      // Saved again as a browser that has seen the org with data holds it, so the one-time first-data banner never lands mid-test.
+      await recordFirstDataSeen(page);
+      await context.storageState({ path: authFile });
+      testLogger.info('Storage state saved after the first visit with data', { authFile });
     }
     
   } catch (error) {
@@ -139,6 +147,26 @@ async function globalSetup() {
   }
   
   testLogger.info('Global setup completed successfully - ready for test execution');
+}
+
+/**
+ * Reloads the app until the first-data notice records that the org has data.
+ * @param {import('@playwright/test').Page} page
+ */
+async function recordFirstDataSeen(page) {
+  const key = `o2.onboarding.firstData.${process.env["ORGNAME"]}`;
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    const recorded = await page
+      .waitForFunction((k) => JSON.parse(localStorage.getItem(k) || 'null')?.hadData === true, key, { timeout: 15000 })
+      .then(() => true)
+      .catch(() => false);
+    if (recorded) {
+      testLogger.info('First-data visit recorded', { attempt });
+      return;
+    }
+  }
+  testLogger.warn('First-data visit not recorded; tests may still see the first-data banner', { key });
 }
 
 /**
@@ -160,7 +188,7 @@ async function performGlobalIngestion(page) {
   const baseUrl = (process.env.INGESTION_URL || process.env.ZO_BASE_URL || 'http://localhost:5080').replace(/\/+$/, '');
   let response;
   try {
-    response = await page.request.post(`${baseUrl}/api/${orgId}/${streamName}/_json`, {
+    response = await page.request.post(`${ingestBase(baseUrl)}/api/${orgId}/${streamName}/_json`, {
       headers: headers,
       data: logsdata
     });
@@ -194,7 +222,7 @@ async function performGlobalIngestion(page) {
     testLogger.error('Data ingestion failed', {
       status: responseStatus,
       response: responseData,
-      url: `${baseUrl}/api/${orgId}/${streamName}/_json`,
+      url: `${ingestBase(baseUrl)}/api/${orgId}/${streamName}/_json`,
       orgId,
       streamName
     });

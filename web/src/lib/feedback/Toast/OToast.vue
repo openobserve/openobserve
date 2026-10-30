@@ -18,9 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import type { ToastProps, ToastEmits } from "./OToast.types";
 import { computed, ref, onUnmounted } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { pauseTimer, resumeTimer, isPageVisible } from "./useToast";
 import { ToastRoot, ToastTitle, ToastDescription, ToastClose } from "reka-ui";
+import { useI18nTyped } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 defineOptions({ inheritAttrs: false });
 
@@ -207,7 +211,10 @@ onUnmounted(() => {
         <!-- Message + inline action -->
         <div :class="['flex flex-wrap items-start gap-x-3 gap-y-1.5', title ? 'mt-1' : '']">
           <ToastDescription
-            :class="['text-sm leading-snug', title ? 'text-toast-fg-secondary' : 'text-toast-fg']"
+            :class="[
+              'text-sm leading-snug break-words whitespace-pre-line',
+              title ? 'text-toast-fg-secondary' : 'text-toast-fg',
+            ]"
             data-test="o-toast-message"
           >
             {{ message }}
@@ -220,6 +227,7 @@ onUnmounted(() => {
           <button
             v-if="action"
             type="button"
+            data-test="o-toast-action-btn"
             :class="[
               'rounded-default inline-flex items-center justify-center gap-1 px-2.5 py-0.5 text-xs font-semibold transition-all focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none',
               actionSucceeded
@@ -254,7 +262,7 @@ onUnmounted(() => {
               class="size-3.5"
               aria-hidden="true"
             />
-            Affected Sections
+            {{ t("components.toast.affectedSections") }}
           </button>
           <ul v-if="detailsExpanded" class="mt-1.5 space-y-1.5" data-test="o-toast-details-list">
             <li
@@ -263,11 +271,9 @@ onUnmounted(() => {
               class="flex items-baseline justify-between gap-2 text-xs"
             >
               <span class="text-toast-fg shrink-0 font-medium">{{ detail.label }}</span>
-              <span
-                class="text-toast-fg-secondary truncate text-right font-mono"
-                :title="detail.url"
-                >{{ detail.url }}</span
-              >
+              <OTruncatedText class="text-toast-fg-secondary text-right font-mono">{{
+                detail.url
+              }}</OTruncatedText>
             </li>
           </ul>
         </div>
@@ -279,7 +285,8 @@ onUnmounted(() => {
           'rounded-default text-toast-fg-secondary hover:text-toast-fg focus-visible:ring-toast-info-border flex shrink-0 items-center p-0.5 focus-visible:ring-2 focus-visible:outline-none',
           title ? 'self-start' : 'self-center',
         ]"
-        aria-label="Dismiss notification"
+        :aria-label="t('components.toast.dismissNotification')"
+        data-test="o-toast-dismiss"
       >
         <OIcon name="close" size="sm" class="size-4" aria-hidden="true" />
       </ToastClose>

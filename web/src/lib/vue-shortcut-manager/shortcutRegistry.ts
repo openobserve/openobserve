@@ -1,5 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nKey } from "@/types/i18n";
 /**
  * Single source of truth for every keyboard shortcut in the app.
  *
@@ -28,7 +29,7 @@ export interface ShortcutEntry {
   /** Stable, globally-unique id. */
   id: string;
   /** i18n key under shortcuts.actions.* */
-  descriptionKey: string;
+  descriptionKey: I18nKey;
   /** Same combo on every platform. */
   key?: string;
   /** Platform-specific combo (Windows / Linux). Pairs with `keyForMac`. */
@@ -41,22 +42,61 @@ export interface ShortcutEntry {
   display?: string;
   /** Fire even while a text input has focus (see `Shortcut.allowInInput`). */
   allowInInput?: boolean;
+  /** Never fire while a text input has focus, even as a modifier combo (see `Shortcut.skipInInput`). */
+  skipInInput?: boolean;
+  /** Hide this entry in the cheatsheet unless the edition/config exposes it. */
+  visible?: (caps: ShortcutCapabilities) => boolean;
 }
 
 export interface ShortcutGroup {
   /** i18n key under shortcuts.pages.* */
-  pageKey: string;
+  pageKey: I18nKey;
   /** Manager scope shared by this group's registerable shortcuts (omit = global). */
   scope?: string;
+  /** Hide this page in the cheatsheet unless the edition/config exposes the feature. */
+  visible?: (caps: ShortcutCapabilities) => boolean;
   shortcuts: ShortcutEntry[];
+}
+
+/** Runtime edition + org scope + `/config` flags that gate feature-specific pages. */
+export interface ShortcutCapabilities {
+  isEnterprise: boolean;
+  isCloud: boolean;
+  isMetaOrg: boolean;
+  onlineEvalsEnabled: boolean;
+  incidentsEnabled: boolean;
+  modelPricingEnabled: boolean;
+  rbacEnabled: boolean;
+  aiEnabled: boolean;
+  downtimesEnabled: boolean;
 }
 
 export interface ShortcutModule {
   /** i18n key under shortcuts.modules.* */
-  titleKey: string;
+  titleKey: I18nKey;
+  /**
+   * Literal title, used INSTEAD of `titleKey` when the name must not be translated.
+   * Acronyms only: "RUM" and "IAM" came back from the translator as "RON"/"RHUM"
+   * (the drink) and "SOY YO" ("I am me").
+   */
+  title?: string;
   /** pageKeys (ShortcutGroup.pageKey) grouped under this module, in display order */
-  pages: string[];
+  pages: I18nKey[];
 }
+
+// Gates mirror each feature's own route guard, so the cheatsheet never lists a page OSS cannot reach.
+const enterprise = (c: ShortcutCapabilities) => c.isEnterprise;
+const cloud = (c: ShortcutCapabilities) => c.isCloud;
+const enterpriseOrCloud = (c: ShortcutCapabilities) => c.isEnterprise || c.isCloud;
+const incidents = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.incidentsEnabled;
+const onlineEvals = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.onlineEvalsEnabled;
+const modelPricing = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.modelPricingEnabled;
+const rbac = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.rbacEnabled;
+const aiChat = (c: ShortcutCapabilities) => c.isEnterprise && c.aiEnabled;
+const downtimes = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.downtimesEnabled;
+// Cluster-scoped admin surfaces only render inside the _meta org.
+const metaAdmin = (c: ShortcutCapabilities) => c.isEnterprise && c.isMetaOrg;
+const cloudMetaAdmin = (c: ShortcutCapabilities) => c.isCloud && c.isMetaOrg;
 
 /**
  * Groups the flat SHORTCUT_REGISTRY into modules for the cheatsheet. Each module
@@ -78,6 +118,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
       "shortcuts.pages.dashboardsList",
       "shortcuts.pages.dashboards",
       "shortcuts.pages.dashboardsPanel",
+      "shortcuts.pages.dashboardTvPlaylist",
       "shortcuts.pages.panelEditor",
     ],
   },
@@ -94,7 +135,12 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
       "shortcuts.pages.alertSources",
       "shortcuts.pages.alertTemplates",
       "shortcuts.pages.alertIncidents",
+      "shortcuts.pages.downtimes",
     ],
+  },
+  {
+    titleKey: "shortcuts.modules.oncall",
+    pages: ["shortcuts.pages.oncall", "shortcuts.pages.oncallDetail"],
   },
   { titleKey: "shortcuts.modules.streams", pages: ["shortcuts.pages.streams"] },
   {
@@ -106,8 +152,15 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
     pages: ["shortcuts.pages.functions", "shortcuts.pages.enrichmentTables"],
   },
   { titleKey: "shortcuts.modules.reports", pages: ["shortcuts.pages.reports"] },
+  { titleKey: "shortcuts.modules.synthetics", pages: ["shortcuts.pages.syntheticsJourney"] },
+  { titleKey: "shortcuts.modules.kubernetes", pages: ["shortcuts.pages.kubernetes"] },
+  {
+    titleKey: "shortcuts.modules.fleet",
+    pages: ["shortcuts.pages.fleetOverview", "shortcuts.pages.fleetConfigEditor"],
+  },
   {
     titleKey: "shortcuts.modules.iam",
+    title: "IAM",
     pages: [
       "shortcuts.pages.iamUsers",
       "shortcuts.pages.iamRoles",
@@ -136,6 +189,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
   },
   {
     titleKey: "shortcuts.modules.rum",
+    title: "RUM",
     pages: [
       "shortcuts.pages.rumErrors",
       "shortcuts.pages.rumSessions",
@@ -146,6 +200,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
     titleKey: "shortcuts.modules.onlineEvals",
     pages: [
       "shortcuts.pages.evalTemplates",
+      "shortcuts.pages.quality",
       "shortcuts.pages.scorers",
       "shortcuts.pages.evalJobs",
       "shortcuts.pages.scoreConfigs",
@@ -187,6 +242,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         keyForWindows: "ctrl+b",
         keyForMac: "meta+b",
         descriptionKey: "shortcuts.actions.aiChatToggle",
+        visible: aiChat,
       },
     ],
   },
@@ -227,6 +283,19 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         keyForWindows: "ctrl+shift+d",
         keyForMac: "meta+shift+d",
         descriptionKey: "shortcuts.actions.logsExport",
+      },
+      { id: "logsNextRow", key: "j", descriptionKey: "shortcuts.actions.logsNextRow" },
+      { id: "logsPrevRow", key: "k", descriptionKey: "shortcuts.actions.logsPrevRow" },
+      {
+        id: "logsRowFocusMove",
+        display: "↑ / ↓",
+        descriptionKey: "shortcuts.actions.logsRowFocusMove",
+      },
+      { id: "logsRowOpen", display: "enter", descriptionKey: "shortcuts.actions.logsRowOpen" },
+      {
+        id: "logsDetailClose",
+        display: "escape",
+        descriptionKey: "shortcuts.actions.logsDetailClose",
       },
     ],
   },
@@ -278,12 +347,67 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         keyForMac: "meta+s",
         descriptionKey: "shortcuts.actions.dashboardSave",
       },
+      // The manager builds combos as ctrl, shift, alt, meta, so the Mac redo is shift+meta.
+      {
+        id: "dashboardLayoutUndo",
+        keyForWindows: "ctrl+z",
+        keyForMac: "meta+z",
+        descriptionKey: "shortcuts.actions.dashboardLayoutUndo",
+        skipInInput: true,
+      },
+      {
+        id: "dashboardLayoutRedo",
+        keyForWindows: "ctrl+shift+z",
+        keyForMac: "shift+meta+z",
+        descriptionKey: "shortcuts.actions.dashboardLayoutRedo",
+        skipInInput: true,
+      },
+      {
+        id: "dashboardLayoutExit",
+        key: "escape",
+        descriptionKey: "shortcuts.actions.dashboardLayoutExit",
+      },
+      {
+        id: "dashboardKioskExit",
+        key: "escape",
+        descriptionKey: "shortcuts.actions.dashboardKioskExit",
+      },
       {
         id: "dashboardFullscreen",
         key: "f",
         descriptionKey: "shortcuts.actions.dashboardFullscreen",
       },
       { id: "dashboardExport", key: "x", descriptionKey: "shortcuts.actions.dashboardExport" },
+    ],
+  },
+
+  // ── Dashboard TV playlist ────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.dashboardTvPlaylist",
+    scope: "dashboard-tv",
+    shortcuts: [
+      {
+        id: "dashboardPlaylistPrev",
+        key: "left",
+        display: "←",
+        descriptionKey: "shortcuts.actions.dashboardPlaylistPrev",
+      },
+      {
+        id: "dashboardPlaylistNext",
+        key: "right",
+        display: "→",
+        descriptionKey: "shortcuts.actions.dashboardPlaylistNext",
+      },
+      {
+        id: "dashboardPlaylistPause",
+        key: "space",
+        descriptionKey: "shortcuts.actions.dashboardPlaylistPause",
+      },
+      {
+        id: "dashboardPlaylistExit",
+        key: "escape",
+        descriptionKey: "shortcuts.actions.dashboardPlaylistExit",
+      },
     ],
   },
 
@@ -374,6 +498,9 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         keyForMac: "meta+shift+c",
         descriptionKey: "shortcuts.actions.tracesCopyUrl",
       },
+      { id: "tracesNextRow", key: "j", descriptionKey: "shortcuts.actions.tracesNextRow" },
+      { id: "tracesPrevRow", key: "k", descriptionKey: "shortcuts.actions.tracesPrevRow" },
+      { id: "tracesRowOpen", display: "enter", descriptionKey: "shortcuts.actions.tracesRowOpen" },
     ],
   },
 
@@ -386,13 +513,13 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         id: "traceNextSpan",
         keys: ["j", "down"],
         display: "J / ↓",
-        descriptionKey: "shortcuts.actions.traceNextSpan",
+        descriptionKey: "shortcuts.actions.traceNextVisibleSpan",
       },
       {
         id: "tracePrevSpan",
         keys: ["k", "up"],
         display: "K / ↑",
-        descriptionKey: "shortcuts.actions.tracePrevSpan",
+        descriptionKey: "shortcuts.actions.tracePrevVisibleSpan",
       },
     ],
   },
@@ -464,6 +591,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.alertSources",
     scope: "alert-sources",
+    visible: incidents,
     shortcuts: [
       { id: "alertSourcesAdd", key: "n", descriptionKey: "shortcuts.actions.alertSourcesAdd" },
       {
@@ -549,15 +677,36 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     ],
   },
 
+  // ── Kubernetes ──────────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.kubernetes",
+    scope: "kubernetes",
+    shortcuts: [
+      {
+        id: "k8sPalette",
+        keyForWindows: "ctrl+k",
+        keyForMac: "meta+k",
+        descriptionKey: "shortcuts.actions.k8sPalette",
+        allowInInput: true,
+      },
+    ],
+  },
+
   // ── Functions ───────────────────────────────────────────────────────────
   {
     pageKey: "shortcuts.pages.functions",
     scope: "functions",
     shortcuts: [
       { id: "functionsAdd", key: "n", descriptionKey: "shortcuts.actions.functionsAdd" },
+      { id: "functionsImport", key: "i", descriptionKey: "shortcuts.actions.functionsImport" },
       { id: "functionsRefresh", key: "r", descriptionKey: "shortcuts.actions.functionsRefresh" },
       { id: "functionsFocusSearch", key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
       { id: "functionsRowEdit", display: "e", descriptionKey: "shortcuts.actions.tableRowEdit" },
+      {
+        id: "functionsRowExport",
+        display: "x",
+        descriptionKey: "shortcuts.actions.tableRowExport",
+      },
       {
         id: "functionsRowDelete",
         display: "del / ⌫",
@@ -604,6 +753,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.iamRoles",
     scope: "iam-roles",
+    visible: rbac,
     shortcuts: [
       { id: "iamRolesAdd", key: "n", descriptionKey: "shortcuts.actions.iamRolesAdd" },
       { id: "iamRolesRefresh", key: "r", descriptionKey: "shortcuts.actions.iamRolesRefresh" },
@@ -621,6 +771,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.iamGroups",
     scope: "iam-groups",
+    visible: rbac,
     shortcuts: [
       { id: "iamGroupsAdd", key: "n", descriptionKey: "shortcuts.actions.iamGroupsAdd" },
       { id: "iamGroupsRefresh", key: "r", descriptionKey: "shortcuts.actions.iamGroupsRefresh" },
@@ -713,10 +864,24 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     ],
   },
 
+  // ── Synthetics — Journey editor ─────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.syntheticsJourney",
+    scope: "synthetics-journey",
+    shortcuts: [
+      {
+        id: "syntheticsJourneyFocusSearch",
+        key: "/",
+        descriptionKey: "shortcuts.actions.focusSearch",
+      },
+    ],
+  },
+
   // ── Running Queries ─────────────────────────────────────────────────────
   {
     pageKey: "shortcuts.pages.runningQueries",
     scope: "running-queries",
+    visible: metaAdmin,
     shortcuts: [
       {
         id: "runningQueriesRefresh",
@@ -735,6 +900,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.alertIncidents",
     scope: "alert-incidents",
+    visible: incidents,
     shortcuts: [
       {
         id: "alertIncidentsRefresh",
@@ -744,10 +910,51 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     ],
   },
 
+  // ── Downtimes ───────────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.downtimes",
+    scope: "downtimes",
+    visible: downtimes,
+    shortcuts: [
+      { id: "downtimesCreate", key: "n", descriptionKey: "shortcuts.actions.downtimesCreate" },
+      { id: "downtimesRefresh", key: "r", descriptionKey: "shortcuts.actions.downtimesRefresh" },
+      { id: "downtimesFocusSearch", key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+    ],
+  },
+
+  // ── On-Call: the list screens ───────────────────────────────────────────
+  // One scope for Pages / My on-call / Teams / Routing. A page registers only
+  // the ids it actually handles, so sharing the scope costs nothing and lets
+  // `r` mean "refresh this list" everywhere in the module.
+  {
+    pageKey: "shortcuts.pages.oncall",
+    scope: "oncall",
+    shortcuts: [
+      { id: "oncallRefresh", key: "r", descriptionKey: "shortcuts.actions.oncallRefresh" },
+      { id: "oncallSearch", key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+      { id: "oncallNewTeam", key: "n", descriptionKey: "shortcuts.actions.oncallNewTeam" },
+    ],
+  },
+
+  // ── On-Call: one page ───────────────────────────────────────────────────
+  // Its own scope: `r` on a record would mean something different from `r` on
+  // a list, and `shift+r` must not be shadowed by the list's refresh.
+  {
+    pageKey: "shortcuts.pages.oncallDetail",
+    scope: "oncall-detail",
+    shortcuts: [
+      { id: "oncallAck", key: "a", descriptionKey: "shortcuts.actions.oncallAck" },
+      { id: "oncallEscalate", key: "e", descriptionKey: "shortcuts.actions.oncallEscalate" },
+      { id: "oncallSnooze", key: "s", descriptionKey: "shortcuts.actions.oncallSnooze" },
+      { id: "oncallResolve", key: "shift+r", descriptionKey: "shortcuts.actions.oncallResolve" },
+    ],
+  },
+
   // ── Pipeline Destinations ───────────────────────────────────────────────
   {
     pageKey: "shortcuts.pages.pipelineDestinations",
     scope: "pipeline-destinations",
+    visible: enterprise,
     shortcuts: [
       {
         id: "pipelineDestinationsRefresh",
@@ -774,6 +981,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.iamInvitations",
     scope: "iam-invitations",
+    visible: cloud,
     shortcuts: [
       {
         id: "iamInvitationsRefresh",
@@ -800,6 +1008,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.regexPatterns",
     scope: "regex-patterns",
+    visible: enterprise,
     shortcuts: [
       {
         id: "regexPatternsRefresh",
@@ -813,6 +1022,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.cipherKeys",
     scope: "cipher-keys",
+    visible: enterprise,
     shortcuts: [
       { id: "cipherKeysRefresh", key: "r", descriptionKey: "shortcuts.actions.cipherKeysRefresh" },
     ],
@@ -822,6 +1032,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.nodes",
     scope: "nodes",
+    visible: metaAdmin,
     shortcuts: [{ id: "nodesRefresh", key: "r", descriptionKey: "shortcuts.actions.nodesRefresh" }],
   },
 
@@ -829,6 +1040,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.modelPricing",
     scope: "model-pricing",
+    visible: modelPricing,
     shortcuts: [
       {
         id: "modelPricingRefresh",
@@ -842,6 +1054,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.searchSchedulers",
     scope: "search-schedulers",
+    visible: enterprise,
     shortcuts: [
       {
         id: "searchSchedulersRefresh",
@@ -877,6 +1090,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.evalTemplates",
     scope: "eval-templates",
+    visible: onlineEvals,
     shortcuts: [
       {
         id: "evalTemplatesRefresh",
@@ -886,10 +1100,21 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     ],
   },
 
+  // ── Online Evals — Quality ──────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.quality",
+    scope: "quality",
+    visible: onlineEvals,
+    shortcuts: [
+      { id: "qualityBack", key: "escape", descriptionKey: "shortcuts.actions.qualityBack" },
+    ],
+  },
+
   // ── Online Evals — Scorers ──────────────────────────────────────────────
   {
     pageKey: "shortcuts.pages.scorers",
     scope: "scorers",
+    visible: onlineEvals,
     shortcuts: [
       { id: "scorersRefresh", key: "r", descriptionKey: "shortcuts.actions.scorersRefresh" },
     ],
@@ -899,6 +1124,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.evalJobs",
     scope: "eval-jobs",
+    visible: onlineEvals,
     shortcuts: [
       { id: "evalJobsRefresh", key: "r", descriptionKey: "shortcuts.actions.evalJobsRefresh" },
     ],
@@ -908,6 +1134,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.scoreConfigs",
     scope: "score-configs",
+    visible: onlineEvals,
     shortcuts: [
       {
         id: "scoreConfigsRefresh",
@@ -921,6 +1148,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.actions",
     scope: "actions",
+    visible: enterpriseOrCloud,
     shortcuts: [
       { id: "actionsRefresh", key: "r", descriptionKey: "shortcuts.actions.actionsRefresh" },
     ],
@@ -930,6 +1158,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.llmProviders",
     scope: "llm-providers",
+    visible: onlineEvals,
     shortcuts: [
       {
         id: "llmProvidersRefresh",
@@ -943,6 +1172,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.aiToolsets",
     scope: "ai-toolsets",
+    visible: enterprise,
     shortcuts: [
       { id: "aiToolsetsRefresh", key: "r", descriptionKey: "shortcuts.actions.aiToolsetsRefresh" },
     ],
@@ -952,6 +1182,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.orgManagement",
     scope: "organization-management",
+    visible: cloudMetaAdmin,
     shortcuts: [
       {
         id: "orgManagementRefresh",
@@ -967,6 +1198,12 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     scope: "rum-errors",
     shortcuts: [
       { id: "rumErrorsRefresh", key: "r", descriptionKey: "shortcuts.actions.rumErrorsRefresh" },
+      {
+        id: "rumErrorsCopyUrl",
+        keyForWindows: "ctrl+shift+c",
+        keyForMac: "meta+shift+c",
+        descriptionKey: "shortcuts.actions.rumErrorsCopyUrl",
+      },
     ],
   },
 
@@ -980,6 +1217,12 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         key: "r",
         descriptionKey: "shortcuts.actions.rumSessionsRefresh",
       },
+      {
+        id: "rumSessionsCopyUrl",
+        keyForWindows: "ctrl+shift+c",
+        keyForMac: "meta+shift+c",
+        descriptionKey: "shortcuts.actions.rumSessionsCopyUrl",
+      },
     ],
   },
 
@@ -989,6 +1232,33 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     scope: "rum-source-maps",
     shortcuts: [
       { id: "sourceMapsRefresh", key: "r", descriptionKey: "shortcuts.actions.sourceMapsRefresh" },
+    ],
+  },
+
+  // ── Fleet — Overview flow map ───────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.fleetOverview",
+    scope: "fleet-overview",
+    shortcuts: [
+      {
+        id: "fleetFlowCloseDetails",
+        key: "escape",
+        descriptionKey: "shortcuts.actions.fleetFlowCloseDetails",
+      },
+    ],
+  },
+
+  // ── Fleet — Configuration editor ────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.fleetConfigEditor",
+    scope: "fleet-config-editor",
+    shortcuts: [
+      {
+        id: "fleetEditorDeleteNode",
+        keys: ["delete", "backspace"],
+        display: "del / ⌫",
+        descriptionKey: "shortcuts.actions.fleetEditorDeleteNode",
+      },
     ],
   },
 ];
@@ -1007,6 +1277,7 @@ export interface ShortcutDef {
   keyForMac?: string;
   keys?: string[];
   allowInInput?: boolean;
+  skipInInput?: boolean;
 }
 
 function isRegisterable(e: ShortcutEntry): boolean {
@@ -1030,6 +1301,7 @@ const DEFS: Map<string, ShortcutDef> = (() => {
         keyForMac: e.keyForMac,
         keys: e.keys,
         allowInInput: e.allowInInput,
+        skipInInput: e.skipInInput,
       });
     }
   }

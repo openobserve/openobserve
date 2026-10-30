@@ -21,6 +21,12 @@ describe("OSwitch", () => {
     expect(wrapper.text()).toContain("Enable notifications");
   });
 
+  it("names an unlabelled switch from aria-label on the switch itself", () => {
+    wrapper = mount(OSwitch, { attrs: { "aria-label": "Built-in bot rule" } });
+    expect(wrapper.find('[role="switch"]').attributes("aria-label")).toBe("Built-in bot rule");
+    expect(wrapper.attributes("aria-label")).toBeUndefined();
+  });
+
   it("renders label slot when provided", () => {
     wrapper = mount(OSwitch, {
       slots: { label: "<strong>Custom</strong>" },
@@ -61,6 +67,30 @@ describe("OSwitch", () => {
     expect(wrapper.find("button").attributes("role")).toBe("switch");
     await wrapper.find("button").trigger("click");
     expect(wrapper.emitted("update:modelValue")![0][0]).toBe(true);
+  });
+
+  it("mirrors the checked-thumb offset for RTL at every size", () => {
+    for (const [size, offset] of [
+      ["sm", "2"],
+      ["md", "2.5"],
+      ["lg", "3"],
+      ["xl", "5"],
+    ] as const) {
+      const sized = mount(OSwitch, { props: { size, modelValue: true } });
+      const thumb = sized.find('[role="switch"]').find("span");
+
+      expect(thumb.classes()).toContain(`translate-x-${offset}`);
+      expect(thumb.classes()).toContain(`rtl:-translate-x-${offset}`);
+      sized.unmount();
+    }
+  });
+
+  it("parks the thumb at the reading edge while unchecked", () => {
+    wrapper = mount(OSwitch, { props: { modelValue: false } });
+    const thumb = wrapper.find('[role="switch"]').find("span");
+
+    expect(thumb.classes()).toContain("translate-x-0");
+    expect(thumb.classes().some((className) => className.startsWith("rtl:"))).toBe(false);
   });
 
   it("renders correctly with lg size and still toggles", async () => {

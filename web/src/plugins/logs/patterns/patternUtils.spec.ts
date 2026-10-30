@@ -18,10 +18,13 @@ import {
   extractConstantsFromPattern,
   escapeForMatchAll,
   buildPatternSqlQuery,
+  buildPatternSetSqlQuery,
   buildAlertNameFromPattern,
   buildPatternAlertData,
   compactCount,
   formatBucketDuration,
+  patternSeverityKey,
+  patternSeverityKeyForPattern,
 } from "./patternUtils";
 
 describe("extractConstantsFromPattern", () => {
@@ -75,38 +78,34 @@ describe("extractConstantsFromPattern", () => {
   });
 });
 
+// The backend's PostgreSqlDialect parser does not support backslash string-literal
+// escapes, so doubling an embedded single quote is the only escaping this needs —
+// backslash, double quotes, and control characters are all literal once quoted.
 describe("escapeForMatchAll", () => {
-  it("escapes backslashes first", () => {
-    expect(escapeForMatchAll("a\\b")).toBe("a\\\\b");
+  it("doubles an embedded single quote", () => {
+    expect(escapeForMatchAll("it's")).toBe("it''s");
   });
 
-  it("escapes single quotes", () => {
-    expect(escapeForMatchAll("it's")).toBe("it\\'s");
+  it("leaves a backslash untouched", () => {
+    expect(escapeForMatchAll("a\\b")).toBe("a\\b");
   });
 
-  it("escapes double quotes", () => {
-    expect(escapeForMatchAll('say "hello"')).toBe('say \\"hello\\"');
+  it("leaves double quotes untouched", () => {
+    expect(escapeForMatchAll('say "hello"')).toBe('say "hello"');
   });
 
-  it("escapes newlines", () => {
-    expect(escapeForMatchAll("line1\nline2")).toBe("line1\\nline2");
-  });
-
-  it("escapes carriage returns", () => {
-    expect(escapeForMatchAll("line1\rline2")).toBe("line1\\rline2");
-  });
-
-  it("escapes tabs", () => {
-    expect(escapeForMatchAll("col1\tcol2")).toBe("col1\\tcol2");
+  it("leaves newlines, carriage returns, and tabs untouched", () => {
+    expect(escapeForMatchAll("line1\nline2")).toBe("line1\nline2");
+    expect(escapeForMatchAll("line1\rline2")).toBe("line1\rline2");
+    expect(escapeForMatchAll("col1\tcol2")).toBe("col1\tcol2");
   });
 
   it("does not modify plain strings", () => {
     expect(escapeForMatchAll("hello world")).toBe("hello world");
   });
 
-  it("handles backslash before quote correctly (order matters)", () => {
-    // Input: \'  → after backslash escape: \\'  → after quote escape: \\\\'
-    expect(escapeForMatchAll("\\'")).toBe("\\\\\\'");
+  it("doubles a backslash immediately before a quote without introducing extra backslashes", () => {
+    expect(escapeForMatchAll("\\'")).toBe("\\''");
   });
 });
 
@@ -128,7 +127,7 @@ describe("buildPatternSqlQuery", () => {
 
   it("escapes special chars in constants", () => {
     const sql = buildPatternSqlQuery("Error: it's a problem here <*> done", "my_stream");
-    expect(sql).toContain("match_all('Error: it\\'s a problem here')");
+    expect(sql).toContain("match_all('Error: it''s a problem here')");
   });
 });
 
@@ -262,5 +261,153 @@ describe("formatBucketDuration", () => {
 
   it("never reports a zero-length bucket", () => {
     expect(formatBucketDuration(0, t)).toBe("1 second");
+  });
+});
+
+describe("buildPatternSetSqlQuery", () => {
+  // Two patterns whose invariant constants are long enough to survive
+  // extractConstantsFromPattern.
+  const ERROR_PATTERN = "Connection refused to upstream <*>";
+  const TIMEOUT_PATTERN = "Request deadline exceeded after <*>";
+
+  it("builds an include-only query", () => {
+    const sql = buildPatternSetSqlQuery({
+      streamName: "k8s_logs",
+      includes: [ERROR_PATTERN],
+    });
+    expect(sql).toBe("SELECT * FROM 'k8s_logs' WHERE match_all('Connection refused to upstream')");
+  });
+
+  it("ORs several includes, each bracketed against the surrounding ANDs", () => {
+    const sql = buildPatternSetSqlQuery({
+      streamName: "k8s_logs",
+      includes: [ERROR_PATTERN, TIMEOUT_PATTERN],
+    });
+    expect(sql).toBe(
+      "SELECT * FROM 'k8s_logs' WHERE ((match_all('Connection refused to upstream')) OR " +
+        "(match_all('Request deadline exceeded after')))",
+    );
+  });
+
+  it("negates excludes as a group — the 'ignore these' case", () => {
+    const sql = buildPatternSetSqlQuery({
+      streamName: "k8s_logs",
+      excludes: [ERROR_PATTERN, TIMEOUT_PATTERN],
+    });
+    expect(sql).toBe(
+      "SELECT * FROM 'k8s_logs' WHERE NOT ((match_all('Connection refused to upstream')) OR " +
+        "(match_all('Request deadline exceeded after')))",
+    );
+  });
+
+  it("ANDs the current search filter in front — the headline use case", () => {
+    const sql = buildPatternSetSqlQuery({
+      streamName: "k8s_logs",
+      baseFilter: "code = 500",
+      excludes: [ERROR_PATTERN],
+    });
+    expect(sql).toBe(
+      "SELECT * FROM 'k8s_logs' WHERE (code = 500) AND NOT (match_all('Connection refused to upstream'))",
+    );
+  });
+
+  it("combines base filter, includes and excludes in that order", () => {
+    const sql = buildPatternSetSqlQuery({
+      streamName: "k8s_logs",
+      baseFilter: "code = 500",
+      includes: [ERROR_PATTERN],
+      excludes: [TIMEOUT_PATTERN],
+    });
+    expect(sql).toBe(
+      "SELECT * FROM 'k8s_logs' WHERE (code = 500) AND match_all('Connection refused to upstream') " +
+        "AND NOT (match_all('Request deadline exceeded after'))",
+    );
+  });
+
+  it("emits a count projection for threshold-on-number alerts", () => {
+    const sql = buildPatternSetSqlQuery({
+      streamName: "k8s_logs",
+      includes: [ERROR_PATTERN],
+      select: "count",
+    });
+    expect(sql).toBe(
+      "SELECT count(*) AS cnt FROM 'k8s_logs' WHERE match_all('Connection refused to upstream')",
+    );
+  });
+
+  it("drops patterns with no distinctive constants rather than emitting a bare clause", () => {
+    const sql = buildPatternSetSqlQuery({
+      streamName: "k8s_logs",
+      includes: ["<*> <*>"],
+    });
+    expect(sql).toBe("SELECT * FROM 'k8s_logs'");
+  });
+
+  it("selects everything when nothing at all is supplied", () => {
+    expect(buildPatternSetSqlQuery({ streamName: "k8s_logs" })).toBe("SELECT * FROM 'k8s_logs'");
+  });
+
+  it.each(["status=500 --404", "status=500 -- note", "status=500\n-- note"])(
+    "strips a comment from the base filter so it cannot swallow the pattern terms: %j",
+    (baseFilter) => {
+      expect(
+        buildPatternSetSqlQuery({ streamName: "k8s_logs", baseFilter, excludes: [ERROR_PATTERN] }),
+      ).toBe(
+        "SELECT * FROM 'k8s_logs' WHERE (status=500) AND NOT (match_all('Connection refused to upstream'))",
+      );
+    },
+  );
+
+  it("keeps -- inside a string literal of the base filter, and drops a comment-only base", () => {
+    expect(buildPatternSetSqlQuery({ streamName: "k8s_logs", baseFilter: "msg = 'a -- b'" })).toBe(
+      "SELECT * FROM 'k8s_logs' WHERE (msg = 'a -- b')",
+    );
+    expect(buildPatternSetSqlQuery({ streamName: "k8s_logs", baseFilter: "-- note" })).toBe(
+      "SELECT * FROM 'k8s_logs'",
+    );
+  });
+
+  it("ignores a whitespace-only base filter", () => {
+    expect(buildPatternSetSqlQuery({ streamName: "k8s_logs", baseFilter: "   " })).toBe(
+      "SELECT * FROM 'k8s_logs'",
+    );
+  });
+
+  it("escapes quotes in pattern text", () => {
+    const sql = buildPatternSetSqlQuery({
+      streamName: "k8s_logs",
+      includes: ["cannot open user's configuration file <*>"],
+    });
+    expect(sql).toContain("user''s");
+  });
+
+  it("agrees with buildPatternSqlQuery for the single-include case", () => {
+    expect(buildPatternSetSqlQuery({ streamName: "s", includes: [ERROR_PATTERN] })).toBe(
+      buildPatternSqlQuery(ERROR_PATTERN, "s"),
+    );
+  });
+});
+
+describe("pattern severity buckets", () => {
+  it.each([
+    ["trace", "debug"],
+    ["0", "info"],
+    [0, "info"],
+    ["3", "error"],
+    ["WARN2", "info"],
+    ["failure", "info"],
+    ["error", "error"],
+    ["notice", "warning"],
+    ["ok", "info"],
+  ])("backend level %s → %s", (level, bucket) => {
+    expect(patternSeverityKeyForPattern({ level, template: "x" })).toBe(bucket);
+  });
+
+  it.each([
+    ["GET /api ERROR <*>", "error"],
+    ["trace span <*>", "debug"],
+    ["user logged in <*>", "uncategorized"],
+  ])("template %s → %s", (template, bucket) => {
+    expect(patternSeverityKey(template)).toBe(bucket);
   });
 });

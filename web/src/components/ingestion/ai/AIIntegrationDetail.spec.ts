@@ -35,7 +35,7 @@ const CARD_STUB = {
   props: ["content", "docUrl"],
 };
 const COPY_STUB = {
-  name: "CopyContent",
+  name: "CredentialCodeBlock",
   template: '<div data-test="ai-integration-detail-copy-content"><slot /></div>',
   props: ["content"],
 };
@@ -53,7 +53,7 @@ describe("AIIntegrationDetail", () => {
       props,
       global: {
         plugins: [store],
-        stubs: { AIIntegrationCard: CARD_STUB, CopyContent: COPY_STUB },
+        stubs: { AIIntegrationCard: CARD_STUB, CredentialCodeBlock: COPY_STUB },
       },
     });
 
@@ -74,7 +74,7 @@ describe("AIIntegrationDetail", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("renders the legacy CopyContent snippet", () => {
+    it("renders the legacy CredentialCodeBlock snippet", () => {
       expect(wrapper.find('[data-test="ai-integration-detail-copy-content"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="ai-integration-card-stub"]').exists()).toBe(false);
     });

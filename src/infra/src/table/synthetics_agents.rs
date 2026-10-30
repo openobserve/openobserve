@@ -19,22 +19,18 @@
 //! `/synthetics/agent/register`; `last_seen_at` refreshed by register and by
 //! every job lease. A location whose agents are all stale is reported "down".
 
-use std::{
-    sync::LazyLock,
-    time::{Duration, Instant},
-};
+use std::time::Duration;
 
-use config::RwHashMap;
 use sea_orm::{
     ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set, sea_query::Expr,
 };
 
 use super::{
     entity::synthetics_agents::{ActiveModel, Column, Entity, Model},
-    get_lock,
+    ttl_cache::TtlCache,
 };
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
 };
 
@@ -81,8 +77,7 @@ impl From<Model> for SyntheticsAgentRecord {
 /// not invalidate — invalidating there would defeat the cache entirely, since it
 /// fires at exactly the rate of the reads being served. Anything that judges
 /// agent liveness (the staleness watcher, location health) must use [`get`].
-static AGENT_CACHE: LazyLock<RwHashMap<String, (SyntheticsAgentRecord, Instant)>> =
-    LazyLock::new(Default::default);
+static AGENT_CACHE: TtlCache<SyntheticsAgentRecord> = TtlCache::new(AGENT_CACHE_TTL);
 
 const AGENT_CACHE_TTL: Duration = Duration::from_secs(15);
 
@@ -103,8 +98,7 @@ async fn invalidate_and_publish(agent_id: &str) {
 /// Insert an agent row, or refresh version/capabilities/last_seen_at when the
 /// id already exists (idempotent re-register after restart).
 pub async fn register(record: &SyntheticsAgentRecord) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let existing = Entity::find_by_id(&record.id)
         .one(client)
         .await
@@ -143,11 +137,6 @@ pub async fn register(record: &SyntheticsAgentRecord) -> Result<(), errors::Erro
                 .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
         }
     }
-    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
-    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
-    // returns, so emitting while holding it deadlocks the process — and the
-    // mutex is then held forever, hanging every later synthetics query.
-    drop(_lock);
     // Register is where capabilities change, so the cached copy is now stale.
     invalidate_and_publish(&record.id).await;
     Ok(())
@@ -159,7 +148,7 @@ pub async fn register(record: &SyntheticsAgentRecord) -> Result<(), errors::Erro
 /// lease, which is exactly the rate of the reads the cache serves. Callers that
 /// need a current `last_seen_at` use [`get`], not [`get_cached`].
 pub async fn touch(agent_id: &str, now_us: i64) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::update_many()
         .col_expr(Column::LastSeenAt, Expr::value(now_us))
         .filter(Column::Id.eq(agent_id))
@@ -173,7 +162,7 @@ pub async fn touch(agent_id: &str, now_us: i64) -> Result<(), errors::Error> {
 pub async fn list_by_location(
     location_id: &str,
 ) -> Result<Vec<SyntheticsAgentRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let rows = Entity::find()
         .filter(Column::LocationId.eq(location_id))
         .order_by_desc(Column::LastSeenAt)
@@ -196,7 +185,7 @@ pub async fn list_by_locations(
     if location_ids.is_empty() {
         return Ok(std::collections::HashMap::new());
     }
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let rows = Entity::find()
         .filter(Column::LocationId.is_in(location_ids.to_vec()))
         .order_by_desc(Column::LastSeenAt)
@@ -225,7 +214,7 @@ pub async fn find_by_identity(
     location_id: &str,
     name: &str,
 ) -> Result<Option<SyntheticsAgentRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let row = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::LocationId.eq(location_id))
@@ -244,7 +233,7 @@ pub async fn find_by_identity(
 pub async fn count_by_token(
     org_id: &str,
 ) -> Result<std::collections::HashMap<String, i64>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let rows: Vec<Option<String>> = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .select_only()
@@ -264,24 +253,35 @@ pub async fn count_by_token(
 /// Reads an agent from cache when fresh — see [`AGENT_CACHE`] for the staleness
 /// contract. Use [`get`] when `last_seen_at` matters.
 pub async fn get_cached(agent_id: &str) -> Result<Option<SyntheticsAgentRecord>, errors::Error> {
-    if let Some(entry) = AGENT_CACHE.get(agent_id)
-        && entry.1.elapsed() < AGENT_CACHE_TTL
-    {
-        return Ok(Some(entry.0.clone()));
+    if let Some(cached) = AGENT_CACHE.get(agent_id) {
+        return Ok(Some(cached));
     }
     let found = get(agent_id).await?;
     if let Some(rec) = &found {
-        AGENT_CACHE.insert(agent_id.to_string(), (rec.clone(), Instant::now()));
+        AGENT_CACHE.insert(agent_id.to_string(), rec.clone());
     }
     Ok(found)
 }
 
 /// Reads an agent straight from the database, `last_seen_at` included.
 pub async fn get(agent_id: &str) -> Result<Option<SyntheticsAgentRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let row = Entity::find_by_id(agent_id)
         .one(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
     Ok(row.map(Into::into))
+}
+
+/// Deletes every agent of an org and drops each from the agent cache on every node.
+pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    let client = get_orm_client_rw().await;
+    let delete = Entity::delete_many().filter(Column::OrgId.eq(org_id));
+    let ids: Vec<String> = super::delete_returning(client, delete, &[Column::Id])
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    for id in &ids {
+        invalidate_and_publish(id).await;
+    }
+    Ok(())
 }

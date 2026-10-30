@@ -9,14 +9,17 @@ import { createRouter, createWebHistory } from "vue-router";
 import config from "@/aws-exports";
 
 // Mock dependencies
-vi.mock("@/services/jstransform", () => ({
-  default: {
-    create: vi.fn(() => Promise.resolve({ data: { message: "Function created successfully" } })),
-    update: vi.fn(() => Promise.resolve({ data: { message: "Function updated successfully" } })),
-  },
-}));
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create: vi.fn(() => Promise.resolve({ data: { message: "Function created successfully" } })),
+      update: vi.fn(() => Promise.resolve({ data: { message: "Function updated successfully" } })),
+    },
+  });
+});
 
-vi.mock("@/services/segment_analytics", () => ({
+vi.mock("@/services/product_analytics", () => ({
   default: {
     track: vi.fn(),
   },
@@ -126,50 +129,60 @@ describe("AddFunction.vue Branch Coverage", () => {
     });
   const getForm = (wrapper: any) => (wrapper.findComponent(OForm).vm as any).form;
 
-  // JavaScript functions are an enterprise/cloud entitlement; OSS stays VRL-only.
-  // The gate drives the VRL/JS radio options, which in turn drive the editor
-  // language + placeholder — so getting it wrong silently mislabels the editor.
+  // JavaScript functions are an enterprise/cloud entitlement; OSS shows the
+  // option locked (not hidden) instead of omitting it, so the gate now drives
+  // a `disabled` flag on the option rather than the option's presence.
   describe("JS entitlement gate (enterprise/cloud only)", () => {
     const values = (wrapper: any) =>
       ((wrapper.vm as any).transformTypeOptions as any[]).map((o) => o.value);
+    const jsOption = (wrapper: any) =>
+      ((wrapper.vm as any).transformTypeOptions as any[]).find((o) => o.value === "1");
 
     beforeEach(() => {
       (config as any).isEnterprise = "false";
       (config as any).isCloud = "false";
     });
 
-    it("OSS: offers VRL only — no JavaScript option", () => {
-      expect(values(mountAddFunction())).toEqual(["0"]);
-    });
-
-    it("enterprise: offers VRL + JavaScript", () => {
-      (config as any).isEnterprise = "true";
-      expect(values(mountAddFunction())).toEqual(["0", "1"]);
-    });
-
-    it("cloud: offers VRL + JavaScript", () => {
-      (config as any).isCloud = "true";
-      expect(values(mountAddFunction())).toEqual(["0", "1"]);
-    });
-
-    it("is no longer tied to the _meta org (any enterprise org gets JS)", () => {
-      // the old rule keyed ONLY off selectedOrganization === "_meta"; the store
-      // here is "test-org", so JS must appear purely from the entitlement.
-      (config as any).isEnterprise = "true";
-      expect(values(mountAddFunction())).toContain("1");
-    });
-
-    it("OSS _meta org still gets JS (pre-existing SSO claim-parsing behavior)", () => {
-      // _meta predates the enterprise entitlement — it must keep JS on OSS.
-      const wrapper = mountAddFunction(defaultProps, "_meta");
+    it("OSS: offers VRL + a locked JavaScript option", () => {
+      const wrapper = mountAddFunction();
       expect(values(wrapper)).toEqual(["0", "1"]);
+      expect(jsOption(wrapper).disabled).toBe(true);
     });
 
-    it("OSS non-_meta org gets no JS", () => {
-      expect(values(mountAddFunction(defaultProps, "some-org"))).toEqual(["0"]);
+    it("enterprise: offers VRL + an unlocked JavaScript option", () => {
+      (config as any).isEnterprise = "true";
+      const wrapper = mountAddFunction();
+      expect(values(wrapper)).toEqual(["0", "1"]);
+      expect(jsOption(wrapper).disabled).toBe(false);
     });
 
-    it("OSS but EDITING an existing JS function: keeps the JS option", () => {
+    it("cloud: offers VRL + an unlocked JavaScript option", () => {
+      (config as any).isCloud = "true";
+      const wrapper = mountAddFunction();
+      expect(values(wrapper)).toEqual(["0", "1"]);
+      expect(jsOption(wrapper).disabled).toBe(false);
+    });
+
+    it("is no longer tied to the _meta org (any enterprise org unlocks JS)", () => {
+      // the old rule keyed ONLY off selectedOrganization === "_meta"; the store
+      // here is "test-org", so JS must unlock purely from the entitlement.
+      (config as any).isEnterprise = "true";
+      expect(jsOption(mountAddFunction()).disabled).toBe(false);
+    });
+
+    it("OSS _meta org still gets an unlocked JS option (pre-existing SSO claim-parsing behavior)", () => {
+      // _meta predates the enterprise entitlement — it must keep JS unlocked on OSS.
+      const wrapper = mountAddFunction(defaultProps, "_meta");
+      expect(jsOption(wrapper).disabled).toBe(false);
+    });
+
+    it("OSS non-_meta org gets a locked JS option", () => {
+      const wrapper = mountAddFunction(defaultProps, "some-org");
+      expect(values(wrapper)).toEqual(["0", "1"]);
+      expect(jsOption(wrapper).disabled).toBe(true);
+    });
+
+    it("OSS but EDITING an existing JS function: keeps the JS option unlocked", () => {
       // otherwise the radio renders with nothing selected and the editor would
       // silently fall back to VRL for a JS function.
       const wrapper = mountAddFunction({
@@ -177,16 +190,17 @@ describe("AddFunction.vue Branch Coverage", () => {
         isUpdated: true,
         modelValue: { ...defaultProps.modelValue, transType: "1" },
       });
-      expect(values(wrapper)).toEqual(["0", "1"]);
+      expect(jsOption(wrapper).disabled).toBe(false);
     });
 
-    it("OSS editing a VRL function: still no JS option", () => {
+    it("OSS editing a VRL function: JS option stays locked", () => {
       const wrapper = mountAddFunction({
         ...defaultProps,
         isUpdated: true,
         modelValue: { ...defaultProps.modelValue, transType: "0" },
       });
-      expect(values(wrapper)).toEqual(["0"]);
+      expect(values(wrapper)).toEqual(["0", "1"]);
+      expect(jsOption(wrapper).disabled).toBe(true);
     });
   });
 
@@ -697,6 +711,46 @@ describe("AddFunction.vue Branch Coverage", () => {
 
     it("renders with no forced language at all (unchanged behaviour)", () => {
       expect(placeholder(mountAddFunction()).exists()).toBe(true);
+    });
+  });
+
+  // getCode() is the workflow disk-save's source of truth. formData.function only
+  // catches up 500ms (editor debounce) after the last keystroke, so reading it at
+  // click time silently saved the stale seed instead of the typed code.
+  describe("getCode reads the LIVE editor buffer", () => {
+    const EditorStub = {
+      name: "UnifiedQueryEditor",
+      template: "<div class='uqe-stub' />",
+      setup(_props: any, { expose }: any) {
+        // Trailing whitespace: the debounced path always trimmed, so getCode must too.
+        expose({ getValue: () => "  row.meta.enriched = true;\n\n" });
+      },
+    };
+
+    it("🔑 returns the buffer even before the debounced update:query lands", async () => {
+      const wrapper = mount(AddFunction, {
+        props: { ...defaultProps, forcedLanguage: "javascript", defaultCode: "// seed\n" },
+        global: {
+          plugins: [mockI18n, mockRouter],
+          provide: { store: mockStore },
+          stubs: { ...stubs, UnifiedQueryEditor: EditorStub },
+        },
+      });
+      await flushPromises();
+      expect((wrapper.vm.$ as any).exposed.getCode()).toBe("row.meta.enriched = true;");
+    });
+
+    it("falls back to formData while the editor has not mounted", async () => {
+      const wrapper = mount(AddFunction, {
+        props: { ...defaultProps, forcedLanguage: "javascript", defaultCode: "// seed\n" },
+        global: {
+          plugins: [mockI18n, mockRouter],
+          provide: { store: mockStore },
+          stubs: { ...stubs, UnifiedQueryEditor: true },
+        },
+      });
+      await flushPromises();
+      expect((wrapper.vm.$ as any).exposed.getCode()).toBe("// seed");
     });
   });
 });

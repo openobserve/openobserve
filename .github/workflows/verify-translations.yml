@@ -1,0 +1,87 @@
+# Copyright 2026 OpenObserve Inc.
+name: Verify Translations
+
+# The gate that makes "main is never missing translations" true.
+#
+# update-translations.yml *generates* translations, but it fires only when the
+# author signals the PR is done (auto_merge_enabled / ready_for_review) and it
+# cannot run for fork PRs. So there are ways for a merge to reach the queue with
+# English-only strings. This workflow catches those: it runs `main.py --check`,
+# which is a pure comparison of en-US.json against the locale files and
+# .translation_state.json — no API calls, no API key, and no dependencies to
+# install (`openai` is imported lazily inside translator.py). A run is a few
+# seconds and costs nothing, which is what makes it affordable as a required check
+# on every PR.
+#
+# Make this a required status check on `main` for it to actually gate anything.
+on:
+  # No `types` and deliberately no `paths`. A required status check whose workflow
+  # was filtered out sits at "Expected — waiting for status" forever, which would
+  # block every PR that doesn't touch en-US.json. It is cheap enough to just run.
+  pull_request:
+    # labeled/unlabeled/ready_for_review/converted_to_draft so the gate re-evaluates when the state changes.
+    types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
+
+concurrency:
+  group: verify-translations-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    # Nothing runs on a PR without the 'ready-for-ci' label, or on a draft; ci-gate alone reports the state.
+    if: ${{ github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false) }}
+    name: Verify translations are up to date
+    runs-on: ubuntu-latest
+
+    # Read-only, and no secrets are referenced anywhere in this file. That is
+    # deliberate: unlike update-translations.yml, this one runs for fork PRs, so
+    # it must hold nothing worth stealing.
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+
+      - name: Check for untranslated strings
+        run: |
+          cd scripts/translations
+
+          set +e
+          OUTPUT="$(python3 main.py --check 2>&1)"
+          STATUS=$?
+          set -e
+          echo "$OUTPUT"
+
+          if [ "$STATUS" -eq 0 ]; then
+            echo "✅ Every locale is up to date with en-US.json." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if [ "$STATUS" -ne 2 ]; then
+            echo "::error::Translation check failed to run (exit $STATUS)."
+            exit "$STATUS"
+          fi
+
+          {
+            echo "### Untranslated strings"
+            echo
+            echo '```'
+            echo "$OUTPUT"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "::notice::${OUTPUT##*$'\n'} These are generated automatically when you click 'Merge when ready'. Nothing blocks on this check."
+          {
+            echo
+            echo "ℹ️ Expected while the PR is in progress — translations are generated when you"
+            echo "click **Merge when ready**. This check only blocks in the merge queue."
+          } >> "$GITHUB_STEP_SUMMARY"

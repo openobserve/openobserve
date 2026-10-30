@@ -4,7 +4,7 @@
     :open="open"
     side="right"
     :width="70"
-    :title="row?.name"
+    :title="raw(row?.name)"
     :title-data-test="'scorer-detail-name-badge'"
     :sub-title="t('onlineEvals.scorer.detail.eyebrow')"
     data-test="scorer-detail"
@@ -22,6 +22,7 @@
           ref="dateTimePickerRef"
           v-model="selectedDate"
           :auto-apply-dashboard="true"
+          calendar-presets
           class="flex-none"
           data-test="scorer-detail-runs-window"
         />
@@ -95,8 +96,8 @@
 
       <!-- ── Body ── -->
       <div
-        class="flex min-h-0 flex-1 flex-col gap-4.5 overflow-auto pt-4.5"
-        :class="{ 'pb-4.5': activeTab !== 'runs' }"
+        class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto"
+        :class="{ 'pb-4.5': activeTab !== 'runs', 'pt-2': activeTab !== 'versions' }"
       >
         <!-- Runs filter row — agent filter, right-aligned. The date picker +
              refresh live in the global toolbar above the cards, so they're not
@@ -121,11 +122,13 @@
                names this block, so an in-panel "Configuration" title (and its
                separator) would just duplicate it. -->
           <section class="flex flex-col gap-2 px-5">
-            <dl class="sd-kv">
+            <dl class="sd-kv [&_dd]:text-text-heading [&_dt]:text-text-secondary">
               <dt>{{ t("onlineEvals.scorer.detail.scorerTypeLabel") }}</dt>
               <dd class="flex flex-wrap items-center gap-1.5">
                 <OTag type="scorerType" :value="scorerType" />
-                <OTag type="fieldTag" value="soft">v{{ row.version }}</OTag>
+                <OTag type="fieldTag" value="soft"
+                  >{{ t("onlineEvals.versionPrefix") }}{{ row.version }}</OTag
+                >
               </dd>
 
               <template v-if="scorerType === 'llm_judge'">
@@ -152,7 +155,7 @@
 
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-normal font-semibold"
+              class="text-compact text-text-heading border-b-text-secondary/12 m-0 inline-flex items-center gap-1.5 border-b pb-1.5 leading-normal font-semibold"
             >
               {{ t("onlineEvals.scorer.detail.producesSection") }}
             </h4>
@@ -164,7 +167,7 @@
               <OIcon name="rule" size="xs" />
               <span class="sd-produces__name">{{ producesConfig.name }}</span>
               <span class="sd-produces__version text-text-secondary"
-                >v{{ producesConfig.version }}</span
+                >{{ t("onlineEvals.versionPrefix") }}{{ producesConfig.version }}</span
               >
               <span class="sd-produces__sep text-text-secondary">·</span>
               <span class="sd-produces__type text-text-secondary">{{
@@ -181,7 +184,7 @@
 
           <section v-if="row.template" class="flex flex-col gap-2 px-5">
             <h4
-              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-normal font-semibold"
+              class="text-compact text-text-heading border-b-text-secondary/12 m-0 inline-flex items-center gap-1.5 border-b pb-1.5 leading-normal font-semibold"
             >
               {{
                 scorerType === "llm_judge"
@@ -200,7 +203,7 @@
 
           <section v-if="outputSchemaPretty" class="flex flex-col gap-2 px-5">
             <h4
-              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-normal font-semibold"
+              class="text-compact text-text-heading border-b-text-secondary/12 m-0 inline-flex items-center gap-1.5 border-b pb-1.5 leading-normal font-semibold"
             >
               {{ t("onlineEvals.scorer.detail.outputSchemaSection") }}
             </h4>
@@ -209,11 +212,11 @@
 
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-normal font-semibold"
+              class="text-compact text-text-heading border-b-text-secondary/12 m-0 inline-flex items-center gap-1.5 border-b pb-1.5 leading-normal font-semibold"
             >
               {{ t("onlineEvals.scorer.detail.metadataSection") }}
             </h4>
-            <dl class="sd-kv">
+            <dl class="sd-kv [&_dd]:text-text-heading [&_dt]:text-text-secondary">
               <dt v-if="createdAt">
                 {{ t("onlineEvals.scorer.detail.createdLabel") }}
               </dt>
@@ -233,21 +236,11 @@
         <!-- Versions -->
         <template v-else-if="activeTab === 'versions'">
           <div class="sd__tab-pad">
-            <p class="sd__tab-intro">
-              {{ t("onlineEvals.scorer.detail.versionsIntro") }}
-            </p>
-            <ul class="sd-versions">
-              <li class="sd-versions__item sd-versions__item--active">
-                <div class="sd-versions__head">
-                  <span class="sd-versions__label text-text-heading">v{{ row.version }}</span>
-                  <OTag type="activeVersionFlag" value="active" />
-                </div>
-                <div v-if="updatedAt" class="sd-versions__meta text-text-secondary">
-                  {{ t("onlineEvals.scorer.detail.lastUpdated") }}
-                  <span>{{ formatTimestamp(updatedAt) }}</span>
-                </div>
-              </li>
-            </ul>
+            <ScorerVersionsTab
+              :versions="versions"
+              :loading="versionsLoading"
+              :active-version="row.version"
+            />
           </div>
         </template>
 
@@ -267,7 +260,6 @@
             :page-size="20"
             :page-size-options="[20, 50, 100, 250, 500]"
             :empty-message="t('onlineEvals.scorer.detail.runs.empty')"
-            :footer-title="t('onlineEvals.scorer.detail.tabs.runs')"
             show-index
             width="100%"
             class="w-full"
@@ -279,15 +271,11 @@
               <span>{{ jobNameFor(row.jobId) }}</span>
             </template>
             <template #cell-targetSpanId="{ row }">
-              <span v-if="row.targetSpanId" class="block truncate" :title="row.targetSpanId">{{
-                row.targetSpanId
-              }}</span>
+              <span v-if="row.targetSpanId">{{ row.targetSpanId }}</span>
               <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-targetTraceId="{ row }">
-              <span v-if="row.targetTraceId" class="block truncate" :title="row.targetTraceId">{{
-                row.targetTraceId
-              }}</span>
+              <span v-if="row.targetTraceId">{{ row.targetTraceId }}</span>
               <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-scoreDisplay="{ row }">
@@ -305,11 +293,11 @@
         <!-- Used by -->
         <template v-else-if="activeTab === 'usedBy'">
           <div class="sd__tab-pad">
-            <p class="sd__tab-intro">
+            <p class="sd__tab-intro text-text-secondary">
               {{ t("onlineEvals.scorer.detail.usedByIntro") }}
             </p>
             <OEmptyState
-              v-if="usedByJobs.length === 0"
+              v-if="usedByCount === 0 && !experimentsLoading"
               size="inline"
               :title="t('onlineEvals.scorer.detail.usedByEmpty')"
               data-test="scorer-detail-used-by-empty"
@@ -318,7 +306,7 @@
               <li v-for="job in usedByJobs" :key="job.id">
                 <OButton
                   variant="ghost"
-                  class="sd-used-list__item"
+                  class="sd-used-list__item group"
                   :data-test="`scorer-detail-used-by-item-${job.name}`"
                   @click="emit('view-job', job)"
                 >
@@ -328,7 +316,26 @@
                   <OIcon
                     name="chevron-right"
                     size="xs"
-                    class="sd-used-list__chevron text-text-secondary"
+                    class="sd-used-list__chevron text-text-secondary group-hover:text-accent group-hover:opacity-100"
+                  />
+                </OButton>
+              </li>
+              <li v-for="experiment in usedByExperiments" :key="experiment.id">
+                <OButton
+                  variant="ghost"
+                  class="sd-used-list__item group"
+                  :data-test="`scorer-detail-used-by-experiment-${experiment.name}`"
+                  @click="router.push(aiExperimentDetailRoute(orgId, experiment.id))"
+                >
+                  <OIcon name="science" size="xs" />
+                  <span>{{ experiment.name }}</span>
+                  <span class="sd-used-list__meta text-text-secondary">{{
+                    t("onlineEvals.scorer.detail.usedByExperiment")
+                  }}</span>
+                  <OIcon
+                    name="chevron-right"
+                    size="xs"
+                    class="sd-used-list__chevron text-text-secondary group-hover:text-accent group-hover:opacity-100"
                   />
                 </OButton>
               </li>
@@ -342,8 +349,9 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -355,8 +363,18 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import KpiCardsSkeleton from "./KpiCardsSkeleton.vue";
-import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
-import type { EvalJob, Provider, Scorer, ScoreConfig } from "@/services/online-evals.service";
+import ScorerVersionsTab from "./ScorerVersionsTab.vue";
+import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { experimentsListQuery } from "@/services/llm-experiments.queries";
+import type { LlmExperiment } from "@/services/llm-experiments.service";
+import { aiExperimentDetailRoute } from "@/enterprise/views/AIObservability/experimentRoutes";
+import onlineEvalsService, {
+  type EvalJob,
+  type Provider,
+  type Scorer,
+  type ScoreConfig,
+} from "@/services/online-evals.service";
 import { dataTypeOf, entityId } from "../utils/evalEntity";
 import { useScorerRuns, type RunRow, type ScorerRunsWindow } from "../composables/useScorerRuns";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -379,8 +397,9 @@ const emit = defineEmits<{
   (e: "view-job", row: EvalJob): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
+const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "default");
 
 type TabId = "configuration" | "versions" | "runs" | "usedBy";
@@ -450,6 +469,52 @@ const usedByJobs = computed<EvalJob[]>(() => {
   });
 });
 
+const versions = ref<Scorer[]>([]);
+const versionsLoading = ref(false);
+
+async function loadVersions() {
+  versionsLoading.value = true;
+  try {
+    const list = await onlineEvalsService.scorers.versions(orgId.value, entityId(props.row));
+    versions.value = [...list].sort((left, right) => right.version - left.version);
+  } catch {
+    // Without history the list still shows the version the drawer was opened with.
+    versions.value = [props.row];
+  } finally {
+    versionsLoading.value = false;
+  }
+}
+watch(
+  () => [orgId.value, entityId(props.row), props.row.version],
+  () => void loadVersions(),
+  { immediate: true },
+);
+
+const experiments = ref<LlmExperiment[]>([]);
+const experimentsLoading = ref(false);
+
+// Best-effort: the jobs list still renders when the experiments request fails.
+async function loadExperiments() {
+  experimentsLoading.value = true;
+  try {
+    experiments.value = await queryClient.fetchQuery(experimentsListQuery(orgId.value));
+  } catch {
+    experiments.value = [];
+  } finally {
+    experimentsLoading.value = false;
+  }
+}
+watch(orgId, () => void loadExperiments(), { immediate: true });
+
+const usedByExperiments = computed<LlmExperiment[]>(() => {
+  const myId = entityId(props.row);
+  return experiments.value.filter((experiment) =>
+    (experiment.scorers ?? []).some((ref) => ref.id === myId),
+  );
+});
+
+const usedByCount = computed(() => usedByJobs.value.length + usedByExperiments.value.length);
+
 const createdAt = computed<number | null>(() => {
   const v = valueOf<number>(props.row, "createdAt", "created_at");
   return typeof v === "number" ? v : null;
@@ -470,7 +535,7 @@ const tabs = computed(() => [
   {
     id: "versions" as TabId,
     label: t("onlineEvals.scorer.detail.tabs.versions"),
-    count: 1,
+    count: versionsLoading.value ? null : versions.value.length,
   },
   {
     id: "runs" as TabId,
@@ -480,7 +545,7 @@ const tabs = computed(() => [
   {
     id: "usedBy" as TabId,
     label: t("onlineEvals.scorer.detail.tabs.usedBy"),
-    count: usedByJobs.value.length,
+    count: experimentsLoading.value ? null : usedByCount.value,
   },
 ]);
 
@@ -503,9 +568,9 @@ const agents = ref<AgentFilterSelection[]>([]);
 const agentKey = ref(ALL_AGENTS_VALUE);
 
 const agentOptions = computed(() => [
-  { label: "All Agents", value: ALL_AGENTS_VALUE },
+  { label: t("onlineEvals.quality.allAgents"), value: ALL_AGENTS_VALUE },
   ...agents.value.map((agent) => ({
-    label: agentFilterLabel(agent),
+    label: raw(agentFilterLabel(agent)),
     value: agentFilterKey(agent),
   })),
 ]);
@@ -515,10 +580,19 @@ const selectedAgent = computed<AgentFilterSelection | null>(() => {
   return agents.value.find((agent) => agentFilterKey(agent) === agentKey.value) ?? null;
 });
 
-async function loadAgents() {
+async function loadAgents(force = false) {
   const { startUs, endUs } = dateWindow.value;
   try {
-    const response = await genAiAgentMappingService.listAgents(orgId.value, startUs, endUs);
+    const options = genAiAgentsQuery(orgId.value, startUs, endUs);
+    // Agents appear as they emit spans and no write expires the list, so a user refresh forces.
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const response = await queryClient.fetchQuery(options);
     agents.value = response.agents;
     if (
       agentKey.value !== ALL_AGENTS_VALUE &&
@@ -572,6 +646,8 @@ const {
 
 async function refreshRuns() {
   syncDateWindow();
+  // The window watcher's own read is not forced, and does not run at all when the window is unchanged.
+  void loadAgents(true);
   await refreshRunsData();
 }
 
@@ -642,7 +718,7 @@ const runColumns = computed<OTableColumnDef<RunRow>[]>(() => [
 // — KPI strip cards —
 // value/unit split mirrors the SessionDetails KPI cards (big value + small
 // trailing unit) so the AI module's detail pages read identically.
-const kpiCards = computed<{ label: string; value: string; unit: string }[]>(() => {
+const kpiCards = computed<{ label: I18nText; value: string; unit: string }[]>(() => {
   const k = kpis.value;
   return [
     {
@@ -661,7 +737,7 @@ const kpiCards = computed<{ label: string; value: string; unit: string }[]>(() =
     },
     {
       label: t("onlineEvals.scorer.detail.kpis.usedBy"),
-      value: String(usedByJobs.value.length),
+      value: experimentsLoading.value ? "—" : String(usedByCount.value),
       unit: "",
     },
   ];
@@ -708,35 +784,34 @@ function relativeTime(timestampMs: number): string {
   const diff = Date.now() - timestampMs;
   if (diff < 0 || !Number.isFinite(diff)) return "—";
   const sec = Math.floor(diff / 1000);
-  if (sec < 60) return `${sec}s ago`;
+  if (sec < 60) return t("refreshButton.secondsAgo", { sec });
   const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
+  if (min < 60) return t("refreshButton.minutesAgo", { min });
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
+  if (hr < 24) return t("refreshButton.hoursAgo", { h: hr });
   const day = Math.floor(hr / 24);
-  return `${day}d ago`;
+  return t("onlineEvals.quality.overview.relativeTime.daysAgo", { day });
 }
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 /* keep(complex-state): The <dl>/<dt>/<dd> element-selector grid, the used-by list's hover/:deep(button)
    overrides, and the status-cell dot variants — descendant and pseudo-class
    selectors with no element of their own to carry a utility. */
-// Page layout, spacing, colors, and text styling are Tailwind utilities in the
-// template (matching SessionDetails.vue). Only cohesive blocks that rely on
-// descendant/element selectors or hover state remain here. Font-family is never
-// set per component — it inherits the global --font-sans.
+/* Page layout, spacing, colors, and text styling are Tailwind utilities in the
+   template (matching SessionDetails.vue). Only cohesive blocks that rely on
+   descendant/element selectors or hover state remain here. Font-family is never
+   set per component — it inherits the global --font-sans. */
 
 .sd__tab-intro {
   margin: 0;
   font-size: var(--text-xs);
   line-height: 1.5;
-  color: var(--color-text-secondary, var(--color-text-secondary));
 }
 
-// Versions / Used By tab content sits directly in the body (not in a
-// .sd-section), so it needs its own horizontal inset. The Runs tab keeps its
-// full-bleed table and is not wrapped here.
+/* Versions / Used By tab content sits directly in the body (not in a
+   .sd-section), so it needs its own horizontal inset. The Runs tab keeps its
+   full-bleed table and is not wrapped here. */
 .sd__tab-pad {
   display: flex;
   flex-direction: column;
@@ -755,13 +830,11 @@ function relativeTime(timestampMs: number): string {
 .sd-kv dt {
   font-size: var(--text-xs);
   font-weight: 600;
-  color: var(--color-text-secondary, var(--color-text-secondary));
 }
 
 .sd-kv dd {
   margin: 0;
   font-size: var(--text-compact);
-  color: var(--color-text-heading, currentColor);
 }
 
 .sd-produces {
@@ -769,8 +842,8 @@ function relativeTime(timestampMs: number): string {
   align-items: center;
   gap: 0.375rem;
   padding: 0.625rem 0.75rem;
-  background: color-mix(in srgb, var(--color-primary-600) 8%, transparent);
-  border: 0.0625rem solid color-mix(in srgb, var(--color-primary-600) 30%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  border: 0.0625rem solid color-mix(in srgb, var(--color-accent) 30%, transparent);
   border-radius: 0.3125rem;
   font-size: var(--text-xs);
 }
@@ -804,44 +877,6 @@ function relativeTime(timestampMs: number): string {
   white-space: pre;
 }
 
-/* — Versions tab — */
-.sd-versions {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.sd-versions__item {
-  padding: 0.75rem 0.875rem;
-  background: var(--color-card-bg);
-  border: 0.0625rem solid color-mix(in srgb, var(--color-text-secondary) 16%, transparent);
-  border-radius: 0.375rem;
-}
-
-.sd-versions__item--active {
-  border-color: color-mix(in srgb, var(--color-primary-600) 30%, transparent);
-  background: color-mix(in srgb, var(--color-primary-600) 5%, var(--color-card-bg));
-}
-
-.sd-versions__head {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.sd-versions__label {
-  font-weight: 700;
-  font-size: var(--text-compact);
-}
-
-.sd-versions__meta {
-  margin-top: 0.375rem;
-  font-size: var(--text-2xs);
-}
-
 /* — Used by tab — */
 .sd-used-list {
   list-style: none;
@@ -863,8 +898,8 @@ function relativeTime(timestampMs: number): string {
 }
 
 .sd-used-list__item:hover {
-  border-color: color-mix(in srgb, var(--color-primary-600) 35%, transparent) !important;
-  background: color-mix(in srgb, var(--color-primary-600) 5%, transparent) !important;
+  border-color: color-mix(in srgb, var(--color-accent) 35%, transparent) !important;
+  background: color-mix(in srgb, var(--color-accent) 5%, transparent) !important;
 }
 
 .sd-used-list__item:deep(button) {
@@ -885,10 +920,5 @@ function relativeTime(timestampMs: number): string {
 
 .sd-used-list__chevron {
   opacity: 0.5;
-}
-
-.sd-used-list__item:hover .sd-used-list__chevron {
-  color: var(--color-primary-600);
-  opacity: 1;
 }
 </style>

@@ -39,13 +39,13 @@ export default function useRoutePrefetch() {
     "/metrics": () => import("@/plugins/metrics/explorer/MetricsExplorer.vue"),
     "/traces": () => import("@/plugins/traces/Index.vue"),
     "/rum": () => import("@/views/RUM/RealUserMonitoring.vue"),
+    "/product-analytics": () => import("@/views/RUM/AppAnalytics.vue"),
     "/dashboards": () => import("@/views/Dashboards/Dashboards.vue"),
     "/streams": () => import("@/views/StreamExplorer.vue"),
     "/alerts": () => import("@/views/AppAlerts.vue"),
     "/ingestion": () => import("@/views/Ingestion.vue"),
     "/iam": () => import("@/views/IdentityAccessManagement.vue"),
     "/reports": () => import("@/components/reports/ReportList.vue"),
-    "/actions": () => import("@/components/actionScripts/ActionScripts.vue"),
     "/settings": () => import("@/components/settings/index.vue"),
   };
 

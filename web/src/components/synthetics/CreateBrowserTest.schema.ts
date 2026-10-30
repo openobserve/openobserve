@@ -12,18 +12,12 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
-// Validation schema for CreateBrowserTest.vue (create/edit browser check).
-// Built via a factory so error messages stay i18n-driven (pass useI18n's `t`).
-//
-// Field ownership:
-//   • name   — required.
-//   • url    — required + valid HTTP(S) URL.
 
 import { z } from "zod";
 import { stepIsMissingTarget } from "@/utils/synthetics/stepTarget";
 import { isStorableAction } from "@/utils/synthetics/buildV2Steps";
-import { assertionNeedsExpected } from "@/constants/synthetics";
+import { assertionNeedsExpected, START_LOAD_STEP_ID } from "@/constants/synthetics";
+import { isHttpUrlTemplate } from "@/components/synthetics/variables/placeholders";
 import type { AssertionKind } from "@/types/synthetics";
 
 /**
@@ -49,23 +43,28 @@ const locatorSchema = z.object({
   author_ordered: z.boolean().optional(),
 });
 
+const isPlainHttpUrl = (value: string): boolean => {
+  try {
+    const u = new URL(value);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
+/** The Navigate-step rule: a plain http(s) URL, or a template the server's `check_http_url` accepts. */
+const httpUrlOrTemplate = (t: Translate) =>
+  z
+    .string()
+    .min(1, t("synthetics.validation.urlRequired"))
+    .refine((v) => isPlainHttpUrl(v) || (v.includes("{{") && isHttpUrlTemplate(v)), {
+      message: t("synthetics.validation.urlInvalid"),
+    });
+
 export const makeBrowserCheckGateSchema = (t: Translate) =>
   z.object({
     name: z.string().min(1, t("synthetics.validation.nameRequired")).trim(),
-    url: z
-      .string()
-      .min(1, t("synthetics.validation.urlRequired"))
-      .refine(
-        (v) => {
-          try {
-            const u = new URL(v);
-            return u.protocol === "http:" || u.protocol === "https:";
-          } catch {
-            return false;
-          }
-        },
-        { message: t("synthetics.validation.urlInvalid") },
-      ),
+    url: httpUrlOrTemplate(t),
   });
 
 export type BrowserCheckGateForm = z.infer<ReturnType<typeof makeBrowserCheckGateSchema>>;
@@ -79,20 +78,7 @@ export const makeBrowserCheckSaveSchema = (t: Translate) =>
   z
     .object({
       name: z.string().min(1, t("synthetics.validation.nameRequired")).trim(),
-      url: z
-        .string()
-        .min(1, t("synthetics.validation.urlRequired"))
-        .refine(
-          (v) => {
-            try {
-              const u = new URL(v);
-              return u.protocol === "http:" || u.protocol === "https:";
-            } catch {
-              return false;
-            }
-          },
-          { message: t("synthetics.validation.urlInvalid") },
-        ),
+      url: httpUrlOrTemplate(t),
       locations: z.array(z.string()).min(1, t("synthetics.validation.locationsRequired")),
       journey: z
         .array(
@@ -105,6 +91,9 @@ export const makeBrowserCheckSaveSchema = (t: Translate) =>
             name: z.string().trim().min(1, t("synthetics.validation.stepNameRequired")),
             value: z.string().optional(),
             timeout: z.number().optional(),
+            subtest: z.object({ id: z.string(), name: z.string().optional() }).optional(),
+            optional: z.boolean().optional(),
+            alwaysRun: z.boolean().optional(),
             // A step names its element here, and nowhere else. Declared
             // explicitly because z.object strips what it does not declare —
             // leaving it out made every step look target-less to the
@@ -122,16 +111,6 @@ export const makeBrowserCheckSaveSchema = (t: Translate) =>
         .default([]),
     })
     .superRefine((val, ctx) => {
-      // First step must be "navigate"
-      const first = val.journey[0];
-      if (first && first.action !== "navigate") {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["journey", 0, "action"],
-          message: t("synthetics.validation.firstStepMustNavigate"),
-        });
-      }
-
       // The two rules that decide whether a journey can be stored at all.
       // They used to be answered by isV2Journey, whose only consequence was a
       // quiet fall back to the version-1 payload shape — which discarded every
@@ -139,6 +118,39 @@ export const makeBrowserCheckSaveSchema = (t: Translate) =>
       // answer has to reach the author, on the step it is about.
       for (let i = 0; i < val.journey.length; i++) {
         const step = val.journey[i];
+
+        if (step.id === START_LOAD_STEP_ID) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["journey", i, "id"],
+            message: t("synthetics.validation.stepIdReserved"),
+          });
+        }
+
+        if (step.action === "subtest") {
+          if (!step.subtest?.id) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["journey", i, "subtest"],
+              message: t("synthetics.validation.subtestRequired"),
+            });
+          }
+          if (step.optional) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["journey", i, "optional"],
+              message: t("synthetics.validation.subtestFlags"),
+            });
+          }
+          if (step.alwaysRun) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["journey", i, "alwaysRun"],
+              message: t("synthetics.validation.subtestFlags"),
+            });
+          }
+          continue;
+        }
 
         if (!isStorableAction(step.action)) {
           ctx.addIssue({
@@ -170,11 +182,15 @@ export const makeBrowserCheckSaveSchema = (t: Translate) =>
       for (let i = 0; i < val.journey.length; i++) {
         const step = val.journey[i];
 
-        if (step.action === "navigate" && !/^https?:\/\/\S+$/i.test(step.value ?? "")) {
+        if (
+          step.action === "navigate" &&
+          !/^https?:\/\/\S+$/i.test(step.value ?? "") &&
+          !((step.value ?? "").includes("{{") && isHttpUrlTemplate(step.value ?? ""))
+        ) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["journey", i, "value"],
-            message: t("synthetics.validation.urlInvalid"),
+            message: t("synthetics.validation.navigateUrlInvalid"),
           });
         }
 

@@ -30,16 +30,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 
 interface OrgOption {
-  label: string;
+  label: I18nText;
   identifier: string;
   [key: string]: any;
 }
@@ -55,7 +56,7 @@ const emit = defineEmits<{
   (e: "select", org: OrgOption): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const open = ref(false);
 const searchQuery = ref("");
@@ -115,7 +116,7 @@ const copiedId = ref<string | null>(null);
 let copyTimer: ReturnType<typeof setTimeout> | null = null;
 
 const copyId = async (org: OrgOption) => {
-  const ok = await copyToClipboard(org.identifier, { silent: true });
+  const ok = await copyToClipboard(org.identifier, t, { silent: true });
   if (!ok) return;
   copiedId.value = org.identifier;
   if (copyTimer) clearTimeout(copyTimer);
@@ -206,13 +207,13 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
           variant="outline-primary"
           size="xs"
           data-test="navbar-organizations-select-trigger"
-          class="text-text-body! w-56"
-          :class="open ? 'ring-accent/25 ring-2 ring-inset' : ''"
+          class="text-text-body! w-56 max-md:w-28"
+          :class="open ? 'ring-focus-ring-accent ring-2 ring-inset' : ''"
         >
           <template #icon-left>
             <OIcon name="domain" size="sm" class="shrink-0 opacity-60" />
           </template>
-          <span class="min-w-0 flex-1 truncate text-left">{{ current?.label || "" }}</span>
+          <OTruncatedText class="flex-1 text-left">{{ current?.label || "" }}</OTruncatedText>
           <template #icon-right>
             <OIcon
               name="arrow-drop-down"
@@ -235,7 +236,9 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
             class="text-2xs bg-select-item-hover-bg text-text-secondary shrink-0 rounded-full px-2 py-1 leading-none font-semibold"
           >
             {{
-              searchQuery ? `${filtered.length} of ${organizations.length}` : organizations.length
+              searchQuery
+                ? t("common.countOfTotal", { count: filtered.length, total: organizations.length })
+                : organizations.length
             }}
           </span>
         </div>
@@ -247,7 +250,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
             v-model="searchQuery"
             clearable
             :debounce="1"
-            placeholder="Search by name or ID"
+            :placeholder="t('organization.searchByNameOrId')"
             @keydown="onSearchKeydown"
           />
         </div>
@@ -282,17 +285,15 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
                    if it alone exceeds the whole row); the id yields, truncating
                    to whatever space is left. -->
               <div class="flex min-w-0 flex-1 items-baseline gap-2">
-                <span
-                  class="text-compact max-w-full min-w-0 flex-none truncate leading-tight font-medium"
-                >
+                <OTruncatedText class="text-compact max-w-full flex-none leading-tight font-medium">
                   {{ row.org.label }}
-                </span>
-                <span
+                </OTruncatedText>
+                <OTruncatedText
                   v-if="row.org.identifier && row.org.identifier !== row.org.label"
-                  class="text-2xs text-text-secondary min-w-0 shrink truncate font-mono leading-tight"
+                  class="text-2xs text-text-secondary shrink font-mono leading-tight"
                 >
                   {{ row.org.identifier }}
-                </span>
+                </OTruncatedText>
               </div>
 
               <!-- Copy identifier without selecting the row. Feedback is the
@@ -301,7 +302,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
               <button
                 type="button"
                 data-test="organization-menu-item-copy-id"
-                :aria-label="`Copy organization ID ${row.org.identifier}`"
+                :aria-label="t('common.copyOrganizationId', { id: row.org.identifier })"
                 class="rounded-default hover:bg-select-item-selected-bg hover:text-select-item-selected-text inline-flex size-6 shrink-0 items-center justify-center transition"
                 :class="
                   copiedId === row.org.identifier
@@ -327,7 +328,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
           data-test="organization-menu-no-data"
           class="text-compact text-text-secondary w-full py-7 text-center"
         >
-          No organizations found
+          {{ t("organization.noOrganizationsFound") }}
         </div>
       </div>
     </ODropdown>

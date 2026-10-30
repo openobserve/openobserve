@@ -160,8 +160,8 @@ LeafletCoordSys.create = function (ecModel, api) {
       if (lmapRoot) {
         // Reset viewport left and top, which will be changed
         // in moving handler in Leaflet View
-        viewportRoot.style.left = "0px";
-        viewportRoot.style.top = "0px";
+        viewportRoot.style.left = "0";
+        viewportRoot.style.top = "0";
 
         root.removeChild(lmapRoot);
       }

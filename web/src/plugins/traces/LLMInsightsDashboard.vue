@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          solidAgentTrigger keeps the "All Agents" empty state in solid text. -->
     <AiScopeBar
       v-if="availableStreams.length > 0"
-      v-model:filter-mode="filterMode"
+      :filter-mode="filterMode"
       v-model:active-stream="activeStream"
       v-model:selected-env="selectedEnv"
       v-model:selected-agent-name="selectedAgentName"
@@ -40,6 +40,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="llm-insights"
       all-agents
       agent-skeleton
+      :show-agent-toggle="genAiAgentMappingAccess.allowed"
+      :agent-toggle-locked-message="
+        !genAiAgentMappingAccess.allowed ? genAiAgentMappingAccess.message : undefined
+      "
       :show-version="!compareMode"
       :labels="{
         agent: t('traces.lLMInsightsDashboard.agent'),
@@ -63,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              affordance when it can't apply is cleaner (ui-architect empty-affordance
              rule). The tooltip explains the concept when the entry IS available. -->
         <OTooltip
-          v-if="canCompare && !compareMode"
+          v-if="genAiAgentMappingAccess.allowed && canCompare && !compareMode"
           :content="t('traces.lLMInsightsDashboard.compareEntryHint')"
         >
           <OButton
@@ -76,6 +80,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("traces.lLMInsightsDashboard.compareEntry") }}
           </OButton>
         </OTooltip>
+        <!-- OSS can't reach Agent mode at all, so `canCompare` (which needs
+             real agent-version data) is never meaningful here — show the
+             entry locked instead of hiding it, same treatment as the Agent
+             toggle above. -->
+        <template v-else-if="!genAiAgentMappingAccess.allowed && !compareMode">
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-left="compare-arrows"
+            data-test="llm-insights-compare-locked"
+            @click="openUpgradeDialog"
+          >
+            <template #icon-right
+              ><OIcon name="lock" size="sm" class="text-warning-600"
+            /></template>
+            {{ t("traces.lLMInsightsDashboard.compareEntry") }}
+          </OButton>
+        </template>
         <!-- Exit compare lives in the SAME spot as the enter affordance, so the
              two toggle in place — the user leaves compare where they entered it. -->
         <OButton
@@ -92,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </AiScopeBar>
 
     <VersionCompareView
-      v-if="compareMode"
+      v-if="genAiAgentMappingAccess.allowed && compareMode"
       :version-list="compareVersionList"
       :stream="effectiveStream"
       :windows="versionCompare.windows.value"
@@ -134,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="error"
         data-test="llm-insights-empty-error"
         :title="t('traces.lLMInsightsDashboard.failedToLoad')"
-        :description="error || ''"
+        :description="raw(error || '')"
         :action-label="t('traces.lLMInsightsDashboard.retry')"
         action-icon="refresh"
         @action="loadInsights()"
@@ -185,35 +207,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="card in kpiCards"
             :key="card.label"
-            class="bg-card-glass-bg rounded-default border-border-default flex min-h-32.5 flex-col gap-1 border px-3.5 py-2.5"
+            class="bg-card-glass-bg rounded-default border-border-default flex flex-col gap-1 border px-3.5 py-2.5 max-lg:shrink-0 max-lg:basis-auto max-lg:px-1.5 max-lg:py-1"
+            :title="lgUp ? undefined : card.label"
           >
             <!-- P95 rides its own (slower) query — skeleton the WHOLE card while
                it loads, matching the initial strip skeleton tile (see
                LLMInsightsSkeleton). Its sparkline comes from the histogram, but
                showing a chart before the number reads as ready, so we hold both. -->
             <template v-if="card.loading">
-              <div class="flex flex-col gap-1">
+              <div class="mb-1 flex items-center justify-between gap-2">
                 <OSkeleton type="text" class="h-3 w-[60%]" />
-                <OSkeleton type="text" class="h-5.5 w-[55%]" />
+                <OSkeleton type="text" class="h-6 w-6 shrink-0" />
               </div>
-              <div class="mt-auto flex h-8 items-end gap-[0.15rem]">
-                <OSkeleton
-                  type="text"
-                  v-for="bar in 16"
-                  :key="bar"
-                  :style="{ height: `${30 + ((bar * 23) % 65)}%` }"
-                  class="w-full"
-                />
-              </div>
+              <OSkeleton type="text" class="h-6 w-[55%]" />
             </template>
             <template v-else>
-              <div class="flex flex-col gap-1">
-                <div class="mb-1 flex items-center justify-between gap-2">
-                  <div
-                    class="text-2xs text-text-secondary min-w-0 truncate leading-normal font-semibold"
+              <div
+                class="flex flex-col gap-1 max-lg:flex-row-reverse max-lg:items-center max-lg:gap-1.5"
+              >
+                <div class="mb-1 flex items-center justify-between gap-2 max-lg:mb-0">
+                  <OTruncatedText
+                    as="div"
+                    class="text-2xs text-text-secondary leading-normal font-semibold max-lg:hidden"
                   >
                     {{ card.label }}
-                  </div>
+                  </OTruncatedText>
                   <span
                     class="rounded-default bg-surface-subtle text-text-secondary inline-flex h-6 w-6 shrink-0 items-center justify-center"
                   >
@@ -221,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </div>
                 <div class="flex items-baseline gap-[0.2rem]">
-                  <span class="text-text-secondary text-2xl leading-none font-bold">
+                  <span class="text-text-secondary text-2xl leading-none font-bold max-lg:text-lg">
                     {{ card.value }}
                   </span>
                   <span v-if="card.unit" class="text-compact text-text-secondary font-semibold">
@@ -234,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data="card.sparkData"
                 :color="card.sparkColor"
                 :height="32"
-                class="mt-auto"
+                class="mt-auto max-lg:hidden"
               />
             </template>
           </div>
@@ -292,7 +310,8 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import type { AcceptableValue } from "reka-ui";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { useLLMInsights } from "./composables/useLLMInsights";
 import { splitNumberWithUnit, splitDuration, splitCost } from "./llmInsightsDashboard.utils";
 import KpiSparkline from "./KpiSparkline.vue";
@@ -310,15 +329,22 @@ import useStreams from "@/composables/useStreams";
 import genAiAgentMappingService, {
   type GenAiAgentListItem,
 } from "@/services/gen-ai-agent-mapping.service";
+import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { buildAgentTraceFilter } from "./llmAgentFilter";
 import { useAgentScope } from "@/enterprise/composables/useAgentScope";
 import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import VersionCompareView from "@/enterprise/components/AIObservability/VersionCompareView.vue";
 import { useVersionCompare } from "./composables/useVersionCompare";
+import analytics from "@/services/product_analytics";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { buildFeatureGateContext, checkFeatureAccess } from "@/utils/enterpriseFeatures";
 
-const { getStreams } = useStreams();
-const { t } = useI18n();
+const { t } = useI18nTyped();
+const { lgUp } = useBreakpoint();
+const { getStreams } = useStreams(t);
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
@@ -329,6 +355,8 @@ const store = useStore();
 const urlType = typeof route.query.type === "string" ? route.query.type : "";
 const urlStream = typeof route.query.stream === "string" ? route.query.stream : "";
 const urlAgentName = typeof route.query.agent === "string" ? route.query.agent : "";
+const urlEnv = typeof route.query.env === "string" ? route.query.env : "";
+const urlVersion = typeof route.query.version === "string" ? route.query.version : "";
 
 interface Props {
   streamName: string;
@@ -360,11 +388,12 @@ const {
 const activeStream = ref<string>(
   urlStream || localStorage.getItem(STREAM_LS_KEY) || props.streamName || "",
 );
-// Persists the RESOLVED agent NAME of the cascade selection (was the old single
-// `activeAgent` key). On reload we re-seed the cascade from it (see
-// `pendingAgentName` + `selectAgentByName`), so the last-picked agent is
-// remembered exactly as before — via the cascade, not the retired `activeAgent`.
+// Persists the RESOLVED agent name/env/version of the cascade selection. On
+// reload we re-seed the cascade from them (see `pendingAgentName` +
+// `selectAgentByScope`), so the last-picked variant is remembered exactly.
 const AGENT_LS_KEY = "llmInsights_agentFilter";
+const ENV_LS_KEY = "llmInsights_envFilter";
+const VERSION_LS_KEY = "llmInsights_versionFilter";
 const agents = ref<GenAiAgentListItem[]>([]);
 // True once the agents API has resolved at least once — lets us tell "agents
 // not loaded yet" apart from "this window genuinely has no agents".
@@ -379,16 +408,48 @@ const switching = ref(false);
 // Filter mode: "stream" = view a whole stream; "agent" = view a single agent,
 // whose source stream + trace filter both come from the agents API.
 const MODE_LS_KEY = "llmInsights_filterMode";
+// Cloud registers the SAME enterprise route tree and backend as an enterprise
+// build (see router/index.ts's userCloudRoutes() picked for isCloud too) — only
+// a true OSS build lacks the agent-mapping API this gates. Goes through the
+// shared `genAiAgentMapping` registry entry (also used by SessionsList.vue
+// and the Settings Gen AI Agent Mapping tab) so a future backend flag only
+// has to change in one place (see enterpriseFeatures.ts).
+const genAiAgentMappingAccess = checkFeatureAccess(
+  "genAiAgentMapping",
+  buildFeatureGateContext(store.state.zoConfig),
+);
+const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 // Default scope is ALWAYS "agent" — the AI module is agent-centric and every AI
 // page lands on Agent for consistency. Only an explicit `?type=stream` URL param
 // overrides it (a stale saved preference must not silently land on Stream).
-const filterMode = ref<"stream" | "agent">(urlType === "stream" ? "stream" : "agent");
-// Agent NAME to seed the cascade with once the list loads: the URL `?agent=`
+// Agent mode calls the enterprise-only agent-mapping API (and gates version
+// compare), so OSS is pinned to Stream regardless of the URL/localStorage — the
+// toggle to reach Agent is locked, not gone, but clicking it is a no-op.
+const filterMode = ref<"stream" | "agent">(
+  !genAiAgentMappingAccess.allowed ? "stream" : urlType === "stream" ? "stream" : "agent",
+);
+// Env/name/version to seed the cascade with once the list loads: the URL
 // deep-link first, else the persisted last selection. Resolved into
-// selectedEnv/AgentName/Version via `selectAgentByName`, then cleared. (The URL
-// carries the readable name, not the internal stream-scoped key.)
+// selectedEnv/AgentName/Version via `selectAgentByScope` (falls back to
+// `selectAgentByName` when the exact env+version no longer exists), then
+// cleared. (The URL carries readable values, not the internal agent key.)
 const pendingAgentName = ref<string | null>(
   filterMode.value === "agent" ? urlAgentName || localStorage.getItem(AGENT_LS_KEY) || null : null,
+);
+// Env/version come from the same source as the name, so a name-only link never pairs with a stored variant of another agent.
+const pendingEnv = ref<string | null>(
+  filterMode.value !== "agent"
+    ? null
+    : urlAgentName
+      ? urlEnv || null
+      : localStorage.getItem(ENV_LS_KEY) || null,
+);
+const pendingVersion = ref<string | null>(
+  filterMode.value !== "agent"
+    ? null
+    : urlAgentName
+      ? urlVersion || null
+      : localStorage.getItem(VERSION_LS_KEY) || null,
 );
 
 // Shared derived scope computeds come from useAgentScope. LLM Insights injects
@@ -397,7 +458,7 @@ const pendingAgentName = ref<string | null>(
 // `availableStreams` is LLM's trace-stream list. Agent selection now flows
 // through the Env→Agent→Version cascade (selectedEnv/AgentName/Version →
 // selectedAgent), so the old single `activeAgent` ref is gone. The `?agent=`
-// deep-link and last-selection restore seed the cascade via `selectAgentByName`
+// deep-link and last-selection restore seed the cascade via `selectAgentByScope`
 // (see loadInsights). `agentFilterClause` stays page-local (LLM's trace-filter
 // builder). Injected refs are the SAME instances the page owns.
 const {
@@ -413,6 +474,7 @@ const {
   selectedAgentName,
   selectedVersion,
   selectAgentByName,
+  selectAgentByScope,
 } = useAgentScope({
   filterMode,
   activeStream,
@@ -436,8 +498,8 @@ const agentFilterClause = computed(() =>
 // the currently-selected agent has fewer than 2 versions across the wide
 // (retention-scoped) enumeration — checked via `versions` (page-window-scoped,
 // cheap) first; the wide-window `listVersionsForCompare` call is what actually
-// feeds the compare bar once entered (enumeration must ignore the page
-// date-picker window per the plan's baseline-enumeration requirement).
+// feeds the compare bar once entered (enumeration covers the retention window
+// and the page date-picker window, whichever reaches further back).
 const compareMode = ref(false);
 const compareVersionList = ref<GenAiAgentListItem[]>([]);
 const versionCompare = useVersionCompare();
@@ -474,6 +536,7 @@ async function enterCompareMode() {
     selectedAgentName.value,
     selectedEnv.value === "__unset__" ? null : selectedEnv.value,
     nowMicros,
+    props.startTime,
   );
 }
 
@@ -509,6 +572,9 @@ async function onCompareRun(payload: {
   const sharedWindow =
     payload.align === "sameWallClock" ? { start: props.startTime, end: props.endTime } : undefined;
   await versionCompare.run(effectiveStream.value, payload.manual, sharedWindow);
+  if (versionCompare.result.value && !versionCompare.errorA.value && !versionCompare.errorB.value) {
+    analytics.track("agent_version_compare_completed", { align: payload.align });
+  }
 }
 
 // sameWallClock re-runs the compare whenever the page date-picker changes —
@@ -561,7 +627,7 @@ watch(
 // is a no-op unless all three are non-empty (usePanelCache), so we mint a
 // stable, scoped identity for our panels:
 //   folder      → one constant bucket for this whole page.
-//   dashboardId → stream + agent + exact time window, so a different selection
+//   dashboardId → org + stream + agent + time window, so a different selection
 //                 or a new window is a clean miss (fresh fetch) while the same
 //                 one is a hit. Built from the agent NAME, never the SQL filter,
 //                 so no query text leaks into ids/URLs.
@@ -570,14 +636,25 @@ watch(
 // This SAME id is the canonical "which selection are we looking at" key for the
 // whole page: it's the panel dashboardId, the KPI cache key, AND the error
 // table's cache key (passed down as a prop) — so all three caches agree on one
-// identity instead of each deriving its own. `agentKey` is the agent's name, or
+// identity instead of each deriving its own. `agentKey` is the agent variant, or
 // a placeholder when there's no agent (`_stream` on the Stream tab, `_none` on
 // the Agent tab before one resolves) — handled here, in one place.
 const PANEL_CACHE_FOLDER = "ai-llm-insights";
+// Env/version are part of the key: each variant filters to different data, so sharing a name must not share a cache slot.
+function selectionAgentKey(): string {
+  if (filterMode.value !== "agent") return "_stream";
+  const a = effectiveAgent.value;
+  return a ? `${a.name}::${a.env ?? ""}::${a.version ?? ""}` : "_none";
+}
 const panelCacheDashboardId = computed(() => {
-  const agentKey =
-    filterMode.value === "agent" ? (effectiveAgent.value?.name ?? "_none") : "_stream";
-  return selectionKey(effectiveStream.value, agentKey, props.startTime, props.endTime);
+  const agentKey = selectionAgentKey();
+  return selectionKey(
+    store.state.selectedOrganization?.identifier ?? "",
+    effectiveStream.value,
+    agentKey,
+    props.startTime,
+    props.endTime,
+  );
 });
 // PanelSchemaRenderer (via its annotation composable) calls getDashboard() on
 // mount, which hits the network for any dashboardId not already in the Vuex
@@ -617,17 +694,26 @@ const agentEmpty = computed(
 );
 
 // Reflect the current filter in the URL so the view is shareable / survives a
-// reload: `?type=stream&stream=<name>` or `?type=agent&agent=<name>`. We keep
-// the readable name (not the internal agent key) and preserve other params
+// reload: `?type=stream&stream=<name>` or `?type=agent&agent=<name>&env=<env>&version=<version>`.
+// We keep readable values (not the internal agent key) and preserve other params
 // (e.g. the time range owned by the parent).
 function syncFilterUrl() {
   const query: Record<string, any> = { ...route.query, type: filterMode.value };
   if (filterMode.value === "agent") {
     delete query.stream;
-    if (selectedAgent.value?.name) query.agent = selectedAgent.value.name;
-    else delete query.agent;
+    if (selectedAgent.value?.name) {
+      query.agent = selectedAgent.value.name;
+      query.env = selectedEnv.value;
+      query.version = selectedVersion.value;
+    } else {
+      delete query.agent;
+      delete query.env;
+      delete query.version;
+    }
   } else {
     delete query.agent;
+    delete query.env;
+    delete query.version;
     if (activeStream.value) query.stream = activeStream.value;
     else delete query.stream;
   }
@@ -682,7 +768,7 @@ async function loadTraceStreams() {
 // on every tab toggle. Guarding on this kills a redundant /gen_ai/agents call
 // per toggle.
 let agentsLoadedWindow = "";
-async function loadAgents(startTime?: number, endTime?: number) {
+async function loadAgents(startTime?: number, endTime?: number, force = false) {
   const orgId = store.state.selectedOrganization?.identifier;
   const start = startTime ?? props.startTime;
   const end = endTime ?? props.endTime;
@@ -697,7 +783,16 @@ async function loadAgents(startTime?: number, endTime?: number) {
   const windowKey = `${start}-${end}`;
   if (agentsLoaded.value && agentsLoadedWindow === windowKey) return;
   try {
-    const agentList = await genAiAgentMappingService.listAgents(orgId, start, end);
+    const options = genAiAgentsQuery(orgId, start, end);
+    // Past the window guard a user refresh must reach the server: the key buckets the window by the minute.
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const agentList = await queryClient.fetchQuery(options);
     agents.value = agentList.agents;
     agentsLoadedWindow = windowKey;
     // Proactively seed the panel-cache stub for every selection at this window —
@@ -705,9 +800,9 @@ async function loadAgents(startTime?: number, endTime?: number) {
     // panels before the per-id sync watcher fires, so pre-seeding here (right
     // after the list resolves, before any switch) closes that race and keeps
     // getDashboard a store lookup in every case.
-    ensurePanelCacheStub(`${activeStream.value}::_stream::${start}-${end}`);
+    ensurePanelCacheStub(selectionKey(orgId, activeStream.value, "_stream", start, end));
     for (const agent of agents.value) {
-      ensurePanelCacheStub(`${agent.source_stream}::${agent.name}::${start}-${end}`);
+      ensurePanelCacheStub(selectionKey(orgId, agent.source_stream, agent.name, start, end));
     }
     // The cascade selection is reconciled against the fresh list by
     // useAgentScope's watcher (invalid env/name/version fall back / clear), so
@@ -763,7 +858,7 @@ function onEmptyAction(id?: string) {
 }
 
 interface KpiCard {
-  label: string;
+  label: I18nText;
   /** Material-symbol icon name (OIcon) shown in the card's corner tile. */
   icon: string;
   value: string;
@@ -836,9 +931,14 @@ const kpiCards = computed<KpiCard[]>(() => {
 // llmInsightsCache.ts) is its in-memory equivalent, keyed by the same
 // stream+agent+window scope and restored on a tab toggle / same-window revisit.
 function kpiCacheKey(start: number, end: number): string {
-  const agentKey =
-    filterMode.value === "agent" ? (effectiveAgent.value?.name ?? "_none") : "_stream";
-  return selectionKey(effectiveStream.value, agentKey, start, end);
+  const agentKey = selectionAgentKey();
+  return selectionKey(
+    store.state.selectedOrganization?.identifier ?? "",
+    effectiveStream.value,
+    agentKey,
+    start,
+    end,
+  );
 }
 
 // Single fetch entry point. Always pulls from the current props (which the
@@ -862,13 +962,19 @@ async function loadInsights(startTime?: number, endTime?: number, opts?: { force
       // Agent tab can't fetch until it knows the agent's source stream, so the
       // agents list must be loaded first — await it here. (Agents API is only
       // ever hit on the Agent tab.)
-      await loadAgents(start, end);
-      // Seed the cascade from a carried-over agent NAME (URL `?agent=` deep-link,
-      // else the persisted last selection) now that the list exists. On a match
-      // this pins env→name→version so `selectedAgent` resolves; then clear it.
+      await loadAgents(start, end, force);
+      // Seed the cascade from the carried-over env/name/version (URL deep-link,
+      // else the persisted last selection) now that the list exists: the exact
+      // triple when env and version are known, else by name; then clear it.
       if (pendingAgentName.value) {
-        selectAgentByName(pendingAgentName.value);
+        if (pendingEnv.value && pendingVersion.value) {
+          selectAgentByScope(pendingEnv.value, pendingAgentName.value, pendingVersion.value);
+        } else {
+          selectAgentByName(pendingAgentName.value);
+        }
         pendingAgentName.value = null;
+        pendingEnv.value = null;
+        pendingVersion.value = null;
       }
       // Default to the first agent when nothing valid is selected (fresh entry
       // to the tab, or the previously-picked agent is gone for this window).
@@ -876,9 +982,11 @@ async function loadInsights(startTime?: number, endTime?: number, opts?: { force
       if (!selectedAgent.value && agents.value.length > 0) {
         selectAgentByName(agents.value[0].name);
       }
-      // Persist the resolved agent NAME so a reload restores the same selection.
+      // Persist the resolved agent variant so a reload restores the same selection.
       if (selectedAgent.value?.name) {
         localStorage.setItem(AGENT_LS_KEY, selectedAgent.value.name);
+        localStorage.setItem(ENV_LS_KEY, selectedEnv.value);
+        localStorage.setItem(VERSION_LS_KEY, selectedVersion.value);
       }
     } else {
       // Agents API is only relevant on the Agent tab — don't touch it in Stream
@@ -983,6 +1091,7 @@ defineExpose({
   compareMode,
   selectedAgentName,
   selectedEnv,
+  selectedVersion,
   activeStream,
   filterMode,
 });
@@ -1000,5 +1109,6 @@ onMounted(() => {
 // the user pays for work they don't see.
 onUnmounted(() => {
   cancelAll();
+  versionCompare.cancel();
 });
 </script>

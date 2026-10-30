@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
+
 use config::meta::{
     dashboards::{
         Dashboard, ListDashboardsParams, v1::Dashboard as DashboardV1,
@@ -24,8 +26,8 @@ use config::meta::{
 };
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
-    IntoActiveModel, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
-    TryIntoModel, prelude::Expr, sea_query::Func,
+    IntoActiveModel, JoinType, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect,
+    RelationTrait, Set, TransactionTrait, TryIntoModel, prelude::Expr, sea_query::Func,
 };
 use serde_json::Value as JsonValue;
 use svix_ksuid::KsuidLike;
@@ -36,7 +38,7 @@ use super::{
     folders::folder_type_into_i16,
 };
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, GetDashboardError},
 };
 
@@ -117,7 +119,7 @@ pub async fn get_from_folder(
     folder_id: &str,
     dashboard_id: &str,
 ) -> Result<Option<Dashboard>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let model = get_model_from_folder(client, org_id, folder_id, dashboard_id)
         .await?
         .and_then(|(_folder, maybe_dash)| maybe_dash);
@@ -139,7 +141,7 @@ pub async fn get_by_id(
     org_id: &str,
     dashboard_id: &str,
 ) -> Result<Option<(Folder, Dashboard)>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let Some((folder_m, dash_m)) = get_model_by_id(client, org_id, dashboard_id).await? else {
         return Ok(None);
     };
@@ -148,9 +150,21 @@ pub async fn get_by_id(
     Ok(Some((folder, dash)))
 }
 
+/// [`get_by_id`] from the primary, for a build that must see the latest saved dashboard.
+pub async fn get_by_id_primary(
+    org_id: &str,
+    dashboard_id: &str,
+) -> Result<Option<(Folder, Dashboard)>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let Some((folder_m, dash_m)) = get_model_by_id(client, org_id, dashboard_id).await? else {
+        return Ok(None);
+    };
+    Ok(Some((folder_m.into(), dash_m.try_into()?)))
+}
+
 /// Lists dashboards.
 pub async fn list(params: ListDashboardsParams) -> Result<Vec<(Folder, Dashboard)>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let dashboards = list_models(client, params)
         .await?
         .into_iter()
@@ -163,9 +177,65 @@ pub async fn list(params: ListDashboardsParams) -> Result<Vec<(Folder, Dashboard
     Ok(dashboards)
 }
 
+/// A dashboard's title and its current folder, as listed next to its public links.
+#[derive(Clone, Debug)]
+pub struct DashboardLabel {
+    pub title: String,
+    pub folder_id: String,
+    pub folder_name: String,
+}
+
+/// Title and folder for each given dashboard in one query; deleted ones are absent from the map.
+pub async fn labels_by_ids(
+    org_id: &str,
+    dashboard_ids: &[String],
+) -> Result<HashMap<String, DashboardLabel>, errors::Error> {
+    if dashboard_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let client = get_orm_client_ro().await;
+    let rows: Vec<(String, String, String, String)> = dashboards::Entity::find()
+        .select_only()
+        .column(dashboards::Column::DashboardId)
+        .column(dashboards::Column::Title)
+        .column(folders::Column::FolderId)
+        .column(folders::Column::Name)
+        .join(JoinType::InnerJoin, dashboards::Relation::Folders.def())
+        .filter(folders::Column::Org.eq(org_id))
+        .filter(dashboards::Column::DashboardId.is_in(dashboard_ids.iter().cloned()))
+        .into_tuple()
+        .all(client)
+        .await?;
+    Ok(rows
+        .into_iter()
+        .map(|(id, title, folder_id, folder_name)| {
+            (
+                id,
+                DashboardLabel {
+                    title,
+                    folder_id,
+                    folder_name,
+                },
+            )
+        })
+        .collect())
+}
+
+pub async fn list_ids_by_org(org_id: &str) -> Result<Vec<(String, String)>, errors::Error> {
+    Ok(list_ids_by_org_with(get_orm_client_ro().await, org_id).await?)
+}
+
+/// Lists dashboards like [`list`], but logs and skips rows that do not convert.
+pub async fn list_skipping_invalid(
+    params: ListDashboardsParams,
+) -> Result<Vec<(Folder, Dashboard)>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    Ok(convert_skipping_invalid(list_models(client, params).await?))
+}
+
 /// Lists all existing dashboards
 pub async fn list_all() -> Result<Vec<(String, Dashboard)>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let dashboards = list_all_models(client)
         .await?
         .into_iter()
@@ -187,7 +257,7 @@ pub async fn put(
     mut dashboard: Dashboard,
     clone: bool,
 ) -> Result<Dashboard, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     // Get the fields that will be inserted into or updated in the database.
     let dashboard_id = dashboard
@@ -305,7 +375,7 @@ pub async fn delete_from_folder(
     folder_id: &str,
     dashboard_id: &str,
 ) -> Result<(), errors::Error> {
-    let txn = ORM_CLIENT.get_or_init(connect_to_orm).await.begin().await?;
+    let txn = get_orm_client_rw().await.begin().await?;
     let maybe_dashboard_model = get_model_from_folder(&txn, org_id, folder_id, dashboard_id)
         .await?
         .and_then(|(_folder, maybe_dash)| maybe_dash);
@@ -330,7 +400,7 @@ pub async fn delete_from_folder(
 
 /// Deletes all dashboards.
 pub async fn delete_all() -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let dashboards = list_all().await?;
     let ids: Vec<_> = dashboards
@@ -439,6 +509,41 @@ async fn list_models(
     Ok(folders_and_dashboards)
 }
 
+async fn list_ids_by_org_with<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+) -> Result<Vec<(String, String)>, sea_orm::DbErr> {
+    dashboards::Entity::find()
+        .select_only()
+        .column(dashboards::Column::DashboardId)
+        .column_as(
+            Expr::col((folders::Entity, folders::Column::FolderId)),
+            "folder_id",
+        )
+        .left_join(folders::Entity)
+        .filter(folders::Column::Org.eq(org_id))
+        .into_tuple::<(String, String)>()
+        .all(db)
+        .await
+}
+
+fn convert_skipping_invalid(
+    rows: Vec<(folders::Model, dashboards::Model)>,
+) -> Vec<(Folder, Dashboard)> {
+    rows.into_iter()
+        .filter_map(|(f, d)| {
+            let id = d.id.clone();
+            match Dashboard::try_from(d) {
+                Ok(d) => Some((Folder::from(f), d)),
+                Err(e) => {
+                    log::warn!("[dashboards] skipping dashboard {id} that does not convert: {e}");
+                    None
+                }
+            }
+        })
+        .collect()
+}
+
 /// Lists all existing dashboard ORM models
 async fn list_all_models(
     db: &DatabaseConnection,
@@ -530,24 +635,44 @@ fn inner_data_as_json(dashboard: Dashboard) -> Result<JsonValue, errors::Error> 
     Ok(data)
 }
 
-/// Deletes all dashboards belonging to the given org (via folder join).
-pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    // Collect folder PKs for this org
-    let folder_ids: Vec<String> = folders::Entity::find()
+/// Deletes all dashboards of the org (via folder join); returns each `(dashboard_id, folder_id)`.
+pub async fn delete_by_org(org_id: &str) -> Result<Vec<(String, String)>, errors::Error> {
+    use sea_orm::{QuerySelect, sea_query::Query};
+    let txn = get_orm_client_rw().await.begin().await?;
+    let folder_ids: std::collections::HashMap<String, String> = folders::Entity::find()
+        .select_only()
+        .column(folders::Column::Id)
+        .column(folders::Column::FolderId)
         .filter(folders::Column::Org.eq(org_id))
-        .all(client)
+        .into_tuple::<(String, String)>()
+        .all(&txn)
         .await?
         .into_iter()
-        .map(|f| f.id)
         .collect();
-    if !folder_ids.is_empty() {
-        dashboards::Entity::delete_many()
-            .filter(dashboards::Column::FolderId.is_in(folder_ids))
-            .exec(client)
-            .await?;
-    }
-    Ok(())
+    let org_folders = Query::select()
+        .column(folders::Column::Id)
+        .from(folders::Entity)
+        .and_where(folders::Column::Org.eq(org_id))
+        .to_owned();
+    let delete = dashboards::Entity::delete_many()
+        .filter(dashboards::Column::FolderId.in_subquery(org_folders));
+    let deleted: Vec<(String, String)> = super::delete_returning(
+        &txn,
+        delete,
+        &[
+            dashboards::Column::DashboardId,
+            dashboards::Column::FolderId,
+        ],
+    )
+    .await?;
+    txn.commit().await?;
+    Ok(deleted
+        .into_iter()
+        .map(|(dashboard_id, pk)| {
+            let folder_id = folder_ids.get(&pk).cloned().unwrap_or(pk);
+            (dashboard_id, folder_id)
+        })
+        .collect())
 }
 
 #[cfg(test)]
@@ -579,16 +704,88 @@ mod tests {
     }
 
     #[test]
-    fn test_try_from_version_zero_returns_err() {
-        let model = make_model(0, serde_json::json!({}));
-        assert!(Dashboard::try_from(model).is_err());
-    }
-
-    #[test]
     fn test_try_from_data_not_object_version1_returns_err() {
         // data is null, not an object — injection is skipped, deserialization must fail
         let model = make_model(1, serde_json::Value::Null);
         assert!(Dashboard::try_from(model).is_err());
+    }
+
+    #[test]
+    fn default_refresh_interval_survives_db_save_and_load() {
+        let inner: DashboardV8 = serde_json::from_value(serde_json::json!({
+            "version": 8,
+            "title": "My Dashboard",
+            "description": "",
+            "defaultRefreshInterval": 30
+        }))
+        .unwrap();
+        let data = inner_data_as_json(inner.into()).unwrap();
+        let loaded = Dashboard::try_from(make_model(8, data)).unwrap();
+        assert_eq!(loaded.v8.unwrap().default_refresh_interval, Some(30));
+    }
+
+    #[test]
+    fn convert_skipping_invalid_drops_only_the_bad_row() {
+        let folder = folders::Model {
+            id: "folder-1".to_string(),
+            org: "org".to_string(),
+            folder_id: "f1".to_string(),
+            name: "F".to_string(),
+            description: None,
+            icon: None,
+            r#type: 0,
+        };
+        let good = make_model(8, serde_json::json!({}));
+        let mut bad = make_model(999, serde_json::json!({}));
+        bad.id = "id-2".to_string();
+        let kept = convert_skipping_invalid(vec![(folder.clone(), bad), (folder, good)]);
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0].1.dashboard_id(), Some("dash-1"));
+    }
+
+    #[tokio::test]
+    async fn list_ids_by_org_includes_malformed_dashboards_and_scopes_the_org() {
+        let db = sea_orm::Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = sea_orm::Schema::new(backend);
+        db.execute(backend.build(&schema.create_table_from_entity(folders::Entity)))
+            .await
+            .unwrap();
+        db.execute(backend.build(&schema.create_table_from_entity(dashboards::Entity)))
+            .await
+            .unwrap();
+        for (org, id, version, data) in [
+            ("org", "valid", 8, serde_json::json!({})),
+            ("org", "invalid", 999, serde_json::Value::Null),
+            ("other", "untouched", 8, serde_json::json!({})),
+        ] {
+            folders::ActiveModel {
+                id: Set(format!("folder-{id}")),
+                org: Set(org.to_string()),
+                folder_id: Set(format!("f-{id}")),
+                name: Set(id.to_string()),
+                description: Set(None),
+                icon: Set(None),
+                r#type: Set(0),
+            }
+            .insert(&db)
+            .await
+            .unwrap();
+            let mut model = make_model(version, data);
+            model.id = id.to_string();
+            model.dashboard_id = id.to_string();
+            model.folder_id = format!("folder-{id}");
+            model.into_active_model().insert(&db).await.unwrap();
+        }
+        let mut ids = list_ids_by_org_with(&db, "org").await.unwrap();
+        ids.sort();
+        assert_eq!(
+            ids,
+            [
+                ("invalid".to_string(), "f-invalid".to_string()),
+                ("valid".to_string(), "f-valid".to_string())
+            ]
+        );
     }
 
     #[tokio::test]
@@ -607,7 +804,7 @@ mod tests {
             db.into_transaction_log(),
             vec![Transaction::from_sql_and_values(
                 DatabaseBackend::Postgres,
-                r#"SELECT "dashboards"."id" AS "A_id", "dashboards"."dashboard_id" AS "A_dashboard_id", "dashboards"."folder_id" AS "A_folder_id", "dashboards"."owner" AS "A_owner", "dashboards"."role" AS "A_role", "dashboards"."title" AS "A_title", "dashboards"."description" AS "A_description", "dashboards"."data" AS "A_data", "dashboards"."version" AS "A_version", "dashboards"."created_at" AS "A_created_at", "dashboards"."updated_at" AS "A_updated_at", "folders"."id" AS "B_id", "folders"."org" AS "B_org", "folders"."folder_id" AS "B_folder_id", "folders"."name" AS "B_name", "folders"."description" AS "B_description", "folders"."type" AS "B_type" FROM "dashboards" LEFT JOIN "folders" ON "dashboards"."folder_id" = "folders"."id" WHERE "folders"."org" = $1 AND "folders"."type" = $2 AND "folders"."folder_id" = $3 AND LOWER("title") LIKE $4 ORDER BY "dashboards"."title" ASC, "folders"."name" ASC LIMIT $5 OFFSET $6"#,
+                r#"SELECT "dashboards"."id" AS "A_id", "dashboards"."dashboard_id" AS "A_dashboard_id", "dashboards"."folder_id" AS "A_folder_id", "dashboards"."owner" AS "A_owner", "dashboards"."role" AS "A_role", "dashboards"."title" AS "A_title", "dashboards"."description" AS "A_description", "dashboards"."data" AS "A_data", "dashboards"."version" AS "A_version", "dashboards"."created_at" AS "A_created_at", "dashboards"."updated_at" AS "A_updated_at", "folders"."id" AS "B_id", "folders"."org" AS "B_org", "folders"."folder_id" AS "B_folder_id", "folders"."name" AS "B_name", "folders"."description" AS "B_description", "folders"."icon" AS "B_icon", "folders"."type" AS "B_type" FROM "dashboards" LEFT JOIN "folders" ON "dashboards"."folder_id" = "folders"."id" WHERE "folders"."org" = $1 AND "folders"."type" = $2 AND "folders"."folder_id" = $3 AND LOWER("title") LIKE $4 ORDER BY "dashboards"."title" ASC, "folders"."name" ASC LIMIT $5 OFFSET $6"#,
                 [
                     "orgId".into(),
                     0i16.into(),
@@ -637,7 +834,7 @@ mod tests {
             db.into_transaction_log(),
             vec![Transaction::from_sql_and_values(
                 DatabaseBackend::Sqlite,
-                r#"SELECT "dashboards"."id" AS "A_id", "dashboards"."dashboard_id" AS "A_dashboard_id", "dashboards"."folder_id" AS "A_folder_id", "dashboards"."owner" AS "A_owner", "dashboards"."role" AS "A_role", "dashboards"."title" AS "A_title", "dashboards"."description" AS "A_description", "dashboards"."data" AS "A_data", "dashboards"."version" AS "A_version", "dashboards"."created_at" AS "A_created_at", "dashboards"."updated_at" AS "A_updated_at", "folders"."id" AS "B_id", "folders"."org" AS "B_org", "folders"."folder_id" AS "B_folder_id", "folders"."name" AS "B_name", "folders"."description" AS "B_description", "folders"."type" AS "B_type" FROM "dashboards" LEFT JOIN "folders" ON "dashboards"."folder_id" = "folders"."id" WHERE "folders"."org" = ? AND "folders"."type" = ? AND "folders"."folder_id" = ? AND LOWER("title") LIKE ? ORDER BY "dashboards"."title" ASC, "folders"."name" ASC LIMIT ? OFFSET ?"#,
+                r#"SELECT "dashboards"."id" AS "A_id", "dashboards"."dashboard_id" AS "A_dashboard_id", "dashboards"."folder_id" AS "A_folder_id", "dashboards"."owner" AS "A_owner", "dashboards"."role" AS "A_role", "dashboards"."title" AS "A_title", "dashboards"."description" AS "A_description", "dashboards"."data" AS "A_data", "dashboards"."version" AS "A_version", "dashboards"."created_at" AS "A_created_at", "dashboards"."updated_at" AS "A_updated_at", "folders"."id" AS "B_id", "folders"."org" AS "B_org", "folders"."folder_id" AS "B_folder_id", "folders"."name" AS "B_name", "folders"."description" AS "B_description", "folders"."icon" AS "B_icon", "folders"."type" AS "B_type" FROM "dashboards" LEFT JOIN "folders" ON "dashboards"."folder_id" = "folders"."id" WHERE "folders"."org" = ? AND "folders"."type" = ? AND "folders"."folder_id" = ? AND LOWER("title") LIKE ? ORDER BY "dashboards"."title" ASC, "folders"."name" ASC LIMIT ? OFFSET ?"#,
                 [
                     "orgId".into(),
                     0i16.into(),

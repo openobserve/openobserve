@@ -1,4 +1,5 @@
 import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
+import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
 
 let parser: any;
 let parserImportPromise: Promise<any> | null = null;
@@ -54,6 +55,9 @@ const importSqlParser = async () => {
       parser = await sqlParser();
       return parser;
     })();
+    parserImportPromise.catch(() => {
+      parserImportPromise = null;
+    });
   }
   return parserImportPromise;
 };
@@ -465,6 +469,15 @@ function extractJoinConditions(onClause: any, conditions: any[]): void {
   }
 }
 
+// The builder treats an empty value as "no value yet" and skips the condition.
+// `x != ''` in SQL is a real filter, so mark it to keep it.
+const emptyLiteralFlag = (condition: any) =>
+  ["=", "!=", "<>"].includes(condition?.operator) &&
+  ["single_quote_string", "string"].includes(condition?.right?.type) &&
+  condition?.right?.value === ""
+    ? { emptyLiteral: true }
+    : {};
+
 function parseCondition(condition: any) {
   try {
     if (condition.type === "binary_expr") {
@@ -529,6 +542,7 @@ function parseCondition(condition: any) {
           column: columnObj,
           operator: condition?.operator,
           value: `${condition?.right?.value}`,
+          ...emptyLiteralFlag(condition),
           logicalOperator: "AND",
           filterType: "condition",
         };
@@ -543,6 +557,7 @@ function parseCondition(condition: any) {
           column: columnObj,
           operator: "<>",
           value: `${condition?.right?.value}`,
+          ...emptyLiteralFlag(condition),
           logicalOperator: "AND",
           filterType: "condition",
         };
@@ -733,6 +748,23 @@ function parseCondition(condition: any) {
       conditions: [],
     };
   }
+}
+
+function countWhereLeaves(node: any): number {
+  if (!node) return 0;
+  if (node.type === "binary_expr" && (node.operator === "AND" || node.operator === "OR")) {
+    return countWhereLeaves(node.left) + countWhereLeaves(node.right);
+  }
+  return 1;
+}
+
+function countFilterConditions(filter: any): number {
+  if (!filter) return 0;
+  if (filter.filterType === "condition") return 1;
+  return (filter.conditions ?? []).reduce(
+    (total: number, child: any) => total + countFilterConditions(child),
+    0,
+  );
 }
 
 function convertWhereToFilter(where: any) {
@@ -934,7 +966,7 @@ export const getStreamNameFromQuery = async (query: any) => {
   try {
     await importSqlParser();
     try {
-      if (query && query != "") {
+      if (query && query != "" && maxParenDepth(query) <= SQL_PARSE_MAX_DEPTH) {
         const parsedQuery = parser?.astify(query);
 
         // Recursively find the first base table, descending into sub-queries in
@@ -1292,6 +1324,22 @@ export const parseWhereClauseToFilter = async (
     };
   } catch {
     return defaultFilter;
+  }
+};
+
+export const parseWhereClauseToFilterChecked = async (
+  whereClauseText: string,
+): Promise<{ filter: Awaited<ReturnType<typeof parseWhereClauseToFilter>>; complete: boolean }> => {
+  if (!whereClauseText?.trim()) {
+    return { filter: await parseWhereClauseToFilter(whereClauseText), complete: true };
+  }
+  await importSqlParser();
+  const filter = await parseWhereClauseToFilter(whereClauseText);
+  try {
+    const ast: any = parser.astify(`SELECT * FROM "dummy" WHERE ${whereClauseText}`);
+    return { filter, complete: countWhereLeaves(ast?.where) === countFilterConditions(filter) };
+  } catch {
+    return { filter, complete: false };
   }
 };
 

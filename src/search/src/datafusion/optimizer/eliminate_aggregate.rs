@@ -40,12 +40,8 @@ impl PhysicalOptimizerRule for EliminateAggregateRule {
         _config: &ConfigOptions,
     ) -> Result<Arc<dyn ExecutionPlan>> {
         let is_empty_streaming_agg = plan.exists(|plan| {
-            if plan.name() == "StreamingAggsExec"
-                && plan.output_partitioning().partition_count() == 0
-            {
-                return Ok(true);
-            }
-            Ok(false)
+            Ok(plan.name() == "StreamingAggsExec"
+                && plan.output_partitioning().partition_count() == 0)
         })?;
 
         if is_empty_streaming_agg {

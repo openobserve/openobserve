@@ -193,13 +193,18 @@ describe("AddFolder.vue", () => {
     it("seeds blank default-values in create mode", () => {
       wrapper = createWrapper({ editMode: false });
       const defaults = wrapper.findComponent(OFormStub).props("defaultValues");
-      expect(defaults).toEqual({ name: "", description: "" });
+      expect(defaults).toEqual({ name: "", description: "", icon: null });
     });
 
     it("seeds the folder's values as default-values in edit mode", () => {
       wrapper = createWrapper({ editMode: true, folderId: "folder-1", type: "alerts" });
       const defaults = wrapper.findComponent(OFormStub).props("defaultValues");
-      expect(defaults).toEqual({ name: "Test Folder", description: "Test Description" });
+      // No icon stored for this folder, so it seeds blank rather than guessing.
+      expect(defaults).toEqual({
+        name: "Test Folder",
+        description: "Test Description",
+        icon: null,
+      });
     });
 
     it("handles folderId / type props", () => {
@@ -237,6 +242,7 @@ describe("AddFolder.vue", () => {
       expect(wrapper.findComponent(OFormStub).props("defaultValues")).toEqual({
         name: "",
         description: "",
+        icon: null,
       });
       store.state.organizationData.foldersByType = original;
     });

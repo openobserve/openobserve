@@ -88,4 +88,13 @@ describe("ODate", () => {
     wrapper = mount(ODate);
     expect(wrapper.find('[aria-label="Open calendar"]').exists()).toBe(true);
   });
+
+  it("draws its label like the other form fields", () => {
+    const w = mount(ODate, { props: { label: "Expires" } });
+    const label = w.find("label");
+    expect(label.classes()).toEqual(
+      expect.arrayContaining(["text-compact", "font-medium", "text-input-label-text"]),
+    );
+    expect(label.classes()).not.toContain("font-semibold");
+  });
 });

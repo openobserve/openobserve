@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Request types used by the OpenObserve PromQL query service.
-use config::meta::search::SearchEventType;
+use config::meta::search::{SearchEventContext, SearchEventType};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -27,6 +27,7 @@ pub struct MetricsQueryRequest {
     pub query_exemplars: bool,
     pub use_cache: Option<bool>,
     pub search_type: Option<SearchEventType>,
+    pub search_event_context: Option<SearchEventContext>,
     pub regions: Vec<String>,
     pub clusters: Vec<String>,
 }
@@ -59,9 +60,41 @@ impl From<MetricsQueryRequest> for proto::cluster_rpc::MetricsQueryRequest {
                 .search_type
                 .map(|value| value.to_string())
                 .unwrap_or_default(),
+            search_event_context: req.search_event_context.map(Into::into),
             regions: req.regions,
             clusters: req.clusters,
             is_super_cluster: false,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_public_promql_request_keeps_its_usage_ids_through_the_cluster_request() {
+        let ctx = SearchEventContext {
+            public_dashboard_link_id: Some("l1".into()),
+            range_key: Some("r3600".into()),
+            panel_id: Some("p1".into()),
+            ..Default::default()
+        };
+        let req = MetricsQueryRequest {
+            query: "up".into(),
+            start: 0,
+            end: 1,
+            step: 1,
+            query_exemplars: false,
+            use_cache: None,
+            search_type: Some(SearchEventType::PublicDashboard),
+            search_event_context: Some(ctx.clone()),
+            regions: vec![],
+            clusters: vec![],
+        };
+        let rpc: proto::cluster_rpc::MetricsQueryRequest = req.into();
+        // The usage row reads the context back from the cluster request, as search() does.
+        let reported: Option<SearchEventContext> = rpc.search_event_context.map(Into::into);
+        assert_eq!(reported, Some(ctx));
     }
 }

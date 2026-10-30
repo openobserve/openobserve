@@ -24,6 +24,7 @@ import { createI18n } from "vue-i18n";
 import { ref } from "vue";
 import KubernetesConfig from "./KubernetesConfig.vue";
 import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
+import { gt } from "@/types/i18n";
 
 // `isCloud` gates the in-cluster variants, so it must be mutable per-test.
 const mockConfig = { isCloud: "false" };
@@ -72,7 +73,7 @@ const SUBS = {
 
 // Imported lazily inside tests so the mocked aws-exports value is picked up.
 const buildCard = async () =>
-  (await import("@/components/ingestion/setupCard/content/kubernetes")).default(SUBS);
+  (await import("@/components/ingestion/setupCard/content/kubernetes")).default(SUBS, gt);
 
 describe("kubernetesCard builder", () => {
   beforeEach(() => {
@@ -113,7 +114,7 @@ describe("kubernetesCard builder", () => {
 
   it("marks the quick install as the recommended path", async () => {
     const install = (await buildCard()).steps[0];
-    expect(install.title).toBe("Quick Install (Recommended)");
+    expect(install.titleKey).toBe("ingestion.setupCard.quickInstallTitle");
     expect(install.required).toBe(true);
   });
 
@@ -122,12 +123,11 @@ describe("kubernetesCard builder", () => {
     // who wants Helm has to scroll past two steps that don't apply to them.
     const card = await buildCard();
     const install = card.steps[0];
-    const label = card.extras!.advanced!.label;
     for (const v of install.variants!) {
       // A jump link, not prose — it opens the accordion and scrolls to it.
-      expect(v.note).toContain(`[${label}](#advanced)`);
+      expect(v.note).toContain("[Advanced installation (manual steps)](#advanced)");
     }
-    expect(label).toBe("Advanced Installation (Manual Steps)");
+    expect(card.extras!.advanced!.labelKey).toBe("ingestion.setupCard.advancedInstallLabel");
   });
 
   it("keeps the quick install to the two endpoint choices", async () => {
@@ -150,7 +150,7 @@ describe("kubernetesCard builder", () => {
     expect(install.code?.raw).toContain("--o2-url=");
     // With no variants to carry it, the installer note (and the jump link to
     // the advanced section) moves onto the step itself.
-    expect(install.note).toContain("[Advanced Installation (Manual Steps)](#advanced)");
+    expect(install.note).toContain("[Advanced installation (manual steps)](#advanced)");
   });
 
   it("points the internal variant at the cluster-local router", async () => {
@@ -163,7 +163,7 @@ describe("kubernetesCard builder", () => {
 
   it("keeps the manual helm sequence as one collapsed advanced block", async () => {
     const advanced = (await buildCard()).extras!.advanced!;
-    expect(advanced.label).toContain("Advanced Installation");
+    expect(advanced.labelKey).toBe("ingestion.setupCard.advancedInstallLabel");
     const code = advanced.code.raw;
     // Previously six separate copy boxes plus a "wait 2 minutes" instruction.
     expect(code).toContain("cert-manager.yaml");
@@ -178,23 +178,53 @@ describe("kubernetesCard builder", () => {
     expect(advanced.code.masked).not.toContain(SUBS.token);
   });
 
-  it("exposes auto-instrumentation as an optional per-language step", async () => {
+  it("offers language libraries or eBPF as an optional two-level choice", async () => {
     const step = (await buildCard()).steps.find((s) => s.id === "instrument")!;
     // Not required — the chip renders "Optional" off the absent `required`.
     expect(step.required).toBeUndefined();
-    expect(step.variants?.map((v) => v.id)).toEqual(["java", "dotnet", "nodejs", "python", "go"]);
-    expect(step.variants!.every((v) => !!v.icon)).toBe(true);
+    expect(step.variants?.map((v) => v.id)).toEqual(["libraries", "ebpf"]);
+  });
 
-    const java = step.variants!.find((v) => v.id === "java")!;
-    expect(java.code.raw).toContain(
-      'instrumentation.opentelemetry.io/inject-java="openobserve-collector/openobserve-java"',
-    );
-    // Injection only happens at pod creation, so a restart is part of the step.
-    expect(java.code.raw).toContain("kubectl rollout restart");
+  it("keeps the per-language annotation commands under language libraries", async () => {
+    const step = (await buildCard()).steps.find((s) => s.id === "instrument")!;
+    const libraries = step.variants!.find((v) => v.id === "libraries")!;
+    if (!("variants" in libraries)) throw new Error("libraries must be nested");
+    expect(libraries.variants.map((v) => v.id)).toEqual(["java", "dotnet", "nodejs", "python"]);
+    expect(libraries.variants.every((v) => !!v.icon)).toBe(true);
+    const annotate = (id: string) =>
+      [
+        "# Every pod in the namespace is instrumented — no code or image change.",
+        "kubectl annotate namespace my-namespace \\",
+        `  instrumentation.opentelemetry.io/inject-${id}="openobserve-collector/openobserve-${id}"`,
+        "",
+        "# Restart so running pods pick up the injection",
+        "kubectl rollout restart deployment -n my-namespace",
+      ].join("\n");
+    for (const v of libraries.variants) expect(v.code.raw).toBe(annotate(v.id));
+  });
 
-    // Go's eBPF instrumentation additionally needs the in-container binary path.
-    const go = step.variants!.find((v) => v.id === "go")!;
-    expect(go.code.raw).toContain("instrumentation.opentelemetry.io/otel-go-auto-target-exe");
+  it("upgrades the installed release to enable eBPF from at least one selector", async () => {
+    const step = (await buildCard()).steps.find((s) => s.id === "instrument")!;
+    const ebpf = step.variants!.find((v) => v.id === "ebpf")!;
+    if ("variants" in ebpf) throw new Error("ebpf must not be nested");
+    expect(ebpf.code.raw).toContain("upgrade o2c");
+    expect(ebpf.code.raw).toContain("ebpf.enabled=true");
+    expect(ebpf.code.raw).toContain("{flags}");
+    expect(ebpf.inputs?.map((i) => [i.id, i.helmSet])).toEqual([
+      ["ebpfPorts", "ebpf.trace.ports"],
+      ["ebpfExe", "ebpf.trace.exePaths"],
+      ["ebpfCmd", "ebpf.trace.cmdLines"],
+    ]);
+    expect(ebpf.requireOneOf?.ids).toEqual(["ebpfPorts", "ebpfExe", "ebpfCmd"]);
+    // Nothing is traced until the user picks a selector.
+    expect(ebpf.inputs?.every((i) => i.default === "")).toBe(true);
+  });
+
+  it("drops the deprecated Go operator sidecar", async () => {
+    const step = (await buildCard()).steps.find((s) => s.id === "instrument")!;
+    const json = JSON.stringify(step);
+    expect(json).not.toContain('"go"');
+    expect(json).not.toContain("otel-go-auto-target-exe");
   });
 
   it("anchors detection on the verify step with a valid SQL filter", async () => {
@@ -214,6 +244,9 @@ describe("kubernetesCard builder", () => {
     const urls = (card.docLinks ?? []).map((l) => l.url);
     expect(urls).toContain("https://github.com/openobserve/hotcommerce");
     expect(urls).toContain("https://github.com/open-telemetry/opentelemetry-operator");
+    expect(urls).toContain(
+      "https://github.com/openobserve/openobserve-helm-chart/blob/main/charts/openobserve-collector/docs/traces.md#ebpf-tracing",
+    );
   });
 
   it("carries troubleshooting guidance without markdown link syntax", async () => {
@@ -234,7 +267,7 @@ describe("KubernetesConfig.vue", () => {
   });
 
   it("renders the shared setup card for the kubernetes slug", () => {
-    expect(getDataSourceCard("kubernetes", SUBS)?.provider.name).toBe("Kubernetes");
+    expect(getDataSourceCard("kubernetes", SUBS, gt)?.provider.name).toBe("Kubernetes");
     wrapper = mount(KubernetesConfig, {
       global: { plugins: [mockStore, mockI18n] },
     });

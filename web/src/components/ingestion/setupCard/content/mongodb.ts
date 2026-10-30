@@ -16,9 +16,12 @@
 // MongoDB data-source setup card. Follows the OpenObserve guide:
 // https://openobserve.ai/blog/monitor-mongodb-metrics-otel (requires MongoDB 4.0+).
 
+import { raw, type TranslateFn } from "@/types/i18n";
+
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
+import { DB_SETUP_MODES, dbQuickInstallStep, dbUninstallExtra, manualOnly } from "./dbInstaller";
 
 // The receiver authenticates as a user with clusterMonitor. Name/password are
 // literal here and in the config so the two stay in lockstep.
@@ -57,29 +60,29 @@ service:
       processors: [batch]
       exporters: [otlphttp/openobserve]`;
 
-export default function mongodbCard(subs: CardSubstitutions): RichCardContent {
+export default function mongodbCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   const tool = sharedToolIcons();
   return {
     provider: {
-      name: "MongoDB",
-      tagline:
-        "Collect MongoDB metrics with the OpenTelemetry Collector and ship them to OpenObserve.",
+      id: "mongoDB",
+      name: raw("MongoDB"),
+      tagline: t("ingestion.setupCard.mongodbTagline"),
       logo: getImageURL("images/ingestion/mongodb.svg"),
       tone: "#00ED64",
-      metaBadges: ["Metrics"],
+      metaBadges: [t("common.metrics")],
     },
+    setupModes: DB_SETUP_MODES,
     steps: [
       {
         id: "prepare",
-        title: "Prepare MongoDB",
-        description:
-          "Create a monitoring user with clusterMonitor — run it in mongosh, **not** your shell.",
-        chip: { kind: "terminal", label: "Terminal" },
+        titleKey: "ingestion.setupCard.prepareMongodbTitle",
+        descriptionKey: "ingestion.setupCard.prepareMongodbDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
         completeOn: "copy",
         variants: [
           {
             id: "mongosh",
-            label: "mongosh",
+            label: raw("mongosh"),
             icon: tool.terminal,
             code: {
               lang: "bash",
@@ -88,7 +91,7 @@ export default function mongodbCard(subs: CardSubstitutions): RichCardContent {
           },
           {
             id: "docker",
-            label: "Docker",
+            label: raw("Docker"),
             icon: tool.docker,
             code: {
               lang: "bash",
@@ -97,47 +100,76 @@ export default function mongodbCard(subs: CardSubstitutions): RichCardContent {
           },
           {
             id: "shell",
-            label: "Compass Shell",
+            label: raw("Compass Shell"),
             icon: getImageURL("images/ingestion/mongodb.svg"),
             code: { lang: "javascript", raw: USER_JS },
           },
         ],
       },
-      collectorInstallStep(),
+      dbQuickInstallStep(t, subs, {
+        db: "mongodb",
+        hostLabelKey: "ingestion.setupCard.mongodbHostLabel",
+        defaultPort: "27017",
+        defaultUser: "otel",
+      }),
+      manualOnly(collectorInstallStep(t)),
       {
         id: "configure",
-        title: "Configure the OpenTelemetry Collector",
-        description: "Writes `config.yaml` — set the host/port below.",
-        chip: { kind: "terminal", label: "Terminal" },
+        mode: "manual",
+        titleKey: "ingestion.setupCard.configureCollectorTitle",
+        descriptionKey: "ingestion.setupCard.configureCollectorDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
         required: true,
         completeOn: "copy",
         variantGroup: "os",
         variantToggle: false,
         inputs: [
-          { id: "host", label: "MongoDB Host", default: "localhost", placeholder: "localhost" },
-          { id: "port", label: "Port", default: "27017", placeholder: "27017", width: "sm" },
+          {
+            id: "host",
+            labelKey: "ingestion.setupCard.mongodbHostLabel",
+            default: "localhost",
+            placeholder: raw("localhost"),
+          },
+          {
+            id: "port",
+            labelKey: "ingestion.setupCard.portLabel",
+            default: "27017",
+            placeholder: raw("27017"),
+            width: "sm",
+          },
         ],
         variants: writeConfigVariants(CONFIG_YAML, subs),
       },
       {
         id: "run",
-        title: "Run the OpenTelemetry Collector",
-        description: "Start the collector.",
-        chip: { kind: "run", label: "Run" },
+        mode: "manual",
+        titleKey: "ingestion.setupCard.runCollectorTitle",
+        descriptionKey: "ingestion.setupCard.runCollectorDesc",
+        chip: { kind: "run", labelKey: "ingestion.setupCard.chipRun" },
         completeOn: "copy",
         code: { lang: "bash", raw: "./otelcol-contrib --config ./config.yaml" },
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description: "Hit Test below, or check Streams for the `mongodb_*` metrics.",
-        chip: { kind: "traces", label: "Metrics" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyMongodbMetricsDesc",
+        chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Connections", "Operations", "Cache Hits", "Cursors", "Documents"],
+        // What the verify step will show, in prose. These are NOT the receiver metric
+        // names (those are mongodb.connection.count, mongodb.cursor.count, …) — they are
+        // a plain-English summary of them, so they are translated.
+        pills: [
+          t("ingestion.setupCard.pillConnections"),
+          t("ingestion.setupCard.pillOperations"),
+          t("ingestion.setupCard.pillCacheHits"),
+          t("ingestion.setupCard.pillCursors"),
+          t("ingestion.setupCard.pillDocuments"),
+        ],
       },
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "mongodb", filter: "" },
+    extras: { uninstall: dbUninstallExtra() },
     docUrl: "https://openobserve.ai/blog/monitor-mongodb-metrics-otel",
   };
 }

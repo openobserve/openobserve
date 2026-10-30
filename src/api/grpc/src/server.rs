@@ -21,6 +21,7 @@ use openobserve_node::{cluster_info::ClusterInfoService, node::NodeService};
 use opentelemetry_proto::tonic::collector::{
     logs::v1::logs_service_server::LogsServiceServer,
     metrics::v1::metrics_service_server::MetricsServiceServer,
+    profiles::v1development::profiles_service_server::ProfilesServiceServer,
     trace::v1::trace_service_server::TraceServiceServer,
 };
 use proto::cluster_rpc::{
@@ -30,22 +31,24 @@ use proto::cluster_rpc::{
     search_server::SearchServer, streams_server::StreamsServer,
 };
 use search_service::SEARCH_SERVER;
-use tokio::sync::oneshot;
+use tokio::{net::TcpListener, sync::oneshot};
 use tonic::{
     codec::CompressionEncoding,
-    service::interceptor::InterceptedService,
-    transport::{Identity, ServerTlsConfig},
+    service::{Routes, interceptor::InterceptedService},
+    transport::{Identity, ServerTlsConfig, server::TcpIncoming},
 };
+use tonic_tracing_opentelemetry::middleware::server::OtelGrpcLayer;
 
 use crate::{
     handler::grpc::{
-        auth::{check_auth, check_otlp_auth},
+        auth::{check_auth, check_internal_auth, check_otlp_auth},
         flight::FlightServiceImpl,
         request::{
             event::Eventer,
             ingest::Ingester,
             logs::LogsServer,
             metrics::{ingester::MetricsIngester, querier::MetricsQuerier},
+            profiles::ProfilesServer,
             query_cache::QueryCacheServerImpl,
             stream::StreamServiceImpl,
             traces::TraceServer,
@@ -79,6 +82,31 @@ async fn run_common(
         "0.0.0.0".to_string()
     };
     let gaddr: SocketAddr = format!("{}:{}", ip, cfg.grpc.port).parse()?;
+    log::info!(
+        "starting gRPC server {} at {}",
+        if cfg.grpc.tls_enabled { "with TLS" } else { "" },
+        gaddr
+    );
+    let incoming = TcpIncoming::from(bind_listener(gaddr, init_tx).await?).with_nodelay(Some(true));
+
+    let mut builder = server_builder()?.layer(otel_layer());
+    let ret = builder
+        .add_routes(common_routes())
+        .serve_with_incoming_shutdown(incoming, async {
+            shutdown_rx.await.ok();
+            log::info!("gRPC server starts shutting down");
+        })
+        .await;
+    if let Err(e) = ret {
+        return Err(anyhow::anyhow!("{e}"));
+    }
+
+    stopped_tx.send(()).ok();
+    Ok(())
+}
+
+fn common_routes() -> Routes {
+    let cfg = get_config();
     let event_svc = EventServer::new(Eventer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
@@ -97,16 +125,25 @@ async fn run_common(
     let metrics_ingest_svc = MetricsServiceServer::new(MetricsIngester)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Zstd)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let logs_svc = LogsServiceServer::new(LogsServer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Zstd)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let trace_svc = TraceServiceServer::new(TraceServer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Zstd)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+    let profiles_svc = ProfilesServiceServer::new(ProfilesServer)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Zstd)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let query_cache_svc = QueryCacheServer::new(QueryCacheServerImpl)
@@ -142,33 +179,26 @@ async fn run_common(
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
 
-    let event_svc = authenticated(event_svc);
-    let search_svc = authenticated(search_svc);
-    let metrics_svc = authenticated(metrics_svc);
+    let event_svc = internal_authenticated(event_svc);
+    let search_svc = internal_authenticated(search_svc);
+    let metrics_svc = internal_authenticated(metrics_svc);
     let metrics_ingest_svc = otlp_authenticated(metrics_ingest_svc);
     let trace_svc = otlp_authenticated(trace_svc);
+    let profiles_svc = otlp_authenticated(profiles_svc);
     let logs_svc = otlp_authenticated(logs_svc);
-    let query_cache_svc = authenticated(query_cache_svc);
-    let ingest_svc = authenticated(ingest_svc);
+    let query_cache_svc = internal_authenticated(query_cache_svc);
+    let ingest_svc = internal_authenticated(ingest_svc);
     let streams_svc = authenticated(streams_svc);
-    let flight_svc = authenticated(flight_svc);
-    let node_svc = authenticated(node_svc);
-    let cluster_info_svc = authenticated(cluster_info_svc);
+    let flight_svc = internal_authenticated(flight_svc);
+    let node_svc = internal_authenticated(node_svc);
+    let cluster_info_svc = internal_authenticated(cluster_info_svc);
 
-    log::info!(
-        "starting gRPC server {} at {}",
-        if cfg.grpc.tls_enabled { "with TLS" } else { "" },
-        gaddr
-    );
-    init_tx.send(()).ok();
-
-    let mut builder = server_builder()?;
-    let ret = builder
-        .add_service(event_svc)
+    Routes::new(event_svc)
         .add_service(search_svc)
         .add_service(metrics_svc)
         .add_service(metrics_ingest_svc)
         .add_service(trace_svc)
+        .add_service(profiles_svc)
         .add_service(logs_svc)
         .add_service(query_cache_svc)
         .add_service(ingest_svc)
@@ -176,17 +206,6 @@ async fn run_common(
         .add_service(flight_svc)
         .add_service(node_svc)
         .add_service(cluster_info_svc)
-        .serve_with_shutdown(gaddr, async {
-            shutdown_rx.await.ok();
-            log::info!("gRPC server starts shutting down");
-        })
-        .await;
-    if let Err(e) = ret {
-        return Err(anyhow::anyhow!("{e}"));
-    }
-
-    stopped_tx.send(()).ok();
-    Ok(())
 }
 
 async fn run_router(
@@ -199,36 +218,47 @@ async fn run_router(
     let logs_svc = LogsServiceServer::new(router::grpc::ingest::logs::LogsServer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Zstd)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let metrics_svc = MetricsServiceServer::new(router::grpc::ingest::metrics::MetricsServer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Zstd)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let traces_svc = TraceServiceServer::new(router::grpc::ingest::traces::TraceServer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Zstd)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+    let profiles_svc = ProfilesServiceServer::new(router::grpc::ingest::profiles::ProfilesServer)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Zstd)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
 
     let logs_svc = otlp_authenticated(logs_svc);
     let metrics_svc = otlp_authenticated(metrics_svc);
     let traces_svc = otlp_authenticated(traces_svc);
+    let profiles_svc = otlp_authenticated(profiles_svc);
 
     log::info!(
         "starting gRPC server {} at {}",
         if cfg.grpc.tls_enabled { "with TLS" } else { "" },
         gaddr
     );
-    init_tx.send(()).ok();
+    let incoming = TcpIncoming::from(bind_listener(gaddr, init_tx).await?).with_nodelay(Some(true));
 
-    let mut builder = server_builder()?;
+    let mut builder = server_builder()?.layer(otel_layer());
     let ret = builder
         .add_service(logs_svc)
         .add_service(metrics_svc)
         .add_service(traces_svc)
-        .serve_with_shutdown(gaddr, async {
+        .add_service(profiles_svc)
+        .serve_with_incoming_shutdown(incoming, async {
             shutdown_rx.await.ok();
             log::info!("gRPC server starts shutting down");
         })
@@ -251,6 +281,25 @@ fn otlp_authenticated<S>(service: S) -> InterceptedService<S, AuthInterceptor> {
     InterceptedService::new(service, check_otlp_auth)
 }
 
+fn internal_authenticated<S>(service: S) -> InterceptedService<S, AuthInterceptor> {
+    InterceptedService::new(service, check_internal_auth)
+}
+
+async fn bind_listener(
+    gaddr: SocketAddr,
+    init_tx: oneshot::Sender<()>,
+) -> Result<TcpListener, anyhow::Error> {
+    let listener = TcpListener::bind(gaddr).await?;
+    init_tx
+        .send(())
+        .map_err(|_| anyhow::anyhow!("gRPC initialization receiver dropped"))?;
+    Ok(listener)
+}
+
+fn otel_layer() -> OtelGrpcLayer {
+    OtelGrpcLayer::default().filter(config::meta::logger::otel_middleware_enabled)
+}
+
 fn server_builder() -> Result<tonic::transport::Server, anyhow::Error> {
     let cfg = get_config();
     let builder = if cfg.grpc.tls_enabled {
@@ -266,4 +315,173 @@ fn server_builder() -> Result<tonic::transport::Server, anyhow::Error> {
         .initial_connection_window_size(config::GRPC_HTTP2_CONNECTION_WINDOW_SIZE)
         .http2_adaptive_window(Some(cfg.grpc.http2_adaptive_window))
         .tcp_nodelay(true))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{Arc, Mutex};
+
+    use futures::StreamExt;
+    use proto::cluster_rpc::{
+        self, ingest_client::IngestClient, metrics_client::MetricsClient, metrics_server::Metrics,
+    };
+    use tokio::net::TcpStream;
+    use tonic::{Request, Response, Status, transport::Channel};
+    use tracing_subscriber::{Layer, filter::LevelFilter, layer::Context, prelude::*};
+
+    use super::*;
+    use crate::handler::grpc::auth::tests::{basic_request, seed_org_user};
+
+    struct Echo;
+
+    #[tonic::async_trait]
+    impl Metrics for Echo {
+        async fn query(
+            &self,
+            _: Request<cluster_rpc::MetricsQueryRequest>,
+        ) -> Result<Response<cluster_rpc::MetricsQueryResponse>, Status> {
+            Ok(Response::new(Default::default()))
+        }
+        type DataStream = futures::stream::Empty<Result<cluster_rpc::MetricsQueryResponse, Status>>;
+        async fn data(
+            &self,
+            _: Request<cluster_rpc::MetricsQueryRequest>,
+        ) -> Result<Response<Self::DataStream>, Status> {
+            Ok(Response::new(futures::stream::empty()))
+        }
+    }
+
+    struct WarnRecorder(Arc<Mutex<usize>>);
+
+    impl<S: tracing::Subscriber> Layer<S> for WarnRecorder {
+        fn on_event(&self, event: &tracing::Event<'_>, _: Context<'_, S>) {
+            if *event.metadata().level() == tracing::Level::WARN {
+                *self.0.lock().unwrap() += 1;
+            }
+        }
+    }
+
+    async fn warnings_per_request(layer: OtelGrpcLayer, level: LevelFilter) -> usize {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = format!("http://{}", listener.local_addr().unwrap());
+        let server = tokio::spawn(
+            tonic::transport::Server::builder()
+                .layer(layer)
+                .add_service(MetricsServer::new(Echo))
+                .serve_with_incoming(TcpIncoming::from(listener)),
+        );
+        let warnings = Arc::new(Mutex::new(0));
+        let subscriber = tracing_subscriber::registry()
+            .with(WarnRecorder(Arc::clone(&warnings)).with_filter(level));
+        // a lone dispatcher lets parallel tests cache the WARN callsite as disabled
+        let _second = tracing::Dispatch::new(tracing::subscriber::NoSubscriber::default());
+        let _guard = tracing::subscriber::set_default(subscriber);
+        let channel = tonic::transport::Channel::from_shared(addr)
+            .unwrap()
+            .connect()
+            .await
+            .unwrap();
+        MetricsClient::new(channel)
+            .query(cluster_rpc::MetricsQueryRequest::default())
+            .await
+            .unwrap();
+        server.abort();
+        *warnings.lock().unwrap()
+    }
+
+    #[tokio::test]
+    async fn init_is_signaled_after_grpc_socket_listens() {
+        let gaddr = "127.0.0.1:0".parse().unwrap();
+        let (init_tx, init_rx) = oneshot::channel();
+
+        let listener = bind_listener(gaddr, init_tx).await.unwrap();
+        init_rx.await.unwrap();
+
+        assert!(
+            TcpStream::connect(listener.local_addr().unwrap())
+                .await
+                .is_ok()
+        );
+    }
+
+    #[tokio::test]
+    async fn failed_bind_does_not_signal_init() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let (init_tx, init_rx) = oneshot::channel();
+
+        assert!(
+            bind_listener(listener.local_addr().unwrap(), init_tx)
+                .await
+                .is_err()
+        );
+        assert!(init_rx.await.is_err());
+    }
+
+    #[tokio::test]
+    async fn incoming_stream_enables_tcp_nodelay() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let mut incoming = TcpIncoming::from(listener).with_nodelay(Some(true));
+
+        let _client = TcpStream::connect(addr).await.unwrap();
+        let accepted = incoming.next().await.unwrap().unwrap();
+
+        assert!(accepted.nodelay().unwrap());
+    }
+
+    #[tokio::test]
+    async fn otel_layer_is_silent_when_tracing_is_off() {
+        for level in [LevelFilter::INFO, LevelFilter::TRACE] {
+            assert!(warnings_per_request(OtelGrpcLayer::default(), level).await > 0);
+            assert_eq!(warnings_per_request(otel_layer(), level).await, 0);
+        }
+    }
+
+    #[tokio::test]
+    async fn ingest_service_rejects_user_credentials() {
+        seed_org_user(
+            "grpc-wiring",
+            "wiring@example.com",
+            "Wiringpass#123",
+            "wiring-token",
+        );
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = format!("http://{}", listener.local_addr().unwrap());
+        let server = tokio::spawn(
+            tonic::transport::Server::builder()
+                .add_routes(common_routes())
+                .serve_with_incoming(TcpIncoming::from(listener)),
+        );
+        let channel = Channel::from_shared(addr).unwrap().connect().await.unwrap();
+        let ingest = |auth: Request<()>| {
+            let mut client = IngestClient::new(channel.clone());
+            let (metadata, extensions, ()) = auth.into_parts();
+            let body = cluster_rpc::IngestionRequest {
+                org_id: "grpc-wiring".to_string(),
+                stream_type: "index".to_string(),
+                ..Default::default()
+            };
+            async move {
+                client
+                    .ingest(Request::from_parts(metadata, extensions, body))
+                    .await
+            }
+        };
+
+        for password in ["Wiringpass#123", "wiring-token"] {
+            let user = basic_request("grpc-wiring", "wiring@example.com", password);
+            let status = ingest(user).await.unwrap_err();
+            assert_eq!(status.code(), tonic::Code::Unauthenticated);
+        }
+
+        let mut internal = Request::new(());
+        internal.metadata_mut().insert(
+            "authorization",
+            config::meta::cluster::get_internal_grpc_token()
+                .parse()
+                .unwrap(),
+        );
+        assert!(ingest(internal).await.is_ok());
+        server.abort();
+    }
 }

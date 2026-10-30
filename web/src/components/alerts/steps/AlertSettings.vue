@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Section header -->
     <div class="border-border-default flex items-center border-b px-3 py-2.5">
-      <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+      <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
       <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
         t("alerts.alertSettings.sectionTitle")
       }}</span>
@@ -33,18 +33,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="px-3 py-2">
       <div>
         <!-- For Real-Time Alerts -->
-        <template v-if="isRealTime === 'true'">
+        <template v-if="isRealTime === 'true' || isRealTime === 'composite'">
           <!-- Silence Notification (Cooldown) -->
-          <div class="mb-4 flex items-start justify-start pb-3">
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
+          <div class="mb-4 flex items-start justify-start pb-3 max-md:flex-col max-md:gap-1">
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
               {{ t("alerts.silenceNotification") + " *" }}
-              <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
+              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
               <OTooltip :content="t('alerts.alertSettings.cooldownTooltip')" side="right" />
             </div>
-            <div class="mr-2 flex w-fit flex-col gap-1">
+            <div class="me-2 flex w-fit flex-col gap-1">
               <div class="flex items-center">
                 <div class="w-21.75">
                   <OFormInput
+                    :aria-label="t('alerts.silenceNotification')"
                     name="trigger_condition.silence"
                     type="number"
                     min="0"
@@ -71,60 +72,94 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <!-- Destinations -->
-          <div class="mb-4 flex items-start pb-4">
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
-              {{ t("alerts.destination") + " *" }}
-              <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
-              <OTooltip :content="t('alerts.alertSettings.destinationsTooltip')" side="right" />
+          <!-- Pending period. Composite only — no per-alert frequency to warn
+               against (§2b), so no not-a-multiple hint here, unlike the
+               scheduled block below. Same field, label, and tooltip as the
+               scheduled version, intentionally no visual distinction — the
+               backend stores and evaluates it for composite alerts too
+               (handle_composite_alert_trigger). -->
+          <div
+            v-if="isRealTime === 'composite'"
+            class="mb-4 flex items-start justify-start pb-3 max-md:flex-col max-md:gap-1"
+          >
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
+              {{ t("alerts.queryConfig.pendingPeriod") }}
+              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
+              <OTooltip :content="t('alerts.queryConfig.pendingPeriodTooltip')" side="right" />
             </div>
-            <!-- Combined destinations + (enterprise) workflows picker. It owns its
-                 refresh / add buttons and keeps the original data-test hooks; the
-                 label above and the error below stay here. Deliberately NOT
-                 name=-bound: one control writes two form fields, so both go up
-                 through the parent's setFieldValue via the events below. -->
-            <div class="flex flex-col">
-              <AlertTargetsSelect
-                :destinations="destinations"
-                :workflows="workflows"
-                :destination-options="formattedDestinations"
-                :workflow-options="workflowOptions"
-                :workflows-enabled="workflowsEnabled"
-                :error="!!destinationsError"
-                @update:destinations="$emit('update:destinations', $event)"
-                @update:workflows="$emit('update:workflows', $event)"
-                @refresh="refreshTargets"
-                @create-destination="routeToCreateDestination"
-                @create-workflow="routeToCreateWorkflow"
-              />
-              <!-- role="alert": focusOnFirstError finds stranded errors by this
-                   marker to bring the owning tab forward — without it a
-                   destination-only error can't pull the user back to this tab. -->
+            <div class="me-2 flex w-fit flex-col gap-1">
+              <div class="flex items-center gap-2">
+                <div class="w-21.75">
+                  <OFormInput
+                    :aria-label="t('alerts.summary.pendingPeriod')"
+                    name="_ui.pendingPeriod"
+                    type="number"
+                    min="0"
+                    data-test="alert-settings-pending-period-input"
+                    @update:model-value="onPendingPeriodChange"
+                  >
+                    <template #error />
+                  </OFormInput>
+                </div>
+                <OSelect
+                  :aria-label="t('common.timeUnit')"
+                  class="max-w-25 min-w-20"
+                  :model-value="pendingPeriodUnit"
+                  :options="pendingPeriodUnitOptions"
+                  labelKey="label"
+                  valueKey="value"
+                  :searchable="false"
+                  data-test="alert-settings-pending-period-unit"
+                  @update:model-value="onPendingPeriodUnitChange"
+                />
+              </div>
               <div
-                v-if="destinationsError"
-                class="text-red-8 text-2xs pt-1 leading-3"
-                data-test="alert-settings-destinations-error"
+                v-if="pendingPeriodError"
+                class="text-input-error-text text-xs whitespace-nowrap"
+                data-test="alert-settings-pending-period-error"
                 role="alert"
               >
-                {{ destinationsError }}
+                {{ pendingPeriodError }}
               </div>
             </div>
           </div>
+
+          <!-- Destinations. Deliberately NOT name=-bound: one control writes two
+               form fields, so both go up through the parent's setFieldValue via
+               the events below. -->
+          <AlertDestinationsField
+            class="mb-4 pb-4"
+            :destinations="destinations"
+            :workflows="workflows"
+            :destination-options="formattedDestinations"
+            :error="destinationsError"
+            :notifies-nobody="notifiesNobody"
+            show-status
+            :placeholder="t('alerts.summary.noDestination')"
+            @update:destinations="$emit('update:destinations', $event)"
+            @update:workflows="$emit('update:workflows', $event)"
+            @refresh="$emit('refresh:destinations')"
+          />
         </template>
 
         <!-- For Scheduled Alerts -->
         <template v-else>
           <!-- Period -->
-          <div ref="periodFieldRef" class="mr-2 mb-4! flex items-start">
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
+          <div
+            v-if="!isForecastMode"
+            ref="periodFieldRef"
+            class="me-2 mb-4! flex items-start max-md:flex-col max-md:gap-1"
+          >
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
               {{ t("alerts.period") + " *" }}
-              <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
+              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
               <OTooltip :content="t('alerts.alertSettings.periodTooltip')" side="right" />
             </div>
-            <div class="mr-2 flex w-fit flex-col gap-1">
+            <div class="me-2 flex w-fit flex-col gap-1">
               <div class="flex items-center">
                 <div class="w-21.75">
                   <OFormInput
+                    :aria-label="t('alerts.period')"
                     name="trigger_condition.period"
                     type="number"
                     min="1"
@@ -154,16 +189,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
-          <div ref="silenceFieldRef" class="mr-2 mb-4! flex items-start">
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
+          <div
+            ref="silenceFieldRef"
+            class="me-2 mb-4! flex items-start max-md:flex-col max-md:gap-1"
+          >
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
               {{ t("alerts.silenceNotification") + " *" }}
-              <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
+              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
               <OTooltip :content="t('alerts.alertSettings.cooldownTooltip')" side="right" />
             </div>
-            <div class="mr-2 flex w-fit flex-col gap-1">
+            <div class="me-2 flex w-fit flex-col gap-1">
               <div class="flex items-center">
                 <div class="w-21.75">
                   <OFormInput
+                    :aria-label="t('alerts.silenceNotification')"
                     name="trigger_condition.silence"
                     type="number"
                     min="0"
@@ -191,85 +230,227 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <!-- Destinations -->
-          <div ref="destinationsFieldRef" class="mr-2 mb-4! flex items-start">
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
-              {{ t("alerts.destination") + " *" }}
-              <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
-              <OTooltip :content="t('alerts.alertSettings.destinationsTooltip')" side="right" />
+          <!-- Pending period for Scheduled Alerts. Moved here from
+               QueryConfig.vue's condition section — same field, label, and
+               tooltip as the composite version above, plus the
+               not-a-multiple-of-Check-every warning (composite has no
+               frequency to compare against, so it skips that row). -->
+          <div
+            ref="pendingPeriodFieldRef"
+            class="me-2 mb-4! flex items-start max-md:flex-col max-md:gap-1"
+          >
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
+              {{ t("alerts.queryConfig.pendingPeriod") }}
+              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
+              <OTooltip :content="t('alerts.queryConfig.pendingPeriodTooltip')" side="right" />
             </div>
-            <!-- Combined destinations + (enterprise) workflows picker. It owns its
-                 refresh / add buttons and keeps the original data-test hooks; the
-                 label above and the error below stay here. Deliberately NOT
-                 name=-bound: one control writes two form fields, so both go up
-                 through the parent's setFieldValue via the events below. -->
-            <div class="flex flex-col">
-              <AlertTargetsSelect
-                :destinations="destinations"
-                :workflows="workflows"
-                :destination-options="formattedDestinations"
-                :workflow-options="workflowOptions"
-                :workflows-enabled="workflowsEnabled"
-                :error="!!destinationsError"
-                @update:destinations="$emit('update:destinations', $event)"
-                @update:workflows="$emit('update:workflows', $event)"
-                @refresh="refreshTargets"
-                @create-destination="routeToCreateDestination"
-                @create-workflow="routeToCreateWorkflow"
-              />
-              <!-- role="alert": focusOnFirstError finds stranded errors by this
-                   marker to bring the owning tab forward — without it a
-                   destination-only error can't pull the user back to this tab. -->
+            <div class="me-2 flex w-fit flex-col gap-1">
+              <div class="flex items-center gap-2">
+                <div class="w-21.75">
+                  <OFormInput
+                    :aria-label="t('alerts.summary.pendingPeriod')"
+                    name="_ui.pendingPeriod"
+                    type="number"
+                    min="0"
+                    data-test="alert-settings-pending-period-input"
+                    @update:model-value="onPendingPeriodChange"
+                  >
+                    <template #error />
+                  </OFormInput>
+                </div>
+                <OSelect
+                  :aria-label="t('common.timeUnit')"
+                  class="max-w-25 min-w-20"
+                  :model-value="pendingPeriodUnit"
+                  :options="pendingPeriodUnitOptions"
+                  labelKey="label"
+                  valueKey="value"
+                  :searchable="false"
+                  data-test="alert-settings-pending-period-unit"
+                  @update:model-value="onPendingPeriodUnitChange"
+                />
+              </div>
               <div
-                v-if="destinationsError"
-                class="text-red-8 text-2xs pt-1 leading-3"
-                data-test="alert-settings-destinations-error"
+                v-if="pendingPeriodError"
+                class="text-input-error-text text-xs whitespace-nowrap"
+                data-test="alert-settings-pending-period-error"
                 role="alert"
               >
-                {{ destinationsError }}
+                {{ pendingPeriodError }}
+              </div>
+              <div
+                v-if="!pendingPeriodError && pendingPeriodWarning"
+                class="text-status-warning-text text-xs whitespace-nowrap"
+                data-test="alert-settings-pending-period-warning"
+                role="alert"
+              >
+                {{ pendingPeriodWarning }}
               </div>
             </div>
           </div>
+
+          <!-- Destinations. Deliberately NOT name=-bound: one control writes two
+               form fields, so both go up through the parent's setFieldValue via
+               the events below. The focus manager resolves a component ref via
+               $el, so the ref moves onto the field unchanged. -->
+          <AlertDestinationsField
+            ref="destinationsFieldRef"
+            class="me-2 mb-4!"
+            :destinations="destinations"
+            :workflows="workflows"
+            :destination-options="formattedDestinations"
+            :error="destinationsError"
+            :notifies-nobody="notifiesNobody"
+            show-status
+            :placeholder="t('alerts.summary.noDestination')"
+            @update:destinations="$emit('update:destinations', $event)"
+            @update:workflows="$emit('update:workflows', $event)"
+            @refresh="$emit('refresh:destinations')"
+          />
         </template>
 
-        <!-- Creates Incident toggle — shown for all alert types -->
-        <div class="mb-4! flex items-start">
-          <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
+        <!-- Creates Incident toggle — all alert types, enterprise/cloud with Incidents on -->
+        <div v-if="incidentsEnabled" class="mb-4! flex items-start max-md:gap-3">
+          <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
             {{ t("alerts.alertSettings.createsIncident") }}
-            <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
+            <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
             <OTooltip :content="t('alerts.alertSettings.createsIncidentTooltip')" side="right" />
           </div>
-          <OFormSwitch name="creates_incident" data-test="alert-creates-incident-toggle" />
+          <OFormSwitch
+            name="creates_incident"
+            :aria-label="t('alerts.alertSettings.createsIncident')"
+            data-test="alert-creates-incident-toggle"
+          />
         </div>
+
+        <!-- Scheduled only: realtime, composite and anomaly alerts keep no episode, so neither field can act. -->
+        <template v-if="isRealTime === 'false'">
+          <div class="mb-4! flex items-start max-md:gap-3">
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
+              {{ t("alerts.alertSettings.notifyOnRecovery") }}
+              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
+              <OTooltip
+                :content="
+                  notifiesNobody
+                    ? t('alerts.alertSettings.notifyOnRecoveryNeedsDestination')
+                    : t('alerts.alertSettings.notifyOnRecoveryTooltip')
+                "
+                side="right"
+              />
+            </div>
+            <div class="flex flex-col gap-1">
+              <!-- A recovery closes what a firing delivered; with no target nothing is
+                   delivered, so it cannot be turned on. It can still be turned off. -->
+              <OFormSwitch
+                name="notify_on_recovery"
+                :aria-label="t('alerts.alertSettings.notifyOnRecovery')"
+                :disabled="notifiesNobody && !formData?.notify_on_recovery"
+                data-test="alert-notify-on-recovery-toggle"
+              />
+              <template v-if="formData?.notify_on_recovery && !notifiesNobody">
+                <div
+                  v-for="row in recoveryPlan"
+                  :key="row.name"
+                  class="text-text-secondary text-xs"
+                  :data-test="`alert-notify-on-recovery-plan-${row.name}`"
+                >
+                  {{ row.name }} — {{ row.action }}
+                </div>
+                <div
+                  v-if="hasChatRecovery"
+                  class="text-text-secondary text-xs"
+                  data-test="alert-notify-on-recovery-hint"
+                >
+                  {{ t("alerts.alertSettings.notifyOnRecoveryTemplateHint") }}
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <AlertDestinationsField
+            v-if="formData?.notify_on_recovery && !notifiesNobody"
+            class="me-2 mb-4!"
+            :destinations="recoveryDestinations"
+            :workflows="[]"
+            :destination-options="formattedDestinations"
+            :label="t('alerts.alertSettings.recoveryDestinations')"
+            :tooltip="t('alerts.alertSettings.recoveryDestinationsTooltip')"
+            :supports-workflows="false"
+            @update:destinations="$emit('update:recoveryDestinations', $event)"
+            @refresh="$emit('refresh:destinations')"
+          />
+
+          <!-- The hold delays on-call and incident closure too, not only the message. -->
+          <div class="mb-4! flex items-start max-md:flex-col max-md:gap-1">
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
+              {{ t("alerts.alertSettings.keepFiringFor") }}
+              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
+              <OTooltip :content="t('alerts.alertSettings.keepFiringForTooltip')" side="right" />
+            </div>
+            <div class="flex items-center">
+              <div class="w-21.75">
+                <OFormInput
+                  :aria-label="t('alerts.alertSettings.keepFiringFor')"
+                  name="keep_firing_for"
+                  type="number"
+                  min="0"
+                  :debounce="300"
+                  data-test="alert-settings-keep-firing-for-input"
+                />
+              </div>
+              <div
+                class="bg-input-addon-bg text-input-addon-text text-compact flex h-8.5 min-w-22.5 items-center justify-center"
+              >
+                {{ t("alerts.seconds") }}
+              </div>
+            </div>
+          </div>
+
+          <div v-if="repeatSuppressionAvailable" class="mb-4! flex items-start max-md:gap-3">
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
+              {{ t("alerts.alertSettings.suppressRepeats") }}
+              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
+              <OTooltip :content="t('alerts.alertSettings.suppressRepeatsTooltip')" side="right" />
+            </div>
+            <OFormSwitch
+              name="suppress_repeats"
+              :aria-label="t('alerts.alertSettings.suppressRepeats')"
+              data-test="alert-suppress-repeats-toggle"
+            />
+          </div>
+        </template>
       </div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, inject, onMounted, ref, type PropType } from "vue";
-import { useI18n } from "vue-i18n";
+import { computed, defineComponent, inject, ref, type PropType } from "vue";
+import { useI18nTyped, type I18nKey } from "@/types/i18n";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
+import config from "@/aws-exports";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import AlertTargetsSelect from "@/components/alerts/AlertTargetsSelect.vue";
-import workflowService from "@/services/workflows";
-import config from "@/aws-exports";
+import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.vue";
+import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
+import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
-import { convertMinutesToCron } from "@/utils/zincutils";
+import { convertMinutesToCron, getCronIntervalDifferenceInSeconds } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "Step3AlertConditions",
   components: {
     OFormInput,
     OFormSwitch,
+    OSelect,
     OTooltip,
     OIcon,
-    AlertTargetsSelect,
+    AlertDestinationsField,
   },
   props: {
     formData: {
@@ -304,26 +485,49 @@ export default defineComponent({
       type: Array as PropType<any[]>,
       default: () => [],
     },
+    // The org's destination OBJECTS (`destinations` above holds only the
+    // selected names). Read-only here — the recovery list needs each selected
+    // destination's platform, which lives on the object.
+    destinationObjects: {
+      type: Array as PropType<any[]>,
+      default: () => [],
+    },
+    // Empty = the recovery follows the firing's destinations.
+    recoveryDestinations: {
+      type: Array as PropType<any[]>,
+      default: () => [],
+    },
   },
   emits: [
     "update:trigger",
     "update:aggregation",
     "update:isAggregationEnabled",
     "update:destinations",
+    "update:recoveryDestinations",
     "refresh:destinations",
     "update:workflows",
     "update:promqlCondition",
   ],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
-    const router = useRouter();
+
+    // Same gate as the Incidents menu: enterprise/cloud build AND the backend
+    // /config flag. `=== true` keeps it hidden while /config is still loading.
+    const incidentsEnabled = computed(
+      () =>
+        (config.isEnterprise === "true" || config.isCloud === "true") &&
+        store.state.zoConfig?.incidents_enabled === true,
+    );
+    // The backend honours the switch only in enterprise builds.
+    const repeatSuppressionAvailable = config.isEnterprise === "true" || config.isCloud === "true";
 
     // Field refs consumed by the parent's AlertFocusManager (registered off the
     // step ref). Scheduled-only.
     const periodFieldRef = ref<any>(null);
     const silenceFieldRef = ref<any>(null);
     const destinationsFieldRef = ref<any>(null);
+    const pendingPeriodFieldRef = ref<any>(null);
 
     // Period / silence are composite "number + Minutes addon" fields: a 5.4rem
     // OFormInput glued to a unit block. OFormInput renders its message INSIDE
@@ -339,64 +543,126 @@ export default defineComponent({
         : computed(() => undefined);
     const periodError = fieldError("trigger_condition.period");
     const silenceError = fieldError("trigger_condition.silence");
-    // Destinations is NOT an OFormSelect any more (AlertTargetsSelect below is a
-    // plain controlled component covering destinations + workflows), so its
-    // schema error has no wrapper to render it — surface it the same way period
-    // and silence do. The rule is "at least one destination OR workflow" and is
-    // keyed on `destinations` in AddAlert.schema.ts, so it lands on this path.
+    // AlertDestinationsField is not an OForm* wrapper, so it cannot render its own schema error.
     const destinationsError = fieldError("destinations");
-
-    // ── Workflows (enterprise/cloud only) ────────────────────────────────────
-    // Options are self-fetched here rather than threaded down the whole alert-form
-    // chain like destinations. In OSS the group is never built, no list is
-    // fetched, and — since `workflows` stays [] — the "destination OR workflow"
-    // rule reduces to the original "destination required".
-    // "Are workflows available here" — the only thing this flag has ever gated
-    // in this component (the picker's Workflows group + the list fetch below).
-    // It was build-only; it now also respects the backend /config flag
-    // `workflows_enabled`, via the same shared gate the sidebar and routes use.
-    // Renamed from `workflowsEnabled` because it no longer means "enterprise build":
-    // on an enterprise deployment with workflows switched off this is false.
-    const workflowsEnabled = computed(
+    const notifiesNobody = computed(
       () =>
-        (config.isEnterprise === "true" || config.isCloud === "true") &&
-        store.state.zoConfig?.workflows_enabled === true,
+        !hasDeliveryTarget({
+          destinations: props.destinations,
+          workflows: props.workflows,
+          oncall_team: props.formData?.oncall_team,
+        }),
     );
-    const workflowOptions = ref<{ label: string; value: string }[]>([]);
-    const fetchWorkflows = async () => {
-      if (!workflowsEnabled.value) return;
-      try {
-        const res = await workflowService.listWorkflows(
-          store.state.selectedOrganization.identifier,
-        );
-        const list = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
-        workflowOptions.value = list.map((wf: any) => ({
-          label: wf.name,
-          value: wf.id,
-        }));
-      } catch {
-        workflowOptions.value = [];
+    const pendingPeriodError = fieldError("_ui.pendingPeriod");
+    // Forecast mode fixes the period and reads its own history window, so a period field would only compete with it.
+    const isForecastMode = form
+      ? form.useStore((s: any) => !!s.values?._ui?.forecast)
+      : computed(() => false);
+
+    // General field get/set — same shape as QueryConfig's `fv`/`setFV`: a
+    // reactive snapshot registers the dependency, the synchronous
+    // `getFieldValue` read stays fresh (same-tick read-after-write).
+    const formValuesSnapshot: any = form?.useStore?.((s: any) => s.values);
+    const fv = (name: string): any => {
+      void formValuesSnapshot?.value;
+      return form?.getFieldValue?.(name);
+    };
+    const setFV = (name: string, value: any): void => {
+      form?.setFieldValue?.(name, value);
+    };
+
+    // Pending period — TWO values, same split as QueryConfig's Check every:
+    //   • pendingPeriodUnit + `_ui.pendingPeriod` → the DISPLAY unit/value.
+    //   • `pending_period_sec` (misnomer kept for wire compatibility) → the
+    //     STORED value, ALWAYS MINUTES, same convention frequency uses. Only
+    //     alertPayload.ts's existing ×60 conversion ever turns it into real
+    //     seconds, so keeping it minutes here means that conversion — and the
+    //     composite hand-built payload's own ×60 — need no changes.
+    // Initial unit mirrors useAlertForm's `pendingPeriodDisplay`: independently
+    // derived from props here (not shared code), matching how QueryConfig's
+    // `frequencyMode` and useAlertForm's `frequencyDisplay` stay independent.
+    const initialPendingPeriodRaw = Number(props.formData?.pending_period_sec ?? 0);
+    const initialPendingPeriodUnit: "minutes" | "hours" =
+      initialPendingPeriodRaw >= 60 && initialPendingPeriodRaw % 60 === 0 ? "hours" : "minutes";
+    const pendingPeriodUnit = ref<"minutes" | "hours">(initialPendingPeriodUnit);
+
+    const pendingPeriodUnitOptions = computed(() => [
+      { label: t("common.minutes"), value: "minutes" },
+      { label: t("common.hours"), value: "hours" },
+    ]);
+
+    /** Bridge DISPLAY → STORED MINUTES. The single writer of
+     *  `pending_period_sec` in this component. */
+    const setStoredPendingPeriod = (display: number | null): void => {
+      const mins =
+        display == null || Number.isNaN(display)
+          ? 0
+          : pendingPeriodUnit.value === "hours"
+            ? display * 60
+            : display;
+      setFV("pending_period_sec", mins);
+    };
+
+    const onPendingPeriodChange = (value: any) => {
+      const parsed = value === "" || value === null || value === undefined ? null : Number(value);
+      setStoredPendingPeriod(parsed);
+    };
+
+    const onPendingPeriodUnitChange = (modelValue: SelectModelValue) => {
+      const unit = typeof modelValue === "string" ? modelValue : "";
+      const prevUnit = pendingPeriodUnit.value;
+      pendingPeriodUnit.value = unit as "minutes" | "hours";
+      if (unit === prevUnit) return;
+
+      const currentDisplay = Number(fv("_ui.pendingPeriod")) || 0;
+      if (unit === "hours" && prevUnit === "minutes") {
+        const hrs = currentDisplay / 60;
+        setFV("_ui.pendingPeriod", hrs);
+        setStoredPendingPeriod(hrs);
+      } else if (unit === "minutes" && prevUnit === "hours") {
+        const mins = currentDisplay * 60;
+        setFV("_ui.pendingPeriod", mins);
+        setStoredPendingPeriod(mins);
       }
     };
-    onMounted(fetchWorkflows);
 
-    // The combined field's single refresh reloads both lists.
-    const refreshTargets = () => {
-      emit("refresh:destinations");
-      fetchWorkflows();
-    };
+    // Not-a-multiple-of-Check-every hint, moved here from QueryConfig.vue.
+    // Purely presentational — never blocks save, the backend doesn't enforce
+    // this relationship either (a non-multiple value just rounds up to the
+    // next evaluation). Scheduled-only: composite has no per-alert frequency
+    // to compare against (§2b), so it returns "" unconditionally.
+    const pendingPeriodWarning = computed<string>(() => {
+      if (props.isRealTime !== "false") return "";
+      const pendingMinutes = Number(fv("pending_period_sec"));
+      if (!Number.isFinite(pendingMinutes) || pendingMinutes <= 0) return "";
 
-    const routeToCreateWorkflow = () => {
-      const url = router.resolve({
-        name: "createWorkflow",
-        query: {
-          trigger: "alert_fired",
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      }).href;
-      window.open(url, "_blank");
-    };
+      const frequencyType = fv("trigger_condition.frequency_type");
+      let freqMinutes: number;
+      if (frequencyType === "cron") {
+        const cronExpression = fv("trigger_condition.cron");
+        if (!cronExpression) return "";
+        try {
+          freqMinutes = getCronIntervalDifferenceInSeconds(cronExpression) / 60;
+        } catch {
+          return "";
+        }
+      } else {
+        freqMinutes = Number(fv("trigger_condition.frequency"));
+      }
+      if (!Number.isFinite(freqMinutes) || freqMinutes <= 0) return "";
 
+      // Float-safe "is a multiple of" — see QueryConfig's original comment:
+      // a cron interval can be fractional minutes, where exact `%` comparisons
+      // can miss by floating-point dust at either edge of the wrap.
+      const remainder = pendingMinutes % freqMinutes;
+      const EPSILON = 1e-6;
+      if (remainder < EPSILON || freqMinutes - remainder < EPSILON) return "";
+      return t("alerts.validation.pendingPeriodNotMultiple", {
+        minutes: Math.round(freqMinutes * 100) / 100,
+      });
+    });
+
+    // ── Workflows (enterprise/cloud only) ────────────────────────────────────
     const getBrowserTimezone = (): string => {
       try {
         return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
@@ -436,34 +702,73 @@ export default defineComponent({
       emit("update:trigger", nextTrigger);
     };
 
-    const routeToCreateDestination = () => {
-      const url = router.resolve({
-        name: "alertDestinations",
-        query: {
-          action: "add",
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      }).href;
-      window.open(url, "_blank");
+    // ── Recovery ────────────────────────────────────────────────────────────
+    // Platform destinations are resolved by the server itself (it closes the
+    // incident/alert it opened); everything else gets an ordinary rendered
+    // message, so only those still depend on the user's template.
+    const { detectPrebuiltType } = usePrebuiltDestinations();
+    const platformRecoveryKeys: Record<string, I18nKey> = {
+      pagerduty: "alerts.alertSettings.recoveryResolvesIncident",
+      opsgenie: "alerts.alertSettings.recoveryClosesAlert",
+      servicenow: "alerts.alertSettings.recoveryResolvesIncident",
     };
 
+    const platformOf = (destination: any): string => detectPrebuiltType(destination) ?? "";
+
+    const platformKeyFor = (name: any): string | undefined => {
+      const destination = props.destinationObjects.find((d: any) => d?.name === name);
+      return destination ? platformRecoveryKeys[platformOf(destination)] : undefined;
+    };
+
+    // Ticket closes always go to the firing's own destinations; only the message can be
+    // redirected, so an override lists both halves rather than replacing the first.
+    const recoveryPlan = computed(() => {
+      const redirected = props.recoveryDestinations.length > 0;
+      const rows = props.destinations
+        .filter((name: any) => !redirected || platformKeyFor(name))
+        .map((name: any) => {
+          const platformKey = platformKeyFor(name);
+          return {
+            name: String(name),
+            isPlatform: !!platformKey,
+            action: t(platformKey ?? "alerts.alertSettings.recoveryChatMessage"),
+          };
+        });
+      if (!redirected) return rows;
+      return rows.concat(
+        props.recoveryDestinations.map((name: any) => ({
+          name: String(name),
+          isPlatform: false,
+          action: t("alerts.alertSettings.recoveryChatMessage"),
+        })),
+      );
+    });
+    const hasChatRecovery = computed(() => recoveryPlan.value.some((row) => !row.isPlatform));
+
     return {
+      recoveryPlan,
+      hasChatRecovery,
       t,
       store,
+      incidentsEnabled,
+      repeatSuppressionAvailable,
       handlePeriodChange,
-      routeToCreateDestination,
       // Field refs for the parent focus manager
       periodFieldRef,
       silenceFieldRef,
       destinationsFieldRef,
+      pendingPeriodFieldRef,
       periodError,
+      isForecastMode,
       silenceError,
       destinationsError,
-      workflowsEnabled,
-      workflowOptions,
-      fetchWorkflows,
-      refreshTargets,
-      routeToCreateWorkflow,
+      notifiesNobody,
+      pendingPeriodError,
+      pendingPeriodWarning,
+      pendingPeriodUnit,
+      pendingPeriodUnitOptions,
+      onPendingPeriodChange,
+      onPendingPeriodUnitChange,
     };
   },
 });

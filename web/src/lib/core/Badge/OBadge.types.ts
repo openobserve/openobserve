@@ -3,6 +3,8 @@
  * No types should be defined inline in OBadge.vue.
  */
 
+import type { I18nText } from "@/types/i18n";
+
 /**
  * Semantic colour variant — design is baked in, no style override props.
  *
@@ -33,6 +35,14 @@ export type BadgeVariant =
   | "primary-soft"
   | "success-soft"
   | "warning-soft"
+  /**
+   * Attention that is COMMON. Reads as amber in light, where the warning
+   * ramp is pale-on-deep and stays tasteful at a dozen per screen; goes
+   * neutral in dark, where the same ramp is full-chroma against near-black
+   * and a dozen of them become the page background. Tint the icon separately
+   * when the state still needs a colour in both themes.
+   */
+  | "warning-quiet"
   | "error-soft"
   // Extended color families for correlation dimensions.
   | "teal"
@@ -61,7 +71,8 @@ export type BadgeVariant =
   | "indigo-soft";
 
 /** Size controls padding and font-size only. */
-export type BadgeSize = "xs" | "sm" | "md";
+/** `lg` is for read-at-a-distance status, such as the dashboard TV-mode strip. */
+export type BadgeSize = "xs" | "sm" | "md" | "lg";
 
 /**
  * Corner shape:
@@ -110,6 +121,16 @@ export interface BadgeProps {
   clickable?: boolean;
   /** Mutes the badge visually and suppresses interaction. */
   disabled?: boolean;
+  /**
+   * Renders a trailing ✕ that emits `remove`. This is the O2 delete affordance
+   * for a chip — a token in a multi-select, an escalation target, a filter pill.
+   * Without it, call sites nest a bare `<button>` inside the badge, which is
+   * neither focus-styled nor sized and gives a keyboard user an unstyled tab
+   * stop inside a pill.
+   */
+  removable?: boolean;
+  /** Accessible name for the remove button. Defaults to `common.remove`. */
+  removeLabel?: I18nText;
 }
 
 export interface BadgeEmits {
@@ -118,6 +139,8 @@ export interface BadgeEmits {
    * via the keyboard (Enter or Space).
    */
   click: [e: MouseEvent | KeyboardEvent];
+  /** Fired when the `removable` ✕ is activated. */
+  remove: [e: MouseEvent];
 }
 
 export interface BadgeSlots {

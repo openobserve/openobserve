@@ -99,6 +99,14 @@ describe("QueryConfig.schema — conditions tree", () => {
       expect(conditionsTreeSchema.safeParse(group([leaf({ value: 0 })])).success).toBe(true);
     });
 
+    it("unary operators need no value", () => {
+      for (const operator of ["is_null", "is_not_null", "is_empty", "is_not_empty"]) {
+        expect(conditionsTreeSchema.safeParse(group([leaf({ operator, value: "" })])).success).toBe(
+          true,
+        );
+      }
+    });
+
     it('value fails ONLY on undefined / null / ""', () => {
       for (const bad of ["", null, undefined]) {
         const result = conditionsTreeSchema.safeParse(group([leaf({ value: bad })]));

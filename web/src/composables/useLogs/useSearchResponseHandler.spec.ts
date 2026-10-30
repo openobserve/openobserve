@@ -99,6 +99,7 @@ const mockLogsUtils = {
 
 const mockHistogram = {
   getHistogramTitle: vi.fn(() => "Histogram"),
+  getHistogramTitleParts: vi.fn(() => null),
   generateHistogramData: vi.fn(),
   resetHistogramWithError: vi.fn(),
 };
@@ -210,6 +211,19 @@ describe("useSearchResponseHandler", () => {
     responseHandler = useSearchResponseHandler();
   });
 
+  describe("handleHistogramStreamingHits", () => {
+    it("skips the fill instead of throwing when the run built no request", () => {
+      (mockState.searchObj.data as any).customDownloadQueryObj = {};
+      const response: any = {
+        content: { results: { hits: [{ zo_sql_key: "2024-01-01T00:00:00", zo_sql_num: 1 }] } },
+      };
+      expect(() =>
+        responseHandler.handleHistogramStreamingHits({ meta: {} } as any, response),
+      ).not.toThrow();
+      expect(mockState.searchObj.data.queryResults.aggs).toHaveLength(1);
+    });
+  });
+
   describe("constructErrorMessage", () => {
     it("should construct error message with default message", () => {
       const result = responseHandler.constructErrorMessage({
@@ -277,7 +291,7 @@ describe("useSearchResponseHandler", () => {
       responseHandler.setCancelSearchError();
 
       expect(mockState.searchObj.data.histogram.errorMsg).toBe(
-        "Histogram search query was cancelled",
+        "search.histogramSearchQueryCancelled",
       );
     });
   });
@@ -368,7 +382,8 @@ describe("useSearchResponseHandler", () => {
       responseHandler.handleSearchError(request, error as any);
 
       expect(mockState.searchObj.data.countErrorMsg).toContain(
-        "Error while retrieving total events",
+        // `t` is mocked to echo its key, so assert the key the code now resolves
+        "search.errorWhileRetrievingTotalEvents",
       );
       expect(mockState.searchObj.data.countErrorMsg).toContain("TraceID: trace-pc");
     });
@@ -390,6 +405,34 @@ describe("useSearchResponseHandler", () => {
       expect(mockState.searchObj.data.histogram.errorMsg).toContain("Histogram failed");
       expect(mockState.searchObj.data.histogram.errorCode).toBe(404);
       expect(mockState.searchObj.data.histogram.errorDetail).toBe("Data not found");
+    });
+  });
+
+  describe("handleSearchError — page crossing outcome (4a §3.2.2)", () => {
+    const fail = (request: object, code: number) =>
+      responseHandler.handleSearchError(request, {
+        content: { message: "x", trace_id: "server-trace", code },
+      } as any);
+
+    it("records `error` for the pagination search, keyed by its own traceId", () => {
+      fail({ type: "search", isPagination: true, traceId: "page-2" }, 500);
+      expect(mockState.searchObj.data.resultGrid.pageLoad).toEqual({
+        requestId: "page-2",
+        ok: false,
+        reason: "error",
+      });
+    });
+
+    it("records `cancelled` for code 20009", () => {
+      fail({ type: "search", isPagination: true, traceId: "page-2" }, 20009);
+      expect(mockState.searchObj.data.resultGrid.pageLoad?.reason).toBe("cancelled");
+    });
+
+    it("histogram, pageCount and first-page errors record nothing", () => {
+      fail({ type: "histogram", isPagination: true, traceId: "h" }, 500);
+      fail({ type: "pageCount", isPagination: true, traceId: "c" }, 500);
+      fail({ type: "search", isPagination: false, traceId: "s" }, 500);
+      expect(mockState.searchObj.data.resultGrid.pageLoad ?? null).toBeNull();
     });
   });
 
@@ -601,7 +644,7 @@ describe("useSearchResponseHandler", () => {
       expect(mockState.searchObj.data.datetime.startTime).toBe(1000);
       expect(mockState.searchObj.data.datetime.endTime).toBe(2000);
       expect(mockState.searchObj.data.datetime.type).toBe("absolute");
-      expect(utils.updateUrlQueryParams).toHaveBeenCalled();
+      expect(utils.updateUrlQueryParams).toHaveBeenCalledWith(null, null, "replace");
     });
   });
 

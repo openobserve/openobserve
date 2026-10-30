@@ -60,7 +60,7 @@
               <OIcon
                 name="drag-indicator"
                 size="sm"
-                class="mr-1"
+                class="me-1"
                 :data-test="`dashboard-addpanel-config-color-by-series-drag-handle-${index}`"
               />
             </div>
@@ -105,6 +105,7 @@
 
               <!-- Delete series -->
               <OButton
+                :aria-label="t('common.remove')"
                 variant="ghost"
                 size="icon"
                 @click="removecolorBySeriesByIndex(index)"
@@ -120,12 +121,9 @@
   </ODialog>
 </template>
 <script lang="ts">
-import { computed, ref, nextTick } from "vue";
-import { defineComponent } from "vue";
-import { useI18n } from "vue-i18n";
-import { onMounted } from "vue";
+import { computed, ref, nextTick, defineComponent, onMounted, watch } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import { VueDraggableNext } from "vue-draggable-next";
-import { watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -165,7 +163,7 @@ export default defineComponent({
   },
   emits: ["close", "save"],
   setup(props: any, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // The whole form is the `series[]` field-array — the FORM is the SOLE source
     // (rule ②). This component OWNS <OForm> and needs to read `series` to render

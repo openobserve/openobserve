@@ -12,6 +12,12 @@ const i18n = createI18n({
     en: {
       search: { noData: "No data available" },
       common: { loading: "Loading..." },
+      components: {
+        table: {
+          selectedOfTotal: "{selected} of {total} selected",
+          selectedCount: "{selected} selected",
+        },
+      },
     },
   },
 });
@@ -21,11 +27,15 @@ beforeAll(() => {
   config.global.plugins.unshift([i18n as any]);
 });
 
-import { nextTick, reactive } from "vue";
+import { defineComponent, h, nextTick, reactive } from "vue";
 import OTable from "./OTable.vue";
 import OTableHeader from "./sub-components/OTableHeader.vue";
+import OTableBody from "./sub-components/OTableBody.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import type { I18nText } from "@/types/i18n";
 import type { OTableColumnDef } from "./OTable.types";
+import { raw } from "@/types/i18n";
 
 interface TestRow {
   id: number;
@@ -247,6 +257,47 @@ describe("OTable", () => {
     });
   });
 
+  describe("pagination: client with filters", () => {
+    const INFO = '[data-test="o2-table-pagination-info"]';
+    const filterableColumns = (): OTableColumnDef<TestRow>[] =>
+      makeColumns().map((c) => (c.id === "status" ? { ...c, filterable: true } : c));
+    const rowsWithFourPending = (): TestRow[] =>
+      makeRows(16).map((r, i) => (i < 4 ? { ...r, status: "Pending" } : r));
+    const footerText = () => wrapper.find(INFO).text().replace(/\s+/g, " ");
+
+    it("counts only rows matching the global filter", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: rowsWithFourPending(),
+          columns: makeColumns(),
+          pagination: "client",
+          pageSize: 10,
+          globalFilter: "Pending",
+        },
+      });
+      await nextTick();
+      expect(wrapper.findAll('[data-test^="o2-table-row-"]').length).toBe(4);
+      expect(footerText()).toMatch(/1 - 4 \S+ 4$/);
+    });
+
+    it("counts only rows matching a column filter", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: rowsWithFourPending(),
+          columns: filterableColumns(),
+          pagination: "client",
+          pageSize: 10,
+        },
+      });
+      expect(footerText()).toMatch(/1 - 10 \S+ 16$/);
+
+      (wrapper.vm as any).table.getColumn("status").setFilterValue(["Pending"]);
+      await nextTick();
+      expect(wrapper.findAll('[data-test^="o2-table-row-"]').length).toBe(4);
+      expect(footerText()).toMatch(/1 - 4 \S+ 4$/);
+    });
+  });
+
   // ── Server-Side Pagination ──────────────────────────────────
 
   describe("pagination: server", () => {
@@ -306,6 +357,36 @@ describe("OTable", () => {
       await wrapper.find('[data-test="o2-table-next-page-btn"]').trigger("click");
       const events = wrapper.emitted("pagination-change") as any[][];
       expect(events.at(-1)![0]).toEqual({ page: 2, size: 20 });
+    });
+
+    it("gives every pagination control an accessible name", () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(20),
+          columns: makeColumns(),
+          pagination: "server",
+          totalCount: 100,
+          totalCountExact: true,
+          pageSize: 20,
+          currentPage: 2,
+        },
+      });
+
+      const names = {
+        first: "First page",
+        prev: "Previous page",
+        next: "Next page",
+        last: "Last page",
+      };
+      for (const [id, name] of Object.entries(names)) {
+        expect(wrapper.find(`[data-test="o2-table-${id}-page-btn"]`).attributes("aria-label")).toBe(
+          name,
+        );
+      }
+      expect(wrapper.find("nav[aria-label]").exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="o2-table-page-size-select-trigger"]').attributes("aria-label"),
+      ).toBe("Records per page");
     });
 
     it("should reflect a pageSize prop change in the footer", async () => {
@@ -673,6 +754,80 @@ describe("OTable", () => {
           .attributes("data-test-sort-direction"),
       ).toBe("none");
     });
+
+    const shuffled = (): TestRow[] =>
+      ["Carol", "Alice", "Bob"].map((name, i) => ({
+        id: i + 1,
+        name,
+        email: `${name.toLowerCase()}@example.com`,
+        status: "Active",
+      }));
+    const columnText = (w: VueWrapper, id: string) =>
+      w.findAll(`[data-test="o2-table-cell-${id}"]`).map((c) => c.text());
+    const nameTrigger = (w: VueWrapper) =>
+      w.findAll('[data-test="o2-table-th-sort-trigger"]').find((t) => t.text().includes("Name"))!;
+
+    it("emits the post-toggle sort on a header click and reorders the rows", async () => {
+      wrapper = mount(OTable, {
+        props: { data: shuffled(), columns: makeColumns(), sorting: "client" },
+      });
+
+      await nameTrigger(wrapper).trigger("click");
+      expect(columnText(wrapper, "name")).toEqual(["Alice", "Bob", "Carol"]);
+      expect(wrapper.emitted("update:sortBy")?.at(-1)).toEqual(["name"]);
+      expect(wrapper.emitted("update:sortOrder")?.at(-1)).toEqual(["asc"]);
+      expect(wrapper.emitted("sort-change")?.at(-1)).toEqual([{ column: "name", order: "asc" }]);
+
+      await nameTrigger(wrapper).trigger("click");
+      expect(columnText(wrapper, "name")).toEqual(["Carol", "Bob", "Alice"]);
+      expect(wrapper.emitted("sort-change")?.at(-1)).toEqual([{ column: "name", order: "desc" }]);
+
+      await nameTrigger(wrapper).trigger("click");
+      expect(columnText(wrapper, "name")).toEqual(["Carol", "Alice", "Bob"]);
+      expect(wrapper.emitted("update:sortBy")?.at(-1)).toEqual([""]);
+      expect(wrapper.emitted("sort-change")?.at(-1)).toEqual([{ column: "", order: "asc" }]);
+    });
+
+    it("applies a later sortBy/sortOrder prop change without emitting", async () => {
+      wrapper = mount(OTable, {
+        props: { data: shuffled(), columns: makeColumns(), sorting: "client" },
+      });
+
+      await wrapper.setProps({ sortBy: "name", sortOrder: "desc" });
+      expect(columnText(wrapper, "name")).toEqual(["Carol", "Bob", "Alice"]);
+      await wrapper.setProps({ sortOrder: "asc" });
+      expect(columnText(wrapper, "name")).toEqual(["Alice", "Bob", "Carol"]);
+
+      expect(wrapper.emitted("update:sortBy")).toBeUndefined();
+      expect(wrapper.emitted("update:sortOrder")).toBeUndefined();
+      expect(wrapper.emitted("sort-change")).toBeUndefined();
+    });
+
+    it("keeps undefined values last in both directions with sortUndefined: last", async () => {
+      const columns: OTableColumnDef<TestRow>[] = [
+        ...makeColumns(),
+        {
+          id: "score",
+          header: "Score",
+          accessorFn: (r) => (r.id % 2 === 0 ? undefined : r.id),
+          sortable: true,
+          sortUndefined: "last",
+        },
+      ];
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(5),
+          columns,
+          sorting: "client",
+          sortBy: "score",
+          sortOrder: "asc",
+        },
+      });
+      expect(columnText(wrapper, "id")).toEqual(["1", "3", "5", "2", "4"]);
+
+      await wrapper.setProps({ sortOrder: "desc" });
+      expect(columnText(wrapper, "id")).toEqual(["5", "3", "1", "2", "4"]);
+    });
   });
 
   // ── Server-Side Sorting ────────────────────────────────────
@@ -697,6 +852,55 @@ describe("OTable", () => {
       });
     });
 
+    it.each([
+      ["reorderable", true],
+      ["fixed-order", false],
+    ])("wraps a plain label header in the sort button, %s header (M15)", (_label, reorder) => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(3),
+          columns: makeColumns(),
+          sorting: "server",
+          enableColumnReorder: reorder,
+        },
+      });
+      const th = wrapper.find('[data-test="o2-table-th-id"]');
+      const trigger = th.find('[data-test="o2-table-th-sort-trigger"]');
+      expect(trigger.find("[data-o2-th-label]").exists()).toBe(true);
+      expect(th.find('[data-test="o2-table-th-custom-header"]').exists()).toBe(false);
+    });
+
+    it.each([
+      ["reorderable", true],
+      ["fixed-order", false],
+    ])(
+      "keeps a component header outside a separate, labelled sort button, %s header (M15)",
+      async (_label, reorder) => {
+        const HeaderWithControl = defineComponent({
+          render: () => h("span", [h("span", "Score"), h("button", { type: "button" }, "info")]),
+        });
+        const columns: OTableColumnDef<any>[] = [
+          { id: "id", header: HeaderWithControl as any, accessorKey: "id", sortable: true },
+          { id: "name", header: raw("Name"), accessorKey: "name" },
+        ];
+        wrapper = mount(OTable, {
+          props: { data: makeRows(3), columns, sorting: "server", enableColumnReorder: reorder },
+          attachTo: document.body,
+        });
+        const th = wrapper.find('[data-test="o2-table-th-id"]');
+        const trigger = th.find('[data-test="o2-table-th-sort-trigger"]');
+        const content = th.find('[data-test="o2-table-th-custom-header"]');
+        expect(trigger.exists()).toBe(true);
+        expect(content.text()).toContain("Score");
+        expect(trigger.findAll("button")).toHaveLength(0);
+        expect(trigger.text()).not.toContain("Score");
+        expect(trigger.attributes("aria-labelledby")).toBe(content.attributes("id"));
+        expect(document.getElementById(content.attributes("id")!)).not.toBeNull();
+        await trigger.trigger("click");
+        expect(wrapper.emitted("sort-change")?.[0][0]).toEqual({ column: "id", order: "asc" });
+      },
+    );
+
     it("toggles sort order on second click", async () => {
       wrapper = mount(OTable, {
         props: {
@@ -716,6 +920,53 @@ describe("OTable", () => {
     });
   });
 
+  describe("applyColumnVisibility", () => {
+    beforeEach(() => localStorage.clear());
+
+    it("hides a column for the session without persisting the choice", async () => {
+      const columns = makeColumns().map((c) => (c.id === "email" ? { ...c, hideable: true } : c));
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(3),
+          columns,
+          tableId: "apply-visibility",
+          persistColumns: true,
+        },
+      });
+      const stored = localStorage.getItem("o2-tables-column-state-v1");
+      expect(wrapper.findAll('[data-test="o2-table-cell-email"]').length).toBe(3);
+
+      (wrapper.vm as any).applyColumnVisibility({ email: false });
+      await nextTick();
+
+      expect(wrapper.findAll('[data-test="o2-table-cell-email"]').length).toBe(0);
+      expect(localStorage.getItem("o2-tables-column-state-v1")).toBe(stored);
+    });
+  });
+
+  describe("persisted columns", () => {
+    beforeEach(() => localStorage.clear());
+
+    /// A column removed from a table must not break a layout saved while it existed.
+    it("ignores saved state for a column the table no longer has", () => {
+      localStorage.setItem(
+        "o2-tables-column-state-v1",
+        JSON.stringify({ "gone-column": { visibility: { state: true }, sizes: { state: 160 } } }),
+      );
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(2),
+          columns: makeColumns(),
+          tableId: "gone-column",
+          persistColumns: true,
+        },
+      });
+
+      expect(wrapper.findAll('[data-test="o2-table-cell-email"]').length).toBe(2);
+      expect(wrapper.find('[data-test="o2-table-cell-state"]').exists()).toBe(false);
+    });
+  });
+
   // ── Row Selection ──────────────────────────────────────────
 
   describe("selection", () => {
@@ -730,6 +981,16 @@ describe("OTable", () => {
       expect(wrapper.find('[data-test="o2-table-select-cell"]').exists()).toBe(true);
     });
 
+    it("names the select-all and row checkboxes", () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(3), columns: makeColumns(), selection: "multiple" },
+      });
+      const all = wrapper.find('[data-test="o2-table-select-all"] [role="checkbox"]');
+      expect(all.attributes("aria-label")).toBe("Select all rows");
+      const row = wrapper.find('[data-test="o2-table-select-0"] [role="checkbox"]');
+      expect(row.attributes("aria-label")).toMatch(/^Select row /);
+    });
+
     it("does not render checkbox column when selection is none", () => {
       wrapper = mount(OTable, {
         props: {
@@ -741,7 +1002,23 @@ describe("OTable", () => {
       expect(wrapper.find('[data-test="o2-table-select-cell"]').exists()).toBe(false);
     });
 
-    it("emits update:selectedIds when a row checkbox is toggled", async () => {
+    it("hides the header select-all but keeps its cell when showSelectAll is false", () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(5),
+          columns: makeColumns(),
+          selection: "multiple",
+          showSelectAll: false,
+        },
+      });
+      const header = wrapper.find('[data-test="o2-table-th-select"]');
+      // The cell stays so the body's selection gutter keeps its width; only the
+      // checkbox goes.
+      expect(header.exists()).toBe(true);
+      expect(header.find('[data-test="o2-table-select-all"]').exists()).toBe(false);
+    });
+
+    it("renders the header select-all by default", () => {
       wrapper = mount(OTable, {
         props: {
           data: makeRows(5),
@@ -749,9 +1026,70 @@ describe("OTable", () => {
           selection: "multiple",
         },
       });
-      // The checkbox might be a nested component; trigger the row click
-      const row = wrapper.find('[data-test="o2-table-row-0"]');
-      await row.trigger("click");
+      expect(
+        wrapper
+          .find('[data-test="o2-table-th-select"]')
+          .find('[data-test="o2-table-select-all"]')
+          .exists(),
+      ).toBe(true);
+    });
+
+    it("emits update:selectedIds when a row checkbox is toggled", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(5),
+          columns: makeColumns(),
+          selection: "multiple",
+          onRowClick: vi.fn(),
+        },
+      });
+      await wrapper.find('[data-test="o2-table-select-0"] button').trigger("click");
+      expect(wrapper.emitted("update:selectedIds")?.[0][0]).toEqual(["1"]);
+      expect(wrapper.emitted("row-click")).toBeFalsy();
+    });
+
+    it("toggles selection without a row-click when the select cell padding is clicked", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(5),
+          columns: makeColumns(),
+          selection: "multiple",
+          onRowClick: vi.fn(),
+        },
+      });
+      const cell = wrapper.findAll('[data-test="o2-table-select-cell"]')[1];
+      await cell.trigger("click");
+      expect(wrapper.emitted("update:selectedIds")?.[0][0]).toEqual(["2"]);
+      await cell.trigger("click");
+      expect(wrapper.emitted("update:selectedIds")?.[1][0]).toEqual([]);
+      expect(wrapper.emitted("row-click")).toBeFalsy();
+    });
+
+    it("ignores select cell clicks on rows that are not selectable", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(3),
+          columns: makeColumns(),
+          selection: "multiple",
+          isRowSelectable: (row: TestRow) => row.id !== 1,
+          onRowClick: vi.fn(),
+        },
+      });
+      await wrapper.findAll('[data-test="o2-table-select-cell"]')[0].trigger("click");
+      expect(wrapper.emitted("update:selectedIds")).toBeFalsy();
+      expect(wrapper.emitted("row-click")).toBeFalsy();
+    });
+
+    it("toggles all rows when the header select cell padding is clicked", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(3),
+          columns: makeColumns(),
+          selection: "multiple",
+        },
+      });
+      await wrapper.find('[data-test="o2-table-th-select"]').trigger("click");
+      expect(wrapper.emitted("update:selectedIds")?.[0][0]).toEqual(["1", "2", "3"]);
     });
   });
 
@@ -864,6 +1202,39 @@ describe("OTable", () => {
     });
   });
 
+  // ── Header over a non-row state ────────────────────────────
+
+  describe("header over a non-row state", () => {
+    const isPinned = (w: VueWrapper) =>
+      w.find('[data-test="o2-table"]').classes().includes("sticky");
+
+    it("pins the header-only table above the empty state", () => {
+      wrapper = mount(OTable, { props: { data: [], columns: makeColumns() } });
+      expect(wrapper.find('[data-test="o2-table-empty"]').exists()).toBe(true);
+      expect(isPinned(wrapper)).toBe(true);
+    });
+
+    it("pins it above the error and no-access states too", async () => {
+      wrapper = mount(OTable, { props: { data: [], columns: makeColumns(), error: "API Error" } });
+      expect(isPinned(wrapper)).toBe(true);
+      await wrapper.setProps({ error: null, forbidden: true });
+      expect(wrapper.find('[data-test="o2-table-forbidden"]').exists()).toBe(true);
+      expect(isPinned(wrapper)).toBe(true);
+    });
+
+    it("leaves pinning to the <thead> while rows show", () => {
+      wrapper = mount(OTable, { props: { data: makeRows(5), columns: makeColumns() } });
+      expect(isPinned(wrapper)).toBe(false);
+    });
+
+    it("stays unpinned when the header is not sticky or not shown", async () => {
+      wrapper = mount(OTable, { props: { data: [], columns: makeColumns(), stickyHeader: false } });
+      expect(isPinned(wrapper)).toBe(false);
+      await wrapper.setProps({ stickyHeader: true, showHeader: false });
+      expect(isPinned(wrapper)).toBe(false);
+    });
+  });
+
   // ── Column Features ────────────────────────────────────────
 
   describe("column features", () => {
@@ -942,10 +1313,377 @@ describe("OTable", () => {
     });
   });
 
+  // ── Cut-off cell tooltip ──────────────────────────────
+
+  describe("cut-off cell tooltip", () => {
+    // jsdom has no layout, so a test sets the two widths the cut-off check compares.
+    const setWidths = (el: Element, scrollWidth: number, clientWidth: number) => {
+      Object.defineProperty(el, "scrollWidth", { configurable: true, value: scrollWidth });
+      Object.defineProperty(el, "clientWidth", { configurable: true, value: clientWidth });
+    };
+    const bubbles = () => document.body.querySelectorAll('[data-test="o-tooltip-content"]');
+    const hoverPastDelay = async (cell: Element) => {
+      cell.dispatchEvent(new MouseEvent("mouseenter"));
+      vi.advanceTimersByTime(700);
+      await nextTick();
+      await nextTick();
+    };
+    const nameSlot = (inner: string) => ({
+      "cell-name": `<template #cell-name="{ row }">${inner}</template>`,
+    });
+
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it("shows the full value in one shared tooltip after hovering a cut cell", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(2), columns: makeColumns() },
+        attachTo: document.body,
+      });
+      const cell = wrapper.findAll('[data-test="o2-table-cell-email"]')[0].element;
+      setWidths(cell, 400, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(bubbles()).toHaveLength(1);
+      expect(bubbles()[0].textContent).toContain("user1@example.com");
+    });
+
+    it("opens and closes the tooltip without re-rendering the table body", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(3), columns: makeColumns() },
+        attachTo: document.body,
+      });
+      const cell = wrapper.findAll('[data-test="o2-table-cell-email"]')[0].element;
+      setWidths(cell, 400, 120);
+      const body = wrapper.findComponent(OTableBody).vm.$;
+      const renderedBody = body.subTree;
+
+      await hoverPastDelay(cell);
+      expect(bubbles()).toHaveLength(1);
+      expect(body.subTree).toBe(renderedBody);
+
+      cell.dispatchEvent(new MouseEvent("mouseleave"));
+      for (let i = 0; i < 4; i++) await nextTick();
+      expect(bubbles()).toHaveLength(0);
+      expect(body.subTree).toBe(renderedBody);
+    });
+
+    it("opens nothing when the cell's text fits", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-email"]').element;
+      setWidths(cell, 120, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(bubbles()).toHaveLength(0);
+    });
+
+    it("never shows a cut cell in a column that opts out, as a secret column does", async () => {
+      const columns = makeColumns().map((c) =>
+        c.id === "email" ? { ...c, meta: { cellOverflowTooltip: false } } : c,
+      );
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns },
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-email"]').element;
+      setWidths(cell, 400, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(bubbles()).toHaveLength(0);
+    });
+
+    it("never shows a cut cell when the whole table turns the tooltip off", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns(), cellOverflowTooltip: false },
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-email"]').element;
+      setWidths(cell, 400, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(bubbles()).toHaveLength(0);
+    });
+
+    it("closes an open tooltip when the table turns the tooltip off", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-email"]').element;
+      setWidths(cell, 400, 120);
+      await hoverPastDelay(cell);
+      expect(bubbles()).toHaveLength(1);
+
+      await wrapper.setProps({ cellOverflowTooltip: false });
+      // reka removes a closed bubble a few ticks after `open` turns false.
+      for (let i = 0; i < 4; i++) await nextTick();
+
+      expect(bubbles()).toHaveLength(0);
+    });
+
+    it("measures the slot wrapper for custom cell content", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        slots: nameSlot(`<b>{{ row.name }}</b>`),
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-name"]').element;
+      setWidths(cell.querySelector("[data-o2-cell-clip]")!, 400, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(bubbles()[0]?.textContent).toContain("User 1");
+    });
+
+    it("leaves cut text alone when it already carries its own title", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        slots: nameSlot(`<span :title="row.name">{{ row.name }}</span>`),
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-name"]').element;
+      setWidths(cell.querySelector("[data-o2-cell-clip]")!, 400, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(bubbles()).toHaveLength(0);
+    });
+
+    it("still shows cut text when the cell's only other title is a text-less copy button", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        slots: nameSlot(`<span>{{ row.name }}</span><button title="Copy"></button>`),
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-name"]').element;
+      setWidths(cell.querySelector("[data-o2-cell-clip]")!, 400, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(bubbles()[0]?.textContent).toContain("User 1");
+    });
+
+    it("never shows text from inside an element marked off, as a secret is", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        slots: nameSlot(`<span data-o-tooltip-off="">{{ row.name }}</span>`),
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-name"]').element;
+      setWidths(cell.querySelector("[data-o2-cell-clip]")!, 400, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(bubbles()).toHaveLength(0);
+    });
+
+    it("shows the cut wrapper's text when an overflow-only tooltip inside it is not cut itself", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        slots: nameSlot(`<span data-o-tooltip-trigger="overflow">{{ row.name }}</span>`),
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-name"]').element;
+      setWidths(cell.querySelector("[data-o2-cell-clip]")!, 400, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(bubbles()[0]?.textContent).toContain("User 1");
+    });
+
+    it("opens nothing when the cut cell has no text, such as an icon", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        slots: nameSlot(`<i class="icon"></i>`),
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-name"]').element;
+      setWidths(cell.querySelector("[data-o2-cell-clip]")!, 400, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(bubbles()).toHaveLength(0);
+    });
+
+    it("opens below the cell when the cell's hover toolbar sits above it", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        slots: { "cell-hover-actions": `<span class="hover-act">A</span>` },
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-email"]').element;
+      setWidths(cell, 400, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(document.querySelector(".hover-act")).not.toBeNull();
+      expect(bubbles()[0]?.getAttribute("data-side")).toBe("bottom");
+    });
+
+    it("opens above the cell when there is no hover toolbar", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-email"]').element;
+      setWidths(cell, 400, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(bubbles()[0]?.getAttribute("data-side")).toBe("top");
+    });
+
+    it("closes the tooltip when the pointer leaves the cell", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-email"]').element;
+      setWidths(cell, 400, 120);
+      await hoverPastDelay(cell);
+      expect(bubbles()).toHaveLength(1);
+
+      cell.dispatchEvent(new MouseEvent("mouseleave"));
+      // reka removes a closed bubble a few ticks after `open` turns false.
+      for (let i = 0; i < 4; i++) await nextTick();
+
+      expect(bubbles()).toHaveLength(0);
+    });
+
+    it("closes the tooltip when the table scrolls", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-email"]').element;
+      setWidths(cell, 400, 120);
+      await hoverPastDelay(cell);
+      expect(bubbles()).toHaveLength(1);
+
+      await wrapper.find('[data-test="o2-table-scroll-container"]').trigger("scroll");
+      await nextTick();
+
+      expect(bubbles()).toHaveLength(0);
+    });
+  });
+
+  describe("cut-off header text", () => {
+    const setWidths = (el: Element, scrollWidth: number, clientWidth: number) => {
+      Object.defineProperty(el, "scrollWidth", { configurable: true, value: scrollWidth });
+      Object.defineProperty(el, "clientWidth", { configurable: true, value: clientWidth });
+    };
+    const bubbles = () => document.body.querySelectorAll('[data-test="o-tooltip-content"]');
+    const hoverPastDelay = async (el: Element) => {
+      el.dispatchEvent(new MouseEvent("mouseenter"));
+      vi.advanceTimersByTime(700);
+      await nextTick();
+      await nextTick();
+    };
+    const withHelp = (subLabel?: string) =>
+      makeColumns().map((c) =>
+        c.id === "email"
+          ? {
+              ...c,
+              // Without row reorder, only a sortable header draws its sub-label.
+              sortable: !!subLabel,
+              meta: {
+                headerTooltip: raw("Where we send alerts"),
+                ...(subLabel ? { headerSubLabel: raw(subLabel) } : {}),
+              },
+            }
+          : c,
+      );
+    const th = () => wrapper.find('[data-test="o2-table-th-email"]').element;
+    const label = () => th().querySelector("[data-o2-th-label]")!;
+
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it("shows a cut column name in a cut-only tooltip instead of an always-on title", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        attachTo: document.body,
+      });
+      expect(label().getAttribute("title")).toBeNull();
+      expect(label().getAttribute("data-o-tooltip-trigger")).toBe("overflow");
+
+      setWidths(label(), 400, 120);
+      await hoverPastDelay(label());
+
+      expect(bubbles()).toHaveLength(1);
+      expect(bubbles()[0].textContent).toContain("Email");
+    });
+
+    it("opens nothing on a column name that fits", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        attachTo: document.body,
+      });
+
+      await hoverPastDelay(label());
+
+      expect(bubbles()).toHaveLength(0);
+    });
+
+    it("starts the help bubble with a cut name, so only one bubble opens", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: withHelp() },
+        attachTo: document.body,
+      });
+      expect(label().hasAttribute("data-o-tooltip-off")).toBe(true);
+      setWidths(label(), 400, 120);
+
+      await hoverPastDelay(th());
+
+      expect(bubbles()).toHaveLength(1);
+      const name = bubbles()[0].querySelector('[data-test="o2-table-th-tooltip-name"]');
+      expect(name?.textContent).toBe("Email");
+      expect(bubbles()[0].textContent).toContain("Where we send alerts");
+    });
+
+    it("leaves the help bubble unchanged when the name fits", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: withHelp() },
+        attachTo: document.body,
+      });
+
+      await hoverPastDelay(th());
+
+      expect(bubbles()).toHaveLength(1);
+      expect(bubbles()[0].querySelector('[data-test="o2-table-th-tooltip-name"]')).toBeNull();
+      expect(bubbles()[0].textContent).toContain("Where we send alerts");
+      expect(bubbles()[0].textContent).not.toContain("Email");
+    });
+
+    it("adds a cut sub-label under the name in the help bubble", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: withHelp("delivery address") },
+        attachTo: document.body,
+      });
+      setWidths(th().querySelector("[data-o2-th-sublabel]")!, 400, 120);
+
+      await hoverPastDelay(th());
+
+      expect(
+        bubbles()[0].querySelector('[data-test="o2-table-th-tooltip-name"]')?.textContent,
+      ).toBe("Email");
+      expect(
+        bubbles()[0].querySelector('[data-test="o2-table-th-tooltip-sublabel"]')?.textContent,
+      ).toBe("delivery address");
+    });
+  });
+
   // ── Cell hover-action overlay ─────────────────────────
 
   describe("cell hover actions", () => {
-    it("renders a cell-hover-actions overlay per cell and activates only the hovered cell", async () => {
+    it("teleports one cell-hover-actions toolbar, only for the hovered cell", async () => {
       vi.useFakeTimers();
       wrapper = mount(OTable, {
         props: { data: makeRows(2), columns: makeColumns() },
@@ -954,20 +1692,48 @@ describe("OTable", () => {
         },
       });
 
-      expect(wrapper.findAll('[data-test^="o2-table-cell-hover-actions-"]').length).toBeGreaterThan(
-        0,
-      );
-      expect(wrapper.findAll('.hover-act[data-active="true"]').length).toBe(0);
+      // The toolbar floats clear of the hovered row, so it lives in <body> and exists
+      // only while a cell is hovered — never one overlay per cell.
+      const toolbars = () =>
+        document.querySelectorAll('[data-test^="o2-table-cell-hover-actions-"]');
+      expect(toolbars().length).toBe(0);
 
       await wrapper.find('[data-test="o2-table-cell-id"]').trigger("mouseenter");
       vi.advanceTimersByTime(250);
       await nextTick();
-      expect(wrapper.findAll('.hover-act[data-active="true"]').length).toBe(1);
+      expect(toolbars().length).toBe(1);
+      expect(document.querySelectorAll('.hover-act[data-active="true"]').length).toBe(1);
 
       await wrapper.find('[data-test="o2-table-cell-id"]').trigger("mouseleave");
       vi.advanceTimersByTime(200);
       await nextTick();
-      expect(wrapper.findAll('.hover-act[data-active="true"]').length).toBe(0);
+      expect(toolbars().length).toBe(0);
+      vi.useRealTimers();
+    });
+
+    it("stays hidden on cells where the slot renders nothing", async () => {
+      vi.useFakeTimers();
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        slots: {
+          "cell-hover-actions": `<span v-if="column.id === 'name'" class="hover-act">A</span>`,
+        },
+      });
+
+      // Hovering the 'id' cell yields only a v-if comment — no empty box should float.
+      await wrapper.find('[data-test="o2-table-cell-id"]').trigger("mouseenter");
+      vi.advanceTimersByTime(250);
+      await nextTick();
+      expect(document.querySelectorAll('[data-test^="o2-table-cell-hover-actions-"]').length).toBe(
+        0,
+      );
+
+      await wrapper.find('[data-test="o2-table-cell-name"]').trigger("mouseenter");
+      vi.advanceTimersByTime(250);
+      await nextTick();
+      expect(document.querySelectorAll('[data-test^="o2-table-cell-hover-actions-"]').length).toBe(
+        1,
+      );
       vi.useRealTimers();
     });
 
@@ -984,7 +1750,102 @@ describe("OTable", () => {
         },
       });
       expect(wrapper.find('[data-test="col-actions"]').exists()).toBe(true);
-      expect(wrapper.findAll('[data-test^="o2-table-cell-hover-actions-"]').length).toBe(0);
+      expect(document.querySelectorAll('[data-test^="o2-table-cell-hover-actions-"]').length).toBe(
+        0,
+      );
+    });
+
+    describe("placement", () => {
+      const realRect = Element.prototype.getBoundingClientRect;
+
+      // The td, the thead and the toolbar are the only rects the placement reads.
+      function stubRects(cellTop: number, cellBottom: number, headerBottom: number) {
+        Element.prototype.getBoundingClientRect = function () {
+          const el = this as HTMLElement;
+          if (el.tagName === "THEAD") {
+            return { top: 0, bottom: headerBottom, height: headerBottom } as DOMRect;
+          }
+          if (el.classList?.contains("o2-table-cell-hover-actions")) {
+            return { top: 0, bottom: 34, left: 0, right: 120, width: 120, height: 34 } as DOMRect;
+          }
+          if (el.tagName === "TD") {
+            return {
+              top: cellTop,
+              bottom: cellBottom,
+              left: 100,
+              right: 300,
+              width: 200,
+              height: cellBottom - cellTop,
+            } as DOMRect;
+          }
+          return { top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0 } as DOMRect;
+        } as any;
+      }
+
+      async function hoverCell(
+        cellTop: number,
+        cellBottom: number,
+        headerBottom: number,
+        clientX: number,
+      ) {
+        stubRects(cellTop, cellBottom, headerBottom);
+        wrapper = mount(OTable, {
+          props: { data: makeRows(3), columns: makeColumns() },
+          slots: { "cell-hover-actions": `<span class="hover-act">A</span>` },
+        });
+        await wrapper
+          .find('[data-test="o2-table-cell-id"]')
+          .trigger("mouseenter", { clientX, clientY: 999 });
+        await nextTick();
+        await nextTick();
+        await nextTick();
+        return document.querySelector('[data-test^="o2-table-cell-hover-actions-"]') as HTMLElement;
+      }
+
+      const arrowOf = (bar: HTMLElement) =>
+        bar.querySelector('[data-test^="o2-table-cell-hover-arrow-"]') as HTMLElement;
+
+      beforeEach(() => {
+        Object.defineProperty(window, "innerWidth", { value: 800, configurable: true });
+      });
+
+      afterEach(() => {
+        Element.prototype.getBoundingClientRect = realRect;
+        document.querySelectorAll(".o2-table-cell-hover-actions").forEach((n) => n.remove());
+      });
+
+      it("anchors to the row's top edge, not the pointer, and points the arrow down", async () => {
+        const bar = await hoverCell(300, 324, 40, 200);
+        // clientY was 999 — a pointer-anchored toolbar would have landed there.
+        expect(bar.style.top).toBe("300px");
+        expect(bar.style.transform).toBe("translate(-50%, -100%)");
+        expect(arrowOf(bar).className).toContain("-bottom-1");
+      });
+
+      it("flips below the row when the toolbar would cover the sticky header", async () => {
+        const bar = await hoverCell(50, 74, 40, 200);
+        expect(bar.style.top).toBe("74px");
+        expect(bar.style.transform).toBe("translate(-50%, 0)");
+        expect(arrowOf(bar).className).toContain("-top-1");
+      });
+
+      it("clamps the toolbar to the window but keeps the arrow over the pointer", async () => {
+        const bar = await hoverCell(300, 324, 40, 795);
+        // Half-width is 60, so the centre can go no further than 800 - 60.
+        expect(bar.style.left).toBe("740px");
+        // Pointer 795 sits 115px into a 120px bar; the arrow stops 10px short of the corner.
+        expect(arrowOf(bar).style.left).toBe("110px");
+      });
+
+      it("centres the arrow and clips it to the half outside the bar", async () => {
+        const bar = await hoverCell(300, 324, 40, 400);
+        expect(bar.style.left).toBe("400px");
+        // `left` is the arrow's centre (`-ms-1`); unclipped, the rotated square's
+        // upper half notches any filled control in the bar (the AI chip).
+        expect(arrowOf(bar).style.left).toBe("60px");
+        expect(arrowOf(bar).className).toContain("-ms-1");
+        expect(arrowOf(bar).className).toContain("[clip-path:polygon(0_100%");
+      });
     });
   });
 
@@ -1002,6 +1863,37 @@ describe("OTable", () => {
       // dense mode sets row height to 2.25rem via CSS variable on the table
       const tableEl = wrapper.find('[data-test="o2-table"]');
       expect(tableEl.attributes("style")).toContain("2.25rem");
+    });
+
+    it("uses the compact row token and unpadded cells when compact is true", () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(3), columns: makeColumns(), compact: true },
+      });
+      const tableEl = wrapper.find('[data-test="o2-table"]');
+      expect(tableEl.attributes("style")).toContain("var(--table-row-height-compact, 1.5625rem)");
+      const cell = wrapper.find('td[data-test^="o2-table-cell-"]');
+      expect(cell.classes()).toContain("px-0");
+      expect(cell.classes()).not.toContain("px-2");
+      expect(wrapper.find('th[data-test^="o2-table-th-"]').classes()).toContain("h-6");
+    });
+
+    it("keeps padded cells and the default header height without compact", () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(3), columns: makeColumns() },
+      });
+      expect(wrapper.find('td[data-test^="o2-table-cell-"]').classes()).toContain("px-2");
+      expect(wrapper.find('th[data-test^="o2-table-th-"]').classes()).toContain("h-8");
+    });
+
+    it("draws the pager hairline by default and drops it with paginationBordered false", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(5), columns: makeColumns(), pageSize: 2 },
+      });
+      const pager = () => wrapper.find('[data-test="o2-table-pagination-bottom"]');
+      expect(pager().classes()).toContain("border-t");
+
+      await wrapper.setProps({ paginationBordered: false });
+      expect(pager().classes()).not.toContain("border-t");
     });
   });
 
@@ -1087,6 +1979,70 @@ describe("OTable", () => {
     // Variable-height virtual rows can't be asserted in jsdom: with no real
     // scroll-element size the virtualizer returns 0 virtual items, so the
     // branch carrying the measurement wiring never renders.
+  });
+
+  describe("windowed row model with row expansion", () => {
+    const mountWindowed = (extra: Record<string, unknown>) =>
+      mount(OTable, {
+        props: {
+          data: makeRows(300),
+          columns: makeColumns(),
+          virtualScroll: true,
+          windowRowModel: true,
+          pagination: "none",
+          sorting: "server",
+          expansion: "multiple",
+          rowKey: (row: TestRow) => String(row.id),
+          ...extra,
+        },
+        slots: { expansion: "<div data-test='detail'>detail</div>" },
+      });
+    const rowModelSize = (w: VueWrapper) => (w.vm as any).table.getRowModel().rows.length as number;
+
+    it("keeps the row model windowed when expanded rows are measured", () => {
+      wrapper = mountWindowed({ measureExpandedRows: true });
+      expect(rowModelSize(wrapper)).toBeLessThan(300);
+    });
+
+    it("still builds every row for an expandable table that does not opt in", () => {
+      wrapper = mountWindowed({});
+      expect(rowModelSize(wrapper)).toBe(300);
+    });
+
+    it("counts every row in the footer while the row model is windowed", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(2000),
+          columns: makeColumns(),
+          virtualScroll: true,
+          windowRowModel: true,
+          pagination: "none",
+          sorting: "server",
+        },
+        slots: {
+          "pagination-bar": `<template #pagination-bar="s"><span data-test="total-rows">{{ s.totalRows }}</span></template>`,
+        },
+      });
+      await nextTick();
+      expect(rowModelSize(wrapper)).toBeLessThan(2000);
+      expect(wrapper.find('[data-test="total-rows"]').text()).toBe("2000");
+    });
+
+    it("never windows a tree", () => {
+      wrapper = mountWindowed({ measureExpandedRows: true, expansion: "tree" });
+      expect(rowModelSize(wrapper)).toBe(300);
+    });
+
+    it("marks the detail row so the virtualizer can measure it with its data row", async () => {
+      wrapper = mountWindowed({ measureExpandedRows: true });
+      await wrapper.find('[data-test="o2-table-expand-0"]').trigger("click");
+      await nextTick();
+      const detail = wrapper.find("[data-row-expansion]");
+      expect(detail.attributes("data-test")).toBe("o2-table-expanded-row-0");
+      expect(detail.element.previousElementSibling?.getAttribute("data-test")).toBe(
+        "o2-table-row-0",
+      );
+    });
   });
 
   // ── Column Management ──────────────────────────────────────
@@ -1397,23 +2353,191 @@ describe("OTable", () => {
       });
       expect(wrapper.find('[data-test="custom-loading-banner"]').exists()).toBe(true);
     });
-  });
 
-  // ── Scoped Bottom Slot ─────────────────────────────────────
-
-  describe("bottom slot", () => {
-    it("renders bottom slot", () => {
+    it("suppresses the default banner for an empty loading-banner slot but keeps the streaming bar", () => {
+      // An empty slot still counts as "provided" — consumers can opt out of the default banner entirely.
       wrapper = mount(OTable, {
         props: {
           data: makeRows(5),
           columns: makeColumns(),
-          pagination: "client",
+          streaming: true,
         },
         slots: {
-          bottom: '<div data-test="custom-bottom">Bottom Content</div>',
+          "loading-banner": "",
         },
       });
-      expect(wrapper.find('[data-test="custom-bottom"]').exists()).toBe(true);
+      expect(wrapper.findAll('[data-test="o2-table-loading-banner"]').length).toBe(0);
+      expect(wrapper.find('[data-test="o2-table-streaming-bar"]').exists()).toBe(true);
+    });
+
+    it("renders the default banner while streaming when no loading-banner slot is supplied", () => {
+      // Pairs with the empty-slot case: together they pin the opt-out as a contract.
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(5),
+          columns: makeColumns(),
+          streaming: true,
+        },
+      });
+      expect(wrapper.find('[data-test="o2-table-loading-banner"]').exists()).toBe(true);
+    });
+  });
+
+  // ── Footer start side ──────────────────────────────────────
+
+  describe("footer start side", () => {
+    const BAR = '[data-test="o2-table-pagination-bottom"]';
+    const SELECTION = '[data-test="o2-table-pagination-selection"]';
+    const COUNT = '[data-test="o2-table-selected-count"]';
+    const NOTE = '[data-test="o2-table-pagination-note"]';
+    const ACTIONS = { "selection-actions": '<button data-test="bulk-delete">Delete</button>' };
+    const NOTE_SLOT = { "footer-note": '<span data-test="cap-note">Showing the first 25</span>' };
+
+    const mountFooter = (props: Record<string, unknown> = {}, slots: Record<string, string> = {}) =>
+      mount(OTable, {
+        props: { data: makeRows(25), columns: makeColumns(), selection: "multiple", ...props },
+        slots,
+      });
+
+    it("renders the pager alone when neither slot is provided", () => {
+      wrapper = mountFooter({ selectedIds: ["1"] });
+      expect(wrapper.find(BAR).element.children).toHaveLength(1);
+      expect(wrapper.find(SELECTION).exists()).toBe(false);
+      expect(wrapper.find(NOTE).exists()).toBe(false);
+    });
+
+    it("prints no total label ahead of the pager", () => {
+      wrapper = mountFooter();
+      const info = wrapper.find('[data-test="o2-table-pagination-info"]').text();
+      expect(wrapper.find(BAR).text().indexOf(info)).toBe(0);
+    });
+
+    it("renders the pager alone until a row is selected", () => {
+      wrapper = mountFooter({}, ACTIONS);
+      expect(wrapper.find(BAR).element.children).toHaveLength(1);
+      expect(wrapper.find('[data-test="bulk-delete"]').exists()).toBe(false);
+    });
+
+    it("shows the selected count of the total beside the actions", () => {
+      wrapper = mountFooter({ selectedIds: ["1", "2"] }, ACTIONS);
+      const count = wrapper.find(COUNT);
+      expect(count.text()).toBe("2 of 25 selected");
+      expect(count.attributes("role")).toBe("status");
+      expect(wrapper.find(SELECTION).find('[data-test="bulk-delete"]').exists()).toBe(true);
+    });
+
+    it("follows the selection as rows are toggled", async () => {
+      wrapper = mountFooter({}, ACTIONS);
+      const checkbox = wrapper.find('[data-test="o2-table-select-0"] button');
+
+      await checkbox.trigger("click");
+      expect(wrapper.find(COUNT).text()).toBe("1 of 25 selected");
+
+      await checkbox.trigger("click");
+      expect(wrapper.find(SELECTION).exists()).toBe(false);
+    });
+
+    it("drops the total when the selection outnumbers it", () => {
+      wrapper = mountFooter({ data: makeRows(2), selectedIds: ["1", "2", "9"] }, ACTIONS);
+      expect(wrapper.find(COUNT).text()).toBe("3 selected");
+    });
+
+    it("counts against totalCount in server mode", () => {
+      wrapper = mountFooter(
+        { data: makeRows(20), pagination: "server", totalCount: 137, selectedIds: ["1", "2"] },
+        ACTIONS,
+      );
+      expect(wrapper.find(COUNT).text()).toBe("2 of 137 selected");
+    });
+
+    it("marks a lower-bound total", () => {
+      wrapper = mountFooter(
+        { pagination: "server", totalCount: 40, totalCountExact: false, selectedIds: ["1", "2"] },
+        ACTIONS,
+      );
+      expect(wrapper.find(COUNT).text()).toBe("2 of 40+ selected");
+    });
+
+    it("shows the note when one is provided", () => {
+      wrapper = mountFooter({}, NOTE_SLOT);
+      expect(wrapper.find(NOTE).find('[data-test="cap-note"]').text()).toBe("Showing the first 25");
+      expect(wrapper.find(SELECTION).exists()).toBe(false);
+    });
+
+    it("gives the start side to the selection over the note", async () => {
+      wrapper = mountFooter({ selectedIds: ["1"] }, { ...ACTIONS, ...NOTE_SLOT });
+      expect(wrapper.find(COUNT).text()).toBe("1 of 25 selected");
+      expect(wrapper.find(NOTE).exists()).toBe(false);
+
+      await wrapper.setProps({ selectedIds: [] });
+      expect(wrapper.find(SELECTION).exists()).toBe(false);
+      expect(wrapper.find('[data-test="cap-note"]').exists()).toBe(true);
+    });
+
+    it("keeps the note when rows are selected but the table has no bulk actions", () => {
+      wrapper = mountFooter({ selectedIds: ["1"] }, NOTE_SLOT);
+      expect(wrapper.find(COUNT).exists()).toBe(false);
+      expect(wrapper.find('[data-test="cap-note"]').exists()).toBe(true);
+    });
+
+    it("withholds the selection and the note while the table is loading", () => {
+      wrapper = mountFooter({ loading: true, selectedIds: ["1"] }, { ...ACTIONS, ...NOTE_SLOT });
+      expect(wrapper.find(BAR).element.children).toHaveLength(1);
+      expect(wrapper.find('[data-test="bulk-delete"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="cap-note"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-pagination-info-skel"]').exists()).toBe(true);
+    });
+
+    it("picks up a note the page provides after mount", async () => {
+      const Host = defineComponent({
+        components: { OTable },
+        props: { capped: Boolean },
+        setup: () => ({ rows: makeRows(25), columns: makeColumns() }),
+        template: `<OTable :data="rows" :columns="columns">
+          <template v-if="capped" #footer-note><span data-test="cap-note">Capped</span></template>
+        </OTable>`,
+      });
+      wrapper = mount(Host);
+      expect(wrapper.find(NOTE).exists()).toBe(false);
+
+      await wrapper.setProps({ capped: true });
+      expect(wrapper.find(NOTE).find('[data-test="cap-note"]').exists()).toBe(true);
+
+      await wrapper.setProps({ capped: false });
+      expect(wrapper.find(NOTE).exists()).toBe(false);
+    });
+  });
+
+  // ── Caller-drawn pagination bar ────────────────────────────
+
+  describe("pagination-bar slot", () => {
+    const CUSTOM_BAR = '[data-test="custom-bar"]';
+    const mountWithBar = (props: Record<string, unknown> = {}) =>
+      mount(OTable, {
+        props: { data: makeRows(25), columns: makeColumns(), pageSize: 10, ...props },
+        slots: {
+          "pagination-bar": (scope: any) =>
+            h(
+              "button",
+              { "data-test": "custom-bar", onClick: scope.nextPage },
+              `${scope.currentPage}/${scope.totalPages} of ${scope.totalRows}`,
+            ),
+        },
+      });
+
+    it("replaces the built-in bar when pagination is on", async () => {
+      wrapper = mountWithBar({ pagination: "client" });
+      expect(wrapper.find('[data-test="o2-table-pagination-bottom"]').exists()).toBe(false);
+      expect(wrapper.find(CUSTOM_BAR).text()).toBe("1/3 of 25");
+
+      await wrapper.find(CUSTOM_BAR).trigger("click");
+      expect(wrapper.find(CUSTOM_BAR).text()).toBe("2/3 of 25");
+    });
+
+    it("still renders when pagination is off", () => {
+      wrapper = mountWithBar({ pagination: "none" });
+      expect(wrapper.find('[data-test="o2-table-pagination-bottom"]').exists()).toBe(false);
+      expect(wrapper.find(CUSTOM_BAR).text()).toContain("of 25");
     });
   });
 
@@ -1659,6 +2783,93 @@ describe("OTable", () => {
       // Should render pivot header instead of standard header
       expect(wrapper.find('[data-test="o2-table-pivot-header"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="o2-table-header"]').exists()).toBe(false);
+    });
+
+    it("merges consecutive same-value cells with a single pivotRowColumns entry", () => {
+      // Single row-field regression: rows of a run share identical row-field
+      // values, so a value-keyed merge map collided and hid the whole run
+      // (including the first row). Keyed by row identity, the first row keeps
+      // its content and only continuation rows blank out.
+      const rows: TestRow[] = [
+        { id: 1, name: "svc-a", email: "a1@example.com", status: "Active" },
+        { id: 2, name: "svc-a", email: "a2@example.com", status: "Active" },
+        { id: 3, name: "svc-b", email: "b1@example.com", status: "Active" },
+      ];
+      wrapper = mount(OTable, {
+        props: {
+          data: rows,
+          columns: makeColumns(),
+          pivotRowColumns: [{ name: "name" }],
+        },
+      });
+
+      const nameCells = wrapper
+        .findAll('[data-test="o2-table-cell-name"]')
+        .map((c) => c.text().trim());
+      expect(nameCells).toEqual(["svc-a", "", "svc-b"]);
+      // Non-merged columns are untouched
+      const emailCells = wrapper
+        .findAll('[data-test="o2-table-cell-email"]')
+        .map((c) => c.text().trim());
+      expect(emailCells).toEqual(["a1@example.com", "a2@example.com", "b1@example.com"]);
+    });
+
+    it("renders one sticky total row for an object and one per entry for an array", () => {
+      const totals = (stickyTotalRow: any) => {
+        wrapper = mount(OTable, {
+          props: { data: makeRows(2), columns: makeColumns(), stickyTotalRow },
+        });
+        const rows = wrapper.findAll('[data-test="o2-table-pivot-total-foot"] tr');
+        const names = wrapper
+          .findAll('[data-test="o2-table-pivot-total-cell-name"]')
+          .map((cell) => cell.text());
+        wrapper.unmount();
+        return { rows: rows.length, names };
+      };
+      expect(totals({ name: "Total" })).toEqual({ rows: 1, names: ["Total"] });
+      expect(totals([{ name: "Sum" }, { name: "Max" }])).toEqual({
+        rows: 2,
+        names: ["Sum", "Max"],
+      });
+      expect(totals(null).rows).toBe(0);
+      expect(totals([]).rows).toBe(0);
+    });
+
+    it("mutes a calculated-totals row's label and makes its values bold", () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(2),
+          columns: makeColumns(),
+          stickyTotalRow: [
+            { name: "Sum", id: "3", __labelKey: "name" },
+            { name: "Total", id: "9" },
+          ],
+        },
+      });
+      const cell = (id: string, row: number) =>
+        wrapper.findAll(`[data-test="o2-table-pivot-total-cell-${id}"]`)[row].classes();
+      expect(cell("name", 0)).toContain("text-text-secondary");
+      expect(cell("name", 0)).not.toContain("font-semibold");
+      expect(cell("id", 0)).toContain("font-semibold");
+      expect(cell("name", 1)).not.toContain("text-text-secondary");
+      expect(cell("id", 1)).not.toContain("font-semibold");
+    });
+
+    it("separates borders on a bordered table only while sticky total rows are pinned", () => {
+      const tableClasses = (extra: Record<string, any>) => {
+        wrapper = mount(OTable, {
+          props: { data: makeRows(2), columns: makeColumns(), bordered: true, ...extra },
+        });
+        const classes = wrapper.find("table").classes();
+        wrapper.unmount();
+        return classes;
+      };
+      const totals = [{ name: "Sum", id: "3", __labelKey: "name" }];
+      expect(tableClasses({})).not.toContain("border-separate");
+      expect(tableClasses({ stickyTotalRow: totals })).not.toContain("border-separate");
+      expect(tableClasses({ stickyTotalRow: totals, stickyRowTotals: true })).toContain(
+        "border-separate",
+      );
     });
 
     it("renders standard header when pivotHeaderLevels is empty", () => {
@@ -1924,5 +3135,500 @@ describe("OTable", () => {
       expect(emitted).toBeTruthy();
       expect(emitted![emitted!.length - 1][0]).toEqual(newOrder);
     });
+  });
+
+  // currentPage only lands if it's present at mount alongside the real data — data arriving after mount loses the race to TanStack's own deferred autoResetPageIndex, so async callers must remount (e.g. via :key) rather than update data in place.
+  describe("controlled currentPage (client mode)", () => {
+    it("restores the given page when mounted directly with data already present", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(20),
+          columns: makeColumns(),
+          pagination: "client",
+          pageSize: 5,
+          currentPage: 3,
+        },
+      });
+      await nextTick();
+      expect((wrapper.vm as any).table.getState().pagination.pageIndex).toBe(2);
+    });
+
+    it("does NOT restore the page if data arrives after mount (documents the race)", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: [],
+          columns: makeColumns(),
+          pagination: "client",
+          pageSize: 5,
+          currentPage: 3,
+          loading: true,
+        },
+      });
+      await wrapper.setProps({ data: makeRows(20), loading: false });
+      await nextTick();
+      await nextTick();
+      expect((wrapper.vm as any).table.getState().pagination.pageIndex).toBe(0);
+    });
+
+    it("restorePage lands on the requested page when it exists, without touching the parent", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(20), columns: makeColumns(), pagination: "client", pageSize: 5 },
+      });
+      (wrapper.vm as any).restorePage(3);
+      await nextTick();
+      expect((wrapper.vm as any).table.getState().pagination.pageIndex).toBe(2);
+      expect(wrapper.emitted("update:currentPage")).toBeUndefined();
+    });
+
+    it("restorePage falls back to page 1 and tells the parent when the page is past the end", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(7), columns: makeColumns(), pagination: "client", pageSize: 5 },
+      });
+      (wrapper.vm as any).restorePage(3);
+      await nextTick();
+      expect((wrapper.vm as any).table.getState().pagination.pageIndex).toBe(0);
+      expect(wrapper.emitted("update:currentPage")).toEqual([[1]]);
+    });
+
+    it("restorePage treats a page below 1 like one past the end", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(7), columns: makeColumns(), pagination: "client", pageSize: 5 },
+      });
+      (wrapper.vm as any).restorePage(0);
+      await nextTick();
+      expect((wrapper.vm as any).table.getState().pagination.pageIndex).toBe(0);
+      expect(wrapper.emitted("update:currentPage")).toEqual([[1]]);
+    });
+  });
+});
+
+describe("OTable row rail + row tone", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  function mountWith(props: Record<string, unknown>) {
+    return mount(OTable, {
+      props: {
+        data: makeRows(3),
+        columns: makeColumns(),
+        pagination: "none",
+        sorting: "none",
+        ...props,
+      },
+    });
+  }
+
+  // V2: the rail used to be a JS colour string injected as an inline boxShadow,
+  // which forced the call site to reach a raw var() and a ramp primitive.
+  it("paints a token-backed rail per row", async () => {
+    wrapper = mountWith({ rowRailTone: (row: TestRow) => (row.id === 1 ? "p1" : null) });
+    await nextTick();
+    const rows = wrapper.findAll("tbody tr");
+    expect(rows[0].classes().join(" ")).toContain("border-s-priority-p1");
+    expect(rows[1].classes().join(" ")).not.toContain("border-s-priority-p1");
+  });
+
+  it.each([
+    ["p3", "border-s-priority-p3"],
+    ["error", "border-s-icon-chip-error-text"],
+    ["neutral", "border-s-border-default"],
+  ])("rails tone %s with its own token", async (tone, expected) => {
+    wrapper = mountWith({ rowRailTone: () => tone });
+    await nextTick();
+    expect(wrapper.find("tbody tr").classes().join(" ")).toContain(expected);
+  });
+
+  // V12: the old muted row was `!bg-surface-panel` — an !important override onto
+  // a library row, which the next OTable row-state feature would silently lose to.
+  it("mutes a row without an !important override", async () => {
+    wrapper = mountWith({ rowTone: (row: TestRow) => (row.id === 2 ? "muted" : null) });
+    await nextTick();
+    const rows = wrapper.findAll("tbody tr");
+    expect(rows[1].classes()).toContain("bg-surface-panel");
+    expect(rows[1].classes().join(" ")).not.toContain("!bg-surface-panel");
+  });
+
+  it("keeps a caller's own rowClass alongside both", async () => {
+    wrapper = mountWith({
+      rowRailTone: () => "p2",
+      rowTone: () => "muted",
+      rowClass: (row: TestRow) => `custom-${row.id}`,
+    });
+    await nextTick();
+    const classes = wrapper.find("tbody tr").classes().join(" ");
+    expect(classes).toContain("border-s-priority-p2");
+    expect(classes).toContain("bg-surface-panel");
+    expect(classes).toContain("custom-1");
+  });
+
+  it("adds nothing when neither prop is passed", async () => {
+    wrapper = mountWith({});
+    await nextTick();
+    const classes = wrapper.find("tbody tr").classes().join(" ");
+    expect(classes).not.toContain("border-s-");
+    expect(classes).not.toContain("bg-surface-panel");
+  });
+});
+
+describe("OTable body sections", () => {
+  let wrapper: VueWrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  function mountSectioned(props: Record<string, any> = {}) {
+    return mount(OTable, {
+      props: {
+        data: makeRows(4),
+        columns: makeColumns(),
+        rowSection: (row: TestRow) => (row.id % 2 === 0 ? "even" : "odd"),
+        sectionOrder: ["odd", "even"],
+        ...props,
+      },
+      slots: {
+        "group-header": `<template #group-header="{ sectionKey, rows }">
+          <span :data-test="'hdr-' + sectionKey">{{ sectionKey }}:{{ rows.length }}</span>
+        </template>`,
+      },
+    }) as unknown as VueWrapper;
+  }
+
+  it("renders one heading per section, in the given order", () => {
+    wrapper = mountSectioned();
+
+    const headings = wrapper.findAll("[data-test^='hdr-']").map((el) => el.text());
+    expect(headings).toEqual(["odd:2", "even:2"]);
+  });
+
+  /// Rows have to sit under their own heading, or the heading is describing
+  /// whatever happened to follow it.
+  it("gathers each section's rows contiguously", () => {
+    wrapper = mountSectioned();
+
+    // Section rows are addressable by the heading row that precedes them.
+    const rowText = wrapper.findAll("tbody tr").map((tr) => tr.text());
+    const oddAt = rowText.findIndex((t) => t.includes("odd:2"));
+    const evenAt = rowText.findIndex((t) => t.includes("even:2"));
+    expect(oddAt).toBe(0);
+    // Two data rows between the two headings.
+    expect(evenAt).toBe(3);
+  });
+
+  /// A key nobody listed renders after every key that was, so a new state stays
+  /// visible instead of disappearing because the caller forgot it.
+  it("puts an unlisted section after the listed ones", () => {
+    wrapper = mountSectioned({
+      data: [...makeRows(2), { id: 99, name: "New", email: "n@e.com", status: "Other" }],
+      rowSection: (row: TestRow) => (row.id === 99 ? "surprise" : "odd"),
+      sectionOrder: ["odd"],
+    });
+
+    const headings = wrapper.findAll("[data-test^='hdr-']").map((el) => el.text());
+    expect(headings[headings.length - 1]).toContain("surprise");
+  });
+
+  /// A heading over no rows reads as a load that failed rather than a state
+  /// nothing happens to be in.
+  it("renders no heading for a section with no rows", () => {
+    wrapper = mountSectioned({
+      data: makeRows(2).filter((r) => r.id % 2 === 1),
+      sectionOrder: ["odd", "even"],
+    });
+
+    expect(wrapper.find("[data-test='hdr-even']").exists()).toBe(false);
+    expect(wrapper.find("[data-test='hdr-odd']").exists()).toBe(true);
+  });
+
+  /// Returning null drops a row from the body as well as from every heading —
+  /// otherwise it would render under whichever section happened to precede it.
+  it("drops a row no section claims", () => {
+    wrapper = mountSectioned({
+      rowSection: (row: TestRow) => (row.id === 1 ? null : "kept"),
+      sectionOrder: ["kept"],
+    });
+
+    expect(wrapper.text()).not.toContain("User 1");
+    expect(wrapper.find("[data-test='hdr-kept']").text()).toBe("kept:3");
+  });
+
+  /// Every row's section is hidden (a caller filtering to a section nothing
+  /// currently matches) — the page has data, so `data.length` alone cannot
+  /// say the table is empty. It has to fall back to what the body actually
+  /// has left, or the reader sees neither rows nor an empty state.
+  it("shows the empty state when every row's section is filtered out", () => {
+    wrapper = mountSectioned({
+      rowSection: () => null,
+      sectionOrder: ["odd", "even"],
+    });
+
+    expect(wrapper.findAll("[data-test^='hdr-']")).toHaveLength(0);
+    expect(wrapper.find('[data-test="o2-table-empty"]').exists()).toBe(true);
+  });
+
+  /// Without the prop nothing changes — the plain body is the same one every
+  /// other table in the app renders.
+  it("renders no headings when no section resolver is given", () => {
+    wrapper = mountSectioned({ rowSection: undefined });
+
+    expect(wrapper.findAll("[data-test^='hdr-']")).toHaveLength(0);
+    expect(wrapper.findAll("tbody tr")).toHaveLength(4);
+  });
+});
+
+describe("OTable activeRowIndex", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  const RING = ["bg-table-row-selected-bg", "ring-2", "ring-inset", "ring-focus-ring-accent"];
+
+  it("marks only the matching row with aria-current, data-active-row and the ring", () => {
+    wrapper = mount(OTable, {
+      props: { data: makeRows(5), columns: makeColumns(), activeRowIndex: 2 },
+    });
+    const active = wrapper.find('[data-test="o2-table-row-2"]');
+    expect(active.attributes("aria-current")).toBe("true");
+    expect(active.attributes("data-active-row")).toBe("true");
+    for (const cls of RING) expect(active.classes()).toContain(cls);
+
+    for (const i of [0, 1, 3, 4]) {
+      const row = wrapper.find(`[data-test="o2-table-row-${i}"]`);
+      expect(row.attributes("aria-current")).toBeUndefined();
+      expect(row.attributes("data-active-row")).toBeUndefined();
+      expect(row.classes()).not.toContain("ring-2");
+      expect(row.classes()).not.toContain("bg-table-row-selected-bg");
+    }
+  });
+
+  it("renders no active state when the prop is absent or null", async () => {
+    wrapper = mount(OTable, { props: { data: makeRows(4), columns: makeColumns() } });
+    expect(wrapper.findAll("[aria-current]")).toHaveLength(0);
+    expect(wrapper.findAll("[data-active-row]")).toHaveLength(0);
+    expect(wrapper.findAll("tr.ring-2")).toHaveLength(0);
+
+    await wrapper.setProps({ activeRowIndex: null });
+    expect(wrapper.findAll("[aria-current]")).toHaveLength(0);
+  });
+
+  it("moves the highlight when the index changes, and clears it on null", async () => {
+    wrapper = mount(OTable, {
+      props: { data: makeRows(4), columns: makeColumns(), activeRowIndex: 0 },
+    });
+    await wrapper.setProps({ activeRowIndex: 3 });
+    expect(wrapper.find('[data-test="o2-table-row-0"]').attributes("aria-current")).toBeUndefined();
+    expect(wrapper.find('[data-test="o2-table-row-3"]').attributes("aria-current")).toBe("true");
+
+    await wrapper.setProps({ activeRowIndex: null });
+    expect(wrapper.findAll("[data-active-row]")).toHaveLength(0);
+  });
+
+  it("keeps the row's existing attributes and test ids", () => {
+    wrapper = mount(OTable, {
+      props: {
+        data: makeRows(3),
+        columns: makeColumns(),
+        activeRowIndex: 1,
+        rowClass: "custom-row-class",
+        onRowClick: () => {},
+      },
+    });
+    const row = wrapper.find('[data-test="o2-table-row-1"]');
+    expect(row.classes()).toContain("custom-row-class");
+    expect(row.attributes("tabindex")).toBe("0");
+  });
+
+  it("does not stripe the active row", () => {
+    wrapper = mount(OTable, {
+      props: { data: makeRows(4), columns: makeColumns(), striped: true, activeRowIndex: 1 },
+    });
+    expect(wrapper.find('[data-test="o2-table-row-1"]').classes()).not.toContain(
+      "bg-table-row-striped-bg",
+    );
+    expect(wrapper.find('[data-test="o2-table-row-3"]').classes()).toContain(
+      "bg-table-row-striped-bg",
+    );
+  });
+
+  it("names the row expand button and reports its state (axe button-name on the J/K highlight)", async () => {
+    const wrapper = mount(OTable, {
+      props: { data: makeRows(2), columns: makeColumns(), expansion: "multiple" },
+    });
+    const button = wrapper.find('[data-test="o2-table-expand-0"]');
+    expect(button.attributes("aria-label")).toBe("Expand");
+    expect(button.attributes("aria-expanded")).toBe("false");
+    await button.trigger("click");
+    await nextTick();
+    expect(wrapper.find('[data-test="o2-table-expand-0"]').attributes("aria-label")).toBe(
+      "Collapse",
+    );
+    expect(wrapper.find('[data-test="o2-table-expand-0"]').attributes("aria-expanded")).toBe(
+      "true",
+    );
+    wrapper.unmount();
+  });
+
+  it("highlights the active row in the virtual-scroll body branch", () => {
+    const host = mount(OTable, { props: { data: makeRows(6), columns: makeColumns() } });
+    const table = (host.vm as any).table;
+    const virtualRows = [2, 3, 4].map((index) => ({
+      index,
+      start: index * 36,
+      size: 36,
+      key: index,
+    }));
+    const body = mount(OTableBody, {
+      props: { rows: table.getRowModel().rows, table, virtualRows, activeRowIndex: 3 },
+      attachTo: document.createElement("table"),
+    });
+    const active = body.findAll("[data-active-row]");
+    expect(active).toHaveLength(1);
+    expect(active[0].attributes("data-test")).toBe("o2-table-row-3");
+    expect(active[0].attributes("aria-current")).toBe("true");
+    body.unmount();
+    host.unmount();
+  });
+});
+
+describe("OTable sort header button", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  const tsColumns = (): OTableColumnDef<TestRow>[] => [
+    { id: "id", header: "ID", accessorKey: "id", sortable: true, size: 60 },
+    { id: "name", header: "Name", accessorKey: "name", size: 200 },
+  ];
+
+  const mountServer = (props: Record<string, unknown> = {}) =>
+    mount(OTable, {
+      props: {
+        data: makeRows(5),
+        columns: tsColumns(),
+        sorting: "server",
+        sortBy: "id",
+        sortOrder: "desc",
+        ...props,
+        "onUpdate:sortOrder": (order: "asc" | "desc") => wrapper.setProps({ sortOrder: order }),
+      },
+    });
+
+  const trigger = () => wrapper.find('[data-test="o2-table-th-sort-trigger"]');
+  const direction = () =>
+    wrapper.find('[data-test="o2-table-sort-icon-active"]').attributes("data-test-sort-direction");
+
+  it("T-A4: with sortClearable=false a sorted column goes desc → asc → desc, never cleared", async () => {
+    wrapper = mountServer({ sortClearable: false });
+    expect(direction()).toBe("desc");
+
+    await trigger().trigger("click");
+    await flushPromises();
+    expect(direction()).toBe("asc");
+
+    await trigger().trigger("click");
+    await flushPromises();
+    expect(direction()).toBe("desc");
+
+    const changes = wrapper.emitted("sort-change")!.map((e) => e[0]);
+    expect(changes).toEqual([
+      { column: "id", order: "asc" },
+      { column: "id", order: "desc" },
+    ]);
+    expect(wrapper.emitted("update:sortBy")!.every((e) => e[0] === "id")).toBe(true);
+  });
+
+  it("still clears a desc sort by default (sortClearable defaults to true)", async () => {
+    wrapper = mountServer();
+    await trigger().trigger("click");
+    expect(wrapper.emitted("sort-change")?.[0][0]).toEqual({ column: "", order: "asc" });
+  });
+
+  it("T-A8: the trigger is a keyboard-operable button and the header carries aria-sort", async () => {
+    wrapper = mountServer({ sortClearable: false });
+    const button = trigger();
+    expect(button.element.tagName).toBe("BUTTON");
+    expect(button.attributes("type")).toBe("button");
+    expect(button.attributes("aria-disabled")).toBeUndefined();
+    expect(wrapper.find('[data-test="o2-table-th-id"]').attributes("aria-sort")).toBe("descending");
+    expect(wrapper.find('[data-test="o2-table-th-name"]').attributes("aria-sort")).toBeUndefined();
+
+    await button.trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="o2-table-th-id"]').attributes("aria-sort")).toBe("ascending");
+  });
+
+  it("reports aria-sort none on a sortable column that is not sorted", () => {
+    wrapper = mountServer({ sortBy: "", sortOrder: undefined });
+    expect(wrapper.find('[data-test="o2-table-th-id"]').attributes("aria-sort")).toBe("none");
+  });
+
+  it("T-A8: sortDisabled ignores clicks, sets aria-disabled and shows the reason tooltip", async () => {
+    const reason = "Newest first while auto refresh is on." as I18nText;
+    wrapper = mountServer({ sortClearable: false, sortDisabled: true, sortDisabledReason: reason });
+    const button = trigger();
+    expect(button.attributes("aria-disabled")).toBe("true");
+    expect(button.classes()).toContain("cursor-not-allowed");
+
+    await button.trigger("click");
+    expect(wrapper.emitted("sort-change")).toBeUndefined();
+    expect(wrapper.emitted("update:sortOrder")).toBeUndefined();
+    expect(direction()).toBe("desc");
+
+    const tooltip = wrapper.findAllComponents(OTooltip).find((c) => c.props("content") === reason);
+    expect(tooltip).toBeTruthy();
+    expect(tooltip!.props("disabled")).toBe(false);
+  });
+
+  it("T-A8: the tooltip stays off while sorting is enabled", () => {
+    wrapper = mountServer({ sortDisabledReason: "unused" as I18nText });
+    const tooltip = wrapper
+      .findAllComponents(OTooltip)
+      .find((c) => c.props("content") === "unused");
+    expect(tooltip!.props("disabled")).toBe(true);
+  });
+
+  it("sortDisabled also blocks client-side sorting", async () => {
+    wrapper = mount(OTable, {
+      props: { data: makeRows(5), columns: tsColumns(), sorting: "client", sortDisabled: true },
+    });
+    await trigger().trigger("click");
+    expect((wrapper.vm as any).table.getState().sorting).toEqual([]);
+  });
+});
+
+describe("OTable row entrance", () => {
+  let wrapper: VueWrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  it("fades the body in when rows replace the loading skeleton", async () => {
+    vi.useFakeTimers();
+    wrapper = mount(OTable, { props: { data: [], columns: makeColumns(), loading: true } });
+    await wrapper.setProps({ data: makeRows(3), loading: false });
+    // The skeleton holds for a minimum time before the body replaces it.
+    await vi.runAllTimersAsync();
+    vi.useRealTimers();
+
+    const body = wrapper.find('[data-test="o2-table-body"]');
+    expect(body.exists()).toBe(true);
+    expect(body.classes()).toContain("motion-safe:animate-in");
+  });
+
+  it("keeps the same body element across a re-sort, so the fade does not replay", async () => {
+    wrapper = mount(OTable, { props: { data: makeRows(3), columns: makeColumns() } });
+    const before = wrapper.find('[data-test="o2-table-body"]').element;
+    await wrapper.setProps({ data: makeRows(3).reverse() });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="o2-table-body"]').element).toBe(before);
   });
 });

@@ -21,15 +21,23 @@ use axum::{
     http::StatusCode,
     response::Response,
 };
+use config::meta::{alerts::content_spec::ContentSpec, destinations::Module};
 use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::check_permissions;
-use openobserve_core::{alerts::destinations, auth::UserEmail, http::destination_error_response};
+use openobserve_core::{
+    alerts::{
+        destinations,
+        notifications::{TestSendError, check_rate_limit, test_send as core_test_send},
+    },
+    auth::UserEmail,
+    http::destination_error_response,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::ssrf_guard::SsrfGuard},
-    models::destinations::{Destination, DestinationType},
+    models::destinations::{Destination, DestinationType, DestinationUseResponse},
     request::{BulkDeleteRequest, BulkDeleteResponse},
 };
 
@@ -47,6 +55,12 @@ pub struct TestDestinationRequest {
     pub destination_type: DestinationType,
     /// Email recipients for email destination testing
     pub recipients: Option<Vec<String>>,
+    /// Template a `slack_app` test renders on a sample alert; the org default when absent.
+    #[serde(default)]
+    pub template: Option<String>,
+    /// The `slack_app` target under test, with the destination body's snake_case fields.
+    #[serde(default)]
+    pub slack_app: Option<crate::models::destinations::SlackAppFields>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, utoipa::ToSchema)]
@@ -93,6 +107,7 @@ pub async fn test_destination(
     match test_req.destination_type {
         DestinationType::Email => test_email_destination(&org_id, &test_req).await,
         DestinationType::Http => test_http_destination(&test_req).await,
+        DestinationType::SlackApp => test_slack_app_destination(&org_id, &test_req).await,
         other => MetaHttpResponse::json(TestDestinationResponse {
             success: false,
             status_code: None,
@@ -131,6 +146,39 @@ async fn test_email_destination(org_id: &str, test_req: &TestDestinationRequest)
     }
 }
 
+/// Posts now through the bot, so the form shows Slack's own answer, never a queued "ok".
+async fn test_slack_app_destination(org_id: &str, test_req: &TestDestinationRequest) -> Response {
+    let Some(fields) = test_req.slack_app.clone() else {
+        return MetaHttpResponse::json(TestDestinationResponse {
+            success: false,
+            status_code: None,
+            response_body: None,
+            error: Some("A Slack app test needs the slackApp target".to_string()),
+        });
+    };
+    let target = fields.into_target();
+    let sent = openobserve_core::alerts::slack_publish::send_form_test(
+        org_id,
+        &target,
+        test_req.template.as_deref(),
+    )
+    .await;
+    MetaHttpResponse::json(match sent {
+        Ok(detail) => TestDestinationResponse {
+            success: true,
+            status_code: None,
+            response_body: Some(detail),
+            error: None,
+        },
+        Err(e) => TestDestinationResponse {
+            success: false,
+            status_code: None,
+            response_body: None,
+            error: Some(e.to_string()),
+        },
+    })
+}
+
 async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
     let method = test_req
         .method
@@ -151,8 +199,8 @@ async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
         });
     }
 
-    // SSRF protection: Validate URL (including DNS resolution) before making request.
-    if let Err(error_msg) = SsrfGuard::validate_url_with_config_async(url).await {
+    // The policy real sends use; an allowlist-only target gets no body back.
+    if let Err(error_msg) = SsrfGuard::validate_destination_url_with_config_async(url).await {
         return MetaHttpResponse::json(TestDestinationResponse {
             success: false,
             status_code: None,
@@ -169,7 +217,7 @@ async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
         client_builder = client_builder.danger_accept_invalid_certs(true);
     }
 
-    let client = match common::utils::ssrf_guard::build_safe_client(client_builder) {
+    let client = match common::utils::ssrf_guard::build_safe_destination_client(client_builder) {
         Ok(client) => client,
         Err(e) => {
             return MetaHttpResponse::json(TestDestinationResponse {
@@ -213,6 +261,14 @@ async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
         Ok(response) => {
             let status_code = response.status().as_u16();
             let success = response.status().is_success();
+            if config::utils::ssrf_guard::admitted_only_by_allowlist(&response) {
+                return MetaHttpResponse::json(TestDestinationResponse {
+                    success,
+                    status_code: Some(status_code),
+                    response_body: None,
+                    error: None,
+                });
+            }
 
             match response.text().await {
                 Ok(response_body) => MetaHttpResponse::json(TestDestinationResponse {
@@ -280,6 +336,7 @@ async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
 pub async fn save_destination(
     Path(org_id): Path<String>,
     Query(query): Query<HashMap<String, String>>,
+    Headers(user_email): Headers<UserEmail>,
     Json(dest): Json<Destination>,
 ) -> Response {
     // Check the module query parameter to determine if this is an alert or pipeline destination
@@ -290,7 +347,7 @@ pub async fn save_destination(
         Ok(dest) => dest,
         Err(e) => return destination_error_response(e),
     };
-    match destinations::save("", dest, true).await {
+    match destinations::save_by("", dest, true, &user_email.user_id).await {
         Ok(v) => MetaHttpResponse::json(
             MetaHttpResponse::message(StatusCode::OK, "Destination saved")
                 .with_id(v.id.map(|id| id.to_string()).unwrap_or_default())
@@ -333,6 +390,7 @@ pub async fn save_destination(
 pub async fn update_destination(
     Path((org_id, name)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
+    Headers(user_email): Headers<UserEmail>,
     Json(dest): Json<Destination>,
 ) -> Response {
     // Check the module query parameter to determine if this is an alert or pipeline destination
@@ -343,7 +401,7 @@ pub async fn update_destination(
         Ok(dest) => dest,
         Err(e) => return destination_error_response(e),
     };
-    match destinations::save(&name, dest, false).await {
+    match destinations::save_by(&name, dest, false, &user_email.user_id).await {
         Ok(_) => MetaHttpResponse::ok("Destination updated"),
         Err(e) => destination_error_response(e),
     }
@@ -401,6 +459,7 @@ pub async fn get_destination(Path((org_id, name)): Path<(String, String)>) -> Re
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("module" = Option<String>, Query, description = "Destination module filter, none, alert, or pipeline"),
+        ("include_usage" = Option<bool>, Query, description = "When true, each destination carries the consumers that reference it"),
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Destination>)),
@@ -421,6 +480,8 @@ pub async fn list_destinations(
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     let module = query.get("module").map(|s| s.as_str());
+    // Opt-in, mirroring ListAlerts' `include_dependencies`: off the hot list path by default.
+    let include_usage = query.get("include_usage").is_some_and(|v| v == "true");
 
     let mut _permitted = None;
     // Get List of allowed objects
@@ -447,7 +508,26 @@ pub async fn list_destinations(
 
     match destinations::list(&org_id, module, _permitted).await {
         Ok(data) => {
-            MetaHttpResponse::json(data.into_iter().map(Destination::from).collect::<Vec<_>>())
+            let mut items: Vec<Destination> = data.into_iter().map(Destination::from).collect();
+            if include_usage {
+                // Same all_usage() the delete guard uses, attached only to this response's rows.
+                match destinations::all_usage(&org_id).await {
+                    Ok(mut by_destination) => {
+                        for item in &mut items {
+                            item.uses = Some(
+                                by_destination
+                                    .remove(&item.name)
+                                    .unwrap_or_default()
+                                    .into_iter()
+                                    .map(DestinationUseResponse::from)
+                                    .collect(),
+                            );
+                        }
+                    }
+                    Err(e) => return MetaHttpResponse::bad_request(e),
+                }
+            }
+            MetaHttpResponse::json(items)
         }
         Err(e) => MetaHttpResponse::bad_request(e),
     }
@@ -462,7 +542,8 @@ pub async fn list_destinations(
     operation_id = "DeleteAlertDestination",
     summary = "Delete alert destination",
     description = "Removes an alert destination configuration from the organization. The destination must not be in use by \
-                   any active alerts or pipelines before deletion. Once deleted, any alerts previously configured to use \
+                   any alert, pipeline, synthetic check, escalation policy, team channel, composite alert, workflow, or \
+                   anomaly detection config before deletion. Once deleted, any alerts previously configured to use \
                    this destination will need to be updated with alternative notification methods to continue functioning.",
     security(
         ("Authorization"= [])
@@ -498,7 +579,8 @@ pub async fn delete_destination(Path((org_id, name)): Path<(String, String)>) ->
     operation_id = "DeleteAlertDestinationBulk",
     summary = "Delete multiple alert destination",
     description = "Removes multiple alert destination configuration from the organization. The destinations must not be in use by \
-                   any active alerts or pipelines before deletion. Once deleted, any alerts previously configured to use \
+                   any alert, pipeline, synthetic check, escalation policy, team channel, composite alert, workflow, or \
+                   anomaly detection config before deletion. Once deleted, any alerts previously configured to use \
                    these destination will need to be updated with alternative notification methods to continue functioning.",
     security(
         ("Authorization"= [])
@@ -605,14 +687,258 @@ pub async fn list_prebuilt_destinations(Path(org_id): Path<String>) -> Response 
     MetaHttpResponse::json(prebuilt_destinations)
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, utoipa::ToSchema)]
+pub struct TestSendRequest {
+    /// A draft content-template spec to test-send. Exactly one of
+    /// `definition` / `template_name` must be set.
+    pub definition: Option<ContentSpec>,
+    /// The name of an already-saved template to test-send. Exactly one of
+    /// `definition` / `template_name` must be set.
+    pub template_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+pub struct TestSendResponse {
+    pub success: bool,
+    pub message: String,
+}
+
+/// TestSendNotification
+///
+/// **Safety note:** this posts a REAL message to the destination's real
+/// channel — a Slack channel, a PagerDuty service, an inbox — marked
+/// `[TEST] `. It is gated on destination WRITE (not template read), so
+/// reading a template can never by itself grant the ability to post into a
+/// channel, and it is rate-capped per user.
+#[utoipa::path(
+    post,
+    path = "/{org_id}/alerts/destinations/{destination_name}/test_send",
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "TestSendNotification",
+    summary = "Test-send a content template to a real destination",
+    description = "Renders a content-template definition (draft, via `definition`, or saved, via `template_name`) \
+                   against a deterministic synthetic sample and DISPATCHES it to the named destination's real \
+                   channel, with every title/subject prefixed `[TEST] `. Requires destination write permission. \
+                   Rate-capped per user (`ZO_ALERT_TEST_SEND_PER_MINUTE`, default 6/min) — returns 429 when exceeded.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("destination_name" = String, Path, description = "Destination name"),
+    ),
+    request_body(content = inline(TestSendRequest), description = "Test-send request data", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = inline(TestSendResponse)),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 429, description = "Rate limited", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "test_send"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn test_send(
+    Path((org_id, destination_name)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(req): Json<TestSendRequest>,
+) -> Response {
+    let user_id = &user_email.user_id;
+
+    // Permission: destination WRITE, not template read — reading a template
+    // must never by itself grant the ability to post into a channel.
+    #[cfg(feature = "enterprise")]
+    if !check_permissions(
+        &destination_name,
+        &org_id,
+        user_id,
+        "destinations",
+        "PUT",
+        None,
+        false,
+        false,
+        false,
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
+
+    // Rate cap: per-user, config `ZO_ALERT_TEST_SEND_PER_MINUTE` (default 6).
+    if let Err(e @ TestSendError::RateLimited { .. }) = check_rate_limit(user_id) {
+        return MetaHttpResponse::too_many_requests(e.to_string());
+    }
+
+    // Exactly one of definition / template_name.
+    let spec = match (&req.definition, &req.template_name) {
+        (Some(_), Some(_)) => {
+            return MetaHttpResponse::bad_request(
+                "Exactly one of `definition` or `template_name` must be set, not both",
+            );
+        }
+        (None, None) => {
+            return MetaHttpResponse::bad_request(
+                "Exactly one of `definition` or `template_name` must be set",
+            );
+        }
+        (Some(definition), None) => definition.clone(),
+        (None, Some(template_name)) => {
+            let template = match db::alerts::templates::get(&org_id, template_name).await {
+                Ok(t) => t,
+                Err(_) => {
+                    return MetaHttpResponse::not_found(format!(
+                        "Template {template_name} not found"
+                    ));
+                }
+            };
+            match db::alerts::templates::get_parsed_content(&template) {
+                Ok(spec) => (*spec).clone(),
+                Err(e) => {
+                    return MetaHttpResponse::bad_request(format!(
+                        "Template {template_name} is not a valid content template: {e}"
+                    ));
+                }
+            }
+        }
+    };
+
+    let dest = match destinations::get(&org_id, &destination_name).await {
+        Ok(d) => d,
+        Err(e) => return destination_error_response(e),
+    };
+    let Module::Alert {
+        destination_type, ..
+    } = &dest.module
+    else {
+        return MetaHttpResponse::bad_request("Test-send is only supported for alert destinations");
+    };
+
+    match core_test_send(&org_id, destination_type, &spec).await {
+        Ok(message) => MetaHttpResponse::json(TestSendResponse {
+            success: true,
+            message,
+        }),
+        Err(e) => MetaHttpResponse::bad_request(e.to_string()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use axum::http::StatusCode;
+    use std::future::Future;
+
+    use axum::{Json, extract::Path, http::StatusCode};
     use db::alerts::destinations::DestinationError;
     use openobserve_core::http::destination_error_response;
 
+    use super::{TestDestinationRequest, test_destination};
+    use crate::models::destinations::DestinationType;
+
     fn status(err: DestinationError) -> StatusCode {
         destination_error_response(err).status()
+    }
+
+    /// Runs the test at `path` in a child process, as the SSRF allowlist is read once per process.
+    fn isolated<F: Future<Output = ()>>(
+        path: &str,
+        envs: &[(&str, &str)],
+        task: impl FnOnce() -> F,
+    ) {
+        let test = path.split_once("::").map_or(path, |(_, test)| test);
+        if std::env::var("O2_SSRF_ISOLATED_TEST").as_deref() == Ok(test) {
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(task());
+            return;
+        }
+        let mut command = std::process::Command::new(std::env::current_exe().unwrap());
+        for (name, _) in std::env::vars().filter(|(name, _)| name.contains("SSRF")) {
+            command.env_remove(name);
+        }
+        let output = command
+            .args(["--exact", test, "--nocapture"])
+            .env("O2_SSRF_ISOLATED_TEST", test)
+            .envs(envs.iter().copied())
+            .output()
+            .unwrap();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            output.status.success() && stdout.contains("1 passed"),
+            "{test} failed in its child process:\n{stdout}\n{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    /// The JSON the destination test returns for a GET to a local server that answers `secret`.
+    async fn tested_secret_server() -> serde_json::Value {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            while let Ok((mut sock, _)) = listener.accept().await {
+                let mut buf = [0u8; 4096];
+                let _ = sock.read(&mut buf).await;
+                let _ = sock
+                    .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\nsecret")
+                    .await;
+            }
+        });
+        let req = TestDestinationRequest {
+            url: format!("http://127.0.0.1:{port}/"),
+            method: Some("GET".to_string()),
+            headers: None,
+            body: None,
+            skip_tls_verify: None,
+            destination_type: DestinationType::Http,
+            recipients: None,
+            template: None,
+            slack_app: None,
+        };
+        let resp = test_destination(Path("default".to_string()), Json(req)).await;
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        serde_json::from_slice(&bytes).unwrap()
+    }
+
+    #[test]
+    fn test_destination_test_accepts_an_allowlisted_target_and_shows_its_status_only() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::test_destination_test_accepts_an_allowlisted_target_and_shows_its_status_only"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let res = tested_secret_server().await;
+                assert_eq!(res["success"], true, "{res}");
+                assert_eq!(res["statusCode"], 200, "{res}");
+                assert!(res["responseBody"].is_null(), "{res}");
+            },
+        );
+    }
+
+    #[test]
+    fn test_destination_test_shows_the_body_of_a_target_the_strict_policy_admits() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::test_destination_test_shows_the_body_of_a_target_the_strict_policy_admits"
+            ),
+            &[
+                ("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32"),
+                ("ZO_SSRF_ALLOW_LOOPBACK", "true"),
+            ],
+            || async {
+                let res = tested_secret_server().await;
+                assert_eq!(res["statusCode"], 200, "{res}");
+                assert_eq!(res["responseBody"], "secret", "{res}");
+            },
+        );
     }
 
     // 404 Not Found
@@ -623,17 +949,11 @@ mod tests {
 
     // 409 Conflict
     #[test]
-    fn test_used_by_alert_is_conflict() {
+    fn test_in_use_is_conflict() {
         assert_eq!(
-            status(DestinationError::UsedByAlert("my-alert".to_string())),
-            StatusCode::CONFLICT
-        );
-    }
-
-    #[test]
-    fn test_used_by_pipeline_is_conflict() {
-        assert_eq!(
-            status(DestinationError::UsedByPipeline("my-pipeline".to_string())),
+            status(DestinationError::InUse(
+                "'x' is used by 1 alert".to_string()
+            )),
             StatusCode::CONFLICT
         );
     }
@@ -684,7 +1004,7 @@ mod tests {
     #[test]
     fn test_user_not_permitted_is_bad_request() {
         assert_eq!(
-            status(DestinationError::UserNotPermitted),
+            status(DestinationError::UserNotPermitted("a@x.com".to_string())),
             StatusCode::BAD_REQUEST
         );
     }

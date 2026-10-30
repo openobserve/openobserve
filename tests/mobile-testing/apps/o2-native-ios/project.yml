@@ -1,0 +1,40 @@
+name: O2NativeIOS
+options:
+  bundleIdPrefix: com.o2native
+  deploymentTarget:
+    iOS: "16.0"
+packages:
+  OpenObserve:
+    url: https://github.com/openobserve/openobserve-sdk-ios.git
+    exactVersion: 0.1.0
+targets:
+  O2NativeIOS:
+    type: application
+    platform: iOS
+    sources: [Sources]
+    info:
+      # Explicit Info.plist so we can add the App Transport Security exception below: the iOS OO
+      # instance in CI is http://localhost (cleartext), which iOS blocks by default. NSAllowsLocal-
+      # Networking permits cleartext to localhost/.local (the committed https introspect target is
+      # unaffected). Mirrors the RN-iOS app's Info.plist.
+      path: Sources/Info.plist
+      properties:
+        UILaunchScreen: {}
+        UIApplicationSupportsIndirectInputEvents: true
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.o2native.ios
+        TARGETED_DEVICE_FAMILY: "1"
+    dependencies:
+      - package: OpenObserve
+        product: OpenObserveCore
+      - package: OpenObserve
+        product: OpenObserveRUM
+      - package: OpenObserve
+        product: OpenObserveLogs
+      - package: OpenObserve
+        product: OpenObserveSessionReplay
+      - package: OpenObserve
+        product: OpenObserveCrashReporting

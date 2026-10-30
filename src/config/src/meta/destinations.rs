@@ -91,6 +91,7 @@ pub enum DestinationType {
     Http(Endpoint),
     Email(Email),
     Sns(AwsSns),
+    SlackApp(SlackAppTarget),
 }
 
 impl Default for DestinationType {
@@ -116,8 +117,6 @@ pub struct Endpoint {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub headers: Option<HashMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub action_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub output_format: Option<HTTPOutputFormat>,
     /// Destination type (e.g., "openobserve", "splunk", "elasticsearch", "custom")
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -131,6 +130,71 @@ pub struct Endpoint {
 pub struct AwsSns {
     pub sns_topic_arn: String,
     pub aws_region: String,
+}
+
+/// A Slack app destination: posts through an installation's bot into one channel.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(default)]
+pub struct SlackAppTarget {
+    pub installation_id: String,
+    pub channel_id: String,
+    pub channel_name: String,
+    pub buttons: bool,
+    pub mention: MentionRule,
+    pub refire_reuse_minutes: u32,
+    pub auto_investigate: AutoInvestigate,
+    pub shared_channel_confirmed: bool,
+    pub oncall_room_confirmed: bool,
+    /// Kept from a switch off a webhook destination so it can be switched back; never sent to.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<Object>)]
+    pub previous_webhook: Option<Endpoint>,
+}
+
+impl SlackAppTarget {
+    pub const DEFAULT_REFIRE_REUSE_MINUTES: u32 = 30;
+    pub const MAX_REFIRE_REUSE_MINUTES: u32 = 240;
+}
+
+impl Default for SlackAppTarget {
+    fn default() -> Self {
+        Self {
+            installation_id: String::new(),
+            channel_id: String::new(),
+            channel_name: String::new(),
+            buttons: true,
+            mention: MentionRule::default(),
+            refire_reuse_minutes: Self::DEFAULT_REFIRE_REUSE_MINUTES,
+            auto_investigate: AutoInvestigate::default(),
+            shared_channel_confirmed: false,
+            oncall_room_confirmed: false,
+            previous_webhook: None,
+        }
+    }
+}
+
+/// Who a repeat or a level-up mentions; `Default` is `@here` for critical and nobody otherwise.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum MentionRule {
+    #[default]
+    Default,
+    Here,
+    Channel,
+    None,
+    #[serde(untagged)]
+    Subteam {
+        subteam_id: String,
+        handle: String,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AutoInvestigate {
+    #[default]
+    Off,
+    Critical,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -245,6 +309,8 @@ pub struct Template {
     #[serde(rename = "type")]
     pub template_type: TemplateType,
     pub body: String,
+    #[serde(default)]
+    pub kind: TemplateKind,
 }
 
 impl MemorySize for Template {
@@ -278,6 +344,38 @@ impl fmt::Display for TemplateType {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum TemplateKind {
+    #[default]
+    Custom,
+    Content,
+}
+
+impl TemplateKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            TemplateKind::Custom => "custom",
+            TemplateKind::Content => "content",
+        }
+    }
+}
+
+impl std::fmt::Display for TemplateKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl From<&str> for TemplateKind {
+    fn from(s: &str) -> Self {
+        match s {
+            "content" => TemplateKind::Content,
+            _ => TemplateKind::Custom,
+        }
+    }
+}
+
 impl Destination {
     /// Get prebuilt destination configurations for common services
     ///
@@ -294,6 +392,23 @@ mod tests {
     use svix_ksuid::KsuidLike;
 
     use super::*;
+
+    #[test]
+    fn test_template_kind_serde_roundtrip_and_default() {
+        // Old-shape JSON (no kind) must deserialize to Custom — mixed-version rule.
+        let old: Template =
+            serde_json::from_str(r#"{"org_id":"o","name":"t","body":"b","type":"http"}"#).unwrap();
+        assert_eq!(old.kind, TemplateKind::Custom);
+
+        let content: Template = serde_json::from_str(
+            r#"{"org_id":"o","name":"t","body":"{}","type":"http","kind":"content"}"#,
+        )
+        .unwrap();
+        assert_eq!(content.kind, TemplateKind::Content);
+
+        let back = serde_json::to_string(&content).unwrap();
+        assert!(back.contains(r#""kind":"content""#));
+    }
 
     #[test]
     fn test_destination_is_alert_destinations() {
@@ -365,7 +480,6 @@ mod tests {
             method: HTTPType::POST,
             skip_tls_verify: false,
             headers: Some(headers.clone()),
-            action_id: Some("action_123".to_string()),
             output_format: Some(HTTPOutputFormat::JSON),
             destination_type: Some("custom".to_string()),
             metadata: HashMap::new(),
@@ -375,7 +489,6 @@ mod tests {
         assert_eq!(endpoint.method, HTTPType::POST);
         assert!(!endpoint.skip_tls_verify);
         assert_eq!(endpoint.headers, Some(headers));
-        assert_eq!(endpoint.action_id, Some("action_123".to_string()));
         assert_eq!(endpoint.output_format, Some(HTTPOutputFormat::JSON));
         assert_eq!(endpoint.destination_type, Some("custom".to_string()));
     }
@@ -392,6 +505,7 @@ mod tests {
                 title: "Test Email".to_string(),
             },
             body: "Hello {{name}}!".to_string(),
+            kind: TemplateKind::default(),
         };
 
         assert_eq!(template.id, Some(id));
@@ -444,7 +558,6 @@ mod tests {
             method: HTTPType::POST,
             skip_tls_verify: true,
             headers: None,
-            action_id: None,
             output_format: None,
             destination_type: Some("openobserve".to_string()),
             metadata: HashMap::new(),
@@ -504,7 +617,6 @@ mod tests {
             method: HTTPType::PUT,
             skip_tls_verify: false,
             headers: None,
-            action_id: None,
             output_format: None,
             destination_type: Some("splunk".to_string()),
             metadata: HashMap::new(),
@@ -750,7 +862,6 @@ mod tests {
             method: HTTPType::POST,
             skip_tls_verify: false,
             headers: None,
-            action_id: None,
             output_format: None,
             destination_type: None,
             metadata: HashMap::new(),
@@ -758,7 +869,6 @@ mod tests {
         let json = serde_json::to_value(&ep).unwrap();
         let obj = json.as_object().unwrap();
         assert!(!obj.contains_key("headers"));
-        assert!(!obj.contains_key("action_id"));
         assert!(!obj.contains_key("output_format"));
         assert!(!obj.contains_key("destination_type"));
     }
@@ -772,7 +882,6 @@ mod tests {
             method: HTTPType::GET,
             skip_tls_verify: false,
             headers: Some(headers),
-            action_id: Some("act1".to_string()),
             output_format: Some(HTTPOutputFormat::JSON),
             destination_type: Some("custom".to_string()),
             metadata: HashMap::new(),
@@ -780,7 +889,6 @@ mod tests {
         let json = serde_json::to_value(&ep).unwrap();
         let obj = json.as_object().unwrap();
         assert!(obj.contains_key("headers"));
-        assert!(obj.contains_key("action_id"));
         assert!(obj.contains_key("output_format"));
         assert!(obj.contains_key("destination_type"));
     }
@@ -810,5 +918,95 @@ mod tests {
         let obj = inner.as_object().unwrap();
         assert!(obj.contains_key("template"));
         assert_eq!(obj["template"], serde_json::json!("my_template"));
+    }
+
+    #[test]
+    fn slack_app_target_defaults_fill_an_older_body_and_ignore_a_newer_field() {
+        let old: SlackAppTarget = serde_json::from_value(serde_json::json!({
+            "installation_id": "i1", "channel_id": "C1", "channel_name": "ops",
+        }))
+        .unwrap();
+        assert!(old.buttons);
+        assert_eq!(old.refire_reuse_minutes, 30);
+        assert_eq!(old.mention, MentionRule::Default);
+        assert_eq!(old.auto_investigate, AutoInvestigate::Off);
+        assert!(!old.shared_channel_confirmed && !old.oncall_room_confirmed);
+        assert!(old.previous_webhook.is_none());
+        let newer: SlackAppTarget = serde_json::from_value(serde_json::json!({
+            "installation_id": "i1", "channel_id": "C1", "channel_name": "ops",
+            "thread_mode": "always",
+        }))
+        .unwrap();
+        assert_eq!(newer, old);
+        let json = serde_json::to_value(&old).unwrap();
+        assert!(json.get("previous_webhook").is_none());
+        assert_eq!(json["mention"], "default");
+        assert_eq!(json["auto_investigate"], "off");
+    }
+
+    #[test]
+    fn mention_rules_are_a_word_or_a_subteam_object() {
+        for (rule, text) in [
+            (MentionRule::Here, "\"here\""),
+            (MentionRule::Channel, "\"channel\""),
+            (MentionRule::None, "\"none\""),
+        ] {
+            assert_eq!(serde_json::to_string(&rule).unwrap(), text);
+            assert_eq!(serde_json::from_str::<MentionRule>(text).unwrap(), rule);
+        }
+        let subteam = MentionRule::Subteam {
+            subteam_id: "S1".into(),
+            handle: "sre".into(),
+        };
+        let json = serde_json::json!({"subteam_id": "S1", "handle": "sre"});
+        assert_eq!(serde_json::to_value(&subteam).unwrap(), json);
+        assert_eq!(
+            serde_json::from_value::<MentionRule>(json).unwrap(),
+            subteam
+        );
+        let switched = SlackAppTarget {
+            previous_webhook: Some(Endpoint {
+                url: "https://hooks.slack.com/services/x".into(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let back: SlackAppTarget =
+            serde_json::from_value(serde_json::to_value(&switched).unwrap()).unwrap();
+        assert_eq!(back, switched);
+    }
+
+    #[test]
+    fn a_slack_app_row_is_flat_under_its_tag_and_only_it_is_unreadable_to_an_older_node() {
+        #[derive(Deserialize)]
+        #[serde(tag = "type", rename_all = "snake_case")]
+        #[allow(dead_code)]
+        enum PreviousRelease {
+            Http(Endpoint),
+            Email(Email),
+            Sns(AwsSns),
+        }
+        let app = DestinationType::SlackApp(SlackAppTarget {
+            installation_id: "I0FAKE00001".into(),
+            channel_id: "C0FAKE00001".into(),
+            channel_name: "sre-prod".into(),
+            ..Default::default()
+        });
+        let json = serde_json::to_value(&app).unwrap();
+        assert_eq!(json["type"], "slack_app");
+        assert_eq!(json["channel_id"], "C0FAKE00001");
+        assert_eq!(json["buttons"], true);
+        let DestinationType::SlackApp(back) = serde_json::from_value(json.clone()).unwrap() else {
+            panic!("a slack_app row decodes as SlackApp");
+        };
+        assert_eq!(back.channel_name, "sre-prod");
+        let err = serde_json::from_value::<PreviousRelease>(json)
+            .err()
+            .expect(
+                "an older node cannot decode it, which is why R-128 and the version guard exist",
+            );
+        assert!(err.to_string().contains("slack_app"), "{err}");
+        let http = serde_json::to_value(DestinationType::Http(Endpoint::default())).unwrap();
+        assert!(serde_json::from_value::<PreviousRelease>(http).is_ok());
     }
 }

@@ -25,6 +25,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { ingestBase } = require('../utils/ingest-url.js');
 
 // ============================================================================
 // TEST DATA CONFIGURATION
@@ -42,8 +43,8 @@ const FOLDER_NAME = `E2E Scheduled ${RUN_ID}`;
 // SETUP HELPER FUNCTIONS (API-based, same pattern as incident-correlation tests)
 // ============================================================================
 
-async function apiCall(page, method, path, body = null) {
-    const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
+async function apiCall(page, method, path, body = null, base = null) {
+    const baseUrl = base || process.env.ZO_BASE_URL || 'http://localhost:5080';
     const headers = getAuthHeaders();
 
     return page.evaluate(async ({ url, method, headers, body }) => {
@@ -145,7 +146,7 @@ async function ingestTestData(page) {
             country: 'test_country'
         });
     }
-    const resp = await apiCall(page, 'POST', `/api/${org}/${STREAM_NAME}/_json`, records);
+    const resp = await apiCall(page, 'POST', `/api/${org}/${STREAM_NAME}/_json`, records, ingestBase(process.env.ZO_BASE_URL));
     testLogger.info('Ingested test data', { status: resp.status, records: records.length });
 }
 
@@ -315,7 +316,7 @@ test.describe("Scheduled Alert Features", () => {
 
         testLogger.info('=== PHASE 4: Test refresh button ===');
 
-        const refreshBtn = page.locator(pm.alertsPage.locators.alertDetailsRefreshButton);
+        const refreshBtn = pm.alertsPage.getAlertDetailsRefreshButtonLocator();
         const refreshBtnVisible = await refreshBtn.isVisible({ timeout: 3000 }).catch(() => false);
         if (refreshBtnVisible) {
             await pm.alertsPage.clickAlertDetailsRefreshButton();
@@ -327,7 +328,7 @@ test.describe("Scheduled Alert Features", () => {
 
         testLogger.info('=== PHASE 5: Test copy conditions button ===');
 
-        const copyBtn = page.locator(pm.alertsPage.locators.alertDetailsCopyConditionsButton);
+        const copyBtn = pm.alertsPage.getAlertDetailsCopyConditionsButtonLocator();
         const copyBtnVisible = await copyBtn.isVisible({ timeout: 3000 }).catch(() => false);
         if (copyBtnVisible) {
             await pm.alertsPage.clickAlertDetailsCopyButton();
@@ -432,7 +433,7 @@ test.describe("Scheduled Alert Features", () => {
         testLogger.info('SQL "not available" message is gone');
 
         // Verify preview chart rendered (PR #10470 enables SQL mode chart preview)
-        const previewChart = page.locator(pm.alertsPage.locators.alertPreviewChart);
+        const previewChart = pm.alertsPage.getAlertPreviewChartLocator();
         const chartVisible = await previewChart.isVisible({ timeout: 10000 }).catch(() => false);
         expect(chartVisible).toBe(true);
         testLogger.info('SQL preview chart is visible');
@@ -483,7 +484,7 @@ test.describe("Scheduled Alert Features", () => {
         // Set trigger_condition BEFORE running any query so that when chart data
         // arrives, handleChartDataUpdate can evaluate instead of returning early.
         // The "Alert if" row is auto-rendered in v3 for scheduled alerts.
-        const alertIfRow = page.locator(pm.alertsPage.locators.alertIfRowLogs);
+        const alertIfRow = pm.alertsPage.getAlertIfRowLogsLocator();
         const rowVisible = await alertIfRow.isVisible({ timeout: 5000 }).catch(() => false);
 
         if (rowVisible) {

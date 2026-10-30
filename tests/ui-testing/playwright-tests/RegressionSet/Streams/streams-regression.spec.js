@@ -5,6 +5,12 @@ const { ingestTestData, getHeaders, getIngestionUrl, sendRequest } = require('..
 const logData = require("../../../fixtures/log.json");
 const { getOrgIdentifier } = require('../../utils/cloud-auth.js');
 
+// Unique per-run suffix for this file's throwaway streams. On the shared cloud org a
+// fixed name collides with a concurrent run's cleanup ("stream is being deleted", 400),
+// which then leaves the stream absent for selectStream. Keeping "ellipsis_testing" in the
+// name preserves the cleanup.spec.js `/ellipsis_testing/` reclaim pattern.
+const RUN_TOKEN = Date.now().toString(36);
+
 test.describe("Streams Regression Bugs", () => {
   test.describe.configure({ mode: 'parallel' });
   let pm; // Page Manager instance
@@ -68,17 +74,18 @@ test.describe("Streams Regression Bugs", () => {
   // Bug #7468: Multi-stream selection should display ellipsis with tooltip
   // https://github.com/openobserve/openobserve/issues/7468
   test('should display ellipsis with tooltip when multiple streams selected', {
-    tag: ['@bug7468', '@P1', '@regression', '@streamsRegression', '@logs']
+    tag: ['@bug-7468', '@P1', '@regression', '@streamsRegression', '@logs']
   }, async ({ page }) => {
     testLogger.info('Test: Verify ellipsis and tooltip for multiple stream selection with long names (Bug #7468)');
 
-    // Use streams with extremely long names to trigger ellipsis
+    // Use streams with extremely long names to trigger ellipsis. The per-run token keeps
+    // them long AND unique so a concurrent run's cleanup can't delete them mid-test.
     const longStreamNames = [
-      'extremely_long_stream_name_for_comprehensive_ellipsis_testing_scenario_number_one_alpha',
-      'another_incredibly_long_stream_name_for_comprehensive_ellipsis_testing_scenario_number_two_beta',
-      'yet_another_extraordinarily_long_stream_name_for_comprehensive_ellipsis_testing_scenario_number_three_gamma',
-      'fourth_tremendously_long_stream_name_for_comprehensive_ellipsis_testing_scenario_number_four_delta',
-      'fifth_exceptionally_long_stream_name_for_comprehensive_ellipsis_testing_scenario_number_five_epsilon'
+      `extremely_long_stream_name_for_comprehensive_ellipsis_testing_scenario_number_one_alpha_${RUN_TOKEN}`,
+      `another_incredibly_long_stream_name_for_comprehensive_ellipsis_testing_scenario_number_two_beta_${RUN_TOKEN}`,
+      `yet_another_extraordinarily_long_stream_name_for_comprehensive_ellipsis_testing_scenario_number_three_gamma_${RUN_TOKEN}`,
+      `fourth_tremendously_long_stream_name_for_comprehensive_ellipsis_testing_scenario_number_four_delta_${RUN_TOKEN}`,
+      `fifth_exceptionally_long_stream_name_for_comprehensive_ellipsis_testing_scenario_number_five_epsilon_${RUN_TOKEN}`
     ];
 
     const orgId = getOrgIdentifier() || 'default';
@@ -97,7 +104,17 @@ test.describe("Streams Regression Bugs", () => {
         test_id: "bug_7468",
         _timestamp: baseTimestamp + i
       };
-      return sendRequest(page, ingestionUrl, payload, headers);
+      // Retry on a transient "stream is being deleted" (400) so a concurrent cleanup
+      // racing the POST doesn't leave the stream absent for the UI selection below.
+      return (async () => {
+        let res;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          res = await sendRequest(page, ingestionUrl, payload, headers);
+          if (res && res.code === 200) return res;
+          if (attempt < 3) await page.waitForTimeout(3000);
+        }
+        return res;
+      })();
     });
 
     const responses = await Promise.all(ingestionPromises);
@@ -206,7 +223,7 @@ test.describe("Streams Regression Bugs", () => {
   // https://github.com/openobserve/openobserve/issues/9354
   // ==========================================================================
   test("should access stream settings with FTS configuration", {
-    tag: ['@bug9354', '@P1', '@fts', '@regression', '@streamsRegression', '@logs']
+    tag: ['@bug-9354', '@P1', '@fts', '@regression', '@streamsRegression', '@logs']
   }, async ({ page }) => {
     testLogger.info('Test: Verify FTS fields access (Bug #9354)');
 
@@ -291,7 +308,7 @@ test.describe("Streams Regression Bugs", () => {
     testLogger.info('✓ Full text search option exists in index type dropdown');
 
     // Close the dropdown
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    await pm.streamsPage.clickBodyToDismiss();
 
     // PART 2: Verify Quick Mode fields from env variables show icon
     testLogger.info('PART 2: Checking Quick Mode field indicators from environment variables');

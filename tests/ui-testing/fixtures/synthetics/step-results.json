@@ -1,0 +1,125 @@
+{
+  "browser_passed": [
+    {
+      "kind": "step",
+      "step_id": "step-navigate",
+      "step_index": 0,
+      "status": "passed",
+      "failed_in_prior_attempt": false,
+      "duration_ms": 420,
+      "engine": "chromium",
+      "location": "e2e-us-east-1",
+      "device": "desktop",
+      "attempts": 1,
+      "error": ""
+    },
+    {
+      "kind": "step",
+      "step_id": "step-title",
+      "step_index": 1,
+      "status": "passed",
+      "failed_in_prior_attempt": false,
+      "duration_ms": 35,
+      "engine": "chromium",
+      "location": "e2e-us-east-1",
+      "device": "desktop",
+      "attempts": 1,
+      "error": ""
+    },
+    {
+      "kind": "step",
+      "step_id": "step-url",
+      "step_index": 2,
+      "status": "passed",
+      "failed_in_prior_attempt": false,
+      "duration_ms": 12,
+      "engine": "chromium",
+      "location": "e2e-us-east-1",
+      "device": "desktop",
+      "attempts": 1,
+      "error": ""
+    }
+  ],
+  "browser_failed": [
+    {
+      "kind": "step",
+      "step_id": "step-navigate",
+      "step_index": 0,
+      "status": "passed",
+      "failed_in_prior_attempt": false,
+      "duration_ms": 420,
+      "engine": "chromium",
+      "location": "e2e-us-east-1",
+      "device": "desktop",
+      "attempts": 1,
+      "error": ""
+    },
+    {
+      "kind": "step",
+      "step_id": "step-title",
+      "step_index": 1,
+      "status": "passed",
+      "failed_in_prior_attempt": false,
+      "duration_ms": 35,
+      "engine": "chromium",
+      "location": "e2e-us-east-1",
+      "device": "desktop",
+      "attempts": 1,
+      "error": ""
+    },
+    {
+      "kind": "step",
+      "step_id": "step-url",
+      "step_index": 2,
+      "status": "failed",
+      "failed_in_prior_attempt": false,
+      "duration_ms": 10010,
+      "engine": "chromium",
+      "location": "e2e-us-east-1",
+      "device": "desktop",
+      "attempts": 1,
+      "error": "Timeout 10000ms exceeded while waiting for locator('#missing-title') to be visible. Tried 3 candidates: css=#missing-title, text=Example Domain, role=heading[name=Example Domain]. The page stayed on https://example.com/ and no navigation was observed during the settle window."
+    }
+  ],
+  "browser_retried": [
+    {
+      "kind": "step",
+      "step_id": "step-navigate",
+      "step_index": 0,
+      "status": "passed",
+      "failed_in_prior_attempt": false,
+      "duration_ms": 420,
+      "engine": "chromium",
+      "location": "e2e-us-east-1",
+      "device": "desktop",
+      "attempts": 2,
+      "error": ""
+    },
+    {
+      "kind": "step",
+      "step_id": "step-title",
+      "step_index": 1,
+      "status": "passed",
+      "failed_in_prior_attempt": false,
+      "duration_ms": 35,
+      "engine": "chromium",
+      "location": "e2e-us-east-1",
+      "device": "desktop",
+      "attempts": 2,
+      "error": ""
+    },
+    {
+      "kind": "step",
+      "step_id": "step-url",
+      "step_index": 2,
+      "status": "passed",
+      "failed_in_prior_attempt": true,
+      "duration_ms": 12,
+      "engine": "chromium",
+      "location": "e2e-us-east-1",
+      "device": "desktop",
+      "attempts": 2,
+      "error": ""
+    }
+  ]
+}

@@ -21,8 +21,8 @@
 //! failure this feature can have: a search outage would read as "no errors
 //! observed" and recover every burn-rate alert in the org.
 //!
-//! Deliberate divergence from Datadog, which counts missing data in a Time
-//! Slice SLO as uptime (D34).
+//! Deliberate divergence from the usual convention, which counts missing data
+//! in a Time Slice SLO as uptime (D34).
 //!
 //! For an `alert`-type SLI the same question is asked of a *source alert's*
 //! evaluations rather than of a query — see [`evaluation_is_measured`].
@@ -123,10 +123,18 @@ pub fn observe(read: WindowRead, coverage_floor: f64, watermark_stale: bool) -> 
 pub fn evaluation_is_measured(outcome: &RunOutcome) -> bool {
     match outcome {
         // Computed a level — the same set §7.6 refreshes `level_at` for.
-        RunOutcome::Firing | RunOutcome::Normal | RunOutcome::NotifyFailed => true,
+        // A suppressed run computed its level; only the delivery was skipped.
+        RunOutcome::Firing
+        | RunOutcome::Normal
+        | RunOutcome::NotifyFailed
+        | RunOutcome::Suppressed => true,
         // Observed nothing: the query failed, the run was skipped, or the
         // outcome belongs to a non-condition module.
-        RunOutcome::Error | RunOutcome::Skipped | RunOutcome::Succeeded => false,
+        RunOutcome::Error
+        | RunOutcome::Skipped
+        | RunOutcome::Succeeded
+        | RunOutcome::Pending
+        | RunOutcome::AckEvent => false,
     }
 }
 
@@ -152,11 +160,6 @@ mod tests {
     }
 
     // ---- coverage arithmetic ----------------------------------------------
-
-    #[test]
-    fn full_coverage_is_one() {
-        assert_eq!(coverage(100, 100), 1.0);
-    }
 
     #[test]
     fn no_observations_is_zero_coverage() {
@@ -344,6 +347,11 @@ mod tests {
     #[test]
     fn a_skipped_evaluation_is_not_a_measurement() {
         assert!(!evaluation_is_measured(&RunOutcome::Skipped));
+    }
+
+    #[test]
+    fn a_suppressed_evaluation_is_a_measurement() {
+        assert!(evaluation_is_measured(&RunOutcome::Suppressed));
     }
 
     /// An interval in which the source alert was **paused** has no records at

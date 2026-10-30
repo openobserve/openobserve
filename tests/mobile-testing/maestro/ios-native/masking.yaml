@@ -1,0 +1,10 @@
+appId: com.o2native.ios
+---
+# Drive to the Checkout form (email + card PII on screen) so Session Replay records it. The app is
+# configured .maskAll, so none of this text may appear in the replay — the masking test asserts that.
+- launchApp:
+    clearState: false
+- tapOn: "Go to Checkout"
+- assertVisible: "Checkout"
+- waitForAnimationToEnd:
+    timeout: 4000

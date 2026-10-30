@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * until now nothing displayed them.
  */
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import type { StepReplayResult } from "@/types/synthetics";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -41,11 +41,13 @@ const props = defineProps<{
   result: StepReplayResult;
   /** Position in the journey, so "re-run to here" can name what it will run. */
   stepNumber?: number;
+  /** Set only for a folded child result: the fix lives in that other test, so Open is offered. */
+  childName?: string;
 }>();
 
-const emit = defineEmits<{ "retry-replay": [] }>();
+const emit = defineEmits<{ "retry-replay": []; "open-child": [] }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const se = computed(() => props.result.structuredError);
 
@@ -92,7 +94,7 @@ const fidelityNotes = computed(() => props.result.fidelity?.notes ?? []);
     class="border-badge-error-ol-border/30 rounded-default overflow-hidden border"
     data-test="synthetics-journey-step-error-card"
   >
-    <div class="flex items-center gap-2 bg-[var(--color-badge-error-soft-bg)] px-3 py-2">
+    <div class="bg-badge-error-soft-bg flex items-center gap-2 px-3 py-2">
       <OIcon :name="errorIconName" size="sm" class="text-status-error-text" aria-hidden="true" />
       <span class="text-text-heading flex-1 text-xs font-semibold">{{ errorLabel }}</span>
       <span class="text-text-secondary font-mono text-xs">
@@ -101,6 +103,14 @@ const fidelityNotes = computed(() => props.result.fidelity?.notes ?? []);
     </div>
 
     <div class="px-3 py-3">
+      <!-- The position-prefixed child name says which child of the reference failed. -->
+      <p
+        v-if="result.stepName"
+        class="text-text-heading m-0 mb-1 text-xs font-semibold"
+        data-test="synthetics-journey-step-error-name"
+      >
+        {{ result.stepName }}
+      </p>
       <p class="text-text-body m-0 text-xs" data-test="synthetics-journey-step-error-message">
         {{ se?.message || result.error }}
       </p>
@@ -159,6 +169,16 @@ const fidelityNotes = computed(() => props.result.fidelity?.notes ?? []);
             ? t("synthetics.journey.reRunToHere", { step: stepNumber })
             : t("synthetics.journey.reRun")
         }}
+      </OButton>
+      <OButton
+        v-if="childName"
+        variant="outline"
+        size="xs"
+        icon-left="open-in-new"
+        data-test="synthetics-journey-error-open-child-btn"
+        @click="emit('open-child')"
+      >
+        {{ t("synthetics.journey.subtest.openChild", { name: childName }) }}
       </OButton>
     </div>
   </div>

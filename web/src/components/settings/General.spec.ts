@@ -31,25 +31,37 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 // Mock external services and composables
-vi.mock("@/services/organizations", () => ({
-  default: {
-    post_organization_settings: vi.fn(),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      post_organization_settings: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/settings", () => ({
-  default: {
-    createLogo: vi.fn(),
-    deleteLogo: vi.fn(),
-    updateCustomText: vi.fn(),
-  },
-}));
+vi.mock("@/services/settings", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      createLogo: vi.fn(),
+      deleteLogo: vi.fn(),
+      updateCustomText: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/config", () => ({
-  default: {
-    get_config: vi.fn(),
-  },
-}));
+vi.mock("@/services/config", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_config: vi.fn(),
+      get_config_full: vi.fn(),
+    },
+  });
+});
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/composables/useLoading", () => ({
   useLoading: (fn: Function) => ({
@@ -75,6 +87,9 @@ import organizations from "@/services/organizations";
 import settingsService from "@/services/settings";
 import configService from "@/services/config";
 import DOMPurify from "dompurify";
+import analytics from "@/services/product_analytics";
+import config from "@/aws-exports";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 
 const mockOrganizations = organizations as any;
 const mockSettingsService = settingsService as any;
@@ -271,6 +286,7 @@ describe("General", () => {
     mockSettingsService.deleteLogo.mockResolvedValue({ status: 200 });
     mockSettingsService.updateCustomText.mockResolvedValue({ status: 200 });
     mockConfigService.get_config.mockResolvedValue({ data: {} });
+    mockConfigService.get_config_full.mockResolvedValue({ data: {} });
     mockDOMPurify.sanitize.mockImplementation((text) => text);
   });
 
@@ -348,6 +364,28 @@ describe("General", () => {
       });
     });
 
+    it("tracks org_general_settings_saved once the save succeeds", async () => {
+      const wrapper = createWrapper();
+      const form = wrapper.findComponent({ name: "OForm" });
+      await form.vm.form.handleSubmit();
+      await nextTick();
+
+      expect(analytics.track).toHaveBeenCalledWith("org_general_settings_saved", {
+        custom_theme: false,
+      });
+    });
+
+    it("does not track org_general_settings_saved when the save fails", async () => {
+      mockOrganizations.post_organization_settings.mockRejectedValue({ message: "Server error" });
+
+      const wrapper = createWrapper();
+      const form = wrapper.findComponent({ name: "OForm" });
+      await form.vm.form.handleSubmit();
+      await nextTick();
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
     it("should handle save error without message", async () => {
       mockOrganizations.post_organization_settings.mockRejectedValue({});
 
@@ -378,6 +416,80 @@ describe("General", () => {
 
       const enterpriseSection = wrapper.find("#enterpriseFeature");
       expect(enterpriseSection.exists()).toBe(false);
+    });
+  });
+
+  // customBranding is self-hosted-only (cloudOffers: false): OSS sees the
+  // section locked-but-visible (disabled controls + lock), pure Cloud doesn't
+  // see it at all — same split as the other cloudOffers:false gates (e.g.
+  // cipherKeys in settings/index.vue).
+  describe("Custom branding gating", () => {
+    const originalIsEnterprise = config.isEnterprise;
+    const originalIsCloud = config.isCloud;
+
+    afterEach(() => {
+      config.isEnterprise = originalIsEnterprise;
+      config.isCloud = originalIsCloud;
+    });
+
+    it("should keep the branding section visible but locked on OSS", () => {
+      mockStore.state.zoConfig.meta_org = "test-org";
+      config.isEnterprise = "false";
+      config.isCloud = "false";
+      const wrapper = createWrapper();
+
+      expect(wrapper.find("#enterpriseFeature").exists()).toBe(true);
+      const lockedText = wrapper.find('[data-test="settings_ent_logo_custom_text_locked"]');
+      expect(lockedText.exists()).toBe(true);
+      // Clickable (not disabled) — the wrapping row opens the upgrade dialog
+      // on click instead of the field being an inert disabled control.
+      expect(lockedText.find("input").attributes("disabled")).toBeUndefined();
+      expect(
+        wrapper.find('[data-test="setting_ent_custom_logo_img_file_upload_locked"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="setting_ent_custom_logo_dark_img_file_upload_locked"]').exists(),
+      ).toBe(true);
+      // The functional controls must not render alongside the locked ones.
+      expect(wrapper.find('[data-test="settings_ent_logo_custom_text"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="settings_ent_logo_custom_text_edit_btn"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("opens the upgrade dialog when a locked branding row is clicked", async () => {
+      mockStore.state.zoConfig.meta_org = "test-org";
+      config.isEnterprise = "false";
+      config.isCloud = "false";
+      const wrapper = createWrapper();
+
+      const { isOpen, close } = useEnterpriseUpgradeDialog();
+      close();
+      await wrapper.find('[data-test="settings_ent_logo_custom_text_locked"]').trigger("click");
+      expect(isOpen.value).toBe(true);
+    });
+
+    it("should hide the branding section entirely on a pure Cloud build", () => {
+      mockStore.state.zoConfig.meta_org = "test-org";
+      config.isEnterprise = "false";
+      config.isCloud = "true";
+      const wrapper = createWrapper();
+
+      expect(wrapper.find("#enterpriseFeature").exists()).toBe(false);
+    });
+
+    it("should render the functional (unlocked) controls on Enterprise", () => {
+      mockStore.state.zoConfig.meta_org = "test-org";
+      config.isEnterprise = "true";
+      config.isCloud = "false";
+      const wrapper = createWrapper();
+
+      expect(wrapper.find('[data-test="settings_ent_logo_custom_text_locked"]').exists()).toBe(
+        false,
+      );
+      expect(
+        wrapper.find('[data-test="setting_ent_custom_logo_img_file_upload_locked"]').exists(),
+      ).toBe(false);
     });
   });
 
@@ -747,6 +859,18 @@ describe("General", () => {
       expect(deleteDialog.attributes("data-secondary-label")).toBe("Cancel");
     });
 
+    it("names the logo theme in bold and uses a destructive OK button", async () => {
+      const wrapper = createWrapper();
+      wrapper.vm.confirmDeleteLogo("dark");
+      await nextTick();
+      const dialog = wrapper.findAllComponents({ name: "ODialog" })[0];
+      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+      const message = wrapper.find('[data-test="general-delete-image-message"]');
+      const name = message.find("span.font-semibold");
+      expect(name.text()).toBe("Dark Mode");
+      expect(message.text()).toContain("Dark Mode");
+    });
+
     it("forwards title and size to the color picker ODialog", () => {
       const wrapper = createWrapper();
       const dialogs = wrapper.findAll('[data-test-stub="o-dialog"]');
@@ -875,7 +999,7 @@ describe("General", () => {
 
       expect(mockToast).toHaveBeenCalledWith({
         variant: "error",
-        message: "1 file(s) did not pass validation constraints",
+        message: "1 file did not pass validation constraints",
       });
     });
   });

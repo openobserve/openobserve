@@ -80,16 +80,15 @@ pub fn time_range_expr_impl(args: &[ColumnarValue]) -> datafusion::error::Result
                         Ok(v) => v,
                         Err(_) => return None,
                     };
-                    let result: bool;
-                    if min > 0 && max > 0 {
-                        result = base >= min && base < max;
+                    let result = if min > 0 && max > 0 {
+                        base >= min && base < max
                     } else if min > 0 {
-                        result = base >= min;
+                        base >= min
                     } else if max > 0 {
-                        result = base < max;
+                        base < max
                     } else {
-                        result = true;
-                    }
+                        true
+                    };
                     Some(result)
                 }
                 _ => None,

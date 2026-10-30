@@ -4,9 +4,13 @@ const crypto = require('crypto');
 const { test: baseTest } = require('@playwright/test');
 const testLogger = require('./test-logger.js');
 const { waitUtils } = require('./wait-helpers.js');
+const { gotoWithRetry } = require('./navigation.js');
 const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
+const { getCloudConfig } = require('./cloud-auth.js');
 
 const istanbulCLIOutput = path.join(process.cwd(), '.nyc_output');
+// Only an istanbul build (VITE_COVERAGE=true) exposes window.__coverage__; otherwise the hooks only cost time.
+const coverageEnabled = process.env.VITE_COVERAGE === 'true';
 const authFile = path.join(__dirname, 'auth', 'user.json');
 
 function generateUUID() {
@@ -28,48 +32,75 @@ const test = baseTest.extend({
         testLogger.info('Using saved authentication state');
         context = await browser.newContext({
           storageState: authFile,
-          viewport: { width: 1500, height: 1024 }
+          viewport: { width: 1500, height: 1024 },
+          // browser.newContext() does NOT inherit the project's `use.permissions`,
+          // so overriding this fixture silently drops them. Specs that read the
+          // clipboard (share-link, legends-copy, table-copy-cell) then fail on a
+          // rejected navigator.clipboard.readText().
+          permissions: ['clipboard-read', 'clipboard-write']
         });
       } else {
         testLogger.warn('No saved auth state found, creating fresh context');
         context = await browser.newContext({
-          viewport: { width: 1500, height: 1024 }
+          viewport: { width: 1500, height: 1024 },
+          permissions: ['clipboard-read', 'clipboard-write']
         });
       }
       
-      // Add coverage collection (from original baseFixtures)
-      await context.addInitScript(() =>
-        window.addEventListener('beforeunload', () => {
-          try {
-            (window).collectIstanbulCoverage(JSON.stringify((window).__coverage__))
-          } catch (error) {
-            testLogger.error('Failed to collect coverage on page unload', { error });
+      // A storageState older than a day makes the cloud day-2 Slack invite modal open on every page load.
+      // The connect-data popup is per-session, and opens whenever an org has no streams yet (navigateToBase runs before ingestion).
+      let cloudUserEmail = null;
+      try {
+        cloudUserEmail = isCloudEnvironment() ? getCloudConfig()?.userEmail || null : null;
+      } catch (_) {}
+      await context.addInitScript((email) => {
+        try {
+          for (const key of Object.keys(localStorage)) {
+            if (key.startsWith('slackCommunityInvite:')) {
+              localStorage.setItem(key, JSON.stringify({ status: 'resolved', shownAt: null, dismissCount: 0 }));
+            }
           }
-        }),
-      );
-      
-      await fs.promises.mkdir(istanbulCLIOutput, { recursive: true });
-      await context.exposeFunction('collectIstanbulCoverage', async (coverageJSON) => {
-        if (!coverageJSON) return;
-        const filename = path.join(istanbulCLIOutput, `playwright_coverage_${generateUUID()}.json`);
-        try {
-          await fs.promises.writeFile(filename, coverageJSON);
-        } catch (error) {
-          testLogger.error('Failed to write coverage data', { error });
-        }
-      });
-      
+          if (email) sessionStorage.setItem(`connectDataSourcePromptShown:${email}`, 'true');
+        } catch (_) {}
+      }, cloudUserEmail);
+
+      // Add coverage collection (from original baseFixtures)
+      if (coverageEnabled) {
+        await context.addInitScript(() =>
+          window.addEventListener('beforeunload', () => {
+            try {
+              (window).collectIstanbulCoverage(JSON.stringify((window).__coverage__))
+            } catch (error) {
+              testLogger.error('Failed to collect coverage on page unload', { error });
+            }
+          }),
+        );
+
+        await fs.promises.mkdir(istanbulCLIOutput, { recursive: true });
+        await context.exposeFunction('collectIstanbulCoverage', async (coverageJSON) => {
+          if (!coverageJSON) return;
+          const filename = path.join(istanbulCLIOutput, `playwright_coverage_${generateUUID()}.json`);
+          try {
+            await fs.promises.writeFile(filename, coverageJSON);
+          } catch (error) {
+            testLogger.error('Failed to write coverage data', { error });
+          }
+        });
+      }
+
       await use(context);
-      
+
       // Collect final coverage
-      await Promise.all(context.pages().map(async (page) => {
-        try {
-          await page.evaluate(() => (window).collectIstanbulCoverage(JSON.stringify((window).__coverage__)))
-        } catch (error) {
-          testLogger.error('Failed to collect final coverage for page', { error });
-        }
-      }));
-      
+      if (coverageEnabled) {
+        await Promise.all(context.pages().map(async (page) => {
+          try {
+            await page.evaluate(() => (window).collectIstanbulCoverage(JSON.stringify((window).__coverage__)))
+          } catch (error) {
+            testLogger.error('Failed to collect final coverage for page', { error });
+          }
+        }));
+      }
+
     } finally {
       if (context) {
         await context.close();
@@ -112,9 +143,15 @@ const expect = test.expect;
 async function verifyAuthentication(page) {
   try {
     // Increase timeout for authentication verification, especially important for first test in suite
-    await page.waitHelpers.waitForElementVisible('[data-test="menu-link-\\/-item"]', {
+    // Verify against the nav rail container rather than a specific item. The
+    // Home tile's `menu-link-/-item` no longer renders on the current rail
+    // (only Slack/Help still use that pattern), so keying auth off it made
+    // every suite fail setup even when login had succeeded.
+    // Pages opened via context.newPage() (e.g. afterAll cleanup) never get the fixture-attached helpers.
+    const waitHelpers = page.waitHelpers ?? waitUtils.create(page);
+    await waitHelpers.waitForElementVisible('[data-test="navbar-main-nav"]', {
       timeout: 15000,
-      description: 'home menu link (auth verification)'
+      description: 'main nav rail (auth verification)'
     });
     return true;
   } catch (error) {
@@ -137,9 +174,11 @@ async function navigateToBase(page) {
   const baseUrlWithOrg = `${process.env["ZO_BASE_URL"]}/web/?org_identifier=${process.env["ORGNAME"]}`;
   testLogger.info('Navigating to base URL with org identifier', { url: baseUrlWithOrg });
 
-  // Use 60s navigation timeout for all environments (dev/staging can be slow to load)
+  // Use 60s navigation timeout for all environments (dev/staging can be slow to load).
+  // Settle on domcontentloaded, not the default `load`: the SPA is interactive well
+  // before every subresource finishes, and the waits below already gate on what we need.
   const navTimeout = 60000;
-  await page.goto(baseUrlWithOrg, { timeout: navTimeout });
+  await gotoWithRetry(page, baseUrlWithOrg, { timeout: navTimeout, waitUntil: 'domcontentloaded' });
   await page.waitForLoadState('domcontentloaded');
   // Cloud needs full hydration before sidebar clicks — without this, clicks trigger Dex redirect
   if (isCloudEnvironment()) {
@@ -147,6 +186,14 @@ async function navigateToBase(page) {
   }
   
   let isAuthenticated = await verifyAuthentication(page);
+
+  // A blank page here is usually a JS chunk that never downloaded, not a lost session; reload before re-login.
+  if (!isAuthenticated && isCloudEnvironment()) {
+    testLogger.warn('Auth check failed — reloading once before re-authentication');
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: navTimeout }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    isAuthenticated = await verifyAuthentication(page);
+  }
 
   // Self-heal on cloud: the shared session token is minted once at the start of the run
   // and reused by every shard, so on long runs (or when shards sharing an org contend on
@@ -158,7 +205,7 @@ async function navigateToBase(page) {
     const { reauthenticateAlpha1 } = require('./reauth-alpha1.js');
     const recovered = await reauthenticateAlpha1(page);
     if (recovered) {
-      await page.goto(baseUrlWithOrg, { timeout: navTimeout });
+      await gotoWithRetry(page, baseUrlWithOrg, { timeout: navTimeout, waitUntil: 'domcontentloaded' });
       await page.waitForLoadState('domcontentloaded');
       await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
       isAuthenticated = await verifyAuthentication(page);
@@ -169,7 +216,7 @@ async function navigateToBase(page) {
     testLogger.error('User not authenticated - global setup might have failed (re-auth also failed or unavailable)');
     throw new Error('User not authenticated. Global setup might have failed.');
   }
-
+  
   testLogger.info('Successfully navigated to base URL with authentication');
 }
 

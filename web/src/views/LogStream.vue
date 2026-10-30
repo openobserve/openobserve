@@ -69,6 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-global-filter="false"
           :default-columns="false"
           :loading="loadingState"
+          :forbidden="forbidden"
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="streams-log-stream-list"
@@ -77,9 +78,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Toolbar inside the table frame: stream-type filter + search. -->
           <template #toolbar>
-            <div class="flex w-full items-center justify-between gap-2">
+            <div
+              class="flex w-full min-w-0 flex-wrap items-center justify-between gap-2 gap-y-1.5 max-md:contents"
+            >
               <OToggleGroup
+                mobile-dropdown
                 :model-value="streamActiveTab"
+                data-test="log-stream-type-filter"
                 @update:model-value="(v) => filterLogStreamByTab(v as string)"
               >
                 <OToggleGroupItem value="logs" size="sm">
@@ -98,6 +103,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   /></template>
                   {{ t("logStream.labelTraces") }}
                 </OToggleGroupItem>
+                <OToggleGroupItem
+                  v-if="store.state.zoConfig?.profiling_enabled"
+                  value="profiles"
+                  size="sm"
+                >
+                  <template #icon-left><OIcon name="memory" size="xs" class="shrink-0" /></template>
+                  {{ t("logStream.labelProfiles") }}
+                </OToggleGroupItem>
                 <OToggleGroupItem value="metadata" size="sm">
                   <template #icon-left><OIcon name="info" size="xs" class="shrink-0" /></template>
                   {{ t("logStream.labelMetadata") }}
@@ -106,23 +119,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSearchInput
                 data-test="streams-search-stream-input"
                 v-model="filterQuery"
-                class="no-border o2-search-input w-64"
+                class="no-border o2-search-input min-w-0 flex-1 max-md:min-w-40"
                 :placeholder="t('logStream.search')"
                 :debounce="300"
               />
             </div>
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
-              :loading="loadingState"
+              :last-run-at="lastUpdatedAt"
+              :loading="isRefreshing"
+              shortcut-id="streamsRefresh"
               data-test="log-stream-refresh-stats-btn"
               @click="refreshStreams"
-            >
-              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="streamsRefresh" />
-            </OButton>
+            />
           </template>
           <!--
             Render the stream-name cell with a deterministic per-name data-test.
@@ -177,6 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="view"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 @click="exploreStream({ row })"
               />
               <OButton
@@ -186,6 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="view"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 @click="listSchema({ row })"
               />
               <OButton
@@ -195,8 +209,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="delete"
                 variant="ghost-destructive"
                 size="icon-sm"
+                class="max-md:hidden"
                 @click="confirmDeleteAction({ row })"
               />
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    :aria-label="t('common.moreActions')"
+                    icon-left="more-vert"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    class="md:hidden"
+                    data-test="log-stream-row-more-actions"
+                    @click.stop
+                  />
+                </template>
+                <ODropdownItem
+                  icon-left="search"
+                  class="md:hidden"
+                  data-test="log-stream-explore-btn-menu"
+                  @select="exploreStream({ row })"
+                >
+                  <span>{{ t("logStream.explore") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="description"
+                  class="md:hidden"
+                  data-test="log-stream-schema-btn-menu"
+                  @select="listSchema({ row })"
+                >
+                  <span>{{ t("logStream.schemaHeader") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="delete"
+                  variant="destructive"
+                  class="md:hidden"
+                  data-test="log-stream-delete-btn-menu"
+                  @select="confirmDeleteAction({ row })"
+                >
+                  <span>{{ t("logStream.delete") }}</span>
+                </ODropdownItem>
+              </ODropdown>
             </div>
           </template>
           <template #empty>
@@ -210,7 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template v-if="!filterQuery" #extra>
                   <div class="flex flex-wrap items-center justify-center gap-2">
-                    <span class="text-text-secondary mr-1 text-sm font-semibold">
+                    <span class="text-text-secondary me-1 text-sm font-semibold">
                       {{ t("logStream.emptyOr") }}
                     </span>
                     <EmptyStateIngestionChip
@@ -227,7 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="h-3.5 w-3.5 shrink-0 object-contain"
                         alt=""
                       />
-                      {{ t("logStream.emptyKubernetes") }}
+                      {{ raw("Kubernetes") }}
                     </EmptyStateIngestionChip>
                     <EmptyStateIngestionChip
                       data-test="log-stream-empty-aws-btn"
@@ -259,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="h-3.5 w-3.5 shrink-0 object-contain"
                         alt=""
                       />
-                      {{ t("logStream.emptyLinux") }}
+                      {{ raw("Linux") }}
                     </EmptyStateIngestionChip>
                     <EmptyStateIngestionChip
                       data-test="log-stream-empty-windows-btn"
@@ -275,30 +328,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="h-3.5 w-3.5 shrink-0 object-contain"
                         alt=""
                       />
-                      {{ t("logStream.emptyWindows") }}
+                      {{ raw("Windows") }}
                     </EmptyStateIngestionChip>
                   </div>
                 </template>
               </OEmptyState>
             </div>
           </template>
-          <template #bottom="scope">
-            <div class="flex w-full items-center justify-between py-2">
-              <div class="flex w-full items-center text-xs font-normal">
-                {{ scope.totalRows }} Stream(s)
-                <OButton
-                  v-if="selectedIds.length > 0"
-                  icon-left="delete"
-                  variant="outline-destructive"
-                  size="sm-action"
-                  class="ml-4"
-                  :disabled="isDeleting"
-                  @click="confirmBatchDeleteAction"
-                >
-                  {{ isDeleting ? "Deleting..." : "Delete" }}
-                </OButton>
-              </div>
-            </div>
+          <template #selection-actions>
+            <OButton
+              icon-left="delete"
+              variant="outline-destructive"
+              size="sm"
+              :disabled="isDeleting"
+              @click="confirmBatchDeleteAction"
+            >
+              {{ isDeleting ? t("common.deleting") : t("common.delete") }}
+            </OButton>
           </template>
         </OTable>
       </div>
@@ -315,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="addStreamDialog.show"
       :is-in-pipeline="false"
       @close="addStreamDialog.show = false"
-      @streamAdded="getLogStream"
+      @streamAdded="refreshStreams"
     />
 
     <ODialog
@@ -326,7 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :secondary-button-label="t('logStream.cancel')"
       :primary-button-label="t('logStream.ok')"
       primary-button-variant="destructive"
-      @click:secondary="confirmDelete = false"
+      @click:secondary="cancelDelete"
       @click:primary="
         () => {
           deleteStream();
@@ -335,7 +381,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
     >
       <div class="flex flex-col gap-3 py-1">
-        <p class="text-sm">{{ t("logStream.confirmDeleteMsg") }}</p>
+        <i18n-t
+          keypath="logStream.confirmDeleteMsg"
+          tag="p"
+          class="text-text-body text-sm"
+          data-test="log-stream-delete-dialog-message"
+        >
+          <template #name
+            ><span class="text-text-heading font-semibold break-all">{{
+              deleteStreamName
+            }}</span></template
+          >
+        </i18n-t>
         <div class="text-text-secondary flex w-full items-center gap-2 text-sm">
           <OCheckbox v-model="deleteAssociatedAlertsPipelines" />
           <span class="text-text-secondary text-xs font-medium">
@@ -353,7 +410,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :secondary-button-label="t('logStream.cancel')"
       :primary-button-label="t('logStream.ok')"
       primary-button-variant="destructive"
-      @click:secondary="confirmBatchDelete = false"
+      @click:secondary="cancelBatchDelete"
       @click:primary="
         () => {
           deleteBatchStream();
@@ -362,11 +419,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
     >
       <div class="flex flex-col gap-3 py-1">
-        <p class="text-sm">{{ t("logStream.confirmBatchDeleteMsg") }}</p>
+        <p class="text-text-body text-sm" data-test="log-stream-batch-delete-dialog-message">
+          {{ t("logStream.confirmBatchDeleteMsg", { count: batchDeleteCount }) }}
+        </p>
         <div class="text-text-secondary flex w-full items-center gap-2 text-sm">
           <OCheckbox v-model="deleteAssociatedAlertsPipelines" />
           <span class="text-text-secondary text-xs font-medium">
-            Delete all Pipelines and Alerts associated with the selected streams
+            {{ t("logStream.deleteAssociatedAlertsPipelinesBatch") }}
           </span>
         </div>
       </div>
@@ -375,32 +434,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref, onActivated, onBeforeMount, type Ref } from "vue";
+import { streamPageQuery } from "@/services/stream.queries";
+import { streamKeys } from "@/services/stream.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { orgSummaryQuery } from "@/services/organizations.queries";
+import { computed, defineComponent, ref, onActivated, onBeforeMount, type Ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useListViewState } from "@/composables/useListViewState";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem, StatTrend } from "@/lib/data/StatStrip/OStatStrip.types";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import streamService from "../services/stream";
-import organizationsService from "../services/organizations";
 import { addCommasToNumber, formatEventCount } from "@/utils/formatters";
 import SchemaIndex from "../components/logstream/schema.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
-import segment from "../services/segment_analytics";
+import analytics from "../services/product_analytics";
 import { getImageURL, verifyOrganizationStatus, formatSizeFromMB } from "../utils/zincutils";
 import config from "@/aws-exports";
 import useStreams from "@/composables/useStreams";
 import AddStream from "@/components/logstream/AddStream.vue";
-import { watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -419,8 +484,10 @@ export default defineComponent({
     EmptyStateIngestionChip,
     AddStream,
     OButton,
-    OTooltip,
+    ORefreshButton,
     ODialog,
+    ODropdown,
+    ODropdownItem,
     OIcon,
     OToggleGroup,
     OToggleGroupItem,
@@ -433,32 +500,46 @@ export default defineComponent({
   emits: [],
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const logStream: Ref<any[]> = ref([]);
     const showIndexSchemaDialog = ref(false);
     const isDeleting = ref(false);
     const confirmDelete = ref<boolean>(false);
     const confirmBatchDelete = ref<boolean>(false);
+    // Snapshot at open: the selection is cleared while the dialog is still closing.
+    const batchDeleteCount = ref(0);
     const schemaData = ref({ name: "", schema: [Object], stream_type: "" });
-    const resultTotal = ref<number>(0);
     const selectedIds = ref<string[]>([]);
     const orgData: any = ref(store.state.selectedOrganization);
     const previousOrgIdentifier = ref("");
-    const filterQuery = ref("");
+    const viewState = useListViewState("logStreams", {
+      filterQuery: "",
+      streamType: "logs",
+      pageSize: 20,
+      currentPage: 1,
+      sortBy: "name",
+      sortOrder: "asc" as "asc" | "desc",
+    });
+    const filterQuery = ref(viewState.filterQuery);
     const duplicateStreamList: Ref<any[]> = ref([]);
-    const selectedStreamType = ref("logs");
+    const selectedStreamType = ref(viewState.streamType);
     const loadingState = ref(true);
+    // A refresh with rows already on screen: the button spins, the table does not
+    // go back to a skeleton.
+    const isRefreshing = ref(false);
+    const lastUpdatedAt = ref<number | null>(null);
+    const forbidden = ref(false);
     const searchKeyword = ref("");
-    const deleteAssociatedAlertsPipelines = ref(true);
-    const streamActiveTab = ref("logs");
+    const deleteAssociatedAlertsPipelines = ref(false);
+    const streamActiveTab = ref(viewState.streamType);
     const { track } = useReo();
 
-    const pageSize = ref(20);
+    const pageSize = ref(viewState.pageSize);
     const pageSizeOptions = [20, 50, 100, 250, 500];
-    const currentPage = ref(1);
-    const sortBy = ref("name");
-    const sortOrder = ref<"asc" | "desc">("asc");
+    const currentPage = ref(viewState.currentPage);
+    const sortBy = ref(viewState.sortBy);
+    const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
     const totalCount = ref(0);
 
     const selectedItems = computed(() =>
@@ -466,7 +547,7 @@ export default defineComponent({
     );
 
     const streamTabs: never[] = [];
-    const { removeStream, getStream, getPaginatedStreams, addNewStreams } = useStreams();
+    const { removeStream, getStream, addNewStreams } = useStreams(t);
 
     // Stats are absent until the ingester has flushed a stream, so "no number
     // yet" renders as a muted em dash rather than a misleading "0 MB".
@@ -612,7 +693,7 @@ export default defineComponent({
       },
     });
 
-    let deleteStreamName = "";
+    const deleteStreamName = ref("");
     let deleteStreamType = "";
 
     onBeforeMount(() => {
@@ -646,64 +727,87 @@ export default defineComponent({
     //   },
     // );
 
+    // Rows only — the one-time side effects below run on the fresh result, so
+    // a cached paint never re-opens the schema dialog or re-warms the next page.
+    const applyStreams = (res: any) => {
+      totalCount.value = res.total;
+      logStream.value = [];
+
+      logStream.value.push(
+        ...res.list.map((data: any) => {
+          // Raw numbers on the row (not pre-formatted strings): the columns
+          // format for display, while the magnitude bars and the liveness
+          // rail need the real values. `stats` is per-row — a stream without
+          // it must read null, never the previous row's numbers.
+          const stats = data.stats ?? {};
+          return {
+            _rowKey: `${data.name}-${data.stream_type}`,
+            name: data.name,
+            doc_num: stats.doc_num ?? null,
+            storage_size: stats.storage_size ?? null,
+            compressed_size: stats.compressed_size ?? null,
+            index_size: stats.index_size ?? null,
+            // Microsecond epoch of the newest record — the liveness signal.
+            doc_time_max: stats.doc_time_max ?? null,
+            storage_type: data.storage_type,
+            actions: "action buttons",
+            schema: data.schema ? data.schema : [],
+            stream_type: data.stream_type,
+          };
+        }),
+      );
+      duplicateStreamList.value = [...logStream.value];
+    };
+
     const getLogStream = (_refresh?: boolean) => {
       if (store.state.selectedOrganization != null) {
-        loadingState.value = true;
+        forbidden.value = false;
         previousOrgIdentifier.value = store.state.selectedOrganization.identifier;
-        const dismiss = toast({
-          variant: "loading",
-          message: "Please wait while loading streams...",
-          timeout: 0,
-        });
-        logStream.value = [];
-
         const offset = (currentPage.value - 1) * pageSize.value;
-        let streamResponse;
-        // if(selectedStreamType.value == "all") {
-        //   streamResponse = getStreams(selectedStreamType.value || "", false, false);
-        // } else {
-        streamResponse = getPaginatedStreams(
-          selectedStreamType.value || "",
-          false,
-          false,
-          offset < 0 ? 0 : offset,
-          pageSize.value,
-          filterQuery.value,
-          sortBy.value,
-          sortOrder.value === "asc",
-        );
-        // }
+        const org = store.state.selectedOrganization.identifier;
+        const type = selectedStreamType.value || "";
+        const params = {
+          offset: offset < 0 ? 0 : offset,
+          limit: pageSize.value,
+          keyword: filterQuery.value,
+          sort: sortBy.value,
+          asc: sortOrder.value === "asc",
+        };
+
+        // Stale-while-revalidate: the rows already on screen stay put while the
+        // page revalidates, so only a cold cache spins and toasts.
+        // Paint what is cached first even on a manual refresh — replacing the
+        // table with a skeleton throws away rows the user is still reading.
+        const cachedPage = queryClient.getQueryData(streamKeys.page(org, type, params));
+        const painted = cachedPage !== undefined;
+        if (painted) applyStreams(cachedPage);
+        isRefreshing.value = true;
+        const opts = streamPageQuery(org, type, params);
+        const streamResponse = _refresh
+          ? queryClient
+              .invalidateQueries({
+                queryKey: opts.queryKey,
+                exact: true,
+                refetchType: "none",
+              })
+              .then(() => queryClient.fetchQuery(opts))
+          : queryClient.fetchQuery(opts);
+
+        loadingState.value = !painted;
+        const dismiss = painted
+          ? () => {}
+          : toast({
+              variant: "loading",
+              message: t("toastMessages.views.pleaseWaitWhileLoadingStreams"),
+              timeout: 0,
+            });
 
         streamResponse
           .then((res: any) => {
-            logStream.value = [];
-            resultTotal.value = res.list.length;
-            totalCount.value = res.total;
-
-            logStream.value.push(
-              ...res.list.map((data: any) => {
-                // Raw numbers on the row (not pre-formatted strings): the columns
-                // format for display, while the magnitude bars and the liveness
-                // rail need the real values. `stats` is per-row — a stream without
-                // it must read null, never the previous row's numbers.
-                const stats = data.stats ?? {};
-                return {
-                  _rowKey: `${data.name}-${data.stream_type}`,
-                  name: data.name,
-                  doc_num: stats.doc_num ?? null,
-                  storage_size: stats.storage_size ?? null,
-                  compressed_size: stats.compressed_size ?? null,
-                  index_size: stats.index_size ?? null,
-                  // Microsecond epoch of the newest record — the liveness signal.
-                  doc_time_max: stats.doc_time_max ?? null,
-                  storage_type: data.storage_type,
-                  actions: "action buttons",
-                  schema: data.schema ? data.schema : [],
-                  stream_type: data.stream_type,
-                };
-              }),
-            );
-            duplicateStreamList.value = [...logStream.value];
+            applyStreams(res);
+            // The cache records the fetch time; fetchQuery does not hand it back, so read it here.
+            lastUpdatedAt.value =
+              queryClient.getQueryState(opts.queryKey)?.dataUpdatedAt ?? Date.now();
 
             logStream.value.forEach((element: any) => {
               if (element.name == router.currentRoute.value.query.dialog) {
@@ -714,13 +818,24 @@ export default defineComponent({
 
             addNewStreams(selectedStreamType.value, res.list);
 
+            // Warm the next page so paging forward is a cache hit.
+            if (params.offset + params.limit < res.total) {
+              queryClient.prefetchQuery(
+                streamPageQuery(org, type, {
+                  ...params,
+                  offset: params.offset + params.limit,
+                }),
+              );
+            }
+
             dismiss();
           })
           .catch((err) => {
-            if (err.response?.status != 403) {
+            forbidden.value = err?.response?.status === 403;
+            if (!forbidden.value) {
               toast({
                 variant: "error",
-                message: err.response?.data?.message || "Error while fetching streams.",
+                message: err.response?.data?.message || t("logStream.errorWhileFetchingStreams"),
               });
             }
             loadingState.value = false;
@@ -728,14 +843,14 @@ export default defineComponent({
           })
           .finally(() => {
             loadingState.value = false;
+            isRefreshing.value = false;
             dismiss();
           });
       }
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Refresh Streams",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         page: "Streams",
       });
     };
@@ -784,7 +899,7 @@ export default defineComponent({
           : s === "empty"
             ? "var(--color-grey-400)"
             : "var(--color-success-500)";
-      return { boxShadow: `inset 0.25rem 0 0 0 ${color}` };
+      return { boxShadow: `var(--shadow-rail-geom) ${color}` };
     };
 
     // ── Org-wide stream footprint (summary strip) ────────────────────────────
@@ -799,13 +914,22 @@ export default defineComponent({
     } | null>(null);
     const summaryLoading = ref(true);
 
-    const getStreamSummary = () => {
+    const getStreamSummary = (force = false) => {
       if (!store.state.selectedOrganization?.identifier) return;
       summaryLoading.value = true;
-      organizationsService
-        .get_organization_summary(store.state.selectedOrganization.identifier)
-        .then((res: any) => {
-          streamSummary.value = res.data?.streams ?? null;
+      const options = orgSummaryQuery(store.state.selectedOrganization.identifier);
+      // Ingestion moves these totals and no write expires them, so refresh must force.
+      const ready = force
+        ? queryClient.invalidateQueries({
+            queryKey: options.queryKey,
+            exact: true,
+            refetchType: "none",
+          })
+        : Promise.resolve();
+      ready
+        .then(() => queryClient.fetchQuery(options))
+        .then((data: any) => {
+          streamSummary.value = data?.streams ?? null;
         })
         .catch(() => {
           // Silent: the strip is context, not the page's payload. Tiles fall back
@@ -832,7 +956,7 @@ export default defineComponent({
       const compressionTrend = (): StatTrend | undefined => {
         const ratio = compressionRatio(s?.total_storage_size, s?.total_compressed_size);
         if (!ratio) return undefined;
-        return { direction: "down", label: ratio, tone: "success" };
+        return { direction: "down", label: raw(ratio), tone: "success" };
       };
       return [
         {
@@ -888,7 +1012,7 @@ export default defineComponent({
     // Refresh = rows + footprint. Pagination / sorting only re-fetch the rows.
     const refreshStreams = () => {
       getLogStream(true);
-      getStreamSummary();
+      getStreamSummary(true);
     };
 
     getStreamSummary();
@@ -899,22 +1023,32 @@ export default defineComponent({
       schemaData.value.stream_type = props.row.stream_type;
       showIndexSchemaDialog.value = true;
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Actions",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         stream_name: props.row.name,
         page: "Streams",
       });
     };
 
     const confirmDeleteAction = (props: any) => {
-      confirmDelete.value = true;
-      deleteStreamName = props.row.name;
+      deleteAssociatedAlertsPipelines.value = false;
+      deleteStreamName.value = props.row.name;
       deleteStreamType = props.row.stream_type;
+      confirmDelete.value = true;
     };
     const confirmBatchDeleteAction = () => {
+      deleteAssociatedAlertsPipelines.value = false;
+      batchDeleteCount.value = selectedItems.value.length;
       confirmBatchDelete.value = true;
+    };
+    const cancelDelete = () => {
+      deleteAssociatedAlertsPipelines.value = false;
+      confirmDelete.value = false;
+    };
+    const cancelBatchDelete = () => {
+      deleteAssociatedAlertsPipelines.value = false;
+      confirmBatchDelete.value = false;
     };
 
     // Prune deleted streams locally; re-fetch is racy (list is async-cached).
@@ -932,9 +1066,26 @@ export default defineComponent({
 
       const removedCount = before - logStream.value.length;
       totalCount.value = Math.max(0, totalCount.value - removedCount);
-      resultTotal.value = logStream.value.length;
 
       selectedIds.value = [];
+
+      // Prune every cached page, not just the one on screen: navigation is
+      // cache-first, so a page still holding the deleted row would paint it
+      // again — and inside staleTime nothing would refetch to correct it.
+      queryClient.setQueriesData(
+        { queryKey: streamKeys.pagesAll(store.state.selectedOrganization.identifier) },
+        (page: any) => {
+          // `undefined` leaves an untouched entry alone; returning it would re-stamp it as fresh.
+          if (!page?.list) return undefined;
+          const list = page.list.filter((s: any) => !removedKeys.has(`${s.name}-${s.stream_type}`));
+          if (list.length === page.list.length) return undefined;
+          return {
+            ...page,
+            list,
+            total: Math.max(0, (page.total ?? 0) - (page.list.length - list.length)),
+          };
+        },
+      );
 
       items.forEach((stream) => {
         removeStream(stream.name, stream.stream_type);
@@ -943,32 +1094,34 @@ export default defineComponent({
 
     const deleteStream = () => {
       isDeleting.value = true;
+      const name = deleteStreamName.value;
       streamService
         .delete(
           store.state.selectedOrganization.identifier,
-          deleteStreamName,
+          name,
           deleteStreamType,
           deleteAssociatedAlertsPipelines.value,
         )
         .then((res: any) => {
           if (res.data.code == 200) {
+            analytics.track("stream_deleted", { stream_type: deleteStreamType, count: 1 });
             toast({
-              message: "Stream deleted successfully.",
+              message: t("toastMessages.views.streamDeletedSuccessfully"),
               variant: "success",
             });
-            removeStreamsFromTable([{ name: deleteStreamName, stream_type: deleteStreamType }]);
+            removeStreamsFromTable([{ name, stream_type: deleteStreamType }]);
           }
         })
         .catch((err: any) => {
           if (err.response.status != 403) {
             toast({
-              message: "Error while deleting stream.",
+              message: t("toastMessages.views.errorWhileDeletingStream"),
               variant: "error",
             });
           }
         })
         .finally(() => {
-          deleteAssociatedAlertsPipelines.value = true;
+          deleteAssociatedAlertsPipelines.value = false;
           isDeleting.value = false;
         });
     };
@@ -992,17 +1145,32 @@ export default defineComponent({
         .then((responses) => {
           const successfulDeletions = responses.filter((res) => res.data.code === 200);
           const failedDeletions = responses.filter((res) => res.data.code !== 200);
+          const deletedTypes = new Set(
+            items
+              .filter((_s: any, i: number) => responses[i].data.code === 200)
+              .map((s: any) => s.stream_type),
+          );
+          if (successfulDeletions.length > 0) {
+            analytics.track("stream_deleted", {
+              stream_type: deletedTypes.size === 1 ? [...deletedTypes][0] : "mixed",
+              count: successfulDeletions.length,
+            });
+          }
 
           if (successfulDeletions.length > 0) {
             toast({
-              message: `Deleted ${successfulDeletions.length} streams successfully.`,
+              message: t("toastMessages.views.deletedStreamsSuccessfully", {
+                count: successfulDeletions.length,
+              }),
               variant: "success",
             });
           }
 
           if (failedDeletions.length > 0) {
             toast({
-              message: `Failed to delete ${failedDeletions.length} streams.`,
+              message: t("toastMessages.views.failedToDeleteStreams", {
+                count: failedDeletions.length,
+              }),
               variant: "error",
             });
           }
@@ -1012,19 +1180,30 @@ export default defineComponent({
         .catch((error) => {
           if (error.response.status != 403) {
             toast({
-              message: error.response?.data?.message || "Error while deleting streams.",
+              message: error.response?.data?.message || t("logStream.errorWhileDeletingStreams"),
               variant: "error",
             });
           }
         })
         .finally(() => {
-          deleteAssociatedAlertsPipelines.value = true;
+          deleteAssociatedAlertsPipelines.value = false;
           isDeleting.value = false;
         });
     };
 
     watch([currentPage, pageSize, sortBy, sortOrder], () => {
       getLogStream();
+    });
+
+    watch([filterQuery, selectedStreamType, pageSize, currentPage, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        filterQuery: filterQuery.value,
+        streamType: selectedStreamType.value,
+        pageSize: pageSize.value,
+        currentPage: currentPage.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
     });
 
     watch(filterQuery, () => {
@@ -1056,7 +1235,7 @@ export default defineComponent({
       if (stream.stream_type === "enrichment_tables") {
         const dismiss = toast({
           variant: "loading",
-          message: "Redirecting to explorer...",
+          message: t("toastMessages.views.redirectingToExplorer"),
           timeout: 0,
         });
 
@@ -1110,7 +1289,9 @@ export default defineComponent({
 
     const onChangeStreamFilter = (value: string) => {
       selectedStreamType.value = value;
-      getLogStream(true);
+      // The type is part of the cache key, so switching back to a type already
+      // loaded is a cache hit — no forced refetch.
+      getLogStream();
       // logStream.value = filterData(
       //   duplicateStreamList.value,
       //   filterQuery.value.toLowerCase(),
@@ -1136,7 +1317,7 @@ export default defineComponent({
     };
 
     const streamsEmptyActions = computed(() => {
-      const actions: { id: string; icon: string; titleKey: string; descriptionKey: string }[] = [
+      const actions: EmptyStateAction[] = [
         {
           id: "setup-ingestion",
           icon: "cloud-upload",
@@ -1172,17 +1353,18 @@ export default defineComponent({
       }
     };
 
-    const onPaginationChange = async (params: { page: number; size: number }) => {
+    // No reload here: `watch([currentPage, pageSize, sortBy, sortOrder])` above
+    // already loads on these writes, so calling it again would put two identical
+    // requests behind one page or sort change.
+    const onPaginationChange = (params: { page: number; size: number }) => {
       currentPage.value = params.page;
       pageSize.value = params.size;
-      await getLogStream();
     };
 
-    const onSortChange = async (params: { column: string; order: "asc" | "desc" }) => {
+    const onSortChange = (params: { column: string; order: "asc" | "desc" }) => {
       sortBy.value = params.column;
       sortOrder.value = params.order;
       currentPage.value = 1;
-      await getLogStream();
     };
 
     const filterLogStreamByTab = (tab: string) => {
@@ -1213,6 +1395,7 @@ export default defineComponent({
     ]);
     return {
       t,
+      raw,
       router,
       store,
       logStream: logStream,
@@ -1228,14 +1411,17 @@ export default defineComponent({
       streamRowStyle,
       summaryStats,
       summaryLoading,
-      resultTotal,
       listSchema,
       deleteStream,
       deleteBatchStream,
       confirmDeleteAction,
       confirmBatchDeleteAction,
+      cancelDelete,
+      cancelBatchDelete,
+      deleteStreamName,
       confirmDelete,
       confirmBatchDelete,
+      batchDeleteCount,
       schemaData,
       pageSize,
       pageSizeOptions,
@@ -1259,6 +1445,9 @@ export default defineComponent({
       streamsEmptyActions,
       onStreamsEmptyStateAction,
       loadingState,
+      isRefreshing,
+      lastUpdatedAt,
+      forbidden,
       isDeleting,
       searchKeyword,
       deleteAssociatedAlertsPipelines,

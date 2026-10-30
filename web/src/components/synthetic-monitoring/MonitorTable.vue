@@ -16,27 +16,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OTable
+    ref="oTableRef"
     v-model:selected-ids="localSelectedIds"
     :columns="columns"
     :data="data"
     :loading="loading"
+    :forbidden="forbidden"
     pagination="client"
-    :page-size="20"
+    :page-size="pageSize"
     :page-size-options="[10, 20, 25, 50]"
+    :current-page="currentPage"
+    :sort-by="sortBy"
+    :sort-order="sortOrder"
     row-key="id"
     selection="multiple"
     :show-global-filter="false"
     :persist-columns="true"
     table-id="synthetic-monitoring-table"
     :enable-column-resize="true"
-    :footer-title="footerTitle"
-    :empty-message="emptyMessage"
+    :empty-message="resolvedEmptyMessage"
     :data-test="dataTest"
     :horizontal-scroll="true"
     :row-class="monitorRowClass"
     :get-row-style="monitorRowStyle"
     show-index
     @row-click="(row: any) => emit('row-click', row)"
+    @update:current-page="emit('update:currentPage', $event)"
+    @update:page-size="emit('update:pageSize', $event)"
+    @update:sort-by="emit('update:sortBy', $event)"
+    @update:sort-order="emit('update:sortOrder', $event)"
   >
     <!-- Summary strip supplied by the parent (it owns the status facet). -->
     <template v-if="$slots.subheader" #subheader>
@@ -58,22 +66,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :dot="true"
         size="sm"
       >
-        {{ resolveBadge("serviceStatus", (row as any).status).label }}
+        {{ resolveBadgeLabel("serviceStatus", (row as any).status) }}
       </OBadge>
     </template>
 
     <!-- Monitor name -->
     <template #cell-name="{ row }">
-      <OTooltip
-        v-if="(row as any).name"
-        :content="(row as any).name"
-        content-class="max-w-[25rem] whitespace-normal break-words text-xs"
-      >
-        <div class="flex min-w-0 items-center gap-1.5 overflow-hidden">
-          <span class="cursor-pointer truncate">{{ (row as any).name || "—" }}</span>
-        </div>
-      </OTooltip>
-      <span v-else class="truncate">—</span>
+      <div class="flex min-w-0 items-center gap-1.5">
+        <template v-if="(row as any).name">
+          <OTruncatedText
+            as="span"
+            class="cursor-pointer"
+            :data-test="`${dataTest}-name-${(row as any).id}`"
+            >{{ (row as any).name }}</OTruncatedText
+          >
+          <MutedChip
+            v-if="(row as any).active_downtime"
+            :downtime="(row as any).active_downtime"
+            :data-test="`${dataTest}-${(row as any).id}-muted`"
+          />
+        </template>
+        <span v-else class="truncate">—</span>
+        <EditorDraftDot
+          v-if="draftSavedAt[String((row as any).id)]"
+          :saved-at="draftSavedAt[String((row as any).id)]"
+          :data-test="`${dataTest}-${(row as any).id}-draft-dot`"
+        />
+      </div>
     </template>
 
     <!-- URL / Endpoint -->
@@ -95,10 +114,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OBadge>
     </template>
 
-    <!-- Steps count (Browser mode) -->
+    <!-- Null means the journey could not be read, which is not zero steps. -->
     <template #cell-steps="{ row }">
-      <span class="truncate">{{
-        (row as any).steps ? `${(row as any).steps} ${t("synthetics.table.stepsSuffix")}` : "—"
+      <span class="flex min-w-0 items-center gap-2">
+        <span class="truncate" :data-test="`${dataTest}-cell-steps`">{{
+          (row as any).steps != null
+            ? t("synthetics.table.stepsCount", { count: (row as any).steps })
+            : "—"
+        }}</span>
+        <OBadge
+          v-if="brokenReferenceLabel((row as any).referenceState)"
+          variant="warning-soft"
+          size="sm"
+          :data-test="`${dataTest}-reference-state`"
+        >
+          {{ brokenReferenceLabel((row as any).referenceState) }}
+        </OBadge>
+      </span>
+    </template>
+
+    <!-- Zero reads as a dash: most checks are referenced by nothing. -->
+    <template #cell-referencedBy="{ row }">
+      <span class="truncate" :data-test="`${dataTest}-cell-referencedBy`">{{
+        (row as any).referencedBy
+          ? t(
+              "synthetics.table.usedByCount",
+              { count: (row as any).referencedBy },
+              (row as any).referencedBy,
+            )
+          : "—"
       }}</span>
     </template>
 
@@ -106,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #cell-assertions="{ row }">
       <span class="truncate">{{
         (row as any).assertions
-          ? `${(row as any).assertions} ${t("synthetics.table.checksSuffix")}`
+          ? t("synthetics.table.checksCount", { count: (row as any).assertions })
           : "—"
       }}</span>
     </template>
@@ -121,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Type badge (monitors mode) -->
     <template #cell-type="{ row }">
       <OBadge :variant="resolveBadge('syntheticType', (row as any).type).variant" size="sm">
-        {{ resolveBadge("syntheticType", (row as any).type).label }}
+        {{ resolveBadgeLabel("syntheticType", (row as any).type) }}
       </OBadge>
     </template>
 
@@ -198,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #cell-locations="{ row }">
       <OTooltip
         v-if="(row as any).locations?.length"
-        :content="formatLocationsList((row as any).locations)"
+        :content="raw(formatLocationsList((row as any).locations))"
         content-class="max-w-[20rem] whitespace-pre-wrap text-xs"
         :delay="0"
       >
@@ -234,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Enable/Pause toggle with per-row spinner -->
         <div
           v-if="props.toggleLoadingMap[(row as any).id]"
-          class="flex h-8 w-7 items-center justify-center"
+          class="flex h-8 w-7 items-center justify-center max-md:hidden"
           :data-test="`${dataTest}-toggle-spinner`"
         >
           <OSpinner size="xs" />
@@ -250,6 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :variant="(row as any).enabled ? 'ghost-destructive' : 'ghost'"
           size="icon-sm"
           :icon-left="(row as any).enabled ? 'pause' : 'play-arrow'"
+          class="max-md:hidden"
           :data-test="`${dataTest}-${(row as any).enabled ? 'pause' : 'enable'}-btn`"
           @click.stop="emit('toggle-enabled', row)"
         >
@@ -266,6 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-sm"
           icon-left="edit"
+          class="max-md:hidden"
           :data-test="`${dataTest}-edit-btn`"
           @click.stop="emit('edit', row)"
         >
@@ -277,10 +323,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-sm"
           icon-left="content-copy"
+          class="max-md:hidden"
           :data-test="`${dataTest}-duplicate-btn`"
           @click.stop="emit('duplicate', row)"
         >
           <OTooltip side="bottom" :content="t('synthetics.table.duplicate')" />
+        </OButton>
+
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="drive-file-move"
+          class="max-md:hidden"
+          :data-test="`${dataTest}-move-btn`"
+          @click.stop="emit('move', row)"
+        >
+          <OTooltip side="bottom" :content="t('synthetics.table.move')" />
         </OButton>
 
         <!-- More menu: Trigger + Delete -->
@@ -307,12 +365,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
 
-          <ODropdownItem :data-test="`${dataTest}-move-item`" @select="emit('move', row)">
+          <ODropdownItem
+            class="md:hidden"
+            :disabled="!!props.toggleLoadingMap[(row as any).id]"
+            :data-test="`${dataTest}-${(row as any).enabled ? 'pause' : 'enable'}-btn-menu`"
+            @select="emit('toggle-enabled', row)"
+          >
+            <template #icon-left>
+              <OIcon :name="(row as any).enabled ? 'pause' : 'play-arrow'" size="sm" />
+            </template>
+            {{ (row as any).enabled ? t("synthetics.table.pause") : t("synthetics.table.enable") }}
+          </ODropdownItem>
+
+          <ODropdownItem
+            class="md:hidden"
+            :data-test="`${dataTest}-edit-btn-menu`"
+            @select="emit('edit', row)"
+          >
+            <template #icon-left>
+              <OIcon name="edit" size="sm" />
+            </template>
+            {{ t("synthetics.table.edit") }}
+          </ODropdownItem>
+
+          <ODropdownItem
+            class="md:hidden"
+            :data-test="`${dataTest}-duplicate-btn-menu`"
+            @select="emit('duplicate', row)"
+          >
+            <template #icon-left>
+              <OIcon name="content-copy" size="sm" />
+            </template>
+            {{ t("synthetics.table.duplicate") }}
+          </ODropdownItem>
+
+          <ODropdownSeparator class="md:hidden" />
+
+          <ODropdownItem
+            class="md:hidden"
+            :data-test="`${dataTest}-move-item`"
+            @select="emit('move', row)"
+          >
             <template #icon-left>
               <OIcon name="drive-file-move" size="sm" />
             </template>
             {{ t("synthetics.table.move") }}
           </ODropdownItem>
+
+          <template v-if="downtimesEnabled">
+            <ODropdownSeparator />
+            <MuteMenuItems
+              :data-test-prefix="`${dataTest}-mute`"
+              @preset="(secs) => muteRows([row], secs)"
+              @until="openMuteDialog([row])"
+            />
+          </template>
 
           <ODropdownSeparator />
 
@@ -363,66 +470,76 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Footer with count + bulk action buttons -->
-    <template #bottom>
-      <div class="flex h-12 w-full items-center justify-between gap-1">
-        <span class="text-secondary min-w-25 text-xs">
-          <template v-if="localSelectedIds.length > 0">{{
-            t("synthetics.table.selectedCount", {
-              selected: localSelectedIds.length,
-              total: data.length,
-            })
-          }}</template>
-          <template v-else>{{ data.length }} {{ footerTitle }}</template>
-        </span>
-        <template v-if="localSelectedIds.length > 0">
+    <template #selection-actions>
+      <OButton
+        variant="outline"
+        size="sm"
+        icon-left="pause"
+        :data-test="`${dataTest}-pause-selected-btn`"
+        :disabled="!!props.bulkActionLoading"
+        @click="emit('pause-selected')"
+        >{{ t("synthetics.table.pause") }}</OButton
+      >
+      <OButton
+        variant="outline"
+        size="sm"
+        icon-left="play-arrow"
+        :data-test="`${dataTest}-enable-selected-btn`"
+        :disabled="!!props.bulkActionLoading"
+        @click="emit('enable-selected')"
+        >{{ t("synthetics.table.enable") }}</OButton
+      >
+      <OButton
+        variant="outline"
+        size="sm"
+        icon-left="sound-sampler"
+        :data-test="`${dataTest}-trigger-selected-btn`"
+        :disabled="!!props.bulkActionLoading"
+        @click="emit('trigger-selected')"
+        >{{ t("synthetics.table.trigger") }}</OButton
+      >
+      <OButton
+        variant="outline"
+        size="sm"
+        icon-left="drive-file-move"
+        :data-test="`${dataTest}-move-selected-btn`"
+        @click="emit('move-selected')"
+        >{{ t("synthetics.table.move") }}</OButton
+      >
+      <ODropdown v-if="downtimesEnabled" side="top">
+        <template #trigger>
           <OButton
             variant="outline"
             size="sm"
-            icon-left="pause"
-            :data-test="`${dataTest}-pause-selected-btn`"
-            :disabled="!!props.bulkActionLoading"
-            @click="emit('pause-selected')"
-            >{{ t("synthetics.table.pause") }}</OButton
+            icon-left="notifications-paused"
+            :data-test="`${dataTest}-mute-selected-btn`"
           >
-          <OButton
-            variant="outline"
-            size="sm"
-            icon-left="play-arrow"
-            :data-test="`${dataTest}-enable-selected-btn`"
-            :disabled="!!props.bulkActionLoading"
-            @click="emit('enable-selected')"
-            >{{ t("synthetics.table.enable") }}</OButton
-          >
-          <OButton
-            variant="outline"
-            size="sm"
-            icon-left="sound-sampler"
-            :data-test="`${dataTest}-trigger-selected-btn`"
-            :disabled="!!props.bulkActionLoading"
-            @click="emit('trigger-selected')"
-            >{{ t("synthetics.table.trigger") }}</OButton
-          >
-          <OButton
-            variant="outline"
-            size="sm"
-            icon-left="drive-file-move"
-            :data-test="`${dataTest}-move-selected-btn`"
-            @click="emit('move-selected')"
-            >{{ t("synthetics.table.move") }}</OButton
-          >
-          <OButton
-            variant="outline-destructive"
-            size="sm"
-            icon-left="delete"
-            :data-test="`${dataTest}-delete-selected-btn`"
-            :loading="!!props.bulkActionLoading"
-            @click="emit('delete-selected')"
-            >{{ t("synthetics.table.delete") }}</OButton
-          >
+            {{ t("alerts.downtimes.mute.bulk") }}
+          </OButton>
         </template>
-      </div>
+        <MuteMenuItems
+          :data-test-prefix="`${dataTest}-bulk-mute`"
+          @preset="(secs) => muteRows(selectedRows, secs)"
+          @until="openMuteDialog(selectedRows)"
+        />
+      </ODropdown>
+      <OButton
+        variant="outline-destructive"
+        size="sm"
+        icon-left="delete"
+        :data-test="`${dataTest}-delete-selected-btn`"
+        :loading="!!props.bulkActionLoading"
+        @click="emit('delete-selected')"
+        >{{ t("synthetics.table.delete") }}</OButton
+      >
     </template>
   </OTable>
+
+  <QuickMuteDialog
+    v-if="downtimesEnabled"
+    v-model:open="muteDialogOpen"
+    :selection="muteSelection"
+  />
 
   <!-- Spark bar detail tooltip -->
   <Teleport to="body">
@@ -478,7 +595,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onUnmounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -492,8 +609,14 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { resolveBadge } from "@/lib/core/Badge/badgeGroups";
+import { resolveBadge, resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import MutedChip from "@/components/alerts/downtimes/MutedChip.vue";
+import MuteMenuItems from "@/components/alerts/downtimes/MuteMenuItems.vue";
+import QuickMuteDialog from "@/components/alerts/downtimes/QuickMuteDialog.vue";
+import { useRowMute } from "@/composables/downtimes/useRowMute";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 type Mode = "all" | "browser";
 
@@ -509,21 +632,22 @@ type Mode = "all" | "browser";
 // noticing, not worth acting on this second, and washing it too would put most of
 // a wobbly estate in colour.
 const monitorRowClass = (row: any): string => {
-  if (String(row?.status ?? "").toLowerCase() === "failed") return "!bg-status-error-bg";
+  const st = String(row?.status ?? "").toLowerCase();
+  if (st === "failed" || st === "error") return "!bg-status-error-bg";
   return row?.enabled === false ? "!bg-surface-panel" : "";
 };
 
 const monitorRowStyle = (row: any): Record<string, string> => {
   const status = String(row?.status ?? "").toLowerCase();
   const color =
-    status === "failed"
+    status === "failed" || status === "error"
       ? "var(--color-error-500)"
       : status === "warning"
         ? "var(--color-warning-500)"
         : status === "passed"
           ? "var(--color-success-500)"
           : "var(--color-grey-400)";
-  return { boxShadow: `inset 0.25rem 0 0 0 ${color}` };
+  return { boxShadow: `var(--shadow-rail-geom) ${color}` };
 };
 
 const props = withDefaults(
@@ -531,11 +655,11 @@ const props = withDefaults(
     mode: Mode;
     data: any[];
     loading?: boolean;
+    forbidden?: boolean;
     /** IANA zone for the Last Check tooltip. Passed in: this table is a leaf
      *  component and must not reach into the store for it. */
     timezone?: string;
-    footerTitle?: string;
-    emptyMessage?: string;
+    emptyMessage?: I18nText;
     dataTest?: string;
     toggleLoadingMap?: Record<string, boolean>;
     triggerLoadingMap?: Record<string, boolean>;
@@ -547,11 +671,16 @@ const props = withDefaults(
      *  human label. Falls back to the raw id when a location isn't in the map
      *  (e.g. deleted since the check last ran). */
     locationNames?: Record<string, string>;
+    /** Check id to when its unsaved editor draft was written. */
+    draftSavedAt?: Record<string, number>;
+    pageSize?: number;
+    currentPage?: number;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
   }>(),
   {
+    pageSize: 20,
     loading: false,
-    footerTitle: "Checks",
-    emptyMessage: "No results found.",
     dataTest: "monitor-table",
     toggleLoadingMap: () => ({}),
     triggerLoadingMap: () => ({}),
@@ -560,6 +689,7 @@ const props = withDefaults(
     bulkActionLoading: false,
     hasFilters: false,
     locationNames: () => ({}),
+    draftSavedAt: () => ({}),
   },
 );
 
@@ -583,14 +713,35 @@ const emit = defineEmits<{
   "trigger-selected": [];
   "navigate-to-folder": [folderId: string];
   "empty-action": [actionId: string];
+  "update:currentPage": [page: number];
+  "update:pageSize": [size: number];
+  "update:sortBy": [columnId: string];
+  "update:sortOrder": [order: "asc" | "desc"];
 }>();
 
-const { t } = useI18n();
+const oTableRef = ref<any>(null);
+
+defineExpose({ restorePage: (page: number) => oTableRef.value?.restorePage?.(page) });
+
+const { t } = useI18nTyped();
+
+// Not a `withDefaults` default: that is evaluated once at module scope and would freeze the copy in the first-loaded locale.
+const resolvedEmptyMessage = computed(() => props.emptyMessage ?? t("search.noResult"));
 
 const localSelectedIds = computed({
   get: () => props.selectedIds ?? [],
   set: (val: string[]) => emit("update:selectedIds", val),
 });
+
+const { downtimesEnabled, muteDialogOpen, muteSelection, muteRows, openMuteDialog } =
+  useRowMute<any>(
+    () => "synthetics",
+    (row) => String(row.id),
+  );
+
+const selectedRows = computed(() =>
+  props.data.filter((row: any) => localSelectedIds.value.includes(String(row.id))),
+);
 
 // ── Column definitions per mode ─────────────────────────────────────
 
@@ -632,15 +783,6 @@ const URL_COL: OTableColumnDef = {
   sortable: false,
   hideable: true,
 };
-const ENDPOINT_COL: OTableColumnDef = {
-  id: "url",
-  header: t("synthetics.table.endpoint"),
-  accessorKey: "url",
-  size: COL.url,
-  minSize: 140,
-  sortable: false,
-  hideable: true,
-};
 const TYPE_COL: OTableColumnDef = {
   id: "type",
   header: t("synthetics.table.type"),
@@ -675,16 +817,6 @@ const PAGE_LOAD_COL: OTableColumnDef = {
   accessorKey: "responseTime",
   size: COL.responseTime,
   minSize: 80,
-  sortable: true,
-  meta: { align: "right" },
-  hideable: true,
-};
-const P50_COL: OTableColumnDef = {
-  id: "responseTime",
-  header: t("synthetics.table.p50"),
-  accessorKey: "responseTime",
-  size: COL.responseTime,
-  minSize: 64,
   sortable: true,
   meta: { align: "right" },
   hideable: true,
@@ -744,30 +876,22 @@ const STEPS_COL: OTableColumnDef = {
   sortable: false,
   hideable: true,
 };
-const METHOD_COL: OTableColumnDef = {
-  id: "method",
-  header: t("synthetics.table.method"),
-  accessorKey: "method",
-  size: COL.method,
-  minSize: 56,
-  sortable: false,
-  hideable: true,
-};
-const ASSERTIONS_COL: OTableColumnDef = {
-  id: "assertions",
-  header: t("synthetics.table.assertions"),
-  accessorKey: "assertions",
-  size: COL.assertions,
-  minSize: 72,
+// Wider than STEPS_COL (72): "3 tests" clips at that width.
+const USED_BY_COL: OTableColumnDef = {
+  id: "referencedBy",
+  header: t("synthetics.table.usedBy"),
+  accessorKey: "referencedBy",
+  size: 90,
+  minSize: 80,
   sortable: false,
   hideable: true,
 };
 const ACTIONS_COL: OTableColumnDef = {
   id: "actions",
-  header: "",
+  header: raw(""),
   accessorKey: "id",
-  size: 160,
-  minSize: 160,
+  size: 190,
+  minSize: 190,
   sortable: false,
   isAction: true,
 };
@@ -788,6 +912,7 @@ const columns = computed<OTableColumnDef[]>(() => {
       TEST_NAME_COL,
       URL_COL,
       STEPS_COL,
+      USED_BY_COL,
       HISTORY_COL,
       PAGE_LOAD_COL,
       UPTIME_COL,
@@ -817,6 +942,13 @@ const columns = computed<OTableColumnDef[]>(() => {
 
 function formatLocationsList(locations: string[]): string {
   return locations.map((l) => locationLabel(l)).join("\n");
+}
+
+/** `ok` and an absent state (no reference) render nothing; see `SyntheticListItem.reference_state`. */
+function brokenReferenceLabel(state: string | undefined): I18nText | undefined {
+  if (state === "missing") return t("synthetics.table.subtestMissing");
+  if (state === "nested") return t("synthetics.table.subtestNested");
+  return undefined;
 }
 
 // ── Spark tooltip ─────────────────────────────────────────────────────

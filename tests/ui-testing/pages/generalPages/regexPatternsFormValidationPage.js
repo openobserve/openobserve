@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import { discardEditorDraftIfAsked, clearEditorDrafts } from '../alertsPages/editorDraftHelpers.js';
+
 export class RegexPatternsFormValidationPage {
     /**
      * @param {import('@playwright/test').Page} page
@@ -66,6 +68,7 @@ export class RegexPatternsFormValidationPage {
     // ── Drawer helpers ────────────────────────────────────────────────────────
 
     async openAddPatternDrawer() {
+        await clearEditorDrafts(this.page);
         await this.page.locator(this.addPatternButton).click();
         await this.page.locator(this.drawer).waitFor({ state: 'visible', timeout: 8000 });
     }
@@ -84,6 +87,7 @@ export class RegexPatternsFormValidationPage {
 
     async clickCancel() {
         await this.page.locator(this.cancelButton).click();
+        await discardEditorDraftIfAsked(this.page);
     }
 
     async touchNameField() {

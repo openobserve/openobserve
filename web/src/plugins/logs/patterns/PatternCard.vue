@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="absolute inset-y-0 left-0 z-10 w-1 bg-current" :class="severityClass" />
 
     <!-- Count + share bar -->
-    <div class="w-28 flex-shrink-0 pr-1 pl-3">
+    <div class="w-28 flex-shrink-0 ps-3 pe-1">
       <div
         class="text-text-body text-sm font-bold tabular-nums"
         :data-test="`pattern-card-${index}-frequency`"
@@ -59,13 +59,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Status -->
     <div class="flex w-20 flex-shrink-0 items-center gap-1.5">
       <span class="h-2 w-2 shrink-0 rounded-full bg-current" :class="severityClass" />
-      <span
-        class="truncate text-xs font-medium"
+      <OTruncatedText
+        class="text-xs font-medium"
         :class="severityClass"
         :data-test="`pattern-card-${index}-status`"
       >
         {{ statusLabel }}
-      </span>
+      </OTruncatedText>
     </div>
 
     <!-- Service -->
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`pattern-card-${index}-service`"
     >
       <template v-if="pattern.service">
-        <span class="text-text-secondary truncate text-xs">{{ pattern.service }}</span>
+        <OTruncatedText class="text-text-secondary text-xs">{{ pattern.service }}</OTruncatedText>
         <span
           v-if="pattern.service_other_count > 0"
           class="text-2xs text-text-secondary bg-card-glass-solid border-border-default rounded-default shrink-0 border border-solid px-1"
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`pattern-card-${index}-badge-${badge.key}`"
         >
           {{ badge.label }}
-          <OTooltip :content="badge.desc" />
+          <OTooltip :content="raw(badge.desc)" />
         </span>
         <span
           v-if="pattern.is_anomaly"
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`pattern-card-${index}-anomaly-badge`"
         >
           {{ t("search.anomalyLabel") }}
-          <OTooltip :content="anomalyExplanationText" max-width="22rem" />
+          <OTooltip :content="raw(anomalyExplanationText)" max-width="22rem" />
         </span>
       </div>
 
@@ -149,8 +149,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import PatternVolumeCell from "./PatternVolumeCell.vue";
 import {
   tokenizeTemplate,
@@ -181,7 +182,7 @@ defineEmits<{
   (e: "click", pattern: any, index: number): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const { onMouseEnter, onMouseLeave } = useWildcardHover();
 
 const templateTokens = computed(() =>

@@ -22,17 +22,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <button
     type="button"
-    class="es-ing-card group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 pr-3.5 pl-3 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
+    class="es-ing-card group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2 max-md:min-h-0 max-md:max-w-full max-md:basis-full max-md:py-2"
     @click="emit('click')"
   >
     <span
-      class="es-ing-card__icon rounded-default bg-tabs-active-bg text-tabs-active-text inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150"
+      v-if="image"
+      class="es-ing-card__icon rounded-default inline-flex h-10 w-10 shrink-0 items-center justify-center max-md:size-8"
       :class="iconClass"
     >
-      <OIcon :name="icon" size="md" />
+      <img :src="image" class="h-6 w-6 object-contain max-md:size-5" alt="" />
+    </span>
+    <span
+      v-else
+      class="es-ing-card__icon rounded-default group-hover:bg-button-primary inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150 group-hover:text-white max-md:size-8"
+      :class="iconClass"
+    >
+      <OIcon v-if="icon" :name="icon" size="md" />
     </span>
     <span class="es-ing-card__body flex min-w-0 flex-1 flex-col gap-0.5">
-      <span class="text-compact text-text-heading truncate font-semibold">{{ label }}</span>
+      <OTruncatedText class="text-compact text-text-heading font-semibold">{{
+        label
+      }}</OTruncatedText>
       <span v-if="sublabel" class="text-text-secondary text-xs leading-[1.4]">{{ sublabel }}</span>
     </span>
     <OIcon
@@ -44,17 +54,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 import { computed } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 type IconVariant = "default" | "blue" | "teal" | "purple" | "amber" | "orange";
 
 const props = withDefaults(
   defineProps<{
-    icon: IconName;
-    label: string;
-    sublabel?: string;
+    icon?: IconName;
+    image?: string;
+    label: I18nText;
+    sublabel?: I18nText;
     iconVariant?: IconVariant;
   }>(),
   { iconVariant: "default" },
@@ -62,39 +75,19 @@ const props = withDefaults(
 
 const emit = defineEmits<{ click: [] }>();
 
-const iconClass = computed(() =>
-  props.iconVariant === "default" ? "" : `es-ing-card__icon--${props.iconVariant}`,
-);
+// Each variant carries BOTH its resting background and its resting colour. They
+// are not split between here and the base class on purpose: two plain utilities
+// setting the same property differ only by Tailwind's emit order, so
+// `text-tabs-active-text` in the base class silently won over every
+// `text-ingest-accent-*` and all five variants rendered one colour.
+const ICON_VARIANT_CLASS: Record<IconVariant, string> = {
+  default: "bg-tabs-active-bg text-tabs-active-text",
+  blue: "bg-ingest-tint-blue text-ingest-accent-blue",
+  teal: "bg-ingest-tint-teal text-ingest-accent-teal",
+  purple: "bg-ingest-tint-purple text-ingest-accent-purple",
+  amber: "bg-ingest-tint-amber text-ingest-accent-amber",
+  orange: "bg-ingest-tint-orange text-ingest-accent-orange",
+};
+
+const iconClass = computed(() => ICON_VARIANT_CLASS[props.iconVariant]);
 </script>
-
-<style scoped>
-/* keep(brand): decorative icon accent tints — color-mix on palette tokens has
-   no semantic equivalent; the parent-hover override must outrank the variant
-   classes, so both live here rather than as utilities. */
-.es-ing-card__icon--blue {
-  background: color-mix(in srgb, var(--color-blue-500) 12%, transparent);
-  color: var(--color-blue-500);
-}
-.es-ing-card__icon--teal {
-  background: color-mix(in srgb, var(--color-teal-600) 12%, transparent);
-  color: var(--color-teal-600);
-}
-.es-ing-card__icon--purple {
-  background: color-mix(in srgb, var(--color-purple-500) 12%, transparent);
-  color: var(--color-purple-500);
-}
-.es-ing-card__icon--amber {
-  background: color-mix(in srgb, var(--color-amber-600) 12%, transparent);
-  color: var(--color-amber-600);
-}
-.es-ing-card__icon--orange {
-  background: color-mix(in srgb, var(--color-orange-500) 12%, transparent);
-  color: var(--color-orange-500);
-}
-
-.es-ing-card:hover .es-ing-card__icon,
-.es-ing-card:hover [class*="es-ing-card__icon--"] {
-  background: var(--color-primary-600);
-  color: var(--color-white);
-}
-</style>

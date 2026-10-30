@@ -13,9 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { describe, expect, it, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
+import { getManager } from "@/lib/vue-shortcut-manager";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -126,6 +128,7 @@ describe("TraceDetails", () => {
     // switches tabs would otherwise leak its selection into every later test.
     localStorage.removeItem("o2_trace_active_tab");
     localStorage.removeItem("o2_trace_tab_order");
+    localStorage.removeItem("o2_trace_critical_path");
 
     // Mock router query params
     vi.spyOn(router, "currentRoute", "get").mockReturnValue({
@@ -142,6 +145,10 @@ describe("TraceDetails", () => {
     } as any);
 
     globalThis.server.use(
+      http.get(
+        `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/:stream/traces/:traceId/details`,
+        () => HttpResponse.json(tracesMockData.tracesDetails.traceSpans),
+      ),
       http.post(
         `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
         async ({ request }) => {
@@ -241,6 +248,7 @@ describe("TraceDetails", () => {
               "hoveredSpanId",
               "isSidebarOpen",
               "scrollContainer",
+              "showCriticalPath",
             ],
             emits: [
               "toggle-collapse",
@@ -328,6 +336,14 @@ describe("TraceDetails", () => {
       expect(operationName.text()).toContain(
         tracesMockData.tracesDetails.traceSpans.hits[0].operation_name,
       );
+    });
+
+    it("should constrain the operation name so a long one ellipsises", () => {
+      const operationName = wrapper.find('[data-test="trace-details-operation-name"]');
+
+      expect(operationName.classes()).toContain("truncate");
+      // The ellipsis only fires if the header also lets the title block shrink.
+      expect(wrapper.findComponent(OPageHeader).props("titleOverflow")).toBe("visible");
     });
 
     it("should display trace ID in toolbar", () => {
@@ -552,6 +568,514 @@ describe("TraceDetails", () => {
   //   expect(wrapper.vm.leftWidth).toBe(300); // 250 + (150 - 100)
   // });
   // });
+
+  describe("J/K follow the visible span order (item 4a §3.5)", () => {
+    const template = tracesMockData.tracesDetails.traceSpans.hits[0];
+    const base = template.start_time;
+    const span = (spanId: string, parentId: string, offsetMs: number, name: string) => ({
+      ...template,
+      span_id: spanId,
+      reference_parent_span_id: parentId,
+      operation_name: name,
+      start_time: base + offsetMs * 1_000_000,
+      end_time: base + (offsetMs + 50) * 1_000_000,
+      _start_time_ns: String(base + offsetMs * 1_000_000),
+      _end_time_ns: String(base + (offsetMs + 50) * 1_000_000),
+    });
+    const spans = [
+      span("R", "", 0, "GET /root"),
+      span("A", "R", 1, "op-a"),
+      span("A1", "A", 2, "op-a1"),
+      span("A2", "A", 3, "op-a2"),
+      span("B", "R", 4, "op-b"),
+    ];
+
+    beforeAll(() => {
+      const messages = {
+        traces: {
+          spanNav: {
+            firstSpan: "First span",
+            lastSpan: "Last span",
+            position: "Span {index} of {count}: {name}",
+          },
+        },
+      };
+      const global = i18n.global as unknown as {
+        locale: string | { value: string };
+        mergeLocaleMessage: (locale: string, messages: object) => void;
+      };
+      const current = typeof global.locale === "string" ? global.locale : global.locale.value;
+      for (const locale of new Set([current, "en-us"])) global.mergeLocaleMessage(locale, messages);
+    });
+
+    async function mountTrace(props: Record<string, unknown> = {}) {
+      wrapper.unmount();
+      wrapper = mount(TraceDetails, {
+        ...mountOptions,
+        props: {
+          mode: "embedded",
+          traceIdProp: "jk-trace-id",
+          streamNameProp: "test-stream",
+          spanListProp: spans,
+          ...props,
+        },
+      });
+      await flushPromises();
+      wrapper.vm.searchObj.data.traceDetails.selectedSpanId = null;
+      await flushPromises();
+    }
+
+    const press = async (key: "j" | "k") => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key }));
+      await flushPromises();
+    };
+    const selected = () => wrapper.vm.selectedSpanId ?? null;
+    const visible = () => wrapper.vm.spanPositionList.map((s: any) => s.spanId);
+    const liveText = () => wrapper.find('[data-test="trace-details-span-nav-live"]').text();
+
+    it("AC7.1: J ×5 from no selection visits R, A, A1, A2, B", async () => {
+      await mountTrace();
+      expect(visible()).toEqual(["R", "A", "A1", "A2", "B"]);
+      const visited: string[] = [];
+      for (let i = 0; i < 5; i++) {
+        await press("j");
+        visited.push(selected());
+      }
+      expect(visited).toEqual(["R", "A", "A1", "A2", "B"]);
+    });
+
+    it("AC7.2: with A collapsed, J from A goes to B and never selects A1", async () => {
+      await mountTrace();
+      wrapper.vm.toggleSpanCollapse("A");
+      await flushPromises();
+      expect(visible()).toEqual(["R", "A", "B"]);
+
+      wrapper.vm.updateSelectedSpan("A");
+      await flushPromises();
+      await press("j");
+      expect(selected()).toBe("B");
+    });
+
+    it("AC7.3: from a hidden A1, J goes to B and K goes to A", async () => {
+      await mountTrace();
+      wrapper.vm.updateSelectedSpan("A1");
+      wrapper.vm.toggleSpanCollapse("A");
+      await flushPromises();
+      await press("j");
+      expect(selected()).toBe("B");
+
+      wrapper.vm.updateSelectedSpan("A1");
+      await flushPromises();
+      await press("k");
+      expect(selected()).toBe("A");
+    });
+
+    it("AC7.4: announces the position in the visible list", async () => {
+      await mountTrace();
+      wrapper.vm.toggleSpanCollapse("A");
+      wrapper.vm.updateSelectedSpan("A");
+      await flushPromises();
+      await press("j");
+      expect(liveText()).toBe("Span 3 of 3: op-b");
+    });
+
+    it("announces First span / Last span at the edges and keeps the selection", async () => {
+      await mountTrace();
+      wrapper.vm.updateSelectedSpan("B");
+      await flushPromises();
+      await press("j");
+      expect(selected()).toBe("B");
+      expect(liveText()).toBe("Last span");
+
+      wrapper.vm.updateSelectedSpan("R");
+      await flushPromises();
+      await press("k");
+      expect(selected()).toBe("R");
+      expect(liveText()).toBe("First span");
+    });
+
+    it("K with no selection does nothing", async () => {
+      await mountTrace();
+      await press("k");
+      expect(selected()).toBeNull();
+      expect(liveText()).toBe("");
+    });
+
+    it("the live region is a polite, atomic, visually hidden region", async () => {
+      await mountTrace();
+      const region = wrapper.find('[data-test="trace-details-span-nav-live"]');
+      expect(region.attributes("aria-live")).toBe("polite");
+      expect(region.attributes("aria-atomic")).toBe("true");
+      expect(region.classes()).toContain("sr-only");
+    });
+
+    it("stays finite on a trace whose parent links form a cycle", async () => {
+      await mountTrace({
+        spanListProp: [span("R", "", 0, "root"), span("X", "Y", 1, "x"), span("Y", "X", 2, "y")],
+      });
+      wrapper.vm.updateSelectedSpan("X");
+      await flushPromises();
+      await press("j");
+      await press("k");
+      expect(["R", "X", "Y"]).toContain(selected());
+    });
+
+    it("shortcutsActive=false registers nothing", async () => {
+      await mountTrace({ shortcutsActive: false });
+      const manager = getManager()!;
+      expect(manager.getById("traceNextSpan-0")).toBeUndefined();
+      expect(manager.getById("tracePrevSpan-0")).toBeUndefined();
+      expect(manager.getScope()).not.toBe("trace-detail");
+
+      await press("j");
+      expect(selected()).toBeNull();
+    });
+
+    it("shortcutsActive toggling registers and releases the trace-detail scope", async () => {
+      await mountTrace({ shortcutsActive: false });
+      const manager = getManager()!;
+      await wrapper.setProps({ shortcutsActive: true });
+      expect(manager.getById("traceNextSpan-0")?.key).toBe("j");
+      expect(manager.getScope()).toBe("trace-detail");
+
+      await wrapper.setProps({ shortcutsActive: false });
+      expect(manager.getById("traceNextSpan-0")).toBeUndefined();
+      expect(manager.getScope()).not.toBe("trace-detail");
+    });
+  });
+
+  describe("Critical path", () => {
+    const toggle = () => wrapper.find('[data-test="trace-details-critical-path-toggle-btn"]');
+    const treeShowsCriticalPath = () =>
+      wrapper.findComponent('[data-test="trace-details-tree"]').props("showCriticalPath");
+
+    async function openTab(tab: string) {
+      wrapper.vm.activeTab = tab;
+      await flushPromises();
+    }
+
+    it("shows the toggle only on the Waterfall tab", async () => {
+      await openTab("waterfall");
+      expect(toggle().exists()).toBe(true);
+
+      await openTab("flame-graph");
+      expect(toggle().exists()).toBe(false);
+
+      await openTab("spans");
+      expect(toggle().exists()).toBe(false);
+    });
+
+    it("is off by default and flips the waterfall overlay when toggled", async () => {
+      await openTab("waterfall");
+      expect(toggle().attributes("aria-checked")).toBe("false");
+      expect(treeShowsCriticalPath()).toBe(false);
+
+      await toggle().trigger("click");
+      await flushPromises();
+
+      expect(toggle().attributes("aria-checked")).toBe("true");
+      expect(treeShowsCriticalPath()).toBe(true);
+    });
+
+    it("persists the toggle across remounts", async () => {
+      await openTab("waterfall");
+      await toggle().trigger("click");
+      await flushPromises();
+      expect(localStorage.getItem("o2_trace_critical_path")).toBe("true");
+
+      await remount();
+      await openTab("waterfall");
+
+      expect(toggle().attributes("aria-checked")).toBe("true");
+      expect(treeShowsCriticalPath()).toBe(true);
+    });
+
+    it("stores each span's critical sections on its waterfall row", () => {
+      const rows = wrapper.vm.spanPositionList;
+      expect(rows.length).toBe(tracesMockData.tracesDetails.traceSpans.hits.length);
+      rows.forEach((row: any) => {
+        expect(row.criticalSections.length).toBeGreaterThan(0);
+        row.criticalSections.forEach((section: any) => expect(section.spanId).toBe(row.spanId));
+      });
+      // The deepest span of the mock's single chain is critical for its whole length.
+      const leaf = rows.find((row: any) => !row.spans.length);
+      expect(leaf.criticalSections).toEqual([
+        { spanId: leaf.spanId, sectionStartUs: leaf.startTimeUs, sectionEndUs: leaf.endTimeUs },
+      ]);
+    });
+
+    it("gives an orphan root no critical path even when it starts before the true root", async () => {
+      const template = tracesMockData.tracesDetails.traceSpans.hits[0];
+      const base = template.start_time;
+      const span = (
+        spanId: string,
+        parentId: string,
+        startOffsetNs: number,
+        endOffsetNs: number,
+      ) => ({
+        ...template,
+        span_id: spanId,
+        reference_parent_span_id: parentId,
+        start_time: base + startOffsetNs,
+        end_time: base + endOffsetNs,
+        _start_time_ns: String(base + startOffsetNs),
+        _end_time_ns: String(base + endOffsetNs),
+      });
+      localStorage.setItem("o2_trace_critical_path", "true");
+      wrapper.unmount();
+      wrapper = mount(TraceDetails, {
+        ...mountOptions,
+        props: {
+          mode: "embedded",
+          traceIdProp: "orphan-trace-id",
+          streamNameProp: "test-stream",
+          spanListProp: [
+            span("orphan", "parent-missing-from-trace", 0, 3_000_000),
+            span("true-root", "", 1_000_000, 5_000_000),
+            span("root-child", "true-root", 2_000_000, 4_000_000),
+          ],
+        },
+      });
+      await flushPromises();
+
+      expect(treeShowsCriticalPath()).toBe(true);
+      const row = (spanId: string) =>
+        wrapper.vm.spanPositionList.find((r: any) => r.spanId === spanId);
+      expect(row("orphan").criticalSections).toEqual([]);
+      expect(row("true-root").criticalSections.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("Trace Graph view toggle and service search", () => {
+    const template = tracesMockData.tracesDetails.traceSpans.hits[0];
+    const spans = [
+      { ...template, span_id: "s1", reference_parent_span_id: "", service_name: "frontend" },
+      { ...template, span_id: "s2", reference_parent_span_id: "s1", service_name: "checkout" },
+      { ...template, span_id: "s3", reference_parent_span_id: "s2", service_name: "payments" },
+      { ...template, span_id: "s4", reference_parent_span_id: "s1", service_name: "catalog" },
+    ];
+    const treeBtn = () => wrapper.find('[data-test="trace-graph-tree-view-btn"]');
+    const graphBtn = () => wrapper.find('[data-test="trace-graph-graph-view-btn"]');
+    const series = () =>
+      wrapper.findComponent('[data-test="trace-details-service-map-chart"]').props("data").options
+        .series?.[0];
+    const chartData = () =>
+      wrapper.findComponent('[data-test="trace-details-service-map-chart"]').props("data");
+    const treeNames = (nodes: any[] = []): string[] =>
+      nodes.flatMap((n) => [n.name, ...treeNames(n.children)]);
+
+    let fakeChart: any;
+
+    async function mountMap() {
+      wrapper.unmount();
+      wrapper = mount(TraceDetails, {
+        ...mountOptions,
+        global: {
+          ...mountOptions.global,
+          stubs: {
+            ...mountOptions.global.stubs,
+            "chart-renderer": {
+              ...mountOptions.global.stubs["chart-renderer"],
+              data: () => ({ chart: fakeChart }),
+            },
+          },
+        },
+        props: {
+          mode: "embedded",
+          traceIdProp: "graph-trace-id",
+          streamNameProp: "test-stream",
+          spanListProp: spans,
+        },
+      });
+      await flushPromises();
+      wrapper.vm.activeTab = "map";
+      await flushPromises();
+    }
+
+    beforeEach(() => {
+      localStorage.removeItem("o2_trace_graph_view");
+      fakeChart = { getDom: () => document.createElement("div"), on: vi.fn(), off: vi.fn() };
+    });
+
+    it("renders the toggle and service search only on the Trace Graph tab", async () => {
+      await mountMap();
+      expect(treeBtn().exists()).toBe(true);
+      expect(graphBtn().exists()).toBe(true);
+      expect(wrapper.find('[data-test="trace-graph-search-input"]').exists()).toBe(true);
+
+      wrapper.vm.activeTab = "waterfall";
+      await flushPromises();
+      expect(treeBtn().exists()).toBe(false);
+      expect(wrapper.find('[data-test="trace-graph-search-input"]').exists()).toBe(false);
+    });
+
+    it("defaults to Tree View and switches to a graph series", async () => {
+      await mountMap();
+      expect(series().type).toBe("tree");
+
+      await graphBtn().trigger("click");
+      await flushPromises();
+
+      expect(wrapper.vm.traceGraphView).toBe("graph");
+      expect(series().type).toBe("graph");
+      expect(
+        series()
+          .data.map((n: any) => n.name)
+          .sort(),
+      ).toEqual(["catalog", "checkout", "frontend", "payments"]);
+      expect(
+        series()
+          .links.map((l: any) => [l.source, l.target])
+          .sort(),
+      ).toEqual([
+        ["checkout", "payments"],
+        ["frontend", "catalog"],
+        ["frontend", "checkout"],
+      ]);
+      expect(
+        wrapper.findComponent('[data-test="trace-details-service-map-chart"]').props("data")
+          .notMerge,
+      ).toBe(true);
+    });
+
+    it("persists the chosen view across remounts", async () => {
+      await mountMap();
+      await graphBtn().trigger("click");
+      await flushPromises();
+      expect(localStorage.getItem("o2_trace_graph_view")).toBe("graph");
+
+      await mountMap();
+      expect(series().type).toBe("graph");
+    });
+
+    it("filters the tree to matches and their ancestors from the search input", async () => {
+      await mountMap();
+      const field = wrapper.find('[data-test="trace-graph-search-input"]');
+      const input = field.element.tagName === "INPUT" ? field : field.find("input");
+      await input.setValue("PAY");
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      await flushPromises();
+      expect(treeNames(series().data)).toEqual(["frontend", "checkout", "payments"]);
+    });
+
+    it("filters the graph to edges touching a match", async () => {
+      await mountMap();
+      await graphBtn().trigger("click");
+      wrapper.vm.traceGraphSearch = "pay";
+      await flushPromises();
+      expect(
+        series()
+          .data.map((n: any) => n.name)
+          .sort(),
+      ).toEqual(["checkout", "payments"]);
+    });
+
+    it("renders an empty chart when no service matches", async () => {
+      await mountMap();
+      wrapper.vm.traceGraphSearch = "nope";
+      await flushPromises();
+      expect(chartData()).toEqual({ options: {}, notMerge: true });
+
+      wrapper.vm.traceGraphSearch = "";
+      await flushPromises();
+      expect(series().type).toBe("tree");
+
+      await graphBtn().trigger("click");
+      wrapper.vm.traceGraphSearch = "nope";
+      await flushPromises();
+      expect(chartData()).toEqual({ options: {}, notMerge: true });
+    });
+
+    it("insets the graph series so nodes and their labels stay inside the chart", async () => {
+      await mountMap();
+      await graphBtn().trigger("click");
+      await flushPromises();
+      expect(series()).toMatchObject({ top: 55, bottom: 79, left: 64, right: 175 });
+    });
+
+    it("caps the graph label insets in a narrow chart", async () => {
+      await mountMap();
+      const el = wrapper.find('[data-test="trace-details-service-map-chart"]').element;
+      Object.defineProperty(el, "clientWidth", { configurable: true, value: 400 });
+
+      await graphBtn().trigger("click");
+      await flushPromises();
+      expect(series()).toMatchObject({ left: 64, right: 100 });
+
+      Object.defineProperty(el, "clientWidth", { configurable: true, value: 200 });
+      wrapper.vm.traceGraphSearch = " ";
+      await flushPromises();
+      expect(series()).toMatchObject({ left: 55, right: 55 });
+    });
+
+    it("truncates graph labels and hides overlapping ones", async () => {
+      await mountMap();
+      await graphBtn().trigger("click");
+      await flushPromises();
+      expect(series().label).toMatchObject({ show: true, width: 120, overflow: "truncate" });
+      expect(series().labelLayout).toEqual({ hideOverlap: true });
+      series().data.forEach((n: any) => expect(n.tooltip.formatter).toContain(n.name));
+    });
+
+    it("lays out a graph with finite positions in a tiny chart container", async () => {
+      await mountMap();
+      const el = wrapper.find('[data-test="trace-details-service-map-chart"]').element;
+      Object.defineProperty(el, "clientWidth", { configurable: true, value: 1000 });
+      Object.defineProperty(el, "clientHeight", { configurable: true, value: 100 });
+
+      await graphBtn().trigger("click");
+      await flushPromises();
+
+      expect(series().data.length).toBe(4);
+      series().data.forEach((n: any) => {
+        expect(Number.isFinite(n.x)).toBe(true);
+        expect(Number.isFinite(n.y)).toBe(true);
+      });
+    });
+
+    it("skips the custom tree tooltip in Graph View and restores it in Tree View", async () => {
+      const tooltipSetupDelay = () => new Promise((resolve) => setTimeout(resolve, 350));
+      await mountMap();
+
+      await graphBtn().trigger("click");
+      await tooltipSetupDelay();
+      expect(fakeChart.on).not.toHaveBeenCalled();
+
+      await treeBtn().trigger("click");
+      await tooltipSetupDelay();
+      expect(fakeChart.on).toHaveBeenCalledWith("mouseover", expect.any(Function));
+    });
+
+    it("detaches the tree tooltip when switching from Tree View to Graph View", async () => {
+      const tooltipSetupDelay = () => new Promise((resolve) => setTimeout(resolve, 350));
+      await mountMap();
+      await graphBtn().trigger("click");
+      await treeBtn().trigger("click");
+      await tooltipSetupDelay();
+      expect(fakeChart.on).toHaveBeenCalledWith("mouseover", expect.any(Function));
+      expect(fakeChart.off).not.toHaveBeenCalled();
+
+      await graphBtn().trigger("click");
+      await flushPromises();
+
+      expect(fakeChart.off).toHaveBeenCalledWith("mouseover", expect.any(Function));
+    });
+
+    it("does not attach the tree tooltip when Graph View is chosen during the setup delay", async () => {
+      const tooltipSetupDelay = () => new Promise((resolve) => setTimeout(resolve, 350));
+      await mountMap();
+      await graphBtn().trigger("click");
+      await tooltipSetupDelay();
+
+      // Both calls land before the first one's nextTick resumes and schedules its timer.
+      wrapper.vm.setTraceGraphView("tree");
+      wrapper.vm.setTraceGraphView("graph");
+      await tooltipSetupDelay();
+
+      expect(wrapper.vm.traceGraphView).toBe("graph");
+      expect(fakeChart.on).not.toHaveBeenCalled();
+    });
+  });
 
   describe("Data processing", () => {
     it("should process span data correctly", () => {
@@ -1599,29 +2123,23 @@ describe("TraceDetails", () => {
   });
 
   describe("Coverage: redirectToSessionReplay edge cases", () => {
-    it("should handle case when firstRumSessionData is null (lines 1851-1853)", () => {
+    it("should not navigate when no span has a replayable RUM session", () => {
       const routerPushSpy = vi.spyOn(router, "push");
-      // Set spanList without RUM session data - firstRumSessionData will be null
       wrapper.vm.searchObj.data.traceDetails.spanList =
         tracesMockData.tracesDetails.traceSpans.hits;
 
-      // Verify firstRumSessionData is null
-      expect(wrapper.vm.firstRumSessionData).toBeNull();
-
-      // This should not throw an error now that the bug is fixed
-      // Previously would throw: Cannot read properties of null (reading 'rum_session_id')
       expect(() => wrapper.vm.redirectToSessionReplay()).not.toThrow();
       expect(routerPushSpy).not.toHaveBeenCalled();
       routerPushSpy.mockRestore();
     });
 
-    it("should navigate to session viewer when rum_session_id exists", () => {
+    it("should navigate to session viewer when a RUM session with a replay exists", () => {
       const routerPushSpy = vi.spyOn(router, "push");
-      // Add RUM session data to spanList
       wrapper.vm.searchObj.data.traceDetails.spanList = [
         {
           ...tracesMockData.tracesDetails.traceSpans.hits[0],
           rum_session_id: "session-123",
+          rum_session_has_replay: true,
           start_time: 1000000000,
           end_time: 2000000000,
           rum_date: 1500000000,
@@ -1751,6 +2269,21 @@ describe("TraceDetails", () => {
       routerPushSpy.mockRestore();
     });
 
+    it("uses real browser back when there's history to pop, instead of the hardcoded traces route", () => {
+      window.history.pushState({ back: "/previous" }, "", "/previous-fake-url");
+      const routerBackSpy = vi.spyOn(router, "back");
+      const routerPushSpy = vi.spyOn(router, "push");
+
+      wrapper.vm.routeToTracesList();
+
+      expect(routerBackSpy).toHaveBeenCalledTimes(1);
+      expect(routerPushSpy).not.toHaveBeenCalled();
+
+      routerBackSpy.mockRestore();
+      routerPushSpy.mockRestore();
+      window.history.replaceState(null, "");
+    });
+
     it("should not navigate when in embedded mode", () => {
       const embeddedWrapper = mount(TraceDetails, {
         attachTo: "#app",
@@ -1815,16 +2348,17 @@ describe("TraceDetails", () => {
   });
 
   describe("Coverage: RUM session integration", () => {
-    it("should show session replay button when RUM session exists", async () => {
+    it("should show session replay button when a RUM session with a replay exists", async () => {
       wrapper.vm.searchObj.data.traceDetails.spanList = [
         {
           ...tracesMockData.tracesDetails.traceSpans.hits[0],
           rum_session_id: "session-123",
+          rum_session_has_replay: true,
         },
       ];
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.vm.hasRumSessionId).toBe(true);
+      expect(wrapper.vm.hasReplaySession).toBe(true);
       const replayBtn = wrapper.find('[data-test="trace-details-view-session-replay-btn"]');
       expect(replayBtn.exists()).toBe(true);
     });
@@ -1834,13 +2368,13 @@ describe("TraceDetails", () => {
         tracesMockData.tracesDetails.traceSpans.hits;
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.vm.hasRumSessionId).toBe(false);
+      expect(wrapper.vm.hasReplaySession).toBe(false);
       const replayBtn = wrapper.find('[data-test="trace-details-view-session-replay-btn"]');
       expect(replayBtn.exists()).toBe(false);
     });
 
     it("should hide session replay button when hideSessionReplayButton prop is true", async () => {
-      // The button v-if checks hasRumSessionId && !hideSessionReplayButton
+      // The button v-if checks hasReplaySession && !hideSessionReplayButton
       const hiddenWrapper = mount(TraceDetails, {
         attachTo: "#app",
         props: {
@@ -1849,6 +2383,7 @@ describe("TraceDetails", () => {
             {
               ...tracesMockData.tracesDetails.traceSpans.hits[0],
               rum_session_id: "session-hidden",
+              rum_session_has_replay: true,
             },
           ],
           mode: "embedded",
@@ -2322,6 +2857,10 @@ describe("TraceDetails", () => {
 
       // Register the search API handler that returns real trace spans
       globalThis.server.use(
+        http.get(
+          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/:stream/traces/:traceId/details`,
+          () => HttpResponse.json(tracesMockData.tracesDetails.traceSpans),
+        ),
         http.post(
           `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
           async ({ request }) => {
@@ -2390,6 +2929,10 @@ describe("TraceDetails", () => {
       const spanId = response.hits[0].span_id;
 
       globalThis.server.use(
+        http.get(
+          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/:stream/traces/:traceId/details`,
+          () => HttpResponse.json(response),
+        ),
         http.post(
           `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
           async ({ request }) => {
@@ -2415,6 +2958,10 @@ describe("TraceDetails", () => {
       const spanId = response.hits[0].span_id;
 
       globalThis.server.use(
+        http.get(
+          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/:stream/traces/:traceId/details`,
+          () => HttpResponse.json(response),
+        ),
         http.post(
           `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
           async ({ request }) => {
@@ -2431,6 +2978,152 @@ describe("TraceDetails", () => {
       await flushPromises();
 
       expect(localWrapper.vm.sidebarActiveTab).toBe("preview");
+      localWrapper.unmount();
+    });
+  });
+
+  // Regression: a bare Number() on absent query params produced NaN, which
+  // passes the `!= null` guard in search.ts and reaches the API as "NaN".
+  describe("Bug fix: missing from/to in URL query params", () => {
+    // Records the details URL the component actually requested, so we can
+    // assert on what reached the wire rather than only on internal state.
+    let requestedUrl: string;
+
+    // Helper that builds a full mount with a custom route query so we can
+    // control which time-window params (if any) arrive via the URL.
+    function mountWithTimeQuery(range: { from?: string; to?: string }) {
+      vi.spyOn(router, "currentRoute", "get").mockReturnValue({
+        value: {
+          query: {
+            trace_id: "test-trace-id",
+            stream: "test-stream",
+            org_identifier: "default",
+            ...(range.from !== undefined ? { from: range.from } : {}),
+            ...(range.to !== undefined ? { to: range.to } : {}),
+          },
+          name: "traceDetails",
+        },
+      } as any);
+
+      return mount(TraceDetails, {
+        attachTo: "#app",
+        props: { traceId: "test-trace-id" },
+        global: {
+          plugins: [i18n, router],
+          provide: { store },
+          stubs: {
+            ODrawer: ODrawerStub,
+            CodeQueryEditor: {
+              name: "CodeQueryEditor",
+              props: ["query", "language"],
+              emits: ["update:query"],
+              template: '<div data-test="trace-details-filters-code-editor" />',
+            },
+            "chart-renderer": {
+              template: '<div data-test="chart-renderer">Chart</div>',
+              props: ["data", "id"],
+              emits: ["updated:chart"],
+            },
+            "trace-tree": {
+              template: '<div data-test="trace-tree">Trace Tree</div>',
+              props: [
+                "collapseMapping",
+                "spans",
+                "baseTracePosition",
+                "spanDimensions",
+                "spanMap",
+                "leftWidth",
+                "searchQuery",
+                "spanList",
+              ],
+              emits: ["toggle-collapse", "select-span", "update-current-index", "search-result"],
+            },
+            "trace-header": {
+              template: '<div data-test="trace-header">Trace Header</div>',
+              props: ["baseTracePosition", "splitterWidth"],
+              emits: ["resize-start"],
+            },
+            "trace-details-sidebar": {
+              template: '<div data-test="trace-details-sidebar">Sidebar</div>',
+              props: [
+                "span",
+                "baseTracePosition",
+                "searchQuery",
+                "streamName",
+                "serviceStreamsEnabled",
+                "parentMode",
+                "activeTab",
+                "selectedLogStreams",
+                "showLogStreamSelector",
+              ],
+              emits: [
+                "view-logs",
+                "close",
+                "open-trace",
+                "add-filter",
+                "apply-filter-immediately",
+                "update:activeTab",
+              ],
+            },
+          },
+        },
+      });
+    }
+
+    beforeEach(() => {
+      requestedUrl = "";
+      globalThis.server.use(
+        http.get(
+          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/:stream/traces/:traceId/details`,
+          ({ request }) => {
+            requestedUrl = request.url;
+            return HttpResponse.json(tracesMockData.tracesDetails.traceSpans);
+          },
+        ),
+      );
+    });
+
+    it("resolves a finite window when from/to are absent", async () => {
+      const localWrapper = mountWithTimeQuery({});
+      await flushPromises();
+
+      expect(localWrapper.vm.effectiveTimeRange).toEqual({ from: 0, to: 0 });
+      localWrapper.unmount();
+    });
+
+    // The API rejects the literal string "NaN", so this is the assertion that
+    // actually fails before the fix.
+    it("never sends NaN bounds to the details API", async () => {
+      const localWrapper = mountWithTimeQuery({});
+      await flushPromises();
+
+      expect(requestedUrl).not.toContain("NaN");
+      expect(requestedUrl).toContain("start_time=0");
+      expect(requestedUrl).toContain("end_time=0");
+      localWrapper.unmount();
+    });
+
+    // Half a window is its own API error, so one usable bound must not survive
+    // on its own.
+    it("collapses both bounds when only one is present", async () => {
+      const localWrapper = mountWithTimeQuery({ from: "1752490492843" });
+      await flushPromises();
+
+      expect(localWrapper.vm.effectiveTimeRange).toEqual({ from: 0, to: 0 });
+      localWrapper.unmount();
+    });
+
+    it("still honours the URL window when from/to are present", async () => {
+      const localWrapper = mountWithTimeQuery({
+        from: "1752490492843",
+        to: "1752490493164",
+      });
+      await flushPromises();
+
+      expect(localWrapper.vm.effectiveTimeRange).toEqual({
+        from: 1752490492843,
+        to: 1752490493164,
+      });
       localWrapper.unmount();
     });
   });
@@ -2683,6 +3376,98 @@ describe("TraceDetails", () => {
 
       expect(wrapper.vm.sidebarActiveTab).toBe("attributes");
     });
+
+    // Regression: onSelectSpanEvent set sidebarActiveTab synchronously, but
+    // selectedSpanId is a computed over the store, so its watcher ran on the
+    // next flush and — with no span previously selected (`!oldSpanId`) —
+    // overwrote the tab with the default. Measured in a browser: the sidebar
+    // opened on "attributes" every time.
+    it("should keep sidebarActiveTab as 'events' after a marker click", async () => {
+      const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+
+      wrapper.vm.onSelectSpanEvent({ spanId, eventIndex: 2 });
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.sidebarActiveTab).toBe("events");
+    });
+
+    it("should still apply the default tab for an ordinary span click", async () => {
+      const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+
+      wrapper.vm.updateSelectedSpan(spanId);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.sidebarActiveTab).toBe("attributes");
+    });
+
+    // Regression: the pending tab was only cleared inside the watcher's spanMap
+    // guard. Re-clicking a marker on the already-selected span does not change
+    // selectedSpanId, so the watcher never fired and the flag survived to
+    // hijack the next ordinary selection.
+    it("should not let a stale marker request hijack the next span click", async () => {
+      const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+      const otherSpanId = tracesMockData.tracesDetails.traceSpans.hits[1].span_id;
+
+      // Select the span, then click a marker on that same span — no id change.
+      wrapper.vm.updateSelectedSpan(spanId);
+      await wrapper.vm.$nextTick();
+      wrapper.vm.onSelectSpanEvent({ spanId, eventIndex: 0 });
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.sidebarActiveTab).toBe("events");
+
+      // A later, unrelated span click must land on the default tab.
+      wrapper.vm.updateSelectedSpan(otherSpanId);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.sidebarActiveTab).toBe("attributes");
+    });
+
+    it("should drain a marker request aimed at a span that is not loaded", async () => {
+      const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+
+      wrapper.vm.onSelectSpanEvent({ spanId: "span-not-in-map", eventIndex: 0 });
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.updateSelectedSpan(spanId);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.sidebarActiveTab).toBe("attributes");
+    });
+
+    // Regression: the reset was keyed on the tab being named "events", which
+    // also caught a user who opened Events by hand. Every other tab persists
+    // across span navigation; a manually chosen Events tab must too.
+    it("should keep a manually chosen Events tab when navigating to another span", async () => {
+      const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+      const otherSpanId = tracesMockData.tracesDetails.traceSpans.hits[1].span_id;
+
+      wrapper.vm.updateSelectedSpan(spanId);
+      await wrapper.vm.$nextTick();
+      wrapper.vm.onSidebarTabChange("events");
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.updateSelectedSpan(otherSpanId);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.sidebarActiveTab).toBe("events");
+    });
+
+    // A manual choice after a marker click clears the marker's provenance, so
+    // that choice persists too rather than being reset on the next navigation.
+    it("should keep a tab chosen by hand after a marker click", async () => {
+      const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+      const otherSpanId = tracesMockData.tracesDetails.traceSpans.hits[1].span_id;
+
+      wrapper.vm.onSelectSpanEvent({ spanId, eventIndex: 0 });
+      await wrapper.vm.$nextTick();
+      wrapper.vm.onSidebarTabChange("links");
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.updateSelectedSpan(otherSpanId);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.sidebarActiveTab).toBe("links");
+    });
   });
 
   describe("effectiveSpanId", () => {
@@ -2914,6 +3699,43 @@ describe("TraceDetails", () => {
       await wrapper.vm.$nextTick();
 
       expect(tabValues()).toEqual(before);
+    });
+  });
+
+  describe("Tree view: View Logs on a span", () => {
+    it("selects the span and runs the sidebar's own View Logs (which loads correlation)", async () => {
+      const viewSpanLogs = vi.fn().mockResolvedValue(undefined);
+      const baseStub = mountOptions.global.stubs["trace-details-sidebar"];
+      wrapper.unmount();
+      wrapper = mount(TraceDetails, {
+        ...mountOptions,
+        global: {
+          ...mountOptions.global,
+          stubs: {
+            ...mountOptions.global.stubs,
+            "trace-details-sidebar": { ...baseStub, methods: { viewSpanLogs } },
+          },
+        },
+      });
+      await flushPromises();
+
+      // No correlation data has been loaded for this span yet.
+      wrapper.vm.searchObj.data.traceDetails.correlationProps = null;
+      const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+
+      await wrapper.vm.handleTreeViewCorrelatedLogs({ span_id: spanId });
+
+      expect(wrapper.vm.searchObj.data.traceDetails.selectedSpanId).toBe(spanId);
+      expect(viewSpanLogs).toHaveBeenCalledTimes(1);
+
+      // The selection moves before the sidebar shows the clicked span, so nothing opens.
+      viewSpanLogs.mockClear();
+      const [first, second] = tracesMockData.tracesDetails.traceSpans.hits;
+      const pending = wrapper.vm.handleTreeViewCorrelatedLogs({ span_id: first.span_id });
+      wrapper.vm.searchObj.data.traceDetails.selectedSpanId = second.span_id;
+      await pending;
+
+      expect(viewSpanLogs).not.toHaveBeenCalled();
     });
   });
 });

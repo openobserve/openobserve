@@ -7,6 +7,7 @@
  */
 
 import { getUUID } from "@/utils/zincutils";
+import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
 
 export interface TransformContext {
   formData: any;
@@ -52,6 +53,19 @@ export interface V1Group {
  * Ensures all groups have groupId and all conditions have id
  * This is needed because data from backend might not have these fields
  */
+// The backend serializes operators in canonical lowercase ("contains",
+// "is_null", ...) while the operator select's option values use the FE
+// spellings — a loaded tree must be mapped back or the select renders empty.
+const OPERATOR_DISPLAY_MAP: Record<string, string> = {
+  contains: "Contains",
+  not_contains: "NotContains",
+  notcontains: "NotContains",
+  isnull: "is_null",
+  isnotnull: "is_not_null",
+  isempty: "is_empty",
+  isnotempty: "is_not_empty",
+};
+
 export const ensureIds = (group: any): any => {
   if (!group) return group;
 
@@ -70,6 +84,10 @@ export const ensureIds = (group: any): any => {
         // Ensure condition has an id
         if (!item.id) {
           item.id = getUUID();
+        }
+        const opKey = String(item.operator ?? "").toLowerCase();
+        if (Object.hasOwn(OPERATOR_DISPLAY_MAP, opKey)) {
+          item.operator = OPERATOR_DISPLAY_MAP[opKey];
         }
         return item;
       }
@@ -188,6 +206,23 @@ export const removeConditionGroup = (
   }
 };
 
+/**
+ * Backfill `value: ""` on unary-operator leaves (imported JSON may omit it,
+ * but the backend's `Condition.value` field is required). Mutates in place.
+ */
+export const ensureUnaryConditionValues = (node: any): any => {
+  if (!node || typeof node !== "object") return node;
+  if (Array.isArray(node)) {
+    node.forEach(ensureUnaryConditionValues);
+    return node;
+  }
+  if (node.value === undefined && isUnaryOperator(node.operator)) {
+    node.value = "";
+  }
+  if (Array.isArray(node.conditions)) node.conditions.forEach(ensureUnaryConditionValues);
+  return node;
+};
+
 export const transformFEToBE = (node: any): any => {
   if (!node || !node.items || !Array.isArray(node.items)) return {};
 
@@ -204,7 +239,8 @@ export const transformFEToBE = (node: any): any => {
     return {
       column: item.column,
       operator: item.operator,
-      value: item.value,
+      // The backend requires `value` even for unary operators.
+      value: item.value === undefined && isUnaryOperator(item.operator) ? "" : item.value,
       ignore_case: !!item.ignore_case,
     };
   });

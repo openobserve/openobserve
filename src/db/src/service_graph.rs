@@ -13,39 +13,60 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use bytes::Bytes;
+use infra::errors::{DbError, Error};
+
 use crate as db;
 
-fn mk_key() -> String {
-    "/service_graph/node/offsets".to_string()
+pub fn v4_offset_key(org_id: &str, stream_name: &str) -> String {
+    format!("/service_graph/v4/offsets/{org_id}/{stream_name}")
 }
 
-pub async fn get_offset() -> (i64, String) {
-    let key = mk_key();
-    let mut value = match db::get(&key).await {
-        Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
-        Err(_) => String::from("0"),
-    };
+/// Malformed meta-db content is `(0, "")`, never a panic.
+pub fn parse_v4_offset(value: &str) -> (i64, String) {
+    let value = value.trim();
     if value.is_empty() {
-        value = String::from("0");
+        return (0, String::new());
     }
-    if value.contains(';') {
-        let mut parts = value.split(';');
-        let offset: i64 = parts.next().unwrap().parse().unwrap();
-        let node = parts.next().unwrap().to_string();
-        (offset, node)
-    } else {
-        (value.parse().unwrap(), String::from(""))
+    let (offset, node) = value.split_once(';').unwrap_or((value, ""));
+    match offset.parse::<i64>() {
+        Ok(offset) if offset >= 0 => (offset, node.to_string()),
+        _ => {
+            log::warn!("[ServiceGraph] malformed v4 offset value {value:?}, treating as unset");
+            (0, String::new())
+        }
     }
 }
 
-pub async fn set_offset(offset: i64, node: Option<&str>) -> Result<(), anyhow::Error> {
-    let key = mk_key();
-    let val = if let Some(node) = node {
-        format!("{offset};{node}")
-    } else {
-        offset.to_string()
-    };
+pub async fn get_v4_offset(org_id: &str, stream_name: &str) -> (i64, String) {
+    let key = v4_offset_key(org_id, stream_name);
+    match db::get(&key).await {
+        Ok(ret) => parse_v4_offset(&String::from_utf8_lossy(&ret)),
+        Err(_) => (0, String::new()),
+    }
+}
+
+/// Value is `<micros>;<node_uuid>`: the claiming node travels with the offset.
+pub async fn set_v4_offset(
+    org_id: &str,
+    stream_name: &str,
+    offset: i64,
+    node: &str,
+) -> Result<(), anyhow::Error> {
+    let key = v4_offset_key(org_id, stream_name);
+    let val = format!("{offset};{node}");
     Ok(db::put(&key, val.into(), db::NO_NEED_WATCH, None).await?)
+}
+
+/// Only a missing key is absent; any other meta-db error must not be mistaken for one.
+pub(crate) fn missing_as_none(
+    ret: infra::errors::Result<Bytes>,
+) -> infra::errors::Result<Option<Bytes>> {
+    match ret {
+        Ok(value) => Ok(Some(value)),
+        Err(Error::DbError(DbError::KeyNotExists(_))) => Ok(None),
+        Err(e) => Err(e),
+    }
 }
 
 #[cfg(test)]
@@ -53,7 +74,42 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_mk_key_returns_expected_path() {
-        assert_eq!(mk_key(), "/service_graph/node/offsets");
+    fn test_key_formats() {
+        assert_eq!(
+            v4_offset_key("default", "traces"),
+            "/service_graph/v4/offsets/default/traces"
+        );
+    }
+
+    #[test]
+    fn test_parse_v4_offset_micros_and_uuid() {
+        assert_eq!(
+            parse_v4_offset("1700000000000000;node-a"),
+            (1_700_000_000_000_000, "node-a".to_string())
+        );
+        assert_eq!(parse_v4_offset("42;"), (42, String::new()));
+        assert_eq!(parse_v4_offset("42"), (42, String::new()));
+    }
+
+    #[test]
+    fn test_missing_as_none_keeps_read_errors() {
+        let value = missing_as_none(Ok(Bytes::from("42;node"))).unwrap();
+        assert_eq!(value, Some(Bytes::from("42;node")));
+        let missing = Err(Error::DbError(DbError::KeyNotExists("/k".to_string())));
+        assert_eq!(missing_as_none(missing).unwrap(), None);
+        let failed = Err(Error::DbError(DbError::DBOperError(
+            "database is locked".to_string(),
+            "/k".to_string(),
+        )));
+        assert!(missing_as_none(failed).is_err());
+    }
+
+    #[test]
+    fn test_parse_v4_offset_malformed_is_unset() {
+        assert_eq!(parse_v4_offset(""), (0, String::new()));
+        assert_eq!(parse_v4_offset("abc;node"), (0, String::new()));
+        assert_eq!(parse_v4_offset(";node"), (0, String::new()));
+        assert_eq!(parse_v4_offset("-5;node"), (0, String::new()));
+        assert_eq!(parse_v4_offset("1.5;node"), (0, String::new()));
     }
 }

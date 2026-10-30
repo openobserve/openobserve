@@ -14,23 +14,36 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed } from "vue";
+import { gt, type I18nKey } from "@/types/i18n";
+import { getIntlLocale } from "@/locales";
+import { formatCalendarLabel } from "@/utils/dashboard/calendarPeriods";
 
+/**
+ * `gt()` rather than a threaded `t`: this is a module-scope pure helper that
+ * components import directly (LogsNoEventsState) as well as being called from
+ * the composable below, so there is no single setup scope to thread through.
+ */
 export function periodToLabel(period: string): string {
   if (!period || period === "absolute") return "";
+  const calendarLabel = formatCalendarLabel(period, null, gt, getIntlLocale());
+  if (calendarLabel) return calendarLabel;
   const value = parseInt(period, 10);
   const unit = period.slice(-1);
-  const units: Record<string, [string, string]> = {
-    s: ["Second", "Seconds"],
-    m: ["Minute", "Minutes"],
-    h: ["Hour", "Hours"],
-    d: ["Day", "Days"],
-    w: ["Week", "Weeks"],
-    M: ["Month", "Months"],
+  // One pipe-plural message key per unit — each message carries the whole sentence
+  // so word order stays translatable instead of being glued together here, and the
+  // singular/plural split is the message's business (Slavic needs three forms).
+  const units: Record<string, I18nKey> = {
+    s: "common.pastSecond",
+    m: "common.pastMinute",
+    h: "common.pastHour",
+    d: "common.pastDay",
+    w: "common.pastWeek",
+    M: "common.pastMonth",
   };
-  const [sg, pl] = units[unit] ?? ["unit", "units"];
-  return `Past ${value} ${value === 1 ? sg : pl}`;
+  return gt(units[unit] ?? "common.pastUnit", { count: value });
 }
 
+/** A rolling period that contains `period`. */
 export function nextWiderPeriod(period: string): string {
   const value = parseInt(period, 10);
   const unit = period.slice(-1);
@@ -75,6 +88,7 @@ export default function useWidenRange(
   const suggestedPeriodLabel = computed(() => periodToLabel(suggestedPeriod.value));
   const expandRangeSublabel = computed(() => {
     if (!isRelative.value) return absoluteExpandDesc;
+    if (!suggestedPeriod.value) return "";
     return `${currentPeriodLabel.value} → ${suggestedPeriodLabel.value}`;
   });
 

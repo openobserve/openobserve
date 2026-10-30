@@ -9,6 +9,7 @@ import {
 } from "./OSelect.types";
 import { SelectItem, SelectItemText } from "reka-ui";
 import { computed, inject, onMounted, onUnmounted } from "vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 const props = withDefaults(defineProps<SelectItemProps>(), {
   disabled: false,
@@ -52,14 +53,17 @@ onUnmounted(() => {
       'py-1.5 ps-3 pe-3 text-sm',
       'text-select-item-text rounded-default',
       'cursor-pointer outline-none select-none',
-      'transition-colors duration-100',
+      'transition-colors duration-(--duration-hover-out) data-highlighted:duration-(--duration-hover-in)',
       'data-highlighted:bg-select-item-hover-bg',
       'data-[state=checked]:bg-select-item-selected-bg data-[state=checked]:text-select-item-selected-text',
       'data-disabled:text-select-item-disabled data-disabled:pointer-events-none data-disabled:cursor-not-allowed',
     ]"
   >
-    <SelectItemText>
-      <slot>{{ props.label }}</slot>
+    <!-- reka renders SelectItemText as a bare span, which cannot shrink without min-w-0. -->
+    <SelectItemText class="min-w-0 flex-1">
+      <slot>
+        <OTruncatedText class="block flex-1">{{ props.label }}</OTruncatedText>
+      </slot>
     </SelectItemText>
   </SelectItem>
 </template>

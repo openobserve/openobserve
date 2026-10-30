@@ -13,40 +13,44 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::VecDeque,
-    sync::{
-        Arc, LazyLock as Lazy,
-        atomic::{AtomicI64, Ordering},
-    },
+use std::sync::{
+    Arc, LazyLock as Lazy,
+    atomic::{AtomicI64, Ordering},
 };
 
 use config::{
     get_config,
     meta::promql::value::{RangeValue, Value},
     utils::{
-        hash::{Sum64, gxhash},
+        hash::key_sum64,
         time::{HourFormat, get_ymdh_from_micros, now_micros, second_micros},
     },
 };
-use hashbrown::HashMap;
-use infra::errors::{Error, Result};
+use hashbrown::{HashMap, HashSet};
+use infra::{
+    cache::file_data::disk::METRICS_RESULT_CACHE_FILE_PREFIX,
+    errors::{Error, Result},
+};
 use prost::Message;
 use tokio::sync::RwLock;
 
-const METRICS_INDEX_CACHE_GC_TRIGGER_NUM: usize = 10;
-const METRICS_INDEX_CACHE_GC_PERCENT: usize = 10; // 10% of the items will be removed
+const METRICS_INDEX_CACHE_GC_PERCENT: usize = 10; // gc releases 10% of the memory budget
 const METRICS_INDEX_CACHE_MAX_ITEMS: usize = 100;
 const METRICS_INDEX_CACHE_BUCKETS: usize = 100;
+// Arc control block (strong + weak counts) + the Vec's pointer slot + the item itself
+const METRICS_INDEX_ITEM_OVERHEAD: usize = 16
+    + std::mem::size_of::<Arc<MetricsIndexCacheItem>>()
+    + std::mem::size_of::<MetricsIndexCacheItem>();
 
 static CACHE_KEY_SUFFIX: Lazy<AtomicI64> = Lazy::new(|| AtomicI64::new(now_micros()));
 
 static GLOBAL_CACHE: Lazy<Vec<RwLock<MetricsIndex>>> = Lazy::new(|| {
-    let cfg = get_config();
+    // metrics_result_cache_max_size is resolved to bytes in check_config
+    let max_bytes = get_config().limit.metrics_result_cache_max_size;
     let mut metrics = Vec::with_capacity(METRICS_INDEX_CACHE_BUCKETS);
     for _ in 0..METRICS_INDEX_CACHE_BUCKETS {
         metrics.push(RwLock::new(MetricsIndex::new(
-            cfg.limit.metrics_cache_max_entries / METRICS_INDEX_CACHE_BUCKETS,
+            max_bytes / METRICS_INDEX_CACHE_BUCKETS,
         )));
     }
     metrics
@@ -66,6 +70,11 @@ pub async fn get_cache_stats() -> (usize, usize, usize) {
 }
 
 pub async fn init() -> Result<()> {
+    // drop index entries whose disk files get evicted by the disk cache gc
+    infra::cache::file_data::disk::set_metrics_result_cache_evict_hook(|files| {
+        tokio::spawn(remove_evicted_files(files));
+    });
+
     let cfg = get_config();
     if !cfg.common.result_cache_enabled {
         return Ok(());
@@ -83,31 +92,32 @@ pub async fn init() -> Result<()> {
             .write()
             .await;
         let items = std::mem::take(&mut *w);
-        for item in items.iter() {
-            if let Err(e) = load(item).await {
-                log::error!("load disk metrics cache error: {e}");
+        let total = items.len();
+        let mut malformed = Vec::new();
+        for item in items {
+            if !load(&item).await {
+                malformed.push(item);
             }
         }
+        let malformed_len = malformed.len();
+        // the disk scan already dropped legacy names; these carry the prefix but cannot be parsed
+        infra::cache::file_data::delete::add(malformed);
         log::info!(
-            "Loading disk metrics cache done, total items: {}",
-            items.len()
+            "Loading disk metrics cache done, total items: {total}, dropped malformed items: {malformed_len}"
         );
     });
     Ok(())
 }
 
-/// Get the samples from the cache
-///
-/// This function will return the samples from the cache if the samples are found.
-/// If the samples are not found, it will return None.
 pub async fn get(
+    org: &str,
     query: &str,
     start: i64,
     end: i64,
     step: i64,
 ) -> Result<Option<(i64, Vec<proto::cluster_rpc::Series>)>> {
     // get the bucket cache
-    let key = get_hash_key(query, step);
+    let key = get_hash_key(org, query, step);
     let bucket_id = get_bucket_id(&key);
     let r = GLOBAL_CACHE[bucket_id].read().await;
     let Some(index) = r.data.get(&key) else {
@@ -121,11 +131,12 @@ pub async fn get(
         );
         return Ok(None);
     }
+    index.touch();
 
     // get the best key
-    let mut best_key = String::new();
+    let mut best_idx = None;
     let mut best_diff = 0;
-    for entry in index.entries.iter() {
+    for (i, entry) in index.entries.iter().enumerate() {
         if start < entry.start {
             continue;
         }
@@ -134,33 +145,34 @@ pub async fn get(
             d = end - start;
         }
         if d >= best_diff {
-            best_key = entry.key.clone();
+            best_idx = Some(i);
             best_diff = d;
         }
     }
+    let best_key = best_idx.map(|i| index.entries[i].key.clone());
     drop(r);
-    if best_key.is_empty() {
+    let Some(best_key) = best_key else {
         return Ok(None);
-    }
+    };
 
     // get the data from disk cache
     let Some(data) = infra::cache::file_data::disk::get(&best_key, None).await else {
-        // need to drop the key from index
-        let mut w = GLOBAL_CACHE[bucket_id].write().await;
-        if let Some(index) = w.data.get_mut(&key) {
-            index.entries.retain(|entry| entry.key != best_key);
-        }
-        drop(w);
+        remove_index_entry(bucket_id, &key, best_key).await;
         return Ok(None);
     };
     let mut resp = match proto::cluster_rpc::MetricsQueryResponse::decode(data) {
         Ok(resp) => resp,
         Err(e) => {
             log::error!("decode metrics query response error: {e}");
+            // the corrupt file would be re-adopted at every restart if left on disk
+            infra::cache::file_data::delete::add(vec![best_key.clone()]);
+            remove_index_entry(bucket_id, &key, best_key).await;
             return Ok(None);
         }
     };
     if resp.series.is_empty() {
+        infra::cache::file_data::delete::add(vec![best_key.clone()]);
+        remove_index_entry(bucket_id, &key, best_key).await;
         return Ok(None);
     }
 
@@ -215,6 +227,9 @@ pub async fn get(
         }
     }
 
+    // a series whose readings all fall before the window would reach callers with no samples
+    resp.series.retain(|series| !series.samples.is_empty());
+
     // if new_start == start, it means we have no data in cache, so we need to return None
     if new_start == start {
         return Ok(None);
@@ -246,7 +261,8 @@ pub async fn set(
     }
 
     // get the bucket cache
-    let key = get_hash_key(query, step);
+    let hash = query_hash(query, step);
+    let key = scoped_cache_key(org, &hash);
     let bucket_id = get_bucket_id(&key);
     let r = GLOBAL_CACHE[bucket_id].read().await;
     if let Some(index) = r.data.get(&key) {
@@ -268,12 +284,7 @@ pub async fn set(
             return Ok(());
         }
     }
-    let need_gc = r.cacher.len() >= r.max_entries - METRICS_INDEX_CACHE_GC_TRIGGER_NUM;
     drop(r);
-
-    if need_gc && let Err(e) = gc(bucket_id).await {
-        log::error!("[trace_id {trace_id}] promql->search->cache: gc err: {e}");
-    }
 
     // filter the samples
     if end >= max_ts {
@@ -334,6 +345,10 @@ pub async fn set(
             }
         }
     };
+    // the retention filter can drain everything; caching an empty payload would poison the range
+    if range_values.is_empty() {
+        return Ok(());
+    }
 
     // convert RangeValue to proto::cluster_rpc::MetricsQueryResponse then encode to vec
     let mut resp = proto::cluster_rpc::MetricsQueryResponse::default();
@@ -341,137 +356,236 @@ pub async fn set(
     let bytes_data = resp.encode_to_vec();
 
     // store the series to disk cache
-    let cache_key = get_cache_item_key(&key, org, start, new_end);
+    let cache_key = get_cache_item_key(org, &hash, start, new_end);
     infra::cache::file_data::disk::set(&cache_key, bytes_data.into())
         .await
         .map_err(|e| Error::Message(e.to_string()))?;
 
     // store the cache item
+    // a cancelled future must not leave the file on disk without a GLOBAL_CACHE entry
+    let mut cleanup = DiskFileCleanup(Some(cache_key.clone()));
+    // held across the insert so a concurrent disk eviction orders after it and prunes the entry
+    let Some(_indexed) = infra::cache::file_data::disk::indexed_file_guard(&cache_key).await else {
+        cleanup.0 = None;
+        return Ok(());
+    };
     let cache_item = MetricsIndexCacheItem::new(&cache_key, start, new_end);
-    let mut w = GLOBAL_CACHE[bucket_id].write().await;
-    w.cacher.push_back(key.to_string());
-    let index = w.data.entry(key).or_insert(MetricsIndexCache::new(query));
-    if index.entries.len() >= METRICS_INDEX_CACHE_MAX_ITEMS {
-        // remove the first half items
-        index.entries.drain(0..METRICS_INDEX_CACHE_MAX_ITEMS / 2);
+    let evicted = insert_index(bucket_id, key, query, cache_item).await;
+    cleanup.0 = None;
+    if evicted > 0 {
+        log::debug!("[trace_id {trace_id}] promql->search->cache: evicted {evicted} index entries");
     }
-    index.entries.push(Arc::new(cache_item));
-    drop(w);
 
     Ok(())
 }
 
-/// load the cache item from the secondary storage
-pub async fn load(cache_key: &str) -> Result<()> {
-    let cfg = get_config();
-    if !cfg.common.result_cache_enabled {
-        return Ok(());
+/// Removes this node's cached metrics results of an org: the disk files, then their index entries.
+pub async fn remove_org_results(org_id: &str) -> Result<()> {
+    let dirs = infra::cache::file_data::disk::get_dirs().await;
+    let org = org_id.to_string();
+    let files = tokio::task::spawn_blocking(move || org_result_files(&dirs, &org))
+        .await
+        .map_err(|e| Error::Message(format!("cache file scan task: {e}")))??;
+    let mut keys = Vec::with_capacity(files.len());
+    let mut paths = Vec::with_capacity(files.len());
+    for (path, key) in files {
+        infra::cache::file_data::disk::remove(&key)
+            .await
+            .map_err(|e| Error::Message(format!("remove {key}: {e}")))?;
+        paths.push(path);
+        keys.push(key);
     }
+    // The index removes only files it holds, so an unindexed one goes by path.
+    tokio::task::spawn_blocking(move || remove_result_paths(&paths))
+        .await
+        .map_err(|e| Error::Message(format!("cache file removal task: {e}")))??;
+    remove_evicted_files(keys).await;
+    Ok(())
+}
+
+/// Adopt a cache file found on disk into the index; false means its name is not in this format.
+async fn load(cache_key: &str) -> bool {
     let Some((key, start, end)) = parse_cache_item_key(cache_key) else {
-        return Ok(());
+        return false;
+    };
+    // held across the insert so a concurrent disk eviction orders after it and prunes the entry
+    let Some(_indexed) = infra::cache::file_data::disk::indexed_file_guard(cache_key).await else {
+        return true;
     };
     let bucket_id = get_bucket_id(&key);
-    let cache_item = MetricsIndexCacheItem::new(cache_key, start, end);
-    let mut w = GLOBAL_CACHE[bucket_id].write().await;
-    w.cacher.push_back(key.to_string());
-    let index = w.data.entry(key).or_insert(MetricsIndexCache::new(""));
-    index.entries.push(Arc::new(cache_item));
-    drop(w);
-
-    Ok(())
-}
-
-async fn gc(bucket_id: usize) -> Result<()> {
-    log::warn!("MetricsIndexCache is full, releasing 10% of the cache");
-    let mut w = GLOBAL_CACHE[bucket_id].write().await;
-    for _ in 0..(w.max_entries / METRICS_INDEX_CACHE_GC_PERCENT) {
-        if let Some(key) = w.cacher.pop_front() {
-            w.data.remove(&key);
-        } else {
-            break;
+    // an over-budget bucket rejects startup adoption; the disk gc reclaims the unindexed files
+    {
+        let r = GLOBAL_CACHE[bucket_id].read().await;
+        if r.cur_size >= r.max_size {
+            return true;
         }
     }
+    let cache_item = MetricsIndexCacheItem::new(cache_key, start, end);
+    insert_index(bucket_id, key, "", cache_item).await;
+    true
+}
+
+/// Insert into the bucket index and queue evicted entries' disk files for deletion.
+async fn insert_index(
+    bucket_id: usize,
+    key: String,
+    query: &str,
+    item: MetricsIndexCacheItem,
+) -> usize {
+    let mut w = GLOBAL_CACHE[bucket_id].write().await;
+    let evicted = w.insert(key, query, item);
     drop(w);
-
-    Ok(())
-}
-
-fn get_hash_key(query: &str, step: i64) -> String {
-    config::utils::md5::hash(&format!("{query}-{step}"))
-}
-
-fn get_cache_item_key(prefix: &str, org: &str, start: i64, end: i64) -> String {
-    format!(
-        "metrics_results/{}/{}/{}_{}_{}_{}.pb",
-        org,
-        get_ymdh_from_micros(start, HourFormat::Real),
-        prefix,
-        start,
-        end,
-        CACHE_KEY_SUFFIX.fetch_add(1, Ordering::SeqCst)
-    )
-}
-
-/// parse the cache item key
-///
-/// the key format is: metrics_results/{date}/{prefix}_{start}_{end}_{suffix}.json
-fn parse_cache_item_key(key: &str) -> Option<(String, i64, i64)> {
-    if !key.starts_with("metrics_results/") || !key.ends_with(".pb") {
-        return None;
+    if !evicted.is_empty() {
+        // cache keys are never reused (monotonic suffix), so a queued delete cannot race a rewrite
+        infra::cache::file_data::delete::add(evicted.iter().map(|v| v.key.clone()).collect());
     }
-    let item_key = key.split('/').next_back().unwrap_or("");
-    let parts = item_key.split('_').collect::<Vec<_>>();
-    if parts.len() != 4 {
-        return None;
-    }
+    evicted.len()
+}
 
-    let prefix = parts[0];
-    let Ok(start) = parts[1].parse::<i64>() else {
-        return None;
-    };
-    let Ok(end) = parts[2].parse::<i64>() else {
-        return None;
-    };
-    Some((prefix.to_string(), start, end))
+/// drop the index entries whose disk files were evicted by the disk cache gc
+async fn remove_evicted_files(files: Vec<String>) {
+    // group by bucket and key so each bucket lock is taken once
+    let mut buckets: HashMap<usize, HashMap<String, HashSet<String>>> = HashMap::new();
+    for file in files {
+        let Some((key, ..)) = parse_cache_item_key(&file) else {
+            continue;
+        };
+        buckets
+            .entry(get_bucket_id(&key))
+            .or_default()
+            .entry(key)
+            .or_default()
+            .insert(file);
+    }
+    for (bucket_id, keys) in buckets {
+        let mut w = GLOBAL_CACHE[bucket_id].write().await;
+        for (key, file_keys) in keys {
+            w.remove_files(&key, &file_keys);
+        }
+        drop(w);
+    }
+}
+
+async fn remove_index_entry(bucket_id: usize, key: &str, file_key: String) {
+    let mut w = GLOBAL_CACHE[bucket_id].write().await;
+    w.remove_files(key, &HashSet::from_iter([file_key]));
 }
 
 fn get_bucket_id(key: &str) -> usize {
-    let hash = gxhash::new().sum64(key);
+    let hash = key_sum64(key);
     hash as usize % METRICS_INDEX_CACHE_BUCKETS
 }
 
 struct MetricsIndex {
     data: HashMap<String, MetricsIndexCache>,
-    cacher: VecDeque<String>,
-    max_entries: usize,
+    max_size: usize, // memory budget in bytes for this bucket
+    cur_size: usize, // accounted bytes of keys, queries and entries
 }
 
 impl MetricsIndex {
-    fn new(max_entries: usize) -> Self {
+    fn new(max_size: usize) -> Self {
         Self {
             data: HashMap::new(),
-            cacher: VecDeque::new(),
-            max_entries,
+            max_size,
+            cur_size: 0,
         }
+    }
+
+    /// Insert the item, enforcing the per-key item cap and the memory budget.
+    fn insert(
+        &mut self,
+        key: String,
+        query: &str,
+        item: MetricsIndexCacheItem,
+    ) -> Vec<Arc<MetricsIndexCacheItem>> {
+        let base_size = index_base_size(&key, query);
+        let cur_size = &mut self.cur_size;
+        let index = self.data.entry(key).or_insert_with(|| {
+            *cur_size += base_size;
+            MetricsIndexCache::new(query)
+        });
+        index.touch();
+        // load() restores keys with an empty query; upgrade it so the hash-conflict guard works
+        if index.query.is_empty() && !query.is_empty() {
+            self.cur_size += query.len();
+            index.query = query.to_string();
+        }
+        let mut evicted = Vec::new();
+        if index.entries.len() >= METRICS_INDEX_CACHE_MAX_ITEMS {
+            // remove the first half items
+            evicted.extend(index.entries.drain(0..METRICS_INDEX_CACHE_MAX_ITEMS / 2));
+            self.cur_size -= evicted.iter().map(|v| item_size(v)).sum::<usize>();
+        }
+        self.cur_size += item_size(&item);
+        index.entries.push(Arc::new(item));
+        evicted.extend(self.gc());
+        evicted
+    }
+
+    /// Remove entries by their disk file keys; drops the key when its entry list becomes empty.
+    fn remove_files(&mut self, key: &str, file_keys: &HashSet<String>) {
+        let Some(index) = self.data.get_mut(key) else {
+            return;
+        };
+        let mut freed = 0;
+        index.entries.retain(|entry| {
+            if file_keys.contains(entry.key.as_str()) {
+                freed += item_size(entry);
+                false
+            } else {
+                true
+            }
+        });
+        self.cur_size -= freed;
+        if index.entries.is_empty() {
+            let base_size = index_base_size(key, &index.query);
+            self.data.remove(key);
+            self.cur_size -= base_size;
+        }
+    }
+
+    /// Evict the least recently used keys until a tenth of the memory budget is free.
+    fn gc(&mut self) -> Vec<Arc<MetricsIndexCacheItem>> {
+        if self.cur_size <= self.max_size {
+            return Vec::new();
+        }
+        log::warn!("MetricsIndex is over its memory budget, releasing the coldest keys");
+        let target = self.max_size - self.max_size * METRICS_INDEX_CACHE_GC_PERCENT / 100;
+        let mut keys = self
+            .data
+            .iter()
+            .map(|(k, v)| (k.clone(), v.last_used.load(Ordering::Relaxed)))
+            .collect::<Vec<_>>();
+        keys.sort_unstable_by_key(|(_, last_used)| *last_used);
+        let mut evicted = Vec::new();
+        for (key, _) in keys {
+            if self.cur_size <= target {
+                break;
+            }
+            let Some(index) = self.data.remove(&key) else {
+                continue;
+            };
+            self.cur_size -= key_size(&key, &index);
+            evicted.extend(index.entries);
+        }
+        evicted
     }
 
     fn stats(&self) -> (usize, usize, usize) {
         let mut total_len = 0;
         let mut total_cap = 0;
-        let mut total_mem = 0;
-        for (k, v) in self.data.iter() {
-            let (len, cap, mem_size) = v.stats();
-            total_len += len;
-            total_cap += cap;
-            total_mem += mem_size + k.len();
+        for v in self.data.values() {
+            total_len += v.entries.len();
+            total_cap += v.entries.capacity();
         }
-        (total_len, total_cap, total_mem)
+        (total_len, total_cap, self.cur_size)
     }
 }
 
 struct MetricsIndexCache {
     query: String,
     entries: Vec<Arc<MetricsIndexCacheItem>>,
+    last_used: AtomicI64,
 }
 
 impl MetricsIndexCache {
@@ -479,14 +593,12 @@ impl MetricsIndexCache {
         Self {
             query: query.to_string(),
             entries: Vec::new(),
+            last_used: AtomicI64::new(now_micros()),
         }
     }
 
-    fn stats(&self) -> (usize, usize, usize) {
-        let len = self.entries.len();
-        let cap = self.entries.capacity();
-        let mem_size = std::mem::size_of::<MetricsIndexCacheItem>() * len + self.query.len();
-        (len, cap, mem_size)
+    fn touch(&self) {
+        self.last_used.store(now_micros(), Ordering::Relaxed);
     }
 }
 
@@ -506,20 +618,372 @@ impl MetricsIndexCacheItem {
     }
 }
 
+/// Queues the disk file for deletion on drop unless disarmed after the index insert commits.
+struct DiskFileCleanup(Option<String>);
+
+impl Drop for DiskFileCleanup {
+    fn drop(&mut self) {
+        if let Some(file_key) = self.0.take() {
+            infra::cache::file_data::delete::add(vec![file_key]);
+        }
+    }
+}
+
+fn get_hash_key(org: &str, query: &str, step: i64) -> String {
+    scoped_cache_key(org, &query_hash(query, step))
+}
+
+fn query_hash(query: &str, step: i64) -> String {
+    config::utils::md5::hash(&format!("{query}-{step}"))
+}
+
+fn scoped_cache_key(org: &str, hash: &str) -> String {
+    format!("{}:{org}:{hash}", org.len())
+}
+
+fn get_cache_item_key(org: &str, hash: &str, start: i64, end: i64) -> String {
+    format!(
+        "metrics_results/{}/{}/{}{}_{}_{}_{}.pb",
+        org,
+        get_ymdh_from_micros(start, HourFormat::Real),
+        METRICS_RESULT_CACHE_FILE_PREFIX,
+        hash,
+        start,
+        end,
+        CACHE_KEY_SUFFIX.fetch_add(1, Ordering::SeqCst)
+    )
+}
+
+/// Parses `metrics_results/{org}/{Y/m/d/H}/v2_{md5}_{start}_{end}_{suffix}.pb`.
+fn parse_cache_item_key(key: &str) -> Option<(String, i64, i64)> {
+    let path = key.split('/').collect::<Vec<_>>();
+    if path.len() != 7 || path[0] != "metrics_results" || path[1].is_empty() {
+        return None;
+    }
+    let item_key = path[6]
+        .strip_suffix(".pb")?
+        .strip_prefix(METRICS_RESULT_CACHE_FILE_PREFIX)?;
+    let parts = item_key.split('_').collect::<Vec<_>>();
+    if parts.len() != 4 {
+        return None;
+    }
+    let hash = parts[0];
+    if hash.len() != 32 || !hash.bytes().all(|ch| ch.is_ascii_hexdigit()) {
+        return None;
+    }
+    let start = parts[1].parse::<i64>().ok()?;
+    let end = parts[2].parse::<i64>().ok()?;
+    parts[3].parse::<i64>().ok()?;
+    if start >= end {
+        return None;
+    }
+    Some((scoped_cache_key(path[1], hash), start, end))
+}
+
+fn index_base_size(key: &str, query: &str) -> usize {
+    key.len() + query.len() + std::mem::size_of::<MetricsIndexCache>()
+}
+
+fn item_size(item: &MetricsIndexCacheItem) -> usize {
+    METRICS_INDEX_ITEM_OVERHEAD + item.key.len()
+}
+
+fn key_size(key: &str, index: &MetricsIndexCache) -> usize {
+    index_base_size(key, &index.query) + index.entries.iter().map(|v| item_size(v)).sum::<usize>()
+}
+
+/// `(path, cache key)` of each metrics result file of the org under any of the cache dirs.
+fn org_result_files(dirs: &[String], org_id: &str) -> Result<Vec<(String, String)>> {
+    let mut files = Vec::new();
+    for root in dirs {
+        let root = root.trim_end_matches('/');
+        let dir = format!("{root}/metrics_results/{org_id}");
+        let found = match config::utils::file::scan_files(&dir, "pb", None) {
+            Ok(found) => found,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(e) => return Err(Error::Message(format!("scan {dir}: {e}"))),
+        };
+        let prefix = format!("{root}/");
+        for path in found {
+            if let Some(key) = path.strip_prefix(&prefix) {
+                let key = key.to_string();
+                files.push((path, key));
+            }
+        }
+    }
+    Ok(files)
+}
+
+fn remove_result_paths(paths: &[String]) -> Result<()> {
+    for path in paths {
+        if let Err(e) = std::fs::remove_file(path)
+            && e.kind() != std::io::ErrorKind::NotFound
+        {
+            return Err(Error::Message(format!("remove {path}: {e}")));
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
-    use config::meta::promql::value::{Labels, Sample};
+    use config::meta::promql::value::{Label, Labels, Sample};
     use promql::adjust_start_end;
 
     use super::*;
+
+    struct IsolationFixture {
+        query: String,
+        start: i64,
+        end: i64,
+        step: i64,
+    }
+
+    impl IsolationFixture {
+        fn new() -> Option<Self> {
+            // set/get round-trip through the disk cache, which a local .env may switch off
+            if !get_config().disk_cache.enabled {
+                return None;
+            }
+            let start = 1_700_000_000_000_000;
+            let step = second_micros(15);
+            Some(Self {
+                query: format!("isolation_{}", config::ider::uuid()),
+                start,
+                end: start + 4 * step,
+                step,
+            })
+        }
+
+        async fn write(&self, org: &str, value: f64) -> String {
+            let values = vec![RangeValue {
+                labels: vec![Arc::new(Label::new("tenant", org))],
+                samples: (0..=4)
+                    .map(|i| Sample::new(self.start + i * self.step, value))
+                    .collect(),
+                exemplars: None,
+                time_window: None,
+            }];
+            set(
+                "isolation_test",
+                org,
+                &self.query,
+                self.start,
+                self.end,
+                self.step,
+                values,
+                false,
+            )
+            .await
+            .unwrap();
+            let key = get_hash_key(org, &self.query, self.step);
+            GLOBAL_CACHE[get_bucket_id(&key)].read().await.data[&key].entries[0]
+                .key
+                .clone()
+        }
+
+        async fn assert_hit(&self, org: &str, value: f64, start: i64, end: i64) {
+            let (next_start, series) = get(org, &self.query, start, end, self.step)
+                .await
+                .unwrap()
+                .expect("same-organization cache must remain reusable");
+            assert_eq!(next_start, self.end.min(end) + self.step);
+            assert_eq!(series.len(), 1);
+            assert_eq!(series[0].metric[0].name, "tenant");
+            assert_eq!(series[0].metric[0].value, org);
+            assert!(series[0].samples.iter().all(|sample| {
+                sample.value == value && sample.time >= start && sample.time <= end
+            }));
+            assert_eq!(series[0].samples[0].time, start);
+            assert_eq!(series[0].samples.last().unwrap().time, self.end.min(end));
+        }
+
+        async fn forget(&self, org: &str, file: &str) {
+            let key = get_hash_key(org, &self.query, self.step);
+            remove_index_entry(get_bucket_id(&key), &key, file.to_string()).await;
+        }
+
+        async fn delete(&self, org: &str, file: &str) {
+            self.forget(org, file).await;
+            infra::cache::file_data::disk::remove(file).await.unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn test_promql_cache_organization_isolation_full_partial_and_restored() {
+        let Some(fixture) = IsolationFixture::new() else {
+            return;
+        };
+        let file_a = fixture.write("isolation_a", 11.0).await;
+        assert!(
+            get(
+                "isolation_b",
+                &fixture.query,
+                fixture.start,
+                fixture.end,
+                fixture.step
+            )
+            .await
+            .unwrap()
+            .is_none()
+        );
+        let file_b = fixture.write("isolation_b", 22.0).await;
+        for (org, value) in [("isolation_a", 11.0), ("isolation_b", 22.0)] {
+            fixture
+                .assert_hit(org, value, fixture.start, fixture.end)
+                .await;
+            fixture
+                .assert_hit(org, value, fixture.start, fixture.end + 2 * fixture.step)
+                .await;
+            fixture
+                .assert_hit(
+                    org,
+                    value,
+                    fixture.start + fixture.step,
+                    fixture.end - fixture.step,
+                )
+                .await;
+        }
+        fixture.forget("isolation_a", &file_a).await;
+        fixture.forget("isolation_b", &file_b).await;
+        assert!(load(&file_a).await);
+        assert!(load(&file_b).await);
+        fixture
+            .assert_hit("isolation_a", 11.0, fixture.start, fixture.end)
+            .await;
+        fixture
+            .assert_hit(
+                "isolation_b",
+                22.0,
+                fixture.start,
+                fixture.end + fixture.step,
+            )
+            .await;
+        fixture.delete("isolation_a", &file_a).await;
+        fixture.delete("isolation_b", &file_b).await;
+    }
+
+    #[tokio::test]
+    async fn test_promql_cache_skips_legacy_files() {
+        let Some(fixture) = IsolationFixture::new() else {
+            return;
+        };
+        let file = fixture.write("legacy_org", 22.0).await;
+        let bytes = infra::cache::file_data::disk::get(&file, None)
+            .await
+            .unwrap();
+        let legacy = file.replace(METRICS_RESULT_CACHE_FILE_PREFIX, "");
+        infra::cache::file_data::disk::set(&legacy, bytes)
+            .await
+            .unwrap();
+        fixture.forget("legacy_org", &file).await;
+        assert!(!load(&legacy).await);
+        assert!(
+            get(
+                "legacy_org",
+                &fixture.query,
+                fixture.start,
+                fixture.end,
+                fixture.step
+            )
+            .await
+            .unwrap()
+            .is_none()
+        );
+        assert!(load(&file).await);
+        fixture
+            .assert_hit("legacy_org", 22.0, fixture.start, fixture.end)
+            .await;
+        fixture.delete("legacy_org", &file).await;
+        infra::cache::file_data::disk::remove(&legacy)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_promql_cache_drops_series_trimmed_to_nothing() {
+        let Some(fixture) = IsolationFixture::new() else {
+            return;
+        };
+        let org = "trimmed_org";
+        let series = |pod: &str, steps: i64| RangeValue {
+            labels: vec![Arc::new(Label::new("pod", pod))],
+            samples: (0..steps)
+                .map(|i| Sample::new(fixture.start + i * fixture.step, 1.0))
+                .collect(),
+            exemplars: None,
+            time_window: None,
+        };
+        set(
+            "trimmed_test",
+            org,
+            &fixture.query,
+            fixture.start,
+            fixture.end,
+            fixture.step,
+            vec![series("waiting", 5), series("recovered", 1)],
+            false,
+        )
+        .await
+        .unwrap();
+
+        let start = fixture.start + 2 * fixture.step;
+        let (_, cached) = get(org, &fixture.query, start, fixture.end, fixture.step)
+            .await
+            .unwrap()
+            .expect("the waiting series still has samples in the window");
+        assert_eq!(cached.len(), 1);
+        assert_eq!(cached[0].metric[0].value, "waiting");
+        assert_eq!(cached[0].samples.len(), 3);
+
+        let key = get_hash_key(org, &fixture.query, fixture.step);
+        let file = GLOBAL_CACHE[get_bucket_id(&key)].read().await.data[&key].entries[0]
+            .key
+            .clone();
+        fixture.delete(org, &file).await;
+    }
+
+    #[tokio::test]
+    async fn test_promql_cache_organization_eviction_isolation() {
+        let Some(fixture) = IsolationFixture::new() else {
+            return;
+        };
+        let file_a = fixture.write("eviction_a", 11.0).await;
+        let file_b = fixture.write("eviction_b", 22.0).await;
+        infra::cache::file_data::disk::remove(&file_a)
+            .await
+            .unwrap();
+        remove_evicted_files(vec![file_a.clone()]).await;
+        assert!(
+            get(
+                "eviction_a",
+                &fixture.query,
+                fixture.start,
+                fixture.end,
+                fixture.step
+            )
+            .await
+            .unwrap()
+            .is_none()
+        );
+        fixture
+            .assert_hit("eviction_b", 22.0, fixture.start, fixture.end)
+            .await;
+        remove_evicted_files(vec![file_a]).await;
+        fixture
+            .assert_hit("eviction_b", 22.0, fixture.start, fixture.end)
+            .await;
+        fixture.delete("eviction_b", &file_b).await;
+    }
 
     #[test]
     fn test_promql_cache_hash_key_generation() {
         let query = "test_query";
         let step = 60000000; // 60 seconds in microseconds
 
-        let key = get_hash_key(query, step);
-        assert_eq!(key, "b235015c612525ad7c11c109e3fdc261");
+        let key = get_hash_key("default", query, step);
+        assert_eq!(key, "7:default:b235015c612525ad7c11c109e3fdc261");
+        assert_ne!(key, get_hash_key("other", query, step));
     }
 
     #[test]
@@ -571,7 +1035,7 @@ mod tests {
         assert!(set_result.is_ok());
 
         // Test getting cache
-        let get_result = get(query, start, end, step).await;
+        let get_result = get(org, query, start, end, step).await;
         assert!(get_result.is_ok());
 
         if let Ok(Some((new_start, cached_range_values))) = get_result {
@@ -624,7 +1088,7 @@ mod tests {
         }
 
         // Verify that the cache size is maintained
-        let key = get_hash_key(query, step);
+        let key = get_hash_key(org, query, step);
         let bucket_id = get_bucket_id(&key);
         let metrics = GLOBAL_CACHE[bucket_id].read().await;
 
@@ -637,24 +1101,26 @@ mod tests {
 
     #[test]
     fn test_parse_cache_item_key() {
-        // Test valid key
-        let key = "metrics_results/2024/01/01/00/prefix_1234_5678_suffix.pb";
-        let result = parse_cache_item_key(key);
-        assert!(result.is_some());
-        let (prefix, start, end) = result.unwrap();
-        assert_eq!(prefix, "prefix");
-        assert_eq!(start, 1234);
-        assert_eq!(end, 5678);
+        let hash = query_hash("test_query", 60_000_000);
+        let file_key = get_cache_item_key("default", &hash, 1234, 5678);
+        assert_eq!(
+            parse_cache_item_key(&file_key),
+            Some((
+                get_hash_key("default", "test_query", 60_000_000),
+                1234,
+                5678
+            ))
+        );
 
-        // Test invalid keys
-        let invalid_keys = vec![
-            "invalid_key",                      // Too few parts
-            "prefix_abc_def_suffix.pb",         // Non-numeric values
-            "prefix_1234_5678",                 // Missing .pb extension
-            "prefix/1234/5678/extra/suffix.pb", // Too many parts
-        ];
-
-        for invalid_key in invalid_keys {
+        for invalid_key in [
+            "invalid_key",
+            "metrics_results/default/2024/01/01/00/b235015c612525ad7c11c109e3fdc261_1234_5678_1.pb",
+            "metrics_results/default/2024/01/01/00/v2_short_1234_5678_1.pb",
+            "metrics_results/default/2024/01/01/00/v2_b235015c612525ad7c11c109e3fdc261_5678_1234_1.pb",
+            "metrics_results/default/2024/01/01/00/v2_b235015c612525ad7c11c109e3fdc261_1234_5678_bad.pb",
+            "metrics_results/2024/01/01/00/v2_b235015c612525ad7c11c109e3fdc261_1234_5678_1.pb",
+            "metrics_results/default/2024/01/01/00/v2-b235015c612525ad7c11c109e3fdc261_1234_5678_1.pb",
+        ] {
             assert!(parse_cache_item_key(invalid_key).is_none());
         }
     }
@@ -746,47 +1212,146 @@ mod tests {
         assert_eq!(total_mem, manual_mem);
     }
 
-    #[tokio::test]
-    async fn test_metrics_index_stats() {
-        // Test the MetricsIndex::stats() method directly
-        let mut metrics = MetricsIndex::new(100);
-
-        // Initial stats should be zero
+    #[test]
+    fn test_metrics_index_size_accounting() {
+        let mut metrics = MetricsIndex::new(1024 * 1024);
         let (len, _cap, mem) = metrics.stats();
         assert_eq!(len, 0);
         assert_eq!(mem, 0);
 
-        // Add an entry
-        let cache = MetricsIndexCache::new("test_query");
-        metrics.data.insert("test_key".to_string(), cache);
+        let item1 = MetricsIndexCacheItem::new("metrics_results/org/acct1.pb", 100, 200);
+        let item2 = MetricsIndexCacheItem::new("metrics_results/org/acct2.pb", 200, 300);
+        let expected_mem =
+            index_base_size("acct_key", "acct_query") + item_size(&item1) + item_size(&item2);
+        metrics.insert("acct_key".to_string(), "acct_query", item1);
+        metrics.insert("acct_key".to_string(), "acct_query", item2);
+        let (len, _cap, mem) = metrics.stats();
+        assert_eq!(len, 2);
+        assert_eq!(mem, expected_mem);
 
-        // Stats should reflect the added entry
-        let (len, cap, mem) = metrics.stats();
-        assert_eq!(len, 0); // No entries in the cache itself yet
-        assert_eq!(cap, 0);
-        assert!(mem > 0); // Should have memory for the key and query
+        // removing one file frees its bytes; removing the last one drops the key
+        metrics.remove_files(
+            "acct_key",
+            &HashSet::from_iter(["metrics_results/org/acct1.pb".to_string()]),
+        );
+        let (len, _cap, mem_after) = metrics.stats();
+        assert_eq!(len, 1);
+        assert!(mem_after < mem);
+        metrics.remove_files(
+            "acct_key",
+            &HashSet::from_iter(["metrics_results/org/acct2.pb".to_string()]),
+        );
+        assert!(metrics.data.is_empty());
+        assert_eq!(metrics.cur_size, 0);
     }
 
     #[tokio::test]
-    async fn test_metrics_index_cache_stats() {
-        // Test the MetricsIndexCache::stats() method directly
-        let mut cache = MetricsIndexCache::new("test_query");
+    async fn test_cancelled_insert_is_cleaned_up() {
+        let key = get_hash_key("cancel_org", "cancel_probe_query", 15_000_000);
+        let bucket_id = get_bucket_id(&key);
+        let file_key = "metrics_results/cancel_org/2024/01/01/00/eee_1_2_3.pb".to_string();
+        infra::cache::file_data::disk::set_size(&file_key, 1)
+            .await
+            .unwrap();
+        assert!(
+            infra::cache::file_data::disk::indexed_file_guard(&file_key)
+                .await
+                .is_some()
+        );
 
-        // Initial stats
-        let (len, cap, mem) = cache.stats();
-        assert_eq!(len, 0);
-        assert_eq!(cap, 0);
-        assert!(mem > 0); // Should have memory for the query string
+        // park the handoff on the bucket write lock, then abort it mid-insert
+        let w = GLOBAL_CACHE[bucket_id].write().await;
+        let task_key = key.clone();
+        let task_file = file_key.clone();
+        let handle = tokio::spawn(async move {
+            let mut cleanup = DiskFileCleanup(Some(task_file.clone()));
+            let _indexed = infra::cache::file_data::disk::indexed_file_guard(&task_file).await;
+            let item = MetricsIndexCacheItem::new(&task_file, 1, 2);
+            insert_index(bucket_id, task_key, "q", item).await;
+            cleanup.0 = None;
+        });
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        handle.abort();
+        let _ = handle.await;
+        drop(w);
 
-        // Add an entry
-        let item = Arc::new(MetricsIndexCacheItem::new("test_key", 100, 200));
-        cache.entries.push(item);
+        // nothing was inserted, and the armed guard queued the disk file for deletion
+        assert!(
+            GLOBAL_CACHE[bucket_id]
+                .read()
+                .await
+                .data
+                .get(&key)
+                .is_none()
+        );
+        for _ in 0..100 {
+            if infra::cache::file_data::disk::indexed_file_guard(&file_key)
+                .await
+                .is_none()
+            {
+                return;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+        panic!("cleanup guard did not queue the file for deletion");
+    }
 
-        // Stats should reflect the added entry
-        let (len, cap, mem) = cache.stats();
-        assert_eq!(len, 1);
-        assert!(cap >= 1);
-        assert!(mem > "test_query".len()); // Should include query + entry size
+    #[test]
+    fn test_metrics_index_insert_upgrades_empty_query() {
+        let mut metrics = MetricsIndex::new(1024 * 1024);
+        metrics.insert(
+            "upgrade_key".to_string(),
+            "",
+            MetricsIndexCacheItem::new("metrics_results/org/upg1.pb", 100, 200),
+        );
+        metrics.insert(
+            "upgrade_key".to_string(),
+            "real_query",
+            MetricsIndexCacheItem::new("metrics_results/org/upg2.pb", 200, 300),
+        );
+        assert_eq!(metrics.data.get("upgrade_key").unwrap().query, "real_query");
+
+        // accounting stays symmetric after the upgrade
+        metrics.remove_files(
+            "upgrade_key",
+            &HashSet::from_iter(["metrics_results/org/upg1.pb".to_string()]),
+        );
+        metrics.remove_files(
+            "upgrade_key",
+            &HashSet::from_iter(["metrics_results/org/upg2.pb".to_string()]),
+        );
+        assert!(metrics.data.is_empty());
+        assert_eq!(metrics.cur_size, 0);
+    }
+
+    #[test]
+    fn test_metrics_index_gc_evicts_coldest_keys() {
+        let mut metrics = MetricsIndex::new(1024 * 1024);
+        for i in 0..3 {
+            metrics.insert(
+                format!("gc_key_{i}"),
+                "q",
+                MetricsIndexCacheItem::new(&format!("metrics_results/org/gc{i}.pb"), 0, 1),
+            );
+        }
+        for i in 0..3i64 {
+            metrics
+                .data
+                .get(&format!("gc_key_{i}"))
+                .unwrap()
+                .last_used
+                .store(i, Ordering::Relaxed);
+        }
+
+        // shrink the budget below the current size and gc: only the coldest key goes
+        metrics.max_size = metrics.cur_size - 1;
+        let evicted = metrics.gc();
+        assert_eq!(evicted.len(), 1);
+        assert_eq!(evicted[0].key, "metrics_results/org/gc0.pb");
+        assert!(!metrics.data.contains_key("gc_key_0"));
+        assert!(metrics.data.contains_key("gc_key_1"));
+        assert!(metrics.data.contains_key("gc_key_2"));
+        assert!(metrics.cur_size <= metrics.max_size);
     }
 
     #[tokio::test]
@@ -798,5 +1363,40 @@ mod tests {
         // All values should be non-negative (usize is always >= 0)
         // The function should complete without panicking
         assert!(len <= cap); // Length should not exceed capacity
+    }
+
+    #[test]
+    fn test_org_result_files_covers_every_cache_subdirectory() {
+        let root = std::env::temp_dir().join(format!(
+            "o2-metrics-org-files-{}-{}",
+            std::process::id(),
+            now_micros()
+        ));
+        let root = root.to_str().unwrap().to_string();
+        for file in [
+            "metrics_results/t1/2026/01/01/00/a.pb",
+            "d2/metrics_results/t1/2026/01/01/00/b.pb",
+            "d2/metrics_results/t10/2026/01/01/00/c.pb",
+        ] {
+            let path = std::path::Path::new(&root).join(file);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, b"x").unwrap();
+        }
+        let dirs = [
+            format!("{root}/"),
+            format!("{root}/d2/"),
+            format!("{root}/d3/"),
+        ];
+        let found = org_result_files(&dirs, "t1");
+        std::fs::remove_dir_all(&root).unwrap();
+        let mut keys: Vec<String> = found.unwrap().into_iter().map(|(_, key)| key).collect();
+        keys.sort();
+        assert_eq!(
+            keys,
+            [
+                "metrics_results/t1/2026/01/01/00/a.pb",
+                "metrics_results/t1/2026/01/01/00/b.pb"
+            ]
+        );
     }
 }

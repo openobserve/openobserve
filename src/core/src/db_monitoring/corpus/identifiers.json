@@ -1,0 +1,106 @@
+[
+  {
+    "id": "ident-date-partition-a",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "SELECT count(*) FROM events_20260807 WHERE tenant = $1"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT count(*) FROM events_? WHERE tenant = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_events_partition_count",
+    "literals": ["20260807"],
+    "source": "authored"
+  },
+  {
+    "id": "ident-date-partition-b",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "SELECT count(*) FROM events_20260806 WHERE tenant = $1"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT count(*) FROM events_? WHERE tenant = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_events_partition_count",
+    "literals": ["20260806"],
+    "source": "authored"
+  },
+  {
+    "id": "ident-hex-suffix-a",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "SELECT * FROM job_results_9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c LIMIT 10"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT * FROM job_results_? LIMIT ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_job_results_scan",
+    "literals": ["9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c"],
+    "source": "authored"
+  },
+  {
+    "id": "ident-uuidish-suffix-b",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "SELECT * FROM job_results_1672d3b08a8411f19a18eae17e9be2ff LIMIT 25"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT * FROM job_results_? LIMIT ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_job_results_scan",
+    "literals": ["1672d3b08a8411f19a18eae17e9be2ff"],
+    "source": "authored"
+  }
+]

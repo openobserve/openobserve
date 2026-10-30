@@ -67,13 +67,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="xs"
           @click="closeTraceDetail"
           data-test="rum-player-traces-tab-back-btn"
-          aria-label="Back"
+          :aria-label="t('common.back')"
         >
           <OIcon name="arrow-back" size="sm" />
         </OButton>
-        <code class="text-text-secondary min-w-0 flex-1 truncate text-sm">{{
-          shortRoute(selectedTrace.route) || selectedTrace.label
-        }}</code>
+        <OTruncatedText as="code" class="text-text-secondary flex-1 text-sm">{{
+          traceDisplayName(selectedTrace)
+        }}</OTruncatedText>
         <div class="flex flex-shrink-0 items-center gap-1.5">
           <span
             v-if="selectedTrace.metadata?.errorCount > 0"
@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="traceDetailsRef"
           mode="embedded"
           :trace-id-prop="selectedTrace.traceId"
-          stream-name-prop="default"
+          :stream-name-prop="selectedTrace.stream || RUM_CORRELATION_TRACES_STREAM"
           :span-list-prop="[]"
           :start-time-prop="selectedTraceStartTime"
           :end-time-prop="selectedTraceEndTime"
@@ -147,15 +147,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- List view -->
     <div v-else class="flex h-full flex-col overflow-hidden px-2">
       <!-- Filter bar -->
-      <div class="flex min-h-8 shrink-0 items-center py-1 pr-2">
+      <div class="flex min-h-8 shrink-0 items-center py-1 pe-2">
         <OTag
           type="logsResultChip"
           value="neutral"
           data-test="rum-player-traces-tab-count-badge"
-          class="mr-[0.6rem]"
-          >{{
-            `${formatLargeNumber(correlatedViews.length)} ${t("menu.traces").toLowerCase()}`
-          }}</OTag
+          class="me-[0.6rem]"
+          >{{ `${formatLargeNumber(visibleViews.length)} ${t("menu.traces").toLowerCase()}` }}</OTag
         >
         <OTag
           v-if="totalErrorCount > 0"
@@ -164,6 +162,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="rum-player-traces-tab-error-count-badge"
           >{{ `${formatLargeNumber(totalErrorCount)} ${t("rum.errorTraces")}` }}</OTag
         >
+        <div class="ms-auto w-[18rem] max-w-[50%]">
+          <OInput
+            v-model="traceSearch"
+            clearable
+            :placeholder="t('traces.sessionDetail.searchPlaceholder')"
+            data-test="rum-player-traces-tab-search"
+          />
+        </div>
+      </div>
+      <div class="flex shrink-0 items-center gap-2 pe-2 pb-1">
+        <div class="w-1/2">
+          <OSelect
+            v-model="selectedTraceStatuses"
+            :options="traceStatusOptions"
+            multiple
+            labelKey="label"
+            valueKey="value"
+            :placeholder="t('common.status')"
+            data-test="rum-player-traces-tab-status-filter"
+          />
+        </div>
+        <div class="w-1/2">
+          <OSelect
+            v-model="selectedPages"
+            :options="pageOptions"
+            multiple
+            searchable
+            clearable
+            labelKey="label"
+            valueKey="value"
+            :placeholder="t('rum.analytics.overview.allPages')"
+            data-test="rum-player-traces-tab-page-filter"
+          />
+        </div>
       </div>
 
       <!-- Traces table -->
@@ -172,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="rum-player-traces-tab-table"
       >
         <OTable
-          :data="correlatedViews"
+          :data="visibleViews"
           :columns="traceColumns"
           :row-height="32"
           :default-columns="false"
@@ -187,9 +219,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ formatTraceTimestamp(row.metadata?.start_time) }}
             </span>
           </template>
+          <template #cell-page="{ row }">
+            <span class="font-mono text-xs">
+              {{ pageRoute(row) }}
+            </span>
+          </template>
           <template #cell-route="{ row }">
-            <span class="block truncate font-mono text-xs" :title="row.route">
-              {{ shortRoute(row.route) }}
+            <span class="font-mono text-xs">
+              {{ traceDisplayName(row) }}
             </span>
           </template>
           <template #cell-duration="{ row }">
@@ -207,26 +244,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, computed } from "vue";
+import { ref, watch, onMounted, onUnmounted, computed, type PropType } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import searchService from "@/services/search";
 import useStreams from "@/composables/useStreams";
-import { rumFieldSql, rumFieldNotNullSql } from "@/utils/rum/fields";
+import {
+  rumFieldSql,
+  rumFieldNotNullSql,
+  normalizeTraceId,
+  RUM_CORRELATION_TRACES_STREAM,
+} from "@/utils/rum/fields";
 import { formatTimeWithSuffix, formatLargeNumber, generateTraceContext } from "@/utils/zincutils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
+import useCorrelatedTracesStream from "@/composables/rum/useCorrelatedTracesStream";
+import {
+  arrivalTraceWindowUs,
+  TRACE_RANGE_PADDING_US,
+  traceQueryWindow,
+} from "@/utils/rum/traceWindow";
+import type { TraceTimeRange } from "@/ts/interfaces/traces/traceTimeRange.types";
+import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { sqlEquals, sqlIn } from "@/utils/query/sqlFilterBuilder";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import TraceStatusCell from "@/plugins/traces/components/TraceStatusCell.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
-const { getStream } = useStreams();
+const { getStream } = useStreams(t);
+const {
+  resolveTraceLocationsBulk,
+  fallbackTracesStream,
+  cancel: cancelCorrelatedTracesStream,
+} = useCorrelatedTracesStream(t);
 
 const props = defineProps({
   sessionId: {
@@ -245,6 +304,10 @@ const props = defineProps({
     type: Number,
     default: 0,
   },
+  rumWindowUs: {
+    type: Object as PropType<{ start: number; end: number } | null>,
+    default: null,
+  },
 });
 
 const emit = defineEmits(["event-emitted"]);
@@ -260,12 +323,71 @@ const traceDetailsRef = ref<any>(null);
 const traceMetadata = ref<Record<string, any>>({});
 const metadataLoading = ref(false);
 const metadataError = ref<string | null>(null);
+const traceSearchWindow = ref<{ start: number; end: number } | null>(null);
 
-const totalErrorCount = computed(
-  () => correlatedViews.value.filter((v) => (v.metadata?.errorCount || 0) > 0).length,
+const traceSearch = ref("");
+
+// A request whose end-to-end duration reaches this counts as slow.
+const SLOW_TRACE_MS = 1000;
+
+const selectedTraceStatuses = ref<string[]>(["error", "success", "slow"]);
+const selectedPages = ref<string[]>([]);
+
+const traceStatusOptions = computed(() => [
+  { label: t("rum.playerEvents.error"), value: "error" },
+  { label: t("common.success"), value: "success" },
+  { label: t("rum.slowTraceFilter", { seconds: SLOW_TRACE_MS / 1000 }), value: "slow" },
+]);
+
+// The pages this session's traces came from, in the order they were first visited.
+const pageOptions = computed(() =>
+  [...new Set(correlatedViews.value.map(pageRoute).filter(Boolean))].map((page) => ({
+    label: raw(page),
+    value: page,
+  })),
 );
 
-const { fetchQueryDataWithHttpStream } = useHttpStreaming();
+// Like the Breadcrumbs type filter: a trace shows if it matches any checked status,
+// and an empty selection shows every trace.
+function matchesTraceStatus(view: any): boolean {
+  const statuses = selectedTraceStatuses.value;
+  if (!statuses.length) return true;
+  const hasError = (view.metadata?.errorCount || 0) > 0;
+  return (
+    (statuses.includes("error") && hasError) ||
+    (statuses.includes("success") && !hasError) ||
+    (statuses.includes("slow") && (view.metadata?.e2eDuration || 0) >= SLOW_TRACE_MS)
+  );
+}
+
+// Search over what each row shows: the page, the request name and the trace id.
+function matchesTraceSearch(view: any, term: string): boolean {
+  return [pageRoute(view), traceDisplayName(view), view.traceId].some((value) =>
+    String(value ?? "")
+      .toLowerCase()
+      .includes(term),
+  );
+}
+
+const visibleViews = computed(() => {
+  const term = traceSearch.value.trim().toLowerCase();
+  const pages = new Set(selectedPages.value);
+  return correlatedViews.value.filter(
+    (view) =>
+      matchesTraceStatus(view) &&
+      (!pages.size || pages.has(pageRoute(view))) &&
+      (!term || matchesTraceSearch(view, term)),
+  );
+});
+
+const totalErrorCount = computed(
+  () => visibleViews.value.filter((v) => (v.metadata?.errorCount || 0) > 0).length,
+);
+
+const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
+
+// The metadata stream carries a local trace id; track it so unmount can abort an in-flight fetch.
+let activeTraceIds: string[] = [];
 
 // ── Table column definitions ────────────────────────────────
 const traceColumns = computed(() => [
@@ -279,9 +401,19 @@ const traceColumns = computed(() => [
     meta: { align: "left" },
   },
   {
+    // The browser page each request was made from; the route column names the request itself.
+    id: "page",
+    header: t("rum.errorDetail.facetPage"),
+    accessorFn: (row: any) => pageRoute(row),
+    size: 160,
+    minSize: 80,
+    maxSize: 400,
+    meta: { align: "left" },
+  },
+  {
     id: "route",
     header: t("rum.route"),
-    accessorFn: (row: any) => shortRoute(row.route),
+    accessorFn: (row: any) => traceDisplayName(row),
     size: 400,
     minSize: 80,
     maxSize: 800,
@@ -315,10 +447,21 @@ function traceRowClass(row: any): string {
 function shortRoute(url: string): string {
   try {
     const u = new URL(url);
+    // Hash-routed SPAs keep the route after `#`, so the pathname alone is `/` for every page.
+    if (u.hash.startsWith("#/")) return u.pathname + u.search + u.hash;
     return u.pathname + u.search || "/";
   } catch {
     return url;
   }
+}
+
+function pageRoute(trace: any): string {
+  return trace.route ? shortRoute(trace.route) : "";
+}
+
+function traceDisplayName(trace: any): string {
+  const operation = trace.metadata?.httpOperation || trace.metadata?.rootOperation;
+  return operation && operation !== "unknown" ? operation : shortRoute(trace.route) || trace.label;
 }
 
 // Converts nanosecond trace timestamp to millisecond offset from session start,
@@ -352,29 +495,57 @@ function traceTimeOffset(startTimeNs: number): string {
 }
 
 // ── Data fetching ───────────────────────────────────────────
-async function fetchTraceMetadata(traceIds: string[]): Promise<Record<string, any>> {
+/**
+ * The window covering `ranges`, padded — widened to the caller's window when
+ * any trace has no indexed range, so an unknown trace is never narrowed out.
+ */
+function unionTraceWindow(
+  ranges: (TraceTimeRange | undefined)[],
+  fallbackStartUs: number,
+  fallbackEndUs: number,
+): { startTime: number; endTime: number } {
+  const known = ranges.filter((range): range is TraceTimeRange => Boolean(range));
+  if (!known.length) return { startTime: fallbackStartUs, endTime: fallbackEndUs };
+  const merged = known.reduce((acc, range) => ({
+    start_time: Math.min(acc.start_time, range.start_time),
+    end_time: Math.max(acc.end_time, range.end_time),
+  }));
+  const traceWindow = traceQueryWindow(merged, fallbackStartUs, fallbackEndUs);
+  if (known.length === ranges.length) return traceWindow;
+  return {
+    startTime: Math.min(traceWindow.startTime, fallbackStartUs),
+    endTime: Math.max(traceWindow.endTime, fallbackEndUs),
+  };
+}
+
+async function fetchTraceMetadata(
+  traceIds: string[],
+  streamName: string,
+  window?: { startTime: number; endTime: number },
+): Promise<Record<string, any>> {
   if (traceIds.length === 0) return {};
 
   const orgId = store.state.selectedOrganization.identifier;
   const nowMs = Date.now();
-  const searchStartTime = (props.startTime || nowMs - 86400000) * 1000;
-  const searchEndTime = (props.endTime || nowMs) * 1000;
+  const searchStartTime = window?.startTime ?? (props.startTime || nowMs - 86400000) * 1000;
+  const searchEndTime = window?.endTime ?? (props.endTime || nowMs) * 1000;
 
   // Build filter for multiple trace IDs
-  const safeTraceIds = traceIds.map((id) => id.replace(/'/g, "''"));
   const filter =
-    safeTraceIds.length === 1
-      ? `trace_id='${safeTraceIds[0]}'`
-      : `trace_id IN (${safeTraceIds.map((id) => `'${id}'`).join(",")})`;
+    traceIds.length === 1 ? sqlEquals("trace_id", traceIds[0]) : sqlIn("trace_id", traceIds);
 
-  return new Promise<Record<string, any>>((resolve, reject) => {
+  const metadata = await new Promise<Record<string, any>>((resolve, reject) => {
     const traceId = generateTraceContext().traceId;
+    activeTraceIds.push(traceId);
+    const untrack = () => {
+      activeTraceIds = activeTraceIds.filter((id) => id !== traceId);
+    };
     const metadata: Record<string, any> = {};
 
     fetchQueryDataWithHttpStream(
       {
         queryReq: {
-          stream_name: "default",
+          stream_name: streamName,
           filter,
           start_time: searchStartTime,
           end_time: searchEndTime,
@@ -401,19 +572,67 @@ async function fetchTraceMetadata(traceIds: string[]): Promise<Record<string, an
             };
           });
         },
-        error: (_, error) => reject(error),
-        complete: () => resolve(metadata),
+        error: (_, error) => {
+          untrack();
+          reject(error);
+        },
+        complete: () => {
+          untrack();
+          resolve(metadata);
+        },
         reset: () => {},
       },
     );
   });
+
+  try {
+    const stream = quoteSqlIdentifierIfNeeded(streamName);
+    const timestamp = quoteSqlIdentifierIfNeeded(store.state.zoConfig.timestamp_column);
+    const operationResponse = await searchService.search(
+      {
+        org_identifier: orgId,
+        query: {
+          query: {
+            sql: `SELECT trace_id, first_value(operation_name ORDER BY ${timestamp} ASC) AS operation_name FROM ${stream} WHERE ${filter} AND span_kind='2' AND http_route IS NOT NULL AND operation_name IS NOT NULL AND operation_name != '' GROUP BY trace_id`,
+            start_time: searchStartTime,
+            end_time: searchEndTime,
+            from: 0,
+            size: traceIds.length,
+          },
+        },
+        page_type: "traces",
+      },
+      "RUM",
+    );
+
+    for (const hit of operationResponse.data?.hits || []) {
+      if (metadata[hit.trace_id] && hit.operation_name) {
+        metadata[hit.trace_id].httpOperation = hit.operation_name;
+      }
+    }
+  } catch (err) {
+    console.warn("HTTP server operation fetch failed:", err);
+  }
+
+  return metadata;
 }
+
+// An in-flight metadata fetch outlives this tab otherwise; cancel it on unmount.
+onUnmounted(() => {
+  const orgId = store.state.selectedOrganization?.identifier;
+  activeTraceIds.forEach((traceId) =>
+    cancelStreamQueryBasedOnRequestId({ trace_id: traceId, org_id: orgId }),
+  );
+  activeTraceIds = [];
+  cancelCorrelatedTracesStream();
+});
 
 async function fetchTraces() {
   if (!props.sessionId) return;
 
   loading.value = true;
   error.value = null;
+  traceSearchWindow.value = null;
 
   try {
     const orgId = store.state.selectedOrganization.identifier;
@@ -434,11 +653,37 @@ async function fetchTraces() {
       return;
     }
 
+    // Optional browser fields must be schema-guarded because mobile streams omit them.
+    const presentCols = new Set((rumStream?.schema ?? []).map((field: any) => field?.name));
+    const has = (col: string): boolean => presentCols.has(col);
+    const aggOrNull = (fn: string, col: string, alias: string): string =>
+      has(col) ? `${fn}(${col}) as ${alias}` : `NULL as ${alias}`;
+
+    const selectParts = [
+      aggOrNull("max", "view_id", "_view_id"),
+      aggOrNull("max", "view_url", "_view_url"),
+      aggOrNull("max", "view_loading_type", "_view_loading_type"),
+      `${traceIdExpr} as _trace_id`,
+      aggOrNull("max", "type", "_type"),
+      aggOrNull("min", "date", "_date"),
+    ];
+    if (props.rumWindowUs) {
+      const ts = quoteSqlIdentifierIfNeeded(store.state.zoConfig.timestamp_column);
+      selectParts.push(`min(${ts}) as _first_ts`, `max(${ts}) as _last_ts`);
+    }
+    const whereParts = [sqlEquals("session_id", props.sessionId), traceIdSet];
+    const having = has("resource_url")
+      ? " HAVING MAX(CASE WHEN resource_url LIKE '%/socket.io/%' AND resource_url LIKE '%transport=polling%' THEN 1 ELSE 0 END) = 0"
+      : "";
+
     const rumQuery = {
       query: {
-        sql: `SELECT max(view_id) as _view_id, max(view_url) as _view_url, max(view_loading_type) as _view_loading_type, ${traceIdExpr} as _trace_id, max(type) as _type, min(date) as _date FROM "_rumdata" WHERE session_id='${props.sessionId}' AND ${traceIdSet} AND action_id is not null GROUP BY ${traceIdExpr} ORDER BY _date ASC`,
-        start_time: searchStartTime,
-        end_time: searchEndTime,
+        sql: `SELECT ${selectParts.join(", ")} FROM "_rumdata" WHERE ${whereParts.join(" AND ")} GROUP BY ${traceIdExpr}${having} ORDER BY _date ASC`,
+        start_time: props.rumWindowUs?.start ?? searchStartTime,
+        // Rows keep arriving after the last device-clock event, so a re-fetch must reach "now".
+        end_time: props.rumWindowUs
+          ? Math.max(props.rumWindowUs.end, Date.now() * 1000)
+          : searchEndTime,
         from: 0,
         size: 250,
       },
@@ -460,10 +705,24 @@ async function fetchTraces() {
       return;
     }
 
-    // Deduplicate by trace_id, keep first occurrence for view context
+    const deviceWindow = { start: searchStartTime, end: searchEndTime };
+    const arrival = props.rumWindowUs ? arrivalTraceWindowUs(rumHits) : null;
+    // Arrival can trail a span by more than the pad (offline buffering), so keep the device window too.
+    const searchWindow = arrival
+      ? {
+          start: Math.min(arrival.start, deviceWindow.start - TRACE_RANGE_PADDING_US),
+          end: Math.max(arrival.end, deviceWindow.end),
+        }
+      : deviceWindow;
+    if (props.rumWindowUs) traceSearchWindow.value = searchWindow;
+
+    // Deduplicate by trace_id, keep first occurrence for view context.
+    // Canonicalize the id: SDK 0.4.x stored it zero-stripped, while the traces
+    // stream stores the padded 32-char form — the metadata join and the embedded
+    // trace view both need the stream's form.
     const traceMap = new Map<string, any>();
     for (const hit of rumHits) {
-      const traceId = hit._trace_id;
+      const traceId = normalizeTraceId(hit._trace_id) || hit._trace_id;
       if (!traceId || traceMap.has(traceId)) continue;
       const viewUrl = hit._view_url || hit.view_url || "";
       traceMap.set(traceId, {
@@ -486,7 +745,47 @@ async function fetchTraces() {
     if (views.length > 0) {
       metadataLoading.value = true;
       try {
-        const metadata = await fetchTraceMetadata(views.map((v) => v.traceId));
+        // Which stream holds each trace (one bulk request; cached in the store).
+        // Every row keeps ITS OWN stream so multi-stream sessions list fully and
+        // each click opens against the right stream; an unresolved id falls back
+        // to `default` only where the org has it, and otherwise drops out unfetched.
+        const locationById = await resolveTraceLocationsBulk(
+          views.map((v) => v.traceId),
+          searchWindow.start,
+          searchWindow.end,
+        );
+        const fallbackStream = await fallbackTracesStream();
+        for (const view of views as any[]) {
+          const location = locationById[view.traceId];
+          view.stream = location?.stream ?? fallbackStream;
+          view.range = location?.range;
+        }
+
+        // Metadata is fetched per distinct stream (usually one, at most a few).
+        const idsByStream = new Map<string, string[]>();
+        const rangeById = new Map<string, TraceTimeRange | undefined>();
+        for (const view of views as any[]) {
+          if (!view.stream) continue;
+          const ids = idsByStream.get(view.stream) ?? [];
+          ids.push(view.traceId);
+          idsByStream.set(view.stream, ids);
+          rangeById.set(view.traceId, view.range);
+        }
+        const metadata: Record<string, any> = {};
+        const metadataPerStream = await Promise.all(
+          [...idsByStream.entries()].map(([stream, ids]) =>
+            fetchTraceMetadata(
+              ids,
+              stream,
+              unionTraceWindow(
+                ids.map((id) => rangeById.get(id)),
+                searchWindow.start,
+                searchWindow.end,
+              ),
+            ),
+          ),
+        );
+        for (const part of metadataPerStream) Object.assign(metadata, part);
 
         // Only keep views whose trace_id exists in the traces stream, sorted by start time
         filteredViews = views
@@ -503,7 +802,7 @@ async function fetchTraces() {
 
         traceMetadata.value = metadata;
       } catch (err: any) {
-        metadataError.value = err?.message || "Failed to fetch trace metadata";
+        metadataError.value = err?.message || t("rum.fetchTraceMetadataFailed");
         console.warn("Trace metadata fetch failed:", err);
       } finally {
         metadataLoading.value = false;
@@ -522,8 +821,9 @@ function openTraceDetail(view: any) {
   selectedTrace.value = view;
 
   const nowMs = Date.now();
-  const fallbackStart = (props.startTime || nowMs - 86400000) * 1000;
-  const fallbackEnd = (props.endTime || nowMs) * 1000;
+  const fallbackStart =
+    traceSearchWindow.value?.start ?? (props.startTime || nowMs - 86400000) * 1000;
+  const fallbackEnd = traceSearchWindow.value?.end ?? (props.endTime || nowMs) * 1000;
 
   const meta = traceMetadata.value[view.traceId];
   if (meta?.start_time && meta?.end_time) {
@@ -531,8 +831,11 @@ function openTraceDetail(view: any) {
     selectedTraceStartTime.value = Math.floor(meta.start_time / 1000) - ONE_MINUTE_US;
     selectedTraceEndTime.value = Math.ceil(meta.end_time / 1000) + ONE_MINUTE_US;
   } else {
-    selectedTraceStartTime.value = fallbackStart;
-    selectedTraceEndTime.value = fallbackEnd;
+    // The indexed range beats the session window: a trace running past the
+    // session's picker window would otherwise open truncated.
+    const traceWindow = traceQueryWindow(view.range, fallbackStart, fallbackEnd);
+    selectedTraceStartTime.value = traceWindow.startTime;
+    selectedTraceEndTime.value = traceWindow.endTime;
   }
 }
 
@@ -566,6 +869,8 @@ watch(
   () => props.sessionId,
   () => {
     correlatedViews.value = [];
+    // Another session visited other pages.
+    selectedPages.value = [];
     selectedTrace.value = null;
     closeTraceDetail();
     fetchTraces();

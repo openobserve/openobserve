@@ -432,6 +432,112 @@ describe("useAgentScope — Env→Agent→Version cascade (Plan 2)", () => {
     // Single-dropdown path still resolves the first agent unchanged.
     expect(scope.selectedAgent.value).toEqual(agentA);
   });
+
+  it("selectAgentByScope pins the exact env+name+version triple, not just the first name match", () => {
+    const scope = makeCascade(CASCADE_AGENTS);
+    // "a" exists in production@v1, production@v2 and staging@v1 — an exact
+    // triple must resolve the SPECIFIC one, not whichever comes first.
+    expect(scope.selectAgentByScope("production", "a", "v2")).toBe(true);
+    expect(scope.selectedEnv.value).toBe("production");
+    expect(scope.selectedAgentName.value).toBe("a");
+    expect(scope.selectedVersion.value).toBe("v2");
+  });
+
+  it("selectAgentByScope falls back to selectAgentByName when the exact triple no longer exists", () => {
+    const scope = makeCascade(CASCADE_AGENTS);
+    // No agent "a" in a "decommissioned" env at all — falls back to the
+    // first "a" match anywhere (production@v1) rather than resolving nothing.
+    expect(scope.selectAgentByScope("decommissioned", "a", "v1")).toBe(true);
+    expect(scope.selectedAgent.value).toMatchObject({
+      name: "a",
+      env: "production",
+      version: "v1",
+    });
+  });
+});
+
+describe("useAgentScope — cascade with the All option (Quality)", () => {
+  const AGENTS: GenAiAgentListItem[] = [
+    {
+      name: "a",
+      id: "a",
+      source_stream: "s",
+      source_stream_type: "traces",
+      env: "prod",
+      version: "v1",
+    },
+    {
+      name: "a",
+      id: "a",
+      source_stream: "s",
+      source_stream_type: "traces",
+      env: "prod",
+      version: "v2",
+    },
+    {
+      name: "b",
+      id: "b",
+      source_stream: "s",
+      source_stream_type: "traces",
+      env: "dev",
+      version: "v1",
+    },
+    {
+      name: "x",
+      id: "x",
+      source_stream: "s",
+      source_stream_type: "traces",
+      env: null,
+      version: null,
+    },
+  ];
+
+  function makeScope(allOption?: boolean) {
+    return useAgentScope({
+      filterMode: ref<"stream" | "agent">("agent"),
+      activeStream: ref(""),
+      orgId: () => "org1",
+      getWindow: () => ({ start: 100, end: 200 }),
+      cascade: true,
+      allOption,
+      agents: ref<GenAiAgentListItem[]>(AGENTS),
+      agentsLoaded: ref(true),
+      t,
+    });
+  }
+
+  it("starts every level on All and lists it first", () => {
+    const scope = makeScope(true);
+    expect(scope.selectedEnv.value).toBe(ALL_AGENTS_VALUE);
+    expect(scope.selectedAgentName.value).toBe(ALL_AGENTS_VALUE);
+    expect(scope.selectedVersion.value).toBe(ALL_AGENTS_VALUE);
+    expect(scope.envs.value.map((o) => o.value)).toEqual([ALL_AGENTS_VALUE, "prod", "dev"]);
+    expect(scope.agentNames.value.map((o) => o.value)).toEqual([ALL_AGENTS_VALUE, "a", "b", "x"]);
+    expect(scope.versions.value.map((o) => o.value)).toEqual([ALL_AGENTS_VALUE, "v1", "v2"]);
+    expect(scope.envs.value[0].label).toBe("common.all");
+    expect(scope.agentNames.value[0].label).toBe("traces.allAgents");
+    expect(scope.selectedAgent.value).toBeNull();
+  });
+
+  it("narrows the lower levels without picking a value, and resets them to All", () => {
+    const scope = makeScope(true);
+    scope.selectedEnv.value = "prod";
+    expect(scope.agentNames.value.map((o) => o.value)).toEqual([ALL_AGENTS_VALUE, "a"]);
+    expect(scope.selectedAgentName.value).toBe(ALL_AGENTS_VALUE);
+    scope.selectedAgentName.value = "a";
+    scope.selectedVersion.value = "v2";
+    scope.selectedEnv.value = "dev";
+    expect(scope.selectedAgentName.value).toBe(ALL_AGENTS_VALUE);
+    expect(scope.selectedVersion.value).toBe(ALL_AGENTS_VALUE);
+  });
+
+  it("without the option keeps the first-value default and no All entry", () => {
+    const scope = makeScope();
+    expect(scope.selectedEnv.value).toBe("prod");
+    expect(scope.selectedAgentName.value).toBe("a");
+    expect(scope.selectedVersion.value).toBe("v1");
+    expect(scope.envs.value.map((o) => o.value)).toEqual(["prod", "dev", UNSET]);
+  });
 });
 
 describe("useAgentScope — stream options", () => {

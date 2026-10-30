@@ -6,8 +6,9 @@
 // (at your option) any later version.
 
 import http from "@/services/http";
+import analytics from "./product_analytics";
 
-export type EvalJobStatus = "draft" | "active" | "paused" | "degraded" | "archived";
+export type EvalJobStatus = "draft" | "active" | "paused" | "archived";
 export type EvalTargetScope = "span" | "trace" | "session";
 export type SamplingMode = "rate" | "all" | "count";
 export type ConfigurableSamplingMode = "rate" | "all";
@@ -23,6 +24,8 @@ export interface Provider {
   providerType?: string;
   provider_type?: string;
   endpoint?: string | null;
+  resolvedEndpoint?: string;
+  resolved_endpoint?: string;
   defaultModel?: string;
   default_model?: string;
   availableModels?: string[];
@@ -84,6 +87,8 @@ export interface Scorer {
   produces_score_config_version?: number | null;
   template: string;
   variables?: string[];
+  referenceBased?: boolean;
+  reference_based?: boolean;
   outputSchema?: any;
   output_schema?: any;
   params?: Record<string, any>;
@@ -149,6 +154,8 @@ export interface EvalJob {
   created_at?: number;
   updatedAt?: number;
   updated_at?: number;
+  /** Persisted health state; absent until the backend first evaluates the job. */
+  health?: EvalJobHealth | null;
 }
 
 export interface ExtraMetadataField {
@@ -249,12 +256,154 @@ export interface ManualEvalJobResult {
   tasksCreated: number;
 }
 
+export type EvalJobHealthState =
+  "healthy" | "degraded" | "waiting_for_credentials" | "no_recent_runs";
+
+export interface EvalJobLastError {
+  /** e.g. provider_auth, rate_limited, timeout, provider_5xx, parse_error,
+   *  mapping_error, scorer_missing, execution_error */
+  kind: string;
+  message: string;
+  /** Microseconds since epoch. */
+  at: number;
+}
+
+/** Persisted health state for one job; never changes the job's status. */
+export interface EvalJobHealth {
+  state: EvalJobHealthState;
+  /** When `state` last changed, microseconds since epoch. */
+  since: number;
+  /** When the backend last measured this job, microseconds since epoch. */
+  evaluatedAt: number;
+  recentRuns: number;
+  recentErrors: number;
+  scores24h: number;
+  /** Microseconds since epoch. */
+  lastSuccessAt?: number | null;
+  lastError?: EvalJobLastError | null;
+}
+
+export type QualityStatus = "attention" | "healthy" | "unset" | "no_data";
+
+export interface QualityScopeCounts {
+  span: number;
+  trace: number;
+  session: number;
+}
+
+/** One row of the Quality list API. Times are microseconds. */
+export interface QualityConfigSummary {
+  configId: string;
+  name: string;
+  dataType: ScoreDataType;
+  status: QualityStatus;
+  total: number;
+  unhealthy: number | null;
+  average: number | null;
+  lastScoredAt: number | null;
+  scopeCounts: QualityScopeCounts;
+  topValue: { key: string | boolean; count: number } | null;
+}
+
+export interface QualityAgentParams {
+  agent_id?: string;
+  agent_name?: string;
+  agent_env?: string;
+  agent_version?: string;
+}
+
+export interface QualityListParams extends QualityAgentParams {
+  start_time: number;
+  end_time: number;
+  scope?: EvalTargetScope;
+}
+
+export interface QualityScoresParams extends QualityListParams {
+  unhealthy_only?: boolean;
+  bucket_from?: number;
+  bucket_to?: number;
+  value?: string;
+  from?: number;
+  size?: number;
+}
+
+/** Numeric buckets key on their index; boolean and categorical buckets key on the value. */
+export interface QualityDistributionBucket {
+  key: number | string | boolean;
+  lower?: number;
+  upper?: number;
+  count: number;
+  unhealthy: number | null;
+}
+
+/** Latest scores written in one slice of the time range; times in microseconds. */
+export interface QualityTimelineBucket {
+  start: number;
+  end: number;
+  count: number;
+  unhealthy: number | null;
+  /** Boolean configs only. */
+  trueCount: number | null;
+  /** Numeric configs only, like `p95`. */
+  average: number | null;
+  p95: number | null;
+}
+
+export interface QualityScore {
+  id: string;
+  timestamp: number;
+  refTimestamp: number;
+  sourceType: string;
+  targetScope: EvalTargetScope;
+  targetId: string | null;
+  spanId: string | null;
+  traceId: string | null;
+  sessionId: string | null;
+  sourceStream: string | null;
+  sourceStreamType: string | null;
+  value: number | string | boolean | null;
+  unhealthy: boolean | null;
+  reasoning: string | null;
+  evaluatorTraceId: string | null;
+  taskId: string | null;
+  inputPreview: string | null;
+  outputPreview: string | null;
+  /** The spans the scorer read the input and output from; null when it recorded none. */
+  inputSpanId: string | null;
+  outputSpanId: string | null;
+}
+
+export interface QualityScorePage {
+  average: number | null;
+  distribution: QualityDistributionBucket[];
+  list: QualityScore[];
+  total: number;
+  from: number;
+  size: number;
+}
+
+// The API rejects unknown and malformed params, so empty optionals are dropped and times are whole microseconds.
+const qualityQuery = (params: QualityListParams | QualityScoresParams) => {
+  const out: Record<string, string | number | boolean> = {};
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === "") continue;
+    out[key] = key === "start_time" || key === "end_time" ? Math.floor(value as number) : value;
+  }
+  return out;
+};
 const unwrapList = <T>(response: any, key = "list"): T[] => {
   const data = response?.data;
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.[key])) return data[key];
   return [];
 };
+
+// Score Configs change far less often than the pages that merely read them
+// get visited — a session-lived cache keyed by org avoids re-fetching the
+// whole list on every page mount. Callers that just mutated a config (create,
+// update, delete) must keep using `scoreConfigs.list` directly for
+// guaranteed-fresh data; this cache is for read-only consumers only.
+const scoreConfigsCache = new Map<string, Promise<ScoreConfig[]>>();
 
 const onlineEvalsService = {
   providers: {
@@ -271,11 +420,34 @@ const onlineEvalsService = {
     delete: async (orgId: string, providerId: string): Promise<void> => {
       await http().delete(`/api/${orgId}/providers/${providerId}`);
     },
+    testConfig: async (
+      orgId: string,
+      payload: ProviderPayload,
+      providerId?: string,
+    ): Promise<string> =>
+      (
+        await http().post(`/api/${orgId}/providers/test`, {
+          ...payload,
+          ...(providerId ? { providerId } : {}),
+        })
+      ).data.message,
   },
 
   scoreConfigs: {
     list: async (orgId: string): Promise<ScoreConfig[]> =>
       unwrapList<ScoreConfig>(await http().get(`/api/${orgId}/score_configs`)),
+    // Read-only, cached-per-org variant of `list` — for pages that only need
+    // Score Configs as reference data (e.g. looking up a scorer's configured
+    // healthy value) and would otherwise refetch the whole list on every visit.
+    listCached: async (orgId: string): Promise<ScoreConfig[]> => {
+      let pending = scoreConfigsCache.get(orgId);
+      if (!pending) {
+        pending = onlineEvalsService.scoreConfigs.list(orgId);
+        pending.catch(() => scoreConfigsCache.delete(orgId));
+        scoreConfigsCache.set(orgId, pending);
+      }
+      return pending;
+    },
     create: async (orgId: string, payload: Record<string, any>): Promise<ScoreConfig> =>
       (await http().post(`/api/${orgId}/score_configs`, payload)).data,
     update: async (
@@ -307,6 +479,11 @@ const onlineEvalsService = {
     delete: async (orgId: string, entityId: string): Promise<void> => {
       await http().delete(`/api/${orgId}/scorers/${entityId}`);
     },
+    versions: async (orgId: string, entityId: string): Promise<Scorer[]> =>
+      unwrapList<Scorer>(
+        await http().get(`/api/${orgId}/scorers/${entityId}/versions`),
+        "versions",
+      ),
     test: async (orgId: string, payload: ScorerTestPayload): Promise<ScorerTestResult> =>
       (await http().post(`/api/${orgId}/scorers/test`, payload)).data,
     previewLlmJudgeOutputSchema: async (
@@ -316,13 +493,44 @@ const onlineEvalsService = {
       (await http().post(`/api/${orgId}/scorers/llm_judge/output_schema`, payload)).data,
   },
 
+  quality: {
+    list: async (orgId: string, params: QualityListParams): Promise<QualityConfigSummary[]> =>
+      unwrapList<QualityConfigSummary>(
+        await http().get(`/api/${orgId}/score_configs/quality`, { params: qualityQuery(params) }),
+      ),
+    scores: async (
+      orgId: string,
+      entityId: string,
+      params: QualityScoresParams,
+    ): Promise<QualityScorePage> =>
+      (
+        await http().get(`/api/${orgId}/score_configs/${encodeURIComponent(entityId)}/quality`, {
+          params: qualityQuery(params),
+        })
+      ).data,
+    timeline: async (
+      orgId: string,
+      entityId: string,
+      params: QualityListParams,
+    ): Promise<{ timeline: QualityTimelineBucket[] }> =>
+      (
+        await http().get(
+          `/api/${orgId}/score_configs/${encodeURIComponent(entityId)}/quality/timeline`,
+          { params: qualityQuery(params) },
+        )
+      ).data,
+  },
+
   jobs: {
     list: async (orgId: string, status?: EvalJobStatus): Promise<EvalJob[]> => {
       const query = status ? `?status=${encodeURIComponent(status)}` : "";
       return unwrapList<EvalJob>(await http().get(`/api/${orgId}/eval_jobs${query}`));
     },
-    create: async (orgId: string, payload: EvalJobPayload): Promise<EvalJob> =>
-      (await http().post(`/api/${orgId}/eval_jobs`, payload)).data,
+    create: async (orgId: string, payload: EvalJobPayload): Promise<EvalJob> => {
+      const response = await http().post(`/api/${orgId}/eval_jobs`, payload);
+      analytics.track("llm_eval_job_created");
+      return response.data;
+    },
     update: async (orgId: string, jobId: string, payload: EvalJobPayload): Promise<EvalJob> =>
       (await http().put(`/api/${orgId}/eval_jobs/${jobId}`, payload)).data,
     delete: async (orgId: string, jobId: string): Promise<void> => {

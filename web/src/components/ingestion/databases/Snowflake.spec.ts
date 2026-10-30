@@ -21,6 +21,7 @@ import { ref } from "vue";
 import Snowflake from "./Snowflake.vue";
 import snowflakeCard from "@/components/ingestion/setupCard/content/snowflake";
 import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
+import { gt } from "@/types/i18n";
 
 const mockEndpoint = ref({
   url: "https://test.openobserve.ai",
@@ -52,7 +53,7 @@ const SUBS = { url: "https://test.openobserve.ai", org: "test-org", token: "dGVz
 
 describe("snowflakeCard builder", () => {
   it("builds metadata + step flow", () => {
-    const card = snowflakeCard(SUBS);
+    const card = snowflakeCard(SUBS, gt);
     expect(card.provider.name).toBe("Snowflake");
     expect(card.detect).toMatchObject({
       streamType: "metrics",
@@ -62,7 +63,7 @@ describe("snowflakeCard builder", () => {
     expect(card.steps.map((s) => s.id)).toEqual(["install", "configure", "run", "verify"]);
   });
   it("pins the install to v0.92.0 and has a snowflake receiver config", () => {
-    const card = snowflakeCard(SUBS);
+    const card = snowflakeCard(SUBS, gt);
     const install = card.steps
       .find((s) => s.id === "install")!
       .variants!.find((v) => v.id === "linux-amd64")!.code.raw;
@@ -81,7 +82,7 @@ describe("Snowflake.vue", () => {
     if (wrapper) wrapper.unmount();
   });
   it("renders the shared card", () => {
-    expect(getDataSourceCard("snowflake", SUBS)?.provider.name).toBe("Snowflake");
+    expect(getDataSourceCard("snowflake", SUBS, gt)?.provider.name).toBe("Snowflake");
     wrapper = mount(Snowflake, { global: { plugins: [mockStore, mockI18n] } });
     expect(wrapper.findComponent({ name: "SetupCardRenderer" }).exists()).toBe(true);
   });

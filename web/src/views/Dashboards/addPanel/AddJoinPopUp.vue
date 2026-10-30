@@ -14,7 +14,10 @@
 -->
 
 <template>
-  <div data-test="dashboard-join-pop-up" class="flex max-h-[54vh] w-156 flex-col overflow-hidden">
+  <div
+    data-test="dashboard-join-pop-up"
+    class="flex max-h-[54vh] w-156 flex-col overflow-hidden max-lg:w-[calc(100vw-1.5rem)]"
+  >
     <div class="flex min-h-0 flex-1 flex-col p-3">
       <div class="mb-2 flex items-start justify-between gap-4">
         <div class="flex min-w-0 flex-1 flex-col gap-1">
@@ -47,7 +50,7 @@
               class="rounded-default flex cursor-pointer flex-col items-center gap-0.5 border px-2.5 py-1.5 transition-colors"
               :class="
                 localJoinType === option.type
-                  ? 'border-accent text-accent bg-[color-mix(in_srgb,var(--color-accent)_15%,transparent)]'
+                  ? 'border-accent text-accent bg-accent/15'
                   : 'text-text-secondary hover:bg-surface-subtle border-transparent'
               "
               :aria-pressed="localJoinType === option.type"
@@ -85,7 +88,7 @@
         <div class="text-text-secondary py-2 text-center text-xs" v-if="showJoinSummary">
           {{ t("dashboard.addJoinPopUp.performing") }}
           <span
-            class="rounded-default text-accent inline-flex items-center bg-[color-mix(in_srgb,var(--color-accent)_15%,transparent)] px-1.5 py-0.5 text-xs font-semibold"
+            class="rounded-default text-accent bg-accent/15 inline-flex items-center px-1.5 py-0.5 text-xs font-semibold"
             >{{ joinTypeLabel }} {{ t("dashboard.addJoinPopUp.join") }}</span
           >
           {{ t("dashboard.addJoinPopUp.between") }}
@@ -178,7 +181,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { defineComponent, watch, onMounted, inject, ref, computed, markRaw, PropType } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useLoading } from "@/composables/useLoading";
 import useStreams from "@/composables/useStreams";
@@ -191,7 +194,7 @@ import RightJoinTypeSvg from "@/components/icons/RightJoinTypeSvg.vue";
 import InnerJoinTypeSvg from "@/components/icons/InnerJoinTypeSvg.vue";
 
 export interface StreamOption {
-  label: string;
+  label: I18nText;
   value: string;
 }
 
@@ -289,13 +292,13 @@ export default defineComponent({
   emits: ["update:modelValue"],
 
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
-    const { getStreams } = useStreams();
+    const { getStreams } = useStreams(t);
 
     const dashboardPanelDataPageKey = inject<string>("dashboardPanelDataPageKey", "dashboard");
 
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     // Same reference as props.modelValue; mutation targets its nested fields only.
     const modelValueModel = computed(() => props.modelValue);
@@ -303,7 +306,7 @@ export default defineComponent({
     const streamOptions = ref<StreamOption[]>([]);
     const operationOptions = [...JOIN_OPERATIONS];
     const operationSelectOptions = operationOptions.map((op) => ({
-      label: op,
+      label: raw(op),
       value: op,
     }));
 
@@ -416,12 +419,10 @@ export default defineComponent({
         };
 
         const previousJoins =
-          currentQuery.joins?.slice(0, props.joinIndex)?.map(
-            (join: any): StreamReference => ({
-              stream: join.stream,
-              streamAlias: join.streamAlias,
-            }),
-          ) ?? [];
+          currentQuery.joins?.slice(0, props.joinIndex)?.map((join: any): StreamReference => ({
+            stream: join.stream,
+            streamAlias: join.streamAlias,
+          })) ?? [];
 
         return [mainStream, ...previousJoins];
       } catch (error) {
@@ -437,12 +438,10 @@ export default defineComponent({
       try {
         const response = (await getStreams(streamType, false)) as GetStreamsResponse;
 
-        streamOptions.value = response.list.map(
-          (stream: StreamListEntry): StreamOption => ({
-            label: stream.name,
-            value: stream.name,
-          }),
-        );
+        streamOptions.value = response.list.map((stream: StreamListEntry): StreamOption => ({
+          label: raw(stream.name),
+          value: stream.name,
+        }));
 
         // Select first stream if no stream is selected or current stream is invalid
         if (streamOptions.value.length > 0) {

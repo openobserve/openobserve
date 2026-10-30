@@ -2,6 +2,7 @@
 // Encapsulates selectors and actions for multi-query tab management
 
 const testLogger = require("../../playwright-tests/utils/test-logger.js");
+import { settlePanelLeave } from "./panel-leave-dialog.js";
 
 export default class DashboardMultiSQL {
   constructor(page) {
@@ -40,12 +41,9 @@ export default class DashboardMultiSQL {
     return this.page.locator(`[data-test="dashboard-panel-query-tab-name-${index}"]`);
   }
 
-  /** Locator for the rename input at given index.
-   * The OInput wrapper carries the `...-input-${index}` data-test; the actual
-   * <input> element is the inner `...-field` node (OInput convention), which is
-   * what fill()/press() must target. */
+  /** Locator for the rename input at given index. */
   queryTabNameInput(index) {
-    return this.page.locator(`[data-test="dashboard-panel-query-tab-name-input-${index}-field"]`);
+    return this.page.locator(`[data-test="dashboard-panel-query-tab-name-input-${index}"]`);
   }
 
   /** Locator for the remove (close) icon at given index */
@@ -97,6 +95,17 @@ export default class DashboardMultiSQL {
     return this.page.locator('[data-test="panel-x-alias-inconsistency-warning"]');
   }
 
+  /**
+   * Locator for the x-alias-inconsistency warning nested inside a given axis
+   * layout section (used to assert the warning is NOT rendered inside a layout).
+   * @param {string} layoutDataTest - data-test of the layout wrapper
+   */
+  xAliasWarningInLayout(layoutDataTest) {
+    return this.page.locator(
+      `[data-test="${layoutDataTest}"] [data-test="panel-x-alias-inconsistency-warning"]`,
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
@@ -135,7 +144,10 @@ export default class DashboardMultiSQL {
    * @param {number} index
    */
   async switchToQueryTab(index) {
-    await this.queryTab(index).click();
+    // Click the NAME, not the tab's centre: the centre can land on the rename /
+    // visibility icons, which deliberately swallow the click so they never
+    // activate the tab. The name always bubbles up and activates it.
+    await this.queryTabLabel(index).click();
     // Wait for the clicked tab to actually become active (its fields/editor are
     // rendered for that query) instead of a fixed sleep.
     await this.waitForActiveQueryTab(index, 10000);
@@ -221,9 +233,8 @@ export default class DashboardMultiSQL {
    * Discard the current panel and return to the dashboard view page.
    * Use this for teardown when the panel intentionally contains an
    * incomplete/invalid query (which cannot pass save validation) or when the
-   * test does not need to persist the panel. Discarding an edited panel fires a
-   * native window.confirm — Playwright auto-dismisses dialogs by default, which
-   * would cancel navigation and leave the page on add_panel — so accept it.
+   * test does not need to persist the panel. Discarding a panel with edits opens
+   * the in-app leave dialog, answered with Discard.
    */
   async discardPanel() {
     const dialogHandler = (dialog) => dialog.accept();
@@ -231,10 +242,7 @@ export default class DashboardMultiSQL {
     try {
       await this.discardBtn.waitFor({ state: "visible", timeout: 15000 });
       await this.discardBtn.click();
-      // Discard navigates to the dashboard view page (/dashboards/view).
-      await this.page.waitForURL((url) => !url.pathname.includes("add_panel"), {
-        timeout: 30000,
-      });
+      await settlePanelLeave(this.page);
     } finally {
       this.page.off("dialog", dialogHandler);
     }

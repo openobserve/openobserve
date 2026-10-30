@@ -1,33 +1,61 @@
 ﻿<!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import { useI18n } from "vue-i18n";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import { useI18nTyped } from "@/types/i18n";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
+
+const roleDrafts = useEditorDraftIds("iam_role");
 
 const props = defineProps<{
   data: any[];
   loading?: boolean;
+  forbidden?: boolean;
   actionLoading?: boolean;
   selectedIds?: string[];
   globalFilter?: string;
+  pageSize?: number;
+  currentPage?: number;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  /** Member email being assigned to a role (from the "Assign a role" quick-link).
+   *  Presence alone turns on the Assign column — not gated separately. */
+  assignTarget?: string;
+  /** Role currently in flight for an assign click, so only that row spins. */
+  assigningRoleName?: string | null;
+  /** Roles assignTarget already belongs to — rendered as "Assigned" instead of
+   *  an actionable button. */
+  assignedRoleNames?: string[];
 }>();
 
 const emit = defineEmits<{
   "update:selectedIds": [ids: string[]];
   "update:globalFilter": [value: string];
+  "update:pageSize": [value: number];
+  "update:currentPage": [value: number];
+  "update:sortBy": [value: string];
+  "update:sortOrder": [value: "asc" | "desc"];
   edit: [row: any];
   delete: [row: any];
   "bulk-delete": [];
   create: [];
+  assign: [row: any];
 }>();
+
+const oTableRef = ref<any>(null);
+defineExpose({ restorePage: (page: number) => oTableRef.value?.restorePage?.(page) });
 
 const onEmptyStateAction = (id?: string) => {
   if (id === "clear-filters") {
@@ -67,6 +95,17 @@ const columns = computed<OTableColumnDef[]>(() => {
     });
   }
 
+  if (props.assignTarget) {
+    cols.push({
+      id: "assign",
+      header: t("iam.rolesPage.assignColumn"),
+      sortable: false,
+      resizable: false,
+      size: 130,
+      meta: { align: "center" },
+    });
+  }
+
   cols.push({
     id: "actions",
     header: t("common.actions"),
@@ -85,21 +124,27 @@ const columns = computed<OTableColumnDef[]>(() => {
 // fault. No summary strip: the count is already in the footer and "unused" is just
 // this column sorted ascending, so a strip would restate what the rows already say.
 const isUnusedRole = (row: any): boolean => row?.user_count === 0;
+
+const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includes(row?.role_name);
 </script>
 
 <template>
   <OTable
+    ref="oTableRef"
     :frame="false"
     :data="data"
     :columns="columns"
     :loading="loading"
+    :forbidden="forbidden"
     :selected-ids="selectedIds"
     :global-filter="globalFilter"
     :show-global-filter="false"
     pagination="client"
-    :page-size="20"
+    :page-size="pageSize ?? 20"
     :page-size-options="[20, 50, 100, 250, 500]"
-    :footer-title="t('iam.roles')"
+    :current-page="currentPage ?? 1"
+    :sort-by="sortBy"
+    :sort-order="sortOrder"
     sorting="client"
     selection="multiple"
     row-key="role_name"
@@ -108,9 +153,13 @@ const isUnusedRole = (row: any): boolean => row?.user_count === 0;
     show-index
     @update:selected-ids="emit('update:selectedIds', $event)"
     @update:global-filter="emit('update:globalFilter', $event)"
+    @update:page-size="emit('update:pageSize', $event)"
+    @update:current-page="emit('update:currentPage', $event)"
+    @update:sort-by="emit('update:sortBy', $event)"
+    @update:sort-order="emit('update:sortOrder', $event)"
   >
     <template #toolbar>
-      <div class="flex w-full items-center gap-2">
+      <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
         <OSearchInput
           :model-value="globalFilter"
           :placeholder="t('iam.searchRole')"
@@ -119,6 +168,17 @@ const isUnusedRole = (row: any): boolean => row?.user_count === 0;
           @update:model-value="emit('update:globalFilter', $event)"
         />
       </div>
+    </template>
+
+    <template #cell-role_name="{ row, value }">
+      <span class="inline-flex items-center gap-2">
+        <span class="text-text-body">{{ value }}</span>
+        <EditorDraftDot
+          v-if="roleDrafts.ids.has(row?.role_name)"
+          :saved-at="roleDrafts.savedAt(row?.role_name)"
+          :data-test="`iam-roles-${row?.role_name}-draft-dot`"
+        />
+      </span>
     </template>
 
     <!-- Members: a role with nobody in it is muted, not coloured — it is a cleanup
@@ -133,6 +193,26 @@ const isUnusedRole = (row: any): boolean => row?.user_count === 0;
     <template #toolbar-trailing>
       <slot name="toolbar-trailing" />
     </template>
+
+    <!-- Rendered only when a member (?member=<email>) is being assigned via the token popup's link. -->
+    <template #cell-assign="{ row }">
+      <div class="flex items-center justify-center">
+        <OBadge v-if="isAssigned(row)" variant="success" icon="check" size="sm">
+          {{ t("iam.rolesPage.assignedBadge") }}
+        </OBadge>
+        <OButton
+          v-else
+          :data-test="`iam-roles-assign-${row.role_name}-btn`"
+          variant="outline"
+          size="sm"
+          :loading="assigningRoleName === row.role_name"
+          @click="emit('assign', row)"
+        >
+          {{ t("iam.rolesPage.assignBtn") }}
+        </OButton>
+      </div>
+    </template>
+
     <!-- Row actions: edit + delete -->
     <template #cell-actions="{ row }">
       <div class="flex items-center justify-center">
@@ -141,6 +221,7 @@ const isUnusedRole = (row: any): boolean => row?.user_count === 0;
           data-row-action="edit"
           variant="ghost"
           size="icon-sm"
+          class="max-md:hidden"
           :title="t('common.edit')"
           @click="emit('edit', row)"
         >
@@ -151,11 +232,42 @@ const isUnusedRole = (row: any): boolean => row?.user_count === 0;
           data-row-action="delete"
           variant="ghost"
           size="icon-sm"
+          class="max-md:hidden"
           :title="t('common.delete')"
           @click="emit('delete', row)"
         >
           <OIcon name="delete" size="sm" />
         </OButton>
+        <ODropdown side="bottom" align="end">
+          <template #trigger>
+            <OButton
+              :aria-label="t('common.moreActions')"
+              icon-left="more-vert"
+              variant="ghost"
+              size="icon-xs-sq"
+              class="md:hidden"
+              data-test="iam-roles-row-more-actions"
+              @click.stop
+            />
+          </template>
+          <ODropdownItem
+            icon-left="edit"
+            class="md:hidden"
+            :data-test="`iam-roles-edit-${row.role_name}-role-icon-menu`"
+            @select="emit('edit', row)"
+          >
+            <span>{{ t("common.edit") }}</span>
+          </ODropdownItem>
+          <ODropdownItem
+            icon-left="delete"
+            variant="destructive"
+            class="md:hidden"
+            :data-test="`iam-roles-delete-${row.role_name}-role-icon-menu`"
+            @select="emit('delete', row)"
+          >
+            <span>{{ t("common.delete") }}</span>
+          </ODropdownItem>
+        </ODropdown>
       </div>
     </template>
 
@@ -168,10 +280,8 @@ const isUnusedRole = (row: any): boolean => row?.user_count === 0;
       />
     </template>
 
-    <template #bottom>
-      <span class="text-xs font-normal">{{ data.length }} {{ t("iam.roles") }}</span>
+    <template #selection-actions>
       <OButton
-        v-if="(selectedIds?.length ?? 0) > 0"
         data-test="iam-roles-bulk-delete-btn"
         variant="outline-destructive"
         size="sm"

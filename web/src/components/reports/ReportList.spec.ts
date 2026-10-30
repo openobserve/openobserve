@@ -15,12 +15,19 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { nextTick } from "vue";
+import { nextTick, ref } from "vue";
 import * as vueRouter from "vue-router";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import reports from "@/services/reports";
 import ReportList from "./ReportList.vue";
+import { reportDraftId } from "./reportDraft";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
+import {
+  readEditorDraft,
+  writeEditorDraft,
+  type EditorDraftScope,
+} from "@/utils/drafts/editorDraftStore";
 
 // ─── Module mocks (hoisted) ──────────────────────────────────────────────────
 
@@ -36,14 +43,17 @@ vi.mock("vue-router", async () => {
   };
 });
 
-vi.mock("@/services/reports", () => ({
-  default: {
-    listByFolderId: vi.fn(),
-    toggleReportStateById: vi.fn(),
-    deleteReportById: vi.fn(),
-    bulkDeleteById: vi.fn(),
-  },
-}));
+vi.mock("@/services/reports", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      listByFolderId: vi.fn(),
+      toggleReportStateById: vi.fn(),
+      deleteReportById: vi.fn(),
+      bulkDeleteById: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/services/reodotdev_analytics", () => ({
   useReo: () => ({ track: vi.fn() }),
@@ -112,7 +122,7 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
             <slot name="empty" />
           </div>
         </template>
-        <slot name="bottom" :pagination="{}" :pagesNumber="1" />
+        <slot name="selection-actions" />
       </div>
     `,
   },
@@ -188,11 +198,11 @@ const MoveAcrossFoldersStub = {
   `,
 };
 
-function mountComponent() {
+function mountComponent(query: Record<string, string> = {}) {
   const mockRouter = {
     push: vi.fn(),
     replace: vi.fn(),
-    currentRoute: { value: { query: {} } },
+    currentRoute: ref<{ query: Record<string, string> }>({ query }),
   };
   vi.mocked(vueRouter.useRouter).mockReturnValue(mockRouter as any);
 
@@ -225,6 +235,7 @@ describe("ReportList", () => {
   let mockRouter: { push: ReturnType<typeof vi.fn>; replace: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
+    resetListViewState();
     vi.mocked(reports.listByFolderId).mockResolvedValue({
       data: [REPORT_SCHEDULED, REPORT_CACHED],
     } as any);
@@ -347,14 +358,10 @@ describe("ReportList", () => {
       expect(wrapper.vm.reportsTableRows).toHaveLength(2);
     });
 
-    it("should update resultTotal after filterReports", async () => {
-      wrapper.vm.staticReportsList = [
-        { ...REPORT_SCHEDULED, "#": 1 },
-        { ...REPORT_CACHED, "#": 2 },
-      ];
-      wrapper.vm.activeTab = "shared";
-      await wrapper.vm.filterReports();
-      expect(wrapper.vm.resultTotal).toBe(wrapper.vm.reportsTableRows.length);
+    it("switches tabs through the route so History is deep-linkable", () => {
+      const router = vi.mocked(vueRouter.useRouter).mock.results.at(-1)!.value;
+      wrapper.vm.onTabChange("history");
+      expect(router.push).toHaveBeenCalledWith({ query: { tab: "history" } });
     });
 
     it("refreshes rows after filtering (index is OTable's built-in show-index)", async () => {
@@ -395,7 +402,7 @@ describe("ReportList", () => {
     });
   });
 
-  // ── visibleRows computed & resultTotal watch ─────────────────────────────
+  // ── visibleRows computed ─────────────────────────────────────────────────
 
   describe("visibleRows computed property", () => {
     beforeEach(async () => {
@@ -425,42 +432,30 @@ describe("ReportList", () => {
       expect(wrapper.vm.visibleRows).toHaveLength(1);
       expect(wrapper.vm.visibleRows[0].name).toBe("Another Scheduled");
     });
-
-    it("should update resultTotal when visibleRows change (watch)", async () => {
-      wrapper.vm.filterQuery = "Scheduled Report";
-      await nextTick();
-      // Give the watcher a tick to run
-      await nextTick();
-      expect(wrapper.vm.resultTotal).toBe(wrapper.vm.visibleRows.length);
-    });
   });
 
   // ── Date formatting ──────────────────────────────────────────────────────
 
-  describe("last_triggered_at formatting", () => {
-    // These used to call `wrapper.vm.convertUnixToDateFormat(null)` — asserting
-    // the shared util's null handling, which `date.spec.ts` already owns, and
-    // forcing the component to `defineExpose` a function purely so a test could
-    // reach it. What is actually ReportList's to get right is the ROW mapping:
-    // format a real timestamp, and show "-" when there is none.
-    it("formats a triggered report's timestamp for the table", () => {
+  describe("last run column", () => {
+    it("shows Never for a report that has not run", () => {
       const row = wrapper.vm.reportsTableRows.find((r: any) => r.name === REPORT_SCHEDULED.name);
-
-      // 1234567890000000µs = 2009-02-13T23:31:30Z. The suite pins TZ=UTC
-      // (vitest.config.ts), so the zero offset renders as `Z`.
-      expect(row.last_triggered_at).toBe("2009-02-13T23:31:30Z");
-      // ...and the raw value is kept alongside it, for sorting.
-      expect(row.last_triggered_at_raw).toBe(REPORT_SCHEDULED.last_triggered_at);
+      expect(row.last_run_chip).toBe("unrecorded");
     });
 
-    it("shows a dash for a report that has never triggered", async () => {
-      wrapper.vm.activeTab = "cached";
-      await flushPromises();
+    it("maps the stored last run onto the chip", () => {
+      const rows = wrapper.vm.shapeReports([
+        { ...REPORT_SCHEDULED, last_run_status: "error", last_run_at: 5 },
+        { ...REPORT_SCHEDULED, last_run_status: "succeeded", last_run_at: 5 },
+      ]);
+      expect(rows.map((r: any) => r.last_run_chip)).toEqual(["error", "succeeded"]);
+    });
 
-      const row = wrapper.vm.reportsTableRows.find((r: any) => r.name === REPORT_CACHED.name);
-
-      expect(row.last_triggered_at).toBe("-");
-      expect(row.last_triggered_at_raw).toBeNull();
+    it("calls an enabled report overdue once its run is 15 minutes late", () => {
+      const late = (Date.now() - 16 * 60_000) * 1000;
+      const [row] = wrapper.vm.shapeReports([
+        { ...REPORT_SCHEDULED, enabled: true, next_run_at: late, last_run_status: "succeeded" },
+      ]);
+      expect(row.last_run_chip).toBe("overdue");
     });
   });
 
@@ -562,9 +557,11 @@ describe("ReportList", () => {
     it("should open delete dialog with correct message", async () => {
       await wrapper.vm.confirmDeleteReport(REPORT_SCHEDULED);
       expect(wrapper.vm.deleteDialog.show).toBe(true);
-      expect(wrapper.vm.deleteDialog.message).toBe(
-        `Are you sure you want to delete report "${REPORT_SCHEDULED.name}"`,
-      );
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((c: any) => c.props("messageKeypath") === "reports.deleteReportNamedMessage");
+      expect(dialog!.props("messageName")).toBe(REPORT_SCHEDULED.name);
+      expect(dialog!.props("okVariant")).toBe("destructive");
       expect(wrapper.vm.deleteDialog.data).toEqual({
         report_id: REPORT_SCHEDULED.report_id,
         name: REPORT_SCHEDULED.name,
@@ -636,6 +633,10 @@ describe("ReportList", () => {
     it("should set confirmBulkDelete to true", () => {
       wrapper.vm.openBulkDeleteDialog();
       expect(wrapper.vm.confirmBulkDelete).toBe(true);
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((c: any) => c.props("title") === i18n.global.t("reports.deleteReportsTitle"));
+      expect(dialog!.props("okVariant")).toBe("destructive");
     });
   });
 
@@ -863,5 +864,237 @@ describe("ReportList", () => {
       expect(wrapper.vm.showMoveDialog).toBe(true);
       expect(wrapper.vm.reportIdsToMove).toEqual([REPORT_SCHEDULED.report_id]);
     });
+  });
+});
+
+describe("ReportList view state persistence", () => {
+  let wrapper: VueWrapper;
+  const defaults = {
+    filterQuery: "",
+    searchQuery: "",
+    searchAcrossFolders: false,
+    sortBy: "",
+    sortOrder: "asc" as "asc" | "desc",
+    pageSize: 20,
+    currentPage: 1,
+  };
+
+  beforeEach(() => {
+    resetListViewState();
+    vi.mocked(reports.listByFolderId).mockResolvedValue({
+      data: [REPORT_SCHEDULED, REPORT_CACHED],
+    } as any);
+    store.state.selectedOrganization = { identifier: "test-org", name: "Test Org" };
+    store.state.theme = "light";
+    store.state.organizationData.allReportsListByFolderId = {};
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    resetListViewState();
+    vi.clearAllMocks();
+  });
+
+  it("takes the tab from the route and seeds filter, sort and paging from the saved view", async () => {
+    Object.assign(useListViewState("reports", defaults), {
+      filterQuery: "daily",
+      sortBy: "name",
+      sortOrder: "desc",
+      pageSize: 50,
+      currentPage: 2,
+    });
+    wrapper = mountComponent({ tab: "cached" }).wrapper;
+    await flushPromises();
+
+    const vm = wrapper.vm as any;
+    expect(vm.activeTab).toBe("cached");
+    expect(vm.filterQuery).toBe("daily");
+    expect(vm.sortBy).toBe("name");
+    expect(vm.sortOrder).toBe("desc");
+    expect(vm.pageSize).toBe(50);
+    expect(vm.currentPage).toBe(2);
+  });
+
+  it("saves filter, sort and page changes into the view state", async () => {
+    wrapper = mountComponent().wrapper;
+    await flushPromises();
+    const vm = wrapper.vm as any;
+
+    vm.filterQuery = "weekly";
+    vm.sortBy = "name";
+    vm.currentPage = 3;
+    await flushPromises();
+
+    expect(useListViewState("reports", defaults)).toMatchObject({
+      filterQuery: "weekly",
+      sortBy: "name",
+      currentPage: 3,
+    });
+  });
+
+  it("resets the page when the tab changes", async () => {
+    Object.assign(useListViewState("reports", defaults), { currentPage: 3 });
+    const mounted = mountComponent();
+    wrapper = mounted.wrapper;
+    await flushPromises();
+    const vm = wrapper.vm as any;
+
+    mounted.mockRouter.currentRoute.value = { query: { tab: "cached" } };
+    await flushPromises();
+
+    expect(vm.currentPage).toBe(1);
+  });
+});
+
+describe("ReportList editor drafts", () => {
+  let wrapper: VueWrapper;
+  const draftScope = (name: string | null, userEmail = "me@x.io"): EditorDraftScope => ({
+    kind: "report",
+    org: "test-org",
+    entityId: name === null ? null : reportDraftId("default", name),
+    userEmail,
+  });
+  const seed = (scope: EditorDraftScope) => writeEditorDraft(scope, { data: {} });
+  type ReportRow = typeof REPORT_SCHEDULED | typeof REPORT_CACHED;
+  interface DraftListVm {
+    confirmDeleteReport: (row: ReportRow) => void;
+    deleteReport: () => Promise<void>;
+    bulkDeleteReports: () => Promise<void>;
+    staticReportsList: ReportRow[];
+    selectedReports: ReportRow[];
+  }
+  const listVm = () => wrapper.vm as unknown as DraftListVm;
+
+  beforeEach(async () => {
+    localStorage.clear();
+    resetListViewState();
+    vi.mocked(reports.listByFolderId).mockResolvedValue({
+      data: [REPORT_SCHEDULED, REPORT_CACHED],
+    } as never);
+    store.state.selectedOrganization = { identifier: "test-org", name: "Test Org" };
+    store.state.userInfo = { ...store.state.userInfo, email: "me@x.io" };
+    store.state.organizationData.allReportsListByFolderId = {};
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it("dots the rows and the Add button that have this user's drafts", async () => {
+    seed(draftScope(REPORT_SCHEDULED.name));
+    seed(draftScope(REPORT_CACHED.name, "other@x.io"));
+    seed(draftScope(null));
+    wrapper = mountComponent().wrapper;
+    await flushPromises();
+
+    const dot = wrapper.get(`[data-test="report-list-${REPORT_SCHEDULED.name}-draft-dot"]`);
+    expect(dot.attributes("aria-label")).toMatch(/^Unsaved draft · /);
+    // Spaced by its row's gap like every other list's dot, not a margin of its own.
+    expect(dot.classes()).not.toContain("ms-2");
+    const nameRow = dot.element.closest(".gap-2");
+    expect(
+      nameRow?.querySelector(`[data-test="report-list-name-cell-${REPORT_SCHEDULED.name}"]`),
+    ).not.toBeNull();
+    expect(wrapper.find(`[data-test="report-list-${REPORT_CACHED.name}-draft-dot"]`).exists()).toBe(
+      false,
+    );
+    const addButton = wrapper.get('[data-test="report-list-add-report-btn"]');
+    expect(addButton.attributes("aria-label")).toMatch(/unsaved draft$/);
+    expect(addButton.find('[data-test="report-list-add-report-draft-dot"]').exists()).toBe(true);
+  });
+
+  it("dots a row only for the draft of its own folder", async () => {
+    const inOtherFolder = {
+      ...REPORT_SCHEDULED,
+      report_id: "uuid-other",
+      name: "Other Report",
+      folder_id: "folder-2",
+    };
+    vi.mocked(reports.listByFolderId).mockResolvedValue({
+      data: [REPORT_SCHEDULED, inOtherFolder],
+    } as never);
+    const scoped = (folder: string, name: string) => ({
+      ...draftScope(null),
+      entityId: reportDraftId(folder, name),
+    });
+    seed(scoped("folder-2", REPORT_SCHEDULED.name));
+    seed(scoped("default", inOtherFolder.name));
+    wrapper = mountComponent().wrapper;
+    await flushPromises();
+
+    const dot = (name: string) => wrapper.find(`[data-test="report-list-${name}-draft-dot"]`);
+    expect(dot(REPORT_SCHEDULED.name).exists()).toBe(false);
+    expect(dot(inOtherFolder.name).exists()).toBe(false);
+
+    seed(scoped("folder-2", inOtherFolder.name));
+    await flushPromises();
+    expect(dot(inOtherFolder.name).exists()).toBe(true);
+  });
+
+  it("drops every user's draft of a deleted report", async () => {
+    seed(draftScope(REPORT_SCHEDULED.name));
+    seed(draftScope(REPORT_SCHEDULED.name, "other@x.io"));
+    seed(draftScope(REPORT_CACHED.name));
+    wrapper = mountComponent().wrapper;
+    await flushPromises();
+    const vm = listVm();
+    vi.mocked(reports.deleteReportById).mockResolvedValueOnce({} as never);
+    vm.confirmDeleteReport(REPORT_SCHEDULED);
+    await vm.deleteReport();
+    await flushPromises();
+
+    expect(readEditorDraft(draftScope(REPORT_SCHEDULED.name))).toBeNull();
+    expect(readEditorDraft(draftScope(REPORT_SCHEDULED.name, "other@x.io"))).toBeNull();
+    expect(readEditorDraft(draftScope(REPORT_CACHED.name))).not.toBeNull();
+  });
+
+  it("drops the deleted report's draft of its own folder only", async () => {
+    const inOtherFolder = { ...REPORT_SCHEDULED, folder_id: "folder-2" };
+    const own = { ...draftScope(null), entityId: reportDraftId("folder-2", inOtherFolder.name) };
+    seed(own);
+    seed(draftScope(REPORT_SCHEDULED.name));
+    wrapper = mountComponent().wrapper;
+    await flushPromises();
+    const vm = listVm();
+    vi.mocked(reports.deleteReportById).mockResolvedValueOnce({} as never);
+    vm.confirmDeleteReport(inOtherFolder);
+    await vm.deleteReport();
+    await flushPromises();
+
+    expect(readEditorDraft(own)).toBeNull();
+    expect(readEditorDraft(draftScope(REPORT_SCHEDULED.name))).not.toBeNull();
+  });
+
+  it("keeps the draft when the delete fails", async () => {
+    seed(draftScope(REPORT_SCHEDULED.name));
+    wrapper = mountComponent().wrapper;
+    await flushPromises();
+    const vm = listVm();
+    vi.mocked(reports.deleteReportById).mockRejectedValueOnce({ response: { status: 500 } });
+    vm.confirmDeleteReport(REPORT_SCHEDULED);
+    await vm.deleteReport();
+    await flushPromises();
+
+    expect(readEditorDraft(draftScope(REPORT_SCHEDULED.name))).not.toBeNull();
+  });
+
+  it("drops drafts only of the reports a bulk delete removed", async () => {
+    seed(draftScope(REPORT_SCHEDULED.name));
+    seed(draftScope(REPORT_CACHED.name));
+    wrapper = mountComponent().wrapper;
+    await flushPromises();
+    const vm = listVm();
+    vm.staticReportsList = [{ ...REPORT_SCHEDULED }, { ...REPORT_CACHED }];
+    vm.selectedReports = [REPORT_SCHEDULED, REPORT_CACHED];
+    vi.mocked(reports.bulkDeleteById).mockResolvedValueOnce({
+      data: { successful: [REPORT_SCHEDULED.report_id], unsuccessful: [REPORT_CACHED.report_id] },
+    } as never);
+    await vm.bulkDeleteReports();
+    await flushPromises();
+
+    expect(readEditorDraft(draftScope(REPORT_SCHEDULED.name))).toBeNull();
+    expect(readEditorDraft(draftScope(REPORT_CACHED.name))).not.toBeNull();
   });
 });

@@ -52,9 +52,11 @@ use super::{Alert, QueryCondition, StreamType};
 /// ```
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 pub struct CreateAlertRequestBody {
-    /// Optional folder ID indicating the folder in which to create the alert.
-    /// If omitted the alert will be created in the default folder.
-    #[schema(example = "default")]
+    /// Deprecated. The destination folder is taken from the `folder` query
+    /// parameter, which is what the permission check authorizes; the default
+    /// folder is used when it is absent. A value here that disagrees with the
+    /// query parameter is rejected with 400 rather than silently ignored.
+    #[schema(deprecated, example = "default")]
     pub folder_id: Option<String>,
 
     /// Discriminates the alert type. Defaults to scheduled alert when absent.
@@ -64,6 +66,9 @@ pub struct CreateAlertRequestBody {
     /// Anomaly-detection-specific fields (nested object).
     pub anomaly_config: Option<AnomalyAlertFields>,
 
+    /// Composite-only boolean condition over stable child alert IDs.
+    pub composite_condition: Option<CompositeCondition>,
+
     /// The alert configuration. All fields from Alert are flattened into this request body.
     #[serde(flatten)]
     #[schema(inline)]
@@ -71,6 +76,34 @@ pub struct CreateAlertRequestBody {
 }
 
 impl CreateAlertRequestBody {
+    /// Returns the name of the first field this payload carries that a
+    /// composite alert does not support (query conditions, realtime, etc.), or
+    /// `None` when it is a valid composite definition. Callers use the returned
+    /// name to emit a precise `composite_unsupported_field` error.
+    pub fn composite_unsupported_field(&self) -> Option<&'static str> {
+        if self.anomaly_config.is_some() {
+            return Some("anomaly_config");
+        }
+        if self.alert.id.is_some() {
+            return Some("id");
+        }
+        if !self.alert.stream_name.is_empty() {
+            return Some("stream_name");
+        }
+        if self.alert.query_condition != QueryCondition::default() {
+            return Some("query_condition");
+        }
+        if !self.alert.row_template.is_empty() {
+            return Some("row_template");
+        }
+        if self.alert.is_real_time {
+            return Some("is_real_time");
+        }
+        if self.alert.tz_offset != 0 {
+            return Some("tz_offset");
+        }
+        composite_trigger_unsupported_field(&self.alert.trigger_condition)
+    }
     /// Return the anomaly config fields, combining `detection_function` +
     /// `detection_function_field` into the canonical "avg(field)" form.
     /// Returns `None` when no `anomaly_config` was supplied or when
@@ -106,8 +139,7 @@ pub struct AnomalyAlertFields {
     pub training_window_days: Option<i32>,
     /// 0 = never retrain automatically; otherwise days between retrains
     pub retrain_interval_days: Option<i32>,
-    /// Percentile threshold (50.0–99.9). Default: 97.0
-    /// Also accepts the name `threshold` (integer, e.g. 97) for API convenience.
+    /// Legacy percentile; no longer selects the trained k outside budget mode. Alias `threshold`.
     #[serde(
         default,
         alias = "threshold",
@@ -115,9 +147,34 @@ pub struct AnomalyAlertFields {
         deserialize_with = "config::meta::slo::lenient_f64::deserialize_opt"
     )]
     pub percentile: Option<f64>,
+    /// Delivered-alert budget per day; mutually exclusive with `percentile`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_budget_per_day: Option<f64>,
+    /// Accepted and stored, but ignored by the band model.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(deprecated)]
+    pub level_half_width_seconds: Option<i64>,
+    #[schema(deprecated)]
     pub rcf_num_trees: Option<i32>,
+    #[schema(deprecated)]
     pub rcf_tree_size: Option<i32>,
+    #[schema(deprecated)]
     pub rcf_shingle_size: Option<i32>,
+    /// Manual band half-width k in sigmas, 1 to 10; absent uses the trained k (Auto, 3 to 6).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub band_width: Option<f64>,
+    /// `both`, `above` or `below`; absent means both.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_direction: Option<String>,
+    /// Window-share length in buckets, at least 1 and at most 24h of buckets; absent means 1.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_window_buckets: Option<i32>,
+    /// Percent of the window out of band that fires; absent means 100.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_window_fire_pct: Option<f64>,
+    /// Percent of the window out of band below which it recovers; absent means the fire percent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_window_recover_pct: Option<f64>,
     pub alert_enabled: Option<bool>,
 }
 
@@ -140,13 +197,106 @@ pub struct UpdateAlertRequestBody {
     /// are changed).
     pub anomaly_config: Option<UpdateAnomalyAlertFields>,
 
+    /// Composite-only boolean condition over stable child alert IDs.
+    pub composite_condition: Option<CompositeCondition>,
+
     /// Alert configuration fields (used for scheduled/realtime alerts).
     #[serde(flatten)]
     #[schema(inline)]
     pub alert: Alert,
 }
 
+/// Composite expression and truth-policy configuration.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CompositeCondition {
+    /// Boolean expression over child alert IDs, e.g. `{child_a} && ({child_b} || {child_c})`.
+    pub expression: String,
+    /// Whether a child at `warning` severity counts as firing (`true`) or only
+    /// `critical` does (`false`). Defaults to `true`.
+    #[serde(default = "default_true")]
+    pub warning_counts_as_firing: bool,
+    /// How a child with a stale (out-of-freshness) state is treated.
+    #[serde(default)]
+    pub stale_child_policy: CompositeStaleChildPolicy,
+}
+
+/// How a composite treats a child whose latest state is stale (no recent
+/// evaluation within its freshness deadline).
+///
+/// The `storage_id` mapping below is persisted in the `stale_child_policy`
+/// column and is **append-only**: never renumber an existing variant, or rows
+/// already on disk will silently decode to the wrong policy.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CompositeStaleChildPolicy {
+    /// Use the child's last known truth value (the default).
+    #[default]
+    UseLastState,
+    /// Treat a stale child as evaluating `false`.
+    TreatAsFalse,
+    /// Treat a stale child as evaluating `true`.
+    TreatAsTrue,
+}
+
+impl CompositeStaleChildPolicy {
+    /// Persisted integer id (0/1/2). Append-only: the ids are part of the
+    /// on-disk contract and must not be reordered.
+    pub fn storage_id(self) -> i16 {
+        match self {
+            Self::UseLastState => 0,
+            Self::TreatAsFalse => 1,
+            Self::TreatAsTrue => 2,
+        }
+    }
+}
+
+const fn default_true() -> bool {
+    true
+}
+
+/// Advisory validation/preview request. Persistence repeats all checks under
+/// the organization graph lock.
+#[derive(Clone, Debug, Deserialize, ToSchema)]
+pub struct ValidateCompositeRequestBody {
+    /// The composite expression and truth policy to validate.
+    pub composite_condition: CompositeCondition,
+    /// When editing an existing composite, its ID (so the graph check can exempt
+    /// the composite being updated); `None` when validating a new definition.
+    pub composite_id: Option<String>,
+    /// Reserved and currently unused: validation does not read this field, so
+    /// callers must not rely on it to scope or validate the composite.
+    pub folder_id: Option<String>,
+}
+
 impl UpdateAlertRequestBody {
+    /// Returns the name of the first field this payload carries that a
+    /// composite alert does not support (query conditions, realtime, etc.), or
+    /// `None` when it is a valid composite definition. Callers use the returned
+    /// name to emit a precise `composite_unsupported_field` error.
+    pub fn composite_unsupported_field(&self) -> Option<&'static str> {
+        if self.anomaly_config.is_some() {
+            return Some("anomaly_config");
+        }
+        if self.alert.id.is_some() {
+            return Some("id");
+        }
+        if !self.alert.stream_name.is_empty() {
+            return Some("stream_name");
+        }
+        if self.alert.query_condition != QueryCondition::default() {
+            return Some("query_condition");
+        }
+        if !self.alert.row_template.is_empty() {
+            return Some("row_template");
+        }
+        if self.alert.is_real_time {
+            return Some("is_real_time");
+        }
+        if self.alert.tz_offset != 0 {
+            return Some("tz_offset");
+        }
+        composite_trigger_unsupported_field(&self.alert.trigger_condition)
+    }
     /// Return the anomaly config fields, combining `detection_function` +
     /// `detection_function_field` into the canonical "avg(field)" form when both are present.
     pub fn anomaly_fields(&self) -> UpdateAnomalyAlertFields {
@@ -159,6 +309,32 @@ impl UpdateAlertRequestBody {
             );
         }
         base
+    }
+}
+
+fn composite_trigger_unsupported_field(trigger: &super::TriggerCondition) -> Option<&'static str> {
+    if trigger.period_minutes != 0 {
+        Some("trigger_condition.period")
+    } else if trigger.operator != super::Operator::default() {
+        Some("trigger_condition.operator")
+    } else if trigger.threshold_count != 0 {
+        Some("trigger_condition.threshold")
+    } else if trigger.warning_threshold_count.is_some() {
+        Some("trigger_condition.warning_threshold")
+    } else if trigger.notify_on_warning.is_some() {
+        Some("trigger_condition.notify_on_warning")
+    } else if trigger.frequency_minutes != 0 {
+        Some("trigger_condition.frequency")
+    } else if trigger.frequency_type.is_some() {
+        Some("trigger_condition.frequency_type")
+    } else if !trigger.cron.is_empty() {
+        Some("trigger_condition.cron")
+    } else if trigger.timezone.is_some() {
+        Some("trigger_condition.timezone")
+    } else if trigger.tolerance_seconds.is_some() {
+        Some("trigger_condition.tolerance_in_secs")
+    } else {
+        None
     }
 }
 
@@ -178,7 +354,7 @@ pub struct UpdateAnomalyAlertFields {
     pub detection_window_seconds: Option<i64>,
     pub training_window_days: Option<i32>,
     pub retrain_interval_days: Option<i32>,
-    /// Also accepts the name `threshold`, matching the create body.
+    /// Legacy percentile; no longer selects the trained k outside budget mode. Alias `threshold`.
     #[serde(
         default,
         alias = "threshold",
@@ -186,8 +362,62 @@ pub struct UpdateAnomalyAlertFields {
         deserialize_with = "config::meta::slo::lenient_f64::deserialize_opt"
     )]
     pub percentile: Option<f64>,
+    /// Absent leaves the stored budget; `null` clears it, back to the trained k.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<f64>)]
+    pub alert_budget_per_day: Option<Option<f64>>,
+    /// Accepted and stored, but ignored by the band model.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(deprecated)]
+    pub level_half_width_seconds: Option<i64>,
+    /// Absent leaves the stored value, so pause/resume keeps it; `null` clears to auto.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<f64>)]
+    pub band_width: Option<Option<f64>>,
+    /// `both`, `above` or `below`; `null` clears to both.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<String>)]
+    pub alert_direction: Option<Option<String>>,
+    /// Window-share length in buckets, at least 1 and at most 24h of buckets; `null` clears to 1.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<i32>)]
+    pub alert_window_buckets: Option<Option<i32>>,
+    /// Percent of the window out of band that fires; `null` clears to 100.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<f64>)]
+    pub alert_window_fire_pct: Option<Option<f64>>,
+    /// Out-of-band percent below which the window recovers; `null` clears to the fire percent.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<f64>)]
+    pub alert_window_recover_pct: Option<Option<f64>>,
     pub alert_enabled: Option<bool>,
     pub enabled: Option<bool>,
+    /// Moves the config to this folder. Naming a folder you cannot write to
+    /// returns 403; omit it to leave the config where it is.
     pub folder_id: Option<String>,
     pub owner: Option<String>,
 }
@@ -217,6 +447,12 @@ pub struct MoveAlertsRequestBody {
 pub struct ListAlertsQuery {
     /// Optional folder ID filter parameter.
     pub folder: Option<String>,
+
+    /// Restrict the list to the alerts attached to one SLO (Feature 5, B1).
+    /// Reads the indexed `slo_id` column, so it is a SQL predicate rather than
+    /// an app-side scan. An EMPTY value matches nothing — see the field docs on
+    /// `ListAlertsParams::slo_id`.
+    pub slo_id: Option<String>,
 
     /// Optional stream type filter parameter.
     pub stream_type: Option<StreamType>,
@@ -269,6 +505,13 @@ pub struct ListAlertsQuery {
 
     /// Sort direction: `desc` for descending, anything else ascending.
     pub sort_order: Option<String>,
+
+    /// When `true`, each list item also carries its notification `destinations`
+    /// and any alert-level `template` override — the fields the notification
+    /// dependency view cross-references. Only that view opts in; the default
+    /// (absent / false) keeps them off the hot list path so ordinary consumers
+    /// neither pay the extra bytes nor receive destination/template names.
+    pub include_dependencies: Option<bool>,
 }
 
 /// HTTP URL query component that contains parameters for enabling alerts.
@@ -319,6 +562,7 @@ impl ListAlertsQuery {
                 _ => None,
             },
             sort_desc: matches!(self.sort_order.as_deref(), Some("desc")),
+            slo_id: self.slo_id,
         }
     }
 
@@ -361,6 +605,15 @@ fn parse_priority_filter(
         return None; // genuinely no filter
     }
     Some(tokens.iter().filter_map(|t| t.parse().ok()).collect())
+}
+
+/// `#[serde(default)]` alone decodes an explicit `null` to the outer `None`, losing "clear".
+fn double_option<'de, D, T>(de: D) -> Result<Option<Option<T>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Deserialize::deserialize(de).map(Some)
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -625,8 +878,57 @@ mod tests {
     }
 
     #[test]
+    fn test_update_alert_band_settings_keep_absent_and_null_apart() {
+        let toggle: UpdateAlertRequestBody = serde_json::from_value(serde_json::json!({
+            "anomaly_config": { "enabled": false }
+        }))
+        .unwrap();
+        let fields = toggle.anomaly_fields();
+        assert_eq!(fields.band_width, None);
+        assert_eq!(fields.alert_direction, None);
+        assert_eq!(fields.alert_window_recover_pct, None);
+
+        let full: UpdateAlertRequestBody = serde_json::from_value(serde_json::json!({
+            "anomaly_config": {
+                "band_width": null,
+                "alert_direction": "above",
+                "alert_window_buckets": 5,
+                "alert_window_fire_pct": 80.0,
+                "alert_window_recover_pct": null
+            }
+        }))
+        .unwrap();
+        let fields = full.anomaly_fields();
+        assert_eq!(fields.band_width, Some(None));
+        assert_eq!(fields.alert_direction, Some(Some("above".to_string())));
+        assert_eq!(fields.alert_window_buckets, Some(Some(5)));
+        assert_eq!(fields.alert_window_fire_pct, Some(Some(80.0)));
+        assert_eq!(fields.alert_window_recover_pct, Some(None));
+    }
+
+    #[test]
+    fn test_update_alert_budget_keeps_absent_and_null_apart() {
+        let parse = |body: serde_json::Value| {
+            serde_json::from_value::<UpdateAlertRequestBody>(body)
+                .unwrap()
+                .anomaly_fields()
+                .alert_budget_per_day
+        };
+        assert_eq!(parse(serde_json::json!({ "anomaly_config": {} })), None);
+        assert_eq!(
+            parse(serde_json::json!({ "anomaly_config": { "alert_budget_per_day": null } })),
+            Some(None)
+        );
+        assert_eq!(
+            parse(serde_json::json!({ "anomaly_config": { "alert_budget_per_day": 2.5 } })),
+            Some(Some(2.5))
+        );
+    }
+
+    #[test]
     fn test_list_alerts_query_into_all_fields() {
         let q = ListAlertsQuery {
+            slo_id: None,
             folder: Some("f1".to_string()),
             stream_type: None,
             stream_name: None,
@@ -640,6 +942,7 @@ mod tests {
             tags: None,
             sort_by: None,
             sort_order: None,
+            include_dependencies: None,
         };
         let params = q.into("my_org");
         assert_eq!(params.org_id, "my_org");
@@ -652,6 +955,7 @@ mod tests {
     #[test]
     fn test_list_alerts_query_into_defaults() {
         let q = ListAlertsQuery {
+            slo_id: None,
             folder: None,
             stream_type: None,
             stream_name: None,
@@ -665,6 +969,7 @@ mod tests {
             tags: None,
             sort_by: None,
             sort_order: None,
+            include_dependencies: None,
         };
         let params = q.into("org2");
         assert_eq!(params.org_id, "org2");
@@ -675,6 +980,7 @@ mod tests {
     #[test]
     fn test_list_alerts_query_page_idx_defaults_to_zero() {
         let q = ListAlertsQuery {
+            slo_id: None,
             folder: None,
             stream_type: None,
             stream_name: None,
@@ -688,6 +994,7 @@ mod tests {
             tags: None,
             sort_by: None,
             sort_order: None,
+            include_dependencies: None,
         };
         let params = q.into("org3");
         assert_eq!(params.page_size_and_idx, Some((5, 0)));
@@ -725,6 +1032,7 @@ mod priority_tag_query_tests {
         // comma-separated string is still one entry.
         let priority = priority.map(|p| vec![p.to_string()]).unwrap_or_default();
         ListAlertsQuery {
+            slo_id: None,
             folder: None,
             alert_name_substring: None,
             stream_type: None,
@@ -738,6 +1046,7 @@ mod priority_tag_query_tests {
             tags: tags.map(|s| s.to_string()),
             sort_by: sort_by.map(|s| s.to_string()),
             sort_order: order.map(|s| s.to_string()),
+            include_dependencies: None,
         }
     }
 

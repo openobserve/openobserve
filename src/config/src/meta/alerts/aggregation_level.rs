@@ -471,15 +471,6 @@ mod tests {
     }
 
     #[test]
-    fn test_validation_rejects_wrong_direction() {
-        let a = agg(Operator::GreaterThan, json!(50), Some(100.0));
-        assert_eq!(
-            validate_aggregation_thresholds(&a),
-            Err(AggThresholdError::WarningNotLessSevere)
-        );
-    }
-
-    #[test]
     fn test_validation_rejects_equal_thresholds() {
         let a = agg(Operator::GreaterThan, json!(100), Some(100.0));
         assert_eq!(

@@ -37,6 +37,9 @@
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
+import { gt, raw, type I18nText } from "@/types/i18n";
+import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
+
 export interface SqlErrorRange {
   startLine: number;
   endLine: number;
@@ -54,64 +57,155 @@ export interface SqlErrorRange {
 // ─── Message templates ────────────────────────────────────────────────────────
 // Keep messages here so they are easy to update in one place.
 
+// Memoised: these getters sit on the hot path (validateSql runs per keystroke and
+// per query in bulk callers), and vue-i18n resolution is not free. A locale change
+// triggers window.location.reload(), so a per-session cache can never go stale.
+const _msgCache = new Map<string, I18nText>();
+const m = (key: string): I18nText => {
+  let v = _msgCache.get(key);
+  if (v === undefined) {
+    v = gt(key);
+    _msgCache.set(key, v);
+  }
+  return v;
+};
+
+// Parameterised sibling of `m`, and it has to be memoised for the same reason:
+// a `gt` call costs ~0.2ms on this instance, and the messages below are built
+// on the classifier's main path — including for errors that are then
+// suppressed — so resolving one per call put the spec back over its 5s budget.
+//
+// The result varies with the values, so what is cached is the RESOLVED LAYOUT
+// rather than the text: `gt` runs once per key with every placeholder fed a
+// unique sentinel, and splitting on those sentinels recovers the literal
+// segments plus the order the placeholders appear in. vue-i18n still owns
+// lookup, fallback and compilation; only the substitution of the values is
+// ours, so a locale that reorders or repeats a placeholder is still honoured.
+//
+// Assumes a key is always called with the same set of placeholder names, which
+// is true by construction: each MSG entry below owns exactly one key.
+const SENTINEL = "\u0000";
+const _tmplCache = new Map<string, string[]>();
+
+const mi = (key: string, named: Record<string, unknown>): I18nText => {
+  let parts = _tmplCache.get(key);
+  if (parts === undefined) {
+    const probes: Record<string, string> = {};
+    for (const name of Object.keys(named)) probes[name] = `${SENTINEL}${name}${SENTINEL}`;
+    // Even indices are literal text, odd indices are placeholder names.
+    parts = gt(key, probes).split(SENTINEL);
+    _tmplCache.set(key, parts);
+  }
+  let text = "";
+  for (let i = 0; i < parts.length; i++) {
+    text += i % 2 === 0 ? parts[i] : String(named[parts[i]] ?? "");
+  }
+  // `raw` is used purely as the cast-free way to re-brand text that vue-i18n
+  // already resolved above — this is translated output, not an exemption.
+  return raw(text);
+};
+
 const MSG = {
   // EOF / incomplete
-  incompleteAnd: "Incomplete condition — expected an expression after AND",
-  incompleteOr: "Incomplete condition — expected an expression after OR",
-  incompleteNot: "Incomplete condition — expected an expression after NOT",
-  incompleteLike: "Incomplete LIKE — expected a pattern string, e.g. LIKE '%value%'",
-  incompleteIn: "Incomplete IN — expected a value list, e.g. IN (1, 2, 3) or IN (SELECT …)",
-  incompleteBetween: "Incomplete BETWEEN — expected a range, e.g. BETWEEN 1 AND 10",
-  incompleteIs: "Incomplete IS — expected NULL, NOT NULL, TRUE, or FALSE after IS",
-  incompleteOrderBy: "Incomplete ORDER BY — expected a column name or expression",
-  incompleteOrder: "Incomplete ORDER — expected BY after ORDER",
-  incompleteGroupBy: "Incomplete GROUP BY — expected a column name or expression",
-  incompleteGroup: "Incomplete GROUP — expected BY after GROUP",
-  incompleteHaving: "Incomplete HAVING — expected a condition after HAVING",
-  incompleteWhere: "Incomplete WHERE — expected a condition after WHERE",
-  incompleteFrom: "Incomplete FROM — expected a table or stream name",
-  incompleteSelect: "Incomplete SELECT — expected column names, expressions, or *",
-  incompleteComparison: (op: string) => `Incomplete comparison — expected a value after ${op}`,
-  incompleteLimit: "Incomplete LIMIT — expected a number",
-  incompleteOffset: "Incomplete OFFSET — expected a number",
-  incompleteOpenParen: "Unclosed parenthesis — expected an expression or closing )",
-  incompleteExpr: "Unexpected end of query — the expression is incomplete",
+  get incompleteAnd() {
+    return m("sqlEditor.diagnostics.incompleteAnd");
+  },
+  get incompleteOr() {
+    return m("sqlEditor.diagnostics.incompleteOr");
+  },
+  get incompleteNot() {
+    return m("sqlEditor.diagnostics.incompleteNot");
+  },
+  get incompleteLike() {
+    return m("sqlEditor.diagnostics.incompleteLike");
+  },
+  get incompleteIn() {
+    return m("sqlEditor.diagnostics.incompleteIn");
+  },
+  get incompleteBetween() {
+    return m("sqlEditor.diagnostics.incompleteBetween");
+  },
+  get incompleteIs() {
+    return m("sqlEditor.diagnostics.incompleteIs");
+  },
+  get incompleteOrderBy() {
+    return m("sqlEditor.diagnostics.incompleteOrderBy");
+  },
+  get incompleteOrder() {
+    return m("sqlEditor.diagnostics.incompleteOrder");
+  },
+  get incompleteGroupBy() {
+    return m("sqlEditor.diagnostics.incompleteGroupBy");
+  },
+  get incompleteGroup() {
+    return m("sqlEditor.diagnostics.incompleteGroup");
+  },
+  get incompleteHaving() {
+    return m("sqlEditor.diagnostics.incompleteHaving");
+  },
+  get incompleteWhere() {
+    return m("sqlEditor.diagnostics.incompleteWhere");
+  },
+  get incompleteFrom() {
+    return m("sqlEditor.diagnostics.incompleteFrom");
+  },
+  get incompleteSelect() {
+    return m("sqlEditor.diagnostics.incompleteSelect");
+  },
+  incompleteComparison: (op: string) => mi("sqlEditor.diagnostics.incompleteComparison", { op }),
+  get incompleteLimit() {
+    return m("sqlEditor.diagnostics.incompleteLimit");
+  },
+  get incompleteOffset() {
+    return m("sqlEditor.diagnostics.incompleteOffset");
+  },
+  get incompleteOpenParen() {
+    return m("sqlEditor.diagnostics.incompleteOpenParen");
+  },
+  get incompleteExpr() {
+    return m("sqlEditor.diagnostics.incompleteExpr");
+  },
 
   // UNION / JOIN / DISTINCT
-  incompleteUnion: "Incomplete UNION — expected SELECT after UNION or UNION ALL",
-  incompleteJoinOn: "Incomplete JOIN — expected a condition after ON",
-  incompleteDistinct: "Incomplete SELECT — expected column names after DISTINCT",
+  get incompleteUnion() {
+    return m("sqlEditor.diagnostics.incompleteUnion");
+  },
+  get incompleteJoinOn() {
+    return m("sqlEditor.diagnostics.incompleteJoinOn");
+  },
+  get incompleteDistinct() {
+    return m("sqlEditor.diagnostics.incompleteDistinct");
+  },
 
   // Unexpected token
-  missingWhere: (col: string) => `Missing WHERE keyword — did you mean: … FROM … WHERE ${col} = …?`,
-  missingOperator: (word: string) =>
-    `Missing operator before '${word}' — did you forget AND or OR?`,
-  unexpectedIdent: (word: string) =>
-    `Unexpected '${word}' — did you forget AND, OR, or an operator?`,
-  badLikePattern: "Invalid LIKE pattern — wrap the pattern in single quotes, e.g. LIKE '%value%'",
-  unexpectedClose: "Unexpected closing parenthesis ) — check that every ( has a matching )",
+  missingWhere: (col: string) => mi("sqlEditor.diagnostics.missingWhere", { col }),
+  missingWhereBefore: (expr: string) => mi("sqlEditor.diagnostics.missingWhereBefore", { expr }),
+  missingOperator: (word: string) => mi("sqlEditor.diagnostics.missingOperator", { word }),
+  unexpectedIdent: (word: string) => mi("sqlEditor.diagnostics.unexpectedIdent", { word }),
+  get badLikePattern() {
+    return m("sqlEditor.diagnostics.badLikePattern");
+  },
+  get unexpectedClose() {
+    return m("sqlEditor.diagnostics.unexpectedClose");
+  },
   unexpectedComma: (line: number, col: number) =>
-    `Unexpected comma at line ${line}, column ${col} — check your column list or function arguments`,
+    mi("sqlEditor.diagnostics.unexpectedComma", { line, col }),
   generic: (ch: string, line: number, col: number) =>
-    `Unexpected '${ch}' at line ${line}, column ${col}`,
+    mi("sqlEditor.diagnostics.generic", { ch, line, col }),
 
   // Semantic / schema errors (returned by the backend, not caught client-side).
   // These reference an identifier that we locate in the query text.
-  fieldNotFound: (field: string) =>
-    `Unknown field '${field}' — this column does not exist in the stream`,
-  functionNotFound: (fn: string) => `Unknown function '${fn}' — no such function is defined`,
-  incompatibleType: (field: string) =>
-    `Field '${field}' has an incompatible data type for this operation`,
-  streamNotFound: (stream: string) => `Unknown stream '${stream}' — this stream does not exist`,
-  groupByMissing: (col: string) =>
-    `'${col}' must appear in the GROUP BY clause or be used in an aggregate function`,
-  ambiguousColumn: (col: string) =>
-    `Column '${col}' is ambiguous — qualify it with its stream/table name`,
-  duplicateColumn: (col: string) =>
-    `Column '${col}' is defined more than once — remove or alias the duplicate`,
-  tableNotFound: (tbl: string) => `Unknown table '${tbl}' — this table or CTE does not exist`,
-  functionSignature: (fn: string) =>
-    `Function '${fn}' was called with the wrong argument type(s) — add an explicit cast`,
+  fieldNotFound: (field: string) => mi("sqlEditor.diagnostics.fieldNotFound", { field }),
+  functionNotFound: (fn: string) => mi("sqlEditor.diagnostics.functionNotFound", { fn }),
+  incompatibleType: (field: string) => mi("sqlEditor.diagnostics.incompatibleType", { field }),
+  streamNotFound: (stream: string) => mi("sqlEditor.diagnostics.streamNotFound", { stream }),
+  groupByMissing: (col: string) => mi("sqlEditor.diagnostics.groupByMissing", { col }),
+  ambiguousColumn: (col: string) => mi("sqlEditor.diagnostics.ambiguousColumn", { col }),
+  duplicateColumn: (col: string) => mi("sqlEditor.diagnostics.duplicateColumn", { col }),
+  tableNotFound: (tbl: string) => mi("sqlEditor.diagnostics.tableNotFound", { tbl }),
+  functionSignature: (fn: string) => mi("sqlEditor.diagnostics.functionSignature", { fn }),
+  notACondition: (field: string, isText: boolean) =>
+    mi(`sqlEditor.diagnostics.${isText ? "notACondition" : "notAConditionValue"}`, { field }),
 } as const;
 
 // ─── Backward context scanner ─────────────────────────────────────────────────
@@ -278,6 +372,89 @@ function has(set: Set<string>, ...keys: string[]): boolean {
   return keys.some((k) => set.has(k));
 }
 
+/**
+ * True when the LIKE/ILIKE/RLIKE operand closest to the error position is a
+ * bare (unquoted) wildcard pattern, e.g. `uri_path LIKE /api/%`.
+ *
+ * Only a pattern whose first character cannot continue an identifier (e.g.
+ * `LIKE BIN-%`) makes the parser stop on the `%` itself; `LIKE E00%` parses as
+ * the identifier `E00` followed by the modulo operator and fails on whatever
+ * token comes next, so the position alone cannot classify it.
+ *
+ * Quoted patterns, parenthesised expressions and function calls (`LIKE '%a%'`,
+ * `LIKE CONCAT(p, '%')`) are valid operands and never match: the operand must
+ * contain a `%` and no quote or parenthesis at all.
+ *
+ * A pattern that contains a space (`LIKE 'GET %'` unquoted becomes
+ * `LIKE GET %`) lexes as an identifier followed by a bare `%`, so the wildcard
+ * lands in the token after the operand — that shape counts too.
+ */
+function hasUnquotedLikePattern(sql: string, offset: number): boolean {
+  const head = sql.substring(0, offset);
+  let operandStart = -1;
+  for (const m of head.matchAll(/\b(?:I|R)?LIKE\s+/gi)) {
+    operandStart = (m.index ?? 0) + m[0].length;
+  }
+  if (operandStart < 0) return false;
+
+  const rest = sql.substring(operandStart);
+  const operand = rest.match(/^\S+/)?.[0] ?? "";
+  if (/^[^\s'"`()]*%[^\s'"`()]*$/.test(operand)) return true;
+  // `LIKE GET %` — bare operand whose wildcard is the next token
+  return /^[^\s'"`(),]+\s+%/.test(rest);
+}
+
+/**
+ * True when a filter expression follows the table reference with no WHERE
+ * keyword between them, e.g. `FROM "default" re_match(log, 'x') AND y = 1`
+ * or `FROM "default" a a.latency_ms > 100`.
+ *
+ * The parser reports these at the token where the text stops being a plausible
+ * table reference — the `AND`, or the inner `(` of the call — which is several
+ * tokens past where the condition actually started, so the token at the error
+ * position alone cannot classify them.
+ *
+ * Returns the first identifier of that expression (used to name the problem in
+ * the message), or null when the text between FROM and the error is not that
+ * shape — including every case where a clause keyword intervenes, which means
+ * the parser was past the FROM clause and the failure is something else.
+ */
+function filterExpressionAfterFrom(sql: string, offset: number): string | null {
+  const head = sql.substring(0, offset);
+  let fromEnd = -1;
+  for (const m of head.matchAll(/\bFROM\b/gi)) {
+    fromEnd = (m.index ?? 0) + m[0].length;
+  }
+  if (fromEnd < 0) return null;
+
+  const segment = sql.substring(fromEnd, offset);
+  if (
+    /\b(?:SELECT|WHERE|GROUP|HAVING|ORDER|LIMIT|OFFSET|JOIN|ON|USING|UNION|EXCEPT|INTERSECT|WINDOW)\b/i.test(
+      segment,
+    )
+  ) {
+    return null;
+  }
+
+  // Table reference (quoted or bare, optional alias) followed by more text.
+  const parts = segment.match(
+    /^\s*(?:"[^"]*"|`[^`]*`|[a-zA-Z_$][\w$]*)(?:\s+(?:AS\s+)?[a-zA-Z_$][\w$]*)?\s+(\S[\s\S]*)$/,
+  );
+  if (!parts) return null;
+
+  const rest = parts[1].trim();
+  // Neither a comparison nor a function call can legally follow a table
+  // reference — both mean the WHERE keyword was dropped.
+  const startsComparison =
+    /^[a-zA-Z_$][\w$]*(?:\.[\w$]+)*\s*(?:=|!=|<>|<=|>=|<|>|\b(?:IS|IN|NOT|LIKE|ILIKE|RLIKE|BETWEEN)\b)/i.test(
+      rest,
+    );
+  const startsCall = /^[a-zA-Z_$][\w$]*\s*\(/.test(rest);
+  if (!startsComparison && !startsCall) return null;
+
+  return rest.match(/^[a-zA-Z_$][\w$]*(?:\.[\w$]+)*/)?.[0] ?? null;
+}
+
 // ─── Core message builder ─────────────────────────────────────────────────────
 
 /**
@@ -293,7 +470,7 @@ function has(set: Set<string>, ...keys: string[]): boolean {
  */
 export function buildContextualSqlMessage(sql: string, err: any): string | null {
   const loc = err?.location?.start;
-  if (!loc) return err?.message?.split("\n")[0] ?? "SQL syntax error";
+  if (!loc) return err?.message?.split("\n")[0] ?? m("sqlEditor.diagnostics.syntaxError");
 
   const offset: number = loc.offset;
   const found: string | null = err.found ?? null;
@@ -311,8 +488,7 @@ export function buildContextualSqlMessage(sql: string, err: any): string | null 
 
   // ── EOF after OVER ( — expSize is moderate (PARTITION/ORDER/ROWS in expected) ─
   if (found === null && has(exp, "PARTITION", "ORDER", "ROWS") && !has(exp, "AND", "OR", "WHERE")) {
-    if (has(exp, "PARTITION"))
-      return "Incomplete OVER clause — expected PARTITION BY, ORDER BY, or closing )";
+    if (has(exp, "PARTITION")) return m("sqlEditor.diagnostics.incompleteOver");
   }
 
   // ── EOF inside nested constructs (CASE/COALESCE/OVER/subquery/CTE) ──────────
@@ -322,27 +498,27 @@ export function buildContextualSqlMessage(sql: string, err: any): string | null 
     const construct = innermostConstruct(sql, offset);
     switch (construct) {
       case "CASE_WHEN":
-        return "Incomplete CASE — expected THEN after the WHEN condition";
+        return m("sqlEditor.diagnostics.incompleteCaseWhen");
       case "CASE_THEN":
-        return "Incomplete CASE — expected another WHEN, ELSE, or END";
+        return m("sqlEditor.diagnostics.incompleteCaseThen");
       case "CASE_ELSE":
-        return "Incomplete CASE — expected END to close the CASE expression";
+        return m("sqlEditor.diagnostics.incompleteCaseElse");
       case "CASE":
-        return "Incomplete CASE — expected WHEN after CASE";
+        return m("sqlEditor.diagnostics.incompleteCase");
       case "COALESCE":
-        return "Incomplete COALESCE — expected another argument or closing )";
+        return m("sqlEditor.diagnostics.incompleteCoalesce");
       case "NULLIF":
-        return "Incomplete NULLIF — expected a second argument, e.g. NULLIF(expr, 0)";
+        return m("sqlEditor.diagnostics.incompleteNullif");
       case "IIF":
-        return "Incomplete IIF — expected condition, true-value, and false-value";
+        return m("sqlEditor.diagnostics.incompleteIif");
       case "PARTITION":
-        return "Incomplete PARTITION BY — expected a column name or expression";
+        return m("sqlEditor.diagnostics.incompletePartitionBy");
       case "OVER":
-        return "Incomplete OVER clause — expected PARTITION BY, ORDER BY, or closing )";
+        return m("sqlEditor.diagnostics.incompleteOver");
       case "CTE":
-        return "Incomplete CTE — expected ) to close the WITH expression";
+        return m("sqlEditor.diagnostics.incompleteCte");
       case "SUBQUERY":
-        return "Incomplete subquery — expected SELECT or closing )";
+        return m("sqlEditor.diagnostics.incompleteSubquery");
       default: {
         // construct is "" or "PAREN" — scanner found no unclosed named construct.
         // Fall back to lastWord for keywords that produce large expSizes.
@@ -508,6 +684,18 @@ export function buildContextualSqlMessage(sql: string, err: any): string | null 
     if (isBareIdent && atErrorIsOperator) {
       return MSG.missingWhere(tokenBefore);
     }
+    // Same mistake, reported one token earlier: with a table alias in play
+    // (`FROM "default" a a.latency_ms > 100`) the error lands on the condition's
+    // own column, so the operator is one identifier further along.
+    const conditionStart = atErrorStr.match(
+      /^[a-zA-Z_$][\w$]*(?:\.[\w$]+)*(?=\s*(?:=|!=|<>|<=|>=|<|>|\b(?:IS|IN|NOT|LIKE|ILIKE|RLIKE|BETWEEN)\b))/i,
+    )?.[0];
+    if (isBareIdent && conditionStart) return MSG.missingWhereBefore(conditionStart);
+    // Or reported further along: the condition starts right after the table
+    // reference, so the error lands on the AND / the call's own parenthesis
+    // rather than on the operator.
+    const expr = filterExpressionAfterFrom(sql, offset);
+    if (expr) return MSG.missingWhereBefore(expr);
     // Not a recognisable missing-WHERE pattern — fall through to suppression
   }
 
@@ -531,6 +719,13 @@ export function buildContextualSqlMessage(sql: string, err: any): string | null 
 
   // found ","
   if (found === ",") return MSG.unexpectedComma(loc.line, loc.column);
+
+  // Unquoted LIKE pattern whose first character does not terminate the
+  // identifier — `x LIKE E00%` parses as the identifier E00 followed by the
+  // modulo operator, so the parser fails on a later token and the found === "%"
+  // check above never fires. Checked last, so it only reclassifies errors that
+  // would otherwise be suppressed.
+  if (hasUnquotedLikePattern(sql, offset)) return MSG.badLikePattern;
 
   // Unrecognised unexpected-token shape — suppress to avoid false positives
   return null;
@@ -652,6 +847,8 @@ export async function validateSql(
   lineOffset = 0,
   colOffset = 0,
 ): Promise<SqlErrorRange | null> {
+  if (maxParenDepth(sql) > SQL_PARSE_MAX_DEPTH) return null;
+
   const parser = await getParser();
   try {
     parser.astify(sql);
@@ -704,13 +901,18 @@ export async function rangesFromSqlParserDetail(
     //   (b) It hit a parser-limitation or unclassified fingerprint and suppressed.
     //       → Fall through and use the server-reported position with a cleaned message,
     //         because the server told us there IS a real parse error at a known location.
-    // Distinguish: re-parse and check if it throws at all.
-    const parser = await getParser();
-    let clientThrows = false;
-    try {
-      parser.astify(originalSql);
-    } catch {
-      clientThrows = true;
+    // Distinguish: re-parse and check if it throws at all. Skipped past
+    // SQL_PARSE_MAX_DEPTH for the same reason validateSql skips it above —
+    // treat as case (b) below rather than hang re-parsing a query we already
+    // know is too complex to check client-side.
+    let clientThrows = maxParenDepth(originalSql) > SQL_PARSE_MAX_DEPTH;
+    if (!clientThrows) {
+      const parser = await getParser();
+      try {
+        parser.astify(originalSql);
+      } catch {
+        clientThrows = true;
+      }
     }
     if (!clientThrows) return []; // case (a): client accepted — semantic error only
     // case (b): client rejected but suppressed — use server position + cleaned message
@@ -884,6 +1086,62 @@ export function locateIdentifier(sql: string, rawName: string): TokenHit[] {
   return hits;
 }
 
+/** The bare operand DataFusion's "logical boolean operation <lhs> AND <rhs>" names only by type, or null. */
+export function locateNotACondition(
+  text: string,
+  query: string,
+  typeOf: FieldTypeOf | null = fieldTypeOf,
+): { field: string; hit: TokenHit; message: I18nText } | null {
+  const types = text.match(/logical boolean operation\s+(\w+)\s+(AND|OR)\s+(\w+)/i);
+  if (!types) return null;
+  const [, lhsType, opName, rhsType] = types;
+  const tokens = tokenizeOperands(query);
+  const betweenAnds = betweenAndIndexes(tokens);
+  const candidates: { field: string; type: string; start: number; end: number }[] = [];
+  for (let k = 0; k < tokens.length; k++) {
+    const op = tokens[k].text.toUpperCase();
+    // The types belong to the operator the error names; the other kind's operands say nothing about them.
+    if (tokens[k].kind !== "word" || op !== opName.toUpperCase() || betweenAnds.has(k)) continue;
+    const sides: [string, number, number][] = [
+      [lhsType, k - 1, -1],
+      [rhsType, k + 1, 1],
+    ];
+    for (const [type, from, step] of sides) {
+      if (/^boolean$/i.test(type)) continue;
+      const span = bareOperandSpan(tokens, from, step, betweenAnds);
+      if (span)
+        candidates.push({
+          ...span,
+          type,
+          field: query.slice(span.start, span.end).replace(/["`]/g, ""),
+        });
+    }
+  }
+  // With the stream's column types known, a bare Boolean column elsewhere in the query is not the culprit.
+  const columnType = (c: (typeof candidates)[number]) =>
+    typeOf?.(c.field.split(".").pop() ?? c.field);
+  const sameType = (c: (typeof candidates)[number]) => sameColumnType(columnType(c), c.type);
+  const possible = candidates.filter((c) => !/^boolean$/i.test(columnType(c) ?? ""));
+  const pick = possible.find(sameType) ?? possible[0];
+  if (!pick) return null;
+  return {
+    field: pick.field,
+    hit: {
+      ...offsetToLineCol(query, pick.start),
+      endCol: offsetToLineCol(query, pick.end).startCol,
+    },
+    message: MSG.notACondition(pick.field, /utf8/i.test(pick.type)),
+  };
+}
+
+/** Logs registers its stream's column types here, so a type error can be pinned to the right column; the release clears only its own lookup. */
+export function setFieldTypeOf(lookup: FieldTypeOf): () => void {
+  fieldTypeOf = lookup;
+  return () => {
+    if (fieldTypeOf === lookup) fieldTypeOf = null;
+  };
+}
+
 /** Strip quotes/backticks and trailing punctuation from an extracted identifier. */
 function cleanIdent(raw: string | undefined | null): string | null {
   if (!raw) return null;
@@ -985,6 +1243,142 @@ function extractSemanticError(text: string): { field: string; message: string } 
   return null;
 }
 
+type FieldTypeOf = (field: string) => string | undefined;
+
+let fieldTypeOf: FieldTypeOf | null = null;
+
+// Arrow names its string types Utf8, LargeUtf8 and Utf8View; any of them matches an error's Utf8.
+const sameColumnType = (column: string | undefined, errorType: string): boolean => {
+  if (!column) return false;
+  const norm = (t: string) => (/utf8/i.test(t) ? "utf8" : t.toLowerCase());
+  return norm(column) === norm(errorType);
+};
+
+interface OperandToken {
+  kind: "word" | "ident" | "literal" | "punct";
+  text: string;
+  start: number;
+  end: number;
+}
+
+const OPERAND_BOUNDARY_WORDS = new Set([
+  "AND",
+  "OR",
+  "NOT",
+  "WHERE",
+  "HAVING",
+  "ON",
+  "WHEN",
+  "THEN",
+  "ELSE",
+  "END",
+  "GROUP",
+  "ORDER",
+  "LIMIT",
+  "SELECT",
+  "FROM",
+]);
+const NON_FIELD_WORDS = new Set(["TRUE", "FALSE", "NULL"]);
+
+function tokenizeOperands(sql: string): OperandToken[] {
+  const tokens: OperandToken[] = [];
+  let i = 0;
+  while (i < sql.length) {
+    const rest = sql.slice(i);
+    const skip = rest.match(/^(\s+|--[^\n]*|\/\*[\s\S]*?(\*\/|$))/);
+    if (skip) {
+      i += skip[0].length;
+      continue;
+    }
+    const lexeme = rest.match(/^'(?:[^'\\]|\\.|'')*'?/)?.[0] ?? rest.match(/^\d[\w.]*/)?.[0];
+    const ident = rest.match(/^("(?:[^"]|"")*"?|`[^`]*`?)/)?.[0];
+    const word = rest.match(/^[A-Za-z_$][\w$]*/)?.[0];
+    const punct = rest.match(/^(<=|>=|!=|<>|\|\||::|.)/)![0];
+    const [kind, text]: [OperandToken["kind"], string] = lexeme
+      ? ["literal", lexeme]
+      : ident
+        ? ["ident", ident]
+        : word
+          ? ["word", word]
+          : ["punct", punct];
+    tokens.push({ kind, text, start: i, end: i + text.length });
+    i += text.length;
+  }
+  return tokens;
+}
+
+// The AND inside `x BETWEEN a AND b` joins the range bounds, not two conditions.
+function betweenAndIndexes(tokens: OperandToken[]): Set<number> {
+  const result = new Set<number>();
+  const pendingDepths: number[] = [];
+  let depth = 0;
+  tokens.forEach((t, k) => {
+    if (t.text === "(") depth++;
+    else if (t.text === ")") depth--;
+    const upper = t.kind === "word" ? t.text.toUpperCase() : "";
+    if (upper === "BETWEEN") pendingDepths.push(depth);
+    else if (upper === "AND" && pendingDepths.at(-1) === depth) {
+      pendingDepths.pop();
+      result.add(k);
+    }
+  });
+  return result;
+}
+
+function isOperandBoundary(t: OperandToken, index: number, betweenAnds: Set<number>): boolean {
+  if (t.kind === "punct") return t.text === "(" || t.text === ")" || t.text === ",";
+  return (
+    t.kind === "word" && OPERAND_BOUNDARY_WORDS.has(t.text.toUpperCase()) && !betweenAnds.has(index)
+  );
+}
+
+// A bare operand is one identifier, optionally qualified, and never a call's name.
+function bareOperandSpan(
+  tokens: OperandToken[],
+  from: number,
+  step: number,
+  betweenAnds: Set<number>,
+): { start: number; end: number } | null {
+  const picked: OperandToken[] = [];
+  let k = from;
+  while (k >= 0 && k < tokens.length && !isOperandBoundary(tokens[k], k, betweenAnds)) {
+    picked.push(tokens[k]);
+    k += step;
+  }
+  if (step < 0) picked.reverse();
+  const after = tokens[from + step * picked.length];
+  if (step > 0 && after?.text === "(") return null;
+  const shape = picked.map((t) => (t.text === "." ? "." : t.kind)).join(" ");
+  if (!/^(word|ident)( \. (word|ident))*$/.test(shape)) return null;
+  const last = picked[picked.length - 1];
+  if (picked.length === 1 && NON_FIELD_WORDS.has(last.text.toUpperCase())) return null;
+  return { start: picked[0].start, end: last.end };
+}
+
+function offsetToLineCol(text: string, offset: number): { line: number; startCol: number } {
+  const before = text.slice(0, offset).split("\n");
+  return { line: before.length, startCol: before[before.length - 1].length + 1 };
+}
+
+function isSqlSyntaxErrorText(text: string): boolean {
+  return (
+    /at\s+Line:\s*\d+,\s*Column:\s*\d+/i.test(text) || /ParserError|sql parser error/i.test(text)
+  );
+}
+
+const QUERY_ERROR_MESSAGES: [RegExp, number][] = [
+  [/Search SQL not valid/i, 20001],
+  [/Search field not found/i, 20004],
+  [/Search function not defined/i, 20005],
+  [/Search field has no compatible data type/i, 20007],
+  [/Search SQL execute error/i, 20008],
+];
+
+export function queryErrorCodeFromText(text: string): number | null {
+  if (isSqlSyntaxErrorText(text)) return 20001;
+  return QUERY_ERROR_MESSAGES.find(([pattern]) => pattern.test(text))?.[1] ?? null;
+}
+
 /**
  * Unified server-error → editor ranges entry point. Handles ALL locatable
  * search error codes. This is the single function response handlers should
@@ -1003,7 +1397,7 @@ function extractSemanticError(text: string): { field: string; message: string } 
  */
 export async function rangesFromServerError(params: {
   code?: number;
-  message?: string;
+  message?: I18nText;
   errorDetail?: string;
   sqlMode: boolean;
   query?: string;
@@ -1020,10 +1414,7 @@ export async function rangesFromServerError(params: {
   // ParserError signature (some callers surface only the HTTP status, not the
   // 2000x business code). Falls through to the semantic path if it locates
   // nothing (the client parser can't always reproduce the server's error).
-  const looksLikeSyntax =
-    code === 20001 ||
-    /at\s+Line:\s*\d+,\s*Column:\s*\d+/i.test(text) ||
-    /ParserError|sql parser error/i.test(text);
+  const looksLikeSyntax = code === 20001 || isSqlSyntaxErrorText(text);
   if (looksLikeSyntax) {
     let syntaxRanges: SqlErrorRange[] = [];
     if (sqlMode && (errorDetail || message)) {
@@ -1037,6 +1428,14 @@ export async function rangesFromServerError(params: {
       );
     }
     if (syntaxRanges.length) return syntaxRanges;
+  }
+
+  const bare = locateNotACondition(text, query);
+  if (bare) {
+    const { line, startCol, endCol } = bare.hit;
+    return [
+      { startLine: line, endLine: line, column: startCol, endColumn: endCol, error: bare.message },
+    ];
   }
 
   // ── Semantic errors: locate the identifier the backend named ────────────────

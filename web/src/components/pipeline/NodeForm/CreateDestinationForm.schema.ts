@@ -11,6 +11,7 @@
 // Validation TIMING is owned by OForm; this file only describes WHAT is valid.
 
 import { z } from "zod";
+import { raw } from "@/types/i18n";
 import { isValidResourceName } from "@/utils/zincutils";
 
 // One row in the dynamic Headers array-field. Both fields are free-form text
@@ -20,7 +21,9 @@ export const headerRowSchema = z.object({
   value: z.string(),
 });
 
-export const makeDestinationSchema = (t: (_key: string) => string) =>
+export const makeDestinationSchema = (
+  t: (_key: string, _named?: Record<string, unknown>) => string,
+) =>
   z
     .object({
       // ── User-typed fields ────────────────────────────────────────────────
@@ -160,14 +163,20 @@ export const makeDestinationSchema = (t: (_key: string) => string) =>
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["metadata", "ddsource"],
-            message: t("pipeline.ddSourceRequiredDatadog"),
+            message: t("pipeline.ddSourceRequiredDatadog", {
+              product1: raw("DD Source"),
+              product2: raw("Datadog"),
+            }),
           });
         }
         if (!trimmed(val.metadata?.ddtags)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["metadata", "ddtags"],
-            message: t("pipeline.ddTagsRequiredDatadog"),
+            message: t("pipeline.ddTagsRequiredDatadog", {
+              product1: raw("DD Tags"),
+              product2: raw("Datadog"),
+            }),
           });
         }
       }

@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <DashboardHeader :title="title" backButton @back="close"> </DashboardHeader>
 
       <div
-        class="[&::-webkit-scrollbar-thumb]:rounded-default [&::-webkit-scrollbar-thumb]:bg-border-default min-h-0 flex-1 overflow-y-auto px-0.75 pb-4 [scrollbar-color:var(--color-border-default)_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:bg-transparent"
+        class="[&::-webkit-scrollbar-thumb]:rounded-default [&::-webkit-scrollbar-thumb]:bg-border-default min-h-0 flex-1 [scrollbar-width:thin] [scrollbar-color:var(--color-border-default)_transparent] overflow-y-auto px-0.75 pb-4 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:bg-transparent"
       >
         <OForm greedy id="add-setting-variable-form" :form="form" class="px-0.5">
           <div class="mt-3">
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="mt-4 text-base font-bold">
               {{ t("dashboard.addGeneralSettings") }}
             </div>
-            <div class="mt-3 flex gap-4">
+            <div class="mt-3 flex gap-4 max-md:flex-col max-md:gap-2">
               <div class="flex flex-1 flex-col">
                 <OFormInput
                   name="name"
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    line at the bottom of that select. Bottom-aligning would shove the
                    error-free sibling down to stay flush; top-aligning keeps both
                    inputs aligned and lets the error hang below. -->
-              <div class="flex items-start gap-x-4">
+              <div class="flex items-start gap-x-4 max-md:flex-col max-md:gap-y-2">
                 <OFormSelect
                   name="query_data.stream_type"
                   :label="t('dashboard.selectStreamType')"
@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-variable-stream-select"
                 >
                   <template #tooltip>
-                    <OTooltip max-width="250px">
+                    <OTooltip max-width="15.625rem">
                       <template #content>
                         {{ t("dashboard.streamSelectTooltip") }}
                       </template>
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-variable-field-select"
                 >
                   <template #tooltip>
-                    <OTooltip max-width="250px">
+                    <OTooltip max-width="15.625rem">
                       <template #content>
                         {{ t("dashboard.fieldSelectTooltip") }}
                       </template>
@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div data-test="dashboard-query-values-filter" class="text-base font-bold">
                     {{ t("dashboard.addSettingVariable.filters") }}
                   </div>
-                  <OTooltip max-width="250px">
+                  <OTooltip max-width="15.625rem">
                     <OIcon
                       size="sm"
                       name="info-outline"
@@ -186,7 +186,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <template #content>
                       {{ t("dashboard.filterInfoTooltip") }}
-                      <span class="bg-highlight-bg px-1.25">$variableName</span>.
+                      <span class="bg-highlight-bg px-1.25">{{ raw("$variableName") }}</span
+                      >.
                     </template>
                   </OTooltip>
                 </div>
@@ -203,9 +204,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       valueKey="name"
                       searchable
                       :placeholder="
-                        filter.name ? '' : t('dashboard.addSettingVariable.selectFieldPlaceholder')
+                        filter.name
+                          ? raw('')
+                          : t('dashboard.addSettingVariable.selectFieldPlaceholder')
                       "
-                      :title="filter.name || undefined"
                       @update:model-value="filterUpdated(index, $event)"
                       data-test="dashboard-query-values-filter-name-selector"
                       class="min-w-0 flex-2"
@@ -220,27 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :name="`query_data.filter[${index}].operator`"
                       class="operator min-w-0 flex-[1.5]"
                       data-test="dashboard-query-values-filter-operator-selector"
-                      :options="[
-                        '=',
-                        '!=',
-                        '>=',
-                        '<=',
-                        '>',
-                        '<',
-                        'IN',
-                        'NOT IN',
-                        'str_match',
-                        'str_match_ignore_case',
-                        'match_all',
-                        're_match',
-                        're_not_match',
-                        'Contains',
-                        'Not Contains',
-                        'Starts With',
-                        'Ends With',
-                        'Is Null',
-                        'Is Not Null',
-                      ]"
+                      :options="filterOperatorOptions"
                     />
                     <OFormCombobox
                       v-if="!['Is Null', 'Is Not Null'].includes(filter.operator)"
@@ -258,6 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                          nudging the inputs/button out of alignment). -->
                     <div class="flex h-[2.125rem] shrink-0 items-center">
                       <OButton
+                        :aria-label="t('common.remove')"
                         variant="ghost"
                         size="icon"
                         @click="removeFilter(index)"
@@ -336,13 +319,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="w-6 pt-3.5">{{ index + 1 }}</span>
               <OFormInput
                 :name="`options[${index}].label`"
-                class="mr-2 flex-1"
+                class="me-2 flex-1"
                 :data-test="`dashboard-custom-variable-${index}-label`"
                 :placeholder="t('dashboard.addSettingVariable.labelPlaceholder', { n: index + 1 })"
               />
               <OFormInput
                 :name="`options[${index}].value`"
-                class="mr-2 flex-1"
+                class="me-2 flex-1"
                 :data-test="`dashboard-custom-variable-${index}-value`"
                 :placeholder="t('dashboard.addSettingVariable.valuePlaceholder', { n: index + 1 })"
               />
@@ -355,6 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div>
                 <OButton
+                  :aria-label="t('common.remove')"
                   variant="ghost"
                   size="icon"
                   :disabled="variableData?.options?.length === 1"
@@ -429,13 +413,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :key="index"
                 class="mt-3 flex-wrap"
               >
-                <div class="mr-2 flex w-1/2">
+                <div class="me-2 flex w-1/2">
                   <OFormInput
                     :name="`customMultiSelectValue[${index}]`"
                     :placeholder="t('dashboard.addSettingVariable.enterValue')"
                     :data-test="`dashboard-variable-custom-value-${index}`"
                   />
                   <OButton
+                    :aria-label="t('common.remove')"
                     v-if="variableData.multiSelect"
                     variant="ghost"
                     size="icon"
@@ -449,6 +434,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div v-if="variableData.multiSelect" class="flex w-1/2">
                 <OButton
+                  :aria-label="t('common.add')"
                   variant="outline"
                   size="sm"
                   class="mt-3"
@@ -477,9 +463,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('dashboard.escapeSingleQuotes')"
               data-test="dashboard-variable-escape-single-quotes"
               size="lg"
+              disabled
             >
               <template #tooltip>
-                <OTooltip max-width="300px">
+                <OTooltip max-width="18.75rem">
                   <template #content>
                     {{ t("dashboard.escapeSingleQuotesTooltip") }}
                   </template>
@@ -490,7 +477,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OForm>
       </div>
       <div
-        class="border-t-border-default sticky bottom-0 left-0 z-10 flex w-full justify-end gap-3 border-t px-4 py-3 [box-shadow:var(--color-grey-150)_0_-0.25rem_0.4375rem_0] dark:[box-shadow:var(--color-grey-900)_0_-0.25rem_0.4375rem_0]"
+        class="border-t-border-default shadow-sticky-footer sticky bottom-0 left-0 z-10 flex w-full justify-end gap-3 border-t px-4 py-3"
       >
         <OButton
           variant="outline"
@@ -521,19 +508,20 @@ import {
   reactive,
   onMounted,
   onActivated,
+  onBeforeUnmount,
   watch,
   toRef,
-  toRaw,
-  type Ref,
   computed,
   nextTick,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
 import { useStore } from "vuex";
 import { addVariable, getDashboard, updateVariable } from "../../../utils/commons";
 import { useRoute } from "vue-router";
 import { useLoading } from "../../../composables/useLoading";
+import { useDashboardSettingsDraft } from "./dashboardSettingsDraft";
+import { stableStringify } from "@/utils/drafts/editorDraftStore";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -559,6 +547,8 @@ import {
 import { getScopeType } from "@/utils/dashboard/variables/variablesScopeUtils";
 import OFormCombobox from "@/lib/forms/Combobox/OFormCombobox.vue";
 import useNotifications from "@/composables/useNotifications";
+import { useDashboardSaveConflict } from "@/composables/dashboard/useDashboardSaveConflict";
+import analytics from "@/services/product_analytics";
 
 export default defineComponent({
   name: "AddSettingVariable",
@@ -606,14 +596,43 @@ export default defineComponent({
         filter: [],
       },
       value: "",
-      options: [{ label: "", value: "", selected: true }],
+      options: [{ label: raw(""), value: "", selected: true }],
       multiSelect: false,
       hideOnDashboard: false,
       selectAllValueForMultiSelect: "first",
       customMultiSelectValue: [],
-      escapeSingleQuotes: false,
+      escapeSingleQuotes: true,
     });
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
+
+    /**
+     * Filter operators for the variable query builder. The `value` is persisted into
+     * `query_data.filter[].operator` and switched on by identity, so it stays English;
+     * only the label is translated. SQL/regex tokens are the syntax itself and stay
+     * `raw()`. Mirrors views/Dashboards/addPanel/AddCondition.vue.
+     */
+    const filterOperatorOptions = computed(() => [
+      { label: raw("="), value: "=" },
+      { label: raw("!="), value: "!=" },
+      { label: raw(">="), value: ">=" },
+      { label: raw("<="), value: "<=" },
+      { label: raw(">"), value: ">" },
+      { label: raw("<"), value: "<" },
+      { label: raw("IN"), value: "IN" },
+      { label: raw("NOT IN"), value: "NOT IN" },
+      { label: raw("str_match"), value: "str_match" },
+      { label: raw("str_match_ignore_case"), value: "str_match_ignore_case" },
+      { label: raw("match_all"), value: "match_all" },
+      { label: raw("re_match"), value: "re_match" },
+      { label: raw("re_not_match"), value: "re_not_match" },
+      { label: t("dashboard.filterOperators.contains"), value: "Contains" },
+      { label: t("dashboard.filterOperators.notContains"), value: "Not Contains" },
+      { label: t("dashboard.filterOperators.startsWith"), value: "Starts With" },
+      { label: t("dashboard.filterOperators.endsWith"), value: "Ends With" },
+      { label: t("dashboard.filterOperators.isNull"), value: "Is Null" },
+      { label: t("dashboard.filterOperators.isNotNull"), value: "Is Not Null" },
+    ]);
+
     const addSettingVariableSchema = makeAddSettingVariableSchema(t);
     const form = useOForm<AddSettingVariableForm>({
       defaultValues: addSettingVariableDefaults(),
@@ -685,10 +704,77 @@ export default defineComponent({
     // form-id). isSubmitting resets even if the save throws.
     const isSavingVariable = form.useStore((s: any) => s.isSubmitting);
 
+    // The panel editor's variable form has no settings drawer around it, so it keeps no draft.
+    const draftContext = props.isFromAddPanel ? null : useDashboardSettingsDraft();
+    // The form as loaded, once its own watchers settled; null until then.
+    let loadedKey: string | null = null;
+    // Set once the form saved or was cancelled, so its last values never come back as unsaved.
+    let released = false;
+    let lastSaveSucceeded = false;
+    let unregisterDraftSection: (() => void) | null = null;
+
+    const syncDraftSection = () => {
+      if (!draftContext || loadedKey === null || released) return;
+      const values = JSON.parse(JSON.stringify(formValues.value ?? {})) as AddSettingVariableForm;
+      draftContext.pending.variable =
+        stableStringify(values) === loadedKey
+          ? null
+          : { variableName: props.variableName ?? null, values };
+    };
+
+    const pendingForThisVariable = () => {
+      const pending = draftContext?.pending.variable;
+      return pending && pending.variableName === (props.variableName ?? null) ? pending : null;
+    };
+
+    const applyPendingDraft = async () => {
+      const pending = pendingForThisVariable();
+      if (!pending) return;
+      form.reset(pending.values);
+      customSelectAllModel.value =
+        pending.values.type === "custom" &&
+        (pending.values.options ?? []).length > 0 &&
+        (pending.values.options ?? []).every((option: { selected?: boolean }) => option.selected);
+      await nextTick();
+    };
+
+    const releaseDraftSection = () => {
+      released = true;
+      if (draftContext) draftContext.pending.variable = null;
+    };
+
+    const saveForDraft = async (): Promise<boolean> => {
+      lastSaveSucceeded = false;
+      await form.handleSubmit();
+      return lastSaveSucceeded;
+    };
+
+    const startDraftSection = async () => {
+      if (!draftContext) return;
+      // Two ticks: the scope and panel watchers prune the loaded selection after a reset.
+      await nextTick();
+      await nextTick();
+      loadedKey = stableStringify(formValues.value ?? {});
+      await applyPendingDraft();
+      syncDraftSection();
+      unregisterDraftSection = draftContext.register("variable", saveForDraft);
+    };
+
+    watch(formValues, syncDraftSection, { deep: true });
+    watch(
+      () => draftContext?.restoreRevision,
+      async () => {
+        if (loadedKey === null) return;
+        await applyPendingDraft();
+        syncDraftSection();
+      },
+    );
+    onBeforeUnmount(() => unregisterDraftSection?.());
+
     // Format tabs for selection from dashboard data
     const tabsOptions = computed(() =>
       dashboardData.value.tabs.map((tab: any) => ({
-        label: tab.name,
+        label: raw(tab.name),
         value: tab.tabId,
       })),
     );
@@ -729,7 +815,7 @@ export default defineComponent({
           // Add existing panels from this tab
           panelOptions.push(
             ...(tab.panels || []).map((panel: any) => ({
-              label: panel.title,
+              label: raw(panel.title),
               value: panel.id,
             })),
           );
@@ -751,9 +837,9 @@ export default defineComponent({
     });
     const route = useRoute();
     const title = ref(t("dashboard.newVariable"));
-    const { getStreams, getStream } = useStreams();
-    const { showErrorNotification, showConfictErrorNotificationWithRefreshBtn } =
-      useNotifications();
+    const { getStreams, getStream } = useStreams(t);
+    const { showErrorNotification } = useNotifications();
+    const saveConflict = useDashboardSaveConflict();
     // const model = ref(null)
     // const filteredStreams = ref([]);
     const variableTypes = ref([
@@ -787,7 +873,7 @@ export default defineComponent({
     ]);
 
     const streamTypeOptions = computed(() =>
-      data.streamType.map((t: string) => ({ label: t, value: t })),
+      data.streamType.map((t: string) => ({ label: raw(t), value: t })),
     );
 
     const handleCustomSelectAll = () => {
@@ -875,7 +961,7 @@ export default defineComponent({
         hideOnDashboard: variable.hideOnDashboard ?? false,
         selectAllValueForMultiSelect: variable.selectAllValueForMultiSelect ?? "first",
         customMultiSelectValue: variable.customMultiSelectValue ?? [],
-        escapeSingleQuotes: variable.escapeSingleQuotes ?? false,
+        escapeSingleQuotes: variable.escapeSingleQuotes ?? true,
       };
     };
 
@@ -929,6 +1015,7 @@ export default defineComponent({
       } catch (error) {
         showErrorNotification(t("dashboard.addSettingVariable.failedToLoadDashboard"));
       }
+      await startDraftSection();
     });
 
     // Watch on scope — reset tab/panel selections via the form.
@@ -967,7 +1054,7 @@ export default defineComponent({
     // Add a watch for selectedTabs
     watch(
       selectedTabs,
-      (newTabs) => {
+      (_newTabs) => {
         if (variableData.scope === "panels") {
           nextTick(() => {
             updatePanels();
@@ -1050,7 +1137,7 @@ export default defineComponent({
     const addField = () => {
       // add new field for options
       formPush("options", {
-        label: "",
+        label: raw(""),
         value: "",
         selected: false,
       });
@@ -1136,20 +1223,28 @@ export default defineComponent({
       if (editMode.value) {
         try {
           await updateVariable(
+            t,
             store,
             dashId,
             props.variableName,
             payload,
             route.query.folder ?? "default",
           );
+          analytics.track("dashboard_variable_saved", { type: payload.type, is_new: false });
+          lastSaveSucceeded = true;
+          releaseDraftSection();
           emit("save");
         } catch (error: any) {
-          if (error?.response?.status === 409) {
-            showConfictErrorNotificationWithRefreshBtn(
-              error?.response?.data?.message ??
-                error?.message ??
-                t("dashboard.addSettingVariable.variableUpdateFailed"),
-            );
+          if (saveConflict.isConflict(error)) {
+            void saveConflict.openConflict({
+              dashboardId: dashId,
+              folderId: (route.query.folder as string) ?? "default",
+              change: t("dashboard.saveConflict.change.editedVariable", { name: payload.name }),
+              onResolved: () => emit("save"),
+            });
+            // The variable is already in the working copy; leaving the form open would let Save add it again.
+            releaseDraftSection();
+            emit("save");
           } else {
             showErrorNotification(
               error.message ?? t("dashboard.addSettingVariable.variableUpdateFailed"),
@@ -1161,15 +1256,22 @@ export default defineComponent({
         }
       } else {
         try {
-          await addVariable(store, dashId, payload, route.query.folder ?? "default");
+          await addVariable(t, store, dashId, payload, route.query.folder ?? "default");
+          analytics.track("dashboard_variable_saved", { type: payload.type, is_new: true });
+          lastSaveSucceeded = true;
+          releaseDraftSection();
           emit("save");
         } catch (error: any) {
-          if (error?.response?.status === 409) {
-            showConfictErrorNotificationWithRefreshBtn(
-              error?.response?.data?.message ??
-                error?.message ??
-                t("dashboard.addSettingVariable.variableCreationFailed"),
-            );
+          if (saveConflict.isConflict(error)) {
+            void saveConflict.openConflict({
+              dashboardId: dashId,
+              folderId: (route.query.folder as string) ?? "default",
+              change: t("dashboard.saveConflict.change.addedVariable", { name: payload.name }),
+              onResolved: () => emit("save"),
+            });
+            // The variable is already in the working copy; leaving the form open would let Save add it again.
+            releaseDraftSection();
+            emit("save");
           } else {
             showErrorNotification(
               error.message ?? t("dashboard.addSettingVariable.variableCreationFailed"),
@@ -1377,6 +1479,7 @@ export default defineComponent({
     };
 
     const close = () => {
+      releaseDraftSection();
       emit("close");
     };
 
@@ -1439,7 +1542,7 @@ export default defineComponent({
       });
 
       return filteredVars.map((it: any) => ({
-        label: it.name,
+        label: raw(it.name),
         value: "$" + it.name,
       }));
     });
@@ -1536,6 +1639,8 @@ export default defineComponent({
       isSavingVariable,
       store,
       t,
+      raw,
+      filterOperatorOptions,
       data,
       streamsFilterFn,
       fieldsFilterFn,

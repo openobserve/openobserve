@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     data-test="edit-group-section"
-    :title="groupDetails.group_name"
+    :title="raw(groupDetails.group_name)"
     :back="{ label: t('iam.groups'), onClick: cancelEditGroup }"
     bleed
   >
@@ -90,20 +90,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { updateGroupMutation } from "@/services/iam.queries";
 import { ref, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import GroupRoles from "./GroupRoles.vue";
 import GroupUsers from "./GroupUsers.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter, onBeforeRouteLeave } from "vue-router";
 import { onBeforeMount } from "vue";
-import { getGroup, updateGroup } from "@/services/iam";
+import { getGroup } from "@/services/iam";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
 import GroupServiceAccounts from "./GroupServiceAccounts.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { confirmForcedSignOutDiscard, draftSignOutForced } from "@/utils/drafts/draftSession";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 onBeforeMount(() => {
@@ -118,7 +123,9 @@ const store = useStore();
 
 const router = useRouter();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
+
+const { confirm } = useConfirmDialog();
 
 const groupDetails = ref({
   group_name: "dev",
@@ -166,6 +173,7 @@ const onLeaveConfirm = (proceed: boolean) => {
 
 onBeforeRouteLeave(() => {
   if (!isAnyDirty.value) return true;
+  if (draftSignOutForced.value) return confirmForcedSignOutDiscard(confirm, t);
 
   return new Promise<boolean>((resolve) => {
     leaveConfirm.value.resolve = resolve;
@@ -232,6 +240,9 @@ const updateActiveTab = (tab: string) => {
   activeTab.value = tab;
 };
 
+const orgId = useOrgId();
+const updateGroupOne = useMutation(() => updateGroupMutation(orgId.value));
+
 const saveGroupChanges = () => {
   // Users and service accounts are both sent as users; merge the two staging
   // sets (dedup via Set) for the request payload.
@@ -246,14 +257,12 @@ const saveGroupChanges = () => {
     remove_roles: Array.from(removedRoles.value) as string[],
   };
 
-  if (
-    !(
-      payload.add_users.length ||
-      payload.remove_users.length ||
-      payload.add_roles.length ||
-      payload.remove_roles.length
-    )
-  ) {
+  if (!(
+    payload.add_users.length ||
+    payload.remove_users.length ||
+    payload.add_roles.length ||
+    payload.remove_roles.length
+  )) {
     toast({
       variant: "info",
       message: t("iam.editGroup.noUpdates"),
@@ -262,11 +271,11 @@ const saveGroupChanges = () => {
     return;
   }
 
-  updateGroup({
-    group_name: groupDetails.value.group_name,
-    org_identifier: store.state.selectedOrganization.identifier,
-    payload,
-  })
+  // Was: invalidate, then update — the refetch raced the write.
+  // Returned so callers (and tests) can await the whole save, not just the
+  // request: `mutateAsync` settles a tick later than a bare promise did.
+  return updateGroupOne
+    .mutateAsync({ group_name: groupDetails.value.group_name, payload })
     .then(() => {
       toast({
         variant: "success",

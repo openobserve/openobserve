@@ -281,9 +281,9 @@ test.describe("Dashboard Raw Query testcases", () => {
     await page.goto(
       `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${process.env["ORGNAME"]}`
     );
-    await page.locator('[data-test="dashboard-search"]').waitFor({ state: "visible", timeout: 30000 });
+    await pm.dashboardCreate.waitForSearchVisible(30000);
     await pm.dashboardCreate.searchDashboard(dashboardName);
-    await page.locator('[data-test="dashboard-table"]').waitFor({ state: "visible", timeout: 10000 });
+    await pm.dashboardCreate.waitForDashboardTableVisible(10000);
     await deleteDashboard(page, dashboardName);
   });
 

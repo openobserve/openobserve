@@ -3,7 +3,7 @@ const API_REQUIRING_CHANGES = new Set(["queries", "variables"]);
 
 // Keys under "queries" that are runtime metadata — changes to these
 // should NOT trigger the "chart not up to date" banner or require an API call.
-const IGNORED_QUERY_KEYS = new Set(["vrlFunctionFieldList", "tabName"]);
+const IGNORED_QUERY_KEYS = new Set(["vrlFunctionFieldList", "tabName", "ref"]);
 
 /**
  * Flattens an object's keys with dot notation
@@ -33,6 +33,21 @@ const flattenObject = (obj: any, prefix = ""): Record<string, any> => {
     return acc;
   }, {});
 };
+
+// Hiding never needs a run; showing a hidden PromQL query does, since it was never sent.
+// Chart types whose PromQL loader keeps more series than the default cap (see promqlSeriesCap).
+const OWN_PROMQL_SERIES_CAP_TYPES = new Set(["state-timeline", "hostmap"]);
+
+const promqlSeriesCapKind = (type: unknown) =>
+  typeof type === "string" && OWN_PROMQL_SERIES_CAP_TYPES.has(type) ? type : "default";
+
+/** Whether a PromQL panel moved to a chart type that loads a different number of series. */
+const promqlSeriesCapChanged = (oldConfig: any, newConfig: any): boolean =>
+  newConfig?.queryType === "promql" &&
+  promqlSeriesCapKind(oldConfig?.type) !== promqlSeriesCapKind(newConfig?.type);
+
+const isUnhiddenPromQL = (newConfig: any, key: string): boolean =>
+  newConfig?.queryType === "promql" && !flattenObject(newConfig)[key];
 
 /**
  * Gets changed keys between two objects
@@ -71,9 +86,9 @@ export const checkIfConfigChangeRequiredApiCallOrNot = (
     return !IGNORED_QUERY_KEYS.has(leafKey);
   });
 
-  const configNeedsApiCall = meaningfulChanges.some((key) =>
-    Array.from(API_REQUIRING_CHANGES).some((apiKey) => key.startsWith(apiKey)),
-  );
+  const configNeedsApiCall = meaningfulChanges
+    .filter((key) => !key.endsWith(".hide") || isUnhiddenPromQL(newConfig, key))
+    .some((key) => Array.from(API_REQUIRING_CHANGES).some((apiKey) => key.startsWith(apiKey)));
 
-  return configNeedsApiCall;
+  return configNeedsApiCall || promqlSeriesCapChanged(oldConfig, newConfig);
 };

@@ -16,10 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-import CopyContent from "@/components/CopyContent.vue";
+import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import useIngestion from "@/composables/useIngestion";
-import { b64EncodeStandard } from "@/utils/zincutils";
+import { basicIngestToken } from "@/composables/useCredentialSnippet";
 import { aiCategories } from "./data";
 import type { AICategory, AIIntegration } from "./data";
 import { getAICardRaw } from "./content";
@@ -27,12 +28,14 @@ import { safeHttpUrl, type CardSubstitutions } from "./content/renderMarkdown";
 import { getRichCardContent } from "./content/richCard/registry";
 import AIIntegrationCard from "./content/AIIntegrationCard.vue";
 import AIRichSetupCard from "@/components/ingestion/setupCard/SetupCardRenderer.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 
 const props = defineProps<{
   categorySlug: string;
   integrationSlug: string;
 }>();
 
+const { t } = useI18nTyped();
 const store = useStore();
 const { aiContent, endpoint } = useIngestion();
 
@@ -61,45 +64,62 @@ const subs = computed<CardSubstitutions>(() => {
   return {
     url: endpoint.value?.url ?? "",
     org: store.state.selectedOrganization?.identifier ?? "",
-    token: b64EncodeStandard(`${email}:${passcode}`) ?? "",
+    token: basicIngestToken(email, passcode),
   };
 });
+
+const passcodeForbidden = computed(
+  () => !!store.state.organizationData?.organizationPasscodeForbidden,
+);
+
+// must test the RAW markdown: richContent has already had {token} substituted away
+const richContentNeedsPasscode = computed(() =>
+  String(getAICardRaw(integration.value?.contentSlug ?? integration.value?.slug) ?? "").includes(
+    "{token}",
+  ),
+);
 
 // Rich, stepped setup card for integrations that have it (registry-driven, keyed
 // by content slug — e.g. "anthropic"). Falls back to the markdown card otherwise.
 const richContent = computed(() =>
-  getRichCardContent(integration.value?.contentSlug ?? integration.value?.slug, subs.value),
+  getRichCardContent(integration.value?.contentSlug ?? integration.value?.slug, subs.value, t),
 );
 </script>
 
 <template>
   <div v-if="integration" class="p-2">
+    <OBanner
+      v-if="passcodeForbidden && richContent && richContentNeedsPasscode"
+      variant="warning"
+      data-test="ai-integration-detail-passcode-forbidden"
+      :content="t('ingestion.passcodeForbiddenMessage')"
+    />
     <AIRichSetupCard
-      v-if="richContent"
+      v-else-if="richContent"
       :key="integrationSlug"
       :content="richContent"
       :subs="subs"
       :logo-url="integration.logo"
       :logo-url-dark="integration.logoDark"
     />
-    <AIIntegrationCard v-else-if="cardContent" :content="cardContent" :doc-url="docURL" />
+    <AIIntegrationCard v-else-if="cardContent" :content="raw(cardContent)" :doc-url="docURL" />
     <div v-else class="text-base">
-      <CopyContent :content="aiContent" />
+      <CredentialCodeBlock slug="ai-integration" :content="aiContent" />
       <div class="pt-6 pb-2 font-bold">
-        Click
+        {{ t("ingestion.ai.viewDocsPrefix") }}
         <a
           :href="safeHttpUrl(docURL)"
           target="_blank"
           rel="noopener noreferrer"
           class="text-text-link hover:text-text-link-hover"
           style="text-decoration: underline"
-          >here</a
+          >{{ t("ingestion.ai.viewDocsLinkLabel") }}</a
         >
-        to check further documentation.
+        {{ t("ingestion.ai.viewDocsSuffix") }}
       </div>
     </div>
   </div>
   <div v-else class="p-2">
-    <p>Select an integration to view details.</p>
+    <p>{{ t("ingestion.ai.selectIntegrationPrompt") }}</p>
   </div>
 </template>

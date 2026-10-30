@@ -1,0 +1,369 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+//! Metrics index layout and label pruning.
+
+pub mod block;
+pub mod block_cache;
+pub mod layout;
+mod matcher;
+mod pruner;
+mod reader;
+
+pub use layout::{METRICS_INDEX_ROW_COUNT, MetricsFileLayout, metrics_index_stream};
+pub use matcher::{matcher_predicates, matcher_residual_field};
+pub use pruner::{matching_blocks, search};
+pub use reader::fetch_parsed_index;
+
+#[cfg(test)]
+mod tests {
+    use std::{ops::Range, sync::Arc};
+
+    use arrow::{
+        array::{Array, RecordBatch, StringViewArray, UInt32Array},
+        datatypes::{DataType, Field, Schema},
+    };
+    use config::{
+        TIMESTAMP_COL_NAME,
+        meta::{promql::VALUE_LABEL, stream::FileKey},
+    };
+    use promql_parser::label::{MatchOp, Matcher, Matchers};
+
+    use super::{
+        METRICS_INDEX_ROW_COUNT,
+        pruner::{
+            create_physical_filter, metrics_index_labels, residual_matchers_covered, search,
+            sidecar_covers_labels,
+        },
+        reader::{MetricsIndexData, evaluate_metrics_index, load_metrics_index_file},
+    };
+
+    #[tokio::test]
+    async fn indexed_file_without_midx_skips_sidecar_lookup() {
+        let schema = Schema::new(vec![Field::new("path", DataType::Utf8, true)]);
+        let matchers = Matchers::new(vec![Matcher::new(MatchOp::Equal, "path", "/api/bar")]);
+        let file = FileKey::from_file_name(
+            "files/default/metrics/cpu/2026/09/23/00/indexed-v1-no-index.parquet",
+        );
+        let mut files = vec![file];
+        assert!(
+            search("test", &mut files, &schema, &matchers, 1)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(files.len(), 1);
+        assert!(files[0].selection.is_none());
+    }
+
+    #[test]
+    fn labels_keep_only_matchable_table_labels() {
+        let schema = Schema::new(vec![
+            Field::new("__hash__", DataType::UInt64, false),
+            Field::new("__name__", DataType::Utf8View, false),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("instance", DataType::Utf8View, true),
+            Field::new("path", DataType::Utf8View, true),
+            Field::new("trace_id", DataType::Utf8View, true),
+            Field::new(VALUE_LABEL, DataType::Float64, false),
+        ]);
+        let matchers = Matchers::new(vec![
+            Matcher::new(MatchOp::Equal, "path", "a"),
+            Matcher::new(MatchOp::Equal, "path", "b"),
+            Matcher::new(MatchOp::NotEqual, VALUE_LABEL, "1"),
+            Matcher::new(MatchOp::Equal, "missing_label", "x"),
+            Matcher::new(MatchOp::NotEqual, "instance", "i1"),
+            Matcher::new(MatchOp::Equal, "trace_id", "trace-b"),
+        ]);
+        assert_eq!(
+            metrics_index_labels(&schema, &matchers),
+            Some(vec!["path".to_string(), "instance".to_string()])
+        );
+
+        let only_value = Matchers::new(vec![Matcher::new(MatchOp::Equal, VALUE_LABEL, "1")]);
+        assert_eq!(metrics_index_labels(&schema, &only_value), None);
+
+        let only_hash_excluded =
+            Matchers::new(vec![Matcher::new(MatchOp::Equal, "trace_id", "trace-b")]);
+        assert_eq!(metrics_index_labels(&schema, &only_hash_excluded), None);
+    }
+
+    #[test]
+    fn evaluates_and_coalesces_selected_ranges() {
+        // run starts are the prefix sums of the counts: 0, 2, 4, 5
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(METRICS_INDEX_ROW_COUNT, DataType::UInt32, false),
+            Field::new("path", DataType::Utf8View, false),
+        ]));
+        let batch = RecordBatch::try_new(
+            Arc::clone(&schema),
+            vec![
+                Arc::new(UInt32Array::from(vec![2, 2, 1, 3])),
+                Arc::new(StringViewArray::from(vec!["a", "b", "a", "a"])),
+            ],
+        )
+        .unwrap();
+        let data = MetricsIndexData {
+            schema: Arc::clone(&schema),
+            batches: vec![batch],
+            parent_records: 8,
+            row_group_size: None,
+        };
+        let matchers = Matchers::new(vec![Matcher::new(MatchOp::Equal, "path", "a")]);
+        let filter = create_physical_filter(&schema, &matchers).unwrap();
+        assert!(filter.is_some());
+
+        assert_eq!(
+            evaluate_metrics_index(&data, filter.as_deref(), 8).unwrap(),
+            vec![0..2, 4..8]
+        );
+
+        // no evaluable matcher: every series is selected
+        assert_eq!(
+            evaluate_metrics_index(&data, None, 8).unwrap(),
+            vec![Range { start: 0, end: 8 }]
+        );
+
+        let matchers = parsed_matchers(r#"m{path!~"a"}"#);
+        let filter = create_physical_filter(&schema, &matchers).unwrap();
+        assert_eq!(
+            evaluate_metrics_index(&data, filter.as_deref(), 8).unwrap(),
+            vec![Range { start: 2, end: 4 }]
+        );
+    }
+
+    #[tokio::test]
+    async fn rejects_sidecars_that_do_not_tile_the_parent_file() {
+        let mut data = sidecar_data(&[], vec![2, 3], &[]).await;
+        data.parent_records = 4;
+        let too_long = evaluate_metrics_index(&data, None, 4).unwrap_err();
+        assert!(
+            too_long
+                .to_string()
+                .contains("beyond the parent file's 4 records")
+        );
+        data.parent_records = 6;
+        let too_short = evaluate_metrics_index(&data, None, 6).unwrap_err();
+        assert!(too_short.to_string().contains("covers 5 rows"));
+    }
+
+    async fn sidecar_data(
+        labels: &[(&str, Vec<&str>)],
+        counts: Vec<u32>,
+        requested: &[String],
+    ) -> MetricsIndexData {
+        use arrow::array::{Float64Array, Int64Array, UInt64Array};
+        use object_store::{ObjectStore, PutOptions};
+        let rows = counts.iter().map(|n| *n as usize).sum::<usize>();
+        let mut fields = vec![
+            Field::new("__hash__", DataType::UInt64, false),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new(VALUE_LABEL, DataType::Float64, false),
+        ];
+        let hashes = counts
+            .iter()
+            .enumerate()
+            .flat_map(|(i, n)| std::iter::repeat_n(i as u64, *n as usize));
+        let times = counts.iter().flat_map(|n| 0..i64::from(*n));
+        let mut columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(UInt64Array::from_iter_values(hashes)),
+            Arc::new(Int64Array::from_iter_values(times)),
+            Arc::new(Float64Array::from(vec![1.; rows])),
+        ];
+        for (name, values) in labels {
+            fields.push(Field::new(*name, DataType::Utf8View, true));
+            let values = counts
+                .iter()
+                .zip(values)
+                .flat_map(|(count, value)| std::iter::repeat_n(*value, *count as usize));
+            columns.push(Arc::new(StringViewArray::from_iter_values(values)));
+        }
+        let schema = Arc::new(Schema::new(fields));
+        let batch = RecordBatch::try_new(schema.clone(), columns).unwrap();
+        let mut writer = crate::block::BlockWriter::new(
+            Vec::new(),
+            schema.clone(),
+            crate::block::MAX_BLOCK_ROWS,
+        )
+        .unwrap();
+        writer.write(&batch).unwrap();
+        let bytes = writer
+            .finish_for_vortex(
+                crate::block::ParentMetadata {
+                    rows: rows as u64,
+                    compressed_size: 123,
+                },
+                schema,
+            )
+            .unwrap();
+        let id = config::ider::uuid();
+        let account = format!("{id}:default");
+        let path = format!("files/test/mindex/m/2026/09/22/00/indexed-v1-{id}.midx");
+        let data_path = format!("files/test/metrics/m/2026/09/22/00/indexed-v1-{id}.vortex");
+        let store = object_store::memory::InMemory::new();
+        store
+            .put_opts(
+                &path.clone().into(),
+                bytes::Bytes::from(bytes).into(),
+                PutOptions::default(),
+            )
+            .await
+            .unwrap();
+        infra::storage::add_account(&id, Box::new(store)).await;
+        load_metrics_index_file(
+            &account,
+            &data_path,
+            &path,
+            config::FileFormat::Vortex,
+            crate::block::ParentMetadata {
+                rows: rows as u64,
+                compressed_size: 123,
+            },
+            0,
+            crate::reader::IndexLabels {
+                requested: Arc::new(requested.to_vec()),
+                flat: Arc::new(Vec::new()),
+            },
+        )
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn projects_by_name_across_sidecars_with_different_layouts() {
+        let labels = vec!["path".to_string(), "instance".to_string()];
+        let matchers = Matchers::new(vec![
+            Matcher::new(MatchOp::Equal, "path", "a"),
+            Matcher::new(MatchOp::Equal, "instance", "i1"),
+        ]);
+
+        // file 1: [.., instance, job, path]; file 2: [.., path, instance] —
+        // same labels, different positions
+        let file1 = sidecar_data(
+            &[
+                ("instance", vec!["i1", "i2", "i1"]),
+                ("job", vec!["j", "j", "j"]),
+                ("path", vec!["a", "a", "b"]),
+            ],
+            vec![3, 2, 4],
+            &labels,
+        )
+        .await;
+        let file2 = sidecar_data(
+            &[("path", vec!["b", "a"]), ("instance", vec!["i1", "i1"])],
+            vec![7, 1],
+            &labels,
+        )
+        .await;
+        for (name, data, expected_rows, expected) in [
+            ("f1", file1, 9, vec![Range { start: 0, end: 3 }]),
+            ("f2", file2, 8, vec![Range { start: 7, end: 8 }]),
+        ] {
+            assert_eq!(data.schema.fields().len(), 3, "{name}");
+            let filter = create_physical_filter(&data.schema, &matchers).unwrap();
+            assert_eq!(
+                evaluate_metrics_index(&data, filter.as_deref(), expected_rows).unwrap(),
+                expected,
+                "{name}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn exactness_requires_sidecar_coverage_of_every_residual_matcher() {
+        let table_schema = Schema::new(vec![
+            Field::new("__hash__", DataType::UInt64, false),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("path", DataType::Utf8View, true),
+            Field::new("instance", DataType::Utf8View, true),
+            Field::new("trace_id", DataType::Utf8View, true),
+            Field::new(VALUE_LABEL, DataType::Float64, false),
+        ]);
+        let matcher_labels = vec!["path".to_string(), "instance".to_string()];
+
+        // matchers the query never re-applies do not break exactness
+        let covered = Matchers::new(vec![
+            Matcher::new(MatchOp::Equal, "path", "a"),
+            parsed_matchers(r#"m{instance=~"i.*"}"#).matchers.remove(0),
+            Matcher::new(MatchOp::Equal, "__name__", "m"),
+            Matcher::new(MatchOp::Equal, "missing_label", "x"),
+        ]);
+        assert!(residual_matchers_covered(
+            &table_schema,
+            &covered,
+            &matcher_labels
+        ));
+
+        // `trace_id` is hash-excluded: the sidecar cannot answer it, but the
+        // query filters on it, so the selection stays a superset
+        let uncovered = Matchers::new(vec![
+            Matcher::new(MatchOp::Equal, "path", "a"),
+            Matcher::new(MatchOp::Equal, "trace_id", "t1"),
+        ]);
+        assert!(!residual_matchers_covered(
+            &table_schema,
+            &uncovered,
+            &matcher_labels
+        ));
+
+        let data = sidecar_data(
+            &[("path", vec!["a"]), ("instance", vec!["i1"])],
+            vec![3],
+            &matcher_labels,
+        )
+        .await;
+        assert!(sidecar_covers_labels(&data.schema, &matcher_labels));
+        let data = sidecar_data(&[("path", vec!["a"])], vec![3], &matcher_labels).await;
+        assert!(!sidecar_covers_labels(&data.schema, &matcher_labels));
+    }
+
+    #[tokio::test]
+    async fn missing_label_over_selects_instead_of_dropping() {
+        let labels = vec!["path".to_string(), "instance".to_string()];
+        let matchers = Matchers::new(vec![
+            Matcher::new(MatchOp::Equal, "path", "a"),
+            Matcher::new(MatchOp::Equal, "instance", "i1"),
+        ]);
+
+        // sidecar without `instance`: only the `path` matcher is evaluated
+        let data = sidecar_data(&[("path", vec!["a", "b", "a"])], vec![2, 4, 1], &labels).await;
+        assert_eq!(data.schema.fields().len(), 2);
+        let filter = create_physical_filter(&data.schema, &matchers).unwrap();
+        assert!(filter.is_some());
+        assert_eq!(
+            evaluate_metrics_index(&data, filter.as_deref(), 7).unwrap(),
+            vec![0..2, 6..7]
+        );
+
+        // sidecar with none of the matched labels: the whole file is selected
+        let data = sidecar_data(&[("job", vec!["j", "j"])], vec![4, 2], &labels).await;
+        assert_eq!(data.schema.fields().len(), 1);
+        let filter = create_physical_filter(&data.schema, &matchers).unwrap();
+        assert!(filter.is_none());
+        assert_eq!(
+            evaluate_metrics_index(&data, filter.as_deref(), 6).unwrap(),
+            vec![Range { start: 0, end: 6 }]
+        );
+    }
+
+    fn parsed_matchers(query: &str) -> Matchers {
+        let promql_parser::parser::Expr::VectorSelector(selector) =
+            promql_parser::parser::parse(query).unwrap()
+        else {
+            panic!("expected vector selector");
+        };
+        selector.matchers
+    }
+}

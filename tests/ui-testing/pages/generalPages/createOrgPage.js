@@ -42,6 +42,11 @@ export class CreateOrgPage {
         // The current UI does NOT expose a delete button — used only for
         // UI-deletion-attempt diagnostics.
         this.orgEditButtons = page.locator('[data-test="organization-name-edit"]');
+
+        // OToast message surface — the "Organization added successfully." success
+        // notification renders inside [data-test="o-toast-message"] (mirrors
+        // userPage.verifySuccessMessage).
+        this.toastMessage = page.locator('[data-test="o-toast-message"]');
     }
 
     /**
@@ -221,6 +226,25 @@ export class CreateOrgPage {
      */
     getOrgNameError() {
         return this.orgNameError;
+    }
+
+    /**
+     * Assert the positive "Organization added successfully." toast appears after
+     * a successful create. Polls all rendered toast messages until one carries
+     * the expected text — mirrors userPage.verifySuccessMessage so the org
+     * success path is asserted without racing the transient toast auto-dismiss.
+     */
+    async verifyOrgAddedSuccessfully(expectedMessage = 'Organization added successfully.') {
+        await expect.poll(async () => {
+            const count = await this.toastMessage.count();
+            for (let i = 0; i < count; i++) {
+                const visible = await this.toastMessage.nth(i).isVisible().catch(() => false);
+                if (!visible) continue;
+                const text = (await this.toastMessage.nth(i).textContent().catch(() => '')) ?? '';
+                if (text.includes(expectedMessage)) return true;
+            }
+            return false;
+        }, { timeout: 15000, intervals: [250, 500, 1000] }).toBe(true);
     }
 
     async getAdminOrgs(orgId = '_meta') {

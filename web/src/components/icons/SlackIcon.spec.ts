@@ -30,8 +30,10 @@ describe("SlackIcon.vue", () => {
     it("has correct SVG dimensions", () => {
       wrapper = createWrapper();
       const svg = wrapper.find("svg");
-      expect(svg.attributes("width")).toBe("24px");
-      expect(svg.attributes("height")).toBe("24px");
+      // Unitless SVG user units, matching the other icon components. A bare number
+      // renders identically to "24px" but keeps px out of the source.
+      expect(svg.attributes("width")).toBe("24");
+      expect(svg.attributes("height")).toBe("24");
     });
 
     it("has correct viewBox", () => {

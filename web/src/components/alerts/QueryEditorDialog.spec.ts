@@ -18,11 +18,14 @@ import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-vi.mock("@/services/search", () => ({
-  default: {
-    search: vi.fn().mockResolvedValue({ data: { hits: [] } }),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      search: vi.fn().mockResolvedValue({ data: { hits: [] } }),
+    },
+  });
+});
 
 vi.mock("@/composables/useQuery", () => ({
   default: () => ({
@@ -650,12 +653,17 @@ describe("QueryEditorDialog - autocomplete wiring reaches the editor", () => {
 // consumes this module, so mocking it does not affect the rest of the suite.
 vi.mock("@/composables/fieldValueStore", () => ({
   getFieldValuesForSuggestion: vi.fn().mockResolvedValue(["error", "warn"]),
+  requestFieldValues: vi.fn().mockResolvedValue([]),
+  fieldValuesUnavailable: vi.fn(() => false),
 }));
 
 // getSuggestions now awaits a lazy fetch of the server function catalog. Stub it
 // so this suite makes no HTTP call and the awaited chain settles inside
 // flushPromises(); the fetch itself is covered in
 // useSuggestions.serverCatalog.spec.ts.
-vi.mock("@/services/query_functions", () => ({
-  default: { list: vi.fn().mockResolvedValue({ data: { list: [] } }) },
-}));
+vi.mock("@/services/query_functions", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: vi.fn().mockResolvedValue({ data: { list: [] } }) },
+  });
+});

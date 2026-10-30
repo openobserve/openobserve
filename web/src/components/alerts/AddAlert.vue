@@ -76,13 +76,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex items-center gap-1.5"
             >
               <OTooltip
-                :content="anomalyConfig.last_error || ''"
+                :content="raw(anomalyConfig.last_error)"
                 :disabled="anomalyConfig.status !== 'failed' || !anomalyConfig.last_error"
               >
                 <OTag
                   v-if="anomalyConfig.status"
                   type="anomalyStatus"
                   :value="anomalyConfig.status"
+                />
+              </OTooltip>
+              <!-- §4.8 health badge: its own element keyed off notice_class, never folded into the status tag. -->
+              <OTooltip v-if="anomalyNoticeBadge" :content="anomalyNoticeTooltip">
+                <OTag
+                  variant="warning-quiet"
+                  :label="anomalyNoticeBadge.label"
+                  data-test="anomaly-notice-badge"
                 />
               </OTooltip>
               <span
@@ -135,51 +143,84 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 type="alerts"
                 @update:model-value="updateActiveFolderId({ value: $event })"
               />
-              <span v-else class="text-text-body min-w-0 truncate font-medium">
+              <OTruncatedText v-else class="text-text-body font-medium">
                 {{ activeFolderName }}
-              </span>
+              </OTruncatedText>
             </span>
           </template>
         </OPageHeader>
       </template>
 
-      <div class="flex min-h-0 flex-1">
+      <!-- What the source adapter had to change to turn the user's query into an
+           alert — a stripped LIMIT, an absolute range become a rolling window.
+           Shown here rather than only in the confirm dialog because most
+           surfaces now skip that dialog and come straight to this form; without
+           this the transforms would be silent. -->
+      <div v-if="prefillWarnings.length" class="flex shrink-0 flex-col gap-2 px-3 pt-2">
+        <OBanner
+          v-for="(warning, index) in prefillWarnings"
+          :key="`${warning.key}-${index}`"
+          dense
+          :variant="warning.level === 'info' ? 'info' : 'warning'"
+          :content="t(`alerts.prefill.warnings.${warning.key}`, warning.params ?? {})"
+          :data-test="`add-alert-prefill-warning-${warning.key}`"
+        />
+      </div>
+
+      <div :key="draftFormKey" class="flex min-h-0 flex-1 max-lg:flex-col max-lg:overflow-y-auto">
         <!-- LEFT column wrapper (flex: 6.5) -->
-        <div class="flex min-h-0 min-w-0 flex-[6.5] flex-col gap-2 py-2">
+        <div
+          :class="[
+            'flex min-h-0 min-w-0 flex-col gap-2 py-2 max-lg:flex-none',
+            isCompositeMode ? 'flex-1' : 'flex-[6.5]',
+          ]"
+        >
           <!-- Stream Name & Stream Type -->
           <div
             class="bg-card-glass-bg stream-config-card [container-type:inline-size] shrink-0 [container-name:stream-config]"
           >
             <div class="border-border-default flex items-center gap-0 border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
-              <span class="text-compact font-semibold tracking-[0.01em]"
-                >{{ t("alerts.streamConfig") }} <span class="text-text-body">*</span></span
-              >
-            </div>
-            <div class="flex items-center gap-4 px-3 py-2">
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
+              <span class="text-compact me-3 font-semibold tracking-[0.01em]">{{
+                t("alerts.alertType")
+              }}</span>
               <!-- Alert Type -->
-              <div class="flex items-center gap-1.5">
-                <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
-                  {{ t("alerts.alertType") }}
-                </div>
-                <OFormSelect
-                  data-test="add-alert-type-select-dropdown"
-                  name="is_real_time"
-                  :options="alertTypeOptions"
-                  :disabled="beingUpdated || anomalyEditMode"
-                  class="alert-type-select min-w-27.5 @max-[900px]/stream-config:min-w-23.75 @max-[750px]/stream-config:min-w-21.25 @max-[600px]/stream-config:min-w-18.75"
-                  :searchable="false"
-                />
-              </div>
-
+              <OToggleGroup
+                :model-value="formData.is_real_time"
+                :disabled="beingUpdated || anomalyEditMode"
+                class="min-w-0"
+                mobile-dropdown
+                data-test="add-alert-type-tabs"
+                @update:model-value="onAlertTypeChange"
+              >
+                <OToggleGroupItem
+                  v-for="option in alertTypeOptions"
+                  :key="option.value"
+                  :value="option.value"
+                  size="sm"
+                  :data-test="`add-alert-type-tab-${option.value}`"
+                >
+                  <template #icon-left>
+                    <OIcon :name="option.icon" size="sm" />
+                  </template>
+                  {{ option.label }}
+                </OToggleGroupItem>
+              </OToggleGroup>
+            </div>
+            <div
+              v-if="!isCompositeMode"
+              class="flex items-center gap-4 px-3 py-2 max-md:flex-wrap max-md:gap-2"
+            >
               <!-- Stream Type -->
-              <div class="flex items-center gap-1.5">
+              <div v-if="!isCompositeMode" class="flex items-center gap-1.5">
                 <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
                   {{ t("alerts.streamType") }} <span class="text-text-body">*</span>
                 </div>
+                <!-- eslint-disable local/no-hardcoded-px -- query condition: a threshold for WHEN layout changes, not a rendered length -->
                 <OFormSelect
                   ref="streamTypeRef"
                   name="stream_type"
+                  :aria-label="t('alerts.streamType')"
                   data-test="add-alert-stream-type-select-dropdown"
                   :options="streamTypes"
                   :searchable="false"
@@ -187,20 +228,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="beingUpdated || anomalyEditMode"
                   @update:model-value="onStreamTypeChange"
                 />
+                <!-- eslint-enable local/no-hardcoded-px -->
               </div>
 
               <!-- Stream Name -->
-              <div class="flex min-w-0 flex-1 items-center gap-1.5">
+              <div
+                v-if="!isCompositeMode"
+                class="flex min-w-0 flex-1 items-center gap-1.5 max-md:basis-full"
+              >
                 <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
                   {{ t("alerts.stream_name") }} <span class="text-text-body">*</span>
                 </div>
                 <OFormSelect
                   ref="streamNameRef"
                   name="stream_name"
+                  :aria-label="t('alerts.stream_name')"
                   data-test="add-alert-stream-name-select-dropdown"
                   :options="indexOptions"
                   :loading="isFetchingStreams"
-                  class="stream-name-select w-full! min-w-0"
+                  class="stream-name-select w-full! max-w-75 min-w-0"
                   :disabled="beingUpdated || anomalyEditMode || !formData.stream_type"
                   @update:model-value="updateStreamFields($event)"
                 />
@@ -213,7 +259,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- TIER 3: Configuration Tabs -->
-          <div class="alert-v3-tabs bg-card-glass-bg mx-2 flex min-h-0 flex-1 flex-col">
+          <div
+            class="alert-v3-tabs bg-card-glass-bg mx-2 flex min-h-0 flex-1 flex-col max-lg:flex-none"
+          >
             <!-- Tab Headers -->
             <OToggleGroup
               :model-value="activeTab"
@@ -242,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroup>
 
             <!-- Tab Content -->
-            <div class="flex-1 overflow-auto">
+            <div class="flex-1 overflow-auto max-lg:flex-none max-lg:overflow-visible">
               <!-- Alert Rules Tab (Conditions + Alert Settings merged) -->
               <!-- data-tab-pane: lets focusOnFirstError find the tab owning an
                invalid field and bring it forward before focusing it. -->
@@ -252,7 +300,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex flex-col gap-4"
               >
                 <div>
+                  <CompositeAlertForm
+                    v-if="isCompositeMode"
+                    :model-value="formData"
+                    :org-identifier="store.state.selectedOrganization.identifier"
+                    :folder-id="activeFolderId as string"
+                    :available-children="availableCompositeChildren"
+                    @update:model-value="updateCompositeDraft"
+                    @validation="onCompositeValidation"
+                  />
                   <QueryConfig
+                    v-else
                     ref="step2Ref"
                     :tab="formData.query_condition.type || 'custom'"
                     :multiTimeRange="formData.query_condition.multi_time_range"
@@ -267,8 +325,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :vrlFunction="decodedVrlFunction"
                     :streamName="formData.stream_name"
                     :sqlQueryErrorMsg="sqlQueryErrorMsg"
+                    :sqlAggColumnOptions="sqlAggColumnOptions"
+                    :sqlQueryHasHaving="sqlQueryHasHaving"
                     :isAggregationEnabled="isAggregationEnabled"
                     :beingUpdated="beingUpdated"
+                    :isSeeding="isLoadingPrefill"
                     :promqlCondition="formData.query_condition.promql_condition"
                     :triggerCondition="formData.trigger_condition"
                     @update:tab="updateTab"
@@ -297,13 +358,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :columns="filteredColumns"
                     :isAggregationEnabled="isAggregationEnabled"
                     :destinations="formData.destinations"
+                    :recoveryDestinations="formData.recovery_destinations"
                     :formattedDestinations="getFormattedDestinations"
+                    :destinationObjects="destinations"
                     :workflows="formData.workflows"
                     @update:trigger="updateTriggerCondition"
                     @update:aggregation="updateAggregation"
                     @update:isAggregationEnabled="(val) => (isAggregationEnabled = val)"
                     @update:promqlCondition="updatePromqlCondition"
                     @update:destinations="updateDestinations"
+                    @update:recoveryDestinations="updateRecoveryDestinations"
                     @refresh:destinations="refreshDestinations"
                     @update:workflows="updateWorkflows"
                   />
@@ -353,19 +417,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @update:multiTimeRange="updateMultiTimeRange"
                   />
                 </div>
-
-                <!-- Deduplication (scheduled only) -->
-                <div v-if="formData.is_real_time === 'false'">
-                  <Deduplication
-                    :deduplication="formData.deduplication"
-                    :columns="filteredColumns"
-                    @update:deduplication="updateDeduplication"
-                  />
-                </div>
               </div>
 
               <div v-show="activeTab === 'anomaly-config'" data-tab-pane="anomaly-config">
-                <AnomalyDetectionConfig ref="anomalyStep2Ref" :config="anomalyConfig" />
+                <AnomalyDetectionConfig
+                  ref="anomalyStep2Ref"
+                  :config="anomalyConfig"
+                  :preview-sql="anomalyPreviewSql"
+                  :stored-intervals="anomalyStoredIntervals"
+                />
               </div>
 
               <div v-show="activeTab === 'anomaly-alerting'" data-tab-pane="anomaly-alerting">
@@ -388,7 +448,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="sm-action"
               :disabled="isSubmitting"
-              @click="$emit('cancel:hideform')"
+              @click="cancelEditor"
               >{{ t("alerts.cancel") }}</OButton
             >
             <OButton
@@ -396,6 +456,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="primary"
               size="sm-action"
               :loading="isSubmitting || (isAnomalyMode && anomalySaving)"
+              :disabled="compositeSaveDisabled"
               @click="handleSave"
               >{{
                 isAnomalyMode && !anomalyEditMode ? t("alerts.saveAndTrain") : t("alerts.save")
@@ -406,18 +467,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- end LEFT column wrapper -->
 
         <!-- TIER 2: Preview + Summary (RIGHT 30%) -->
-        <!-- border-l: full-height vertical divider flush against the Preview/Summary pane -->
+        <!-- border-s: full-height vertical divider flush against the Preview/Summary pane -->
         <div
-          class="border-border-default flex min-h-0 min-w-0 flex-[3.5] flex-col gap-2 overflow-hidden border-l pt-2 pb-2"
+          v-if="!isCompositeMode"
+          class="border-border-default flex min-h-0 min-w-0 flex-[3.5] flex-col gap-2 overflow-hidden border-s pt-2 pb-2 max-lg:h-160 max-lg:flex-none max-lg:border-s-0 max-lg:border-t"
         >
           <!-- Preview Card -->
           <div class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden">
             <div
               class="border-border-default flex shrink-0 items-center gap-2 border-b px-3 py-2.5 select-none"
             >
-              <span class="text-sm font-medium">{{
-                isAnomalyMode ? t("alerts.sqlPreview") : t("alerts.preview")
-              }}</span>
+              <span class="text-sm font-medium">{{ t("alerts.preview") }}</span>
               <template v-if="!isAnomalyMode && activeEvaluationStatus">
                 <div class="bg-border-default h-4 w-px" />
                 <OIcon
@@ -444,17 +504,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="min-h-0 flex-1 overflow-hidden">
               <template v-if="isAnomalyMode">
-                <!-- editor-height is QueryEditor's own API for this; a class cannot
-                   win against the inline height its rootStyle always sets. -->
-                <QueryEditor
-                  editor-id="anomaly-sql-preview"
-                  language="sql"
-                  :read-only="true"
-                  :show-auto-complete="false"
-                  :hide-nl-toggle="true"
-                  :query="anomalyPreviewSql"
-                  editor-height="100%"
-                />
+                <AnomalyDataPreview :config="anomalyConfig" />
               </template>
               <template v-else>
                 <div
@@ -477,6 +527,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :isUsingBackendSql="isUsingBackendSql"
                   :isEditorOpen="isEditorOpen"
                   :previewDateTime="previewDateTimeValue"
+                  @schema-updated="handleSqlSchemaUpdated"
                 />
               </template>
             </div>
@@ -530,10 +581,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :isEditing="beingUpdated"
     />
   </ODrawer>
+
+  <ODialog
+    data-test="alert-save-mode-dialog"
+    v-model:open="saveModeDialogOpen"
+    size="sm"
+    :title="t('alerts.saveModeDialog.title')"
+    persistent
+    :show-close="false"
+    :secondary-button-label="t('alerts.cancel')"
+    :primary-button-label="
+      t('alerts.saveModeDialog.saveWithMode', { mode: queryModeName(saveModePick) })
+    "
+    @click:secondary="saveModeDialogOpen = false"
+    @click:primary="saveWithPickedMode"
+  >
+    <div class="flex flex-col gap-3 text-sm">
+      <p data-test="alert-save-mode-lead">{{ saveModeLead }}</p>
+      <OToggleGroup v-model="saveModePick" class="self-start" data-test="alert-save-mode-options">
+        <OToggleGroupItem
+          v-for="mode in saveModeChoices ?? []"
+          :key="mode"
+          :value="mode"
+          size="sm"
+          :data-test="`alert-save-mode-option-${mode}`"
+        >
+          <template #icon-left>
+            <OIcon v-if="mode === 'custom'" name="build" size="sm" />
+            <OIcon v-else-if="mode === 'sql'" name="database" size="sm" />
+            <OIcon v-else name="show-chart" size="sm" />
+          </template>
+          {{ queryModeName(mode) }}
+        </OToggleGroupItem>
+      </OToggleGroup>
+      <p v-if="saveModeInfo" class="text-status-warning-text" data-test="alert-save-mode-warning">
+        {{ saveModeInfo }}
+      </p>
+      <p class="text-text-secondary text-xs" data-test="alert-save-mode-note">
+        {{ saveModeNote }}
+      </p>
+    </div>
+  </ODialog>
+
+  <EditorDraftDialogs :draft="alertDraft" />
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, watch, provide } from "vue";
+import { raw } from "@/types/i18n";
+import { defineComponent, computed, watch, provide, ref, onMounted } from "vue";
+import { useStore } from "vuex";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- used only in a template `as` cast (:destinations), which eslint-plugin-vue cannot see; vue-tsc keeps it honest
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -544,17 +641,20 @@ import JsonEditor from "../common/JsonEditor.vue";
 import QueryConfig from "./steps/QueryConfig.vue";
 import AlertSettings from "./steps/AlertSettings.vue";
 import CompareWithPast from "./steps/CompareWithPast.vue";
-import Deduplication from "./steps/Deduplication.vue";
 import Advanced from "./steps/Advanced.vue";
 import InlineSelectFolderDropdown from "../common/sidebar/InlineSelectFolderDropdown.vue";
 import PreviewAlert from "./PreviewAlert.vue";
 import AlertSummary from "./AlertSummary.vue";
 import AnomalyDetectionConfig from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.vue";
+import AnomalyDataPreview from "@/components/anomaly_detection/AnomalyDataPreview.vue";
 import AnomalyAlerting from "@/components/anomaly_detection/steps/AnomalyAlerting.vue";
 import AnomalySummary from "@/components/anomaly_detection/AnomalySummary.vue";
-import QueryEditor from "@/components/QueryEditor.vue";
-import { useAlertForm, defaultAlertValue } from "@/composables/useAlertForm";
+import { useAlertForm, defaultAlertValue, type AlertFormEmit } from "@/composables/useAlertForm";
+import { useAlertEditorDraft } from "@/composables/alerts/useAlertEditorDraft";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { anomalyNoticeBadgeKeys } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInlineEdit from "@/lib/forms/InlineEdit/OFormInlineEdit.vue";
@@ -564,6 +664,10 @@ import { useAutoName } from "@/composables/useAutoName";
 import { buildAlertAutoName } from "@/utils/autoName";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import CompositeAlertForm from "./composite/CompositeAlertForm.vue";
+import alertsService from "@/services/alerts";
 
 export default defineComponent({
   name: "ComponentAddUpdateAlert",
@@ -584,44 +688,162 @@ export default defineComponent({
       type: Array,
       default: () => [],
     },
+    folderId: {
+      type: String,
+      default: undefined,
+    },
   },
   emits: ["update:list", "cancel:hideform", "refresh:destinations", "refresh:templates"],
   components: {
     OIcon,
     OPageLayout,
+    OBanner,
     JsonEditor,
     QueryConfig,
     AlertSettings,
     CompareWithPast,
-    Deduplication,
     Advanced,
     PreviewAlert,
     AlertSummary,
     AnomalyDetectionConfig,
+    AnomalyDataPreview,
     AnomalyAlerting,
     AnomalySummary,
-    QueryEditor,
     InlineSelectFolderDropdown,
     OButton,
     OToggleGroup,
     OToggleGroupItem,
     ODrawer,
+    ODialog,
     OTag,
     OTooltip,
     OForm,
     OFormInlineEdit,
     OFormSelect,
     OPageHeader,
+    OTruncatedText,
+    CompositeAlertForm,
+    EditorDraftDialogs,
   },
   setup(props, { emit }) {
-    const alertForm = useAlertForm(props, emit);
+    const store = useStore();
+    // Bound once the draft exists; a save reports to the draft first, which decides whether the host navigates.
+    let onFormSaved: ((folderId?: string) => void) | null = null;
+    const formEmit = ((event: string, ...args: unknown[]) => {
+      if (event === "update:list" && onFormSaved) {
+        onFormSaved(args[0] as string | undefined);
+        return;
+      }
+      emit(event as Parameters<typeof emit>[0], ...args);
+    }) as AlertFormEmit;
+    const alertForm = useAlertForm(props, formEmit);
+    const alertEditorDraft = useAlertEditorDraft({
+      form: alertForm,
+      modelValue: () => props.modelValue,
+      onSaved: (folderId, options) => emit("update:list", folderId, options),
+    });
+    onFormSaved = alertEditorDraft.handleSaved;
+    onMounted(() => alertEditorDraft.start());
+
+    const cancelEditor = async () => {
+      if (await alertEditorDraft.draft.confirmLeave()) emit("cancel:hideform");
+    };
 
     // Share server SQL-validation squiggle ranges with the descendant query
     // editors (QueryEditorDialog / QueryConfig) via inject.
     provide("alertSqlErrorRanges", alertForm.sqlErrorRanges);
 
+    // SQL tab's Multi Alert value-column dropdown (sql_simple_multi_alert_fe_prd.md
+    // §11): PreviewAlert already calls /result_schema every time the preview
+    // query itself fires (its own reactive query watcher / editor-closed
+    // refresh) — reuse that response instead of a second, differently-timed
+    // fetch. QueryConfig's own watcher on this prop does the actual
+    // clear-if-missing comparison; this handler only forwards the list.
+    const handleSqlSchemaUpdated = (payload: { projections: string[]; hasHaving: boolean }) => {
+      alertForm.sqlAggColumnOptions.value = payload.projections;
+      alertForm.sqlQueryHasHaving.value = payload.hasHaving;
+    };
+
     const isAnomalyDetectionEnabled = computed(
       () => alertForm.store.state.zoConfig.anomaly_detection_enabled === true,
+    );
+
+    // §4.8: keyed off the config API's notice_class field alone.
+    const anomalyNoticeBadge = computed(() => {
+      const keys = anomalyNoticeBadgeKeys(alertForm.anomalyConfig.value.notice_class);
+      return keys ? { label: alertForm.t(keys.labelKey as any) } : null;
+    });
+    const anomalyNoticeTooltip = computed(() => {
+      const keys = anomalyNoticeBadgeKeys(alertForm.anomalyConfig.value.notice_class);
+      return raw(keys ? keys.tooltipKeys.map((k) => alertForm.t(k as any)).join(" ") : "");
+    });
+    const isCompositeMode = computed(() => alertForm.formData.value.is_real_time === "composite");
+    const availableCompositeChildren = ref<any[]>([]);
+
+    const loadCompositeChildren = async () => {
+      if (!isCompositeMode.value) return;
+      try {
+        const response = await alertsService.listByFolderId(
+          0,
+          1000,
+          "name",
+          false,
+          "",
+          alertForm.store.state.selectedOrganization.identifier,
+          undefined,
+          "",
+          "all",
+        );
+        const rows = Array.isArray(response.data?.list) ? response.data.list : [];
+        availableCompositeChildren.value = rows
+          .filter((row: any) => {
+            const id = row.alert_id ?? row.id;
+            return (
+              id && id !== alertForm.formData.value.id && row.alert_type !== "anomaly_detection"
+            );
+          })
+          .map((row: any) => ({
+            alert_id: row.alert_id ?? row.id,
+            name: row.name,
+            alert_type: row.alert_type,
+            folder_id: row.folder_id,
+            folder_name: row.folder_name,
+            enabled: row.enabled,
+            level: row.level,
+            stale: row.stale,
+            accessible: true,
+          }));
+      } catch {
+        availableCompositeChildren.value = [];
+      }
+    };
+
+    const updateCompositeDraft = (draft: any) => {
+      alertForm.setF("composite_condition", draft.composite_condition);
+      alertForm.setF("children", draft.children ?? []);
+    };
+
+    // Composite drafts validate asynchronously against the server; until the
+    // form reports a valid expression the Save button stays disabled (the schema
+    // blocks a bad expression on submit too — this is the visible affordance).
+    const compositeValidation = ref<{ valid: boolean }>({ valid: false });
+    const compositeSaveDisabled = computed(
+      () => isCompositeMode.value && compositeValidation.value.valid !== true,
+    );
+    const onCompositeValidation = (value: { valid: boolean }) => {
+      compositeValidation.value = value;
+    };
+
+    watch(
+      isCompositeMode,
+      (enabled) => {
+        if (!enabled) return;
+        // Fresh draft → re-validate before the button can re-enable on a stale
+        // `valid` from a previous visit to composite mode.
+        compositeValidation.value = { valid: false };
+        loadCompositeChildren();
+      },
+      { immediate: true },
     );
 
     // Auto-expand preview when stream name is selected, collapse when cleared
@@ -648,10 +870,26 @@ export default defineComponent({
       () => alertForm.previewAlertRef.value?.evaluationStatus || null,
     );
     const alertTypeOptions = computed(() => [
-      { label: alertForm.t("alerts.scheduled"), value: "false" },
-      { label: alertForm.t("alerts.realTime"), value: "true" },
+      { label: alertForm.t("alerts.scheduled"), value: "false", icon: "schedule" },
+      { label: alertForm.t("alerts.realTime"), value: "true", icon: "bolt" },
       ...(isAnomalyDetectionEnabled.value
-        ? [{ label: alertForm.t("alerts.anomalyDetection"), value: "anomaly" }]
+        ? [
+            {
+              label: alertForm.t("alerts.anomalyDetection"),
+              value: "anomaly",
+              icon: "query-stats",
+            },
+          ]
+        : []),
+      ...(alertForm.store.state.zoConfig.composite_alerts_available === true ||
+      isCompositeMode.value
+        ? [
+            {
+              label: alertForm.t("alerts.compositeAlert"),
+              value: "composite",
+              icon: "account-tree",
+            },
+          ]
         : []),
     ]);
 
@@ -701,6 +939,8 @@ export default defineComponent({
         path: "/alerts",
         query: {
           folder: alertForm.activeFolderId.value ?? "default",
+          tab: alertForm.router.currentRoute.value.query.tab,
+          org_identifier: store.state.selectedOrganization.identifier,
         },
       });
     };
@@ -713,6 +953,71 @@ export default defineComponent({
       alertForm.setF("stream_type", value);
       alertForm.updateStreams();
     };
+
+    // Alert type now lives in a toggle group, not an OFormSelect, so it writes
+    // the ONE form directly. The existing watch on is_real_time still drives the
+    // anomaly/composite tab switch.
+    const onAlertTypeChange = (value: unknown) => {
+      alertForm.setF("is_real_time", value);
+      // Realtime runs Builder only. The query text and Compare-with-Past windows
+      // stay in the form for a switch back; the payload never sends windows here.
+      if (value === "true" && alertForm.formData.value.query_condition?.type !== "custom") {
+        alertForm.setF("query_condition.type", "custom");
+      }
+    };
+
+    // ── Save-mode dialog copy ────────────────────────────────────────────────
+    // Mode names match the QueryConfig mode toggle.
+    const queryModeName = (mode: string) =>
+      mode === "sql"
+        ? raw("SQL")
+        : mode === "promql"
+          ? raw("PromQL")
+          : alertForm.t("alerts.queryBuilder");
+
+    // Names the modes that are set up; an empty selected mode is named first.
+    const saveModeLead = computed(() => {
+      const selected = alertForm.formData.value.query_condition?.type || "custom";
+      const [first, second, third] = alertForm.queryModesWithContent.value.map(queryModeName);
+      if (alertForm.queryModesWithContent.value.includes(selected)) {
+        return third
+          ? alertForm.t("alerts.saveModeDialog.leadAllSetUp", { first, second, third })
+          : alertForm.t("alerts.saveModeDialog.leadBothSetUp", { first, second });
+      }
+      return second
+        ? alertForm.t("alerts.saveModeDialog.leadSelectedEmptyTwoOthers", {
+            selected: queryModeName(selected),
+            first,
+            second,
+          })
+        : alertForm.t("alerts.saveModeDialog.leadSelectedEmptyOneOther", {
+            selected: queryModeName(selected),
+            other: first,
+          });
+    });
+
+    // Only warns, and only when the picked mode is empty by the same rule as the lead.
+    const saveModeInfo = computed(() => {
+      const pick = alertForm.saveModePick.value;
+      if (alertForm.queryModesWithContent.value.includes(pick)) return null;
+      return pick === "custom"
+        ? alertForm.t("alerts.saveModeDialog.noFilters", {
+            stream: alertForm.formData.value.stream_name,
+          })
+        : alertForm.t("alerts.saveModeDialog.noQuery");
+    });
+
+    // Says what runs: the picked mode only. Names the other modes that hold content.
+    const saveModeNote = computed(() => {
+      const pick = alertForm.saveModePick.value;
+      const [first, second] = alertForm.queryModesWithContent.value
+        .filter((mode) => mode !== pick)
+        .map(queryModeName);
+      const params = { pick: queryModeName(pick), first, second, other: first };
+      if (second) return alertForm.t("alerts.saveModeDialog.noteTwoOthersUnused", params);
+      if (first) return alertForm.t("alerts.saveModeDialog.noteOneOtherUnused", params);
+      return alertForm.t("alerts.saveModeDialog.noteOnlyPick", params);
+    });
 
     // ── Smart alert name ─────────────────────────────────────────────────────
     // A new alert names itself after what it actually watches ("k8s_logs where
@@ -731,16 +1036,33 @@ export default defineComponent({
     });
 
     return {
+      raw,
       ...alertForm,
+      alertDraft: alertEditorDraft.draft,
+      draftFormKey: alertEditorDraft.formKey,
+      cancelEditor,
       alertAutoName,
       headerModeLabel,
       isAnomalyDetectionEnabled,
+      anomalyNoticeBadge,
+      anomalyNoticeTooltip,
       alertTypeOptions,
       alertTabs,
       activeFolderName,
       goBackToAlertsList,
       onStreamTypeChange,
+      onAlertTypeChange,
+      queryModeName,
+      saveModeLead,
+      saveModeInfo,
+      saveModeNote,
       activeEvaluationStatus,
+      isCompositeMode,
+      availableCompositeChildren,
+      updateCompositeDraft,
+      compositeSaveDisabled,
+      onCompositeValidation,
+      handleSqlSchemaUpdated,
     };
   },
 });

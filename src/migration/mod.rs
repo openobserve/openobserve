@@ -21,7 +21,7 @@
 //! - `migrate-file-list`: Migrate file_list related tables only
 
 use ::config::DB_SCHEMA_VERSION;
-use infra::db::{ORM_CLIENT, ORM_CLIENT_DDL, connect_to_orm, connect_to_orm_ddl};
+use infra::db::{get_orm_client_ddl, get_orm_client_ro, get_orm_client_rw};
 
 mod adapter;
 mod config;
@@ -32,8 +32,9 @@ pub use config::MigrationConfig;
 pub use migrator::{run_file_list, run_meta};
 
 pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
-    // we init client here to avoid deadlocks
-    ORM_CLIENT.get_or_init(connect_to_orm).await;
+    // warm both pools before the migration starts hitting them
+    get_orm_client_ro().await;
+    get_orm_client_rw().await;
     // a missing version is Ok(0), so an error here means the db is
     // unreachable or overloaded: never assume a fresh install, retry then abort
     const MAX_RETRIES: usize = 5;
@@ -79,7 +80,7 @@ pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
     }
 
     // we initialize both clients here to avoid potential deadlock afterwards
-    ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
+    get_orm_client_ddl().await;
 
     // migrate infra_sea_orm
     if let Err(e) = infra::table::migrate().await {

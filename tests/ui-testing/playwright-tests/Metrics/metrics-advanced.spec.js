@@ -269,7 +269,7 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
     }
 
     // Verify page is still functional after running subqueries
-    const pageStable = await page.locator('body').isVisible();
+    const pageStable = await pm.metricsPage.getBodyElement().isVisible();
     expect(pageStable).toBe(true);
     testLogger.info('Subquery and nested expression tests completed');
   });

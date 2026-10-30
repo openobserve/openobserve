@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
     role="img"
-    aria-label="Waiting for data to arrive"
+    :aria-label="t('emptyState.illustrations.waiting.ariaLabel')"
   >
     <!-- soft halo + dots -->
     <circle cx="138" cy="138" r="96" fill="var(--color-primary-500)" opacity="0.05" />
@@ -232,5 +232,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { useI18nTyped } from "@/types/i18n";
+
 withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 300, animated: true });
+
+const { t } = useI18nTyped();
 </script>

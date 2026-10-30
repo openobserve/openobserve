@@ -47,10 +47,37 @@ use super::validator::{AuthError, AuthValidationResult, RequestData};
 #[cfg(any(feature = "enterprise", test))]
 fn may_skip_permission_check(
     is_list_invite_call: bool,
+    is_reject_invite_call: bool,
     is_member_subscription: bool,
     is_org_list_call: bool,
 ) -> bool {
-    is_list_invite_call || is_member_subscription || is_org_list_call
+    is_list_invite_call || is_reject_invite_call || is_member_subscription || is_org_list_call
+}
+
+/// Only the top-level org list filters by the caller's email; an org-scoped list does not.
+#[cfg(any(feature = "enterprise", test))]
+fn is_top_level_org_list(path_columns: &[&str], method: &str) -> bool {
+    matches!(path_columns, ["organizations"]) && method == "LIST"
+}
+
+/// A license path names no org, and like the other license writes it needs a `_meta` member.
+#[cfg(any(feature = "enterprise", test))]
+fn user_lookup_org<'a>(path_columns: &[&'a str]) -> &'a str {
+    if openobserve_core::auth::is_license_path_without_org(path_columns) {
+        config::META_ORG_ID
+    } else {
+        openobserve_core::auth::org_from_path(path_columns)
+    }
+}
+
+/// Foreign-`aud` MCP tokens pass only on /{org}/mcp or our own loopback calls.
+#[cfg(any(feature = "enterprise", test))]
+fn relaxes_audience_check(path_columns: &[&str], mcp_marker: Option<&[u8]>) -> bool {
+    let is_mcp_endpoint = path_columns.len() == 2 && path_columns[1] == "mcp";
+    is_mcp_endpoint
+        || mcp_marker.is_some_and(|v| {
+            config::utils::str::constant_time_eq(v, config::cluster::MCP_LOOPBACK_SECRET.as_bytes())
+        })
 }
 
 #[cfg(feature = "enterprise")]
@@ -58,33 +85,16 @@ pub async fn token_validator(
     req_data: &RequestData,
     auth_info: &AuthExtractor,
 ) -> Result<AuthValidationResult, AuthError> {
-    use openobserve_core::{auth::V2_API_PREFIX, authz::check_permissions};
+    use openobserve_core::{auth::routed_path, authz::check_permissions};
 
     let user;
     let keys = get_dex_jwks().await;
-    let path = match req_data
-        .uri
-        .path()
-        .strip_prefix(format!("{}/api/", config::get_config().common.base_uri).as_str())
-    {
-        Some(path) => path,
-        None => req_data.uri.path(),
-    };
-    let path = path.strip_prefix("/").unwrap_or(path);
+    let path = routed_path(req_data.uri.path());
     let path_columns = path.split('/').collect::<Vec<&str>>();
 
-    // Check if this is an MCP endpoint request or has the MCP header
-    let is_mcp_endpoint = path_columns.get(1).map(|s| *s == "mcp").unwrap_or(false);
-    let has_mcp_header = req_data
-        .headers
-        .get("x-o2-mcp")
-        .and_then(|v| v.to_str().ok())
-        .map(|v| v == "true")
-        .unwrap_or_default();
-    let is_mcp_request = is_mcp_endpoint || has_mcp_header;
-
-    // For MCP requests with dynamic clients, skip audience validation
-    let login_flow = !is_mcp_request;
+    let mcp_marker = req_data.headers.get("x-o2-mcp").map(|v| v.as_bytes());
+    // MCP clients register dynamically with Dex, so their `aud` cannot match our client_id
+    let login_flow = !relaxes_audience_check(&path_columns, mcp_marker);
 
     match jwt::verify_decode_token(
         auth_info.auth.strip_prefix("Bearer").unwrap().trim(),
@@ -125,13 +135,18 @@ pub async fn token_validator(
                 // that particular user only, we can skip other checks, and allow listing
                 let is_list_invite_call = path_columns.len() == 1
                     && path_columns.first().is_some_and(|p| p.eq(&"invites"))
-                    && (auth_info.method.eq("GET") || auth_info.method.eq("DELETE"));
+                    && auth_info.method.eq("GET");
+
+                let is_reject_invite_call = path_columns.len() == 2
+                    && path_columns.first().is_some_and(|p| p.eq(&"invites"))
+                    && auth_info.method.eq("DELETE");
 
                 let path_suffix = path_columns.last().unwrap_or(&"");
                 if path_suffix.eq(&"organizations")
                     || path_suffix.eq(&"clusters")
                     || is_member_subscription
                     || is_list_invite_call
+                    || is_reject_invite_call
                 {
                     let db_user = db::user::get_db_user(user_id).await;
                     user = match db_user {
@@ -155,14 +170,8 @@ pub async fn token_validator(
                     }
                 } else {
                     user = match path.find('/') {
-                        Some(index) => {
-                            let org_id =
-                                if path_columns.len() > 1 && path_columns[0].eq(V2_API_PREFIX) {
-                                    path_columns[1]
-                                } else {
-                                    &path[0..index]
-                                };
-                            users::get_user(Some(org_id), user_id).await
+                        Some(_) => {
+                            users::get_user(Some(user_lookup_org(&path_columns)), user_id).await
                         }
                         None => {
                             if path_columns.len() == 1 && path_columns[0] == "license" {
@@ -208,8 +217,9 @@ pub async fn token_validator(
                     // bypass. Similarly specifically for org list, we check by email
                     None if may_skip_permission_check(
                         is_list_invite_call,
+                        is_reject_invite_call,
                         is_member_subscription,
-                        path_suffix.eq(&"organizations") && auth_info.method.eq("LIST"),
+                        is_top_level_org_list(&path_columns, &auth_info.method),
                     ) =>
                     {
                         // Allow these special cases without requiring user in DB
@@ -217,6 +227,8 @@ pub async fn token_validator(
                             user_email: res.0.user_email.clone(),
                             user_role: None,
                             is_internal_user: false,
+                            token_name: None,
+                            delegation: None,
                         })
                     }
                     Some(user) => {
@@ -237,6 +249,8 @@ pub async fn token_validator(
                                 user_email,
                                 user_role: Some(user_role),
                                 is_internal_user: !is_external,
+                                token_name: None,
+                                delegation: None,
                             })
                         } else {
                             Err(AuthError::Forbidden("Forbidden".to_string()))
@@ -269,18 +283,28 @@ mod tests {
     /// those handlers re-verify identity by email.
     #[test]
     fn path_scoped_exemptions_are_intentional() {
-        assert!(may_skip_permission_check(true, false, false), "invites");
         assert!(
-            may_skip_permission_check(false, true, false),
+            may_skip_permission_check(true, false, false, false),
+            "invites"
+        );
+        assert!(
+            may_skip_permission_check(false, true, false, false),
+            "invite reject"
+        );
+        assert!(
+            may_skip_permission_check(false, false, true, false),
             "member_subscription"
         );
-        assert!(may_skip_permission_check(false, false, true), "org LIST");
+        assert!(
+            may_skip_permission_check(false, false, false, true),
+            "org LIST"
+        );
     }
 
     /// A user absent from the target org, on an ordinary route, is not exempt.
     #[test]
     fn ordinary_request_for_nonmember_is_not_exempt() {
-        assert!(!may_skip_permission_check(false, false, false));
+        assert!(!may_skip_permission_check(false, false, false, false));
     }
 
     /// SECURITY REGRESSION GUARD: an MCP-flagged request must NOT skip the
@@ -302,12 +326,66 @@ mod tests {
         // match one of the three path-scoped pre-provisioning cases. There is
         // no MCP input that flips the result.
         assert!(
-            !may_skip_permission_check(false, false, false),
+            !may_skip_permission_check(false, false, false, false),
             "SECURITY: a request that matches none of the invite / \
              member_subscription / org-LIST cases must be permission-checked, \
              regardless of whether it is an MCP request. The MCP exemption \
              (allow_nonexistent_user) was a cross-org authorization bypass and \
              must not return."
         );
+    }
+
+    #[test]
+    fn only_the_top_level_org_list_is_exempt() {
+        assert!(is_top_level_org_list(&["organizations"], "LIST"));
+        assert!(!is_top_level_org_list(&["_meta", "organizations"], "LIST"));
+        assert!(!is_top_level_org_list(&["acme", "organizations"], "LIST"));
+        assert!(!is_top_level_org_list(&["organizations"], "POST"));
+        assert!(!is_top_level_org_list(&["organizations"], "GET"));
+    }
+
+    #[test]
+    fn mcp_endpoint_relaxes_audience_check() {
+        assert!(relaxes_audience_check(&["default", "mcp"], None));
+    }
+
+    #[test]
+    fn paths_below_mcp_keep_audience_check() {
+        assert!(!relaxes_audience_check(&["default", "mcp", "_json"], None));
+        assert!(!relaxes_audience_check(&["default", "mcp", "x"], None));
+    }
+
+    #[test]
+    fn non_mcp_path_without_marker_keeps_audience_check() {
+        assert!(!relaxes_audience_check(&["default", "_search"], None));
+    }
+
+    #[test]
+    fn client_supplied_mcp_marker_keeps_audience_check() {
+        let same_length = vec![b'0'; config::cluster::MCP_LOOPBACK_SECRET.len()];
+        for forged in [&b"true"[..], b"", b"not-the-secret", &same_length] {
+            assert!(!relaxes_audience_check(
+                &["default", "_search"],
+                Some(forged)
+            ));
+        }
+    }
+
+    #[test]
+    fn license_refresh_looks_the_user_up_in_meta() {
+        assert_eq!(user_lookup_org(&["license", "refresh"]), "_meta");
+        assert_eq!(user_lookup_org(&["acme", "license", "refresh"]), "acme");
+        assert_eq!(user_lookup_org(&["license", "refresh", ""]), "license");
+        assert_eq!(user_lookup_org(&["acme", "streams"]), "acme");
+        assert_eq!(user_lookup_org(&["v2", "acme", "downtimes"]), "acme");
+    }
+
+    #[test]
+    fn loopback_secret_relaxes_audience_check() {
+        let secret = config::cluster::MCP_LOOPBACK_SECRET.as_bytes();
+        assert!(relaxes_audience_check(
+            &["default", "_search"],
+            Some(secret)
+        ));
     }
 }

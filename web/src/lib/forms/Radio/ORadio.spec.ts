@@ -69,4 +69,33 @@ describe("ORadio", () => {
 
     expect(wrapper.find("button").classes()).toContain("size-3");
   });
+
+  it("renders the card variant as one selectable surface", async () => {
+    wrapper = mount(ORadioGroup, {
+      props: { modelValue: "" },
+      slots: {
+        default: `
+          <ORadio value="manifest" variant="card" data-test="radio-card">
+            <template #label>
+              <strong>Create with manifest</strong>
+              <span>Recommended setup</span>
+            </template>
+          </ORadio>
+        `,
+      },
+      global: { components: { ORadio } },
+    });
+
+    const surface = wrapper.find("label");
+    expect(surface.attributes("data-variant")).toBe("card");
+    expect(surface.find('[role="radio"]').exists()).toBe(true);
+
+    await surface.trigger("click");
+    expect(wrapper.emitted("update:modelValue")?.[0]?.[0]).toBe("manifest");
+  });
+
+  it("keeps the default radio layout unchanged", () => {
+    wrapper = mountRadioInGroup();
+    expect(wrapper.find("label").attributes("data-variant")).toBeUndefined();
+  });
 });

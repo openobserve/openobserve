@@ -1,0 +1,59 @@
+[
+  {
+    "id": "sqlcommenter-traceparent-a",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "SELECT id, total FROM orders WHERE user_id = $1 /*traceparent='00-f0e1d2c3b4a5968778695a4b3c2d1e0f-00f067aa0ba902b7-01',application='checkout-svc'*/"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT id, total FROM orders WHERE user_id = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_orders_by_user",
+    "literals": [
+      "00-f0e1d2c3b4a5968778695a4b3c2d1e0f-00f067aa0ba902b7-01",
+      "checkout-svc"
+    ],
+    "source": "authored"
+  },
+  {
+    "id": "sqlcommenter-traceparent-b",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "SELECT id, total FROM orders WHERE user_id = $1 /*traceparent='00-aa11bb22cc33dd44ee55ff6677889900-1122334455667788-01',application='checkout-svc'*/"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT id, total FROM orders WHERE user_id = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_orders_by_user",
+    "literals": [
+      "00-aa11bb22cc33dd44ee55ff6677889900-1122334455667788-01"
+    ],
+    "source": "authored"
+  }
+]

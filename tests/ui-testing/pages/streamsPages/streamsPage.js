@@ -3,6 +3,7 @@ import { LoginPage } from '../generalPages/loginPage.js';
 import { LogsPage } from '../logsPages/logsPage.js';
 import { IngestionPage } from '../generalPages/ingestionPage.js';
 import { ManagementPage } from '../generalPages/managementPage.js';
+import { gotoStreamsViaNav } from '../commonActions.js';
 
 import { getHeaders, getIngestionUrl, sendRequest } from '../../utils/apiUtils.js';
 const http = require('http');
@@ -273,7 +274,7 @@ export class StreamsPage {
 
     // Methods from legacy streamsPage.js
     async gotoStreamsPage() {
-        await this.page.locator('[data-test="menu-link-\\/streams-item"]').click();
+        await gotoStreamsViaNav(this.page);
     }
 
     async streamsPageDefaultOrg() {
@@ -311,14 +312,7 @@ export class StreamsPage {
         await schemaBtn.click();
     }
 
-    async searchForField(fieldName) {
-        // OInput exposes the fillable inner <input> via `${parent}-field`. The
-        // wrapper `data-test="schema-field-search-input"` resolves to a <div>
-        // which page.fill() rejects.
-        const field = this.page.locator('[data-test="schema-field-search-input-field"]');
-        await field.click();
-        await field.fill(fieldName);
-    }
+
 
     async selectFullTextSearch() {
         // Per-row OSelect on schema.vue uses data-test "schema-field-<row>-index-type-select".
@@ -587,51 +581,54 @@ export class StreamsPage {
             }
         };
 
+        const postStream = async () => {
+            try {
+                if (process.env.IS_CLOUD === 'true') {
+                    // On cloud, management APIs require OIDC session cookies — use browser context
+                    return await this.page.evaluate(async ({ orgId, streamName, streamType, payload }) => {
+                        const r = await fetch(`/api/${orgId}/streams/${streamName}?type=${streamType}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload),
+                        });
+                        const text = await r.text();
+                        try { return { status: r.status, data: JSON.parse(text) }; }
+                        catch { return { status: r.status, data: text }; }
+                    }, { orgId, streamName, streamType, payload });
+                }
+
+                // Self-hosted: use node-fetch with Basic Auth
+                const response = await _nodeFetchSafe(`${process.env.INGESTION_URL}/api/${orgId}/streams/${streamName}?type=${streamType}`, {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify(payload)
+                });
+                return { status: response.status, data: await response.json() };
+            } catch (error) {
+                return { status: 500, error: error.message };
+            }
+        };
+        const failureMessage = (result) => result.data?.message || result.error || '';
+
         testLogger.info('Creating stream via API', { streamName, streamType });
 
-        try {
-            if (process.env.IS_CLOUD === 'true') {
-                // On cloud, management APIs require OIDC session cookies — use browser context
-                const result = await this.page.evaluate(async ({ orgId, streamName, streamType, payload }) => {
-                    const r = await fetch(`/api/${orgId}/streams/${streamName}?type=${streamType}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload),
-                    });
-                    const text = await r.text();
-                    try { return { status: r.status, data: JSON.parse(text) }; }
-                    catch { return { status: r.status, data: text }; }
-                }, { orgId, streamName, streamType, payload });
-
-                if (result.status === 200) {
-                    testLogger.info('Stream created successfully (cloud)', { streamName });
-                } else {
-                    testLogger.warn('Stream creation returned non-200 (cloud)', { streamName, status: result.status });
-                }
-                return result;
-            }
-
-            // Self-hosted: use node-fetch with Basic Auth
-            const headers = getHeaders();
-            const response = await _nodeFetchSafe(`${process.env.INGESTION_URL}/api/${orgId}/streams/${streamName}?type=${streamType}`, {
-                method: 'POST',
-                headers: headers,
-                body: JSON.stringify(payload)
-            });
-
-            const data = await response.json();
-
-            if (response.status === 200 && data.code === 200) {
-                testLogger.info('Stream created successfully', { streamName });
-            } else {
-                testLogger.warn('Stream creation returned non-200 or already exists', { streamName, status: response.status });
-            }
-
-            return { status: response.status, data };
-        } catch (error) {
-            testLogger.error('Failed to create stream', { streamName, error: error.message });
-            return { status: 500, error: error.message };
+        // Alpha's NATS fails some stream creates with a 500 that clears seconds later; carrying on leaves a stream pipelines can't write to.
+        let result = await postStream();
+        for (let attempt = 2; attempt <= 3 && result.status >= 500; attempt++) {
+            testLogger.warn('Stream creation failed, retrying', { streamName, status: result.status, message: failureMessage(result), attempt });
+            await this.page.waitForTimeout(5000);
+            result = await postStream();
         }
+        if (result.status >= 500) {
+            throw new Error(`Stream ${streamName} was not created: ${result.status} ${failureMessage(result)}`);
+        }
+
+        if (result.status === 200) {
+            testLogger.info('Stream created successfully', { streamName });
+        } else {
+            testLogger.warn('Stream creation returned non-200 or already exists', { streamName, status: result.status });
+        }
+        return result;
     }
 
     /**
@@ -695,26 +692,25 @@ export class StreamsPage {
 
         testLogger.info('Querying stream via API', { streamName });
 
-        // Query for last 10 minutes
-        const endTime = Date.now() * 1000; // microseconds
-        const startTime = endTime - (10 * 60 * 1000 * 1000);
+        // One query attempt over the last 10 minutes. Recomputed per attempt so the window
+        // always trails "now" while we poll.
+        const runQuery = async () => {
+            const endTime = Date.now() * 1000; // microseconds
+            const startTime = endTime - (10 * 60 * 1000 * 1000);
+            const query = {
+                query: {
+                    sql: `SELECT * FROM "${streamName}"`,
+                    start_time: startTime,
+                    end_time: endTime,
+                    from: 0,
+                    size: 1000
+                }
+            };
 
-        const query = {
-            query: {
-                sql: `SELECT * FROM "${streamName}"`,
-                start_time: startTime,
-                end_time: endTime,
-                from: 0,
-                size: 1000
-            }
-        };
-
-        try {
             let data;
-
             if (process.env.IS_CLOUD === 'true') {
                 // Cloud: use browser context (sends OIDC session cookies)
-                const result = await this.page.evaluate(async ({ orgId, query }) => {
+                data = await this.page.evaluate(async ({ orgId, query }) => {
                     const r = await fetch(`/api/${orgId}/_search?type=logs`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -722,7 +718,6 @@ export class StreamsPage {
                     });
                     return await r.json();
                 }, { orgId, query });
-                data = result;
             } else {
                 // Self-hosted: use node-fetch with Basic Auth
                 const headers = getHeaders();
@@ -733,17 +728,28 @@ export class StreamsPage {
                 });
                 data = await response.json();
             }
+            return (data && data.hits) || [];
+        };
 
-            const results = data.hits || [];
-
-            testLogger.info('Query results', { streamName, recordCount: results.length });
-
-            if (expectedMinCount !== null && expectedMinCount !== 0) {
+        try {
+            // When a minimum count is expected, POLL until it's reached. Records routed through
+            // a pipeline land asynchronously (pipeline processing + WAL/index lag), so a single
+            // query routinely catches a partial result ("Expected at least 5 records, got 3").
+            // Non-masking: if the count never arrives within the window, we still throw.
+            let results = await runQuery();
+            if (expectedMinCount !== null && expectedMinCount !== 0 && results.length < expectedMinCount) {
+                const deadline = Date.now() + 30000; // up to 30s for records to land
+                while (Date.now() < deadline && results.length < expectedMinCount) {
+                    await this.page.waitForTimeout(3000);
+                    results = await runQuery();
+                    testLogger.info('Query results (poll)', { streamName, recordCount: results.length, expectedMinCount });
+                }
                 if (results.length < expectedMinCount) {
                     throw new Error(`Expected at least ${expectedMinCount} records, got ${results.length}`);
                 }
             }
 
+            testLogger.info('Query results', { streamName, recordCount: results.length });
             return results;
         } catch (error) {
             testLogger.error('Failed to query stream', { streamName, error: error.message });
@@ -1192,6 +1198,13 @@ export class StreamsPage {
      */
     getFullTextSearchOption() {
         return this.page.locator('[data-test$="-index-type-select-option"][data-test-value="fullTextSearchKey"]').first();
+    }
+
+    /**
+     * Dismiss an open dropdown/popover by clicking an empty corner of the page body
+     */
+    async clickBodyToDismiss() {
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
     }
 
     /**

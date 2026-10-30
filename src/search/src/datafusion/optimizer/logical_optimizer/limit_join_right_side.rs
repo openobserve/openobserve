@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use config::TIMESTAMP_COL_NAME;
+use config::{TIMESTAMP_COL_NAME, meta::stream::StreamType};
 use datafusion::{
     common::{
         Column, Result,
@@ -35,11 +35,12 @@ use crate::datafusion::{
 #[derive(Default, Debug)]
 pub struct LimitJoinRightSide {
     limit: usize,
+    stream_type: StreamType,
 }
 
 impl LimitJoinRightSide {
-    pub fn new(limit: usize) -> Self {
-        Self { limit }
+    pub fn new(limit: usize, stream_type: StreamType) -> Self {
+        Self { limit, stream_type }
     }
 }
 
@@ -80,7 +81,7 @@ impl OptimizerRule for LimitJoinRightSide {
                 // limit the right side output size
                 let mut plan = (*join.right)
                     .clone()
-                    .rewrite(&mut AddSortAndLimit::new(self.limit, 0))?
+                    .rewrite(&mut AddSortAndLimit::new(self.limit, 0, self.stream_type))?
                     .data;
                 if !right_column.is_empty() {
                     // deduplication on join key
@@ -182,6 +183,7 @@ mod tests {
 
     use arrow::array::{Int64Array, StringArray};
     use arrow_schema::{DataType, Field, Schema};
+    use config::meta::stream::StreamType;
     use datafusion::{
         arrow::record_batch::RecordBatch,
         common::Result,
@@ -193,18 +195,21 @@ mod tests {
     };
 
     use super::LimitJoinRightSide;
-    use crate::datafusion::planner::extension_planner::OpenobserveQueryPlanner;
+    use crate::datafusion::{
+        planner::extension_planner::OpenobserveQueryPlanner,
+        table_provider::empty_table::NewEmptyTable,
+    };
 
     #[test]
     fn test_limit_join_right_side_name() {
-        let rule = LimitJoinRightSide::new(10);
+        let rule = LimitJoinRightSide::new(10, StreamType::Logs);
         assert_eq!(rule.name(), "limit_join_right_side");
     }
 
     #[test]
     fn test_limit_join_right_side_apply_order() {
         use datafusion::optimizer::optimizer::ApplyOrder;
-        let rule = LimitJoinRightSide::new(10);
+        let rule = LimitJoinRightSide::new(10, StreamType::Logs);
         assert_eq!(rule.apply_order(), Some(ApplyOrder::TopDown));
     }
 
@@ -233,7 +238,7 @@ mod tests {
             .with_query_planner(Arc::new(OpenobserveQueryPlanner::new()))
             .build();
         let ctx = SessionContext::new_with_state(state);
-        ctx.add_optimizer_rule(Arc::new(LimitJoinRightSide::new(50_000)));
+        ctx.add_optimizer_rule(Arc::new(LimitJoinRightSide::new(50_000, StreamType::Logs)));
         let provider1 = MemTable::try_new(schema.clone(), vec![vec![batch.clone()]]).unwrap();
         ctx.register_table("t1", Arc::new(provider1)).unwrap();
 
@@ -288,7 +293,7 @@ mod tests {
             .with_default_features()
             .build();
         let ctx = SessionContext::new_with_state(state);
-        ctx.add_optimizer_rule(Arc::new(LimitJoinRightSide::new(50_000)));
+        ctx.add_optimizer_rule(Arc::new(LimitJoinRightSide::new(50_000, StreamType::Logs)));
         let provider1 = MemTable::try_new(schema.clone(), vec![vec![batch.clone()]]).unwrap();
         let provider2 = MemTable::try_new(schema, vec![vec![batch.clone()], vec![batch]]).unwrap();
         ctx.register_table("t1", Arc::new(provider1)).unwrap();
@@ -327,6 +332,55 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_metrics_join_right_side_keeps_timestamp_sort() -> Result<()> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("id", DataType::Int64, false),
+            Field::new("_timestamp", DataType::Int64, false),
+        ]));
+        let state = SessionStateBuilder::new()
+            .with_config(SessionConfig::new().with_target_partitions(12))
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
+            .with_query_planner(Arc::new(OpenobserveQueryPlanner::new()))
+            .with_default_features()
+            .build();
+        let ctx = SessionContext::new_with_state(state);
+        ctx.add_optimizer_rule(Arc::new(LimitJoinRightSide::new(
+            50_000,
+            StreamType::Metrics,
+        )));
+        ctx.register_table(
+            "t1",
+            Arc::new(NewEmptyTable::new("t1", schema.clone()).with_partitions(12)),
+        )?;
+        ctx.register_table(
+            "t2",
+            Arc::new(NewEmptyTable::new("t2", schema).with_partitions(12)),
+        )?;
+
+        let logical_plan = ctx
+            .state()
+            .create_logical_plan("SELECT t1.id FROM t1 JOIN t2 ON t1.id = t2.id")
+            .await?;
+        let physical_plan = ctx.state().create_physical_plan(&logical_plan).await?;
+        let plan = get_plan_string(&physical_plan);
+
+        assert!(
+            plan.iter()
+                .any(|line| { line.contains("SortExec: TopK(fetch=50000), expr=[_timestamp") }),
+            "metrics join right side must retain its timestamp sort:\n{}",
+            plan.join("\n")
+        );
+        assert!(
+            plan.iter()
+                .all(|line| !line.contains("sort_order=timestamp_desc")),
+            "metrics scans must not claim timestamp-descending input:\n{}",
+            plan.join("\n")
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_join_three_table() -> Result<()> {
         let schema = Arc::new(Schema::new(vec![
             Field::new("usr_id", DataType::Int64, false),
@@ -351,7 +405,7 @@ mod tests {
             .with_default_features()
             .build();
         let ctx = SessionContext::new_with_state(state);
-        ctx.add_optimizer_rule(Arc::new(LimitJoinRightSide::new(50_000)));
+        ctx.add_optimizer_rule(Arc::new(LimitJoinRightSide::new(50_000, StreamType::Logs)));
         let provider1 = MemTable::try_new(schema.clone(), vec![vec![batch.clone()]]).unwrap();
         let provider2 = MemTable::try_new(
             schema.clone(),
@@ -399,7 +453,7 @@ mod tests {
     #[test]
     fn test_limit_join_right_side_rule_metadata() {
         use datafusion::optimizer::OptimizerRule;
-        let rule = LimitJoinRightSide::new(100);
+        let rule = LimitJoinRightSide::new(100, StreamType::Logs);
         assert_eq!(rule.name(), "limit_join_right_side");
         assert_eq!(
             rule.apply_order(),

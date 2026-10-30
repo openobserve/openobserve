@@ -21,15 +21,16 @@
       :key="JSON.stringify(data) + index"
     >
       <div class="mb-1.25 flex justify-between">
-        <div
+        <OTruncatedText
+          as="div"
           @click="onDrilldownClick(index)"
-          class="w-62.5 cursor-pointer truncate pl-2.5"
+          class="w-62.5 cursor-pointer ps-2.5"
           :data-test="`dashboard-addpanel-config-drilldown-name-${index}`"
         >
           {{ Number(index) + 1 }}. {{ data.name }}
-        </div>
+        </OTruncatedText>
         <OIcon
-          class="mr-1 cursor-pointer"
+          class="me-1 cursor-pointer"
           size="sm"
           name="close"
           @click="removeDrilldownByIndex(index)"
@@ -57,21 +58,21 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, inject, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, inject, ref, onBeforeMount } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import DrilldownPopUp from "./DrilldownPopUp.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
-import { onBeforeMount } from "vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 export default defineComponent({
   name: "Drilldown",
-  components: { DrilldownPopUp, OButton, OIcon },
+  components: { OTruncatedText, DrilldownPopUp, OButton, OIcon },
   props: ["variablesData"],
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const showDrilldownPopUp = ref(false);
     const isDrilldownEditMode = ref(false);
@@ -81,7 +82,7 @@ export default defineComponent({
     const drilldownPopUpKey = ref(0);
 
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     onBeforeMount(() => {
       // Ensure that the drilldown object is initialized in config

@@ -19,15 +19,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- select new folder -->
     <OSelect
       v-model="selectedFolder"
-      :label="t('dashboard.selectFolderLabel')"
+      :label="t(folderKey(type, 'dashboard.selectFolderLabel'))"
       :options="folderOptions"
-      :placeholder="excludeFolderId ? t('dashboard.selectFolderPlaceholder') : undefined"
+      :placeholder="
+        excludeFolderId ? t(folderKey(type, 'dashboard.selectFolderPlaceholder')) : undefined
+      "
       :data-test="`${type}-index-dropdown-stream_type`"
       labelKey="label"
       valueKey="value"
-      class="mr-1 flex-1"
+      class="me-1 flex-1"
       :disabled="disableDropdown"
     >
+      <!-- The trigger paints no per-option icon of its own, so the selected
+           folder's icon comes in through #icon-left. Omitted entirely while
+           nothing is selected — an empty field has no folder to stand for. -->
+      <template v-if="selectedFolder" #icon-left>
+        <FolderIcon :token="selectedFolderIcon" class="text-select-text" />
+      </template>
       <template #empty>{{ t("search.noResult") }}</template>
     </OSelect>
 
@@ -37,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon-xs-sq"
         class="h-8! w-8!"
         :data-test="`${type}-folder-move-new-add`"
-        title="Add Folder"
+        :title="t(folderKey(type, 'common.addFolder'))"
         :disabled="disableDropdown"
         @mousedown.prevent
         @click="
@@ -61,19 +69,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, onActivated, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, onActivated, ref, watch, computed } from "vue";
+import { useI18nTyped } from "@/types/i18n";
+import { folderKey } from "./folderTerms";
 import { useStore } from "vuex";
 import AddFolder from "./AddFolder.vue";
 import { useRoute } from "vue-router";
-import { computed } from "vue";
 import { getFoldersListByType } from "@/utils/commons";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { useFolderIcons } from "@/composables/useFolderIcons";
+import { folderIconOption } from "./folderIconOption";
+import FolderIcon from "./FolderIcon.vue";
 
 export default defineComponent({
   name: "SelectedFolderDropdown",
-  components: { AddFolder, OButton, OSelect },
+  components: { AddFolder, OButton, OSelect, FolderIcon },
   emits: ["folder-selected"],
   props: {
     activeFolderId: {
@@ -118,12 +129,25 @@ export default defineComponent({
     const store: any = useStore();
     const route = useRoute();
     const showAddFolderDialog: any = ref(false);
+    const { iconFor } = useFolderIcons();
+
+    const selectedFolderIcon = computed(() =>
+      iconFor(
+        (store.state.organizationData.foldersByType[props.type] ?? []).find(
+          (item: any) => item.folderId === selectedFolder.value,
+        ),
+      ),
+    );
 
     const folderOptions = computed(() =>
       (store.state.organizationData.foldersByType[props.type] ?? [])
         // `!== undefined` is every folder, so an unset prop filters nothing.
         .filter((item: any) => item.folderId !== props.excludeFolderId)
-        .map((item: any) => ({ label: item.name, value: item.folderId })),
+        .map((item: any) => ({
+          label: item.name,
+          value: item.folderId,
+          iconComponent: folderIconOption(iconFor(item)),
+        })),
     );
 
     const getInitialFolderId = () => {
@@ -142,7 +166,7 @@ export default defineComponent({
 
     //dropdown selected folder index (holds primitive folderId string)
     const selectedFolder = ref<string>(getInitialFolderId());
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const updateFolderList = async (newFolder: any) => {
       showAddFolderDialog.value = false;
@@ -191,8 +215,10 @@ export default defineComponent({
 
     return {
       t,
+      folderKey,
       store,
       selectedFolder,
+      selectedFolderIcon,
       folderOptions,
       updateFolderList,
       showAddFolderDialog,

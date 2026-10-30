@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- The compare bar holds ONLY the two version pickers (the "what am I
        comparing" selection). The alignment toggle + manual date windows live with
        the trend chart (they reshape the chart's x-axis), and Exit lives up in the
-       scope row next to where Compare was entered — mirroring how Datadog/Grafana/
+       scope row next to where Compare was entered — mirroring how Grafana and
        Sentry keep entity-selection separate from the overlay/align control. -->
   <div class="px-page-edge border-border-default border-b py-2">
     <div class="flex items-center gap-3">
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 
@@ -96,7 +96,7 @@ const emit = defineEmits<{
   (e: "update:b", value: string): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const optionsWithoutUnset = computed(() => props.versions.filter((o) => o.value !== UNSET));
 

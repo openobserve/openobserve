@@ -74,6 +74,34 @@ const issuesByPath = (value: any): Record<string, string[]> => {
 };
 
 describe("addAlertSchema (composed orchestrator schema)", () => {
+  it("accepts explicit rule mode without stream or numeric thresholds", () => {
+    const base = validScheduled({
+      stream_name: "",
+      stream_type: "metrics",
+      _meta: defaultAddAlertMeta({ tab: "promql" }),
+      query_condition: {
+        ...validScheduled().query_condition,
+        type: "promql",
+        promql_rule_mode: true,
+        promql_multi_alert: true,
+        promql_condition: null,
+      },
+    });
+    expect(addAlertSchema.safeParse(base).success).toBe(true);
+    const conflicting = {
+      ...base,
+      query_condition: { ...base.query_condition, promql_condition: { operator: ">", value: 5 } },
+    };
+    expect(issuesByPath(conflicting)["query_condition.promql_rule_mode"]).toBeTruthy();
+    const single = {
+      ...base,
+      query_condition: { ...base.query_condition, promql_multi_alert: false },
+    };
+    expect(addAlertSchema.safeParse(single).success).toBe(true);
+    const pendingSingle = { ...single, pending_period_sec: 4 };
+    expect(issuesByPath(pendingSingle)["query_condition.promql_rule_mode"]).toBeTruthy();
+  });
+
   it("passes a complete valid scheduled alert", () => {
     expect(addAlertSchema.safeParse(validScheduled()).success).toBe(true);
   });
@@ -99,10 +127,47 @@ describe("addAlertSchema (composed orchestrator schema)", () => {
     expect(m["stream_name"]).toContain(STREAM_NAME_REQUIRED_MESSAGE);
   });
 
+  // ── Feature 5: SLO alerts have no stream (§6b.6) ──────────────────────────
+  //
+  // An SLO alert runs no query, so there is no stream to name. The backend
+  // skips its schema lookup for this family; requiring a stream here would
+  // make every SLO alert unsavable from the form.
+  // INVERTED, not deleted: SLO alerts are authored on the SLO page now, so
+  // this form's exemption is gone. Keeping the test in its inverted form is
+  // what stops the exemption being quietly reintroduced, which would re-open
+  // generic-form SLO authoring.
+  it("gives a slo query_condition no stream exemption", () => {
+    const m = issuesByPath(
+      validScheduled({
+        stream_name: "",
+        query_condition: {
+          type: "slo",
+          conditions: { groupId: "g", label: "and", items: [] },
+          sql: "",
+          promql: "",
+          slo_condition: {
+            slo_id: "slo1",
+            kind: "burn_rate",
+            operator: ">",
+            critical: 14.4,
+            long_window_secs: 3600,
+            short_window_secs: 300,
+          },
+        },
+      }),
+    );
+    expect(m["stream_name"]).toContain(STREAM_NAME_REQUIRED_MESSAGE);
+  });
+
+  it("still requires a stream for every other query type", () => {
+    const m = issuesByPath(validScheduled({ stream_name: "" }));
+    expect(m["stream_name"]).toContain(STREAM_NAME_REQUIRED_MESSAGE);
+  });
+
   // ── AlertSettings (reused) ──────────────────────────────────────────────────
-  it("requires at least one destination", () => {
+  it("accepts an alert with no destination", () => {
     const m = issuesByPath(validScheduled({ destinations: [] }));
-    expect(m["destinations"]?.length).toBeGreaterThan(0);
+    expect(m["destinations"]).toBeUndefined();
   });
 
   it("requires period ≥ 1 for scheduled alerts", () => {

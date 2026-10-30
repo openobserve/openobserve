@@ -120,9 +120,9 @@ export const makeAddDomainSchema = (t: (_key: string) => string) =>
   z.object({
     newDomain: z
       .string()
-      .min(1, t("settings.domainRequired") || "Domain is required")
+      .min(1, t("settings.domainRequired"))
       .refine((v) => isValidDomain(v), {
-        message: t("settings.invalidDomain") || "Please enter a valid domain (e.g. example.com)",
+        message: t("settings.invalidDomain"),
       }),
   });
 
@@ -138,9 +138,9 @@ export const makeAddEmailSchema = (domainName: string, t: (_key: string) => stri
   z.object({
     newEmail: z
       .string()
-      .min(1, t("settings.emailRequired") || "Email is required")
+      .min(1, t("settings.emailRequired"))
       .refine((v) => isValidEmail(v, domainName), {
-        message: t("settings.invalidEmail") || "Please enter a valid email",
+        message: t("settings.invalidEmail"),
       }),
   });
 

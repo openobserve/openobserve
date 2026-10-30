@@ -25,9 +25,12 @@ import syntheticsService from "@/services/synthetics";
 
 // Only the URL-shape predicate is used here; the composable deliberately does
 // its own raw fetch rather than going through this service's axios wrapper.
-vi.mock("@/services/synthetics", () => ({
-  default: { isProxyArtifactUrl: vi.fn(() => false) },
-}));
+vi.mock("@/services/synthetics", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { isProxyArtifactUrl: vi.fn(() => false) },
+  });
+});
 
 const NDJSON = [
   '{"ts":100,"kind":"response","method":"GET","url":"https://app.dev/a","status":200,"initiated_ts":90,"duration_ms":10,"first_party":true,"step_id":"s1"}',

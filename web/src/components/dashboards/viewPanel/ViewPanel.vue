@@ -16,63 +16,146 @@
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div class="flex h-full flex-col overflow-hidden" data-test="view-panel-screen">
-    <div class="flex items-center justify-between p-3">
-      <div class="mr-3 flex items-center text-xl tracking-[0.005em]">
-        <span data-test="dashboard-viewpanel-title">
-          {{ dashboardPanelData.data.title }}
-        </span>
+    <div class="flex items-center justify-between p-3 max-md:flex-wrap max-md:gap-y-2">
+      <div
+        class="me-3 flex min-w-0 items-center text-xl tracking-[0.005em] max-md:me-0 max-md:flex-1 max-md:basis-full"
+      >
+        <OTruncatedText data-test="dashboard-viewpanel-title">
+          {{ panelTitle }}
+        </OTruncatedText>
+        <ExemplarToggle
+          v-if="viewExemplarsEligible"
+          class="ms-2 shrink-0"
+          :on="viewExemplarsOn"
+          :loading="panelSchemaRendererRef?.exemplarsStatus === 'loading'"
+          :count="panelSchemaRendererRef?.exemplarsCount ?? 0"
+          data-test="dashboard-viewpanel-exemplars-toggle"
+          @toggle="setViewExemplarOverride(!viewExemplarsOn)"
+        />
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex shrink-0 items-center gap-2 max-md:ms-auto">
         <!-- histogram interval for sql queries -->
         <HistogramIntervalDropDown
           v-if="!promqlMode && histogramFields.length"
           v-model="histogramInterval"
-          class="hover:bg-interactive-hover-bg h-8 w-37.5 transition-all duration-200"
+          class="hover:bg-interactive-hover-bg h-7.5 w-37.5 transition-all duration-200"
           data-test="dashboard-viewpanel-histogram-interval-dropdown"
         />
 
         <DateTimePickerDashboard
-          v-model="selectedDate"
+          :model-value="pickedDate ?? selectedDate"
+          :auto-apply-dashboard="true"
           ref="dateTimePickerRef"
-          class="hover:bg-interactive-hover-bg h-8 min-h-8 transition-all duration-200"
+          class="hover:bg-interactive-hover-bg h-7.5 min-h-7.5 transition-all duration-200"
           data-test="dashboard-viewpanel-date-time-picker"
           :disable="disable"
-          @hide="setTimeForVariables()"
+          calendar-presets
+          @update:model-value="timeGate.onPick"
+          @show="timeGate.onShow"
+          @hide="onTimePickerHide"
+          @timezone-change="timeGate.flush"
         />
         <AutoRefreshInterval
           v-model="refreshInterval"
           trigger
           :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
           @trigger="refreshData"
-          class="hover:bg-interactive-hover-bg h-8 transition-all duration-200"
+          class="hover:bg-interactive-hover-bg h-7.5 transition-all duration-200"
           data-test="dashboard-viewpanel-refresh-interval"
         />
-        <OButton
-          v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length && disable"
-          variant="outline-destructive"
-          size="icon-sm"
-          @click="cancelViewPanelQuery"
-          data-test="dashboard-viewpanel-cancel-btn"
-          icon-left="cancel"
-        >
-          <OTooltip :content="t('panel.cancel')" />
-        </OButton>
-        <OButton
-          v-else
-          :variant="isVariablesChanged ? 'outline' : 'warning'"
-          size="icon-sm"
-          @click="refreshData"
-          :disabled="disable"
-          data-test="dashboard-viewpanel-refresh-data-btn"
-          icon-left="refresh"
-        >
+        <OButtonGroup class="shrink-0">
+          <OTooltip v-if="isCancelShown" :content="t('panel.cancel')" :disabled="!isMobile">
+            <OButton
+              variant="cancel-query"
+              :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
+              @click="cancelViewPanelQuery"
+              :aria-label="t('panel.cancel')"
+              data-test="dashboard-viewpanel-cancel-btn"
+              :icon-left="isMobile ? 'cancel' : undefined"
+            >
+              <!-- Both labels share one grid cell: Cancel keeps the Refresh width and still fits a longer translation. -->
+              <span v-if="!isMobile" class="grid items-center justify-items-center">
+                <span
+                  class="invisible col-start-1 row-start-1 flex items-center gap-1.5"
+                  aria-hidden="true"
+                >
+                  <OIcon name="refresh" size="sm" />{{ t("dashboard.viewDashboard.refresh") }}
+                </span>
+                <span class="col-start-1 row-start-1">{{ t("panel.cancel") }}</span>
+              </span>
+            </OButton>
+          </OTooltip>
+          <!-- Wrapper mode: a child-mode tooltip would hover-bind only the icon, not the labelled button. -->
           <OTooltip
-            :content="isVariablesChanged ? 'Refresh' : 'Refresh to apply latest variable changes'"
-          />
-        </OButton>
+            v-else
+            :content="refreshTooltip"
+            :disabled="!isMobile && !isAutoRunOn && !showApplyHint"
+          >
+            <OButton
+              :variant="refreshVariant"
+              :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
+              @click="refreshData"
+              :disabled="disable"
+              :aria-label="t('dashboard.viewDashboard.refresh')"
+              data-test="dashboard-viewpanel-refresh-data-btn"
+              :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
+            >
+              <template v-if="!isMobile">{{ t("dashboard.viewDashboard.refresh") }}</template>
+            </OButton>
+          </OTooltip>
+          <ODropdown v-if="isAutoRunAvailable" align="end" side="bottom">
+            <template #trigger>
+              <OButton
+                :variant="refreshOptionsVariant"
+                size="icon-toolbar"
+                class="w-5!"
+                :disabled="disable"
+                :aria-label="t('dashboard.viewDashboard.moreRefreshOptions')"
+                data-test="dashboard-viewpanel-refresh-options-btn"
+                icon-left="arrow-drop-down"
+              />
+            </template>
+            <ODropdownItem
+              data-test="dashboard-viewpanel-refresh-item"
+              icon-left="refresh"
+              :disabled="disable"
+              @select="refreshData"
+            >
+              {{ t("common.refresh") }}
+            </ODropdownItem>
+            <ODropdownSeparator />
+            <ODropdownItem
+              data-test="dashboard-viewpanel-auto-run-toggle-btn"
+              @select="toggleAutoRun"
+            >
+              <template #icon-left>
+                <OIcon
+                  :name="isAutoRunOn ? 'autorenew' : 'sync-disabled'"
+                  size="sm"
+                  :class="isAutoRunOn ? 'text-accent' : ''"
+                />
+              </template>
+              <span>
+                <div class="font-medium">
+                  {{ isAutoRunOn ? t("search.turnOffLiveMode") : t("search.turnOnLiveMode") }}
+                </div>
+                <div class="text-text-secondary text-xs">
+                  {{ t("dashboard.viewDashboard.autoRunDescription") }}
+                </div>
+                <div
+                  class="text-text-secondary text-xs"
+                  data-test="dashboard-viewpanel-auto-run-scope"
+                >
+                  {{ t("dashboard.viewDashboard.autoRunScope") }}
+                </div>
+              </span>
+            </ODropdownItem>
+          </ODropdown>
+        </OButtonGroup>
         <OButton
+          :aria-label="t('common.close')"
           variant="outline"
-          size="icon-sm"
+          size="icon-toolbar"
           @click="goBack"
           data-test="dashboard-viewpanel-close-btn"
           icon-left="close"
@@ -99,7 +182,7 @@
               />
               <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
                 <div
-                  class="mr-2 flex shrink-0 items-center justify-end"
+                  class="me-2 flex shrink-0 items-center justify-end"
                   data-test="view-panel-last-refreshed-at"
                 >
                   <!-- Error/Warning tooltips -->
@@ -107,6 +190,12 @@
                     :error="errorMessage"
                     :maxQueryRangeWarning="maxQueryRangeWarning"
                     :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+                    v-bind="noticeProps"
+                    :canEdit="canEditFromNotice"
+                    :canRefresh="true"
+                    @refresh-panel="refreshData"
+                    @edit-panel="onNoticeEditPanel"
+                    :sparklineWarning="sparklineWarning"
                     :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
                     :isPartialData="isPartialData"
                     :isPanelLoading="isPanelLoading"
@@ -129,14 +218,20 @@
                   :width="6"
                   :searchType="searchType"
                   :showLegendsButton="true"
+                  :exemplars-override="viewExemplarOverride"
                   @error="handleChartApiError"
                   @updated:data-zoom="onDataZoom"
                   @update:initialVariableValues="onUpdateInitialVariableValues"
                   @last-triggered-at-update="handleLastTriggeredAtUpdate"
                   @result-metadata-update="handleResultMetadataUpdate"
+                  @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
+                  @series-limit-update="handleSeriesLimitUpdate"
+                  @region-join-update="handleRegionJoinUpdate"
+                  @sankey-notice-update="handleSankeyNoticeUpdate"
                   @limit-number-of-series-warning-message-update="
                     handleLimitNumberOfSeriesWarningMessage
                   "
+                  @sparkline-warning-update="handleSparklineWarningUpdate"
                   @is-partial-data-update="handleIsPartialDataUpdate"
                   @loading-state-change="handleLoadingStateChange"
                   @is-cached-data-differ-with-current-time-range-update="
@@ -171,11 +266,17 @@ import {
   onUnmounted,
   onMounted,
   onBeforeMount,
+  onActivated,
+  inject,
+  provide,
+  computed,
+  defineAsyncComponent,
 } from "vue";
 
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
+import { usePanelTitle } from "@/composables/dashboard/usePanelTitle";
 import { getDashboard, getPanel, checkIfVariablesAreLoaded } from "../../../utils/commons";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import DateTimePickerDashboard from "../../../components/DateTimePickerDashboard.vue";
@@ -184,21 +285,43 @@ import VariablesValueSelector from "../../../components/dashboards/VariablesValu
 import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRenderer.vue";
 // import _ from "lodash-es";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
-import { onActivated } from "vue";
 import { parseDuration } from "@/utils/date";
 import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
-import { inject, provide, computed } from "vue";
 import { replaceHistogramInterval } from "@/utils/dashboard/histogramIntervalReplacer";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import config from "@/aws-exports";
 import { isEqual } from "lodash-es";
-import { processQueryMetadataErrors } from "@/utils/zincutils";
+import { usePanelNotices } from "@/composables/dashboard/usePanelNotices";
+import {
+  PANEL_EDITOR_FOCUS_PARAM,
+  type PanelEditorFocusTarget,
+} from "@/composables/dashboard/usePanelEditorFocus";
+import type { PanelNoticeActionId } from "@/utils/dashboard/panelNotices";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
-import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
-import { defineAsyncComponent } from "vue";
+import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
+import { useDashboardTimeGate } from "@/composables/dashboard/useDashboardTimeGate";
+import useBreakpoint from "@/composables/useBreakpoint";
+import {
+  DASHBOARD_FRESH_PANEL_TIME,
+  freshTimeFromAppliedRange,
+} from "@/composables/dashboard/dashboardFreshPanelTime";
+import { panelRefreshTargets } from "@/utils/dashboard/convertCustomChartData";
+import { pickerValueToTimeObj, toPickerSavedDate } from "@/utils/dashboard/panelTimeUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import ExemplarToggle from "@/components/dashboards/exemplars/ExemplarToggle.vue";
+import {
+  exemplarOverrideKey,
+  useExemplarOverride,
+} from "@/composables/dashboard/useExemplarOverride";
+import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 const ShowLegendsPopup = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
@@ -220,7 +343,14 @@ export default defineComponent({
     ShowLegendsPopup,
     PanelErrorButtons,
     OButton,
+    OButtonGroup,
+    ODropdown,
+    ODropdownItem,
+    ODropdownSeparator,
+    OIcon,
     OTooltip,
+    ExemplarToggle,
+    OTruncatedText,
   },
   props: {
     panelId: {
@@ -245,6 +375,11 @@ export default defineComponent({
       default: null,
       type: String || null,
     },
+    /** Read-only embedding: hides the notices' editor actions (Use Top N, Edit function). */
+    viewOnly: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ["closePanel", "update:initialVariableValues"],
   setup(props, { emit }) {
@@ -253,14 +388,14 @@ export default defineComponent({
     const chartData = ref();
     const showLegendsDialog = ref(false);
     const panelSchemaRendererRef: any = ref(null);
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const route = useRoute();
     const store = useStore();
 
     // IMPORTANT: Always create a NEW isolated instance for ViewPanel
     // ViewPanel should NEVER share the variables manager with the parent dashboard
     // This ensures that variable changes in ViewPanel don't affect the parent dashboard
-    const variablesManager = useVariablesManager();
+    const variablesManager = useVariablesManager(t);
 
     // Provide to child components (ViewPanel's own isolated instance)
     provide("variablesManager", variablesManager);
@@ -269,16 +404,19 @@ export default defineComponent({
 
     let parser: any;
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { dashboardPanelData, promqlMode, resetDashboardPanelData } =
-      useDashboardPanelData(dashboardPanelDataPageKey);
-    // default selected date will be absolute time
+    const { dashboardPanelData, promqlMode, resetDashboardPanelData } = useDashboardPanelData(
+      dashboardPanelDataPageKey,
+      t,
+    );
+    // The applied range the chart loads with; the picker's own value is `timeGate.picked`.
     const selectedDate: any = ref(props.selectedDateForViewPanel);
     const dateTimePickerRef: any = ref(null);
     const errorData: any = reactive({
       errors: [],
     });
     let variablesData: any = reactive({});
-    const isVariablesChanged = ref(true); // Flag to track if variables have changed
+    // True while the selector holds values the chart has not applied yet.
+    const isVariablesChanged = ref(false);
     let needsVariablesAutoUpdate = true;
 
     const variablesDataUpdated = (data: any) => {
@@ -325,8 +463,18 @@ export default defineComponent({
     };
 
     // Warning messages
-    const maxQueryRangeWarning = ref("");
+    // Function errors and partial reasons have their own header chips; the range warning keeps the rest.
+    const {
+      maxQueryRangeWarning,
+      noticeProps,
+      handleResultMetadataUpdate,
+      handlePanelDiagnosticsUpdate,
+      handleSeriesLimitUpdate,
+      handleRegionJoinUpdate,
+      handleSankeyNoticeUpdate,
+    } = usePanelNotices(() => store.state.timezone);
     const limitNumberOfSeriesWarningMessage = ref("");
+    const sparklineWarning = ref("");
     const errorMessage = ref("");
     const isPartialData = ref(false);
     const isPanelLoading = ref(false);
@@ -379,9 +527,8 @@ export default defineComponent({
         });
 
         // Mark as changed to signal refresh needed (unless this is initial setup)
-        // Note: false means changes need to be applied (flag logic is inverted)
         if (!wasInitialSetup) {
-          isVariablesChanged.value = false;
+          isVariablesChanged.value = true;
         }
       },
     );
@@ -500,16 +647,16 @@ export default defineComponent({
     watch(
       () => variablesData,
       () => {
-        const isValueChanged =
-          currentVariablesDataRef?.values?.length > 0 &&
-          variablesData.values.every((variable: any, index: number) => {
+        const hasApplied = currentVariablesDataRef?.values?.length > 0;
+        const isInSync =
+          hasApplied &&
+          variablesData.values?.every((variable: any, index: number) => {
             const prevValue = currentVariablesDataRef.values[index]?.value;
             const newValue = variable.value;
             // Compare current and previous values; handle both string and array cases
             return Array.isArray(newValue) ? isEqual(prevValue, newValue) : prevValue === newValue;
           });
-        // Set the `isChanged` flag if values are different
-        isVariablesChanged.value = isValueChanged;
+        isVariablesChanged.value = hasApplied && !isInSync;
       },
       { deep: true },
     );
@@ -525,12 +672,58 @@ export default defineComponent({
         });
 
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
-        dateTimePickerRef.value.refresh();
+        timeGate.refresh();
         Object.assign(currentVariablesDataRef, JSON.parse(JSON.stringify(variablesData)));
-        // Set to true to indicate everything is now in sync (flag logic is inverted)
-        isVariablesChanged.value = true;
+        isVariablesChanged.value = false;
       }
     };
+
+    const { isAutoRunAvailable, isAutoRunOn, toggleAutoRun } = useAutoRunToggle();
+
+    const timeGate = useDashboardTimeGate({
+      applied: selectedDate,
+      isAutoRunOn: () => isAutoRunOn.value,
+      showInPicker: (value) =>
+        dateTimePickerRef.value?.setSavedDate(toPickerSavedDate(value, store.state.timezone)),
+    });
+
+    const showApplyHint = computed(
+      () => (isVariablesChanged.value && !isAutoRunOn.value) || timeGate.needsRefresh.value,
+    );
+
+    const { isMobile } = useBreakpoint();
+    const refreshVariant = computed(() => (showApplyHint.value ? "pending" : "primary"));
+
+    const refreshTooltip = computed(() => {
+      if (isAutoRunOn.value) return t("dashboard.viewDashboard.autoRunDescription");
+      if (timeGate.needsRefresh.value) {
+        return isVariablesChanged.value
+          ? t("dashboard.refreshToApplyTimeRangeAndVariables")
+          : t("dashboard.refreshToApplyTimeRange");
+      }
+      return isVariablesChanged.value
+        ? t("dashboard.refreshToApplyVariables")
+        : t("common.refresh");
+    });
+
+    watch(isAutoRunOn, (on) => variablesManager.setLiveMode(on), { immediate: true });
+
+    // Resolved from this view's own range, which the dashboard's resolver knows nothing about.
+    provide(
+      DASHBOARD_FRESH_PANEL_TIME,
+      freshTimeFromAppliedRange(
+        () => isAutoRunOn.value,
+        () => selectedDate.value,
+      ),
+    );
+
+    // The chart reads the selector snapshot, not the manager's committed state, so apply it here.
+    const stopAutoCommit = variablesManager.onAutoCommit(async () => {
+      await nextTick();
+      Object.assign(currentVariablesDataRef, JSON.parse(JSON.stringify(variablesData)));
+      isVariablesChanged.value = false;
+    });
+    onUnmounted(stopAutoCommit);
 
     const currentDashboard = toRaw(store.state.currentSelectedDashboard);
 
@@ -606,9 +799,9 @@ export default defineComponent({
       }
 
       // if variables data is null, set it to empty list
-      if (
-        !(currentDashboardData.data?.variables && currentDashboardData.data?.variables?.list.length)
-      ) {
+      if (!(
+        currentDashboardData.data?.variables && currentDashboardData.data?.variables?.list.length
+      )) {
         variablesData.isVariablesLoading = false;
         variablesData.values = [];
       }
@@ -617,13 +810,12 @@ export default defineComponent({
     watch(selectedDate, () => {
       updateDateTime();
 
-      // CRITICAL: When date time changes (user clicked Apply), also commit any pending variable changes
+      // CRITICAL: When the applied date time changes, also commit any pending variable changes
       // This ensures that if user changed both variables and date time,
-      // both changes are applied to the chart when Apply is clicked
+      // both changes are applied to the chart together
       Object.assign(currentVariablesDataRef, JSON.parse(JSON.stringify(variablesData)));
 
-      // Mark variables as in sync (flag logic is inverted)
-      isVariablesChanged.value = true;
+      isVariablesChanged.value = false;
     });
 
     const dateTimeForVariables = ref<{
@@ -631,33 +823,30 @@ export default defineComponent({
       end_time: Date;
     } | null>(null);
 
+    // Variables load with the applied range; a range still waiting must not reach them.
     const setTimeForVariables = () => {
-      const date = dateTimePickerRef.value?.getConsumableDateTime();
-      const startTime = new Date(date.startTime);
-      const endTime = new Date(date.endTime);
+      const appliedTime = pickerValueToTimeObj(selectedDate.value);
+      if (appliedTime) dateTimeForVariables.value = appliedTime;
+    };
 
-      // Update the variables time object for query_values variables
-      // This allows variables to load with the new time range
-      // NOTE: This does NOT commit variables to the chart - only refreshData() does that
-      dateTimeForVariables.value = {
-        start_time: startTime,
-        end_time: endTime,
-      };
+    const onTimePickerHide = () => {
+      timeGate.onHide();
+      setTimeForVariables();
     };
 
     const updateDateTime = () => {
-      // CRITICAL: Clear panelIdToBeRefreshed to ensure panel refreshes
-      // In view panel mode, when time changes, this panel should always refresh
-      panelIdToBeRefreshed.value = null;
+      const appliedTime = pickerValueToTimeObj(selectedDate.value);
+      if (!appliedTime) return;
 
-      dashboardPanelData.meta.dateTime = {
-        start_time: new Date(selectedDate.value.startTime),
-        end_time: new Date(selectedDate.value.endTime),
-      };
+      // CRITICAL: Clear panelRefreshTargets to ensure panel refreshes
+      // In view panel mode, when time changes, this panel should always refresh
+      panelRefreshTargets.clear();
+
+      dashboardPanelData.meta.dateTime = appliedTime;
 
       dateTimeForVariables.value = {
-        start_time: new Date(selectedDate.value.startTime),
-        end_time: new Date(selectedDate.value.endTime),
+        start_time: new Date(appliedTime.start_time),
+        end_time: new Date(appliedTime.end_time),
       };
     };
     const goBack = () => {
@@ -677,9 +866,27 @@ export default defineComponent({
     const handleLimitNumberOfSeriesWarningMessage = (message: string) => {
       limitNumberOfSeriesWarningMessage.value = message;
     };
+    const handleSparklineWarningUpdate = (message: string) => {
+      sparklineWarning.value = message;
+    };
 
-    const handleResultMetadataUpdate = (metadata: any) => {
-      maxQueryRangeWarning.value = processQueryMetadataErrors(metadata, store.state.timezone);
+    const router = useRouter();
+    // The fix lives in the editor: close this view and land there on the setting that resolves the notice.
+    const canEditFromNotice = computed(() => !props.viewOnly && !!route.query.dashboard);
+    const onNoticeEditPanel = (action: PanelNoticeActionId) => {
+      const focus: PanelEditorFocusTarget = action === "edit-function" ? "vrl" : "top-n";
+      emit("closePanel");
+      router.push({
+        path: "/dashboards/add_panel",
+        query: {
+          ...route.query,
+          dashboard: String(route.query.dashboard),
+          panelId: props.panelId,
+          folder: route.query.folder ?? "default",
+          tab: route.query.tab ?? currentTabId.value,
+          [PANEL_EDITOR_FOCUS_PARAM]: focus,
+        },
+      });
     };
 
     const getInitialVariablesData = () => {
@@ -726,7 +933,7 @@ export default defineComponent({
       return searchIds.flat() as string[];
     });
 
-    const { traceIdRef, cancelQuery } = useCancelQuery();
+    const { traceIdRef, cancelQuery } = useCancelQuery(t);
 
     const cancelViewPanelQuery = () => {
       traceIdRef.value = searchRequestTraceIds.value;
@@ -734,6 +941,13 @@ export default defineComponent({
     };
 
     const disable = ref(false);
+    const isCancelShown = computed(
+      () =>
+        config.isEnterprise == "true" && searchRequestTraceIds.value.length > 0 && disable.value,
+    );
+    const refreshOptionsVariant = computed(() =>
+      isCancelShown.value ? "cancel-query" : refreshVariant.value,
+    );
 
     watch(variablesAndPanelsDataLoadingState, () => {
       const panelsValues = Object.values(variablesAndPanelsDataLoadingState.panels);
@@ -750,6 +964,29 @@ export default defineComponent({
     const currentPanelId = computed(() => {
       return props.panelId;
     });
+
+    const panelTitle = usePanelTitle({
+      title: () => dashboardPanelData.data.title,
+      variablesData: () => currentVariablesDataRef,
+      context: () => ({ tabId: currentTabId.value, panelId: currentPanelId.value }),
+    });
+
+    // Same session key as the dashboard header, so the full-screen choice carries back to the grid.
+    const viewExemplarsEligible = computed(() => isExemplarEligible(chartData.value));
+    const {
+      override: viewExemplarOverride,
+      effective: viewExemplarsOn,
+      set: setViewExemplarOverride,
+    } = useExemplarOverride(
+      computed(() =>
+        exemplarOverrideKey(
+          store.state.selectedOrganization?.identifier ?? "",
+          props.dashboardId ?? "",
+          String(props.panelId ?? ""),
+        ),
+      ),
+      computed(() => chartData.value?.config?.show_exemplars),
+    );
 
     // Computed property for LIVE merged variables (for HTML/Markdown panels and drilldown)
     // This includes global + tab + panel scoped variables with proper precedence
@@ -780,18 +1017,24 @@ export default defineComponent({
 
     return {
       t,
+      isMobile,
+      isCancelShown,
+      refreshVariant,
+      refreshOptionsVariant,
       setTimeForVariables,
       dateTimeForVariables,
       updateDateTime,
       goBack,
       currentDashboard,
       dashboardPanelData,
+      panelTitle,
       chartData,
       selectedDate,
       errorData,
       handleChartApiError,
       handleResultMetadataUpdate,
       handleLimitNumberOfSeriesWarningMessage,
+      handleSparklineWarningUpdate,
       variablesDataUpdated,
       currentDashboardData,
       variablesData,
@@ -813,13 +1056,33 @@ export default defineComponent({
       config,
       currentVariablesDataRef,
       isVariablesChanged,
+      showApplyHint,
+      refreshTooltip,
+      timeGate,
+      pickedDate: timeGate.picked,
+      onTimePickerHide,
+      isAutoRunAvailable,
+      isAutoRunOn,
+      toggleAutoRun,
       store,
       maxQueryRangeWarning,
+      noticeProps,
+      handlePanelDiagnosticsUpdate,
+      handleSeriesLimitUpdate,
+      handleRegionJoinUpdate,
+      handleSankeyNoticeUpdate,
+      canEditFromNotice,
+      onNoticeEditPanel,
       limitNumberOfSeriesWarningMessage,
+      sparklineWarning,
       errorMessage,
       warning: "warning",
       currentTabId,
       currentPanelId,
+      viewExemplarsEligible,
+      viewExemplarOverride,
+      viewExemplarsOn,
+      setViewExemplarOverride,
       showLegendsDialog,
       currentPanelData,
       panelSchemaRendererRef,

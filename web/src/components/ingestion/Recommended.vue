@@ -25,14 +25,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     panel-data-test="data-sources-recommended-tabs"
     tab-data-test-prefix="ingestion-recommended-tab-"
   >
+    <template v-if="pickTab" #tabs="{ tabs, filter }">
+      <FirstSourcePickGroup
+        v-if="pickMatches(filter)"
+        rail="recommended"
+        :tab="pickTab"
+        :rest-label="t('ingestion.firstSource.recommended')"
+      />
+      <ORouteTab
+        v-for="tab in tabs.filter((tab) => tab.name !== pickTab?.name)"
+        :key="tab.name"
+        :title="tab.title || tab.name"
+        :name="tab.name"
+        :to="tab.to"
+        :icon="tab.icon"
+        :label="tab.label"
+        :data-test="`ingestion-recommended-tab-${tab.name}`"
+      />
+    </template>
     <div class="h-full w-full">
       <div class="bg-card-glass-bg h-full">
         <div class="h-full overflow-auto pt-1.5">
-          <router-view
-            :title="tabs"
-            :currOrgIdentifier="currOrgIdentifier"
-            :currUserEmail="currentUserEmail"
-          >
+          <router-view :currOrgIdentifier="currOrgIdentifier" :currUserEmail="currentUserEmail">
           </router-view>
         </div>
       </div>
@@ -42,18 +56,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
+import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
+import FirstSourcePickGroup from "@/components/ingestion/FirstSourcePickGroup.vue";
 // @ts-ignore
-import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, computed, onBeforeMount, onUpdated } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import { resolveTab } from "@/utils/routeTabMaps";
+import { firstSourceOption, readFirstSource } from "@/components/login/firstSourceOptions";
 
 export default defineComponent({
   name: "RecommendedPage",
-  components: { DataSourceSidebarLayout },
+  components: { DataSourceSidebarLayout, ORouteTab, FirstSourcePickGroup },
   props: {
     currOrgIdentifier: {
       type: String,
@@ -61,7 +78,7 @@ export default defineComponent({
     },
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router: any = useRouter();
     const tabs = ref("");
@@ -105,7 +122,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/common/kubernetes.svg"),
-        label: t("ingestion.kubernetes"),
+        label: raw("Kubernetes"),
         contentClass: "tab_content",
       },
       {
@@ -117,7 +134,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/common/windows.svg"),
-        label: t("ingestion.windows"),
+        label: raw("Windows"),
         contentClass: "tab_content",
       },
       {
@@ -129,7 +146,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/common/linux.svg"),
-        label: t("ingestion.linux"),
+        label: raw("Linux"),
         contentClass: "tab_content",
       },
       {
@@ -145,6 +162,18 @@ export default defineComponent({
         contentClass: "tab_content",
       },
       {
+        name: "ingestFromGpu",
+        to: {
+          name: "ingestFromGpu",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        icon: "memory",
+        label: t("ingestion.gpu"),
+        contentClass: "tab_content",
+      },
+      {
         name: "AWSConfig",
         to: {
           name: "AWSConfig",
@@ -153,7 +182,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/aws.svg"),
-        label: t("ingestion.awsconfig"),
+        label: raw("Amazon Web Services(AWS)"),
         contentClass: "tab_content",
       },
       {
@@ -165,7 +194,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/gcp.svg"),
-        label: t("ingestion.gcpconfig"),
+        label: raw("Google Cloud Platform(GCP)"),
         contentClass: "tab_content",
       },
       {
@@ -177,7 +206,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/azure.png"),
-        label: t("ingestion.azure"),
+        label: raw("Microsoft Azure"),
         contentClass: "tab_content",
       },
       {
@@ -189,7 +218,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/otlp.svg"),
-        label: t("ingestion.tracesotlp"),
+        label: t("ingestion.tracesotlp", { product: raw("OpenTelemetry") }),
         contentClass: "tab_content",
       },
       {
@@ -206,25 +235,43 @@ export default defineComponent({
       },
     ];
 
-    // MCP is an AI feature (endpoint requires O2_AI_ENABLED); available on
-    // enterprise and cloud, and only when ai_enabled is on at runtime.
-    if (
-      (config.isEnterprise == "true" || config.isCloud == "true") &&
-      store.state.zoConfig.ai_enabled
-    ) {
-      recommendedTabs.push({
+    // The MCP endpoint is served by every edition, so this pointer to the IAM
+    // setup page is unconditional.
+    recommendedTabs.push({
+      name: "recommendedMcp",
+      to: {
         name: "recommendedMcp",
-        to: {
-          name: "recommendedMcp",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
         },
-        icon: "mcp",
-        label: t("ingestion.mcp.shortName"),
+      },
+      icon: "mcp",
+      label: t("ingestion.mcp.shortName"),
+      contentClass: "tab_content",
+    });
+
+    // A pick from another category links across to its guide.
+    const pickTab = computed(() => {
+      const option = firstSourceOption(
+        readFirstSource(store.state.selectedOrganization.identifier),
+      );
+      if (!option?.route) return undefined;
+      const listed = recommendedTabs.find((tab) => tab.name === option.route);
+      if (listed) return listed;
+      return {
+        name: option.route,
+        to: {
+          name: option.route,
+          query: { org_identifier: store.state.selectedOrganization.identifier },
+        },
+        icon: option.logo ? "img:" + getImageURL(option.logo) : (option.icon ?? ""),
+        label: t(option.labelKey),
         contentClass: "tab_content",
-      });
-    }
+      };
+    });
+
+    const pickMatches = (filter: string) =>
+      !filter || (pickTab.value?.label ?? "").toLowerCase().includes(filter.toLowerCase());
 
     return {
       t,
@@ -238,6 +285,8 @@ export default defineComponent({
       tabs,
       ingestTabType,
       recommendedTabs,
+      pickTab,
+      pickMatches,
     };
   },
 });

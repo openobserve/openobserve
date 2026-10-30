@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import MonitorStatusTimeline from "./MonitorStatusTimeline.vue";
@@ -129,6 +129,31 @@ describe("MonitorStatusTimeline", () => {
 
   afterEach(() => {
     wrapper?.unmount();
+  });
+
+  describe("environment lanes", () => {
+    it("should render one labelled strip per lane, aligned by run", () => {
+      const segA = makeSegment({ runId: "run-1" });
+      const segB = makeSegment({ runId: "run-2", status: "all-fail" });
+      wrapper = makeWrapper({
+        segments: [segA, segB],
+        lanes: [
+          { label: "cloud", segments: [segA, segB] },
+          // ap1 never ran in run-2 — the slot stays empty so columns compare.
+          { label: "ap1", segments: [segA, null] },
+        ],
+      });
+      const labels = wrapper.find('[data-test="synthetics-timeline-lane-labels"]');
+      expect(labels.text()).toContain("cloud");
+      expect(labels.text()).toContain("ap1");
+      // 2 columns × 2 cells; the missing ap1 slot renders as the empty shade.
+      expect(wrapper.findAll(".bg-border-default\\/40")).toHaveLength(1);
+    });
+
+    it("should keep the single blended strip when no lanes are given", () => {
+      wrapper = makeWrapper({ segments: [makeSegment()] });
+      expect(wrapper.find('[data-test="synthetics-timeline-lane-labels"]').exists()).toBe(false);
+    });
   });
 
   describe("initial render with segments", () => {
@@ -320,14 +345,6 @@ describe("MonitorStatusTimeline", () => {
       ];
       wrapper = makeWrapper({ segments });
 
-      const bars = wrapper.findAll('[data-test="monitor-status-timeline"] [style]');
-      // Each segment renders a div with `:style="{ width: ... }"` and `:class="seg.color"`
-      // We should have at least 2 bars with style (the timeline segments)
-      // plus potentially more from the legend dots.
-      // Just verify bars exist with color classes
-      const allNodes = wrapper.findAll(
-        '[data-test="monitor-status-timeline"] > div > div > div > div > div > div',
-      );
       // The color class is bound to each segment div inside the scroll area
       const bars_in_scroll = wrapper
         .find('[data-test="monitor-status-timeline"]')

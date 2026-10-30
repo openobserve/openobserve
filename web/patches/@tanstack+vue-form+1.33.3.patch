@@ -1,0 +1,48 @@
+diff --git a/node_modules/@tanstack/vue-form/dist/cjs/useForm.cjs b/node_modules/@tanstack/vue-form/dist/cjs/useForm.cjs
+index 2a47f52..d6a2c12 100644
+--- a/node_modules/@tanstack/vue-form/dist/cjs/useForm.cjs
++++ b/node_modules/@tanstack/vue-form/dist/cjs/useForm.cjs
+@@ -54,7 +54,14 @@ function useForm(opts) {
+     );
+     return extendedApi;
+   })();
+-  Vue.onMounted(formApi.mount);
++  let __o2MountCleanup;
++  Vue.onMounted(() => {
++    __o2MountCleanup = formApi.mount();
++  });
++  Vue.onUnmounted(() => {
++    if (typeof __o2MountCleanup === "function") __o2MountCleanup();
++    __o2MountCleanup = void 0;
++  });
+   formApi.update(opts);
+   return formApi;
+ }
+diff --git a/node_modules/@tanstack/vue-form/dist/esm/useForm.js b/node_modules/@tanstack/vue-form/dist/esm/useForm.js
+index 0c98053..0fe7a6b 100644
+--- a/node_modules/@tanstack/vue-form/dist/esm/useForm.js
++++ b/node_modules/@tanstack/vue-form/dist/esm/useForm.js
+@@ -1,6 +1,6 @@
+ import { FormApi } from "@tanstack/form-core";
+ import { useSelector } from "@tanstack/vue-store";
+-import { defineComponent, h, onMounted } from "vue";
++import { defineComponent, h, onMounted, onUnmounted } from "vue";
+ import { Field } from "./useField.js";
+ import { FormGroup } from "./useFormGroup.js";
+ import { useFormId } from "./useFormId.js";
+@@ -52,7 +52,14 @@ function useForm(opts) {
+     );
+     return extendedApi;
+   })();
+-  onMounted(formApi.mount);
++  let __o2MountCleanup;
++  onMounted(() => {
++    __o2MountCleanup = formApi.mount();
++  });
++  onUnmounted(() => {
++    if (typeof __o2MountCleanup === "function") __o2MountCleanup();
++    __o2MountCleanup = void 0;
++  });
+   formApi.update(opts);
+   return formApi;
+ }

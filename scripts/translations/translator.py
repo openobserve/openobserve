@@ -16,24 +16,38 @@ Decision per key (per locale):
   * key removed from en-US.json               -> pruned from the target file
 
 Pending leaves are translated in batches (many strings per API call) to keep the
-request count and cost low. Each item is validated independently — a string whose
-translation drops/alters an interpolation placeholder (e.g. `{count}`) is rejected
-and left un-advanced so it retries on the next run, exactly like a hard API failure.
+request count and cost low, and several batches are in flight at once so a large
+backlog finishes in minutes rather than hours. Each string travels with its i18n
+key path, and the prompt carries the TERMS glossary (English senses plus optional
+per-locale pinned renderings) and the locale's own module names (mined from its
+committed `menu.*` translations), so short ambiguous labels resolve to the right
+sense and reuse the established vocabulary instead of being translated blind.
+Each item is validated
+independently — a string whose translation drops/alters an interpolation
+placeholder (e.g. `{count}`) is rejected and left un-advanced so it retries on the
+next run, exactly like a hard API failure.
 
 Environment:
     DEEPSEEK_API_KEY   Required. API key for https://api.deepseek.com.
     DEEPSEEK_MODEL     Model id (default "deepseek-v4-flash").
     DEEPSEEK_BASE_URL  API base URL (default "https://api.deepseek.com").
     TRANSLATION_BATCH_SIZE  Strings per API call (default 50).
+    TRANSLATION_CONCURRENCY Batches in flight per locale (default 4; 1 = serial).
 """
 
 import json
 import os
 import re
 import hashlib
+import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from openai import OpenAI
+# `openai` is imported inside _get_client(), not here: the change-detection half of
+# this module (collect_pending_leaves, load_state, …) is pure file comparison, and
+# `main.py --check` runs it with no dependencies installed and no API key — which is
+# what lets the merge-queue gate be free.
 
 STATE_FILENAME = ".translation_state.json"
 
@@ -43,13 +57,14 @@ SOURCE_LOCALE = "en-US"
 # Human-readable target names used in the translation prompt, keyed by the target
 # locale's filename stem (BCP-47 style, matching web/src/locales/languages/*.json).
 LANGUAGE_NAMES = {
+    "ar-SA": "Arabic",
     "tr-TR": "Turkish",
     "zh-CN": "Simplified Chinese",
     "fr-FR": "French",
-    "es-ES": "Spanish",
+    "es-ES": "Spanish (Spain)",
     "de-DE": "German",
     "it-IT": "Italian",
-    "pt-PT": "Portuguese",
+    "pt-PT": "European Portuguese (Portugal, not Brazilian)",
     "ja-JP": "Japanese",
     "ko-KR": "Korean",
     "nl-NL": "Dutch",
@@ -57,18 +72,568 @@ LANGUAGE_NAMES = {
     "ru-RU": "Russian",
     "pl-PL": "Polish",
     "vi-VN": "Vietnamese",
-    # NOTE: RTL languages (ar Arabic, fa Persian) are intentionally NOT listed
-    # yet — the web app has no dir="rtl" support, and the locale registry's
-    # strict on-disk/localeFileMap sync would force them to be user-selectable
-    # (and auto-served to ar/fa browsers) the moment their files are generated.
-    # Add them here together with RTL layout support and their web wiring.
 }
 
-# vue-i18n / printf style interpolation tokens that MUST survive translation
-# unchanged: {count}, {name}, {0}, %s, %d, @:linked.key
-_PLACEHOLDER = re.compile(r"{[^{}]*}|%[sd]|@:[\w.]+")
+# The term table injected into every prompt. Strings reach the model as isolated
+# UI fragments, so without the `sense` lines an "event" is a party, a "stream" is
+# a brook and "live" is a broadcast — exactly the mistranslations a zh-CN audit
+# found. A sense steers every target language at once; an optional per-locale key
+# pins one language's rendering, because the same audit found the same word coined
+# differently across batches (stream = 流/数据流, trace = 追踪/跟踪). Keeping both
+# in one table means a pinned rendering can never lose its sense definition.
+TERMS = {
+    "stream": {
+        "sense": "a named dataset of ingested telemetry (logs, metrics, or traces) "
+        "— the data-stream sense, never a brook/creek and never audio/video streaming",
+        "zh-CN": "数据流",
+        "zh-TW": "串流",
+        "de-DE": "Stream",
+        "es-ES": "stream",
+        "it-IT": "stream",
+        "pt-PT": "stream",
+        "nl-NL": "stream",
+        "pl-PL": "strumień",
+        "tr-TR": "akış",
+        "ru-RU": "поток",
+        "ja-JP": "ストリーム",
+        "ko-KR": "스트림",
+        "vi-VN": "stream",
+        "ar-SA": "التدفق",
+    },
+    "alert": {
+        "sense": "a monitoring alert: an alerting rule or the notification it "
+        "sends — the alarm sense, not a browser dialog",
+        "zh-CN": "告警",
+        "zh-TW": "警示",
+        "de-DE": "Alarm",
+        "es-ES": "alerta",
+        "it-IT": "avviso",
+        "pt-PT": "alerta",
+        "nl-NL": "alarm",
+        "pl-PL": "alert",
+        "tr-TR": "uyarı",
+        "ru-RU": "оповещение",
+        "ja-JP": "アラート",
+        "ko-KR": "알림",
+        "vi-VN": "cảnh báo",
+        "ar-SA": "التنبيه",
+    },
+    "filter": {
+        "sense": "a condition that narrows query or list results",
+        "zh-CN": "过滤器",
+        "de-DE": "Filter",
+        "es-ES": "filtro",
+        "it-IT": "filtro",
+        "pt-PT": "filtro",
+        "nl-NL": "filter",
+        "pl-PL": "filtr",
+        "tr-TR": "filtre",
+        "ru-RU": "фильтр",
+        "ja-JP": "フィルター",
+        "ko-KR": "필터",
+        "vi-VN": "bộ lọc",
+        "ar-SA": "الفلتر",
+    },
+    "event": {
+        "sense": "a recorded occurrence in the system (log event, alert event) — "
+        "the record sense, never a social activity or gathering",
+        "zh-CN": "事件",
+        "zh-TW": "事件",
+        "de-DE": "Ereignis",
+        "es-ES": "evento",
+        "it-IT": "evento",
+        "pt-PT": "evento",
+        "nl-NL": "gebeurtenis",
+        "pl-PL": "zdarzenie",
+        "tr-TR": "olay",
+        "ru-RU": "событие",
+        "ja-JP": "イベント",
+        "ko-KR": "이벤트",
+        "vi-VN": "sự kiện",
+        "ar-SA": "الحدث",
+    },
+    "live": {
+        "sense": "updating in real time (live tail, live data) — the real-time "
+        "sense, never a live broadcast or livestream",
+        "zh-CN": "实时",
+        "zh-TW": "即時",
+        "de-DE": "Live",
+        "es-ES": "en tiempo real",
+        "it-IT": "live",
+        "pt-PT": "em tempo real",
+        "nl-NL": "live",
+        "tr-TR": "canlı",
+        "ru-RU": "в реальном времени",
+        "ja-JP": "ライブ",
+        "vi-VN": "trực tiếp",
+        "ar-SA": "مباشر",
+        "ko-KR": "실시간",
+    },
+    "trace": {
+        "sense": "a distributed trace: one request's recorded path through services",
+        "zh-CN": "追踪",
+        "zh-TW": "追蹤",
+        "de-DE": "Trace",
+        "es-ES": "traza",
+        "it-IT": "traccia",
+        "pt-PT": "trace",
+        "nl-NL": "trace",
+        "pl-PL": "trace",
+        "tr-TR": "iz",
+        "ru-RU": "трейс",
+        "ja-JP": "トレース",
+        "ko-KR": "트레이스",
+        "vi-VN": "trace",
+        "ar-SA": "التتبع",
+    },
+    "span": {
+        "sense": "a single operation inside a distributed trace — the APM term of "
+        "art; keep 'Span' when the language has no established equivalent",
+        "zh-CN": "Span",
+        "zh-TW": "Span",
+        "de-DE": "Span",
+        "es-ES": "span",
+        "it-IT": "span",
+        "pt-PT": "span",
+        "nl-NL": "span",
+        "pl-PL": "span",
+        "tr-TR": "span",
+        "ru-RU": "спан",
+        "ja-JP": "スパン",
+        "ko-KR": "스팬",
+        "vi-VN": "span",
+        "ar-SA": "الامتداد",
+    },
+    "function": {
+        "sense": "a user-defined data-transformation function (VRL) — the "
+        "programming sense",
+        "ja-JP": "関数",
+        "tr-TR": "fonksiyon",
+        "vi-VN": "hàm",
+        "ar-SA": "الدالة",
+    },
+    "pipeline": {
+        "sense": "a data-processing pipeline that routes and transforms ingested "
+        "records",
+        "zh-CN": "流水线",
+        "zh-TW": "管線",
+        "fr-FR": "pipeline",
+        "de-DE": "Pipeline",
+        "es-ES": "pipeline",
+        "it-IT": "pipeline",
+        "pt-PT": "pipeline",
+        "nl-NL": "pipeline",
+        "pl-PL": "potok",
+        "tr-TR": "işlem hattı",
+        "ru-RU": "конвейер",
+        "ja-JP": "パイプライン",
+        "ko-KR": "파이프라인",
+        "vi-VN": "pipeline",
+        "ar-SA": "مسار المعالجة",
+    },
+    "downtime": {
+        "sense": "a scheduled window that mutes alert notifications (a maintenance "
+        "window) — never an outage or unavailability",
+        "fr-FR": "période de maintenance",
+        "de-DE": "Wartungsfenster",
+        "es-ES": "periodo de mantenimiento",
+        "it-IT": "downtime",
+        "pt-PT": "janela de manutenção",
+        "nl-NL": "onderhoudsperiode",
+        "pl-PL": "okno serwisowe",
+        "tr-TR": "bakım penceresi",
+        "ru-RU": "окно обслуживания",
+        "ja-JP": "ダウンタイム",
+        "ko-KR": "다운타임",
+        "vi-VN": "thời gian bảo trì",
+        "ar-SA": "فترة الصيانة",
+    },
+    "burn rate": {
+        "sense": "how fast an SLO's error budget is being spent — never combustion",
+        "fr-FR": "taux d'épuisement",
+        "de-DE": "Burn-Rate",
+        "es-ES": "tasa de consumo",
+        "it-IT": "tasso di consumo",
+        "pt-PT": "taxa de consumo",
+        "nl-NL": "burn rate",
+        "pl-PL": "tempo spalania",
+        "tr-TR": "tükenme hızı",
+        "ru-RU": "скорость выгорания",
+        "ja-JP": "バーンレート",
+        "ko-KR": "소진율",
+        "vi-VN": "tốc độ tiêu hao",
+        "ar-SA": "معدل الاستهلاك",
+    },
+    "on-call page": {
+        "sense": "in on-call: a notification that summons a responder, and the "
+        "record it opens — not a web page",
+        "fr-FR": "notification",
+        "de-DE": "Alarmierung",
+        "es-ES": "aviso",
+        "it-IT": "notifica",
+        "pt-PT": "acionamento",
+        "nl-NL": "oproep",
+        "pl-PL": "wezwanie",
+        "tr-TR": "çağrı",
+        "ru-RU": "вызов",
+        "ja-JP": "呼び出し",
+        "ko-KR": "호출",
+        "vi-VN": "thông báo trực",
+        "ar-SA": "نداء المناوبة",
+    },
+    "paging": {
+        "sense": "in on-call: summoning a responder with a notification — not "
+        "pagination",
+        "fr-FR": "notification",
+        "de-DE": "alarmieren",
+        "es-ES": "avisar",
+        "it-IT": "notifiche",
+        "pt-PT": "acionar",
+        "nl-NL": "oproepen",
+        "pl-PL": "wzywanie",
+        "tr-TR": "çağrı gönderme",
+        "ru-RU": "вызов дежурных",
+        "ja-JP": "呼び出し",
+        "ko-KR": "호출",
+        "vi-VN": "gọi trực",
+        "ar-SA": "الاستدعاء",
+    },
+    "scorer": {
+        "sense": "an evaluator that grades LLM output — never a sports scorer",
+        "fr-FR": "évaluateur",
+        "de-DE": "Scorer",
+        "es-ES": "evaluador",
+        "it-IT": "valutatore",
+        "pt-PT": "avaliador",
+        "nl-NL": "scorer",
+        "pl-PL": "ewaluator",
+        "tr-TR": "puanlayıcı",
+        "ru-RU": "оценщик",
+        "ja-JP": "スコアラー",
+        "ko-KR": "스코어러",
+        "vi-VN": "bộ chấm điểm",
+        "ar-SA": "أداة التقييم",
+    },
+    "RUM": {
+        "sense": "Real User Monitoring, a product module name — keep the "
+        "acronym 'RUM' wherever the source says RUM",
+        "fr-FR": "RUM",
+        "de-DE": "RUM",
+        "es-ES": "RUM",
+        "it-IT": "RUM",
+        "pt-PT": "RUM",
+        "nl-NL": "RUM",
+        "pl-PL": "RUM",
+        "tr-TR": "RUM",
+        "ru-RU": "RUM",
+        "ar-SA": "RUM",
+        "ja-JP": "RUM",
+        "ko-KR": "RUM",
+        "vi-VN": "RUM",
+    },
+    "logs": {
+        "sense": "log records and the Logs module — never a ship's logbook or timber",
+        "de-DE": "Logs",
+        "it-IT": "log",
+        "pt-PT": "logs",
+        "nl-NL": "logs",
+        "tr-TR": "günlükler",
+        "ru-RU": "логи",
+        "es-ES": "logs",
+    },
+    "metric": {
+        "sense": "a measured time-series value — never the metric system or plain "
+        "figures",
+        "nl-NL": "metriek",
+        "ja-JP": "メトリクス",
+        "ko-KR": "메트릭",
+        "vi-VN": "chỉ số",
+    },
+    "dashboard": {
+        "sense": "a saved board of chart panels — never a control panel; a panel is "
+        "one chart on it",
+        "pt-PT": "dashboard",
+        "pl-PL": "pulpit",
+        "tr-TR": "gösterge panosu",
+        "ru-RU": "дашборд",
+        "vi-VN": "bảng điều khiển",
+        "ar-SA": "لوحة المعلومات",
+    },
+    "log shipper": {
+        "sense": "an agent that forwards logs (Fluent Bit, Vector, …) — never a timber "
+        "transporter",
+        "de-DE": "Log-Shipper",
+        "es-ES": "agente de envío de logs",
+        "pt-PT": "agente de envio de logs",
+        "pl-PL": "agent przesyłania logów",
+        "ko-KR": "로그 전송 에이전트",
+    },
+    "job": {
+        "sense": "a scheduled or background processing task (search job, eval job) — "
+        "never employment or a job posting",
+        "it-IT": "job",
+        "nl-NL": "taak",
+        "ko-KR": "작업",
+        "ar-SA": "المهمة",
+    },
+    "eval job": {
+        "sense": "a scheduled job that runs scorers over LLM traffic",
+        "es-ES": "trabajo de evaluación",
+        "pl-PL": "zadanie ewaluacji",
+        "tr-TR": "değerlendirme işi",
+        "ja-JP": "評価ジョブ",
+    },
+    "LLM judge": {
+        "sense": "an LLM that grades another model's output — never a court judge or "
+        "jury member",
+        "de-DE": "LLM-Judge",
+        "nl-NL": "LLM Judge",
+        "tr-TR": "LLM hakemi",
+        "ko-KR": "LLM 심사자",
+    },
+    "incident": {
+        "sense": "an operational incident under response — never a criminal case or "
+        "accident",
+        "de-DE": "Vorfall",
+        "ja-JP": "インシデント",
+        "ko-KR": "인시던트",
+        "tr-TR": "vaka",
+        "ar-SA": "الحادث",
+    },
+    "service account": {
+        "sense": "a non-human IAM identity used for API access",
+        "de-DE": "Dienstkonto",
+        "pl-PL": "konto usługi",
+        "ru-RU": "сервисный аккаунт",
+    },
+    "role": {
+        "sense": "an RBAC role that grants permissions",
+        "pt-PT": "função",
+        "ja-JP": "ロール",
+    },
+    "ingestion": {
+        "sense": "receiving telemetry into the system — never swallowing",
+        "nl-NL": "ingestie",
+        "tr-TR": "veri alımı",
+        "ar-SA": "الاستيعاب",
+        "es-ES": "ingesta",
+    },
+    "legend": {
+        "sense": "the key that labels a chart's series — never a myth",
+        "it-IT": "legenda",
+        "tr-TR": "lejant",
+        "ar-SA": "وسيلة الإيضاح",
+    },
+    "template": {
+        "sense": "a reusable notification, message or dashboard template — not an AI "
+        "model",
+        "it-IT": "template",
+        "nl-NL": "sjabloon",
+    },
+    "collapse": {
+        "sense": "folding a UI section closed — never a failure",
+        "de-DE": "Einklappen",
+        "pt-PT": "Recolher",
+        "ar-SA": "طي",
+    },
+    "acknowledge": {
+        "sense": "a responder taking ownership of a page or incident — not admitting "
+        "or recognising",
+        "it-IT": "prendere in carico",
+        "ko-KR": "확인",
+    },
+    "mute": {
+        "sense": "silencing notifications for a while — not disabling the rule",
+        "ru-RU": "заглушить",
+    },
+    "training": {
+        "sense": "fitting a detection model to data — never staff training or a "
+        "workout",
+        "vi-VN": "huấn luyện",
+    },
+    "match": {
+        "sense": "a search, regex or rule match — never a sports match",
+        "tr-TR": "eşleşme",
+        "ar-SA": "التطابق",
+    },
+    "error budget": {
+        "sense": "the failure allowance of an SLO",
+        "ja-JP": "エラーバジェット",
+        "it-IT": "budget di errore",
+    },
+    "apply": {
+        "sense": "applying a setting, filter or change — never applying for a job",
+        "nl-NL": "toepassen",
+    },
+    "resume": {
+        "sense": "continuing something paused — never a CV",
+        "ar-SA": "استئناف",
+    },
+    "panel": {
+        "sense": "one chart on a dashboard — never a committee or the whole dashboard",
+        "ar-SA": "اللوحة",
+        "vi-VN": "panel",
+    },
+    "check": {
+        "sense": "a synthetic monitoring check — never a bank cheque",
+        "ar-SA": "الفحص",
+    },
+    "trigger": {
+        "sense": "what starts an alert or workflow — never a gun trigger",
+        "ar-SA": "المُشغِّل",
+    },
+    "trial": {
+        "sense": "one run of an experiment — never a court trial",
+        "ar-SA": "المحاولة",
+    },
+    "import / export": {
+        "sense": "moving configuration or data into or out of OpenObserve as a file — "
+        "never international trade",
+    },
+    "docs": {
+        "sense": "the product documentation — never doctors",
+    },
+    "slice": {
+        "sense": "a fixed time bucket an SLO's SLI is scored on — never a slice "
+        "of food",
+        "it-IT": "slice",
+        "nl-NL": "slice",
+    },
+    "escalation": {
+        "sense": "on-call: passing an unacknowledged page to the next responder "
+        "level — not a price or conflict escalation",
+        "es-ES": "escalada",
+        "tr-TR": "eskalasyon",
+    },
+    "token": {
+        "sense": "an auth/API/ingestion credential or an LLM usage unit — never "
+        "a coin or game token",
+        "tr-TR": "token",
+    },
+    "run": {
+        "sense": "one execution of a check, eval, job or workflow — never a round "
+        "of a game or a season",
+        "ar-SA": "التشغيل",
+    },
+    "destination": {
+        "sense": "a configured endpoint that alerts or pipeline output are "
+        "delivered to",
+        "zh-CN": "目标",
+        "zh-TW": "目標",
+        "de-DE": "Ziel",
+        "es-ES": "destino",
+        "it-IT": "destinazione",
+        "pt-PT": "destino",
+        "nl-NL": "bestemming",
+        "pl-PL": "miejsce docelowe",
+        "tr-TR": "hedef",
+        "ru-RU": "получатель",
+        "ja-JP": "宛先",
+        "ko-KR": "대상",
+        "vi-VN": "đích",
+        "ar-SA": "الوجهة",
+    },
+    "organization": {
+        "sense": "a tenant/workspace that groups users and data — the account sense",
+        "tr-TR": "kuruluş",
+        "ar-SA": "المؤسسة",
+    },
+    "firing": {
+        "sense": "the state of an alert that is currently triggered",
+        "zh-CN": "触发中",
+        "zh-TW": "觸發中",
+        "de-DE": "ausgelöst",
+        "es-ES": "disparada",
+        "it-IT": "attivo",
+        "pt-PT": "disparado",
+        "nl-NL": "afgaan",
+        "pl-PL": "wyzwolony",
+        "tr-TR": "tetiklenmiş",
+        "ru-RU": "срабатывает",
+        "ja-JP": "発火",
+        "ko-KR": "발생",
+        "vi-VN": "đang kích hoạt",
+        "ar-SA": "قيد الإطلاق",
+    },
+    "open": {
+        "sense": "as an incident/issue status: still unresolved — not the verb "
+        "'to open'",
+    },
+    "top": {
+        "sense": "in rankings (Top N, Top Queries): highest-ranked; in layout "
+        "and position labels it is the ordinary spatial top",
+    },
+    "value": {
+        "sense": "the data value of a field or metric — never worth/merit",
+        "zh-CN": "值",
+        "zh-TW": "值",
+        "de-DE": "Wert",
+        "es-ES": "valor",
+        "it-IT": "valore",
+        "pt-PT": "valor",
+        "nl-NL": "waarde",
+        "pl-PL": "wartość",
+        "tr-TR": "değer",
+        "ru-RU": "значение",
+        "ja-JP": "値",
+        "ko-KR": "값",
+        "vi-VN": "giá trị",
+        "ar-SA": "القيمة",
+    },
+    "breakdown": {
+        "sense": "splitting a chart or metric by a dimension — never a failure "
+        "or collapse",
+        "ja-JP": "内訳",
+        "tr-TR": "kırılım",
+    },
+    "report": {
+        "sense": "a scheduled or exported dashboard report document",
+        "zh-CN": "报表",
+        "zh-TW": "報表",
+        "de-DE": "Bericht",
+        "es-ES": "informe",
+        "it-IT": "report",
+        "pt-PT": "relatório",
+        "nl-NL": "rapport",
+        "pl-PL": "raport",
+        "tr-TR": "rapor",
+        "ru-RU": "отчёт",
+        "ja-JP": "レポート",
+        "ko-KR": "보고서",
+        "vi-VN": "báo cáo",
+        "ar-SA": "التقرير",
+    },
+}
+
+# Subtrees of en-US.json whose leaves are canonical module names; their committed
+# translations are mined per locale into the prompt's fixed-renderings table.
+MODULE_NAME_SUBTREES = ("menu",)
+
+# printf / linked-message tokens that MUST survive translation unchanged.
+# Brace tokens are handled by _scan_tokens, which a regex cannot do: `{'}'}` is a
+# single literal-escape token whose body contains the very character a regex like
+# `{[^{}]*}` stops at.
+_PRINTF = re.compile(r"%[sd]")
+# `@` always starts a linked message in vue-i18n — `@:key` or `@.modifier:key`.
+# A bare `@` (even inside a word, e.g. an email address) is a compile error; the
+# locale files spell it `{'@'}` for that reason.
+_LINKED = re.compile(r"@(?:\.[A-Za-z_$][A-Za-z0-9_$]*)?:[\w.]+")
+
+# A vue-i18n named placeholder is a JS-style identifier; a list placeholder is an
+# index. Anything else — most importantly a name the model helpfully translated,
+# `{标识符}` for `{identifier}` — is INVALID_TOKEN_IN_PLACEHOLDER, and vue-i18n
+# compiles messages just-in-time, so it *throws* at render time and blanks the
+# page that used the string.
+_NAMED = re.compile(r"[A-Za-z_$][A-Za-z0-9_$]*\Z")
+_LIST = re.compile(r"\d+\Z")
 
 _client = None
+_tracer = None
+_tracer_lock = threading.Lock()
+_locale_spans = {}
+# Batches are translated concurrently (see translate_pending), so the lazy client
+# construction below must be race-free.
+_client_lock = threading.Lock()
 
 
 class TranslationError(Exception):
@@ -113,6 +678,31 @@ def load_json(path, default=None):
     return {} if default is None else default
 
 
+def find_duplicate_keys(path):
+    """Return the key names duplicated within a single object in `path`.
+
+    json.load keeps the LAST of a duplicated pair, so a locale file carrying two
+    "announcements" blocks parses, validates and compares as up-to-date while the
+    earlier block is silently dead. Nothing this module writes can produce one —
+    it dumps Python dicts — but git can: line-merging two locale files that each
+    added the same block at a different offset keeps both and reports no conflict.
+    Only a pairs hook sees them, which is why this is checked rather than assumed.
+    """
+    found = []
+
+    def hook(pairs):
+        seen = set()
+        for key, _ in pairs:
+            if key in seen:
+                found.append(key)
+            seen.add(key)
+        return dict(pairs)
+
+    with open(path, "r", encoding="utf-8") as f:
+        json.load(f, object_pairs_hook=hook)
+    return sorted(set(found))
+
+
 def load_source():
     """Load the English source (en-US.json)."""
     return load_json(get_language_file_path(SOURCE_LOCALE), {})
@@ -123,56 +713,233 @@ def load_state():
     return load_json(get_state_file_path(), {})
 
 
+def write_json(path, data, sort_keys=False):
+    """Write `data` as pretty JSON to `path` atomically.
+
+    Written to a sibling temp file and renamed, so an interrupted run (the job is
+    cancellable mid-write, and CI now commits whatever progress exists) can never
+    leave a truncated / half-written locale file behind to be committed.
+    """
+    tmp = f"{path}.tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(json.dumps(data, indent=2, ensure_ascii=False, sort_keys=sort_keys) + "\n")
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
+
+
 def save_state(state):
-    with open(get_state_file_path(), "w", encoding="utf-8") as f:
-        f.write(json.dumps(state, indent=2, ensure_ascii=False, sort_keys=True) + "\n")
+    write_json(get_state_file_path(), state, sort_keys=True)
 
 
 def new_counters():
     return {"pending": 0, "kept": 0, "translated": 0, "failed": 0, "failed_paths": set()}
 
 
+def _scan_tokens(text):
+    """
+    Return (tokens, compilable) for one message.
+
+    `tokens` is the multiset of interpolation tokens vue-i18n would see —
+    placeholders (`{count}`, `{0}`), literal escapes (`{'{'}`, `{'@'}`), printf
+    tokens and linked-message references — normalised so that incidental
+    whitespace inside braces does not count as a difference.
+
+    `compilable` is False when the message is something vue-i18n's compiler would
+    reject outright: a placeholder whose name is not an identifier, an unclosed
+    or unbalanced brace, or an unterminated literal escape. Those are what turn a
+    translation into a thrown SyntaxError at render time instead of a wrong-looking
+    label, so they must never be written to a locale file.
+    """
+    tokens = []
+    i = 0
+    n = len(text)
+    while i < n:
+        ch = text[i]
+
+        if ch == "%":
+            m = _PRINTF.match(text, i)
+            if m:
+                tokens.append(m.group(0))
+                i = m.end()
+                continue
+
+        if ch == "@":
+            m = _LINKED.match(text, i)
+            if not m:
+                return tokens, False  # bare @ — must be written {'@'}
+            tokens.append(m.group(0))
+            i = m.end()
+            continue
+
+        if ch == "}":
+            return tokens, False  # closing brace with nothing open
+
+        if ch != "{":
+            i += 1
+            continue
+
+        j = i + 1
+        while j < n and text[j].isspace():
+            j += 1
+
+        if j < n and text[j] == "'":
+            # Literal escape: {'{'}, {'}'}, {'@'}, {'|'}. The body is quoted, so
+            # scan to the closing quote rather than to the next brace.
+            end = text.find("'", j + 1)
+            if end == -1:
+                return tokens, False
+            k = end + 1
+            while k < n and text[k].isspace():
+                k += 1
+            if k >= n or text[k] != "}":
+                return tokens, False
+            tokens.append("{'" + text[j + 1 : end] + "'}")
+            i = k + 1
+            continue
+
+        end = text.find("}", j)
+        if end == -1:
+            return tokens, False
+        name = text[j:end].strip()
+        if not (_NAMED.match(name) or _LIST.match(name)):
+            return tokens, False
+        tokens.append("{" + name + "}")
+        i = end + 1
+
+    return tokens, True
+
+
 def _placeholders(text):
     """Multiset of interpolation tokens in a string (order-independent)."""
-    return sorted(_PLACEHOLDER.findall(text))
+    return sorted(_scan_tokens(text)[0])
 
 
 def _get_client():
     """Lazily construct the DeepSeek (OpenAI-compatible) client.
 
     Constructed on first use so that dry passes / imports don't require the API
-    key to be present (e.g. when only counting pending work).
+    key — or the `openai` package — to be present (e.g. when only counting pending
+    work). The client itself is thread-safe and shared by every worker; only its
+    construction is locked.
     """
     global _client
     if _client is None:
-        api_key = os.environ.get("DEEPSEEK_API_KEY")
-        if not api_key:
-            raise TranslationError(
-                "DEEPSEEK_API_KEY is not set — cannot reach the translation service."
-            )
-        _client = OpenAI(
-            api_key=api_key,
-            base_url=os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
-            # Cap per-request time so a single hung/slow call can't stall the whole
-            # run for the SDK's 600s default. Our own retry/split loop then recovers.
-            timeout=float(os.environ.get("DEEPSEEK_TIMEOUT", "60")),
-            max_retries=2,
-        )
+        with _client_lock:
+            if _client is None:
+                from openai import OpenAI
+
+                api_key = os.environ.get("DEEPSEEK_API_KEY")
+                if not api_key:
+                    raise TranslationError(
+                        "DEEPSEEK_API_KEY is not set — cannot reach the translation service."
+                    )
+                _client = OpenAI(
+                    api_key=api_key,
+                    base_url=os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+                    # Cap per-request time so a single hung/slow call can't stall the
+                    # whole run for the SDK's 600s default. Our own retry/split loop
+                    # then recovers.
+                    timeout=float(os.environ.get("DEEPSEEK_TIMEOUT", "60")),
+                    max_retries=2,
+                )
     return _client
+
+
+def _get_tracer():
+    """The run's tracer, created on first use so `main.py --check` never touches telemetry."""
+    global _tracer
+    if _tracer is None:
+        with _tracer_lock:
+            if _tracer is None:
+                sys.path.insert(0, os.path.join(_script_dir(), "..", "ci-telemetry"))
+                from o2_llm_trace import Tracer
+
+                _tracer = Tracer("github-actions.translations", "github.workflow.translations")
+    return _tracer
+
+
+def set_trace_outcome(outcome, attributes=None):
+    """Record the run outcome on the root span; a no-op when no API call was traced."""
+    if _tracer is not None:
+        _tracer.set_outcome(outcome, attributes=attributes)
 
 
 def _model():
     return os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-flash")
 
 
-def _system_prompt(locale):
+def build_module_glossary(source, existing):
+    """(English, translated) pairs for the app's module names.
+
+    The MODULE_NAME_SUBTREES trees are where every major module's user-facing
+    name lives (Alerts, Pipelines, Dashboards, Streams, …). Pulling the pairs
+    from the locale's own committed translations means new strings reuse the
+    established vocabulary (zh-CN: Alerts -> 告警, Pipelines -> 流水线) instead of
+    each batch coining its own, with no per-language table to maintain. A pair
+    kept in English (RUM -> RUM) is included on purpose: it tells the model
+    "leave this as is". Sorted so the prompt is byte-stable per locale, which
+    keeps provider-side prompt caching effective across batches.
+    """
+    terms = {}
+    for subtree in MODULE_NAME_SUBTREES:
+        src = source.get(subtree) if isinstance(source.get(subtree), dict) else {}
+        dst = existing.get(subtree) if isinstance(existing.get(subtree), dict) else {}
+        for key, en in src.items():
+            tr = dst.get(key)
+            if not isinstance(en, str) or not isinstance(tr, str):
+                continue
+            # Token-bearing entries (aria templates) are messages, not names.
+            if _placeholders(en) or not en.strip() or not tr.strip():
+                continue
+            terms.setdefault(en, tr)
+    return sorted(terms.items())
+
+
+def _system_prompt(locale, module_terms):
     lang = LANGUAGE_NAMES.get(locale, locale)
-    return (
+    pinned = {term: entry[locale] for term, entry in TERMS.items() if locale in entry}
+    pinned_keys = {term.lower() for term in pinned}
+    # One renderings table, curated pinned terms winning over mined module names
+    # (case/plural-insensitively), so the prompt can never mandate two different
+    # renderings for the same word.
+    renderings = {
+        en: tr
+        for en, tr in module_terms
+        if en.lower() not in pinned_keys
+        and en.lower().removesuffix("s") not in pinned_keys
+    }
+    renderings.update(pinned)
+    parts = [
         f"You are a professional software localization engine. Translate UI strings "
-        f"for OpenObserve, an observability platform, from English into {lang}.\n"
+        f"for OpenObserve from English into {lang}.\n"
+        "Context: OpenObserve is an observability platform. Users ingest logs, "
+        "metrics, and traces into streams, search them, chart them on dashboards, "
+        "alert on them, and transform them with functions and pipelines. Every "
+        "string is UI text from this product (buttons, labels, menu items, table "
+        "headers, messages), so always prefer a word's technical/monitoring sense "
+        "over its everyday sense.\n"
+        'Each input item has "key" and "text". The key is the i18n key path — '
+        "context that tells you where in the UI the text appears (for key "
+        "alerts.incidents.statusOpen, 'Open' is an incident status meaning "
+        "unresolved, not the verb). Use it to resolve ambiguity; translate only "
+        "the text, and never echo the key in the output.\n"
+        "Glossary — the sense these terms always carry in OpenObserve:\n"
+    ]
+    parts.extend(f"- {term}: {entry['sense']}\n" for term, entry in TERMS.items())
+    if renderings:
+        parts.append(
+            f"Fixed {lang} renderings — always render these terms and module "
+            "names exactly as shown:\n"
+        )
+        parts.extend(
+            f"- {en} -> {tr}\n"
+            for en, tr in sorted(renderings.items(), key=lambda kv: kv[0].lower())
+        )
+    parts.append(
         "Rules:\n"
         '- Reply with ONLY a JSON object of the form {\"translations\": [...]} '
-        "containing exactly one translated string per input string, in the same order.\n"
+        "containing exactly one translated string per input item, in the same order.\n"
         "- Preserve every interpolation placeholder EXACTLY as written and untranslated: "
         "curly-brace tokens like {count}, {name}, {0}; printf tokens like %s, %d; and "
         "linked-message tokens like @:common.name. Never translate, reorder, or remove them.\n"
@@ -183,18 +950,29 @@ def _system_prompt(locale):
         "- Copy vue-i18n literal escapes verbatim: {'@'}, {'{'}, {'}'}, {'|'} — keep the "
         "quotes and braces exactly, never translate or unescape them.\n"
         "- Keep any HTML tags, markdown, and URLs intact.\n"
+        "- Keep quoted code literals verbatim — field names, enum values and query "
+        "values in quotes ('metrics', 'role', level = 'error') are typed by users "
+        "and must not be translated.\n"
+        "- A short label that starts with a verb ('Copy Key', 'Import dashboard', "
+        "'Search Role') is an action: translate it as a command, never as a noun "
+        "phrase.\n"
         "- Do not translate the product name 'OpenObserve' or other proper nouns/brand names.\n"
         "- Preserve leading/trailing whitespace and terminal punctuation.\n"
         "- Produce natural, concise wording appropriate for buttons, labels, and short UI messages.\n"
         "- Do not add explanations, notes, or any text outside the JSON object."
     )
+    return "".join(parts)
 
 
-def translate_batch(texts, locale, max_retries=3, _depth=0):
+def translate_batch(items, locale, prompt, max_retries=3, _depth=0):
     """
-    Translate a list of strings via DeepSeek, index-aligned to `texts`.
+    Translate a list of (key, text) pairs via DeepSeek, index-aligned to `items`.
 
-    Returns a list the same length as `texts`; each element is the translated
+    `key` is the string's dotted i18n path, sent purely as disambiguating
+    context. `prompt` is the locale's system prompt, built once per locale by
+    translate_pending.
+
+    Returns a list the same length as `items`; each element is the translated
     string, or None if that specific item could not be translated. A None item is
     left un-advanced by the caller so it retries on the next run.
 
@@ -208,20 +986,33 @@ def translate_batch(texts, locale, max_retries=3, _depth=0):
         is pointless, subsequent attempts raise the temperature so the model can
         actually produce a different (valid) response.
     """
-    if not texts:
+    if not items:
         return []
 
-    payload = json.dumps({"strings": texts}, ensure_ascii=False)
+    payload = json.dumps(
+        {"strings": [{"key": key, "text": text} for key, text in items]},
+        ensure_ascii=False,
+    )
     temperature = 0.0
     last_err = None
+    messages = [
+        {"role": "system", "content": prompt},
+        {"role": "user", "content": payload},
+    ]
+    call = _get_tracer().llm_call(
+        _model(),
+        messages,
+        parent=_locale_spans.get(locale),
+        agent_name="translator",
+        agent_key=locale,
+        attributes={"ai.translations.locale": locale, "ai.translations.items": len(items)},
+    )
     for attempt in range(max_retries):
         try:
-            resp = _get_client().chat.completions.create(
+            resp = call.create(
+                _get_client(),
                 model=_model(),
-                messages=[
-                    {"role": "system", "content": _system_prompt(locale)},
-                    {"role": "user", "content": payload},
-                ],
+                messages=messages,
                 stream=False,
                 temperature=temperature,
                 response_format={"type": "json_object"},
@@ -229,9 +1020,9 @@ def translate_batch(texts, locale, max_retries=3, _depth=0):
             content = resp.choices[0].message.content
             data = json.loads(content) if content else {}
             out = data.get("translations") if isinstance(data, dict) else None
-            if not isinstance(out, list) or len(out) != len(texts):
+            if not isinstance(out, list) or len(out) != len(items):
                 raise TranslationError(
-                    f"expected {len(texts)} translations, got "
+                    f"expected {len(items)} translations, got "
                     f"{len(out) if isinstance(out, list) else type(out).__name__}"
                 )
             # An empty/whitespace/non-string element is a failed item, not a valid
@@ -240,30 +1031,34 @@ def translate_batch(texts, locale, max_retries=3, _depth=0):
             # split below isolates just that index as None (retried next run).
             cleaned = [x if isinstance(x, str) and x.strip() else None for x in out]
             if all(c is not None for c in cleaned):
+                call.end()
                 return cleaned
             raise TranslationError(
-                f"{cleaned.count(None)} of {len(texts)} translations were empty/invalid"
+                f"{cleaned.count(None)} of {len(items)} translations were empty/invalid"
             )
         except (json.JSONDecodeError, TranslationError, KeyError, IndexError, TypeError) as e:
             # Malformed / wrong-length response — perturb temperature and retry.
             last_err = e
+            call.reject(e)
             temperature = 0.3 if temperature == 0.0 else min(temperature + 0.2, 1.0)
         except Exception as e:  # noqa: BLE001 — network / API / rate-limit errors
             last_err = e
+            call.reject(e)
             time.sleep(2 * (attempt + 1))
+    call.end()
 
     # Retries exhausted. Split to isolate the offending element so its neighbours
     # aren't lost with it. Recursion bottoms out naturally at a single string
     # (which returns [None]); the depth guard is only a stack backstop and must be
     # large enough to reach singletons for any batch size (log2(4096) = 12).
-    if len(texts) > 1 and _depth < 32:
-        mid = len(texts) // 2
-        left = translate_batch(texts[:mid], locale, max_retries, _depth + 1)
-        right = translate_batch(texts[mid:], locale, max_retries, _depth + 1)
+    if len(items) > 1 and _depth < 32:
+        mid = len(items) // 2
+        left = translate_batch(items[:mid], locale, prompt, max_retries, _depth + 1)
+        right = translate_batch(items[mid:], locale, prompt, max_retries, _depth + 1)
         return left + right
 
-    print(f"  ! translation failed for [{locale}] ({len(texts)} item(s)): {last_err}")
-    return [None] * len(texts)
+    print(f"  ! translation failed for [{locale}] ({len(items)} item(s)): {last_err}")
+    return [None] * len(items)
 
 
 def _src_text(value):
@@ -410,60 +1205,122 @@ def _validate(src, out):
     Return `out` if it safely preserves `src`'s structure, else None.
 
     Rejects a translation that is empty/whitespace-only (which would blank the
-    label), changes the interpolation-placeholder multiset ({count}, %s, @:key),
-    or changes the vue-i18n pluralization pipe count (`|`) — each silently breaks
-    runtime rendering.
+    label), that vue-i18n could not compile at all, that changes the
+    interpolation-token multiset ({count}, {'{'}, %s, @:key), or that changes the
+    vue-i18n pluralization pipe count (`|`).
+
+    The compilability check is the one that matters most: a translated placeholder
+    name or a mangled literal escape makes vue-i18n throw while rendering, which
+    blanks every component on the page rather than just spoiling one label.
     """
     if not isinstance(out, str) or not out.strip():
         return None
-    if _placeholders(src) != _placeholders(out):
+    out_tokens, compilable = _scan_tokens(out)
+    if not compilable:
+        return None
+    if _placeholders(src) != sorted(out_tokens):
         return None
     if src.count("|") != out.count("|"):
         return None
     return out
 
 
-def translate_pending(pending, locale):
+def translate_pending(pending, locale, module_terms):
+    """Translate all pending leaves for a locale, traced as one child span per locale."""
+    tracer = _get_tracer()
+    span = tracer.start_span(
+        "translations.locale",
+        {"ai.translations.locale": locale, "ai.translations.pending_leaves": len(pending)},
+    )
+    _locale_spans[locale] = span
+    error = None
+    translated = {}
+    try:
+        translated = _translate_pending(pending, locale, module_terms)
+        return translated
+    except Exception as exc:
+        error = exc
+        raise
+    finally:
+        _locale_spans.pop(locale, None)
+        tracer.end_span(
+            span,
+            {"ai.translations.translated_leaves": len(translated), "ai.translations.failed_leaves": len(pending) - len(translated)},
+            error,
+        )
+
+
+def _translate_pending(pending, locale, module_terms):
     """
     Translate all pending leaves for a locale in batches.
 
     `pending` is a list of (path_tuple, value) where value is a string or a list
-    of strings. Returns {path_tuple: translated_value} for leaves that translated
-    successfully AND passed `_validate` for every string. String leaves map to a
-    string; array leaves map to a list (translated element-wise, type preserved).
-    A leaf with any failed/invalid string is omitted entirely (left to retry).
+    of strings; `module_terms` is the locale's module-name glossary from
+    build_module_glossary. Returns {path_tuple: translated_value} for leaves that
+    translated successfully AND passed `_validate` for every string. String
+    leaves map to a string; array leaves map to a list (translated element-wise,
+    type preserved). A leaf with any failed/invalid string is omitted entirely
+    (left to retry).
     """
     batch_size = int(os.environ.get("TRANSLATION_BATCH_SIZE", "50"))
+    prompt = _system_prompt(locale, module_terms)
 
     # Flatten every translatable string across all leaves into one work list so
     # array elements share batches with plain strings. `slots` holds the eventual
     # per-leaf output (translated strings, kept non-str/empty elements, or None).
     units = []  # [path, kind, slots]
-    flat = []   # [(unit_idx, elem_idx, source_string)]
+    flat = []   # [(unit_idx, elem_idx, (dotted_key, source_string))]
     for path, value in pending:
+        dotted = ".".join(path)
         if isinstance(value, list):
             slots = [None] * len(value)
             uidx = len(units)
             units.append([path, "list", slots])
             for i, el in enumerate(value):
                 if isinstance(el, str) and el.strip():
-                    flat.append((uidx, i, el))
+                    flat.append((uidx, i, (f"{dotted}.{i}", el)))
                 else:
                     slots[i] = el  # non-string / empty — keep as-is, never billed
         else:
             uidx = len(units)
             units.append([path, "str", [None]])
-            flat.append((uidx, 0, value))
+            flat.append((uidx, 0, (dotted, value)))
 
     total = len(flat)
+    chunks = [flat[start : start + batch_size] for start in range(0, total, batch_size)]
+
+    # Batches are independent, so translate several concurrently. Sequentially a
+    # backlog run is ~880 API calls and takes hours — longer than the gap between
+    # two en-US.json merges to main, so the run was always superseded before it
+    # could open a PR. Concurrency is what lets a full run actually land.
+    workers = max(1, int(os.environ.get("TRANSLATION_CONCURRENCY", "4")))
+    batch_results = [None] * len(chunks)
     done = 0
-    for start in range(0, total, batch_size):
-        chunk = flat[start : start + batch_size]
-        results = translate_batch([s for _, _, s in chunk], locale)
-        for (uidx, eidx, src), out in zip(chunk, results):
+
+    if workers == 1 or len(chunks) <= 1:
+        for i, chunk in enumerate(chunks):
+            batch_results[i] = translate_batch([item for _, _, item in chunk], locale, prompt)
+            done += len(chunk)
+            print(f"    {locale}: {done}/{total} strings translated", flush=True)
+    else:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {
+                pool.submit(
+                    translate_batch, [item for _, _, item in chunk], locale, prompt
+                ): i
+                for i, chunk in enumerate(chunks)
+            }
+            # Results are stored by index, so out-of-order completion cannot
+            # misalign a translation with its source string.
+            for fut in as_completed(futures):
+                i = futures[fut]
+                batch_results[i] = fut.result()
+                done += len(chunks[i])
+                print(f"    {locale}: {done}/{total} strings translated", flush=True)
+
+    for chunk, results in zip(chunks, batch_results):
+        for (uidx, eidx, (_key, src)), out in zip(chunk, results):
             units[uidx][2][eidx] = _validate(src, out)  # None on failure/mismatch
-        done += len(chunk)
-        print(f"    {locale}: {done}/{total} strings translated")
 
     translated = {}
     for path, kind, slots in units:

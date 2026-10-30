@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { describe, it, expect } from "vitest";
-import { buildPanelAutoName, buildAlertAutoName } from "./autoName";
+import { buildPanelAutoName, buildAlertAutoName, NO_AUTO_NAME_TYPES } from "./autoName";
 
 /** Stand-in for vue-i18n's `t`, using the real en-US templates. */
 const templates: Record<string, string> = {
@@ -9,12 +9,8 @@ const templates: Record<string, string> = {
   "dashboard.autoName.measure": "{fn} of {field}",
   "dashboard.autoName.measureByDimension": "{subject} by {dimension}",
   "dashboard.autoName.streamOverview": "{stream} overview",
-  "alerts.autoName.anomaly": "anomaly_{stream}",
-  "alerts.autoName.realTime": "realtime_{stream}",
-  "alerts.autoName.queryAlert": "{stream}_query_alert",
-  "alerts.autoName.streamAlert": "{stream}_alert",
-  "alerts.autoName.aggregation": "{stream}_{fn}_{field}",
-  "alerts.autoName.condition": "{stream}_{column}_{operator}_{value}",
+  // No alerts.autoName.* entries: alert name patterns are hardcoded English in
+  // autoName.ts, because the result is slugified into the persisted alert name.
 };
 
 const t = (key: string, params: Record<string, unknown> = {}) =>
@@ -125,6 +121,10 @@ describe("buildPanelAutoName", () => {
     expect(buildPanelAutoName(markdown, t)).toBe("");
   });
 
+  it.each([...NO_AUTO_NAME_TYPES])("gives a %s panel no name, even with a stream", (type) => {
+    expect(buildPanelAutoName(panel({ y: [] }, { type }), t)).toBe("");
+  });
+
   it("returns an empty name rather than throwing on an unbuilt panel", () => {
     expect(buildPanelAutoName(undefined, t)).toBe("");
     expect(buildPanelAutoName({ data: { queries: [] } }, t)).toBe("");
@@ -164,6 +164,36 @@ describe("buildPanelAutoName", () => {
           t,
         ),
       ).toBe("Avg of duration by service");
+    });
+
+    it("names a measure whose column is wrapped in a cast", () => {
+      const field = {
+        functionName: "sum",
+        treatAsNonTimestamp: true,
+        args: [
+          {
+            type: "function",
+            value: {
+              functionName: "try_cast",
+              args: [
+                { type: "field", value: { field: "usage_amount" } },
+                { type: "castType", value: "DOUBLE" },
+              ],
+            },
+          },
+        ],
+      };
+      expect(buildPanelAutoName(panel({ y: [field] }), t)).toBe("Sum of usage_amount");
+    });
+
+    it("falls back to the alias when no argument names a column", () => {
+      const field = {
+        functionName: "sum",
+        alias: "y_axis_1",
+        treatAsNonTimestamp: true,
+        args: [{ type: "function", value: { functionName: "try_cast", args: [] } }],
+      };
+      expect(buildPanelAutoName(panel({ y: [field] }), t)).toBe("Sum of y_axis_1");
     });
 
     it("honours a deployment's custom timestamp_column for a builder count", () => {

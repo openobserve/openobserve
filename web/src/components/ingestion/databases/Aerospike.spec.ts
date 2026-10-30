@@ -21,6 +21,7 @@ import { ref } from "vue";
 import Aerospike from "./Aerospike.vue";
 import aerospikeCard from "@/components/ingestion/setupCard/content/aerospike";
 import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
+import { gt } from "@/types/i18n";
 
 const mockEndpoint = ref({
   url: "https://test.openobserve.ai",
@@ -52,7 +53,7 @@ const SUBS = { url: "https://test.openobserve.ai", org: "test-org", token: "dGVz
 
 describe("aerospikeCard builder", () => {
   it("builds metadata + step flow (no prepare step)", () => {
-    const card = aerospikeCard(SUBS);
+    const card = aerospikeCard(SUBS, gt);
     expect(card.provider.name).toBe("Aerospike");
     expect(card.detect).toMatchObject({
       streamType: "metrics",
@@ -62,7 +63,7 @@ describe("aerospikeCard builder", () => {
     expect(card.steps.map((s) => s.id)).toEqual(["install", "configure", "run", "verify"]);
   });
   it("has a aerospike receiver config with the org's exporter", () => {
-    const config = aerospikeCard(SUBS)
+    const config = aerospikeCard(SUBS, gt)
       .steps.find((s) => s.id === "configure")!
       .variants!.find((v) => v.id === "linux-amd64")!.code.raw;
     expect(config).toContain("aerospike:");
@@ -76,7 +77,7 @@ describe("Aerospike.vue", () => {
     if (wrapper) wrapper.unmount();
   });
   it("renders the shared card", () => {
-    expect(getDataSourceCard("aerospike", SUBS)?.provider.name).toBe("Aerospike");
+    expect(getDataSourceCard("aerospike", SUBS, gt)?.provider.name).toBe("Aerospike");
     wrapper = mount(Aerospike, { global: { plugins: [mockStore, mockI18n] } });
     expect(wrapper.findComponent({ name: "SetupCardRenderer" }).exists()).toBe(true);
   });

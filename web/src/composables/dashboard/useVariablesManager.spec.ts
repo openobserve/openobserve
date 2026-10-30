@@ -10,8 +10,15 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU Affero General Public License for more details.
 
-import { describe, it, expect } from "vitest";
-import { useVariablesManager, getVariableKey, type VariableConfig } from "./useVariablesManager";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
+import { nextTick } from "vue";
+import { gt } from "@/types/i18n";
+import {
+  useVariablesManager,
+  getVariableKey,
+  LIVE_COMMIT_DEBOUNCE_MS,
+  type VariableConfig,
+} from "./useVariablesManager";
 
 describe("useVariablesManager", () => {
   describe("getVariableKey", () => {
@@ -33,7 +40,7 @@ describe("useVariablesManager", () => {
 
   describe("Variable Expansion", () => {
     it("should expand global variable without modification", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "country",
@@ -52,7 +59,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should expand tab variable into multiple instances", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "region",
@@ -76,7 +83,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should expand panel variable into multiple instances", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "status",
@@ -100,7 +107,7 @@ describe("useVariablesManager", () => {
     it("should use the option marked as default (selected) for single-select custom variables", () => {
       // Regression: previously the first option was always used as the default,
       // ignoring the per-option "Default" checkbox (option.selected).
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "custom_stream",
@@ -123,7 +130,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should use options marked as default (selected) for multiSelect custom variables", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "custom_multi",
@@ -145,7 +152,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should fall back to the first option when no custom option is marked default", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "custom_no_default",
@@ -166,7 +173,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should migrate legacy variables to global scope", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: any[] = [
         {
           name: "legacy",
@@ -186,7 +193,7 @@ describe("useVariablesManager", () => {
 
   describe("Dependency Graph", () => {
     it("should build dependency graph for global variables", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "country",
@@ -218,7 +225,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should build dependency graph across scopes", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "country",
@@ -251,7 +258,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should detect circular dependencies", async () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "var1",
@@ -281,7 +288,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should ignore invalid cross-scope dependencies when parent not found", async () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "tabVar",
@@ -317,7 +324,7 @@ describe("useVariablesManager", () => {
 
   describe("Variable Loading", () => {
     it("should load independent global variables in parallel", async () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "var1",
@@ -340,7 +347,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should load dependent variables after parent completes", async () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "parent",
@@ -385,7 +392,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should only load tab variables when tab is visible", async () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "tabVar",
@@ -413,7 +420,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should only load panel variables when panel is visible", async () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "panelVar",
@@ -443,7 +450,7 @@ describe("useVariablesManager", () => {
 
   describe("Variable Updates", () => {
     it("should update variable value and trigger dependents", async () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "parent",
@@ -479,7 +486,7 @@ describe("useVariablesManager", () => {
 
   describe("URL Synchronization", () => {
     it("should format global variables for URL", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "country",
@@ -504,7 +511,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should format tab variables for URL", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "region",
@@ -531,7 +538,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should format panel variables for URL", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "status",
@@ -558,7 +565,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should parse global variables from URL", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "country",
@@ -582,7 +589,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should parse tab variables from URL", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "region",
@@ -608,7 +615,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should parse panel variables from URL", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "status",
@@ -635,7 +642,7 @@ describe("useVariablesManager", () => {
 
   describe("Variable Queries", () => {
     it("should get variables for panel (merged: global + tab + panel)", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "globalVar",
@@ -677,7 +684,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should get variables for tab (merged: global + tab)", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "globalVar",
@@ -701,5 +708,614 @@ describe("useVariablesManager", () => {
       expect(tabVars).toHaveLength(2);
       expect(tabVars.map((v) => v.name)).toEqual(["globalVar", "tabVar"]);
     });
+  });
+
+  // A chained child is fast-tracked to pending when EVERY parent loads without
+  // an API call, because then there is nothing to wait for. `loadOptionsWithAllDefault`
+  // breaks that premise: it makes an all-sentinel parent genuinely fetch its
+  // options, so a child pre-marked pending races the parent's response and ships
+  // its filter with the parent placeholder never substituted — observed on the
+  // wire as `... WHERE "k8s_namespace_name" IN ('$namespace')`, which returns no
+  // values and leaves the child picker permanently empty.
+  describe("chained loading order when the all-default parent still fetches", () => {
+    const chained = (parentExtra: Record<string, unknown>): VariableConfig[] =>
+      [
+        {
+          name: "namespace",
+          type: "query_values",
+          scope: "global",
+          value: "",
+          multiSelect: true,
+          selectAllValueForMultiSelect: "all",
+          query_data: { stream: "k8s_pod_memory_usage", field: "k8s_namespace_name" },
+          ...parentExtra,
+        },
+        {
+          name: "pod",
+          type: "query_values",
+          scope: "global",
+          value: "",
+          multiSelect: true,
+          selectAllValueForMultiSelect: "all",
+          query_data: {
+            stream: "k8s_pod_memory_usage",
+            field: "k8s_pod_name",
+            filter: [{ name: "k8s_namespace_name", operator: "IN", value: "$namespace" }],
+          },
+        },
+      ] as VariableConfig[];
+
+    const pendingByName = (config: VariableConfig[]) => {
+      const manager = useVariablesManager(gt);
+      manager.initialize(config, {});
+      return Object.fromEntries(
+        manager.variablesData.global.map((v) => [v.name, v.isVariableLoadingPending]),
+      );
+    };
+
+    it("does NOT pre-mark the child when the all-default parent fetches its options", () => {
+      const pending = pendingByName(chained({ loadOptionsWithAllDefault: true }));
+      expect(pending.namespace).toBe(true);
+      expect(pending.pod).toBe(false);
+    });
+
+    it("still pre-marks the child for a pure all-default parent that never fetches", () => {
+      const pending = pendingByName(chained({}));
+      expect(pending.namespace).toBe(false);
+      expect(pending.pod).toBe(true);
+    });
+  });
+});
+
+describe("useVariablesManager live apply and commit-once", () => {
+  const chainConfig = (): VariableConfig[] => [
+    {
+      name: "env",
+      type: "custom",
+      scope: "global",
+      value: "prod",
+      options: [
+        { label: "prod", value: "prod" },
+        { label: "dev", value: "dev" },
+      ],
+    },
+    {
+      name: "service",
+      type: "query_values",
+      scope: "global",
+      value: null,
+      query_data: { field: "service", filter: [{ filter: "env=$env" }] },
+    },
+    {
+      name: "region",
+      type: "custom",
+      scope: "global",
+      value: "eu",
+      options: [
+        { label: "eu", value: "eu" },
+        { label: "us", value: "us" },
+      ],
+    },
+  ];
+
+  const finishLoading = (v: any, value?: any) => {
+    if (value !== undefined) v.value = value;
+    v.isLoading = false;
+    v.isVariableLoadingPending = false;
+    v.isVariablePartialLoaded = true;
+  };
+
+  const setupSettled = async () => {
+    const manager = useVariablesManager(gt);
+    await manager.initialize(chainConfig(), {});
+    const [env, service, region] = manager.variablesData.global;
+    finishLoading(env);
+    finishLoading(service, "api");
+    finishLoading(region);
+    manager.commitAll();
+    await nextTick();
+    const commits = vi.fn();
+    manager.onAutoCommit(commits);
+    return { manager, env, service, region, commits };
+  };
+
+  const committed = (manager: any, name: string) =>
+    manager.committedVariablesData.global.find((v: any) => v.name === name)?.value;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("commits a live change after the 300ms debounce, not before", async () => {
+    const { manager, commits } = await setupSettled();
+    manager.setLiveMode(true);
+
+    manager.updateVariableValue("region", "global", undefined, undefined, "us");
+    vi.advanceTimersByTime(LIVE_COMMIT_DEBOUNCE_MS - 1);
+    expect(commits).not.toHaveBeenCalled();
+    expect(committed(manager, "region")).toBe("eu");
+
+    vi.advanceTimersByTime(1);
+    expect(commits).toHaveBeenCalledTimes(1);
+    expect(committed(manager, "region")).toBe("us");
+    expect(manager.hasUncommittedChanges.value).toBe(false);
+  });
+
+  it("uses one debounce for the whole dashboard, so quick changes commit together", async () => {
+    const { manager, commits } = await setupSettled();
+    manager.setLiveMode(true);
+
+    manager.updateVariableValue("region", "global", undefined, undefined, "us");
+    vi.advanceTimersByTime(200);
+    manager.updateVariableValue("region", "global", undefined, undefined, "eu");
+    vi.advanceTimersByTime(200);
+    manager.updateVariableValue("region", "global", undefined, undefined, "us");
+    vi.advanceTimersByTime(LIVE_COMMIT_DEBOUNCE_MS);
+
+    expect(commits).toHaveBeenCalledTimes(1);
+    expect(committed(manager, "region")).toBe("us");
+  });
+
+  it("commits a live textbox change at once, since the input already debounced it", async () => {
+    const manager = useVariablesManager(gt);
+    await manager.initialize(
+      [{ name: "search", type: "textbox", scope: "global", value: "a" }],
+      {},
+    );
+    finishLoading(manager.variablesData.global[0]);
+    manager.commitAll();
+    await nextTick();
+    const commits = vi.fn();
+    manager.onAutoCommit(commits);
+    manager.setLiveMode(true);
+
+    manager.updateVariableValue("search", "global", undefined, undefined, "ab");
+
+    expect(commits).toHaveBeenCalledTimes(1);
+    expect(committed(manager, "search")).toBe("ab");
+    vi.advanceTimersByTime(LIVE_COMMIT_DEBOUNCE_MS);
+    expect(commits).toHaveBeenCalledTimes(1);
+  });
+
+  it("a variable outside the changed chain does not hold the live commit", async () => {
+    const { manager, service, commits } = await setupSettled();
+    service.isLoading = true;
+    await nextTick();
+    manager.setLiveMode(true);
+
+    manager.updateVariableValue("region", "global", undefined, undefined, "us");
+    vi.advanceTimersByTime(LIVE_COMMIT_DEBOUNCE_MS);
+
+    expect(commits).toHaveBeenCalledTimes(1);
+    expect(committed(manager, "region")).toBe("us");
+  });
+
+  it("a query blocked by a parent with no data does not hold the commit", async () => {
+    const manager = useVariablesManager(gt);
+    await manager.initialize(
+      [
+        { name: "search", type: "textbox", scope: "global", value: "a" },
+        {
+          name: "ns",
+          type: "query_values",
+          scope: "global",
+          value: null,
+          query_data: { field: "ns", filter: [{ filter: "q=$search" }] },
+        },
+        {
+          name: "ctr",
+          type: "query_values",
+          scope: "global",
+          value: null,
+          query_data: { field: "ctr", filter: [{ filter: "ns=$ns" }] },
+        },
+      ],
+      {},
+    );
+    const [search, ns, ctr] = manager.variablesData.global;
+    finishLoading(search);
+    finishLoading(ns, null);
+    ctr.isVariablePartialLoaded = false;
+    ctr.isVariableLoadingPending = true;
+    manager.commitAll();
+    await nextTick();
+    const commits = vi.fn();
+    manager.onAutoCommit(commits);
+    manager.setLiveMode(true);
+
+    manager.updateVariableValue("search", "global", undefined, undefined, "ab");
+    expect(ns.isVariableLoadingPending).toBe(true);
+    await nextTick();
+    expect(commits).not.toHaveBeenCalled();
+
+    // ns finishes with no options, which leaves ctr pending behind an empty parent.
+    finishLoading(ns, null);
+    ctr.isVariableLoadingPending = true;
+    ctr.isVariablePartialLoaded = false;
+    await nextTick();
+
+    expect(commits).toHaveBeenCalledTimes(1);
+    expect(committed(manager, "search")).toBe("ab");
+  });
+
+  it("keeps the textbox on Refresh-to-apply when live mode is off", async () => {
+    const manager = useVariablesManager(gt);
+    await manager.initialize(
+      [{ name: "search", type: "textbox", scope: "global", value: "a" }],
+      {},
+    );
+    finishLoading(manager.variablesData.global[0]);
+    manager.commitAll();
+
+    manager.updateVariableValue("search", "global", undefined, undefined, "ab");
+    vi.advanceTimersByTime(LIVE_COMMIT_DEBOUNCE_MS * 10);
+
+    expect(committed(manager, "search")).toBe("a");
+  });
+
+  it("waits for every dependent variable to resolve, then commits once", async () => {
+    const { manager, service, commits } = await setupSettled();
+    manager.setLiveMode(true);
+
+    manager.updateVariableValue("env", "global", undefined, undefined, "dev");
+    expect(service.isVariableLoadingPending).toBe(true);
+    vi.advanceTimersByTime(LIVE_COMMIT_DEBOUNCE_MS);
+    await nextTick();
+    expect(commits).not.toHaveBeenCalled();
+    expect(committed(manager, "env")).toBe("prod");
+
+    finishLoading(service, "web");
+    await nextTick();
+
+    expect(commits).toHaveBeenCalledTimes(1);
+    expect(committed(manager, "env")).toBe("dev");
+    expect(committed(manager, "service")).toBe("web");
+  });
+
+  it("keeps today's Refresh-to-apply behaviour when live mode is off", async () => {
+    const { manager, commits } = await setupSettled();
+
+    manager.updateVariableValue("region", "global", undefined, undefined, "us");
+    vi.advanceTimersByTime(LIVE_COMMIT_DEBOUNCE_MS * 10);
+
+    expect(commits).not.toHaveBeenCalled();
+    expect(committed(manager, "region")).toBe("eu");
+    expect(manager.hasUncommittedChanges.value).toBe(true);
+  });
+
+  it("turning live mode off drops a pending commit", async () => {
+    const { manager, commits } = await setupSettled();
+    manager.setLiveMode(true);
+
+    manager.updateVariableValue("region", "global", undefined, undefined, "us");
+    manager.setLiveMode(false);
+    vi.advanceTimersByTime(LIVE_COMMIT_DEBOUNCE_MS);
+
+    expect(commits).not.toHaveBeenCalled();
+    expect(committed(manager, "region")).toBe("eu");
+  });
+
+  it("turning live mode on applies changes that were waiting for Refresh", async () => {
+    const { manager, commits } = await setupSettled();
+
+    manager.updateVariableValue("region", "global", undefined, undefined, "us");
+    manager.setLiveMode(true);
+
+    expect(commits).toHaveBeenCalledTimes(1);
+    expect(committed(manager, "region")).toBe("us");
+  });
+
+  it("a manual refresh cancels the pending live commit so it does not commit twice", async () => {
+    const { manager, commits } = await setupSettled();
+    manager.setLiveMode(true);
+
+    manager.updateVariableValue("region", "global", undefined, undefined, "us");
+    manager.cancelPendingCommit();
+    manager.commitAll();
+    vi.advanceTimersByTime(LIVE_COMMIT_DEBOUNCE_MS);
+
+    expect(commits).not.toHaveBeenCalled();
+    expect(committed(manager, "region")).toBe("us");
+  });
+
+  it("commitWhenSettled commits at once when nothing is loading", async () => {
+    const { manager, commits } = await setupSettled();
+    manager.getVariable("region", "global")!.value = "us";
+
+    manager.commitWhenSettled();
+
+    expect(commits).toHaveBeenCalledTimes(1);
+    expect(committed(manager, "region")).toBe("us");
+  });
+
+  it("repeated commit requests during loading collapse into one commit", async () => {
+    const { manager, service, commits } = await setupSettled();
+    service.isVariableLoadingPending = true;
+    await nextTick();
+
+    manager.commitWhenSettled();
+    manager.commitWhenSettled();
+    manager.commitWhenSettled();
+    expect(commits).not.toHaveBeenCalled();
+
+    finishLoading(service, "web");
+    await nextTick();
+    expect(commits).toHaveBeenCalledTimes(1);
+  });
+
+  it("waits however long a dependent load takes, with no time limit", async () => {
+    const { manager, service, commits } = await setupSettled();
+    manager.setLiveMode(true);
+
+    manager.updateVariableValue("env", "global", undefined, undefined, "dev");
+    vi.advanceTimersByTime(LIVE_COMMIT_DEBOUNCE_MS);
+    service.isLoading = true;
+    await nextTick();
+    vi.advanceTimersByTime(120_000);
+    await nextTick();
+    expect(commits).not.toHaveBeenCalled();
+    expect(committed(manager, "env")).toBe("prod");
+
+    finishLoading(service, "web");
+    await nextTick();
+    expect(commits).toHaveBeenCalledTimes(1);
+    expect(committed(manager, "service")).toBe("web");
+  });
+
+  it("waits for the whole chain when the child is still waiting on a reloading parent", async () => {
+    const { manager, env, service, commits } = await setupSettled();
+    manager.setLiveMode(true);
+    // Opening env's dropdown refetches its options, so env is loading when the user picks.
+    env.isLoading = true;
+    env.isVariablePartialLoaded = false;
+
+    manager.updateVariableValue("env", "global", undefined, undefined, "dev");
+    expect(service.isVariableLoadingPending).toBe(false);
+    vi.advanceTimersByTime(LIVE_COMMIT_DEBOUNCE_MS);
+    await nextTick();
+    expect(commits).not.toHaveBeenCalled();
+
+    finishLoading(env);
+    manager.onVariablePartiallyLoaded("env@global");
+    await nextTick();
+    expect(service.isVariableLoadingPending).toBe(true);
+    expect(commits).not.toHaveBeenCalled();
+
+    finishLoading(service, "web");
+    await nextTick();
+    expect(commits).toHaveBeenCalledTimes(1);
+    expect(committed(manager, "env")).toBe("dev");
+    expect(committed(manager, "service")).toBe("web");
+  });
+
+  it("an errored dependent load releases the commit", async () => {
+    const { manager, service, commits } = await setupSettled();
+    manager.setLiveMode(true);
+    manager.updateVariableValue("env", "global", undefined, undefined, "dev");
+    vi.advanceTimersByTime(LIVE_COMMIT_DEBOUNCE_MS);
+    service.isLoading = true;
+    await nextTick();
+    expect(commits).not.toHaveBeenCalled();
+
+    // The selector's error path: no value, not loading, marked loaded.
+    finishLoading(service, null);
+    await nextTick();
+
+    expect(commits).toHaveBeenCalledTimes(1);
+    expect(committed(manager, "env")).toBe("dev");
+  });
+
+  it("a change still inside its debounce joins the settling commit instead of being dropped", async () => {
+    const manager = useVariablesManager(gt);
+    await manager.initialize(
+      [
+        ...chainConfig().slice(0, 2),
+        {
+          name: "method",
+          type: "custom",
+          scope: "global",
+          value: "GET",
+          options: [
+            { label: "GET", value: "GET" },
+            { label: "POST", value: "POST" },
+          ],
+        },
+        {
+          name: "code",
+          type: "query_values",
+          scope: "global",
+          value: null,
+          query_data: { field: "code", filter: [{ filter: "method=$method" }] },
+        },
+      ],
+      {},
+    );
+    const [env, service, method, code] = manager.variablesData.global;
+    finishLoading(env);
+    finishLoading(service, "api");
+    finishLoading(method);
+    finishLoading(code, "200");
+    manager.commitAll();
+    await nextTick();
+    const commits = vi.fn();
+    manager.onAutoCommit(commits);
+    manager.setLiveMode(true);
+
+    manager.updateVariableValue("env", "global", undefined, undefined, "dev");
+    vi.advanceTimersByTime(LIVE_COMMIT_DEBOUNCE_MS);
+    manager.updateVariableValue("method", "global", undefined, undefined, "POST");
+    vi.advanceTimersByTime(100);
+    finishLoading(service, "web");
+    await nextTick();
+    expect(commits).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(LIVE_COMMIT_DEBOUNCE_MS);
+    await nextTick();
+    expect(commits).not.toHaveBeenCalled();
+
+    finishLoading(code, "201");
+    await nextTick();
+    expect(commits).toHaveBeenCalledTimes(1);
+    expect(committed(manager, "method")).toBe("POST");
+    expect(committed(manager, "code")).toBe("201");
+  });
+
+  it("a parent reload that keeps its value leaves loaded children alone", async () => {
+    const { manager, service } = await setupSettled();
+    manager.onVariablePartiallyLoaded("env@global");
+    finishLoading(service, "api");
+
+    manager.onVariablePartiallyLoaded("env@global");
+
+    expect(service.value).toBe("api");
+    expect(service.isVariableLoadingPending).toBe(false);
+    expect(service.isVariablePartialLoaded).toBe(true);
+  });
+
+  it("a parent changed by the user still reloads children after a same-value reload", async () => {
+    const { manager, service } = await setupSettled();
+    manager.onVariablePartiallyLoaded("env@global");
+    finishLoading(service, "api");
+
+    manager.updateVariableValue("env", "global", undefined, undefined, "dev");
+    finishLoading(service, "web");
+    manager.onVariablePartiallyLoaded("env@global");
+
+    expect(service.value).toBe("web");
+    expect(service.isVariableLoadingPending).toBe(false);
+  });
+
+  it("a parent reload that lands on a new value reloads its children", async () => {
+    const { manager, env, service } = await setupSettled();
+    manager.onVariablePartiallyLoaded("env@global");
+    finishLoading(service, "api");
+
+    env.value = "dev";
+    manager.onVariablePartiallyLoaded("env@global");
+
+    expect(service.value).toBe(null);
+    expect(service.isVariableLoadingPending).toBe(true);
+  });
+
+  const queryChainConfig = (parent: Partial<VariableConfig> = {}): VariableConfig[] => [
+    {
+      name: "ns",
+      type: "query_values",
+      scope: "global",
+      value: null,
+      query_data: { field: "ns" },
+      ...parent,
+    },
+    {
+      name: "pod",
+      type: "query_values",
+      scope: "global",
+      value: null,
+      query_data: { field: "pod", filter: [{ filter: "ns=$ns" }] },
+    },
+  ];
+
+  it("opening an all-default parent leaves its loaded children alone", async () => {
+    const manager = useVariablesManager(gt);
+    await manager.initialize(
+      queryChainConfig({ multiSelect: true, selectAllValueForMultiSelect: "all" }),
+      {},
+    );
+    const [, pod] = manager.variablesData.global;
+    finishLoading(pod, ["p1"]);
+
+    manager.onVariablePartiallyLoaded("ns@global");
+
+    expect(pod.value).toEqual(["p1"]);
+    expect(pod.isVariableLoadingPending).toBe(false);
+  });
+
+  it("opening a URL-restored parent leaves its URL-restored children alone", async () => {
+    const manager = useVariablesManager(gt);
+    await manager.initialize(queryChainConfig(), {});
+    manager.loadFromUrl({ query: { "var-ns": "a", "var-pod": "p1" } });
+    const [ns, pod] = manager.variablesData.global;
+
+    manager.onVariablePartiallyLoaded("ns@global");
+
+    expect(ns.value).toBe("a");
+    expect(pod.value).toBe("p1");
+    expect(pod.isVariableLoadingPending).toBe(false);
+  });
+
+  it("a URL-restored parent whose fetch lands on a new value reloads its children", async () => {
+    const manager = useVariablesManager(gt);
+    await manager.initialize(queryChainConfig(), {});
+    manager.loadFromUrl({ query: { "var-ns": "a", "var-pod": "p1" } });
+    const [ns, pod] = manager.variablesData.global;
+
+    ns.value = "b";
+    manager.onVariablePartiallyLoaded("ns@global");
+
+    expect(pod.value).toBe(null);
+    expect(pod.isVariableLoadingPending).toBe(true);
+  });
+
+  it("an aborted dependent load releases the commit", async () => {
+    const { manager, service, commits } = await setupSettled();
+    manager.setLiveMode(true);
+    manager.updateVariableValue("env", "global", undefined, undefined, "dev");
+    vi.advanceTimersByTime(LIVE_COMMIT_DEBOUNCE_MS);
+    service.isLoading = true;
+    await nextTick();
+    expect(commits).not.toHaveBeenCalled();
+
+    // The selector's abort path (markLoadEnded): not loading, no value, marked as done.
+    service.isLoading = false;
+    service.isVariableLoadingPending = false;
+    service.isVariablePartialLoaded = true;
+    await nextTick();
+
+    expect(commits).toHaveBeenCalledTimes(1);
+    expect(committed(manager, "env")).toBe("dev");
+  });
+
+  it("applies live changes in tab and panel scopes through the same debounce", async () => {
+    const manager = useVariablesManager(gt);
+    await manager.initialize(
+      [
+        {
+          name: "tabVar",
+          type: "custom",
+          scope: "tabs",
+          tabs: ["t1"],
+          value: "a",
+        },
+        {
+          name: "panelVar",
+          type: "custom",
+          scope: "panels",
+          panels: ["p1"],
+          value: "x",
+        },
+      ],
+      { tabs: [{ tabId: "t1", panels: [{ id: "p1" }] }] },
+    );
+    manager.setTabVisibility("t1", true);
+    manager.setPanelVisibility("p1", true);
+    finishLoading(manager.variablesData.tabs.t1[0]);
+    finishLoading(manager.variablesData.panels.p1[0]);
+    manager.commitAll();
+    await nextTick();
+    const commits = vi.fn();
+    manager.onAutoCommit(commits);
+    manager.setLiveMode(true);
+
+    manager.updateVariableValue("tabVar", "tabs", "t1", undefined, "b");
+    manager.updateVariableValue("panelVar", "panels", undefined, "p1", "y");
+    vi.advanceTimersByTime(LIVE_COMMIT_DEBOUNCE_MS);
+
+    expect(commits).toHaveBeenCalledTimes(1);
+    expect(manager.committedVariablesData.tabs.t1[0].value).toBe("b");
+    expect(manager.committedVariablesData.panels.p1[0].value).toBe("y");
   });
 });

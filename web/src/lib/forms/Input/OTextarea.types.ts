@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nText } from "@/types/i18n";
+
 import type { FieldWidth } from "../Input/OInput.types";
 
 export type TextareaSize = "sm" | "md";
@@ -8,19 +10,25 @@ export interface TextareaProps {
   /** Bound value */
   modelValue?: string;
   /** Floating / static label */
-  label?: string;
+  label?: I18nText;
   /** Placeholder text */
-  placeholder?: string;
+  placeholder?: I18nText;
   /** Helper text displayed below the field */
-  helpText?: string;
+  helpText?: I18nText;
   /** Error message — when provided the field shows error styling */
-  errorMessage?: string;
+  errorMessage?: I18nText;
   /** Marks the field as being in an error state without a message */
   error?: boolean;
   /** Number of visible rows */
   rows?: number;
   /** Auto-resize to fit content */
   autogrow?: boolean;
+  /**
+   * Upper bound for `autogrow`, in lines. Past it the field stops growing and
+   * scrolls instead, so one long message cannot push everything below it off
+   * the screen. Ignored without `autogrow`.
+   */
+  maxRows?: number;
   /** Prevents value editing */
   readonly?: boolean;
   /** Prevents interaction */

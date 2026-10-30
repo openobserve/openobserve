@@ -75,6 +75,7 @@ export class PipelinesFormValidationPage {
         this.associateFunctionDrawer         = '[data-test="associate-function-drawer"]';
         this.associateFunctionSelectPopover  = '[data-test="associate-function-select-function-input-popover"]';
         this.associateFunctionSelectError    = '[data-test="associate-function-select-function-input-error"]';
+        this.associateFunctionSelectTrigger  = '[data-test="associate-function-select-function-input-trigger"]';
         this.createFunctionToggle            = '[data-test="create-function-toggle"]';
         this.associateFunctionAfterFlattening = '[data-test="associate-function-after-flattening-toggle"]';
 
@@ -303,6 +304,17 @@ export class PipelinesFormValidationPage {
         return this.page.locator(this.associateFunctionSelectError);
     }
 
+    // FunctionPicker shows a spinner instead of the form until the functions list loads.
+    getAssociateFunctionSelectTriggerLocator() {
+        return this.page.locator(this.associateFunctionSelectTrigger);
+    }
+
+    getAssociateFunctionSaveBlockedLocator() {
+        return this.page
+            .locator(this.associateFunctionSelectError)
+            .or(this.page.locator(`${this.associateFunctionSaveBtn}:disabled`));
+    }
+
     getCreateFunctionToggleLocator() {
         return this.page.locator(this.createFunctionToggle);
     }
@@ -483,42 +495,6 @@ export class PipelinesFormValidationPage {
             }
         }
         testLogger.warn('No pipeline with LLM Evaluation node found');
-        return false;
-    }
-
-    /**
-     * Tries every edit-pipeline button in the list, opens the editor, and looks
-     * for an Associate Function drawer.  If found, returns true.
-     */
-    async openFirstAssociateFunctionNode() {
-        testLogger.info('Searching for a pipeline with an Associate Function node');
-        await this.navigateToPipelines();
-        const editBtns = this.page.locator('[data-test$="-update-pipeline"]');
-        const count = await editBtns.count();
-        for (let i = 0; i < count; i++) {
-            await this.navigateToPipelines();
-            const btns = this.page.locator('[data-test$="-update-pipeline"]');
-            // The pipeline list is shared org-wide, so other parallel test files create
-            // and delete rows while we scan. Re-check the current row count and skip this
-            // index if the list has shrunk past it, instead of clicking a row that no
-            // longer exists (which would hang until the 45s action timeout and flake).
-            if (i >= await btns.count()) break;
-            const target = btns.nth(i);
-            if (!(await target.isVisible({ timeout: 5000 }).catch(() => false))) continue;
-            await target.click();
-            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-            // Function nodes have a click target on the node header area
-            const funcNode = this.page.locator('[data-test$="-function-node"]').first();
-            if (await funcNode.isVisible({ timeout: 3000 }).catch(() => false)) {
-                await funcNode.click();
-                const drawer = this.page.locator(this.associateFunctionDrawer);
-                if (await drawer.isVisible({ timeout: 5000 }).catch(() => false)) {
-                    testLogger.info('Associate Function drawer opened successfully');
-                    return true;
-                }
-            }
-        }
-        testLogger.warn('No pipeline with Associate Function node found');
         return false;
     }
 

@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="isAnimating ? 'auto-refresh-icon--spinning' : ''"
             size="sm"
           />
-          <OTooltip :content="`${t('search.autoRefresh')}: ${selectedLabel}`" />
+          <OTooltip :content="t('search.autoRefreshWithValue', { value: selectedLabel })" />
         </OButton>
       </template>
       <div class="w-75 p-2">
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 side="right"
                 align="center"
                 max-width="18.75rem"
-                :content="minRangeRestrictionMessageVal"
+                :content="raw(minRangeRestrictionMessageVal)"
               />
               {{ item.label }}
             </OButton>
@@ -101,11 +101,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="[
                 isAnimating ? 'auto-refresh-icon--spinning' : '',
                 isAnimating ? 'text-primary' : '',
-                'mr-0.5',
+                'me-0.5',
               ]"
             />
             <div class="text-compact text-center leading-4">{{ selectedLabel }}</div>
-            <OIcon name="arrow-drop-down" size="sm" class="ml-0.5" />
+            <OIcon name="arrow-drop-down" size="sm" class="ms-0.5" />
           </div>
         </OButton>
       </template>
@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 side="right"
                 align="center"
                 max-width="18.75rem"
-                :content="minRangeRestrictionMessageVal"
+                :content="raw(minRangeRestrictionMessageVal)"
               />
               {{ item.label }}
             </OButton>
@@ -172,11 +172,13 @@ import {
   onActivated,
   onDeactivated,
   onMounted,
+  onUnmounted,
   type PropType,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { generateDurationLabel } from "../utils/date";
+import { AUTO_REFRESH_INTERVALS, autoRefreshLabel } from "@/utils/dashboard/autoRefresh";
 import OButton from "@/lib/core/Button/OButton.vue";
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -216,32 +218,28 @@ export default defineComponent({
   emits: ["update:modelValue", "trigger"],
   setup(props: any, { emit }) {
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const btnRefreshInterval = ref(false);
     let intervalInstance = 0;
 
-    const refreshTimes = computed(() => [
-      [
-        { label: `5 ${t("common.sec")}`, value: 5, disabled: false },
-        { label: `1 ${t("common.min")}`, value: 60, disabled: false },
-        { label: `1 ${t("common.hr")}`, value: 3600, disabled: false },
-      ],
-      [
-        { label: `10 ${t("common.sec")}`, value: 10, disabled: false },
-        { label: `5 ${t("common.min")}`, value: 300, disabled: false },
-        { label: `2 ${t("common.hr")}`, value: 7200, disabled: false },
-      ],
-      [
-        { label: `15 ${t("common.sec")}`, value: 15, disabled: false },
-        { label: `15 ${t("common.min")}`, value: 900, disabled: false },
-        { label: `1 ${t("common.day")}`, value: 86400, disabled: false },
-      ],
-      [
-        { label: `30 ${t("common.sec")}`, value: 30, disabled: false },
-        { label: `30 ${t("common.min")}`, value: 1800, disabled: false },
-      ],
-    ]);
+    const refreshTimes = computed(() => {
+      const columns = [
+        AUTO_REFRESH_INTERVALS.filter((v) => v < 60),
+        AUTO_REFRESH_INTERVALS.filter((v) => v >= 60 && v < 3600),
+        AUTO_REFRESH_INTERVALS.filter((v) => v >= 3600),
+      ];
+      const rowCount = Math.max(...columns.map((c) => c.length));
+      return Array.from({ length: rowCount }, (_, i) =>
+        columns
+          .filter((c) => i < c.length)
+          .map((c) => ({
+            label: autoRefreshLabel(c[i], t),
+            value: c[i] as number,
+            disabled: false,
+          })),
+      );
+    });
 
     // v-model computed value
     const selectedValue = computed({
@@ -361,7 +359,12 @@ export default defineComponent({
       clearInterval(intervalInstance);
     });
 
+    onUnmounted(() => {
+      clearInterval(intervalInstance);
+    });
+
     return {
+      raw,
       t,
       router,
       btnRefreshInterval,

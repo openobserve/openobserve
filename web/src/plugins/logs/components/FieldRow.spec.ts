@@ -254,6 +254,34 @@ describe("FieldRow", () => {
       expect(interestingIcons.length).toBe(0);
     });
 
+    it("hides interesting icon for a VRL-derived field when showQuickMode is true", () => {
+      // o2-enterprise#2859: quick mode turns the interesting fields into the SELECT
+      // list, and a VRL function's output field (isSchemaField: false) does not exist
+      // when the SQL runs — starring one built a query that failed with
+      // "Search field not found".
+      const wrapper = createWrapper({
+        field: { ...defaultField, name: "vrl_field", isSchemaField: false },
+        showQuickMode: true,
+      });
+      const interestingIcons = wrapper.findAll(
+        `[data-test="log-search-index-list-interesting-vrl_field-field-btn"]`,
+      );
+      expect(interestingIcons.length).toBe(0);
+    });
+
+    it("shows interesting icon for a field with no isSchemaField flag when showQuickMode is true", () => {
+      // Raw stream schema objects carry no isSchemaField property; they are schema
+      // fields and must stay eligible.
+      const wrapper = createWrapper({
+        field: { name: "plain_field", isInterestingField: false, ftsKey: true },
+        showQuickMode: true,
+      });
+      const interestingIcons = wrapper.findAll(
+        `[data-test="log-search-index-list-interesting-plain_field-field-btn"]`,
+      );
+      expect(interestingIcons.length).toBeGreaterThan(0);
+    });
+
     it("hides add icon for timestamp column", () => {
       const wrapper = createWrapper({
         field: { ...defaultField, name: "_timestamp", ftsKey: true },

@@ -5,6 +5,8 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
+pub mod redaction_evidence;
+
 use std::{
     sync::{Arc, LazyLock as Lazy, OnceLock},
     time::Duration,
@@ -17,6 +19,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
+        alerts::auto_investigate::DecisionRow,
         self_reporting::{
             EnqueueError, ReportingData, ReportingMessage, ReportingQueue, ReportingRunner,
             error::ErrorData,
@@ -49,14 +52,15 @@ pub fn set_batch_publisher(
     BATCH_PUBLISHER.set(publisher)
 }
 
+/// Start the reporting queues.
+///
+/// Deliberately ungated. Trigger records — alert and
+/// report execution history — are published unconditionally (see
+/// [`publish_triggers_usage`]), so the queue has to be running even on a
+/// build that never reports usage. Usage and error records
+/// keep their own gates at their own publish sites, so starting the queue does
+/// not cause anything extra to be written.
 pub async fn run() {
-    #[cfg(not(feature = "enterprise"))]
-    {
-        if !get_config().common.usage_enabled {
-            return;
-        }
-    }
-
     if let Err(error) = start().await {
         log::error!("[SELF-REPORTING] Reporting queue initialization failed: {error}");
         return;
@@ -65,17 +69,24 @@ pub async fn run() {
     log::debug!("[SELF-REPORTING] successfully initialized reporting queues");
 }
 
+/// Publish one trigger execution record.
+///
+/// **Unconditional, in every build.** A trigger record is not telemetry about
+/// the customer — it is the execution history of a feature the customer
+/// configured, and it is what answers "did my alert run, and why did it not
+/// fire". Several product surfaces read it directly: alert history, pipeline
+/// execution history (`api/pipelines`, which queries the `triggers` stream),
+/// and the SLO alert-based SLI.
+///
+/// It used to be gated on the usage reporting flag, so switching off what reads
+/// as billing telemetry silently disabled alert history as well. That coupling
+/// was not discoverable from the flag's name.
+/// Volume is bounded by alert count x evaluation frequency, not by request
+/// rate, so there is no cost argument for gating it the way there is for
+/// `UsageData`.
+///
+/// `_meta` always receives a copy; the originating org's own stream does unless the mode is remote.
 pub fn publish_triggers_usage(trigger: TriggerData) {
-    #[cfg(not(feature = "enterprise"))]
-    {
-        if !get_config().common.usage_enabled {
-            log::debug!(
-                "[SELF-REPORTING] Skipping trigger usage publish - usage reporting disabled"
-            );
-            return;
-        }
-    }
-
     log::debug!(
         "[SELF-REPORTING] Publishing trigger usage: org={}, module={:?}, key={}, status={:?}",
         trigger.org,
@@ -125,12 +136,22 @@ pub fn publish_triggers_usage(trigger: TriggerData) {
     }
 }
 
+/// Logs one auto-investigate gate decision to `_meta`; unconditional, like trigger records.
+pub fn publish_auto_investigate_decision(row: DecisionRow) {
+    let (org, alert_id) = (row.org_id.clone(), row.alert_id.clone());
+    if let Err(e) = try_enqueue(ReportingData::AutoInvestigateDecision(Box::new(row))) {
+        log::warn!(
+            "[SELF-REPORTING] dropped the auto-investigate decision for {org}/{alert_id}: {e}"
+        );
+    }
+}
+
 pub async fn publish_error(error_data: ErrorData) {
     let cfg = get_config();
     #[cfg(not(feature = "enterprise"))]
     {
-        if !cfg.common.usage_enabled {
-            log::debug!("[SELF-REPORTING] Skipping error publish - usage reporting disabled");
+        if !cfg.common.usage_reporting_errors_enabled {
+            log::debug!("[SELF-REPORTING] Skipping error publish - error reporting disabled");
             return;
         }
     }
@@ -189,15 +210,20 @@ pub async fn publish_error(error_data: ErrorData) {
     }
 }
 
+/// Drain the reporting queues at shutdown.
+///
+/// Ungated: trigger records are always queued, so a build that never reports
+/// usage still has buffered alert history that must reach a stream before the
+/// process exits.
+///
+/// The scheduler is included in the role test because it is the node that
+/// publishes trigger records. On a dedicated scheduler node the old
+/// ingester-or-querier test was false, so every trigger still sitting in the
+/// batch was discarded on shutdown.
 pub async fn flush() {
     let cfg = get_config();
 
-    #[cfg(feature = "enterprise")]
-    let usage_enabled = true;
-    #[cfg(not(feature = "enterprise"))]
-    let usage_enabled = cfg.common.usage_enabled;
-
-    if !usage_enabled || (!LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier()) {
+    if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_scheduler() {
         return;
     }
 
@@ -224,12 +250,12 @@ pub async fn report_request_usage_stats(
     }
 
     #[cfg(not(feature = "enterprise"))]
-    if !get_config().common.usage_enabled {
+    if !get_config().common.usage_reporting_enabled {
         return;
     }
 
     let now = DateTime::from_timestamp_micros(timestamp).unwrap();
-    let request_body = stats.request_body.unwrap_or(usage_type.to_string());
+    let request_body = stats.request_body.unwrap_or_else(|| usage_type.to_string());
     let user_email = stats.user_email.unwrap_or_default();
     let mut usages = Vec::with_capacity(if num_functions > 0 { 2 } else { 1 });
 
@@ -274,6 +300,7 @@ pub async fn report_request_usage_stats(
             node_name: stats.node_name.clone(),
             dashboard_info: stats.dashboard_info.clone(),
             peak_memory_usage: stats.peak_memory_usage,
+            region: None,
         });
     }
 
@@ -331,6 +358,7 @@ pub async fn report_request_usage_stats(
         node_name: stats.node_name,
         dashboard_info: stats.dashboard_info,
         peak_memory_usage: stats.peak_memory_usage,
+        region: None,
     });
 
     report_usage(usages);
@@ -342,23 +370,36 @@ pub fn report_usage(usages: Vec<UsageData>) {
 
 async fn publish_usage(usages: Vec<UsageData>) {
     #[cfg(not(feature = "enterprise"))]
-    {
-        let cfg = get_config();
-        if !cfg.common.usage_enabled {
-            return;
-        }
+    if !get_config().common.usage_reporting_enabled {
+        return;
     }
 
     for usage in usages {
+        let event = usage.event;
         if let Err(e) = USAGE_QUEUE
             .enqueue(ReportingData::Usage(Box::new(usage)))
             .await
         {
-            log::error!(
-                "[SELF-REPORTING] Failed to send usage data to background ingesting job: {e}"
-            );
+            record_usage_enqueue_failure(event, &e);
         }
     }
+}
+
+/// Counts a usage row the queue refused, so alert A4 has a signal:
+/// `increase(zo_usage_enqueue_failures_total{event=~"Synthetics.*"}[15m]) > 0`.
+///
+/// Not counted at the caller: [`report_usage`] is fire-and-forget and returns
+/// `()`, so the call site can only ever count rows it handed over, never rows
+/// that were lost. Only this spawned task sees the enqueue's `Result`.
+///
+/// Labelled by event and never by org: the event set is closed and small, while
+/// an org label would put a customer-chosen string into the cardinality of a
+/// counter whose normal value is zero.
+fn record_usage_enqueue_failure(event: UsageEvent, error: &dyn std::fmt::Display) {
+    config::metrics::USAGE_ENQUEUE_FAILURES_TOTAL
+        .with_label_values(&[event.to_string().as_str()])
+        .inc();
+    log::error!("[SELF-REPORTING] Failed to send usage data to background ingesting job: {error}");
 }
 
 pub async fn start() -> Result<(), String> {
@@ -494,8 +535,12 @@ fn decrement_queue_depth(batch: &[ReportingData]) {
 }
 
 fn count_data(data: &[ReportingData]) -> (i64, i64) {
+    // Redaction rides the usage queue, so it must be counted against that depth gauge.
     data.iter().fold((0, 0), |(usage, error), item| match item {
-        ReportingData::Usage(_) | ReportingData::Trigger(_) => (usage + 1, error),
+        ReportingData::Usage(_)
+        | ReportingData::Trigger(_)
+        | ReportingData::Redaction(_)
+        | ReportingData::AutoInvestigateDecision(_) => (usage + 1, error),
         ReportingData::Error(_) => (usage, error + 1),
     })
 }
@@ -595,6 +640,7 @@ mod tests {
             node_name: None,
             dashboard_info: None,
             peak_memory_usage: None,
+            region: None,
         }
     }
 
@@ -621,17 +667,30 @@ mod tests {
             query_took: None,
             scheduler_trace_id: None,
             time_in_queue_ms: None,
-            dedup_enabled: None,
-            dedup_suppressed: None,
-            dedup_count: None,
             grouped: None,
             group_size: None,
             actual_value: None,
+            rule_value: None,
             threshold_value: None,
             threshold_operator: None,
             level: None,
             group_label: None,
             value_is_lower_bound: None,
+            synthetics_error_source: None,
+            synthetics_location: None,
+            downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
+            delivery_attempted: None,
+            repeat_suppressed: None,
+            trigger_source: None,
+            triggered_by: None,
+            recipient_count: None,
+            attachment_type: None,
+            dashboard_count: None,
+            scheduled_for: None,
         }
     }
 
@@ -711,6 +770,37 @@ mod tests {
         // Verify both channels received responses
         assert!(start_receiver.await.is_ok());
         assert!(shutdown_receiver.await.is_ok());
+    }
+
+    /// Asserts only on deltas of its own label values, so it is deterministic
+    /// under `cargo test`'s shared metric registry. Invoked through a function
+    /// pointer so this file keeps exactly one literal call site (see below).
+    #[test]
+    fn a_refused_usage_row_is_counted_under_its_own_event() {
+        let record: fn(UsageEvent, &dyn std::fmt::Display) = record_usage_enqueue_failure;
+        let count = |event: UsageEvent| {
+            config::metrics::USAGE_ENQUEUE_FAILURES_TOTAL
+                .with_label_values(&[event.to_string().as_str()])
+                .get()
+        };
+
+        let before = (
+            count(UsageEvent::SyntheticsBrowserSteps),
+            count(UsageEvent::SyntheticsProtocolSteps),
+        );
+        record(UsageEvent::SyntheticsBrowserSteps, &"channel closed");
+
+        assert_eq!(
+            count(UsageEvent::SyntheticsBrowserSteps) - before.0,
+            1,
+            "A4's counter did not move for the event that was refused",
+        );
+        assert_eq!(
+            count(UsageEvent::SyntheticsProtocolSteps) - before.1,
+            0,
+            "the failure was attributed to the wrong event — A4 would page for protocol steps \
+             while the browser row is the one being lost",
+        );
     }
 
     #[test]

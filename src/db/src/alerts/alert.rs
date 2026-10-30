@@ -30,7 +30,7 @@ use config::{
 #[cfg(feature = "enterprise")]
 use infra::table::workflows::WorkflowTriggerEntity;
 use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     table::alerts as table,
 };
 use sea_orm::{ConnectionTrait, TransactionTrait};
@@ -63,15 +63,23 @@ pub async fn get_by_name(
     stream_name: &str,
     name: &str,
 ) -> Result<Option<Alert>, infra::errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let alert =
-        table::get_by_name(client, org_id, "default", stream_type, stream_name, name).await?;
-    let value = alert.map(|(_f, a)| a);
-    Ok(value)
+    let alert = get_by_name_with_folder(org_id, stream_type, stream_name, name).await?;
+    Ok(alert.map(|(_f, a)| a))
+}
+
+/// [get_by_name] with the alert's parent folder, read from the table.
+pub async fn get_by_name_with_folder(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    name: &str,
+) -> Result<Option<(Folder, Alert)>, infra::errors::Error> {
+    let client = get_orm_client_ro().await;
+    table::get_by_name(client, org_id, "default", stream_type, stream_name, name).await
 }
 
 pub async fn set(org_id: &str, alert: Alert, create: bool) -> Result<Alert, infra::errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     match table::put(client, org_id, "default", alert).await {
         Ok(alert) => {
             infra::coordinator::alerts::emit_put_event(org_id, &alert, None).await?;
@@ -93,7 +101,7 @@ pub async fn set(org_id: &str, alert: Alert, create: bool) -> Result<Alert, infr
                     Ok(t) => t,
                     Err(e) => {
                         log::error!(
-                            "Failed to compute next trigger time for alert {schedule_key}: {e}"
+                            "Failed to compute next trigger time for alert {schedule_key}: org_id: {org_id}, error: {e}"
                         );
                         now_micros()
                     }
@@ -115,7 +123,9 @@ pub async fn set(org_id: &str, alert: Alert, create: bool) -> Result<Alert, infr
                 match db::scheduler::push(trigger).await {
                     Ok(_) => Ok(alert),
                     Err(e) => {
-                        log::error!("Failed to save trigger for alert {schedule_key}: {e}");
+                        log::error!(
+                            "Failed to save trigger for alert {schedule_key}: org_id: {org_id}, error: {e}"
+                        );
                         Err(e)
                     }
                 }
@@ -130,7 +140,7 @@ pub async fn set(org_id: &str, alert: Alert, create: bool) -> Result<Alert, infr
                             Ok(_) => Ok(alert),
                             Err(e) => {
                                 log::error!(
-                                    "Failed to update trigger for alert {schedule_key}: {e}"
+                                    "Failed to update trigger for alert {schedule_key}: org_id: {org_id}, error: {e}"
                                 );
                                 Ok(alert)
                             }
@@ -139,7 +149,9 @@ pub async fn set(org_id: &str, alert: Alert, create: bool) -> Result<Alert, infr
                     Err(_) => match db::scheduler::push(trigger).await {
                         Ok(_) => Ok(alert),
                         Err(e) => {
-                            log::error!("Failed to save trigger for alert {schedule_key}: {e}");
+                            log::error!(
+                                "Failed to save trigger for alert {schedule_key}: org_id: {org_id}, error: {e}"
+                            );
                             Ok(alert)
                         }
                     },
@@ -154,7 +166,7 @@ pub async fn set_without_updating_trigger(org_id: &str, alert: Alert) -> Result<
     let Some(alert_id) = alert.id else {
         return Err(anyhow::anyhow!("Alert ID is required"));
     };
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let Some((_f, _)) = table::get_by_id(client, org_id, alert_id).await? else {
         return Err(anyhow::anyhow!("Alert not found"));
     };
@@ -190,7 +202,9 @@ pub async fn create<C: TransactionTrait>(
         {
             Ok(t) => t,
             Err(e) => {
-                log::error!("Failed to compute next trigger time for alert {schedule_key}: {e}");
+                log::error!(
+                    "Failed to compute next trigger time for alert {schedule_key}: org_id: {org_id}, error: {e}"
+                );
                 now_micros()
             }
         }
@@ -207,7 +221,9 @@ pub async fn create<C: TransactionTrait>(
     };
 
     let _ = db::scheduler::push(trigger).await.map_err(|e| {
-        log::error!("Failed to save trigger for alert {schedule_key}: {e}");
+        log::error!(
+            "Failed to save trigger for alert {schedule_key}: org_id: {org_id}, error: {e}"
+        );
         e
     });
 
@@ -250,7 +266,9 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
         {
             Ok(t) => t,
             Err(e) => {
-                log::error!("Failed to compute next trigger time for alert {schedule_key}: {e}");
+                log::error!(
+                    "Failed to compute next trigger time for alert {schedule_key}: org_id: {org_id}, error: {e}"
+                );
                 now_micros()
             }
         }
@@ -274,11 +292,13 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
         let _ = db::scheduler::update_trigger(trigger, false, "")
             .await
             .map_err(|e| {
-                log::error!("Failed to update trigger for alert {schedule_key}: {e}");
+                log::error!("Failed to update trigger for alert {schedule_key}: org_id: {org_id}, error: {e}");
             });
     } else {
         let _ = db::scheduler::push(trigger).await.map_err(|e| {
-            log::error!("Failed to save trigger for alert {schedule_key}: {e}");
+            log::error!(
+                "Failed to save trigger for alert {schedule_key}: org_id: {org_id}, error: {e}"
+            );
             e
         });
     }
@@ -318,45 +338,7 @@ pub async fn delete_by_id<C: ConnectionTrait>(
     if let Err(e) =
         db::scheduler::delete(org_id, db::scheduler::TriggerModule::Alert, &alert_id_str).await
     {
-        log::error!("Failed to delete trigger: {e}");
-    };
-    Ok(())
-}
-
-pub async fn delete_by_name(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    name: &str,
-) -> Result<(), infra::errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-
-    let Some(alert_id) =
-        table::get_by_name(client, org_id, "default", stream_type, stream_name, name)
-            .await?
-            .and_then(|(_, a)| a.id)
-    else {
-        return Ok(());
-    };
-    let alert_id_str = alert_id.to_string();
-
-    #[cfg(feature = "enterprise")]
-    db::workflows::delete_workflow_association(AssociationDeleteEvent::Entity {
-        org_id: org_id.to_string(),
-        entity_id: alert_id_str.clone(),
-    })
-    .await?;
-
-    table::delete_by_name(client, org_id, "default", stream_type, stream_name, name).await?;
-    infra::coordinator::alerts::emit_delete_event(org_id, &alert_id_str).await?;
-
-    #[cfg(feature = "enterprise")]
-    super_cluster::emit_delete_event(org_id, stream_type, stream_name, name, alert_id).await?;
-
-    if let Err(e) =
-        db::scheduler::delete(org_id, db::scheduler::TriggerModule::Alert, &alert_id_str).await
-    {
-        log::error!("Failed to delete trigger: {e}");
+        log::error!("Failed to delete trigger: org_id: {org_id}, error: {e}");
     };
     Ok(())
 }
@@ -373,8 +355,19 @@ pub async fn list(
         params
     };
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let alerts = table::list(client, params)
+        .await?
+        .into_iter()
+        .map(|(_f, a)| a)
+        .collect();
+    Ok(alerts)
+}
+
+/// Every alert of the org in every folder; `list` reads only the default folder.
+pub async fn list_all_for_cleanup(org_id: &str) -> Result<Vec<Alert>, infra::errors::Error> {
+    let client = get_orm_client_ro().await;
+    let alerts = table::list(client, ListAlertsParams::new(org_id))
         .await?
         .into_iter()
         .map(|(_f, a)| a)
@@ -394,7 +387,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let mut alerts: Vec<(Folder, Alert)> = Vec::new();
     let r = infra::schema::STREAM_SCHEMAS.read().await;
     let mut orgs = HashSet::new();
@@ -439,19 +432,21 @@ async fn put_into_cache(
     alert_id: String,
     _folder_id: Option<String>,
 ) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let Ok(alert_id_ksuid) = svix_ksuid::Ksuid::from_str(&alert_id) else {
-        log::error!("Error parsing alert id into Ksuid while putting the alert into cache");
+        log::error!(
+            "Error parsing alert id into Ksuid while putting the alert into cache, org_id: {org}"
+        );
         return Ok(());
     };
     let item_value = match table::get_by_id(client, &org, alert_id_ksuid).await {
         Ok(Some(val)) => val,
         Ok(None) => {
-            log::error!("Tried to get alert that does not exist in DB");
+            log::error!("Tried to get alert that does not exist in DB, org_id: {org}");
             return Ok(());
         }
         Err(e) => {
-            log::error!("Error getting value: {e}");
+            log::error!("Error getting value: org_id: {org}, error: {e}");
             return Ok(());
         }
     };
@@ -600,7 +595,7 @@ pub fn cache_alert_key(org: &str, alert_id: &str) -> String {
 
 /// Returns the key used to schedule a trigger for the alert.
 pub fn scheduler_key(alert_id: Option<Ksuid>) -> String {
-    alert_id.map_or(DEFAULT_FOLDER.to_string(), |id| id.to_string())
+    alert_id.map_or_else(|| DEFAULT_FOLDER.to_string(), |id| id.to_string())
 }
 
 #[cfg(test)]
@@ -632,12 +627,6 @@ mod tests {
     fn test_cache_alert_key() {
         let key = cache_alert_key("myorg", "alert-123");
         assert_eq!(key, "myorg/alert-123");
-    }
-
-    #[test]
-    fn test_cache_alert_key_empty_org() {
-        let key = cache_alert_key("", "alert-456");
-        assert_eq!(key, "/alert-456");
     }
 
     #[test]

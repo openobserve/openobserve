@@ -16,6 +16,9 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import pipelines from "@/services/pipelines";
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/services/http", () => ({
   default: vi.fn(() => ({
@@ -416,6 +419,127 @@ describe("pipelines service", () => {
       mockHttpInstance.get.mockRejectedValue(error);
 
       await expect(pipelines.getPipelineStreams("org123")).rejects.toThrow("Server error");
+    });
+  });
+
+  describe("product analytics", () => {
+    it("tracks pipeline_created once the request resolves and returns the response", async () => {
+      const response = { data: { code: 200 } };
+      mockHttpInstance.post.mockResolvedValue(response);
+
+      await expect(
+        pipelines.createPipeline({ org_identifier: "org123", data: { name: "p" } }),
+      ).resolves.toBe(response);
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("pipeline_created");
+    });
+
+    it("does not track pipeline_created when the request rejects", async () => {
+      mockHttpInstance.post.mockRejectedValue(new Error("boom"));
+
+      await expect(
+        pipelines.createPipeline({ org_identifier: "org123", data: { name: "p" } }),
+      ).rejects.toThrow("boom");
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    const cases: Array<[string, string, () => Promise<any>, string, Record<string, any>?]> = [
+      [
+        "updatePipeline",
+        "put",
+        () => pipelines.updatePipeline({ org_identifier: "o", data: {} }),
+        "pipeline_updated",
+      ],
+      [
+        "deletePipeline",
+        "delete",
+        () => pipelines.deletePipeline({ pipeline_id: "p", org_id: "o" }),
+        "pipeline_deleted",
+        { count: 1 },
+      ],
+      [
+        "bulkDelete",
+        "delete",
+        () => pipelines.bulkDelete("o", { ids: ["a", "b"] }),
+        "pipeline_deleted",
+        { count: 2 },
+      ],
+      [
+        "toggleState (pause)",
+        "put",
+        () => pipelines.toggleState("o", "p", false, false),
+        "pipeline_paused",
+        { count: 1 },
+      ],
+      [
+        "toggleState (resume)",
+        "put",
+        () => pipelines.toggleState("o", "p", true, true),
+        "pipeline_resumed",
+        { count: 1 },
+      ],
+      [
+        "bulkToggleState (pause)",
+        "post",
+        () => pipelines.bulkToggleState("o", false, { ids: ["a", "b"] }),
+        "pipeline_paused",
+        { count: 2 },
+      ],
+      [
+        "bulkToggleState (resume)",
+        "post",
+        () => pipelines.bulkToggleState("o", true, { ids: ["a", "b"] }),
+        "pipeline_resumed",
+        { count: 2 },
+      ],
+    ];
+
+    it.each(cases)(
+      "%s tracks its event once the request resolves",
+      async (_n, verb, call, event, props) => {
+        const response = { data: { successful: ["a", "b"], unsuccessful: [] } };
+        mockHttpInstance[verb].mockResolvedValue(response);
+
+        await expect(call()).resolves.toBe(response);
+
+        expect(analytics.track).toHaveBeenCalledTimes(1);
+        if (props) expect(analytics.track).toHaveBeenCalledWith(event, props);
+        else expect(analytics.track).toHaveBeenCalledWith(event);
+      },
+    );
+
+    it.each(cases)("%s does not track when the request rejects", async (_n, verb, call) => {
+      mockHttpInstance[verb].mockRejectedValue(new Error("boom"));
+
+      await expect(call()).rejects.toThrow("boom");
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["bulkDelete", "delete", () => pipelines.bulkDelete("o", { ids: ["a"] })],
+      ["bulkToggleState", "post", () => pipelines.bulkToggleState("o", true, { ids: ["a"] })],
+    ] as Array<[string, string, () => Promise<unknown>]>)(
+      "%s does not track when nothing was affected",
+      async (_label, verb, call) => {
+        mockHttpInstance[verb].mockResolvedValue({ data: { successful: [], unsuccessful: ["a"] } });
+
+        await call();
+
+        expect(analytics.track).not.toHaveBeenCalled();
+      },
+    );
+
+    it("bulk delete counts only the pipelines the server deleted", async () => {
+      mockHttpInstance.delete.mockResolvedValue({
+        data: { successful: ["a"], unsuccessful: ["b"] },
+      });
+
+      await pipelines.bulkDelete("o", { ids: ["a", "b"] });
+
+      expect(analytics.track).toHaveBeenCalledWith("pipeline_deleted", { count: 1 });
     });
   });
 });

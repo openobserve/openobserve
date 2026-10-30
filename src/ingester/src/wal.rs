@@ -139,11 +139,27 @@ pub(crate) async fn clean_orphan_par_files(process_start: std::time::SystemTime)
 }
 
 // replay wal files to create immutable
-pub(crate) async fn replay_wal_files(wal_dir: PathBuf, wal_files: Vec<PathBuf>) -> Result<()> {
+pub(crate) async fn replay_wal_files(
+    wal_dir: PathBuf,
+    wal_files: Vec<PathBuf>,
+    process_start: std::time::SystemTime,
+) -> Result<()> {
     if wal_files.is_empty() {
         return Ok(());
     }
+    let process_start_micros = process_start
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_micros() as u64;
     for wal_file in wal_files.iter() {
+        let wal_id = wal_file
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .and_then(|s| s.parse::<u64>().ok());
+        if wal_id.is_some_and(|id| id >= process_start_micros) {
+            log::warn!("skip replay of wal file created by this process: {wal_file:?}");
+            continue;
+        }
         log::warn!("replay wal file: {wal_file:?} starting...");
         let file_str = wal_file
             .strip_prefix(&wal_dir)
@@ -352,4 +368,49 @@ pub async fn collect_wal_parquet_metrics() -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn startup_replay_does_not_delete_a_live_writer_wal() {
+        let dir = tempfile::tempdir().unwrap();
+        let wal_dir = dir.path().join("logs");
+        let stream_dir = wal_dir.join("0");
+        let new_wal = |id: u64| {
+            wal::Writer::new(
+                wal::build_file_path(&stream_dir, "default", "logs", id.to_string()),
+                1024,
+                1024,
+                None,
+            )
+            .unwrap()
+            .0
+        };
+
+        // leftover wal of the previous process
+        drop(new_wal(1));
+        let process_start = std::time::SystemTime::now();
+        // live writer of this process, named by its creation time in micros
+        let live_id = chrono::Utc::now().timestamp_micros() as u64;
+        let _live = new_wal(live_id);
+
+        // the scan runs in the background after ingestion starts, so it sees
+        // the live wal too
+        let wal_files = wal_scan_files(&wal_dir, "wal").await.unwrap();
+        assert_eq!(wal_files.len(), 2);
+        replay_wal_files(wal_dir, wal_files, process_start)
+            .await
+            .unwrap();
+
+        let old = wal::build_file_path(&stream_dir, "default", "logs", "1".to_string());
+        let live = wal::build_file_path(&stream_dir, "default", "logs", live_id.to_string());
+        assert!(!old.exists(), "the previous process's wal must be replayed");
+        assert!(
+            live.exists(),
+            "startup replay must not unlink a live writer's WAL"
+        );
+    }
 }

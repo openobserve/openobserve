@@ -26,7 +26,7 @@ use datafusion::{
     prelude::Expr,
 };
 
-use crate::datafusion::distributed_plan::empty_exec::NewEmptyExec;
+use crate::datafusion::{distributed_plan::empty_exec::NewEmptyExec, sort_order::FileSortOrder};
 
 /// An empty plan that is useful for testing and generating plans
 /// without mapping them to actual data.
@@ -35,7 +35,7 @@ pub struct NewEmptyTable {
     name: String,
     schema: SchemaRef,
     partitions: usize,
-    pub sorted_by_time: bool,
+    pub sort_order: FileSortOrder,
 }
 
 impl NewEmptyTable {
@@ -45,7 +45,7 @@ impl NewEmptyTable {
             name: name.to_string(),
             schema,
             partitions: 1,
-            sorted_by_time: false,
+            sort_order: FileSortOrder::None,
         }
     }
 
@@ -55,9 +55,9 @@ impl NewEmptyTable {
         self
     }
 
-    /// Creates a new EmptyTable with specified sorted_by_time.
-    pub fn with_sorted_by_time(mut self, sorted_by_time: bool) -> Self {
-        self.sorted_by_time = sorted_by_time;
+    /// Creates a new EmptyTable with the physical sort order of the backing files.
+    pub fn with_sort_order(mut self, sort_order: FileSortOrder) -> Self {
+        self.sort_order = sort_order;
         self
     }
 }
@@ -87,7 +87,7 @@ impl TableProvider for NewEmptyTable {
                 projection,
                 filters,
                 None,
-                self.sorted_by_time,
+                self.sort_order,
                 self.schema.clone(),
             )
             .with_partitions(self.partitions),
@@ -121,13 +121,14 @@ mod tests {
     #[test]
     fn test_new_defaults() {
         let table = NewEmptyTable::new("test", test_schema());
-        assert!(!table.sorted_by_time);
+        assert_eq!(table.sort_order, FileSortOrder::None);
     }
 
     #[test]
-    fn test_with_sorted_by_time() {
-        let table = NewEmptyTable::new("test", test_schema()).with_sorted_by_time(true);
-        assert!(table.sorted_by_time);
+    fn test_with_sort_order() {
+        let table =
+            NewEmptyTable::new("test", test_schema()).with_sort_order(FileSortOrder::TimestampDesc);
+        assert_eq!(table.sort_order, FileSortOrder::TimestampDesc);
     }
 
     #[test]

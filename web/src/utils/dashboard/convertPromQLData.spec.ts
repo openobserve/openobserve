@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { convertPromQLData } from "./convertPromQLData";
+import { createPromQLChunkProcessor } from "@/composables/dashboard/promqlChunkProcessor";
 import { getPropsByChartTypeForSeries } from "./promqlChartSeriesProps";
 import { chartColor } from "@/utils/chartTheme";
 import { applyMeasuredYAxisLeftInset } from "./chartDimensionUtils";
@@ -51,6 +52,7 @@ vi.mock("./calculateGridForSubPlot", () => ({
 }));
 
 vi.mock("./colorPalette", () => ({
+  createDistinctSeriesColor: vi.fn(() => () => undefined),
   ColorModeWithoutMinMax: { palette: "palette" },
   getMetricMinMaxValue: vi.fn(() => [0, 100]),
   getSeriesColor: vi.fn(() => "#FF0000"),
@@ -297,8 +299,9 @@ describe("Convert PromQL Data Utils", () => {
       );
 
       expect(result.extras.limitNumberOfSeriesWarningMessage).toBe(
-        "Limiting the displayed series to ensure optimal performance",
+        "Showing 100 of 150 series to keep the chart fast",
       );
+      expect(result.extras.seriesLimit).toEqual({ shown: 100, total: 150, cap: 100 });
     });
 
     it("should NOT show warning when streaming receives duplicate metrics without hitting limit", async () => {
@@ -327,7 +330,8 @@ describe("Convert PromQL Data Utils", () => {
       const metadata = {
         seriesLimiting: {
           totalMetricsReceived: 9, // 3 series × 3 chunks
-          metricsStored: 3, // Only 3 unique series
+          uniqueSeriesSeen: 3, // the same 3 series re-delivered, nothing dropped
+          metricsStored: 3,
           maxSeries: 100,
         },
       };
@@ -374,8 +378,9 @@ describe("Convert PromQL Data Utils", () => {
 
       const metadata = {
         seriesLimiting: {
-          totalMetricsReceived: 150, // Received 150 metrics
-          metricsStored: 100, // Only stored 100 (hit the limit)
+          totalMetricsReceived: 150,
+          uniqueSeriesSeen: 150, // 150 distinct series existed
+          metricsStored: 100, // only 100 survived the cap, so 50 were dropped
           maxSeries: 100,
         },
       };
@@ -394,8 +399,9 @@ describe("Convert PromQL Data Utils", () => {
 
       // Should show warning because we hit the limit and dropped metrics
       expect(result.extras.limitNumberOfSeriesWarningMessage).toBe(
-        "Limiting the displayed series to ensure optimal performance",
+        "Showing 100 of 150 series to keep the chart fast",
       );
+      expect(result.extras.seriesLimit).toEqual({ shown: 100, total: 150, cap: 100 });
     });
 
     it("should handle gauge chart type", async () => {
@@ -510,6 +516,50 @@ describe("Convert PromQL Data Utils", () => {
         cx: 250,
         cy: 150,
       });
+    });
+
+    it("keeps the metric value AND the sparkline series when sparkline is enabled", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "metric",
+        config: {
+          background: { value: { color: "#FFFFFF" } },
+          sparkline: { enabled: true },
+        },
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { job: "test-job" },
+              values: [
+                [1640435200, "42"],
+                [1640435260, "45"],
+                [1640435320, "40"],
+              ],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      // Both the value-text series and the sparkline trend series must survive:
+      // the "one metric value" reduction must not drop the value text (the bug
+      // was slicing after flatten, which kept only the trailing sparkline).
+      expect(result.options.series.length).toBe(2);
+      const textSeries = result.options.series.find((s: any) => s._metricText !== undefined);
+      expect(textSeries).toBeDefined();
+      expect(textSeries._metricText).toBeDefined();
     });
 
     it("should handle bar chart type", async () => {
@@ -703,6 +753,42 @@ describe("Convert PromQL Data Utils", () => {
 
       expect(result.options).toBeDefined();
       expect(result.extras.isTimeSeries).toBe(false);
+    });
+
+    it("renders the NUMBER for a vector result, exactly as it does for a matrix", async () => {
+      // An INSTANT promql query returns resultType "vector"; a range query returns
+      // "matrix". The matrix branch builds a custom series carrying `_metricText`
+      // and a renderItem that paints the value — the vector branch returned a bare
+      // {name, value} with no renderer, so a curated instant tile with a perfectly
+      // good scalar (measured: 8) painted an empty box.
+      const panelSchema = {
+        id: "panel1",
+        type: "metric",
+        config: {},
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const vectorData = [
+        {
+          resultType: "vector",
+          result: [{ metric: {}, value: [1640435200, "8"] }],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        vectorData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      const painted = (result.options?.series ?? []).find((s: any) => s?._metricText);
+      expect(
+        painted,
+        "a vector metric must build the text series the matrix branch builds",
+      ).toBeDefined();
+      expect(String(painted._metricText)).toContain("8");
     });
 
     it("should handle legends position right", async () => {
@@ -1397,9 +1483,9 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      const expectedName =
-        '{"__name__":"memory_usage","job":"prometheus","instance":"localhost:9090"}';
-      const dataSeries = result.options.series.find((s: any) => s.name === expectedName);
+      // A lone series has no siblings to differ from, but `instance` still says
+      // which target it is — better than the label set wrapped in braces.
+      const dataSeries = result.options.series.find((s: any) => s.name === "localhost:9090");
       expect(dataSeries).toBeDefined();
     });
 
@@ -1542,6 +1628,84 @@ describe("Convert PromQL Data Utils", () => {
       );
 
       expect(result.options.yAxis.max).toBe(100); // Max of (100, dataMax) = 100
+    });
+
+    describe("stacked value-axis bounds", () => {
+      const series = (job: string, ...values: string[]) => ({
+        metric: { job },
+        values: values.map((value, i) => [1640435200 + i * 3600, value]),
+      });
+      const run = (type: string, config: object, ...queries: object[][]) =>
+        convertPromQLData(
+          {
+            id: "panel1",
+            type,
+            config,
+            queries: queries.map(() => ({ config: { promql_legend: "" } })),
+          },
+          queries.map((result) => ({ resultType: "matrix", result })),
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+      it.each([
+        ["stacked", "yAxis"],
+        ["area-stacked", "yAxis"],
+        ["h-stacked", "xAxis"],
+      ])("widens a %s y_axis_max that would clip the stack total", async (type, axis) => {
+        const result = await run(type, { y_axis_max: 10 }, [
+          series("a", "70", "70"),
+          series("b", "70", "70"),
+        ]);
+        expect(result.options[axis].max).toBe(140);
+      });
+
+      it("area-stacked: a y_axis_min above the deepest negative stack drops to its sum", async () => {
+        const result = await run("area-stacked", { y_axis_min: -10 }, [
+          series("a", "-70", "-20"),
+          series("b", "-30", "-20"),
+        ]);
+        expect(result.options.yAxis.min).toBe(-100);
+      });
+
+      it("drops a positive y_axis_min to 0 instead of the smallest segment", async () => {
+        const result = await run("stacked", { y_axis_min: 50 }, [
+          series("a", "100"),
+          series("b", "5"),
+        ]);
+        expect(result.options.yAxis.min).toBe(0);
+      });
+
+      it("keeps a y_axis_min that already sits below the stacks", async () => {
+        const result = await run("stacked", { y_axis_min: -20 }, [
+          series("a", "100"),
+          series("b", "5"),
+        ]);
+        expect(result.options.yAxis.min).toBe(-20);
+      });
+
+      it("fits mixed signs: positives and negatives stack apart", async () => {
+        const result = await run("stacked", { y_axis_min: -1, y_axis_max: 1 }, [
+          series("a", "100"),
+          series("b", "-40"),
+          series("c", "60"),
+          series("d", "-30"),
+        ]);
+        expect(result.options.yAxis.min).toBe(-70);
+        expect(result.options.yAxis.max).toBe(160);
+      });
+
+      it("stacks every query of the panel into one total", async () => {
+        const result = await run(
+          "stacked",
+          { y_axis_max: 10 },
+          [series("a", "70")],
+          [series("b", "200")],
+        );
+        expect(result.options.yAxis.max).toBe(270);
+      });
     });
 
     it("should use getFinalAxisValue with null config values", async () => {
@@ -1782,6 +1946,82 @@ describe("Convert PromQL Data Utils", () => {
       expect(scatterSeries.type).toBe("scatter");
       expect(scatterSeries.emphasis.focus).toBe("series");
       expect(scatterSeries.symbolSize).toBe(5);
+    });
+
+    it("applies scatter point size and opacity to an instant (vector) result", async () => {
+      const result = await convertPromQLData(
+        {
+          id: "panel1",
+          type: "scatter",
+          config: { symbol_size: 10, symbol_opacity: 40 },
+          queries: [{ config: { promql_legend: "" } }],
+        },
+        [
+          {
+            resultType: "vector",
+            result: [{ metric: { __name__: "test" }, value: [1640435200, "10"] }],
+          },
+        ],
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      const series = result.options.series.find((s: any) => s.name === '{"__name__":"test"}');
+      expect(series.symbolSize).toBe(10);
+      expect(series.itemStyle.opacity).toBe(0.4);
+    });
+
+    it.each([
+      ["line", { resultType: "matrix", values: [[1640435200, "10"]] }],
+      ["area", { resultType: "matrix", values: [[1640435200, "10"]] }],
+      ["area-stacked", { resultType: "matrix", values: [[1640435200, "10"]] }],
+      ["line", { resultType: "vector", value: [1640435200, "10"] }],
+    ])(
+      "applies the panel line_thickness to %s series (%o)",
+      async (type, { resultType, ...sample }) => {
+        const result = await convertPromQLData(
+          {
+            id: "panel1",
+            type,
+            config: { line_thickness: 4 },
+            queries: [{ config: { promql_legend: "" } }],
+          },
+          [{ resultType, result: [{ metric: { __name__: "test" }, ...sample }] }],
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+        const series = result.options.series.find((s: any) => s.name === '{"__name__":"test"}');
+        expect(series.lineStyle.width).toBe(4);
+      },
+    );
+
+    it("draws a saved line_thickness of 0 at the default width instead of hiding the line", async () => {
+      const result = await convertPromQLData(
+        {
+          id: "panel1",
+          type: "line",
+          config: { line_thickness: 0 },
+          queries: [{ config: { promql_legend: "" } }],
+        },
+        [
+          {
+            resultType: "matrix",
+            result: [{ metric: { __name__: "test" }, values: [[1640435200, "10"]] }],
+          },
+        ],
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      const series = result.options.series.find((s: any) => s.name === '{"__name__":"test"}');
+      expect(series.lineStyle.width).toBe(1.5);
     });
 
     it("should use getLegendPosition function with bottom position", async () => {
@@ -2204,6 +2444,41 @@ describe("Convert PromQL Data Utils", () => {
       expect(formattedValue).toBe("75.5"); // Based on our mock getUnitValue
     });
 
+    it("should show the latest value of a series on a gauge", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "gauge",
+        config: {},
+        queries: [{ config: { promql_legend: "", min: 0, max: 100 } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { __name__: "gauge_metric" },
+              values: [
+                [1640438800, "45"],
+                [1640442400, "80"],
+                [1640435200, "10"],
+              ],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      expect(result.options.series[0].data[0].value).toBe(80);
+    });
+
     it("should test gauge tooltip valueFormatter function (lines 650-658)", async () => {
       const panelSchema = {
         id: "panel1",
@@ -2436,7 +2711,7 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      expect(result.options.xAxis.splitLine.show).toBe(true);
+      expect(result.options.xAxis.splitLine.show).toBe(false);
       expect(result.options.yAxis.splitLine.show).toBe(true);
     });
 
@@ -2470,7 +2745,7 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      expect(result.options.xAxis.splitLine.show).toBe(true);
+      expect(result.options.xAxis.splitLine.show).toBe(false);
       expect(result.options.yAxis.splitLine.show).toBe(true);
     });
 
@@ -2610,8 +2885,8 @@ describe("Convert PromQL Data Utils", () => {
 
       // Based on the ternary logic: panelSchema?.config?.show_gridlines !== undefined ? panelSchema.config.show_gridlines : true
       // When show_gridlines is null, it's not undefined, so it uses the null value
-      // The splitLine.show gets set to null, not the default true
-      expect(result.options.xAxis.splitLine.show).toBe(null);
+      // The y splitLine.show gets set to null, not the default true; the x axis never draws gridlines
+      expect(result.options.xAxis.splitLine.show).toBe(false);
       expect(result.options.yAxis.splitLine.show).toBe(null);
     });
   });
@@ -3239,8 +3514,9 @@ describe("Convert PromQL Data Utils", () => {
 
       // Should limit series and show warning
       expect(result.extras.limitNumberOfSeriesWarningMessage).toBe(
-        "Limiting the displayed series to ensure optimal performance",
+        "Showing 100 of 200 series to keep the chart fast",
       );
+      expect(result.extras.seriesLimit).toEqual({ shown: 100, total: 200, cap: 100 });
 
       // Should still calculate legend width for limited series
       expect(result.options.grid.right).toBeGreaterThan(0);
@@ -3282,7 +3558,7 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      expect(result.options.xAxis.splitLine.show).toBe(true);
+      expect(result.options.xAxis.splitLine.show).toBe(false);
       expect(result.options.legend.show).toBe(false);
       expect(result.extras.isTimeSeries).toBe(true);
     });
@@ -3571,8 +3847,40 @@ describe("Convert PromQL Data Utils", () => {
       // Should show both axis borders and gridlines
       expect(result.options.xAxis.axisLine.show).toBe(true);
       expect(result.options.yAxis.axisLine.show).toBe(true);
-      expect(result.options.xAxis.splitLine.show).toBe(true);
+      expect(result.options.xAxis.splitLine.show).toBe(false);
       expect(result.options.yAxis.splitLine.show).toBe(true);
+    });
+
+    it("draws the x baseline by default and hides it when axis_border_show is false", async () => {
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { __name__: "baseline_metric" },
+              values: [[1640435200, "10"]],
+            },
+          ],
+        },
+      ];
+      const build = (config: Record<string, unknown>) =>
+        convertPromQLData(
+          { id: "panel1", type: "line", config, queries: [{ config: { promql_legend: "" } }] },
+          searchQueryData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+      const byDefault = await build({});
+      expect(byDefault.options.xAxis.axisLine.show).toBe(true);
+      expect(byDefault.options.yAxis.axisLine.show).toBe(false);
+      expect(byDefault.options.xAxis.axisLabel.fontSize).toBe(12);
+      expect(byDefault.options.xAxis.axisLabel.color).toBe(byDefault.options.yAxis.axisLabel.color);
+
+      const hidden = await build({ axis_border_show: false });
+      expect(hidden.options.xAxis.axisLine.show).toBe(false);
     });
 
     it("should handle empty result but valid structure", async () => {
@@ -3748,6 +4056,31 @@ describe("Convert PromQL Data Utils", () => {
     });
 
     describe("Additional comprehensive coverage tests", () => {
+      it("draws annotation bands above the series, so bars and area fills cannot hide them", async () => {
+        const result = await convertPromQLData(
+          {
+            id: "panel1",
+            type: "line",
+            config: {},
+            queries: [{ config: { promql_legend: "" } }],
+          },
+          [
+            {
+              resultType: "matrix",
+              result: [{ metric: { __name__: "m" }, values: [[1640435200, "100"]] }],
+            },
+          ],
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+        const helper = result.options.series.find((s) => s.markArea);
+        expect(helper.markArea.z).toBe(4);
+        expect(helper.markArea.z).toBeGreaterThan(3);
+      });
+
       it("should handle chart with trellis layout enabled", async () => {
         const panelSchema = {
           id: "panel1",
@@ -3825,7 +4158,12 @@ describe("Convert PromQL Data Utils", () => {
         );
 
         expect(result.extras.isTimeSeries).toBe(false);
-        expect(result.options.backgroundColor).toBe("transparent"); // Default background is transparent
+        // The panel configures background.value.color = "#ff0000", and a vector
+        // (instant) result now honours panel config the same way a matrix (range)
+        // result always has. The previous "transparent" expectation was recording
+        // the bug: the vector branch returned a bare data point and applied no
+        // metric styling at all, which is why an instant tile painted nothing.
+        expect(result.options.backgroundColor).toBe("#ff0000");
         expect(result.options.series).toHaveLength(1);
       });
 
@@ -4191,6 +4529,41 @@ describe("Convert PromQL Data Utils", () => {
         expect(tooltipResult).toBe(""); // Should return empty string for different panel
       });
 
+      it("should escape HTML in series names in the chart and legend tooltips", async () => {
+        const payload = '<img src=x onerror="alert(1)">';
+        const escaped = "&lt;img src=x onerror=&quot;alert(1)&quot;&gt;";
+        const panelSchema = {
+          id: "panel1",
+          type: "line",
+          config: {},
+          queries: [{ config: { promql_legend: "" } }],
+        };
+        const searchQueryData = [
+          {
+            resultType: "matrix",
+            result: [{ metric: { instance: payload }, values: [[1640435200, "100"]] }],
+          },
+        ];
+
+        const result = await convertPromQLData(
+          panelSchema,
+          searchQueryData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+        const tooltipResult = result.options.tooltip.formatter([
+          { data: [1640435200 * 1000, 100], seriesName: payload, marker: "●" },
+        ]);
+        expect(tooltipResult).not.toContain("<img");
+        expect(tooltipResult).toContain(escaped);
+
+        const legendResult = result.options.legend.tooltip.formatter({ name: payload });
+        expect(legendResult).toBe(escaped);
+      });
+
       it("should handle empty tooltip data", async () => {
         const panelSchema = {
           id: "panel1",
@@ -4510,6 +4883,195 @@ describe("Convert PromQL Data Utils", () => {
         expect(result.options.xAxis.min).toBeUndefined();
         expect(result.options.xAxis.max).toBeUndefined();
       });
+    });
+  });
+
+  describe("series naming without a legend template", () => {
+    const twoPods = [
+      {
+        resultType: "matrix",
+        result: [
+          {
+            metric: { __name__: "http_requests", container: "api", pod: "api-1" },
+            values: [
+              [1640435200, "10"],
+              [1640438800, "15"],
+            ],
+          },
+          {
+            metric: { __name__: "http_requests", container: "api", pod: "api-2" },
+            values: [
+              [1640435200, "20"],
+              [1640438800, "25"],
+            ],
+          },
+        ],
+      },
+    ];
+
+    it("names each series by the label that tells it apart", async () => {
+      const panelSchema = {
+        id: "naming-panel",
+        type: "line",
+        queries: [{ query: "http_requests", config: {}, fields: {} }],
+        config: {},
+      };
+
+      const result = await convertPromQLData(
+        panelSchema,
+        twoPods,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      // The shared labels (__name__, container) name nothing; only pod does.
+      // An unnamed annotation series rides along, so compare the named ones.
+      expect(result.options.series.map((s: any) => s.name).filter(Boolean)).toEqual([
+        "api-1",
+        "api-2",
+      ]);
+    });
+
+    it("leaves an explicit legend template in charge", async () => {
+      const panelSchema = {
+        id: "naming-panel",
+        type: "line",
+        queries: [{ query: "http_requests", config: { promql_legend: "{container}" }, fields: {} }],
+        config: {},
+      };
+
+      const result = await convertPromQLData(
+        panelSchema,
+        twoPods,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      expect(result.options.series.map((s: any) => s.name).filter(Boolean)).toEqual(["api", "api"]);
+    });
+  });
+
+  // Dropping a series whole is silent data loss unless the panel says so. These drive the
+  // REAL chunk processor, because hand-written seriesLimiting can assert a shape it never emits.
+  describe("series-limit warning, driven by the real chunk processor", () => {
+    const streamThroughProcessor = (uniqueSeries: number, chunks: number, maxSeries: number) => {
+      const processor = createPromQLChunkProcessor({ maxSeries, enableLogging: false });
+      const names = Array.from({ length: uniqueSeries }, (_, i) => `host_${i}`);
+      let merged: any = null;
+      for (let c = 0; c < chunks; c++) {
+        merged = processor.processChunk(merged, {
+          resultType: "matrix",
+          result: names.map((instance) => ({
+            metric: { __name__: "cpu", instance },
+            values: [[1640435200 + c * 60, "1"]] as [number, string][],
+          })),
+        });
+      }
+      const stats = processor.getStats();
+      return {
+        searchQueryData: [{ resultType: "matrix", result: merged.result }],
+        metadata: {
+          seriesLimiting: {
+            totalMetricsReceived: stats.totalMetricsReceived,
+            uniqueSeriesSeen: stats.uniqueSeriesSeen,
+            metricsStored: stats.metricsStored,
+            maxSeries,
+          },
+        },
+      };
+    };
+
+    const panelSchema = {
+      id: "panel1",
+      type: "line",
+      config: {},
+      queries: [{ config: { promql_legend: "" } }],
+    };
+
+    const convert = async (fixture: ReturnType<typeof streamThroughProcessor>) =>
+      convertPromQLData(
+        panelSchema,
+        fixture.searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+        fixture.metadata,
+      );
+
+    beforeEach(() => {
+      mockStore.state.zoConfig.max_dashboard_series = 100;
+    });
+
+    it("warns when the cap drops series, so the loss is never silent", async () => {
+      const fixture = streamThroughProcessor(150, 6, 100);
+      expect(fixture.metadata.seriesLimiting.metricsStored).toBe(100);
+
+      const result = await convert(fixture);
+
+      expect(result.extras.limitNumberOfSeriesWarningMessage).toBe(
+        "Showing 100 of 150 series to keep the chart fast",
+      );
+      expect(result.extras.seriesLimit).toEqual({ shown: 100, total: 150, cap: 100 });
+    });
+
+    it("does not warn when every series survived, even at exactly the cap", async () => {
+      const fixture = streamThroughProcessor(100, 6, 100);
+      expect(fixture.metadata.seriesLimiting.metricsStored).toBe(100);
+      expect(fixture.metadata.seriesLimiting.totalMetricsReceived).toBe(600);
+
+      const result = await convert(fixture);
+
+      expect(result.extras.limitNumberOfSeriesWarningMessage).toBeUndefined();
+    });
+
+    it("does not warn when one series is re-delivered by every chunk", async () => {
+      const result = await convert(streamThroughProcessor(40, 6, 100));
+
+      expect(result.extras.limitNumberOfSeriesWarningMessage).toBeUndefined();
+    });
+  });
+
+  describe("heatmap time axis", () => {
+    it("hands the server step to the heatmap so steps without samples still get a column", async () => {
+      const panelSchema = { id: "panel1", type: "heatmap", config: {}, queries: [{ config: {} }] };
+      const searchQueryData = [
+        {
+          result: [
+            {
+              metric: { job: "api" },
+              values: [
+                [60, "1"],
+                [180, "3"],
+              ],
+            },
+          ],
+        },
+      ];
+
+      const result: any = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        [],
+        { queries: [{ startTime: 0, endTime: 240_000_000 }] },
+        [[{ step: 60_000_000 }]],
+      );
+
+      expect(result.options.xAxis[0].data).toHaveLength(5);
+      expect(result.options.series[0].data.map((cell: any) => cell[2])).toEqual([
+        "-",
+        1,
+        "-",
+        3,
+        "-",
+      ]);
     });
   });
 });

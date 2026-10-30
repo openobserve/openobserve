@@ -38,7 +38,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     // Add global variable
     await pm.dashboardSetting.openSetting();
@@ -50,7 +50,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
       { scope: "global" }
     );
     // Wait for variable to be saved
-    await page.locator(getEditVariableBtn(variableName)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getEditVariableBtnLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     await pm.dashboardSetting.closeSettingWindow();
@@ -60,13 +60,13 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variable to appear on dashboard
-    await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
 
     // Set variable value using page object method
     const { selectedValue } = await scopedVars.changeVariableValue(variableName, { optionIndex: 0, returnSelectedValue: true });
 
     // Click refresh to update URL
-    await page.locator(SELECTORS.REFRESH_BTN).click();
+    await scopedVars.clickDashboardRefresh();
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Verify URL contains var-{variable}={value}
@@ -91,7 +91,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     // Add tab variable to default tab
     await pm.dashboardSetting.openSetting();
@@ -106,7 +106,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
       }
     );
     // Wait for variable to be saved
-    await page.locator(getEditVariableBtn(variableName)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getEditVariableBtnLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     await pm.dashboardSetting.closeSettingWindow();
@@ -116,19 +116,19 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for dashboard to be fully loaded after closing settings
-    await page.locator(SELECTORS.SETTING_BTN).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     // Stay on default tab and wait for variable to appear
-    await page.locator(SELECTORS.ADD_PANEL_BTN).or(page.locator('[data-test*="dashboard-panel-"]')).first().waitFor({ state: "visible", timeout: 5000 });
+    await scopedVars.waitForTabContentLoaded({ timeout: 5000 });
 
     // Wait for variable to appear on the dashboard
-    await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
 
     // Set variable value using page object method
     const { selectedValue } = await scopedVars.changeVariableValue(variableName, { optionIndex: 0, returnSelectedValue: true });
 
     // Click refresh
-    await page.locator(SELECTORS.REFRESH_BTN).click();
+    await scopedVars.clickDashboardRefresh();
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Verify URL contains var-{variable}.t.default={value}
@@ -152,7 +152,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     // Add panel and capture panel ID from API response
     await pm.dashboardCreate.addPanel();
@@ -181,8 +181,8 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     }
 
     // Wait for panel to be added to dashboard
-    await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
-    await page.locator(SELECTORS.SETTING_BTN).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getAnyPanel().waitFor({ state: "visible", timeout: 15000 });
+    await scopedVars.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     // Add panel variable using panel name
     await pm.dashboardSetting.openSetting();
@@ -197,7 +197,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
       }
     );
     // Wait for variable to be saved
-    await page.locator(getEditVariableBtn(variableName)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getEditVariableBtnLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     await pm.dashboardSetting.closeSettingWindow();
@@ -207,13 +207,13 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variable to appear on dashboard
-    await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
 
     // Set variable value using page object method
     await scopedVars.changeVariableValue(variableName, { optionIndex: 0 });
 
     // Click global refresh to update URL
-    await page.locator(SELECTORS.REFRESH_BTN).click();
+    await scopedVars.clickDashboardRefresh();
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Verify URL contains panel variable parameter
@@ -242,7 +242,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     // Add variable
     await pm.dashboardSetting.openSetting();
@@ -254,7 +254,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
       { scope: "global" }
     );
     // Wait for variable to be saved
-    await page.locator(getEditVariableBtn(variableName)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getEditVariableBtnLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     await pm.dashboardSetting.closeSettingWindow();
@@ -264,13 +264,13 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variable to appear on dashboard
-    await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
 
     // Set value using page object method
     const { selectedValue } = await scopedVars.changeVariableValue(variableName, { optionIndex: 0, returnSelectedValue: true });
 
     // Click refresh to update URL
-    await page.locator(SELECTORS.REFRESH_BTN).click();
+    await scopedVars.clickDashboardRefresh();
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Get current URL
@@ -281,14 +281,14 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Wait for dashboard to load after reload
-    await page.locator(SELECTORS.SETTING_BTN).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     // Wait for variable selector to appear
-    await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Verify variable value restored - check the displayed value in the selector
-    const variableSelector = page.locator(getVariableSelector(variableName));
+    const variableSelector = scopedVars.getVariableSelectorLocator(variableName);
     await expect(variableSelector).toContainText(selectedValue.trim(), { timeout: 10000 });
 
     // Cleanup
@@ -308,7 +308,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     // Add variable with default value
     await pm.dashboardSetting.openSetting();
@@ -323,7 +323,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
       }
     );
     // Wait for variable to be saved
-    await page.locator(getEditVariableBtn(variableName)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getEditVariableBtnLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     await pm.dashboardSetting.closeSettingWindow();
@@ -333,7 +333,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variable to appear on dashboard
-    await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
 
     // Get dashboard URL
     const baseURL = page.url();
@@ -346,14 +346,14 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Wait for dashboard to load
-    await page.locator(SELECTORS.SETTING_BTN).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     // Wait for variable selector to appear
-    await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Verify value is set from URL - check the displayed value in the selector
-    const variableSelector = page.locator(getVariableSelector(variableName));
+    const variableSelector = scopedVars.getVariableSelectorLocator(variableName);
     await expect(variableSelector).toContainText(testValue, { timeout: 10000 });
 
     // Cleanup
@@ -372,7 +372,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     // Add variable
     await pm.dashboardSetting.openSetting();
@@ -384,7 +384,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
       { scope: "global" }
     );
     // Wait for variable to be saved
-    await page.locator(getEditVariableBtn(variableName)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getEditVariableBtnLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     await pm.dashboardSetting.closeSettingWindow();
@@ -394,13 +394,13 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variable to appear on dashboard
-    await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
 
     // Set value using page object method
     const { selectedValue } = await scopedVars.changeVariableValue(variableName, { optionIndex: 0, returnSelectedValue: true });
 
     // Click refresh to update URL
-    await page.locator(SELECTORS.REFRESH_BTN).click();
+    await scopedVars.clickDashboardRefresh();
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Get URL
@@ -441,7 +441,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     // Add two variables
     await pm.dashboardSetting.openSetting();
@@ -449,8 +449,8 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardSetting.openSetting();
     await scopedVars.addScopedVariable(var2, "logs", "e2e_automate", "kubernetes_container_name", { scope: "global" });
     // Wait for variables to be saved
-    await page.locator(`[data-test="dashboard-edit-variable-${var1}"]`).waitFor({ state: "visible", timeout: 10000 });
-    await page.locator(`[data-test="dashboard-edit-variable-${var2}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getEditVariableBtnLocator(var1).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getEditVariableBtnLocator(var2).waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     await pm.dashboardSetting.closeSettingWindow();
@@ -460,8 +460,8 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variables to appear on dashboard
-    await page.locator(`[data-test="variable-selector-${var1}"]`).waitFor({ state: "visible", timeout: 10000 });
-    await page.locator(`[data-test="variable-selector-${var2}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(var1).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(var2).waitFor({ state: "visible", timeout: 10000 });
 
     // Set both values using the established POM method (uses inner-trigger, proven reliable)
     await scopedVars.changeVariableValue(var1, { optionIndex: 0 });
@@ -471,7 +471,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Click refresh
-    await page.locator(SELECTORS.REFRESH_BTN).click();
+    await scopedVars.clickDashboardRefresh();
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Verify URL contains both variables
@@ -495,7 +495,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     // Add variable
     await pm.dashboardSetting.openSetting();
@@ -507,7 +507,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
       { scope: "global" }
     );
     // Wait for variable to be saved
-    await page.locator(getEditVariableBtn(variableName)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getEditVariableBtnLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     await pm.dashboardSetting.closeSettingWindow();
@@ -517,7 +517,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variable to appear on dashboard
-    await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
 
     // Add panel with drilldown configuration
     await pm.dashboardCreate.addPanel();
@@ -534,14 +534,14 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardPanelActions.savePanel();
 
     // Wait for panel to be added to dashboard
-    await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
-    await page.locator(SELECTORS.SETTING_BTN).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getAnyPanel().waitFor({ state: "visible", timeout: 15000 });
+    await scopedVars.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     // Set variable value using page object method
     const { selectedValue: drillValue } = await scopedVars.changeVariableValue(variableName, { optionIndex: 0, returnSelectedValue: true });
 
     // Refresh to commit
-    await page.locator(SELECTORS.REFRESH_BTN).click();
+    await scopedVars.clickDashboardRefresh();
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Get URL with drilldown variable
@@ -571,7 +571,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     // Add global and tab variables using default tab
     await pm.dashboardSetting.openSetting();
@@ -579,8 +579,8 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardSetting.openSetting();
     await scopedVars.addScopedVariable(tabVar, "logs", "e2e_automate", "kubernetes_container_name", { scope: "tabs", assignedTabs: ["default"] });
     // Wait for variables to be saved
-    await page.locator(`[data-test="dashboard-edit-variable-${globalVar}"]`).waitFor({ state: "visible", timeout: 10000 });
-    await page.locator(`[data-test="dashboard-edit-variable-${tabVar}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getEditVariableBtnLocator(globalVar).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getEditVariableBtnLocator(tabVar).waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     await pm.dashboardSetting.closeSettingWindow();
@@ -590,36 +590,36 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for dashboard to be fully loaded after closing settings
-    await page.locator(SELECTORS.SETTING_BTN).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     // Wait for both variables to appear on dashboard (both are on default tab)
-    await page.locator(`[data-test="variable-selector-${globalVar}"]`).waitFor({ state: "visible", timeout: 10000 });
-    await page.locator(`[data-test="variable-selector-${tabVar}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(globalVar).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(tabVar).waitFor({ state: "visible", timeout: 10000 });
 
     // Set values
-    const globalDropdown = page.locator(`[data-test="variable-selector-${globalVar}-inner-trigger"]`);
+    const globalDropdown = scopedVars.getVariableTriggerLocator(globalVar);
     await globalDropdown.waitFor({ state: "visible", timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
     await globalDropdown.click();
     // Wait for dropdown menu to open
-    await page.locator(`[data-test="variable-selector-${globalVar}-inner-popover"]`).waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(`[data-test="variable-selector-${globalVar}-inner-popover"]`).locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(`[data-test="variable-selector-${globalVar}-inner-popover"]`).locator(SELECTORS.ROLE_OPTION).first().click();
+    await scopedVars.getVariablePopoverLocator(globalVar).waitFor({ state: "visible", timeout: 5000 });
+    await scopedVars.getVariablePopoverLocator(globalVar).locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
+    await scopedVars.getVariablePopoverLocator(globalVar).locator(SELECTORS.ROLE_OPTION).first().click();
     await safeWaitForHidden(page, `[data-test="variable-selector-${globalVar}-inner-popover"]`, { timeout: 3000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
-    const tabDropdown = page.locator(`[data-test="variable-selector-${tabVar}-inner-trigger"]`);
+    const tabDropdown = scopedVars.getVariableTriggerLocator(tabVar);
     await tabDropdown.waitFor({ state: "visible", timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
     await tabDropdown.click();
     // Wait for dropdown menu to open
-    await page.locator(`[data-test="variable-selector-${tabVar}-inner-popover"]`).waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(`[data-test="variable-selector-${tabVar}-inner-popover"]`).locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(`[data-test="variable-selector-${tabVar}-inner-popover"]`).locator(SELECTORS.ROLE_OPTION).first().click();
+    await scopedVars.getVariablePopoverLocator(tabVar).waitFor({ state: "visible", timeout: 5000 });
+    await scopedVars.getVariablePopoverLocator(tabVar).locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
+    await scopedVars.getVariablePopoverLocator(tabVar).locator(SELECTORS.ROLE_OPTION).first().click();
     await safeWaitForHidden(page, `[data-test="variable-selector-${tabVar}-inner-popover"]`, { timeout: 3000 });
 
     // Refresh
-    await page.locator(SELECTORS.REFRESH_BTN).click();
+    await scopedVars.clickDashboardRefresh();
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Verify URL structure

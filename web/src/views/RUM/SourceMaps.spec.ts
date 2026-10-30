@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 import { createI18n } from "vue-i18n";
+import enUS from "@/locales/languages/en-US.json";
 
 import SourceMaps from "./SourceMaps.vue";
 
@@ -52,11 +54,13 @@ const createMockRouter = () =>
     ],
   });
 
+// Real en-US messages: this spec asserts rendered copy (dialog labels, the
+// delete confirmation), so an empty message set would silently pass on raw keys.
 const createMockI18n = () =>
   createI18n({
     legacy: false,
     locale: "en",
-    messages: { en: {} },
+    messages: { en: enUS },
   });
 
 const notifyMock = vi.fn();
@@ -136,6 +140,7 @@ const buildGlobalConfig = (store: any, router: any, i18n: any) => ({
         "primaryButtonLabel",
         "secondaryButtonLabel",
         "neutralButtonLabel",
+        "primaryButtonVariant",
       ],
       emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
       template:
@@ -152,6 +157,7 @@ describe("SourceMaps.vue", () => {
   let wrapper: any;
 
   beforeEach(() => {
+    resetListViewState();
     store = createMockStore();
     router = createMockRouter();
     i18n = createMockI18n();
@@ -323,10 +329,10 @@ describe("SourceMaps.vue", () => {
       wrapper = await mountComponent();
 
       // OTable is always rendered; when data is empty it renders #empty slot with OEmptyState.
-      // The i18n keys are not translated in the test environment, so we verify the
-      // empty state component is rendered rather than checking for translated text.
       expect(wrapper.find('[data-test-stub="o-table"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test-stub="o-table"]').text()).toContain("emptyState");
+      expect(wrapper.find('[data-test-stub="o-table"]').text()).toContain(
+        "No source maps uploaded",
+      );
     });
 
     it("shows OTable when grouped source maps exist", async () => {
@@ -434,8 +440,8 @@ describe("SourceMaps.vue", () => {
       expect(dialog.exists()).toBe(true);
       expect(dialog.props("open")).toBe(false);
       expect(dialog.props("size")).toBe("xs");
-      expect(dialog.props("primaryButtonLabel")).toBe("common.ok");
-      expect(dialog.props("secondaryButtonLabel")).toBe("common.cancel");
+      expect(dialog.props("primaryButtonLabel")).toBe("OK");
+      expect(dialog.props("secondaryButtonLabel")).toBe("Cancel");
     });
 
     it("confirmDeleteSourceMap opens dialog and populates title/message/data", async () => {
@@ -454,10 +460,13 @@ describe("SourceMaps.vue", () => {
       const dialog = wrapper.findComponent({ name: "ODialog" });
       expect(dialog.props("open")).toBe(true);
       expect(dialog.props("title")).toBe("Delete Source Maps");
-      expect((wrapper.vm as any).deleteDialog.message).toContain("svc-a");
-      expect((wrapper.vm as any).deleteDialog.message).toContain("1.0.0");
-      expect((wrapper.vm as any).deleteDialog.message).toContain("prod");
-      expect((wrapper.vm as any).deleteDialog.message).toContain("2 file(s)");
+      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+      const name = dialog.find('[data-test="delete-source-maps-dialog-name"]');
+      expect(name.text()).toBe("svc-a");
+      expect(name.classes()).toContain("font-semibold");
+      expect(dialog.text()).toContain("svc-a (1.0.0)");
+      expect(dialog.text()).toContain("prod");
+      expect(dialog.text()).toContain("2 files");
       expect((wrapper.vm as any).deleteDialog.data).toEqual(row);
     });
 
@@ -655,6 +664,36 @@ describe("SourceMaps.vue", () => {
 
       expect((wrapper.vm as any).formatTimestamp(0)).toBe("-");
       expect((wrapper.vm as any).formatTimestamp(null)).toBe("-");
+    });
+  });
+
+  describe("View state restore", () => {
+    it("restores filters, page, size and sort and fetches with the filters", async () => {
+      useListViewState("rumSourceMaps", {
+        filters: { service: "web" },
+        pageSize: 50,
+        currentPage: 2,
+        sortBy: "version",
+        sortOrder: "desc",
+      });
+      wrapper = await mountComponent();
+      const vm = wrapper.vm as any;
+      expect(vm.filters).toEqual({ service: "web" });
+      expect(vm.selectedPerPage).toBe(50);
+      expect(vm.sortBy).toBe("version");
+      expect(vm.sortOrder).toBe("desc");
+      expect(listSourceMapsMock).toHaveBeenCalledWith(expect.anything(), { service: "web" });
+    });
+
+    it("saves changes to the view state", async () => {
+      wrapper = await mountComponent();
+      const vm = wrapper.vm as any;
+      vm.filters = { version: "1.0" };
+      vm.selectedPerPage = 100;
+      await nextTick();
+      const saved: any = useListViewState("rumSourceMaps", {});
+      expect(saved.filters).toEqual({ version: "1.0" });
+      expect(saved.pageSize).toBe(100);
     });
   });
 });

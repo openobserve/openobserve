@@ -29,6 +29,7 @@ pub struct Model {
     pub created_by: String,
     pub created_at: i64,
     pub updated_at: i64,
+    pub splunk_token: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -53,6 +54,7 @@ mod tests {
             created_by: "admin@test.com".to_string(),
             created_at: 1000,
             updated_at: 2000,
+            splunk_token: Some("7b3d9f2c-4a11-4e55-9c8b-2f6a01c34d90".to_string()),
         };
         assert_eq!(m.id, "test-id");
         assert_eq!(m.org_id, "org-1");
@@ -74,9 +76,11 @@ mod tests {
             created_by: "admin@test.com".to_string(),
             created_at: 1000,
             updated_at: 2000,
+            splunk_token: None,
         };
         assert!(!m.is_default);
         assert!(!m.enabled);
         assert_eq!(m.description, "");
+        assert!(m.splunk_token.is_none());
     }
 }

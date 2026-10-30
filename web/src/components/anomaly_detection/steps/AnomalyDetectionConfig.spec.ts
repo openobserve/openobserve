@@ -14,16 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // Spec for AnomalyDetectionConfig (the "Detection Config" step of the anomaly
-// wizard). Two layers:
-//   1. SURVIVING BEHAVIOR — the buildPreviewSql / loadPreview logic that the
-//      migration kept unchanged (kept verbatim from the pre-rewrite spec).
-//   2. OFORM BEHAVIOR — the real <OForm> the migration introduced: per-mode
-//      required validation, the two §4-restored rules (training_window_days ≥1,
-//      detection_function required — each only where its control renders),
-//      z.coerce.number typing + write-back egress, the custom_sql bare-Monaco
-//      bridge with submission-gated errors (R3), the filters[] field-array
-//      keying (rendered-inputs delete test), and the exposed validate() surface
-//      the parent (useAlertForm) still calls to gate Next/Save.
+// wizard) —
+// the real <OForm> the migration introduced: per-mode required validation, the
+// two §4-restored rules (training_window_days ≥1, detection_function required —
+// each only where its control renders), z.coerce.number typing + write-back
+// egress, the custom_sql bare-Monaco bridge with submission-gated errors (R3),
+// the filters[] field-array keying (rendered-inputs delete test), and the
+// exposed validate() surface the parent (useAlertForm) still calls to gate
+// Next/Save. The data-preview chart lives in AnomalyDataPreview.spec.ts.
 //
 // The step OWNS its <OForm> (Rule ③ useOForm owner) and returns `form` from
 // setup(), so the TanStack form is reachable as `(wrapper.vm as any).form`.
@@ -36,17 +34,19 @@ import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OFormInput from "@/lib/forms/Input/OFormInput.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import streamService from "@/services/stream";
 
 // vi.mock must be hoisted — declared before component import
-vi.mock("@/services/stream", () => ({
-  default: {
-    schema: vi.fn().mockResolvedValue({ data: { schema: [] } }),
-  },
-}));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      schema: vi.fn().mockResolvedValue({ data: { schema: [] } }),
+    },
+  });
+});
 
 // The stored-value lookup the field-value resolver ends at. Stubbed so the
 // resolver tests can assert the composite key it was asked for without an
@@ -55,10 +55,10 @@ vi.mock("@/services/stream", () => ({
 const { getFieldValuesForSuggestion } = vi.hoisted(() => ({
   getFieldValuesForSuggestion: vi.fn(async () => ["ERROR", "INFO"]),
 }));
-vi.mock("@/composables/fieldValueStore", () => ({ getFieldValuesForSuggestion }));
-
-vi.mock("@/components/dashboards/PanelSchemaRenderer.vue", () => ({
-  default: { template: '<div data-test="panel-schema-renderer" />' },
+vi.mock("@/composables/fieldValueStore", () => ({
+  getFieldValuesForSuggestion,
+  requestFieldValues: vi.fn().mockResolvedValue([]),
+  fieldValuesUnavailable: vi.fn(() => false),
 }));
 
 vi.mock("@/components/QueryEditor.vue", () => ({
@@ -69,6 +69,17 @@ vi.mock("@/components/QueryEditor.vue", () => ({
 }));
 
 import AnomalyDetectionConfig from "./AnomalyDetectionConfig.vue";
+import {
+  anomalyDetectionConfigDefaults,
+  anomalyBandGrouping,
+  anomalyBandWidthPrefill,
+  anomalyExpectedGroupingKey,
+  anomalyNoticeBadgeKeys,
+  anomalyWindowShareErrors,
+  lookBackWindowFloorSeconds,
+} from "./AnomalyDetectionConfig.schema";
+import enLocale from "@/locales/languages/en-US.json";
+import { anomalyBandPayload, defaultAnomalyConfig } from "@/composables/useAlertForm";
 
 // ---------------------------------------------------------------------------
 // Mount factory — keeps stubs and global plugins in one place
@@ -84,11 +95,11 @@ function buildConfig(configOverrides: Record<string, unknown> = {}) {
     detection_function_field: "",
     filters: [] as Array<{ field: string; operator: string; value: string }>,
     custom_sql: "",
-    detection_window_value: 30,
-    detection_window_unit: "m",
+    // Above the schedule+histogram floor (1h + 5m) so unrelated tests stay floor-clean.
+    detection_window_value: 2,
+    detection_window_unit: "h",
     training_window_days: 7,
     threshold: 97,
-    threshold_min: 0,
     ...configOverrides,
   };
 }
@@ -97,16 +108,18 @@ const mountOptions = {
   global: {
     plugins: [store, i18n],
     stubs: {
-      PanelSchemaRenderer: true,
       QueryEditor: true,
     },
   },
 };
 
-function mountConfig(configOverrides: Record<string, unknown> = {}) {
+function mountConfig(
+  configOverrides: Record<string, unknown> = {},
+  extraProps: Record<string, unknown> = {},
+) {
   return mount(AnomalyDetectionConfig, {
     ...mountOptions,
-    props: { config: buildConfig(configOverrides) },
+    props: { config: buildConfig(configOverrides), ...extraProps },
   });
 }
 
@@ -135,14 +148,27 @@ const renderedFilterFields = (w: VueWrapper): unknown[] =>
     .filter((c: any) => /^filters\[\d+\]\.field$/.test(c.props("name") || ""))
     .map((c: any) => c.findComponent(OSelect).props("modelValue"));
 
-// ---------------------------------------------------------------------------
-// Helper: call loadPreview() and return the normalised SQL string
-// ---------------------------------------------------------------------------
-async function getSqlFromPreview(wrapper: VueWrapper): Promise<string> {
-  (wrapper.vm as any).loadPreview();
-  await flushPromises();
-  return (wrapper.vm as any).previewPanelSchema?.queries?.[0]?.query ?? "";
-}
+// The sensitivity tiers, in render order: Auto, then Conservative, Balanced, Aggressive (band width in σ).
+const SENSITIVITY_TIERS = ["auto", 4, 3, 2.5];
+
+// data-state of each tier button. A missing button reads as undefined so a
+// "no tier is active" assertion cannot pass just because nothing rendered.
+const tierStates = (w: VueWrapper): Array<string | undefined> =>
+  SENSITIVITY_TIERS.map((value) => {
+    const button = w.find(`[data-test="anomaly-sensitivity-tier-${value}"]`);
+    return button.exists() ? button.attributes("data-state") : undefined;
+  });
+
+// The level <input> (data-test lands on the OInput wrapper div).
+const levelInput = (w: VueWrapper) => w.find('[data-test="anomaly-sensitivity-level"] input');
+
+// Pinned so the range message is proven to be the translated one, not zod's raw default.
+const RANGE_MESSAGE = "Enter a band width from 1 to 10.";
+
+const sensitivityHintText = (w: VueWrapper): string | undefined => {
+  const hint = w.find('[data-test="anomaly-sensitivity-hint"]');
+  return hint.exists() ? hint.text() : undefined;
+};
 
 // A valid custom SQL query (aliases time_bucket, NOT the timestamp column).
 const VALID_CUSTOM_SQL =
@@ -158,355 +184,6 @@ describe("AnomalyDetectionConfig", () => {
   });
 
   // =========================================================================
-  describe("filters mode — detection function", () => {
-    it("should use count(*) AS value when detection_function is count", async () => {
-      wrapper = mountConfig({ detection_function: "count" });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("count(*) AS value");
-    });
-
-    it("should use count(*) AS value when detection_function is not set", async () => {
-      wrapper = mountConfig({ detection_function: "" });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("count(*) AS value");
-    });
-
-    it("should use avg(response_time) AS value when detection_function is avg", async () => {
-      wrapper = mountConfig({
-        detection_function: "avg",
-        detection_function_field: "response_time",
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("avg(response_time) AS value");
-    });
-
-    it("should use sum(bytes) AS value when detection_function is sum", async () => {
-      wrapper = mountConfig({
-        detection_function: "sum",
-        detection_function_field: "bytes",
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("sum(bytes) AS value");
-    });
-
-    it("should use approx_percentile_cont(latency, 0.95) AS value when detection_function is p95", async () => {
-      wrapper = mountConfig({
-        detection_function: "p95",
-        detection_function_field: "latency",
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("approx_percentile_cont(latency, 0.95) AS value");
-    });
-
-    it("should use approx_percentile_cont(latency, 0.99) AS value when detection_function is p99", async () => {
-      wrapper = mountConfig({
-        detection_function: "p99",
-        detection_function_field: "latency",
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("approx_percentile_cont(latency, 0.99) AS value");
-    });
-
-    it("should include the stream name in FROM clause", async () => {
-      wrapper = mountConfig({ stream_name: "my_stream" });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain('FROM "my_stream"');
-    });
-
-    it("should include GROUP BY and ORDER BY time_bucket", async () => {
-      wrapper = mountConfig();
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("GROUP BY time_bucket");
-      expect(sql).toContain("ORDER BY time_bucket");
-    });
-
-    it("should produce a full default count query with no filters", async () => {
-      wrapper = mountConfig();
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toBe(
-        "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM \"my_stream\" GROUP BY time_bucket ORDER BY time_bucket",
-      );
-    });
-  });
-
-  // =========================================================================
-  describe("filters mode — histogram interval", () => {
-    it("should embed 15m interval when histogram_interval_value is 15 and unit is m", async () => {
-      wrapper = mountConfig({
-        histogram_interval_value: 15,
-        histogram_interval_unit: "m",
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("histogram(_timestamp, '15m')");
-    });
-
-    it("should embed 1h interval when histogram_interval_value is 1 and unit is h", async () => {
-      wrapper = mountConfig({
-        histogram_interval_value: 1,
-        histogram_interval_unit: "h",
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("histogram(_timestamp, '1h')");
-    });
-
-    it("should leave previewPanelSchema null when stream_name is empty", async () => {
-      wrapper = mountConfig({ stream_name: "" });
-      (wrapper.vm as any).loadPreview();
-      await flushPromises();
-      expect((wrapper.vm as any).previewPanelSchema).toBeNull();
-    });
-  });
-
-  // =========================================================================
-  describe("filters mode — WHERE clause from filters", () => {
-    it("should not include WHERE clause when filters array is empty", async () => {
-      wrapper = mountConfig({ filters: [] });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).not.toContain("WHERE");
-    });
-
-    it("should include WHERE status = '200' for a single equality filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "status", operator: "=", value: "200" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE status = '200'");
-    });
-
-    it("should chain additional filters with AND for multiple filters", async () => {
-      wrapper = mountConfig({
-        filters: [
-          { field: "status", operator: "=", value: "200" },
-          { field: "env", operator: "=", value: "prod" },
-        ],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE status = '200'");
-      expect(sql).toContain("AND env = 'prod'");
-    });
-
-    it("should include field IS NULL for an Is Null filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "error_msg", operator: "Is Null", value: "" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE error_msg IS NULL");
-    });
-
-    it("should include field IS NOT NULL for an Is Not Null filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "error_msg", operator: "Is Not Null", value: "" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE error_msg IS NOT NULL");
-    });
-
-    it("should include field IN (values) for an IN filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "status", operator: "IN", value: "200,404,500" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE status IN (200,404,500)");
-    });
-
-    it("should include field NOT IN (values) for a NOT IN filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "status", operator: "NOT IN", value: "500,503" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE status NOT IN (500,503)");
-    });
-
-    it("should use str_match for a Contains filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "message", operator: "Contains", value: "error" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE str_match(message, 'error')");
-    });
-
-    it("should use str_match for a str_match filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "message", operator: "str_match", value: "timeout" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE str_match(message, 'timeout')");
-    });
-
-    it("should use str_match_ignore_case for a str_match_ignore_case filter", async () => {
-      wrapper = mountConfig({
-        filters: [
-          {
-            field: "message",
-            operator: "str_match_ignore_case",
-            value: "ERROR",
-          },
-        ],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE str_match_ignore_case(message, 'ERROR')");
-    });
-
-    it("should use re_match for a re_match filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "level", operator: "re_match", value: "^(error|warn)$" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE re_match(level, '^(error|warn)$')");
-    });
-
-    it("should use match_all for a match_all filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "message", operator: "match_all", value: "critical" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE match_all('critical')");
-    });
-
-    it("should use LIKE pattern for a Starts With filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "path", operator: "Starts With", value: "/api" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE path LIKE '/api%'");
-    });
-
-    it("should use LIKE pattern for an Ends With filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "path", operator: "Ends With", value: ".json" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE path LIKE '%.json'");
-    });
-
-    it("should use NOT LIKE pattern for a Not Contains filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "message", operator: "Not Contains", value: "debug" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE message NOT LIKE '%debug%'");
-    });
-
-    it("should skip a filter whose field is empty", async () => {
-      wrapper = mountConfig({
-        filters: [
-          { field: "", operator: "=", value: "200" },
-          { field: "env", operator: "=", value: "prod" },
-        ],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      // The empty-field filter must not produce a stray fragment
-      expect(sql).not.toContain("= '200'");
-      // The valid filter must still appear
-      expect(sql).toContain("WHERE env = 'prod'");
-    });
-
-    it("should skip a filter whose value is empty and operator needs a value", async () => {
-      wrapper = mountConfig({
-        filters: [
-          { field: "status", operator: "=", value: "" },
-          { field: "env", operator: "=", value: "prod" },
-        ],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      // The valueless filter (= '') should be skipped
-      expect(sql).not.toContain("status =");
-      expect(sql).toContain("WHERE env = 'prod'");
-    });
-
-    it("should produce a complete WHERE clause with three filters", async () => {
-      wrapper = mountConfig({
-        filters: [
-          { field: "status", operator: "=", value: "200" },
-          { field: "env", operator: "=", value: "prod" },
-          { field: "region", operator: "=", value: "us-east" },
-        ],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE status = '200'");
-      expect(sql).toContain("AND env = 'prod'");
-      expect(sql).toContain("AND region = 'us-east'");
-    });
-  });
-
-  // =========================================================================
-  describe("custom_sql mode — query passed through as-is (normalized)", () => {
-    it("should use custom SQL directly when query_mode is custom_sql", async () => {
-      const customSql =
-        "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM \"events\" GROUP BY time_bucket ORDER BY time_bucket";
-      wrapper = mountConfig({
-        query_mode: "custom_sql",
-        stream_name: "events",
-        custom_sql: customSql,
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toBe(customSql);
-    });
-
-    it("should pass through a JOIN query unchanged after normalization", async () => {
-      const rawSql =
-        'SELECT histogram(_timestamp, \'5m\') AS time_bucket, count(*) AS value FROM "events" e JOIN "users" u ON e.user_id = u.id GROUP BY time_bucket ORDER BY time_bucket';
-      wrapper = mountConfig({
-        query_mode: "custom_sql",
-        stream_name: "events",
-        custom_sql: rawSql,
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toBe(rawSql);
-    });
-
-    it("should pass through a subquery unchanged after normalization", async () => {
-      const rawSql =
-        "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM (SELECT * FROM \"raw_events\" WHERE env = 'prod') sub GROUP BY time_bucket ORDER BY time_bucket";
-      wrapper = mountConfig({
-        query_mode: "custom_sql",
-        stream_name: "raw_events",
-        custom_sql: rawSql,
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toBe(rawSql);
-    });
-
-    it("should pass through a CTE query unchanged after normalization", async () => {
-      const rawSql =
-        "WITH filtered AS (SELECT * FROM \"events\" WHERE level = 'error') SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM filtered GROUP BY time_bucket ORDER BY time_bucket";
-      wrapper = mountConfig({
-        query_mode: "custom_sql",
-        stream_name: "events",
-        custom_sql: rawSql,
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toBe(rawSql);
-    });
-
-    it("should collapse multiline SQL to a single line", async () => {
-      const multilineSql =
-        "SELECT histogram(_timestamp, '5m') AS time_bucket,\n       count(*) AS value\nFROM \"events\"\nGROUP BY time_bucket\nORDER BY time_bucket";
-      const expectedSql =
-        "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM \"events\" GROUP BY time_bucket ORDER BY time_bucket";
-      wrapper = mountConfig({
-        query_mode: "custom_sql",
-        stream_name: "events",
-        custom_sql: multilineSql,
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toBe(expectedSql);
-    });
-
-    it("should leave previewPanelSchema null when custom_sql is empty and stream_name is empty", async () => {
-      // stream_name must also be empty — the immediate watcher seeds custom_sql
-      // from buildDefaultSql() when stream_name is set and custom_sql is blank.
-      wrapper = mountConfig({
-        query_mode: "custom_sql",
-        stream_name: "",
-        custom_sql: "",
-      });
-      (wrapper.vm as any).loadPreview();
-      await flushPromises();
-      expect((wrapper.vm as any).previewPanelSchema).toBeNull();
-    });
-  });
-
   // =========================================================================
   // OForm behavior — the real <OForm> the migration introduced
   // =========================================================================
@@ -802,18 +479,19 @@ describe("AnomalyDetectionConfig", () => {
       expect(typeof config.histogram_interval_value).toBe("number");
     });
 
-    it("threshold range max/min are written back to threshold / threshold_min", async () => {
-      const { wrapper: w, config } = mountReturning();
-      wrapper = w;
+    it("band_width is written back as a number", async () => {
+      const config = defaultAnomalyConfig();
+      wrapper = mount(AnomalyDetectionConfig, { ...mountOptions, props: { config } });
       await flushPromises();
       const form = getForm(wrapper);
 
-      form.setFieldValue("threshold_range", { min: 10, max: 80 });
+      form.setFieldValue("band_width", 4);
       await flushPromises();
       await nextTick();
 
-      expect(config.threshold).toBe(80);
-      expect(config.threshold_min).toBe(10);
+      expect(config.band_width).toBe(4);
+      expect(typeof config.band_width).toBe("number");
+      expect("threshold_min" in config).toBe(false);
     });
 
     it("query_mode is mirrored to props.config (egress, not into-form mirror)", async () => {
@@ -827,6 +505,551 @@ describe("AnomalyDetectionConfig", () => {
       await nextTick();
 
       expect(config.query_mode).toBe("custom_sql");
+    });
+  });
+
+  // jsdom lays nothing out, so the sliding pill never measures; data-state is the assertable selection.
+  describe("sensitivity — tier toggle + level input on band_width", () => {
+    it("offers Auto, then maps Conservative, Balanced and Aggressive to 4, 3 and 2.5", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      expect(
+        SENSITIVITY_TIERS.map((value) =>
+          wrapper.find(`[data-test="anomaly-sensitivity-tier-${value}"]`).text(),
+        ),
+      ).toEqual([
+        i18n.global.t("alerts.anomaly.sensitivityAuto"),
+        i18n.global.t("alerts.anomaly.sensitivityConservative"),
+        i18n.global.t("alerts.anomaly.sensitivityBalanced"),
+        i18n.global.t("alerts.anomaly.sensitivityAggressive"),
+      ]);
+    });
+
+    it("a new config defaults to Auto, with no band width", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      expect(getForm(wrapper).state.values.band_width).toBeNull();
+      expect(tierStates(wrapper)).toEqual(["on", "off", "off", "off"]);
+      expect(sensitivityHintText(wrapper)).toBe(i18n.global.t("alerts.anomaly.autoUntrainedHelp"));
+    });
+
+    it.each([
+      [{}, "Available after training", "Auto level"],
+      [
+        { status: "training", current_model_version: 0 },
+        "Learning from your history…",
+        "Auto level",
+      ],
+      [{ status: "failed", current_model_version: 0 }, "Unavailable", "Auto level"],
+      [
+        { status: "ready", is_trained: true, current_model_version: 1, band_k: 4.2345 },
+        "4.23σ",
+        "Current level",
+      ],
+      [
+        { status: "training", is_trained: true, current_model_version: 1, band_k: 4.2345 },
+        "4.23σ",
+        "Last trained level",
+      ],
+      [
+        { status: "failed", is_trained: true, current_model_version: 1, band_k: 4.2345 },
+        "4.23σ",
+        "Last trained level",
+      ],
+      [{ band_k: 4.2345 }, "4.23σ", "Last trained level"],
+      [{ status: "waiting", band_k: 4.2345 }, "Available after training", "Auto level"],
+      [
+        { status: "ready", is_trained: false, current_model_version: 0, band_k: 4.2345 },
+        "Available after training",
+        "Auto level",
+      ],
+    ])("renders an honest Auto lifecycle readout for %j", async (model, value, label) => {
+      wrapper = mountConfig({ band_width: null, ...model });
+      await flushPromises();
+      expect(wrapper.find('[data-test="anomaly-sensitivity-tier-auto"]').text()).toBe("Auto");
+      expect(wrapper.find('[data-test="anomaly-sensitivity-auto-level"]').text()).toBe(
+        `${label}${value}`,
+      );
+      expect(levelInput(wrapper).exists()).toBe(false);
+      expect(getForm(wrapper).state.values.band_width).toBeNull();
+    });
+
+    it("suppresses an active learned value after a query edit and restores it on reverting", async () => {
+      wrapper = mountConfig({
+        status: "ready",
+        is_trained: true,
+        current_model_version: 1,
+        band_k: 4.23,
+      });
+      await flushPromises();
+      getForm(wrapper).setFieldValue("detection_function", "sum");
+      await flushPromises();
+      expect(wrapper.find('[data-test="anomaly-sensitivity-auto-level"]').text()).not.toContain(
+        "4.23",
+      );
+      getForm(wrapper).setFieldValue("detection_function", "count");
+      await flushPromises();
+      expect(wrapper.find('[data-test="anomaly-sensitivity-auto-level"]').text()).toContain(
+        "Current level4.23σ",
+      );
+    });
+
+    it("preserves an unsaved manual draft when model metadata refreshes", async () => {
+      const { wrapper: w, config } = mountReturning({ band_width: 4 });
+      wrapper = w;
+      await flushPromises();
+      await levelInput(wrapper).setValue("3.5");
+      await flushPromises();
+      await wrapper.setProps({
+        config: Object.assign(config, {
+          status: "ready",
+          is_trained: true,
+          current_model_version: 2,
+          band_k: 4.23,
+        }),
+      });
+      await flushPromises();
+      expect((levelInput(wrapper).element as HTMLInputElement).value).toBe("3.5");
+      expect(wrapper.find('[data-test="anomaly-sensitivity-custom"]').text()).toBe(
+        "Custom sensitivity",
+      );
+      expect(anomalyBandPayload(config, false).band_width).toBe(3.5);
+    });
+
+    it("clicking Auto clears an override and writes null back", async () => {
+      const { wrapper: w, config } = mountReturning({ band_width: 4 });
+      wrapper = w;
+      await flushPromises();
+
+      await wrapper.find('[data-test="anomaly-sensitivity-tier-auto"]').trigger("click");
+      await flushPromises();
+      await nextTick();
+
+      expect(getForm(wrapper).state.values.band_width).toBeNull();
+      expect((config as any).band_width).toBeNull();
+      expect(tierStates(wrapper)).toEqual(["on", "off", "off", "off"]);
+    });
+
+    it("clicking a tier sets band_width and writes it back to props.config", async () => {
+      const { wrapper: w, config } = mountReturning();
+      wrapper = w;
+      await flushPromises();
+
+      await wrapper.find('[data-test="anomaly-sensitivity-tier-2.5"]').trigger("click");
+      await flushPromises();
+      await nextTick();
+
+      expect(getForm(wrapper).state.values.band_width).toBe(2.5);
+      expect((config as any).band_width).toBe(2.5);
+    });
+
+    it("a non-tier level lights no tier and still states the band", async () => {
+      wrapper = mountConfig({
+        band_width: 3.5,
+        status: "ready",
+        is_trained: true,
+        current_model_version: 1,
+      });
+      await flushPromises();
+
+      expect(tierStates(wrapper)).toEqual(["off", "off", "off", "off"]);
+      expect((levelInput(wrapper).element as HTMLInputElement).value).toBe("3.5");
+      expect(sensitivityHintText(wrapper)).toBe(
+        i18n.global.t("alerts.anomaly.manualSensitivityHelp"),
+      );
+    });
+
+    it("an untrained config hides the model note while the typed level is out of range", async () => {
+      wrapper = mountConfig({ band_width: 3 });
+      await flushPromises();
+      expect(sensitivityHintText(wrapper)).toBe(
+        i18n.global.t("alerts.anomaly.manualModelRequired"),
+      );
+
+      await levelInput(wrapper).setValue("0.5");
+      await flushPromises();
+
+      expect(sensitivityHintText(wrapper)).toBeUndefined();
+    });
+
+    it("typing a tier value lights that tier up, as a number", async () => {
+      wrapper = mountConfig({ band_width: 3.5 });
+      await flushPromises();
+
+      await levelInput(wrapper).setValue("4");
+      await flushPromises();
+      await nextTick();
+
+      expect(getForm(wrapper).state.values.band_width).toBe(4);
+      expect(tierStates(wrapper)).toEqual(["off", "on", "off", "off"]);
+    });
+
+    it.each([0.5, 10.5, 0, " ", "invalid", Infinity])(
+      "rejects %s with the band-width range message",
+      async (bad) => {
+        wrapper = mountConfig({ band_width: 3 });
+        await flushPromises();
+        const form = getForm(wrapper);
+        form.setFieldValue("band_width", bad);
+        await flushPromises();
+
+        await form.handleSubmit();
+        await flushPromises();
+        await nextTick();
+
+        expect(form.state.isValid).toBe(false);
+        expect(fieldError(wrapper, "band_width")).toBe(RANGE_MESSAGE);
+        // Two OForm* wrappers on one field, but only the step's own message renders.
+        expect(wrapper.text().split(RANGE_MESSAGE).length - 1).toBe(1);
+        expect(wrapper.find('[data-test="anomaly-sensitivity-error"]').attributes("role")).toBe(
+          "alert",
+        );
+        expect(wrapper.find('[data-test="anomaly-sensitivity-hint"]').exists()).toBe(false);
+      },
+    );
+
+    it.each([1, 10, 3.25, 4.234])(
+      "validates typed %s and preserves its numeric payload",
+      async (ok) => {
+        const { wrapper: w, config } = mountReturning({ band_width: 4 });
+        wrapper = w;
+        await flushPromises();
+        await levelInput(wrapper).setValue(String(ok));
+        await flushPromises();
+
+        await expect((wrapper.vm as any).validate()).resolves.toBe(true);
+        expect(anomalyBandPayload(config, false).band_width).toBe(ok);
+        expect(typeof anomalyBandPayload(config, false).band_width).toBe("number");
+      },
+    );
+
+    it.each(["0.5", "10.5", ""])(
+      "blocks a typed %j draft through app validation and keeps manual mode",
+      async (draft) => {
+        wrapper = mountConfig({ band_width: 4 });
+        await flushPromises();
+        await levelInput(wrapper).setValue(draft);
+        await flushPromises();
+
+        await expect((wrapper.vm as any).validate()).resolves.toBe(false);
+        expect(tierStates(wrapper)).toEqual(["off", "off", "off", "off"]);
+        expect(wrapper.find('[data-test="anomaly-sensitivity-auto-level"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="anomaly-sensitivity-error"]').text()).toBe(RANGE_MESSAGE);
+      },
+    );
+
+    // Saving must never pin k: both an Auto create and an untouched Auto edit send null.
+    it.each([
+      ["a new alert left on Auto", {}],
+      [
+        "an untouched edit of an Auto alert",
+        { band_width: anomalyBandWidthPrefill({ band_width: null, band_k: 3.4 }), band_k: 3.4 },
+      ],
+    ])("%s saves band_width null", async (_label, stored) => {
+      const { wrapper: w, config } = mountReturning({ ...defaultAnomalyConfig(), ...stored });
+      wrapper = w;
+      await flushPromises();
+
+      await expect((wrapper.vm as any).validate()).resolves.toBe(true);
+      await flushPromises();
+      expect(anomalyBandPayload(config, false).band_width).toBeNull();
+    });
+
+    it("clearing the level preserves the manual draft and blocks saving", async () => {
+      const { wrapper: w, config } = mountReturning({ band_width: 4 });
+      wrapper = w;
+      await flushPromises();
+
+      await levelInput(wrapper).setValue("");
+      await flushPromises();
+      await nextTick();
+
+      expect((config as any).band_width).toBe("");
+      expect(tierStates(wrapper)).toEqual(["off", "off", "off", "off"]);
+      await expect((wrapper.vm as any).validate()).resolves.toBe(false);
+      const input = levelInput(wrapper);
+      expect(input.attributes("aria-invalid")).toBe("true");
+      expect(wrapper.find(`#${input.attributes("aria-describedby")}`).text()).toBe(RANGE_MESSAGE);
+    });
+
+    it("never writes the percentile threshold, which the server still keeps", async () => {
+      const { wrapper: w, config } = mountReturning({ threshold: 97 });
+      wrapper = w;
+      await flushPromises();
+
+      await wrapper.find('[data-test="anomaly-sensitivity-tier-4"]').trigger("click");
+      await flushPromises();
+      await nextTick();
+
+      expect(config.threshold).toBe(97);
+      expect(getForm(wrapper).state.values).not.toHaveProperty("threshold");
+    });
+
+    it("tier labels re-resolve when the locale changes", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+      const before = wrapper.find('[data-test="anomaly-sensitivity-tier-4"]').text();
+
+      const previous = i18n.global.locale.value;
+      try {
+        i18n.global.locale.value = "de-DE";
+        await nextTick();
+        expect(wrapper.find('[data-test="anomaly-sensitivity-tier-4"]').text()).toBe(
+          i18n.global.t("alerts.anomaly.sensitivityConservative"),
+        );
+      } finally {
+        i18n.global.locale.value = previous;
+        await nextTick();
+      }
+
+      expect(wrapper.find('[data-test="anomaly-sensitivity-tier-4"]').text()).toBe(before);
+    });
+  });
+
+  // Wire contract: `alert_budget_per_day` set = budget mode, which the server rejects band_width beside.
+  describe("sensitivity — budget mode", () => {
+    it("a config with no budget renders the band controls only", async () => {
+      wrapper = mountConfig({ band_width: 3 });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="anomaly-sensitivity-level"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="anomaly-budget-count"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="anomaly-budget-tiers"]').exists()).toBe(false);
+    });
+
+    it("a stored budget replaces the band control with the budget control", async () => {
+      wrapper = mountConfig({ alert_budget_per_day: 2 });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="anomaly-budget-count"] input').exists()).toBe(true);
+      expect(wrapper.find('[data-test="anomaly-sensitivity-level"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="anomaly-sensitivity-tier-3"]').exists()).toBe(false);
+      expect(
+        (wrapper.find('[data-test="anomaly-budget-count"] input').element as HTMLInputElement)
+          .value,
+      ).toBe("2");
+    });
+
+    it("a sub-daily budget is surfaced as alerts per week", async () => {
+      wrapper = mountConfig({ alert_budget_per_day: 1 / 7 });
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      expect(form.state.values.budget_count).toBe(1);
+      expect(form.state.values.budget_period).toBe("week");
+    });
+
+    it("the budget tiers map to 1/week, 1/day and 4/day", async () => {
+      wrapper = mountConfig({ alert_budget_per_day: 2 });
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      await wrapper.find('[data-test="anomaly-budget-tier-1_week"]').trigger("click");
+      await flushPromises();
+      expect(form.state.values.budget_count).toBe(1);
+      expect(form.state.values.budget_period).toBe("week");
+
+      await wrapper.find('[data-test="anomaly-budget-tier-4_day"]').trigger("click");
+      await flushPromises();
+      expect(form.state.values.budget_count).toBe(4);
+      expect(form.state.values.budget_period).toBe("day");
+    });
+
+    it("writes the budget back as a per-day number and touches neither threshold nor band width", async () => {
+      const { wrapper: w, config } = mountReturning({
+        alert_budget_per_day: 2,
+        threshold: 96.4,
+        band_width: null,
+      });
+      wrapper = w;
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      form.setFieldValue("budget_count", 3);
+      form.setFieldValue("budget_period", "week");
+      await flushPromises();
+      await nextTick();
+
+      expect(config.alert_budget_per_day).toBeCloseTo(3 / 7, 10);
+      expect(config.threshold).toBe(96.4);
+      expect((config as any).band_width).toBeNull();
+    });
+
+    // The reverse switch (band -> budget) already worked; this pins the direction
+    // that silently kept the stale budget and blanked the band width on reopen.
+    it("switching sensitivity_mode to band clears the stored budget", async () => {
+      const { wrapper: w, config } = mountReturning({ alert_budget_per_day: 2 });
+      wrapper = w;
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      form.setFieldValue("sensitivity_mode", "band");
+      form.setFieldValue("band_width", 5);
+      await flushPromises();
+      await nextTick();
+
+      expect((config as any).band_width).toBe(5);
+      expect(config.alert_budget_per_day).toBeUndefined();
+    });
+
+    it("an invalid count blocks submit and does not clobber the stored budget", async () => {
+      const { wrapper: w, config } = mountReturning({ alert_budget_per_day: 2 });
+      wrapper = w;
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      form.setFieldValue("budget_count", 0);
+      await flushPromises();
+      await form.handleSubmit();
+      await nextTick();
+
+      expect(form.state.isValid).toBe(false);
+      expect(fieldError(wrapper, "budget_count")).toBe("Enter a number greater than 0");
+      // Writing undefined here would silently flip the config to band mode.
+      expect(config.alert_budget_per_day).toBe(2);
+    });
+
+    it("a budget-mode submit is not judged on the hidden band width", async () => {
+      wrapper = mountConfig({ alert_budget_per_day: 1, band_width: null });
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      await form.handleSubmit();
+      await nextTick();
+
+      expect(form.state.isValid).toBe(true);
+    });
+
+    it("budget-mode hint states the ceiling, never a ranking or a promise of importance", async () => {
+      wrapper = mountConfig({ alert_budget_per_day: 2 });
+      await flushPromises();
+
+      const hint = sensitivityHintText(wrapper);
+      expect(hint).toBeDefined();
+      expect(hint).toContain("2");
+      expect(hint).toContain("per day");
+      for (const claim of ["most important", "most unusual", "highest", "top", "rank"]) {
+        expect(hint!.toLowerCase()).not.toContain(claim);
+      }
+    });
+
+    it("switching the period to week switches the hint", async () => {
+      wrapper = mountConfig({ alert_budget_per_day: 2 });
+      await flushPromises();
+      getForm(wrapper).setFieldValue("budget_period", "week");
+      await flushPromises();
+      await nextTick();
+
+      expect(sensitivityHintText(wrapper)).toContain("per week");
+    });
+  });
+
+  describe("training window — days suffix and one hint line", () => {
+    const floorHint = (w: VueWrapper) => w.find('[data-test="anomaly-training-window-floor-hint"]');
+
+    it.each([7, 28])("%s days states the 21-day training floor", async (days) => {
+      wrapper = mountConfig({ training_window_days: days });
+      await flushPromises();
+      expect(floorHint(wrapper).text()).toBe(
+        i18n.global.t("alerts.anomaly.trainingWindowFloorHint", { days: 21 }),
+      );
+    });
+
+    it("shows days as the input's own unit and keeps the grouping out of the form", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+      const field = wrapper.find('[data-test="anomaly-training-window"]');
+      expect(field.text()).toContain(i18n.global.t("alerts.anomaly.daysUnit"));
+      expect(wrapper.text()).not.toContain(
+        i18n.global.t("alerts.anomaly.bandGroupingWeekendHourIfData"),
+      );
+    });
+
+    it("defaults a new config to 28 days", () => {
+      expect(anomalyDetectionConfigDefaults(undefined).training_window_days).toBe(28);
+    });
+  });
+
+  describe("sensitivity — the removed slider and the relocated chart", () => {
+    it("no longer declares a threshold_range form field or renders the slider", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      expect(getForm(wrapper).state.values).not.toHaveProperty("threshold_range");
+      expect(wrapper.find('[data-test="anomaly-threshold-range"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="anomaly-threshold-range-label"]').exists()).toBe(false);
+    });
+
+    // The chart moved to AnomalyDataPreview in the right-hand Preview card; this
+    // step now shows the generated SQL in its place.
+    it("shows the SQL preview row and no data-preview chart", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="anomaly-sql-preview"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="anomaly-data-preview-load-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="anomaly-data-preview-empty"]').exists()).toBe(false);
+    });
+
+    // In custom_sql mode the user's own editor is on this form already, so a
+    // read-only copy of the same query below it is noise.
+    it("hides the SQL preview row in custom_sql mode", async () => {
+      wrapper = mountConfig({ query_mode: "custom_sql", custom_sql: VALID_CUSTOM_SQL });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="anomaly-sql-preview"]').exists()).toBe(false);
+    });
+
+    it("renders the previewSql prop the parent passes down", async () => {
+      const sql = 'SELECT 1 AS value FROM "my_stream"';
+      wrapper = mount(AnomalyDetectionConfig, {
+        ...mountOptions,
+        props: { config: buildConfig(), previewSql: sql },
+      });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="anomaly-sql-preview"]').attributes("query")).toBe(sql);
+    });
+
+    it("labels the preview row and drops the score-range framing", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      expect(wrapper.text()).toContain("SQL Preview");
+      expect(wrapper.text()).not.toContain("Anomaly Score Range");
+    });
+
+    // "Auto (trained k = 6)" plus three presets cannot fit a 390px row, so narrow screens get a menu.
+    it("collapses the tier group to a dropdown on narrow screens", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+      const group = wrapper
+        .findAllComponents(OToggleGroup)
+        .find((c) => c.vm.$attrs["data-test"] === "anomaly-sensitivity-tier");
+      expect(group?.props("mobileDropdown")).toBe(true);
+    });
+
+    it("gives the tier group an accessible name", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      // The row's "Sensitivity" text is a plain div bound to neither control,
+      // so aria-label is the group's only accessible name.
+      const group = wrapper.find('[data-test="anomaly-sensitivity-tier"]');
+      expect(group.exists()).toBe(true);
+      expect(group.attributes("aria-label")).toBe("Sensitivity");
+    });
+
+    it("exposes no mark-line or series-max machinery", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      // Only symbols actually exposed today are asserted — `updateMarkLines` was
+      // never in the setup() return, so asserting it would pass either way.
+      expect((wrapper.vm as any).onSeriesDataUpdate).toBeUndefined();
+      expect((wrapper.vm as any).previewHasData).toBeUndefined();
     });
   });
 
@@ -948,5 +1171,300 @@ describe("AnomalyDetectionConfig", () => {
       );
       expect(values).toEqual(["ERROR", "INFO"]);
     });
+  });
+
+  // §4.3/§4.6: floor = Check Every + one Detection Resolution, computed locally — no settle margin.
+  describe("look back window floor (schedule + histogram)", () => {
+    const submitted = async (
+      overrides: Record<string, unknown>,
+      extraProps: Record<string, unknown> = {},
+    ): Promise<VueWrapper> => {
+      const w = mountConfig(overrides, extraProps);
+      await flushPromises();
+      await getForm(w).handleSubmit();
+      await nextTick();
+      return w;
+    };
+
+    it("is Check Every plus one Detection Resolution", () => {
+      expect(lookBackWindowFloorSeconds(1, "h", 5, "m")).toBe(3900);
+      expect(lookBackWindowFloorSeconds(5, "m", 5, "m")).toBe(600);
+      expect(lookBackWindowFloorSeconds(90, "s", 30, "s")).toBe(120);
+      expect(lookBackWindowFloorSeconds(1, "d", 1, "h")).toBe(90000);
+    });
+
+    it("is absent when either governing value is not a positive s/m/h/d interval", () => {
+      expect(lookBackWindowFloorSeconds(0, "m", 5, "m")).toBeNull();
+      expect(lookBackWindowFloorSeconds(5, "x", 5, "m")).toBeNull();
+      expect(lookBackWindowFloorSeconds(5, "m", Number.NaN, "m")).toBeNull();
+    });
+
+    it("rejects the live broken shape: 5m window on a 5m schedule and 5m buckets", async () => {
+      wrapper = await submitted({
+        schedule_interval_value: 5,
+        schedule_interval_unit: "m",
+        histogram_interval_value: 5,
+        histogram_interval_unit: "m",
+        detection_window_value: 5,
+        detection_window_unit: "m",
+      });
+
+      expect(fieldError(wrapper, "detection_window_value")).toContain("10m");
+      expect(getForm(wrapper).state.isValid).toBe(false);
+    });
+
+    it("accepts exactly the floor and refuses one bucket under it", async () => {
+      const shape = {
+        schedule_interval_value: 5,
+        schedule_interval_unit: "m",
+        histogram_interval_value: 5,
+        histogram_interval_unit: "m",
+        detection_window_unit: "m",
+      };
+      wrapper = await submitted({ ...shape, detection_window_value: 10 });
+      expect(fieldError(wrapper, "detection_window_value")).toBeUndefined();
+      wrapper.unmount();
+
+      wrapper = await submitted({ ...shape, detection_window_value: 9 });
+      expect(fieldError(wrapper, "detection_window_value")).toBeDefined();
+    });
+
+    it("states the minimum and the recommendation at the field in one line", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      const hint = wrapper.find('[data-test="anomaly-detection-window-hint"]');
+      expect(hint.exists()).toBe(true);
+      expect(hint.text()).toContain("1h 5m");
+      // Twice the floor plus the 10-minute absence allowance.
+      expect(hint.text()).toContain("2h 20m");
+    });
+  });
+
+  // D4/N11: suppression by value vs the fetched triple, never touched-flags; bytes are pinned in the payload spec.
+  describe("client grandfathering of legacy rows (D4/N11/N12)", () => {
+    // A stored below-floor row: window 10m against a 1h schedule + 5m buckets (floor 1h 5m).
+    const storedBelowFloor = () => ({
+      histogram: { raw: "5m", value: 5, unit: "m", parsed: true },
+      schedule: { raw: "1h", value: 1, unit: "h", parsed: true },
+      window: { raw: 600, value: 10, unit: "m", parsed: true },
+    });
+    // The form state the stored triple seeds (schedule 1h is the mount default).
+    const matchingConfig = {
+      histogram_interval_value: 5,
+      histogram_interval_unit: "m",
+      detection_window_value: 10,
+      detection_window_unit: "m",
+    };
+
+    const mountStored = async (stored: Record<string, unknown>) => {
+      const w = mountConfig(matchingConfig, { storedIntervals: stored });
+      await flushPromises();
+      return w;
+    };
+
+    it("an untouched below-floor triple passes: a description-only edit saves", async () => {
+      wrapper = await mountStored(storedBelowFloor());
+      await getForm(wrapper).handleSubmit();
+      await nextTick();
+
+      expect(fieldError(wrapper, "detection_window_value")).toBeUndefined();
+      expect(getForm(wrapper).state.isValid).toBe(true);
+    });
+
+    it("a below-floor window EDIT is rejected", async () => {
+      wrapper = await mountStored(storedBelowFloor());
+      getForm(wrapper).setFieldValue("detection_window_value", 20);
+      await getForm(wrapper).handleSubmit();
+      await nextTick();
+
+      expect(fieldError(wrapper, "detection_window_value")).toContain("1h 5m");
+    });
+
+    it("edit-and-revert is clean again (value comparison, not touched-flags)", async () => {
+      wrapper = await mountStored(storedBelowFloor());
+      const form = getForm(wrapper);
+      form.setFieldValue("detection_window_value", 20);
+      await form.handleSubmit();
+      await nextTick();
+      expect(fieldError(wrapper, "detection_window_value")).toBeDefined();
+
+      form.setFieldValue("detection_window_value", 10);
+      await form.handleSubmit();
+      await nextTick();
+      expect(fieldError(wrapper, "detection_window_value")).toBeUndefined();
+      expect(form.state.isValid).toBe(true);
+    });
+
+    it("unparsable stored values: no floor, no warning -- but W>0 still enforced (N12)", async () => {
+      const stored = storedBelowFloor();
+      stored.schedule = { raw: "1x", value: 1, unit: "h", parsed: false };
+      wrapper = await mountStored(stored);
+      const form = getForm(wrapper);
+
+      // The window edit cannot be floored against an unparsable schedule.
+      form.setFieldValue("detection_window_value", 6);
+      await form.handleSubmit();
+      await nextTick();
+      expect(fieldError(wrapper, "detection_window_value")).toBeUndefined();
+      expect(wrapper.find('[data-test="anomaly-detection-window-legacy-warning"]').exists()).toBe(
+        false,
+      );
+
+      // N12: tolerance never waives W > 0.
+      form.setFieldValue("detection_window_value", 0);
+      await form.handleSubmit();
+      await nextTick();
+      expect(fieldError(wrapper, "detection_window_value")).toBe("Field is required!");
+    });
+
+    it("warns on a grandfathered below-floor row, stating the correctly parsed minimum", async () => {
+      wrapper = await mountStored(storedBelowFloor());
+
+      const warning = wrapper.find('[data-test="anomaly-detection-window-legacy-warning"]');
+      expect(warning.exists()).toBe(true);
+      expect(warning.text()).toContain("1h 5m");
+    });
+
+    it("clears the legacy warning once the triple is edited", async () => {
+      wrapper = await mountStored(storedBelowFloor());
+      getForm(wrapper).setFieldValue("detection_window_value", 70);
+      await nextTick();
+
+      expect(wrapper.find('[data-test="anomaly-detection-window-legacy-warning"]').exists()).toBe(
+        false,
+      );
+    });
+  });
+});
+
+describe("anomalyNoticeBadgeKeys", () => {
+  const enText = (key: string) =>
+    key.split(".").reduce<any>((node, part) => node?.[part], enLocale);
+
+  it.each(["window_floor", "window_skip", "retrain"])(
+    "maps %s to a label and tooltip that exist in en-US",
+    (noticeClass) => {
+      const keys = anomalyNoticeBadgeKeys(noticeClass);
+      expect(keys).not.toBeNull();
+      expect(typeof enText(keys!.labelKey)).toBe("string");
+      for (const key of keys!.tooltipKeys) expect(typeof enText(key)).toBe("string");
+    },
+  );
+
+  it.each([null, undefined, "", "some_future_class", "hybrid_fallback", 42])(
+    "shows no badge for an unknown class (%s)",
+    (noticeClass) => {
+      expect(anomalyNoticeBadgeKeys(noticeClass)).toBeNull();
+    },
+  );
+});
+
+// Mirrors the server's window-share rules: buckets >= 1 within 24h, 0 < recover <= fire <= 100.
+describe("anomalyWindowShareErrors", () => {
+  const errors = (cfg: Record<string, unknown>) => anomalyWindowShareErrors(cfg);
+  const clean = { buckets: null, fire: null, recover: null };
+
+  it("accepts the defaults and blank inputs", () => {
+    expect(errors({ alert_window_buckets: 1, alert_window_fire_pct: 100 })).toEqual(clean);
+    expect(errors({})).toEqual(clean);
+    expect(
+      errors({ alert_window_buckets: "", alert_window_fire_pct: "", alert_window_recover_pct: "" }),
+    ).toEqual(clean);
+  });
+
+  it("accepts 4 of 5 at 80% with recovery below 60%", () => {
+    expect(
+      errors({ alert_window_buckets: 5, alert_window_fire_pct: 80, alert_window_recover_pct: 60 }),
+    ).toEqual(clean);
+  });
+
+  it.each([0, 2.5, -1])("rejects %s buckets", (n) => {
+    expect(errors({ alert_window_buckets: n }).buckets).toBe("alerts.anomaly.windowBucketsRange");
+  });
+
+  it.each([0, -5, 100.1])("rejects a fire share of %s", (n) => {
+    expect(errors({ alert_window_fire_pct: n }).fire).toBe("alerts.anomaly.windowFireRange");
+  });
+
+  it("rejects a window longer than 24h of buckets", () => {
+    const at = (buckets: number, value: number, unit: string) =>
+      errors({
+        alert_window_buckets: buckets,
+        histogram_interval_value: value,
+        histogram_interval_unit: unit,
+      }).buckets;
+    expect(at(288, 5, "m")).toBeNull();
+    expect(at(24, 1, "h")).toBeNull();
+    expect(at(25, 1, "h")).toBe("alerts.anomaly.windowBucketsSpan");
+    expect(at(289, 5, "m")).toBe("alerts.anomaly.windowBucketsSpan");
+    // No fixed bucket cap: 1-minute buckets fill a day at 1440.
+    expect(at(720, 1, "m")).toBeNull();
+    expect(at(1440, 1, "m")).toBeNull();
+    expect(at(1441, 1, "m")).toBe("alerts.anomaly.windowBucketsSpan");
+    expect(at(2, 1, "d")).toBe("alerts.anomaly.windowBucketsSpan");
+    // One bucket looks back nowhere, so even a 13-day resolution stays valid, as when blank.
+    expect(at(1, 13, "d")).toBeNull();
+    // An unparsable resolution leaves the span to the server.
+    expect(at(100, 0, "x")).toBeNull();
+  });
+
+  it("rejects a recover share above fire, or of zero", () => {
+    expect(errors({ alert_window_fire_pct: 50, alert_window_recover_pct: 60 }).recover).toBe(
+      "alerts.anomaly.windowRecoverRange",
+    );
+    expect(errors({ alert_window_recover_pct: 0 }).recover).toBe(
+      "alerts.anomaly.windowRecoverRange",
+    );
+    // A blank fire share is 100, so recover may go up to it.
+    expect(errors({ alert_window_recover_pct: 100 }).recover).toBeNull();
+  });
+});
+
+// Mirrors absence.rs slot_resolution_for: (span + 1h) / cycle >= 3, and an hourly-or-finer bucket.
+describe("anomalyBandGrouping", () => {
+  it.each([60, 300, 3600])("groups %ss buckets by weekday/weekend × hour", (interval) => {
+    expect(anomalyBandGrouping(interval)).toBe("weekend_hour");
+  });
+
+  it("is global for any bucket coarser than 1h", () => {
+    expect(anomalyBandGrouping(3601)).toBe("global");
+    expect(anomalyBandGrouping(86400)).toBe("global");
+  });
+
+  it("assumes weekday/weekend × hour while the interval is not yet valid", () => {
+    expect(anomalyBandGrouping(null)).toBe("weekend_hour");
+  });
+
+  // The trainer picks from the data the stream returns: under 3 days global.
+  it("labels weekday/weekend × hour with its data condition, and global as it is", () => {
+    expect(anomalyExpectedGroupingKey(300)).toBe("alerts.anomaly.bandGroupingWeekendHourIfData");
+    const label = String(i18n.global.t("alerts.anomaly.bandGroupingWeekendHourIfData"));
+    for (const outcome of ["weekday/weekend × hour of day", "3+ days", "global"])
+      expect(label).toContain(outcome);
+    expect(anomalyExpectedGroupingKey(7200)).toBe("alerts.anomaly.bandGroupingGlobal");
+  });
+});
+
+// Edit prefill: an untouched save must keep the band the alert already runs on.
+describe("anomalyBandWidthPrefill", () => {
+  it("keeps a stored band width", () => {
+    expect(anomalyBandWidthPrefill({ band_width: 3.5, band_k: 4.2 })).toBe(3.5);
+  });
+
+  // Prefilling the trained k would turn an untouched save into a pinned override.
+  it.each([3.2667, 3, null])(
+    "is Auto without a stored band width, whatever the trained k (%s)",
+    (bandK) => {
+      expect(anomalyBandWidthPrefill({ band_width: null, band_k: bandK })).toBeNull();
+    },
+  );
+
+  it("is Auto for a config with no band fields at all", () => {
+    expect(anomalyBandWidthPrefill({})).toBeNull();
+  });
+
+  it("leaves a budget-mode alert without one, which the server rejects beside a budget", () => {
+    expect(anomalyBandWidthPrefill({ alert_budget_per_day: 2, band_k: 4 })).toBeNull();
   });
 });

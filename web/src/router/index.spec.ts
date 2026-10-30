@@ -27,7 +27,32 @@ vi.mock("@/composables/shared/router", () => ({
         path: "/login",
         name: "login",
         component: { template: "<div>Login</div>" },
-        meta: { title: "Login" },
+        meta: { titleKey: "login.login" },
+      },
+      {
+        // Mirrors the /signup record in composables/shared/router.ts.
+        path: "/signup",
+        redirect: (to: any) => ({ path: "/login", query: { ...to.query, mode: "signup" } }),
+      },
+      {
+        // Mirrors the public shared-chat record: readable without signing in.
+        path: "/ai/public/:token",
+        name: "publicSharedChat",
+        component: { template: "<div>Public chat</div>" },
+        meta: { public: true },
+      },
+      {
+        // Mirrors the Slack link page: it needs a session, so it is not public.
+        path: "/slack/link",
+        name: "slackLink",
+        component: { template: "<div>Slack link</div>" },
+        meta: { titleKey: "routeTitles.slackLink" },
+      },
+      {
+        path: "/slack/oauth/callback",
+        name: "slackOAuthCallback",
+        component: { template: "<div>Slack OAuth callback</div>" },
+        meta: { titleKey: "routeTitles.slackOAuthCallback" },
       },
     ],
     homeChildRoutes: [
@@ -35,13 +60,13 @@ vi.mock("@/composables/shared/router", () => ({
         path: "",
         name: "home",
         component: { template: "<div>Home</div>" },
-        meta: { title: "Home" },
+        meta: { titleKey: "menu.home" },
       },
       {
         path: "logs",
         name: "logs",
         component: { template: "<div>Logs</div>" },
-        meta: { title: "Logs" },
+        meta: { titleKey: "menu.search" },
       },
     ],
   }),
@@ -73,10 +98,8 @@ vi.mock("@/utils/zincutils", () => ({
   mergeRoutes: vi.fn((r1: any[], r2: any[]) => [...(r1 || []), ...(r2 || [])]),
 }));
 
-vi.mock("@/services/segment_analytics", () => ({
-  default: {
-    track: vi.fn(),
-  },
+vi.mock("@openobserve/browser-rum", () => ({
+  openobserveRum: { setViewName: vi.fn() },
 }));
 
 vi.mock("@/aws-exports", () => ({
@@ -95,7 +118,7 @@ vi.mock("@/layouts/MainLayout.vue", () => ({
 // ---------------------------------------------------------------------------
 import createAppRouter from "@/router/index";
 import { getDecodedUserInfo } from "@/utils/zincutils";
-import segment from "@/services/segment_analytics";
+import { openobserveRum } from "@openobserve/browser-rum";
 
 // ---------------------------------------------------------------------------
 // Helper: build a minimal Vuex store for tests
@@ -192,6 +215,39 @@ describe("router/index (factory)", () => {
       expect(guards).toBeDefined();
     });
 
+    it("lands /signup on /login with mode=signup and the original query intact", async () => {
+      await router.push("/signup?utm_source=blog").catch(() => {});
+      expect(router.currentRoute.value.path).toBe("/login");
+      expect(router.currentRoute.value.query).toEqual({ utm_source: "blog", mode: "signup" });
+    });
+
+    it("lets a public route through without a session", async () => {
+      await router.push("/ai/public/tok123").catch(() => {});
+      expect(router.currentRoute.value.name).toBe("publicSharedChat");
+      expect(router.currentRoute.value.params.token).toBe("tok123");
+    });
+
+    it("AC-9.6 sends a signed-out /slack/link to /login and keeps the URL to return to", async () => {
+      window.sessionStorage.clear();
+      const before = window.location.href;
+      // A Slack link opens a fresh tab, so the address bar already holds the link when the guard runs.
+      window.history.replaceState({}, "", "/web/slack/link?r=req-1.sig");
+      try {
+        await router.push("/slack/link?r=req-1.sig").catch(() => {});
+        expect(router.currentRoute.value.path).toBe("/login");
+        expect(window.sessionStorage.getItem("redirectURI")).toBe(
+          `${window.location.origin}/web/slack/link?r=req-1.sig`,
+        );
+      } finally {
+        window.history.replaceState({}, "", before);
+      }
+    });
+
+    it("lets the Slack OAuth popup callback through without a session", async () => {
+      await router.push("/slack/oauth/callback?code=c&state=s").catch(() => {});
+      expect(router.currentRoute.value.name).toBe("slackOAuthCallback");
+    });
+
     it("should redirect to /login when navigating to a protected route without a session", async () => {
       // Simulate unauthenticated access to /logs; the guard should redirect to /login
       await router.push("/logs").catch(() => {});
@@ -245,12 +301,17 @@ describe("router/index (factory)", () => {
       router = createAppRouter(store);
     });
 
-    it("should call segment.track when user is authenticated", async () => {
-      const trackSpy = vi.mocked(segment.track);
-      await router.push("/logs").catch(() => {});
-      // After navigation, segment.track should eventually be called
-      // (may not be called synchronously in jsdom due to async guard resolution)
-      expect(trackSpy).toBeDefined();
+    it("sets the RUM view name to the route name after navigation", async () => {
+      vi.mocked(openobserveRum.setViewName).mockClear();
+      await router.push("/logs");
+      expect(openobserveRum.setViewName).toHaveBeenCalledWith("logs");
+    });
+
+    it("does not set the RUM view name when the navigation is aborted", async () => {
+      router.beforeEach(() => false);
+      vi.mocked(openobserveRum.setViewName).mockClear();
+      await router.push("/logs");
+      expect(openobserveRum.setViewName).not.toHaveBeenCalled();
     });
   });
 
@@ -264,18 +325,19 @@ describe("router/index (factory)", () => {
       router = createAppRouter(store);
     });
 
-    it("should set document.title to OpenObserve when route has no meta.title", async () => {
-      // Resolve a route without meta.title
-      await router.push("/").catch(() => {});
-      // Title guard ran: default fallback
-      // We cannot assert exact title in all environments but guard logic exists
-      expect(document.title).toMatch(/OpenObserve/);
+    it("should set document.title to OpenObserve when route has no meta.titleKey", async () => {
+      // The ingestion fixture route carries no meta at all
+      await router.push("/ingestion").catch(() => {});
+      expect(document.title).toBe("OpenObserve");
     });
 
-    it("should prefix document.title with OpenObserve - when route has meta.title", async () => {
+    it("should prefix document.title with OpenObserve - and translate meta.titleKey", async () => {
+      // Login fixture carries meta.titleKey = "login.login", which resolves to "Login".
+      // Asserting the resolved text (not the key) is the point: the guard, not the
+      // route table, is what translates — that is what keeps the tab title in the
+      // current locale.
       await router.push("/login").catch(() => {});
-      // Login route has meta.title = "Login"
-      expect(document.title).toMatch(/OpenObserve/);
+      expect(document.title).toBe("OpenObserve - Login");
     });
   });
 });

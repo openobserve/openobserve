@@ -24,7 +24,7 @@ use axum::{
 };
 use chrono::Utc;
 use config::{
-    DISTINCT_FIELDS, META_ORG_ID, TIMESTAMP_COL_NAME, get_config,
+    META_ORG_ID, TIMESTAMP_COL_NAME, get_config,
     meta::{
         search::{
             AgentSearchMode, Request, ResultSchemaResponse, SearchEventType,
@@ -32,10 +32,11 @@ use config::{
             default_use_cache,
         },
         self_reporting::usage::{RequestStats, USAGE_STREAM, UsageType},
-        sql::resolve_stream_names,
+        sql::{extract_where, resolve_stream_names},
         stream::StreamType,
+        traces::session::{key_in_predicate, quote_identifier, quote_sql_string},
     },
-    utils::{base64, json, time::now_micros, util::DISTINCT_STREAM_PREFIX},
+    utils::{base64, json, time::now_micros},
 };
 use db::enrichment_table;
 use error_utils::map_error_to_http_response;
@@ -45,8 +46,6 @@ use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 #[cfg(feature = "cloud")]
 use openobserve_core::organization::is_org_in_free_trial_period;
-#[cfg(feature = "enterprise")]
-use search::sql::visitor::cipher_key::get_cipher_key_names;
 use search::{
     datafusion::plan::projections::get_result_schema, sql::visitor::pickup_where::pickup_where,
     utils::is_permissable_function_error,
@@ -57,16 +56,16 @@ use tracing::{Instrument, Span};
 use transform as functions;
 use usage_reporting::{http_report_metrics, report_request_usage_stats};
 #[cfg(feature = "enterprise")]
-use utils::{StreamPermissionResourceType, check_stream_permissions};
+use utils::{StreamPermissionResourceType, check_cipher_key_permissions, check_stream_permissions};
 
 use crate::common::{
     meta::http::HttpResponse as MetaHttpResponse,
     utils::http::{
-        get_clear_cache_from_request, get_dashboard_info_from_request,
+        get_clear_cache_from_request, get_client_search_type, get_dashboard_info_from_request,
         get_fallback_order_by_col_from_request, get_is_multi_stream_search_from_request,
         get_is_ui_histogram_from_request, get_or_create_trace_id,
-        get_search_event_context_from_request, get_search_type_from_request,
-        get_stream_type_from_request, get_use_cache_from_request, get_work_group,
+        get_search_event_context_from_request, get_stream_type_from_request,
+        get_use_cache_from_request, get_work_group,
     },
 };
 
@@ -76,6 +75,7 @@ pub mod error_utils;
 pub mod multi_streams;
 pub mod patterns;
 pub mod query_functions;
+#[cfg(feature = "enterprise")]
 pub mod query_manager;
 pub mod saved_view;
 #[cfg(feature = "enterprise")]
@@ -83,80 +83,6 @@ pub mod search_inspector;
 pub mod search_job;
 pub mod search_stream;
 pub mod utils;
-
-async fn can_use_distinct_stream(
-    org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
-    fields: &[String],
-    query: &config::meta::search::Query,
-    start_time: i64,
-) -> bool {
-    if !matches!(stream_type, StreamType::Logs | StreamType::Traces) {
-        return false;
-    }
-
-    let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type)
-        .await
-        .unwrap_or_default();
-
-    if !stream_settings.enable_distinct_fields {
-        return false;
-    }
-
-    // all fields which are requested must be in the distinct stream
-    let all_fields_distinct = fields.iter().all(|f| {
-        if DISTINCT_FIELDS.contains(f) {
-            return true;
-        }
-        if f == "count" {
-            // count is reserved field from oo side, so if user has count field
-            // in original stream, it won't actually be in the distinct stream, so
-            // we need to fallback to normal search
-            return false;
-        }
-        stream_settings
-            .distinct_value_fields
-            .iter()
-            .any(|entry| entry.name == *f && entry.added_ts <= start_time)
-    });
-
-    // all the fields used in the query sent must be in the distinct stream
-    #[allow(deprecated)]
-    let query_fields: Vec<String> =
-        match search::sql::Sql::new(&(query.clone().into()), org_id, stream_type, None).await {
-            // if sql is invalid, we let it follow the original search and fail
-            Err(_) => return false,
-            Ok(sql) => {
-                // check if sql contains any filters from which field cannot be inferred.
-                // where clause can contain match_all and a valid field which is in distinct stream
-                // but since there is match_all, we cannot infer the field from the where clause
-                // so we need to return false
-                if sql.has_match_all {
-                    return false;
-                }
-                sql.columns.values().flatten().cloned().collect()
-            }
-        };
-
-    let all_query_fields_distinct = query_fields.iter().all(|f| {
-        if DISTINCT_FIELDS.contains(f) {
-            return true;
-        }
-        if f == "count" {
-            // count is reserved field from oo side, so if user has count field
-            // in original stream, it won't actually be in the distinct stream, so
-            // we need to fallback to normal search
-            return false;
-        }
-        stream_settings
-            .distinct_value_fields
-            .iter()
-            .any(|entry| entry.name == *f && entry.added_ts <= start_time)
-    });
-
-    all_fields_distinct && all_query_fields_distinct
-}
 
 /// SearchStreamData
 
@@ -219,7 +145,7 @@ async fn can_use_distinct_stream(
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
         ("x-o2-mcp" = json!({
-            "description": "Search data with SQL, you can use `match_all('foo')` to search with full text search, also you can use `str_match(field, 'bar')` to search in a specific field; start_time, end_time can't be zero, need to be a valid micro timestamp. Note: in summary mode, response is capped at 100 hits, request detail='full' if you need more. Tip: set agent_options.output_format='csv' to receive tabular hits as a compact csv block (~40% fewer tokens than json); 'md_table' for small result sets. Tip: set agent_options.mode='partition' when querying a large time range: the server scans time partitions one by one and stops early once enough rows are collected (less data scanned), and aggregation queries build up reusable cache partition by partition. Do NOT split the time range yourself and query partitions in a loop — one call does it server-side.",
+            "description": "Search data with SQL, you can use `match_all('foo')` to search with full text search, also you can use `str_match(field, 'bar')` to search in a specific field; start_time, end_time can't be zero, need to be a valid micro timestamp. Note: in summary mode only took/hits/total/from/size/columns/scan_size/function_error are returned; rows are never capped, so `size` is what controls how many you get. Tip: set agent_options.output_format='csv' to receive tabular hits as a compact csv block (~40% fewer tokens than json); 'md_table' for small result sets. Tip: set agent_options.mode='partition' when querying a large time range: the server scans time partitions one by one and stops early once enough rows are collected (less data scanned), and aggregation queries build up reusable cache partition by partition. Do NOT split the time range yourself and query partitions in a loop — one call does it server-side.",
             "category": "search",
             "pinned": true
         }))
@@ -307,7 +233,6 @@ pub async fn search(
             return map_error_to_http_response(&(e.into()), Some(trace_id));
         }
     };
-
     #[cfg(feature = "enterprise")]
     for stream in stream_names.iter() {
         {
@@ -361,17 +286,29 @@ pub async fn search(
     }
 
     // set search event type
-    if req.search_type.is_none() {
-        req.search_type = match get_search_type_from_request(&url_query) {
-            Ok(v) => v,
-            Err(e) => return MetaHttpResponse::bad_request(e),
-        };
+    req.search_type = match get_client_search_type(req.search_type, &url_query) {
+        Ok(v) => v,
+        Err(e) => return MetaHttpResponse::bad_request(e),
     };
     if req.search_event_context.is_none() {
         req.search_event_context = req
             .search_type
             .as_ref()
             .and_then(|event_type| get_search_event_context_from_request(event_type, &url_query));
+    }
+
+    #[cfg(feature = "enterprise")]
+    if let Some(res) = check_sql_stream_permissions(
+        &req.query.sql,
+        &org_id,
+        user_id,
+        stream_type,
+        StreamPermissionResourceType::Search,
+        &trace_id,
+    )
+    .await
+    {
+        return res;
     }
 
     // get stream settings
@@ -401,79 +338,11 @@ pub async fn search(
         {
             return map_error_to_http_response(&e, Some(trace_id));
         }
-
-        // Check permissions on stream
-        #[cfg(feature = "enterprise")]
-        if let Some(res) = check_stream_permissions(
-            stream_name,
-            &org_id,
-            user_id,
-            &stream_type,
-            StreamPermissionResourceType::Search,
-        )
-        .await
-        {
-            return res;
-        }
     }
 
     #[cfg(feature = "enterprise")]
-    {
-        use common::meta;
-        let keys_used = match get_cipher_key_names(&req.query.sql) {
-            Ok(v) => v,
-            Err(e) => {
-                return (
-                    StatusCode::BAD_REQUEST,
-                    Json(meta::http::HttpResponse::error(StatusCode::BAD_REQUEST, e)),
-                )
-                    .into_response();
-            }
-        };
-        if !keys_used.is_empty() {
-            log::info!("keys used : {keys_used:?}");
-        }
-        for key in keys_used {
-            // Check permissions on keys
-            {
-                use o2_openfga::meta::mapping::OFGA_MODELS;
-
-                use crate::service::{auth::AuthExtractor, users::get_user};
-
-                if !db::user::is_root_user(user_id) {
-                    let user: config::meta::user::User =
-                        get_user(Some(&org_id), user_id).await.unwrap();
-
-                    if !openobserve_core::authz::check_permissions(
-                        user_id,
-                        AuthExtractor {
-                            auth: "".to_string(),
-                            method: "GET".to_string(),
-                            o2_type: format!(
-                                "{}:{}",
-                                OFGA_MODELS
-                                    .get("cipher_keys")
-                                    .map_or("cipher_keys", |model| model.key),
-                                key
-                            ),
-                            org_id: org_id.clone(),
-                            bypass_check: false,
-                            parent_id: "".to_string(),
-                            use_all_org: false,
-                            use_self_context: false,
-                            use_self_parent: true,
-                        },
-                        user.role,
-                        user.is_external,
-                    )
-                    .await
-                    {
-                        return MetaHttpResponse::forbidden("Unauthorized Access to key");
-                    }
-                    // Check permissions on key ends
-                }
-            }
-        }
+    if let Some(res) = check_cipher_key_permissions(&org_id, user_id, &req.query.sql).await {
+        return res;
     }
 
     // run search with cache; `agent_options.mode = partition` instead drives
@@ -544,7 +413,7 @@ pub async fn search(
                 start,
                 &org_id,
                 stream_type,
-                "500",
+                &err.http_status().to_string(),
                 "_search",
                 &search_type,
                 "",
@@ -607,7 +476,7 @@ pub async fn search(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Search logs around a timestamp. Note: in summary mode, hits are capped at 100 and only hits/total/took/columns/scan_size/function_error are returned.", "category": "search"}))
+        ("x-o2-mcp" = json!({"description": "Search logs around a timestamp. Note: in summary mode only took/hits/total/from/size/columns/scan_size/function_error are returned; rows are never capped, so `size` is what controls how many records you get around the key.", "category": "search"}))
     )
 )]
 pub async fn around_v1(
@@ -645,6 +514,20 @@ pub async fn around_v1(
     let user_id = Some(user_email.user_id.clone());
 
     let stream_type = get_stream_type_from_request(&url_query).unwrap_or_default();
+    let stream_name = around::resolve_around_stream(&stream_name, None, &url_query);
+
+    #[cfg(feature = "enterprise")]
+    if let Some(res) = check_stream_permissions(
+        &stream_name,
+        &org_id,
+        &user_email.user_id,
+        &stream_type,
+        StreamPermissionResourceType::Search,
+    )
+    .await
+    {
+        return res;
+    }
 
     let ret = around::around(
         &trace_id,
@@ -653,7 +536,6 @@ pub async fn around_v1(
         &stream_name,
         stream_type,
         Query(url_query),
-        None,
         None,
         user_id,
     )
@@ -767,6 +649,20 @@ pub async fn around_v2(
     let user_id = Some(user_email.user_id.clone());
 
     let stream_type = get_stream_type_from_request(&url_query).unwrap_or_default();
+    let stream_name = around::resolve_around_stream(&stream_name, None, &url_query);
+
+    #[cfg(feature = "enterprise")]
+    if let Some(res) = check_stream_permissions(
+        &stream_name,
+        &org_id,
+        &user_email.user_id,
+        &stream_type,
+        StreamPermissionResourceType::Search,
+    )
+    .await
+    {
+        return res;
+    }
 
     let ret = around::around(
         &trace_id,
@@ -775,7 +671,6 @@ pub async fn around_v2(
         &stream_name,
         stream_type,
         Query(url_query),
-        None,
         Some(body),
         user_id,
     )
@@ -870,13 +765,7 @@ pub async fn values(
     };
     let trace_id = get_or_create_trace_id(&headers, &http_span);
 
-    // originally there was v1 which would to a full stream search
-    // and v2 which would do search on a distinct values stream iff
-    // the queried fields configured accordingly.
-    // Now we simply check if the fields in query are in the distinct stream or not,
-    // and change the search stream to the distinct stream, so we don't need any separate
-    // v2 fucntion.
-    values_v1(
+    values_inner(
         &org_id,
         stream_type,
         &stream_name,
@@ -892,21 +781,10 @@ pub type FieldName = String;
 
 /// Builds a search request per field
 ///
-/// This function builds a search request per field based on the given request and parameters.
-/// Search request can basically be of two types:
-///     1. Search on distinct values stream
-///     2. Search on original data stream
-/// If the field is a distinct field, we will search of the distinct values stream.
-/// Otherwise, we will search on the original data stream.
+/// The search runs on the original data stream; secondary index fields are
+/// served by the tantivy TopN/Distinct optimization.
 ///
-/// The `use_result_cache` parameter is used to determine the projection of the SQL query.
-/// This flag will toggle the resultant requests between streaming aggregations and result cache.
-/// By default, this function will produce an SQL which utilizes `Streaming Aggregations` to send
-/// the results to the client. The SQL will be a simple aggregation query in case streaming
-/// aggregations are used. If `use_result_cache` is set to true, the SQL projection will include a
-/// histogram which will allow the use of result cache.
-///
-/// Another parameter is `no_count` which is used to determine if the count is needed or not.
+/// The `no_count` parameter is used to determine if the count is needed or not.
 /// `no_count` is used when only distinct values (sorted in alphabetical order) are needed but not
 /// the frequency of the values. For example, Dashboards, where we show the values listed in
 /// alphabetical order.
@@ -941,7 +819,7 @@ pub async fn build_search_request_per_field(
 
     let schema = infra::schema::get(org_id, stream_name, stream_type)
         .await
-        .unwrap_or(Schema::empty());
+        .unwrap_or_else(|_| Schema::empty());
     let fields = req
         .fields
         .iter()
@@ -991,7 +869,7 @@ pub async fn build_search_request_per_field(
         ..Default::default()
     };
 
-    let (sql_where, can_use_distinct_stream) = match req.filter.as_ref() {
+    let sql_where = match req.filter.as_ref() {
         None => {
             if !decoded_sql.is_empty() {
                 query.uses_zo_fn = functions::get_all_transform_keys(org_id)
@@ -1000,54 +878,23 @@ pub async fn build_search_request_per_field(
                     .any(|fn_name| decoded_sql.contains(&format!("{fn_name}(")));
 
                 // pick up where clause from sql
-                let sql_where_from_query = match pickup_where(&decoded_sql) {
+                match pickup_where(&decoded_sql) {
                     Ok(Some(v)) => format!("WHERE {v}"),
                     Ok(None) => "".to_string(),
                     Err(e) => {
                         return Err(Error::other(e));
                     }
-                };
-                let can_use_distinct_stream = can_use_distinct_stream(
-                    org_id,
-                    stream_name,
-                    stream_type,
-                    &fields,
-                    &query,
-                    start_time,
-                )
-                .await;
-                (sql_where_from_query, can_use_distinct_stream)
+                }
             } else {
-                ("".to_string(), false)
+                "".to_string()
             }
         }
         Some(v) => {
             if v.is_empty() {
-                ("".to_string(), false)
+                "".to_string()
             } else {
-                let columns = v.splitn(2, '=').collect::<Vec<_>>();
-                if columns.len() < 2 {
-                    return Err(Error::other("Invalid filter format"));
-                }
-                let vals = columns[1].split(',').collect::<Vec<_>>().join("','");
-                let sql_where = format!("WHERE {} IN ('{vals}')", columns[0]);
-
-                // Define the default_sql here
-                let default_sql = format!("SELECT {TIMESTAMP_COL_NAME} FROM \"{stream_name}\"");
-
-                query.sql = format!("{default_sql} {sql_where}");
-
-                let can_use_distinct_stream = can_use_distinct_stream(
-                    org_id,
-                    stream_name,
-                    stream_type,
-                    &fields,
-                    &query,
-                    start_time,
-                )
-                .await;
-
-                (sql_where, can_use_distinct_stream)
+                let predicate = values_filter_predicate(v, &schema).map_err(Error::other)?;
+                format!("WHERE {predicate}")
             }
         }
     };
@@ -1068,41 +915,19 @@ pub async fn build_search_request_per_field(
         agent_options: None,
     };
 
-    let distinct_prefix = if can_use_distinct_stream {
-        format!("{}_{}_", DISTINCT_STREAM_PREFIX, stream_type.as_str())
-    } else {
-        "".to_string()
-    };
-
-    let count_fn = if can_use_distinct_stream {
-        "SUM(count)".to_string()
-    } else {
-        "COUNT(*)".to_string()
-    };
-
-    let actual_stream_type = if can_use_distinct_stream {
-        StreamType::Metadata
-    } else {
-        stream_type
-    };
-
     let size = req.query.size;
+    let stream = quote_identifier(stream_name);
     let mut requests = Vec::new();
     for field in fields {
-        let sql_where = if !sql_where.is_empty() && !keyword.is_empty() {
-            format!("{sql_where} AND str_match_ignore_case({field}, '{keyword}')")
-        } else if !keyword.is_empty() {
-            format!("WHERE str_match_ignore_case({field}, '{keyword}')")
-        } else {
-            sql_where.clone()
-        };
+        let column = quote_identifier(&field);
+        let sql_where = values_field_where(&sql_where, &column, keyword);
         let sql = if no_count {
             format!(
-                "SELECT \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key order by zo_sql_key asc limit {size}"
+                "SELECT {column} AS zo_sql_key FROM {stream} {sql_where} GROUP BY zo_sql_key order by zo_sql_key asc limit {size}"
             )
         } else {
             format!(
-                "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key order by zo_sql_num desc limit {size}"
+                "SELECT {column} AS zo_sql_key, COUNT(*) AS zo_sql_num FROM {stream} {sql_where} GROUP BY zo_sql_key order by zo_sql_num desc limit {size}"
             )
         };
 
@@ -1110,17 +935,15 @@ pub async fn build_search_request_per_field(
         req.query.size = size;
         req.query.from = 0;
         req.query.sql = sql;
-        requests.push((req, actual_stream_type, field));
+        requests.push((req, stream_type, field));
     }
 
     Ok(requests)
 }
 
-// If all fields requested in the query AND fields from the
-// sql query in the query are stored in distinct stream,
-// this will search on the distinct stream, otherwise
-// just search on the original data
-async fn values_v1(
+// search values on the original data stream; secondary index fields are
+// served by the tantivy TopN/Distinct optimization
+async fn values_inner(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
@@ -1148,49 +971,23 @@ async fn values_v1(
             }
         });
 
-    let default_sql = format!("SELECT {TIMESTAMP_COL_NAME} FROM \"{stream_name}\"");
-    let mut query_sql = match query.get("filter") {
+    let schema = infra::schema::get(org_id, stream_name, stream_type)
+        .await
+        .unwrap_or_else(|_| Schema::empty());
+    let stream = quote_identifier(stream_name);
+    let default_sql = format!("SELECT {TIMESTAMP_COL_NAME} FROM {stream}");
+    let mut query_sql = match query.get("filter").filter(|v| !v.is_empty()) {
         None => default_sql,
-        Some(v) => {
-            if v.is_empty() {
-                default_sql
-            } else {
-                let columns = v.splitn(2, '=').collect::<Vec<_>>();
-                if columns.len() < 2 {
-                    return MetaHttpResponse::bad_request("Invalid filter format");
-                }
-                let col = columns[0];
-                // Validate that the column name exists in the stream schema to
-                // prevent SQL injection via identifier injection.
-                let schema = match infra::schema::get(org_id, stream_name, stream_type).await {
-                    Ok(s) => s,
-                    Err(_) => {
-                        return MetaHttpResponse::bad_request("Failed to load stream schema");
-                    }
-                };
-                if !schema.fields().iter().any(|f| f.name() == col) {
-                    return MetaHttpResponse::bad_request("Unknown filter column");
-                }
-                // Quote the column identifier (DataFusion style: double-quote, doubling any
-                // embedded double-quotes) and escape single-quotes in each value.
-                let quoted_col = format!("\"{}\"", col.replace('"', "\"\""));
-                let vals = columns[1]
-                    .split(',')
-                    .map(|val| val.replace('\'', "''"))
-                    .collect::<Vec<_>>()
-                    .join("','");
-                format!("{default_sql} WHERE {quoted_col} IN ('{vals}')")
-            }
-        }
+        Some(v) => match values_filter_predicate(v, &schema) {
+            Ok(predicate) => format!("{default_sql} WHERE {predicate}"),
+            Err(e) => return MetaHttpResponse::bad_request(e),
+        },
     };
     if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&query_sql) {
         query_sql = sql;
     }
 
-    let keyword = match query.get("keyword") {
-        None => "".to_string(),
-        Some(v) => v.trim().to_string(),
-    };
+    let keyword = query.get("keyword").map_or("", |v| v.trim());
     let no_count = match query.get("no_count") {
         None => false,
         Some(v) => {
@@ -1209,6 +1006,12 @@ async fn values_v1(
             .any(|fn_name| sql.contains(&format!("{fn_name}(")));
         query_sql = sql;
     };
+
+    // the caller's WHERE is embedded below, so cipher keys it names need the same check as _search
+    #[cfg(feature = "enterprise")]
+    if let Some(res) = check_cipher_key_permissions(org_id, user_id, &query_sql).await {
+        return res;
+    }
 
     // pick up where clause from sql
     let where_str = match pickup_where(&query_sql) {
@@ -1281,17 +1084,6 @@ async fn values_v1(
         query_fn: query_fn.clone(),
         ..Default::default()
     };
-    // check if we can use the distinct stream for this query
-    let use_distinct_stream = can_use_distinct_stream(
-        org_id,
-        stream_name,
-        stream_type,
-        &fields,
-        &req_query,
-        start_time,
-    )
-    .await;
-
     let mut req = config::meta::search::Request {
         query: req_query,
         encoding: config::meta::search::RequestEncoding::Empty,
@@ -1308,11 +1100,6 @@ async fn values_v1(
 
     req.use_cache = get_use_cache_from_request(query);
 
-    // skip fields which aren't part of the schema
-    let schema = infra::schema::get(org_id, stream_name, stream_type)
-        .await
-        .unwrap_or(Schema::empty());
-
     let mut query_results = Vec::with_capacity(fields.len());
     let sql_where = if where_str.is_empty() {
         "".to_string()
@@ -1325,39 +1112,15 @@ async fn values_v1(
         if schema.field_with_name(field).is_err() {
             continue;
         }
-        let sql_where = if !sql_where.is_empty() && !keyword.is_empty() {
-            format!("{sql_where} AND str_match_ignore_case({field}, '{keyword}')")
-        } else if !keyword.is_empty() {
-            format!("WHERE str_match_ignore_case({field}, '{keyword}')")
-        } else {
-            sql_where.clone()
-        };
-
-        let distinct_prefix;
-        let count_fn;
-        let actual_stream_type;
-
-        if use_distinct_stream {
-            distinct_prefix = format!("{}_{}_", DISTINCT_STREAM_PREFIX, stream_type.as_str());
-            // if we are using distinct stream, we have already partially aggregated
-            // the counts, so we need to sum over that field
-            count_fn = "SUM(count)";
-            // distinct_values_* stream is metadata
-            actual_stream_type = StreamType::Metadata;
-        } else {
-            distinct_prefix = "".to_owned();
-            // for non-distinct fields, we need the actual count
-            count_fn = "COUNT(*)";
-            actual_stream_type = stream_type;
-        }
-
+        let column = quote_identifier(field);
+        let sql_where = values_field_where(&sql_where, &column, keyword);
         let sql = if no_count {
             format!(
-                "SELECT \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_key ASC"
+                "SELECT {column} AS zo_sql_key FROM {stream} {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_key ASC"
             )
         } else {
             format!(
-                "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_num DESC, zo_sql_key ASC"
+                "SELECT {column} AS zo_sql_key, COUNT(*) AS zo_sql_num FROM {stream} {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_num DESC, zo_sql_key ASC"
             )
         };
         let mut req = req.clone();
@@ -1371,7 +1134,7 @@ async fn values_v1(
         let search_res = SearchService::cache::search(
             &trace_id,
             org_id,
-            actual_stream_type,
+            stream_type,
             Some(user_id.to_string()),
             &req,
             "".to_string(),
@@ -1480,6 +1243,77 @@ async fn values_v1(
     .await;
 
     Json(resp).into_response()
+}
+
+/// Builds `"col" IN ('v1','v2')` from a `col=v1,v2` filter whose column must be in `schema`.
+fn values_filter_predicate(filter: &str, schema: &Schema) -> Result<String, &'static str> {
+    let Some((col, vals)) = filter.split_once('=') else {
+        return Err("Invalid filter format");
+    };
+    if schema.field_with_name(col).is_err() {
+        return Err("Unknown filter column");
+    }
+    Ok(key_in_predicate(col, vals.split(',')))
+}
+
+/// Appends the case-insensitive `keyword` match on the already-quoted `column` to `sql_where`.
+fn values_field_where(sql_where: &str, column: &str, keyword: &str) -> String {
+    if keyword.is_empty() {
+        return sql_where.to_string();
+    }
+    let matcher = format!(
+        "str_match_ignore_case({column}, {})",
+        quote_sql_string(keyword)
+    );
+    if sql_where.is_empty() {
+        format!("WHERE {matcher}")
+    } else {
+        format!("{sql_where} AND {matcher}")
+    }
+}
+
+/// Every stream `sql` reads, typed by its schema prefix as the search engine resolves it.
+#[cfg(any(feature = "enterprise", test))]
+fn resolve_typed_stream_names(
+    sql: &str,
+    stream_type: StreamType,
+) -> Result<Vec<(String, StreamType)>, infra::errors::Error> {
+    use config::meta::sql::TableReferenceExt;
+
+    Ok(openobserve_core::authz::resolve_sql_tables(sql)?
+        .iter()
+        .map(|t| (t.stream_name(), t.get_stream_type(stream_type)))
+        .collect())
+}
+
+/// Requires permission on every stream `sql` reads, under the type its SQL names; `None` = allowed.
+#[cfg(feature = "enterprise")]
+async fn check_sql_stream_permissions(
+    sql: &str,
+    org_id: &str,
+    user_id: &str,
+    stream_type: StreamType,
+    permission_resource_type: StreamPermissionResourceType,
+    trace_id: &str,
+) -> Option<Response> {
+    let streams = match resolve_typed_stream_names(sql, stream_type) {
+        Ok(streams) => streams,
+        Err(e) => return Some(map_error_to_http_response(&e, Some(trace_id.to_string()))),
+    };
+    for (stream, stream_type) in streams {
+        if let Some(res) = check_stream_permissions(
+            &stream,
+            org_id,
+            user_id,
+            &stream_type,
+            permission_resource_type,
+        )
+        .await
+        {
+            return Some(res);
+        }
+    }
+    None
 }
 
 /// SearchStreamPartition
@@ -1594,6 +1428,18 @@ pub async fn search_partition(
                 )
                     .into_response();
             }
+        }
+        if let Some(res) = check_sql_stream_permissions(
+            &req.sql,
+            &org_id,
+            user_id,
+            stream_type,
+            StreamPermissionResourceType::Search,
+            &trace_id,
+        )
+        .await
+        {
+            return res;
         }
     }
 
@@ -1918,11 +1764,9 @@ pub async fn result_schema(
     };
 
     // set search event type
-    if req.search_type.is_none() {
-        req.search_type = match get_search_type_from_request(&url_query) {
-            Ok(v) => v,
-            Err(e) => return MetaHttpResponse::bad_request(e),
-        };
+    req.search_type = match get_client_search_type(req.search_type, &url_query) {
+        Ok(v) => v,
+        Err(e) => return MetaHttpResponse::bad_request(e),
     };
     if req.search_event_context.is_none() {
         req.search_event_context = req
@@ -1938,6 +1782,20 @@ pub async fn result_schema(
             return map_error_to_http_response(&(e.into()), None);
         }
     };
+
+    #[cfg(feature = "enterprise")]
+    if let Some(res) = check_sql_stream_permissions(
+        &req.query.sql,
+        &org_id,
+        user_id,
+        stream_type,
+        StreamPermissionResourceType::Search,
+        "",
+    )
+    .await
+    {
+        return res;
+    }
 
     // get stream settings
     for stream_name in stream_names {
@@ -1955,75 +1813,11 @@ pub async fn result_schema(
                 req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
             }
         }
-
-        // Check permissions on stream
-        #[cfg(feature = "enterprise")]
-        if let Some(res) = check_stream_permissions(
-            &stream_name,
-            &org_id,
-            user_id,
-            &stream_type,
-            StreamPermissionResourceType::Search,
-        )
-        .await
-        {
-            return res;
-        }
     }
 
     #[cfg(feature = "enterprise")]
-    {
-        let keys_used = match get_cipher_key_names(&req.query.sql) {
-            Ok(v) => v,
-            Err(e) => {
-                return (
-                    StatusCode::BAD_REQUEST,
-                    Json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)),
-                )
-                    .into_response();
-            }
-        };
-        for key in keys_used {
-            // Check permissions on keys
-            {
-                use o2_openfga::meta::mapping::OFGA_MODELS;
-
-                use crate::service::{auth::AuthExtractor, users::get_user};
-
-                if !db::user::is_root_user(user_id) {
-                    let user: config::meta::user::User =
-                        get_user(Some(&org_id), user_id).await.unwrap();
-
-                    if !openobserve_core::authz::check_permissions(
-                        user_id,
-                        AuthExtractor {
-                            auth: "".to_string(),
-                            method: "GET".to_string(),
-                            o2_type: format!(
-                                "{}:{}",
-                                OFGA_MODELS
-                                    .get("cipher_keys")
-                                    .map_or("cipher_keys", |model| model.key),
-                                key
-                            ),
-                            org_id: org_id.clone(),
-                            bypass_check: false,
-                            parent_id: "".to_string(),
-                            use_all_org: false,
-                            use_self_context: false,
-                            use_self_parent: true,
-                        },
-                        user.role,
-                        user.is_external,
-                    )
-                    .await
-                    {
-                        return MetaHttpResponse::forbidden("Unauthorized Access to key");
-                    }
-                    // Check permissions on key ends
-                }
-            }
-        }
+    if let Some(res) = check_cipher_key_permissions(&org_id, user_id, &req.query.sql).await {
+        return res;
     }
 
     let query: proto::cluster_rpc::SearchQuery = req.query.clone().into();
@@ -2140,12 +1934,225 @@ pub async fn result_schema(
         None
     };
 
+    // Single parse → both the full WHERE and the per-stream (join) WHERE.
+    let where_info = extract_where(&req.query.sql);
     Json(ResultSchemaResponse {
         projections: res_schema.projections,
         group_by: res_schema.group_by.into_iter().collect(),
         having: res_schema.having,
         timeseries_field: res_schema.timeseries,
+        where_clause: where_info.where_clause,
+        where_by_stream: where_info.where_by_stream,
         cross_links,
     })
     .into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use arrow_schema::{DataType, Field};
+
+    use super::*;
+
+    #[test]
+    fn test_resolve_typed_stream_names_honours_the_schema_prefix() {
+        assert_eq!(
+            resolve_typed_stream_names("SELECT * FROM metrics.foreign_stream", StreamType::Logs)
+                .unwrap(),
+            vec![("foreign_stream".to_string(), StreamType::Metrics)]
+        );
+        assert_eq!(
+            resolve_typed_stream_names(
+                "SELECT * FROM \"a\" JOIN \"b\" ON a.x = b.x",
+                StreamType::Logs
+            )
+            .unwrap()
+            .len(),
+            2
+        );
+        assert!(resolve_typed_stream_names("not sql", StreamType::Logs).is_err());
+    }
+
+    #[test]
+    fn sql_search_handlers_authorize_the_streams_their_sql_resolves_to() {
+        let handlers = [
+            ("mod.rs", include_str!("mod.rs"), "pub async fn search("),
+            (
+                "mod.rs",
+                include_str!("mod.rs"),
+                "pub async fn search_partition(",
+            ),
+            (
+                "mod.rs",
+                include_str!("mod.rs"),
+                "pub async fn result_schema(",
+            ),
+            (
+                "search_stream.rs",
+                include_str!("search_stream.rs"),
+                "pub async fn search_http2_stream(",
+            ),
+            (
+                "search_job.rs",
+                include_str!("search_job.rs"),
+                "pub async fn submit_job(",
+            ),
+            (
+                "search_job.rs",
+                include_str!("search_job.rs"),
+                "async fn check_permissions(",
+            ),
+            (
+                "patterns.rs",
+                include_str!("patterns.rs"),
+                "pub async fn extract_patterns(",
+            ),
+            (
+                "multi_streams.rs",
+                include_str!("multi_streams.rs"),
+                "pub async fn search_multi(",
+            ),
+            (
+                "multi_streams.rs",
+                include_str!("multi_streams.rs"),
+                "pub async fn _search_partition_multi(",
+            ),
+            (
+                "multi_streams.rs",
+                include_str!("multi_streams.rs"),
+                "pub async fn search_multi_stream(",
+            ),
+        ];
+        for (file, text, signature) in handlers {
+            let start = text
+                .find(signature)
+                .unwrap_or_else(|| panic!("{file}: {signature} not found"));
+            let body = &text[start..];
+            let body = &body[..body.find("\n}\n").expect("handler end")];
+            assert!(
+                body.contains("check_sql_stream_permissions("),
+                "{file}: {signature} must authorize each stream under the type its SQL names"
+            );
+        }
+    }
+
+    fn schema() -> Schema {
+        Schema::new(vec![
+            Field::new("level", DataType::Utf8, true),
+            Field::new("we\"ird", DataType::Utf8, true),
+        ])
+    }
+
+    #[test]
+    fn test_values_filter_predicate_quotes_column_and_values() {
+        assert_eq!(
+            values_filter_predicate("level=error,o'brien", &schema()).unwrap(),
+            "\"level\" IN ('error', 'o''brien')"
+        );
+        assert_eq!(
+            values_filter_predicate("we\"ird=a", &schema()).unwrap(),
+            "\"we\"\"ird\" IN ('a')"
+        );
+    }
+
+    #[test]
+    fn test_values_filter_predicate_rejects_bad_input() {
+        assert_eq!(
+            values_filter_predicate("level", &schema()),
+            Err("Invalid filter format")
+        );
+        assert_eq!(
+            values_filter_predicate("level) OR (1=1", &schema()),
+            Err("Unknown filter column")
+        );
+        assert_eq!(
+            values_filter_predicate("missing=a", &schema()),
+            Err("Unknown filter column")
+        );
+    }
+
+    #[test]
+    fn test_values_field_where() {
+        assert_eq!(values_field_where("", "\"level\"", ""), "");
+        assert_eq!(
+            values_field_where("WHERE a = 1", "\"level\"", ""),
+            "WHERE a = 1"
+        );
+        assert_eq!(
+            values_field_where("", "\"level\"", "it's"),
+            "WHERE str_match_ignore_case(\"level\", 'it''s')"
+        );
+        assert_eq!(
+            values_field_where("WHERE a = 1", "\"level\"", "err"),
+            "WHERE a = 1 AND str_match_ignore_case(\"level\", 'err')"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn non_member() -> Headers<UserEmail> {
+        Headers(UserEmail {
+            user_id: "outsider@example.com".to_string(),
+        })
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn assert_unauthorized(resp: Response) {
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body = String::from_utf8_lossy(&body);
+        assert!(body.contains("Unauthorized Access"), "{body}");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_around_refuses_a_caller_outside_the_org() {
+        let query = || {
+            Query(HashMap::from([
+                (
+                    "sql".to_string(),
+                    base64::encode_url("SELECT * FROM \"victim\""),
+                ),
+                ("key".to_string(), "1790702573362064".to_string()),
+            ]))
+        };
+        let path = || Path(("default".to_string(), "allowed".to_string()));
+        assert_unauthorized(around_v1(path(), HeaderMap::new(), non_member(), query()).await).await;
+        let resp = around_v2(
+            path(),
+            HeaderMap::new(),
+            non_member(),
+            query(),
+            axum::body::Bytes::new(),
+        )
+        .await;
+        assert_unauthorized(resp).await;
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_search_partition_refuses_a_caller_outside_the_org() {
+        let resp = search_partition(
+            Path("default".to_string()),
+            HeaderMap::new(),
+            non_member(),
+            Query(HashMap::new()),
+            Json(SearchPartitionRequest {
+                sql: "SELECT * FROM \"victim\"".to_string(),
+                start_time: 0,
+                end_time: 1,
+                encoding: config::meta::search::RequestEncoding::Empty,
+                regions: vec![],
+                clusters: vec![],
+                query_fn: None,
+                streaming_output: false,
+                histogram_interval: 0,
+                sampling_ratio: None,
+                search_type: None,
+            }),
+        )
+        .await;
+        assert_unauthorized(resp).await;
+    }
 }

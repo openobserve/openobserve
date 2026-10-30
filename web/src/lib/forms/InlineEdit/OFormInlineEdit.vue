@@ -10,11 +10,12 @@ import { inject, ref } from "vue";
 import OInlineEdit from "./OInlineEdit.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
 import { firstFieldError } from "../Form/fieldError";
+import { raw } from "@/types/i18n";
 import type { FormInlineEditProps, FormInlineEditEmits } from "./OFormInlineEdit.types";
 
 defineOptions({ inheritAttrs: false });
 
-const props = defineProps<FormInlineEditProps>();
+const props = withDefaults(defineProps<FormInlineEditProps>(), { submitOnEnter: true });
 const emit = defineEmits<FormInlineEditEmits>();
 
 const form = inject(FORM_CONTEXT_KEY, null);
@@ -44,9 +45,14 @@ defineExpose({ focus: () => inlineEditRef.value?.focus() });
         :maxlength="props.maxlength"
         :disabled="props.disabled"
         :readonly="props.readonly"
+        :submit-on-enter="props.submitOnEnter"
+        :suggestions="props.suggestions"
+        :delimiter="props.delimiter"
         :error="field.state.meta.errors.length > 0"
         :error-message="
-          field.state.meta.errors.length > 0 ? firstFieldError(field.state.meta.errors) : undefined
+          field.state.meta.errors.length > 0
+            ? raw(firstFieldError(field.state.meta.errors))
+            : undefined
         "
         @update:model-value="
           (val: string) => {

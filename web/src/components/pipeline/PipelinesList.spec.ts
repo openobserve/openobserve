@@ -15,30 +15,65 @@
 
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi, type MockedFunction } from "vitest";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import PipelinesList from "@/components/pipeline/PipelinesList.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import i18n from "@/locales";
-import { nextTick } from "vue";
+import { nextTick, reactive } from "vue";
 import pipelineService from "@/services/pipelines";
+import jstransform from "@/services/jstransform";
+import { queryClient } from "@/composables/query/queryClient";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import { createStore } from "vuex";
+import {
+  readEditorDraft,
+  writeEditorDraft,
+  type EditorDraftScope,
+} from "@/utils/drafts/editorDraftStore";
 
 // Mock services
-vi.mock("@/services/pipelines", () => ({
-  default: {
-    getPipelines: vi.fn(),
-    toggleState: vi.fn(),
-    bulkToggleState: vi.fn(),
-    createPipeline: vi.fn(),
-    deletePipeline: vi.fn(),
-  },
-}));
+const mockDownloadFile = vi.fn();
+vi.mock("@/utils/dom", async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return { ...actual, downloadFile: (...args: any[]) => mockDownloadFile(...args) };
+});
 
-// Mock router
+vi.mock("@/services/pipelines", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getPipelines: vi.fn(),
+      toggleState: vi.fn(),
+      bulkToggleState: vi.fn(),
+      bulkDelete: vi.fn(),
+      createPipeline: vi.fn(),
+      deletePipeline: vi.fn(),
+    },
+  });
+});
+
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+    },
+  });
+});
+
+vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  // Callers hold on to the dismiss handle and call it, so hand one back.
+  return { ...actual, toast: vi.fn(() => vi.fn()) };
+});
+
+// Mock router — currentRoute.value is reactive() so the component's route-name watch fires on mutation, matching vue-router's real currentRoute.
 const mockRouter = {
   currentRoute: {
-    value: {
+    value: reactive({
       name: "pipelines",
       query: {},
-    },
+    }),
   },
   push: vi.fn(),
 };
@@ -201,7 +236,7 @@ describe("PipelinesList", () => {
 
   const mockPipelines = [mockRealtimePipeline, mockScheduledPipeline];
 
-  function createWrapper() {
+  function createWrapper(extraStubs: Record<string, any> = {}) {
     return mount(PipelinesList, {
       shallow: true,
       global: {
@@ -213,12 +248,14 @@ describe("PipelinesList", () => {
         stubs: {
           ODialog: ODialogStub,
           ODrawer: ODrawerStub,
+          ...extraStubs,
         },
       },
     });
   }
 
   beforeEach(async () => {
+    resetListViewState();
     store = createStore({
       state: {
         theme: "light",
@@ -226,6 +263,8 @@ describe("PipelinesList", () => {
       },
     });
 
+    // Reset in case a previous test navigated away (route-name watcher tests below).
+    mockRouter.currentRoute.value.name = "pipelines";
     vi.clearAllMocks();
 
     (pipelineService.getPipelines as MockedFunction<any>).mockResolvedValue({
@@ -337,6 +376,28 @@ describe("PipelinesList", () => {
 
       expect(wrapper.vm.confirmDialogMeta.show).toBe(true);
       expect(wrapper.vm.confirmDialogMeta.data).toStrictEqual(mockRealtimePipeline);
+      expect(wrapper.vm.confirmDialogMeta.messageKeypath).toBe("pipeline.deletePipelineConfirm");
+      expect(wrapper.vm.confirmDialogMeta.messageName).toBe(mockRealtimePipeline.name);
+      expect(wrapper.vm.confirmDialogMeta.okVariant).toBe("destructive");
+    });
+
+    it("names the pipeline in bold with a destructive OK in the real ConfirmDialog", async () => {
+      const w = createWrapper({ ConfirmDialog, "i18n-t": false });
+      await flushPromises();
+      w.vm.openDeleteDialog(mockRealtimePipeline);
+      await nextTick();
+
+      const confirm = w.findComponent(ConfirmDialog);
+      const name = confirm.find('[data-test="confirm-dialog-name"]');
+      expect(name.text()).toBe(mockRealtimePipeline.name);
+      expect(name.classes()).toContain("font-semibold");
+      expect(confirm.text()).toContain(
+        `Are you sure you want to delete the ${mockRealtimePipeline.name} pipeline?`,
+      );
+      const dialog = confirm.findComponent(ODialogStub);
+      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+      expect(dialog.props("primaryButtonLabel")).toBe(i18n.global.t("confirmDialog.ok"));
+      w.unmount();
     });
 
     it("resetConfirmDialog hides dialog and clears state", () => {
@@ -556,14 +617,17 @@ describe("PipelinesList", () => {
 
   // ─────────────────────────────────────────────────────────────────────────────
   describe("Export Methods", () => {
-    it("exportPipeline triggers a download for a single pipeline", () => {
-      wrapper.vm.exportPipeline(mockRealtimePipeline);
+    it("exportPipeline triggers a download for a single pipeline", async () => {
+      await wrapper.vm.exportPipeline(mockRealtimePipeline);
 
-      expect(global.URL.createObjectURL).toHaveBeenCalled();
-      expect(global.URL.revokeObjectURL).toHaveBeenCalled();
+      expect(mockDownloadFile).toHaveBeenCalledTimes(1);
+      const [name, body, mime] = mockDownloadFile.mock.calls[0];
+      expect(name).toBe(`${mockRealtimePipeline.name}.json`);
+      expect(mime).toBe("application/json");
+      expect(JSON.parse(body).name).toBe(mockRealtimePipeline.name);
     });
 
-    it("exportBulkPipelines downloads all selected pipelines and clears selection", () => {
+    it("exportBulkPipelines downloads all selected pipelines and clears selection", async () => {
       // Populate filteredPipelines so the computed selectedPipelines can resolve them
       wrapper.vm.filteredPipelines = [mockRealtimePipeline, mockScheduledPipeline];
       // Set selection by IDs (the read-only computed derives values from this)
@@ -572,10 +636,122 @@ describe("PipelinesList", () => {
         mockScheduledPipeline.pipeline_id,
       ];
 
-      wrapper.vm.exportBulkPipelines();
+      await wrapper.vm.exportBulkPipelines();
 
-      expect(global.URL.createObjectURL).toHaveBeenCalled();
+      expect(mockDownloadFile).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(mockDownloadFile.mock.calls[0][1])).toHaveLength(2);
       expect(wrapper.vm.selectedPipelineIds).toEqual([]);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe("Export Methods — bundled functions", () => {
+    const parseNginx = {
+      name: "parse_nginx",
+      function: ".a = 1",
+      params: "row",
+      transType: 0,
+      // Both are dropped on the way out: `streams` is a deprecated association
+      // whose names mean nothing in another org, `numArgs` is derived.
+      streams: [{ stream: "x", stream_type: "logs" }],
+      numArgs: 1,
+    };
+
+    // Two nodes on one function, so the dedupe has something to do.
+    const fnPipeline = {
+      ...mockRealtimePipeline,
+      pipeline_id: "pipeline3",
+      name: "fn-pipeline",
+      nodes: [
+        { id: "n1", io_type: "input", data: { node_type: "stream", name: "s" } },
+        { id: "n2", io_type: "default", data: { node_type: "function", name: "parse_nginx" } },
+        { id: "n3", io_type: "default", data: { node_type: "function", name: "parse_nginx" } },
+      ],
+    };
+
+    // The component hands the file text to downloadFile, which is mocked.
+    const exportedFile = () => JSON.parse(String(mockDownloadFile.mock.calls.at(-1)?.[1]));
+
+    beforeEach(() => {
+      mockDownloadFile.mockClear();
+      // fetchQuery caches, and these tests hand it different lists.
+      queryClient.clear();
+      (jstransform.list as MockedFunction<any>).mockResolvedValue({
+        data: { list: [parseNginx] },
+      });
+    });
+
+    it("bundles the functions a single exported pipeline calls", async () => {
+      await wrapper.vm.exportPipeline(fnPipeline);
+
+      expect(exportedFile().functions).toEqual([
+        { name: "parse_nginx", function: ".a = 1", params: "row", transType: 0 },
+      ]);
+    });
+
+    it("writes one entry per function however many nodes call it", async () => {
+      await wrapper.vm.exportPipeline(fnPipeline);
+
+      expect(exportedFile().functions).toHaveLength(1);
+    });
+
+    it("leaves a pipeline that calls no function unchanged", async () => {
+      await wrapper.vm.exportPipeline(mockRealtimePipeline);
+
+      expect(exportedFile()).not.toHaveProperty("functions");
+      // Nothing to bundle, so the list is never read.
+      expect(jstransform.list).not.toHaveBeenCalled();
+    });
+
+    it("bulk export stays an array, each pipeline carrying its own functions", async () => {
+      wrapper.unmount();
+      (pipelineService.getPipelines as MockedFunction<any>).mockResolvedValue({
+        data: { list: [fnPipeline, mockScheduledPipeline] },
+      });
+      wrapper = createWrapper();
+      await nextTick();
+      await flushPromises();
+
+      wrapper.vm.selectedPipelineIds = [fnPipeline.pipeline_id, mockScheduledPipeline.pipeline_id];
+      await nextTick();
+
+      await wrapper.vm.exportBulkPipelines();
+
+      const file = exportedFile();
+      expect(Array.isArray(file)).toBe(true);
+      expect(file[0].functions).toHaveLength(1);
+      expect(file[1]).not.toHaveProperty("functions");
+    });
+
+    it("leaves out a function it cannot read and names it in a warning", async () => {
+      // Enterprise RBAC filters the list per user, so a node can call a function
+      // this user cannot read.
+      (jstransform.list as MockedFunction<any>).mockResolvedValue({ data: { list: [] } });
+
+      await wrapper.vm.exportPipeline(fnPipeline);
+
+      expect(exportedFile()).not.toHaveProperty("functions");
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "warning",
+          message: expect.stringContaining("parse_nginx"),
+        }),
+      );
+    });
+
+    it("still exports the pipeline when the function read fails", async () => {
+      (jstransform.list as MockedFunction<any>).mockRejectedValue(new Error("boom"));
+
+      await wrapper.vm.exportPipeline(fnPipeline);
+
+      expect(exportedFile().name).toBe("fn-pipeline");
+      expect(mockDownloadFile).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not touch the cached row it exported", async () => {
+      await wrapper.vm.exportPipeline(fnPipeline);
+
+      expect(fnPipeline).not.toHaveProperty("functions");
     });
   });
 
@@ -597,7 +773,7 @@ describe("PipelinesList", () => {
         data: { list: [rt] },
       });
 
-      await wrapper.vm.getPipelines();
+      await wrapper.vm.getPipelines(true);
 
       if (wrapper.vm.pipelines.length > 0) {
         const p = wrapper.vm.pipelines[0];
@@ -629,7 +805,7 @@ describe("PipelinesList", () => {
         data: { list: [sch] },
       });
 
-      await wrapper.vm.getPipelines();
+      await wrapper.vm.getPipelines(true);
 
       if (wrapper.vm.pipelines.length > 0) {
         const p = wrapper.vm.pipelines[0];
@@ -662,7 +838,7 @@ describe("PipelinesList", () => {
         data: { list: [sch] },
       });
 
-      await wrapper.vm.getPipelines();
+      await wrapper.vm.getPipelines(true);
 
       if (wrapper.vm.pipelines.length > 0) {
         const p = wrapper.vm.pipelines[0];
@@ -675,7 +851,7 @@ describe("PipelinesList", () => {
         data: { list: [] },
       });
 
-      await wrapper.vm.getPipelines();
+      await wrapper.vm.getPipelines(true);
 
       expect(wrapper.vm.pipelines).toHaveLength(0);
     });
@@ -686,7 +862,7 @@ describe("PipelinesList", () => {
         new Error("API Error"),
       );
 
-      await wrapper.vm.getPipelines();
+      await wrapper.vm.getPipelines(true);
 
       expect(consoleSpy).toHaveBeenCalledWith(expect.any(Error));
       consoleSpy.mockRestore();
@@ -764,6 +940,17 @@ describe("PipelinesList", () => {
       wrapper.vm.openBulkDeleteDialog();
 
       expect(wrapper.vm.confirmDialogMeta.show).toBe(true);
+    });
+
+    it("openBulkDeleteDialog drops a named message left by a dismissed single delete", () => {
+      wrapper.vm.openDeleteDialog(mockRealtimePipeline);
+      wrapper.vm.filteredPipelines = [mockRealtimePipeline];
+      wrapper.vm.selectedPipelineIds = [mockRealtimePipeline.pipeline_id];
+
+      wrapper.vm.openBulkDeleteDialog();
+
+      expect(wrapper.vm.confirmDialogMeta.messageKeypath).toBeUndefined();
+      expect(wrapper.vm.confirmDialogMeta.okVariant).toBe("destructive");
     });
   });
 
@@ -962,6 +1149,205 @@ describe("PipelinesList", () => {
       required.forEach((m) => {
         expect(typeof wrapper.vm[m]).toBe("function");
       });
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe("Page restoration across route navigation (OTable pagination-reset fix)", () => {
+    it("defaults currentPage to 1", () => {
+      expect(wrapper.vm.currentPage).toBe(1);
+    });
+
+    it("onPageChange updates currentPage", () => {
+      wrapper.vm.onPageChange(4);
+
+      expect(wrapper.vm.currentPage).toBe(4);
+    });
+
+    it("restorePageIndex reasserts the page via a macrotask (setTimeout(0))", () => {
+      vi.useFakeTimers();
+      wrapper.vm.currentPage = 3;
+      const restorePage = vi.fn();
+      // OTable is shallow-stubbed in this suite; plant the piece of its exposed surface the fix depends on directly onto the template ref.
+      wrapper.vm.oTableRef = { restorePage };
+
+      wrapper.vm.restorePageIndex();
+      expect(restorePage).not.toHaveBeenCalled();
+
+      vi.runAllTimers();
+
+      expect(restorePage).toHaveBeenCalledWith(3);
+      vi.useRealTimers();
+    });
+
+    it("reasserts the restored page after returning from the pipeline editor route", async () => {
+      vi.useFakeTimers();
+      wrapper.vm.currentPage = 3;
+
+      // OTable is destroyed (v-if) while the editor is open; simulate leaving and returning.
+      mockRouter.currentRoute.value.name = "pipelineEditor";
+      await nextTick();
+
+      mockRouter.currentRoute.value.name = "pipelines";
+      // Drain the whole re-fetch (OTable's `v-if` remount plus every re-render its props trigger, each of which re-binds the plain template ref) without flushPromises()/setImmediate, which fake timers would stall.
+      await nextTick();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await nextTick();
+      await nextTick();
+
+      // Only now, once nothing will re-render and re-bind the ref again, plant the fake — restorePageIndex() reads oTableRef.value lazily when its timer fires, so this still lands in time.
+      const restorePage = vi.fn();
+      wrapper.vm.oTableRef = { restorePage };
+
+      vi.runAllTimers();
+
+      expect(restorePage).toHaveBeenCalledWith(3);
+      vi.useRealTimers();
+    });
+
+    it("does not reassert the page on an unrelated route-name change (e.g. re-entering pipelines from itself)", async () => {
+      wrapper.vm.currentPage = 3;
+      const restorePage = vi.fn();
+      wrapper.vm.oTableRef = { restorePage };
+
+      // Same name twice: the watcher's guard (`newName === oldName`) must skip it.
+      mockRouter.currentRoute.value.name = "pipelines";
+      await flushPromises();
+
+      expect(restorePage).not.toHaveBeenCalled();
+    });
+
+    it("resets currentPage to 1 when the user explicitly switches tabs", () => {
+      wrapper.vm.currentPage = 5;
+
+      wrapper.vm.onTabChange("scheduled");
+
+      expect(wrapper.vm.currentPage).toBe(1);
+      expect(wrapper.vm.activeTab).toBe("scheduled");
+    });
+  });
+
+  describe("view state restore", () => {
+    it("restores search, tab, state facet, size and sort", () => {
+      resetListViewState();
+      useListViewState("pipelines", {
+        filterQuery: "etl",
+        tab: "scheduled",
+        stateFilter: "paused",
+        pageSize: 50,
+        sortBy: "name",
+        sortOrder: "desc",
+      });
+      const restored = createWrapper();
+      const vm = restored.vm as any;
+      expect(vm.filterQuery).toBe("etl");
+      expect(vm.activeTab).toBe("scheduled");
+      expect(vm.stateFilter).toBe("paused");
+      expect(vm.pageSize).toBe(50);
+      expect(vm.sortBy).toBe("name");
+      expect(vm.sortOrder).toBe("desc");
+      restored.unmount();
+    });
+
+    it("saves changes to the view state", async () => {
+      wrapper.vm.filterQuery = "abc";
+      wrapper.vm.pageSize = 100;
+      await nextTick();
+      const saved: any = useListViewState("pipelines", {});
+      expect(saved.filterQuery).toBe("abc");
+      expect(saved.pageSize).toBe(100);
+    });
+  });
+
+  describe("Editor drafts", () => {
+    const draftScope = (entityId: string, userEmail = "me@x.io"): EditorDraftScope => ({
+      kind: "pipeline",
+      org: "test-org",
+      entityId,
+      userEmail,
+    });
+    const seed = (scope: EditorDraftScope) => writeEditorDraft(scope, { data: {} });
+
+    const mountRows = async () => {
+      store.state.userInfo = { email: "me@x.io" };
+      const rows = mount(PipelinesList, {
+        global: {
+          plugins: [i18n, store],
+          stubs: {
+            ODialog: ODialogStub,
+            ODrawer: ODrawerStub,
+            PipelineView: true,
+            StreamSelection: true,
+            ResumePipelineDialog: true,
+            CreateBackfillJobDialog: true,
+          },
+        },
+      });
+      // OTable holds its skeleton for MIN_SKELETON_MS before rows render.
+      await vi.waitFor(() =>
+        expect(rows.find('[data-test="pipeline-list-name-cell-Test Pipeline 1"]').exists()).toBe(
+          true,
+        ),
+      );
+      return rows;
+    };
+
+    beforeEach(() => localStorage.clear());
+
+    it("dots the rows that have this user's draft", async () => {
+      seed(draftScope("pipeline1"));
+      seed(draftScope("pipeline2", "other@x.io"));
+      const rows = await mountRows();
+
+      const dot = rows.get('[data-test="pipeline-list-Test Pipeline 1-draft-dot"]');
+      expect(dot.attributes("aria-label")).toMatch(/^Unsaved draft · /);
+      expect(rows.find('[data-test="pipeline-list-Test Pipeline 2-draft-dot"]').exists()).toBe(
+        false,
+      );
+      rows.unmount();
+    });
+
+    it("drops every user's draft of a deleted pipeline", async () => {
+      seed(draftScope("pipeline1"));
+      seed(draftScope("pipeline1", "other@x.io"));
+      seed(draftScope("pipeline2"));
+      wrapper.vm.confirmDialogMeta.data = mockRealtimePipeline;
+      await wrapper.vm.deletePipeline();
+      await flushPromises();
+
+      expect(readEditorDraft(draftScope("pipeline1"))).toBeNull();
+      expect(readEditorDraft(draftScope("pipeline1", "other@x.io"))).toBeNull();
+      expect(readEditorDraft(draftScope("pipeline2"))).not.toBeNull();
+    });
+
+    it("keeps the draft when the delete fails", async () => {
+      vi.mocked(pipelineService.deletePipeline).mockRejectedValue({
+        response: { status: 500, data: {} },
+      });
+      seed(draftScope("pipeline1"));
+      wrapper.vm.confirmDialogMeta.data = mockRealtimePipeline;
+      await wrapper.vm.deletePipeline();
+      await flushPromises();
+
+      expect(readEditorDraft(draftScope("pipeline1"))).not.toBeNull();
+    });
+
+    it("drops drafts only of the pipelines a bulk delete removed", async () => {
+      vi.mocked(pipelineService.bulkDelete).mockResolvedValue({
+        data: { successful: ["pipeline1"], unsuccessful: ["pipeline2"] },
+      });
+      seed(draftScope("pipeline1"));
+      seed(draftScope("pipeline2"));
+      wrapper.vm.selectedPipelineIds = ["pipeline1", "pipeline2"];
+      await nextTick();
+      await wrapper.vm.bulkDeletePipelines();
+      await flushPromises();
+
+      expect(readEditorDraft(draftScope("pipeline1"))).toBeNull();
+      expect(readEditorDraft(draftScope("pipeline2"))).not.toBeNull();
     });
   });
 });

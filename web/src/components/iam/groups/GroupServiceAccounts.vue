@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="iam-service-accounts-selection-filters"
       class="bg-card-glass-bg flex shrink-0 justify-start px-3 py-2"
     >
-      <div data-test="iam-service-accounts-selection-show-toggle" class="mr-3">
+      <div data-test="iam-service-accounts-selection-show-toggle" class="me-3">
         <div class="flex items-center">
           <span
             data-test="iam-service-accounts-selection-show-text"
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("iam.groupServiceAccounts.show") }}
           </span>
           <OToggleGroup
-            class="ml-1"
+            class="ms-1"
             :model-value="usersDisplay"
             @update:model-value="(v) => updateUserTable(v as string)"
           >
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroup>
         </div>
       </div>
-      <div data-test="iam-service-accounts-selection-search-input" class="mr-3">
+      <div data-test="iam-service-accounts-selection-search-input" class="me-3">
         <OSearchInput
           data-test="service-accounts-list-search-input"
           v-model="userSearchKey"
@@ -60,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="email"
         :loading="props.loading"
+        :forbidden="forbidden"
         :global-filter="userSearchKey"
         pagination="client"
         :page-size="100"
@@ -67,7 +68,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         filter-mode="client"
         :default-columns="false"
         :show-global-filter="false"
-        :footer-title="t('serviceAccounts.header')"
         dense
       >
         <template #cell-select="{ row }">
@@ -102,10 +102,9 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import usePermissions from "@/composables/iam/usePermissions";
 import { cloneDeep } from "lodash-es";
-import { watch } from "vue";
+import { watch, ref, onBeforeMount } from "vue";
 import type { Ref } from "vue";
-import { ref, onBeforeMount } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { TABLE_CHECKBOX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
@@ -143,7 +142,7 @@ const usersDisplay = ref("selected");
 
 const store = useStore();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const usersDisplayOptions = [
   {
@@ -160,6 +159,9 @@ const userSearchKey = ref("");
 
 const hasFetchedOrgServiceAccounts = ref(false);
 
+// A viewer cannot list service accounts; show the no-access state instead of failing.
+const forbidden = ref(false);
+
 const groupUsersMap = ref(new Set());
 
 const { serviceAccountsState } = usePermissions();
@@ -167,7 +169,7 @@ const { serviceAccountsState } = usePermissions();
 const columns: OTableColumnDef[] = [
   {
     id: "select",
-    header: "",
+    header: raw(""),
     accessorKey: "isInGroup",
     cell: (info: any) => info.getValue(),
     size: TABLE_CHECKBOX_COL_SIZE,
@@ -215,24 +217,40 @@ const updateUserTable = async (value: string) => {
   if (usersDisplay.value === "all") {
     rows.value = users.value;
   } else {
-    rows.value = users.value.filter((user: any) => user.isInGroup);
+    rows.value = users.value.filter(isListedAsSelected);
   }
 };
+
+// Staged picks count too, so a member list mounted over restored changes shows them ticked.
+const isSelected = (email: string) =>
+  props.addedUsers.has(email) || (groupUsersMap.value.has(email) && !props.removedUsers.has(email));
+
+// A member staged for removal stays listed under Selected, so a restored removal can be undone.
+const isListedAsSelected = (user: { email: string; isInGroup: boolean }) =>
+  user.isInGroup || props.removedUsers.has(user.email);
 
 const fetchOrgServiceAccounts = async () => {
   // fetch group users
   hasFetchedOrgServiceAccounts.value = true;
-  const data: any = await serviceAccountsState.getServiceAccounts(
-    store.state.selectedOrganization.identifier,
-  );
-
+  forbidden.value = false;
+  let data: Array<{ email: string; is_system?: boolean }>;
+  try {
+    data = (await serviceAccountsState.getServiceAccounts(
+      store.state.selectedOrganization.identifier,
+    )) as typeof data;
+  } catch (e: unknown) {
+    const status = (e as { response?: { status?: number } } | undefined)?.response?.status;
+    if (status !== 403) throw e;
+    forbidden.value = true;
+    data = [];
+  }
   serviceAccountsState.service_accounts_users = cloneDeep(
     data
       .filter((user: any) => user.is_system !== true) // Filter out system accounts
       .map((user: any) => {
         return {
           email: user.email,
-          isInGroup: groupUsersMap.value.has(user.email),
+          isInGroup: isSelected(user.email),
         };
       }),
   );
@@ -242,7 +260,7 @@ const fetchOrgServiceAccounts = async () => {
       return {
         "#": index + 1,
         email: user.email,
-        isInGroup: groupUsersMap.value.has(user.email),
+        isInGroup: isSelected(user.email),
       };
     },
   );

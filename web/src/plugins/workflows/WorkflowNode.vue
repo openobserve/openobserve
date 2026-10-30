@@ -27,27 +27,105 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :io-type="meta?.ioType || 'default'"
     :has-input="meta?.ioType !== 'input'"
     :has-output="meta?.ioType !== 'output'"
+    :output-handles="outputHandles"
     :data-test="`workflow-node-${data?.node_type}`"
+    :class="{
+      'wf-node-disabled': isDisabled,
+      'wf-result-active': isActiveResult,
+      'wf-needs-setup': needsSetupHighlight,
+    }"
     @click="onClick"
     @mouseenter="handleNodeHover"
     @mouseleave="handleNodeLeave"
-    @output-click="onOutputClick"
   >
-    <!-- Per-type body — rendered via #body (typography is inherited from
-         FlowNodeCard) so it stays identical to the pipeline custom node:
-         Function shows a bold [RAF]/[RBF] tag, everything else shows its
-         config-detail line. -->
+    <!-- Two-line body: the custom NAME (bold) on top when renamed, then a single
+         muted line combining the TYPE and config DETAIL as "Type · detail". Without
+         a name the type is the bold title and the detail the muted subtitle — so the
+         config preview (condition rule / selected function) is never hidden. -->
     <template #body>
-      <div v-if="isConfiguredFunction" class="flex gap-1">
-        {{ data.name }} -
-        <strong>{{ data.after_flatten ? "[RAF]" : "[RBF]" }}</strong>
+      <!-- Capped width so a very long name / function body ellipsises instead of
+           stretching the card across the canvas. -->
+      <div class="flex max-w-[18rem] min-w-0 flex-col">
+        <OTruncatedText class="leading-tight">
+          {{ customName || typeTitle }}
+        </OTruncatedText>
+        <span
+          v-if="showSubtitle"
+          class="text-text-secondary flex min-w-0 items-baseline gap-1 text-xs leading-tight font-normal"
+        >
+          <!-- When a custom name is the title, prefix the subtitle with the type. -->
+          <span v-if="customName" class="shrink-0"
+            >{{ typeTitle }}{{ hasDetail ? " · " : "" }}</span
+          >
+          <template v-if="funcTag">
+            <OTruncatedText data-test="workflow-node-detail">{{ data.name }}</OTruncatedText>
+            <span class="shrink-0">-</span>
+            <strong class="shrink-0">{{ data.after_flatten ? raw("[RAF]") : raw("[RBF]") }}</strong>
+          </template>
+          <OTruncatedText
+            v-else-if="configDetail"
+            class="max-w-46"
+            data-test="workflow-node-detail"
+          >
+            {{ configDetail }}
+          </OTruncatedText>
+        </span>
       </div>
-      <div v-else class="whitespace-nowrap">{{ nodeLabel }}</div>
     </template>
 
-    <!-- hover actions (delete) — the trigger is deletable too, so the user can
-         swap its kind (deleting it brings back the "Choose a Trigger" start node). -->
+    <!-- hover actions (disable + delete) — the trigger is deletable too, so the
+         user can swap its kind (deleting it brings back the start node). -->
     <template #actions>
+      <!-- Always-visible status glyphs (not hover-gated): a "Disabled" badge when
+           the step is muted (T6) and a note glyph when it carries a comment (T3).
+           Sit at the card's top-left so they never collide with the hover actions
+           (top-right) or the test badge (top-right corner). -->
+      <div
+        class="absolute -top-2.5 left-1 z-10 flex max-w-[calc(100%-2.25rem)] flex-wrap items-center gap-1"
+      >
+        <OBadge
+          v-if="isDisabled"
+          variant="default"
+          size="xs"
+          :data-test="`workflow-node-${data?.node_type}-disabled-badge`"
+        >
+          {{ t("workflow.node.disabledBadge") }}
+        </OBadge>
+        <!-- Placeholder / "Configure Later" marker — e.g. a Destination saved with
+             no destination selected. Draft + Test still work; Publish is blocked. -->
+        <!-- A Branch arm left unwired is LEGAL (records on it are dropped), so this
+             is informational only — it never sets meta.incomplete, so Publish stays
+             open, unlike the placeholder badge above. -->
+        <OBadge
+          v-if="unwiredHandles.length"
+          variant="default"
+          size="xs"
+          data-test="workflow-node-branch-unwired-badge"
+        >
+          {{ t("workflow.node.unwiredBadge") }}
+        </OBadge>
+        <OBadge
+          v-if="isIncomplete"
+          variant="warning"
+          size="xs"
+          :data-test="`workflow-node-${data?.node_type}-incomplete-badge`"
+        >
+          {{ t("workflow.node.incompleteBadge") }}
+        </OBadge>
+        <div
+          v-if="commentText"
+          class="bg-surface-overlay/95 border-border-default text-text-secondary flex h-4 w-4 items-center justify-center rounded-full border"
+          :data-test="`workflows-node-comment-indicator`"
+        >
+          <OIcon name="note-add" size="xs" />
+          <OTooltip side="top" align="center" :side-offset="8" max-width="20rem">
+            <template #content>
+              <div class="p-2 text-left text-xs whitespace-pre-wrap">{{ commentText }}</div>
+            </template>
+          </OTooltip>
+        </div>
+      </div>
+
       <div
         v-show="showButtons"
         class="absolute -top-7.5 right-0 z-10 flex gap-1.5 px-1.25 pt-1.25 pb-2.5"
@@ -55,6 +133,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @mouseenter="handleActionsEnter"
         @mouseleave="handleActionsLeave"
       >
+        <!-- Disable / enable toggle (T6) — one click mutes or restores the step
+             without opening the config drawer. Sibling to the delete button. -->
+        <OButton
+          variant="ghost"
+          size="icon"
+          class="rounded-default! bg-surface-overlay/95! h-5! w-5! min-w-5! border! p-0!"
+          :class="
+            isDisabled
+              ? 'border-status-positive! text-status-positive!'
+              : 'border-status-warning-text! text-status-warning-text!'
+          "
+          :data-test="`workflows-node-disable-toggle`"
+          @click.stop="onToggleDisabled"
+        >
+          <OIcon :name="isDisabled ? 'play-circle' : 'pause-circle-filled'" size="sm" />
+          <OTooltip
+            :content="isDisabled ? t('workflow.node.enable') : t('workflow.node.disable')"
+            side="top"
+            align="center"
+            :side-offset="8"
+          />
+        </OButton>
         <OButton
           variant="ghost"
           size="icon"
@@ -77,20 +177,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
 
-      <!-- Test result badge — passed (green tick) / not-verified (grey) / errored
-           (red, hover for messages, click to open the step drawer). -->
+      <!-- Test result badge — stale (amber, REPLACES the tick) / passed (green tick) /
+           not-verified (grey) / errored (red, hover for messages, click to open the
+           step drawer). -->
       <div
-        v-if="testStatus === 'ok'"
+        v-if="testStatus === 'dirty'"
+        class="wf-test-badge wf-test-pop nodrag bg-badge-warning-solid-bg text-badge-warning-solid-text cursor-pointer transition-transform duration-150 hover:scale-110"
+        :data-test="`workflow-node-${data?.node_type}-test-dirty`"
+        @pointerdown.stop
+        @click.stop="openResult"
+      >
+        <OIcon name="warning" size="xs" />
+        <OTooltip side="top" align="center" :side-offset="8" max-width="20rem">
+          <template #content>
+            <div class="p-2 text-left text-xs">
+              {{ t(dirtyReasonKey) }}
+            </div>
+          </template>
+        </OTooltip>
+      </div>
+      <div
+        v-else-if="testStatus === 'ok'"
         class="wf-test-badge wf-test-pop nodrag bg-status-positive cursor-pointer text-white transition-transform duration-150 hover:scale-110"
         :data-test="`workflow-node-${data?.node_type}-test-ok`"
         @pointerdown.stop
         @click.stop="openResult"
       >
         <OIcon name="check" size="xs" />
-        <OTooltip side="top" align="center" :side-offset="8" max-width="320px">
+        <OTooltip side="top" align="center" :side-offset="8" max-width="20rem">
           <template #content>
             <div class="p-2 text-left text-xs">
               {{ t("workflow.test.stepResult.viewHint") }}
+            </div>
+          </template>
+        </OTooltip>
+      </div>
+      <!-- Passed, but only in rehearsal: a neutral flask, NOT the green tick, so a
+           published workflow never looks verified on a test run's evidence. -->
+      <div
+        v-else-if="testStatus === 'rehearsal'"
+        class="wf-test-badge wf-test-pop nodrag bg-badge-default-solid-bg text-badge-default-solid-text cursor-pointer transition-transform duration-150 hover:scale-110"
+        :data-test="`workflow-node-${data?.node_type}-test-rehearsal`"
+        @pointerdown.stop
+        @click.stop="openResult"
+      >
+        <OIcon name="science" size="xs" />
+        <OTooltip side="top" align="center" :side-offset="8" max-width="20rem">
+          <template #content>
+            <div class="p-2 text-left text-xs">
+              {{ t("workflow.test.rehearsalOnly") }}
             </div>
           </template>
         </OTooltip>
@@ -103,10 +238,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click.stop="openResult"
       >
         <OIcon name="remove" size="xs" />
-        <OTooltip side="top" align="center" :side-offset="8" max-width="320px">
+        <OTooltip side="top" align="center" :side-offset="8" max-width="20rem">
           <template #content>
             <div class="p-2 text-left text-xs">
-              {{ t("workflow.test.notVerified") }}
+              {{ t(skippedReasonKey) }}
             </div>
           </template>
         </OTooltip>
@@ -122,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-if="errorCount > 1" class="wf-test-count text-status-negative bg-white">{{
           errorCount
         }}</span>
-        <OTooltip side="top" align="center" :side-offset="8" max-width="360px">
+        <OTooltip side="top" align="center" :side-offset="8" max-width="22.5rem">
           <template #content>
             <div class="flex flex-col gap-1 p-2 text-left">
               <div v-for="(m, i) in errorMessages" :key="i" class="text-xs leading-[1.35]">
@@ -138,16 +273,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import FlowNodeCard from "@/components/flow/FlowNodeCard.vue";
 import useWorkflowCanvas, {
   nodeMeta,
   workflowObj,
   nodeConfigDetail,
   triggerDef,
+  nodeCustomName,
+  nodeComment,
+  isNodeDisabled,
+  isNodeIncomplete,
+  toggleNodeDisabled,
+  branchHandles,
+  branchUnwiredHandles,
+  isTestEarnedResult,
 } from "./useWorkflowCanvas";
 
 const props = defineProps<{
@@ -155,8 +300,38 @@ const props = defineProps<{
   data: any;
 }>();
 
-const { t } = useI18n();
-const { editNode, requestDeleteNode, openStepPicker } = useWorkflowCanvas();
+const { t } = useI18nTyped();
+const { editNode, requestDeleteNode } = useWorkflowCanvas(t);
+
+// This node's live record in the shared graph — the source for meta-backed
+// display (custom name, comment, disabled). Reactive: mutating meta re-renders.
+const node = computed<any>(() =>
+  (workflowObj.currentSelectedWorkflow?.nodes || []).find((n: any) => n.id === props.id),
+);
+// Custom name (T2), comment (T3) and disabled (T6) all round-trip via node.meta.
+const customName = computed(() => nodeCustomName(node.value));
+const commentText = computed(() => nodeComment(node.value));
+const isDisabled = computed(() => isNodeDisabled(node.value));
+// Placeholder / "Configure Later" — e.g. a Destination saved with no destination.
+const isIncomplete = computed(() => isNodeIncomplete(node.value));
+const onToggleDisabled = () => toggleNodeDisabled(props.id);
+// Fan-out (Branch) nodes render one source handle per arm; every other type is
+// single-output and passes nothing so the card keeps its lone "output" handle.
+const outputHandles = computed(() => branchHandles(node.value).map((id) => ({ id })));
+const unwiredHandles = computed(() =>
+  branchUnwiredHandles(node.value, workflowObj.currentSelectedWorkflow?.edges || []),
+);
+
+// This node is the one whose results are open in the NDV — highlight it on the
+// canvas so it's clear which node's Input/Output is on screen (matters when the NDV
+// navigates prev/next between steps).
+const isActiveResult = computed(
+  () => !!workflowObj.testRun.result && workflowObj.currentSelectedNodeID === props.id,
+);
+
+// This node was flagged by Publish validation as needing setup (incomplete/dummy) —
+// flash a warning ring so the user sees exactly which steps block publishing.
+const needsSetupHighlight = computed(() => workflowObj.incompleteHighlight.includes(props.id));
 
 // Test result badge state — read from the last Test run. Null (no run, or this
 // node wasn't part of a `from_node` run) → no badge. A node is a real ✓ only when
@@ -164,22 +339,44 @@ const { editNode, requestDeleteNode, openStepPicker } = useWorkflowCanvas();
 // error. A node the run reached but that received 0 records — e.g. an upstream
 // condition filtered everything out — is "skipped" (grey), NOT a false pass.
 const testResult = computed<any>(() => workflowObj.testRun?.result);
-const testStatus = computed<"ok" | "error" | "skipped" | null>(() => {
+// A ✓ asserts "this step works". A test run cannot assert that about a PUBLISHED
+// workflow — it is a rehearsal on a sample payload with destinations suppressed —
+// so its pass is demoted to a distinct marker rather than deleted (deleting would
+// hide genuine failures). A draft is exactly where rehearsing is the point.
+const isRehearsalEvidence = computed(
+  () => isTestEarnedResult(testResult.value) && !workflowObj.currentSelectedWorkflow?.isDraft,
+);
+const pass = computed<"ok" | "rehearsal">(() => (isRehearsalEvidence.value ? "rehearsal" : "ok"));
+const testStatus = computed<"ok" | "error" | "skipped" | "dirty" | "rehearsal" | null>(() => {
   const r = testResult.value;
   if (!r || !r.ranNodeIds?.includes(props.id)) return null;
+  // Ahead of every other outcome: a config edit since the run means the recorded ✓/✗
+  // no longer describes this step, so it must not render as a pass.
+  if (r.dirtyNodeIds?.includes(props.id)) return "dirty";
   if (r.errors?.[props.id]) return "error";
+  // A never-configured step cannot have done its job, so records reaching it are not a
+  // pass: an empty-destination node records an input, dispatches nowhere and raises no
+  // error, which is otherwise indistinguishable from a real delivery.
+  if (isIncomplete.value) return "skipped";
   // Live Test run carries the per-node `inputs` map: ✓ only if this node got
   // records; otherwise it ran but processed nothing → grey.
-  if (r.inputs) return r.inputs[props.id]?.length ? "ok" : "skipped";
+  if (r.inputs) return r.inputs[props.id]?.length ? pass.value : "skipped";
   // History run (no `inputs` map): fall back to the blocked-downstream logic.
   if (r.blockedNodeIds?.includes(props.id)) return "skipped";
-  return "ok";
+  return pass.value;
 });
 // NodeErrors.errors serializes as an array of [message, value?] tuples.
 const errorMessages = computed<string[]>(() => {
   const raw = testResult.value?.errors?.[props.id];
   if (!Array.isArray(raw?.errors)) return [];
   return raw.errors.map((e: any) => (Array.isArray(e) ? String(e[0]) : String(e)));
+});
+const skippedReasonKey = computed(() =>
+  isIncomplete.value ? "workflow.test.notConfigured" : "workflow.test.notVerified",
+);
+const dirtyReasonKey = computed(() => {
+  const edited = testResult.value?.dirtyEditedId;
+  return edited === props.id ? "workflow.test.dirtySelf" : "workflow.test.dirtyUpstream";
 });
 const errorCount = computed<number>(() => {
   const raw = testResult.value?.errors?.[props.id];
@@ -188,26 +385,30 @@ const errorCount = computed<number>(() => {
 const showButtons = ref(false);
 const meta = computed(() => nodeMeta(props.data?.node_type));
 
-// A configured function node renders its own bold "name - [RAF]/[RBF]" body
-// (see #body) to match the pipeline custom node. Everything else — including a
-// not-yet-configured function — uses the plain `nodeLabel` line below.
-const isConfiguredFunction = computed(
-  () => props.data?.node_type === "function" && !!props.data?.name,
-);
-
-// Node label — the config detail IS the label (icon conveys the type), matching
-// the pipeline custom node exactly: Condition -> rule preview, Destination ->
-// destination name. Falls back to the type title for the trigger and any
-// not-yet-configured node.
-const nodeLabel = computed(() => {
+// Type title — the muted eyebrow, ALWAYS shown so the node's kind stays visible
+// even after a rename. The trigger resolves its KIND's title (Alert Trigger,
+// Incident Trigger, …) from the registry so new kinds label themselves.
+const typeTitle = computed(() => {
   const data = props.data;
-  const type = data?.node_type;
-  const fallback = meta.value ? t(meta.value.titleKey) : type;
-  // The trigger card shows its KIND's title (Alert Trigger, Incident Trigger, …),
-  // resolved from the registry so new kinds label themselves.
-  if (type === "workflow_trigger") return t(triggerDef(data?.trigger_kind).nodeTitleKey);
-  return nodeConfigDetail(data, 28) || fallback;
+  if (data?.node_type === "workflow_trigger") return t(triggerDef(data?.trigger_kind).nodeTitleKey);
+  return meta.value ? t(meta.value.titleKey) : data?.node_type || "";
 });
+// A configured function renders its "name - [RAF]/[RBF]" tag as the detail line
+// (regardless of a custom name, so the selected function is never hidden).
+const funcTag = computed(() => props.data?.node_type === "function" && !!props.data?.name);
+// Config detail for non-function steps — Condition -> rule preview, Destination ->
+// destination name. Trigger + function have no text detail here (function uses the
+// [RAF] tag above; the trigger's kind title IS the eyebrow).
+const configDetail = computed(() => {
+  const type = props.data?.node_type;
+  if (type === "workflow_trigger" || type === "function") return "";
+  return nodeConfigDetail(props.data, Infinity) || "";
+});
+// Whether there's a config detail to show (function tag or a preview string).
+const hasDetail = computed(() => funcTag.value || !!configDetail.value);
+// The muted second line shows whenever a custom name is the title (to surface the
+// type + detail), or — without a name — only when there's a detail to show.
+const showSubtitle = computed(() => !!customName.value || hasDetail.value);
 // Icon for this node type: the pipeline node image as an "img:<url>" string
 // (rendered by OIcon exactly like pipeline canvas nodes), or the OIcon glyph name.
 const nodeIcon = computed(() => {
@@ -265,25 +466,24 @@ const handleActionsLeave = () => {
   }, 200);
 };
 
-// Clicking the source handle is the "add next step" affordance (it replaced the
-// hover-`+` that used to sit under the card). Terminal action nodes render no
-// source handle at all, so this can only fire where a next step is legal — and
-// it stays inert on the read-only Runs canvas.
-const onOutputClick = (event: MouseEvent) => {
-  if (workflowObj.readOnly) return;
-  openStepPicker(props.id, "out", event);
-};
+// Adding the next step / a fan-out branch is now the canvas-level append `+` under
+// (or beside) each node — see WorkflowCanvas.appendPoints — so the source handle is
+// just a connection point again (no click-to-add). The source dot still drags to
+// wire edges manually.
 
-// On the read-only Runs canvas the node body isn't editable — the error badge
-// (openResult) is the only affordance. In the editor, click opens the config.
+// Clicking the node body opens its NDV in both modes — read-only on the Runs
+// canvas (see canvasReadOnly in WorkflowNodeDrawer), editable in the editor.
 const onClick = () => {
-  if (workflowObj.readOnly) return;
   editNode(props.id);
 };
 
-// Open the per-node Input/Output result drawer (from the ✓ / error badge).
+// Clicking a node's ✓/✗ badge opens the node's NDV — the SAME Input · Config · Output
+// panel a node-click opens, now populated with this run's Input/Output (testRun.result
+// is set). One UI everywhere: the editor and the read-only Runs view both inspect a
+// step through the NDV (read-only there — see canvasReadOnly in WorkflowNodeDrawer),
+// so there's no separate results dock.
 const openResult = () => {
-  workflowObj.testRun.resultDrawer = { show: true, nodeId: props.id };
+  editNode(props.id);
 };
 </script>
 

@@ -2,6 +2,11 @@
 // Page Object Model for PromQL Builder Mode UI interactions
 // Covers: Label Filters, Operations, Options, Query Mode tabs, Add to Dashboard
 
+import { expect } from '@playwright/test';
+
+// Keyed by page so every PageManager built on the same page shares one set of listeners instead of stacking more.
+const promqlTrackers = new WeakMap();
+
 export class MetricsBuilderPage {
     constructor(page) {
         this.page = page;
@@ -175,6 +180,8 @@ export class MetricsBuilderPage {
         // OToast success / error
         this.toastSuccess = page.locator('[data-test-variant="success"]');
         this.toastError = page.locator('[data-test-variant="error"]');
+
+        this.promqlTracker = trackPromqlRequests(page);
     }
 
     // ============== Factory helpers for per-index locators ==============
@@ -368,7 +375,8 @@ export class MetricsBuilderPage {
             custom: this.customModeBtn,
         };
         const btn = btnMap[mode];
-        if (await btn.isVisible({ timeout: 2000 })) {
+        // isVisible() ignores its timeout, and the query-type toggles re-render while the page initialises.
+        if (await btn.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false)) {
             // OToggleGroupItem (Reka UI) signals active state via data-state="on".
             // Poll briefly because QueryTypeSelector mounts and initializes
             // `selectedButtonType` asynchronously after the page loads.
@@ -572,6 +580,20 @@ export class MetricsBuilderPage {
             return true;
         }
         return false;
+    }
+
+    /** Select the first available label value, gating on the async values fetch; returns the value or ''. */
+    async selectFirstLabelValue() {
+        if (await this.isValueSelectDisabled()) return '';
+        await this.valueSelectLast.click();
+        await this.valuePopover.waitFor({ state: 'visible', timeout: 5000 });
+        // Values load async after the popover opens; wait for the first option to attach before reading, else a one-shot count races the fetch and selects nothing (→ metric{label=""} matches nothing).
+        await this.valueOptions.first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        if (await this.valueOptions.count() === 0) return '';
+        const value = (await this.valueOptions.first().textContent()).trim();
+        await this.valueOptions.first().click();
+        await this.valuePopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        return value;
     }
 
     /**
@@ -931,6 +953,19 @@ export class MetricsBuilderPage {
         ).catch(() => null);
     }
 
+    /** Wait until no PromQL stream is in flight and none started for quietMs since this call; throws on timeout. */
+    async waitForPromqlIdle({ quietMs = 1500, timeout = 30000 } = {}) {
+        // Quiet counts from the call too: a run the caller's last action scheduled (50ms debounce) may not have started yet.
+        const since = Date.now();
+        const deadline = since + timeout;
+        while (Date.now() < deadline) {
+            const lastActivity = Math.max(this.promqlTracker.lastActivity, since);
+            if (this.promqlTracker.inFlight.size === 0 && Date.now() - lastActivity >= quietMs) return;
+            await new Promise((resolve) => setTimeout(resolve, 200));
+        }
+        throw new Error(`PromQL queries still in flight after ${timeout}ms (${this.promqlTracker.inFlight.size} open)`);
+    }
+
     // ===== Add to Dashboard =====
 
     /**
@@ -1249,6 +1284,9 @@ export class MetricsBuilderPage {
      * @returns {Promise<string>} The PromQL query string from the request
      */
     async captureQueryFromRunRequest() {
+        // A chart-type switch fires its own debounced run; clicking Run on top of it overlaps runs and can strand the panel on "No Data".
+        await this.waitForPromqlIdle();
+
         const requestPromise = this.page.waitForRequest(
             (req) => req.url().includes('/prometheus/api/v1/query_range') ||
                      req.url().includes('/prometheus/api/v1/query'),
@@ -1275,8 +1313,8 @@ export class MetricsBuilderPage {
             }
         }
 
-        // Wait for the corresponding response so the chart renders before assertions
-        await this.waitForQueryResponse(15000);
+        // Run fires several superseding runs; wait for every stream body to finish so the chart shows the final one.
+        await this.waitForPromqlIdle();
         return decodeURIComponent(query);
     }
 
@@ -1369,20 +1407,16 @@ export class MetricsBuilderPage {
         const visible = await this.dashboardPanelTable.isVisible({ timeout: 5000 }).catch(() => false);
         if (!visible) return { visible: false, rowCount: 0, headers: [] };
 
-        // Wait for the table to settle (rows hydrated, or loading complete) BEFORE counting.
-        // Loading attribute `data-test-loading="false"` on `o2-table` signals query completion.
-        await this.page.locator('[data-test="o2-table"][data-test-loading="false"]')
-            .first()
-            .waitFor({ state: 'attached', timeout: 15000 })
-            .catch(() => {});
-
-        // `data-test-loading="false"` is not enough on its own: switching the chart
-        // type re-mounts the panel, so a table left over from the previous render is
-        // already attached and "not loading" while the new one has yet to hydrate its
-        // rows — we would measure that stale, empty table. Wait for the first row to
-        // actually exist. Times out quietly when the query legitimately has no data,
-        // leaving the caller's rowCount assertion to fail on the real state.
-        await this.tableRows.first().waitFor({ state: 'attached', timeout: 15000 }).catch(() => {});
+        // Switching chart type + re-running leaves a stale table (loading=false but empty)
+        // attached while the new one hydrates, and under CI load the query response can land
+        // late — so wait for a table that is BOTH done-loading AND has rows, not either alone.
+        // Times out quietly when the query legitimately has no data, leaving the caller's
+        // rowCount assertion to fail on the real state.
+        await this.page.waitForFunction(() => {
+            const doneLoading = document.querySelector('[data-test="o2-table"][data-test-loading="false"]');
+            const hasRows = document.querySelectorAll('[data-test^="o2-table-row-"]').length > 0;
+            return !!doneLoading && hasRows;
+        }, undefined, { timeout: 25000 }).catch(() => {});
 
         // Get header texts via the data-test header cells
         const headers = [];
@@ -1401,16 +1435,14 @@ export class MetricsBuilderPage {
     // ===== Chart Type Switching =====
 
     /**
-     * Select a chart type by clicking its icon
+     * Select a chart type and assert it became the selected one
      * @param {string} chartType - e.g., 'line', 'bar', 'table', 'area', 'scatter', 'h-bar', 'stacked', 'h-stacked', 'pie', 'donut', 'heatmap', 'gauge'
      */
     async selectChartType(chartType) {
         const chartItem = this.page.locator(`[data-test="selected-chart-${chartType}-item"]`);
-        if (await chartItem.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await chartItem.click();
-            return true;
-        }
-        return false;
+        await chartItem.waitFor({ state: 'visible' });
+        await chartItem.click();
+        await expect(chartItem).toHaveAttribute('data-selected', 'true');
     }
 
     /**
@@ -1429,6 +1461,11 @@ export class MetricsBuilderPage {
         const chartVisible = await this.chartRenderer.isVisible({ timeout: 5000 }).catch(() => false);
         const tableVisible = await this.dashboardPanelTable.isVisible({ timeout: 5000 }).catch(() => false);
         return chartVisible || tableVisible;
+    }
+
+    /** Assert the table chart renders; the table component mounts lazily after the first PromQL load settles. */
+    async expectTableRendered(timeout = 30000) {
+        await expect(this.dashboardPanelTable).toBeVisible({ timeout });
     }
 
     // ===== Add to Dashboard - Full Save Flow =====
@@ -1674,4 +1711,26 @@ export class MetricsBuilderPage {
     async hasErrorNotification() {
         return await this.toastError.isVisible({ timeout: 3000 }).catch(() => false);
     }
+}
+
+function trackPromqlRequests(page) {
+    const existing = promqlTrackers.get(page);
+    if (existing) return existing;
+    const tracker = { inFlight: new Set(), lastActivity: Date.now() };
+    // PromQL panel queries stream over SSE, so a response's headers arrive long before its data; track body completion instead.
+    const isPromql = (req) => /\/prometheus\/api\/v1\/query(_range)?/.test(req.url());
+    const settle = (req) => {
+        if (!isPromql(req)) return;
+        tracker.inFlight.delete(req);
+        tracker.lastActivity = Date.now();
+    };
+    page.on('request', (req) => {
+        if (!isPromql(req)) return;
+        tracker.inFlight.add(req);
+        tracker.lastActivity = Date.now();
+    });
+    page.on('requestfinished', settle);
+    page.on('requestfailed', settle);
+    promqlTrackers.set(page, tracker);
+    return tracker;
 }

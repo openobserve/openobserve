@@ -1,9 +1,9 @@
 <!-- Copyright 2026 OpenObserve Inc. SPDX-License-Identifier: AGPL-3.0-or-later -->
 <script setup lang="ts">
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import SecurityPlaceholder from "./SecurityPlaceholder.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 </script>
 <template>
   <SecurityPlaceholder

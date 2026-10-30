@@ -43,15 +43,35 @@
 -->
 <template>
   <div class="flex flex-col gap-3" data-test="slos-sloburndownchart-root">
+    <!-- Coverage is a property of the DATA, not of either panel, so it is
+         stated once above both rather than twice in their headers. Without it
+         a window that is almost entirely unmeasured renders as two panels of
+         bare axes and the reader has no way to tell that apart from a broken
+         chart — which is the whole failure this note exists to prevent. -->
+    <OBanner
+      v-if="sparse && !loading && !error"
+      variant="info"
+      icon="info"
+      dense
+      data-test="slos-sloburndownchart-sparse"
+    >
+      <span class="text-compact">
+        {{
+          t("slos.chart.sparseCoverage", {
+            measured: measuredBuckets,
+            total: points.length,
+          })
+        }}
+      </span>
+    </OBanner>
+
     <div
       v-for="panel in panels"
       :key="panel.key"
       class="rounded-default border-border-default flex flex-col overflow-hidden border"
       :data-test="`slos-sloburndownchart-${panel.key}`"
     >
-      <div
-        class="border-border-default text-compact text-text-heading flex min-h-7 w-full items-center justify-between gap-2 border-b px-2 py-1 font-medium tracking-[0.02em]"
-      >
+      <PanelBar class="w-full justify-between gap-2">
         <span class="flex items-center gap-1">
           {{ panel.label }}
           <!-- The formula, not just prose: "budget remaining" and "burn rate"
@@ -69,7 +89,7 @@
                 <div class="flex flex-col gap-2">
                   <p class="text-xs leading-relaxed">{{ panel.explain }}</p>
                   <div class="flex flex-col gap-1">
-                    <span class="text-text-secondary text-2xs font-semibold uppercase">
+                    <span class="text-text-secondary text-2xs font-semibold">
                       {{ t("slos.chart.formulaLabel") }}
                     </span>
                     <!-- The interpolation hugs the tags: `whitespace-pre-line`
@@ -87,7 +107,7 @@
           </OIcon>
         </span>
         <span class="text-text-secondary font-normal">{{ panel.hint }}</span>
-      </div>
+      </PanelBar>
 
       <div class="h-60 w-full">
         <div
@@ -123,19 +143,23 @@
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onBeforeUnmount, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { format } from "date-fns";
 
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import PanelBar from "@/components/common/PanelBar.vue";
 import searchService from "@/services/search";
 import {
   bucketSecsFor,
   budgetUnitsFor,
   budgetedBadFor,
   buildSloBurndownQuery,
+  correctedRanges,
+  isMissingCorrectedColumn,
   toBurndownSeries,
   type SloBurndownPoint,
   type SloSliceBucket,
@@ -165,7 +189,7 @@ const props = defineProps<{
   sliType?: string;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 const points = ref<SloBurndownPoint[]>([]);
@@ -178,6 +202,23 @@ const loading = ref(false);
 const error = ref("");
 
 const hasData = computed(() => points.value.some((p) => p.remaining !== null || p.burn !== null));
+
+/** Buckets that actually scored something. `burn` is non-null exactly when the
+ *  bucket had events, which makes it the measured/unmeasured flag — `remaining`
+ *  is not, because cumulative spend carries forward across a trailing gap and
+ *  stays non-null over time nobody measured. */
+const measuredBuckets = computed(() => points.value.filter((p) => p.burn !== null).length);
+
+/** Below this share of measured buckets the pair reads as EMPTY even though it
+ *  is not: too few segments to form a line, and the panels come up as bare
+ *  axes. A backfilled SLO sits here — the window is thirty days and the stream
+ *  may only have started reporting an hour ago — and so does any window that
+ *  spans a long ingestion outage. */
+const SPARSE_BUCKET_SHARE = 0.25;
+
+const sparse = computed(
+  () => hasData.value && measuredBuckets.value < points.value.length * SPARSE_BUCKET_SHARE,
+);
 
 /** Read a design token for the chart renderer, which takes colour STRINGS and
  *  cannot be handed a utility class. Resolved at build time rather than
@@ -272,6 +313,9 @@ function twoUnitTooltip(rows: (value: number) => Array<[string, string]>) {
       const point = Array.isArray(params) ? params[0] : params;
       if (!point) return "";
       const head = point.axisValueLabel ?? point.name ?? "";
+      if (points.value[point.dataIndex]?.corrected) {
+        return [head, t("slos.chart.correctedTooltip")].join("<br/>");
+      }
       const raw = Number(point.value);
       // A gap is a bucket nobody measured, and it has no reading in EITHER
       // unit. Echarts would otherwise render it as a bare dash.
@@ -281,6 +325,27 @@ function twoUnitTooltip(rows: (value: number) => Array<[string, string]>) {
       return [head, ...rows(raw).map(([label, value]) => `${label}: ${value}`)].join("<br/>");
     },
   };
+}
+
+/**
+ * Series data carrying a marker on every ISOLATED point.
+ *
+ * A line is drawn BETWEEN points, so a measured bucket whose neighbours are
+ * both gaps has no segment to belong to: with `showSymbol: false` it renders
+ * as nothing whatsoever. That is not a corner case on this page — a window
+ * that is mostly backfilled empty slices (a new SLO, or a stream that only
+ * started reporting an hour ago) collapses to ONE measured bucket, and the
+ * panel then comes up as bare axes. `hasData` is true, so not even the empty
+ * state fires to explain it.
+ *
+ * Marking ONLY the isolated points is what keeps a dense series clean:
+ * everywhere the line already shows the value, the symbol stays at size 0.
+ */
+function withIsolatedMarkers(values: (number | null)[]) {
+  return values.map((value, i) => ({
+    value,
+    symbolSize: value !== null && values[i - 1] == null && values[i + 1] == null ? 5 : 0,
+  }));
 }
 
 /** A right-hand axis is a SCALE, not a second series: it borrows the left
@@ -318,10 +383,27 @@ function baseOptions(axisColor: string, gridColor: string, tooltip: unknown) {
   };
 }
 
+const bucketSecs = computed(() => bucketSecsFor(props.windowSecs, props.sliceIntervalSecs));
+
+/** Corrected runs as category-axis index pairs, for the band on the budget chart. */
+const correctedAreas = computed(() => {
+  const indexOf = new Map(points.value.map((p, i) => [p.ts, i]));
+  const last = Math.max(points.value.length - 1, 0);
+  const closeAt = (end: number) => {
+    const i = points.value.findIndex((p) => p.ts >= end);
+    return i < 0 ? last : i;
+  };
+  // The band closes on the first bucket after the run, so a one-bucket run still has width.
+  return correctedRanges(points.value, bucketSecs.value).map(([start, end]) => [
+    { xAxis: indexOf.get(start) ?? 0, name: t("slos.chart.corrected") },
+    { xAxis: closeAt(end) },
+  ]);
+});
+
 const budgetOptions = computed(() => {
   void store.state.theme; // getComputedStyle is not reactive — re-resolve on flip.
   const accent = resolveToken("--color-accent", "#5960b2");
-  const danger = resolveToken("--color-severity-error-color", "#ef5350");
+  const danger = resolveToken("--color-severity-error-color", "#ea1a17");
   const axisColor = resolveToken("--color-text-secondary", "#6b7280");
   const gridColor = resolveToken("--color-border-default", "#e5e7eb");
 
@@ -355,13 +437,15 @@ const budgetOptions = computed(() => {
         name: t("slos.chart.budgetRemaining"),
         type: "line",
         smooth: false,
-        showSymbol: false,
+        // Symbols are sized per point rather than switched off wholesale — see
+        // `withIsolatedMarkers`. Everything with a neighbour draws at size 0.
+        showSymbol: true,
         // Gaps stay gaps: an unmeasured bucket is `null`, and joining across it
         // would draw a budget line through time nobody observed.
         connectNulls: false,
         lineStyle: { width: 2, color: accent },
         itemStyle: { color: accent },
-        data: points.value.map((p) => p.remaining),
+        data: withIsolatedMarkers(points.value.map((p) => p.remaining)),
         markLine: {
           symbol: "none",
           animation: false,
@@ -380,6 +464,19 @@ const budgetOptions = computed(() => {
           },
           data: [{ yAxis: 0 }],
         },
+        markArea: {
+          silent: true,
+          animation: false,
+          itemStyle: {
+            color: accent,
+            opacity: 0.12,
+            borderColor: accent,
+            borderWidth: 1,
+            borderType: "dashed",
+          },
+          label: { position: "insideTop", color: accent, fontSize: 10, distance: 6 },
+          data: correctedAreas.value,
+        },
       },
     ],
   };
@@ -388,7 +485,7 @@ const budgetOptions = computed(() => {
 const burnOptions = computed(() => {
   void store.state.theme;
   const accent = resolveToken("--color-accent", "#5960b2");
-  const warning = resolveToken("--color-severity-warning-color", "#fb8c00");
+  const warning = resolveToken("--color-severity-warning-color", "#b16300");
   const axisColor = resolveToken("--color-text-secondary", "#6b7280");
   const gridColor = resolveToken("--color-border-default", "#e5e7eb");
 
@@ -419,11 +516,11 @@ const burnOptions = computed(() => {
         name: t("slos.chart.burnRate"),
         type: "line",
         smooth: false,
-        showSymbol: false,
+        showSymbol: true,
         connectNulls: false,
         lineStyle: { width: 2, color: accent },
         itemStyle: { color: accent },
-        data: points.value.map((p) => p.burn),
+        data: withIsolatedMarkers(points.value.map((p) => p.burn)),
         // ×1 is the only threshold that means anything here: at exactly 1 the
         // budget lands on the window's end. Above it the SLO is overspending,
         // below it is banking budget — which is unreadable without the line.
@@ -492,15 +589,17 @@ async function load() {
 
   const nowSecs = Math.floor(Date.now() / 1000);
   const startSecs = nowSecs - props.windowSecs;
-  const sql = buildSloBurndownQuery({
-    sloId: props.sloId,
-    generation: props.generation,
-    startSecs,
-    bucketSecs: bucketSecsFor(props.windowSecs, props.sliceIntervalSecs),
-  });
+  const sqlFor = (withCorrected: boolean) =>
+    buildSloBurndownQuery({
+      sloId: props.sloId,
+      generation: props.generation,
+      startSecs,
+      bucketSecs: bucketSecs.value,
+      withCorrected,
+    });
 
-  try {
-    const res = await searchService.search(
+  const search = (sql: string) =>
+    searchService.search(
       {
         org_identifier: org,
         query: {
@@ -523,6 +622,13 @@ async function load() {
       },
       "ui",
     );
+
+  try {
+    // Streams written before the upgrade have no `corrected_by` until the first pass merges it.
+    const res = await search(sqlFor(true)).catch((e: unknown) => {
+      if (isMissingCorrectedColumn(e)) return search(sqlFor(false));
+      throw e;
+    });
 
     if (controller !== mine) return;
     const hits: SloSliceBucket[] = res?.data?.hits ?? [];

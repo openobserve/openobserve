@@ -29,8 +29,10 @@
  */
 
 /** A single `label="value"` matcher inside the selector braces. */
+import type { I18nKey, I18nText } from "@/types/i18n";
+
 export interface PromqlLabelMatcher {
-  label: string;
+  label: I18nText;
   /** The four matchers PromQL defines: equal, not-equal, regex, negated regex. */
   op: "=" | "!=" | "=~" | "!~";
   value: string;
@@ -48,7 +50,8 @@ export type PromqlStepArg = string | number | boolean | string[];
 
 /** How the editor should present one argument of a step. */
 export interface PromqlStepArgSpec {
-  name: string;
+  /** The argument's form-field label. */
+  name: I18nText;
   type: "string" | "number" | "boolean" | "select";
   /**
    * A fixed list of choices, or `true` to mean "offer the metric's own labels".
@@ -56,18 +59,33 @@ export interface PromqlStepArgSpec {
    */
   options?: Array<string | number> | boolean;
   optional?: boolean;
-  placeholder?: string;
-  description?: string;
+  /** Example-value placeholder only (`"5m"`, `"0.95"`) — a code token, so untranslated. */
+  placeholder?: I18nText;
+  /**
+   * Prose placeholder ("Select labels"), translated by `OperationsList.vue` at
+   * render time — the catalog is built at import, so it cannot call `t()`.
+   * Wins over {@link placeholder} when both are set.
+   */
+  placeholderKey?: I18nKey;
+  /** i18n KEY for the argument's help text. Stored as data — see `placeholderKey`. */
+  descriptionKey?: I18nKey;
 }
 
 /** The catalog entry for a step: what it is called, and what it takes. */
 export interface PromqlStepSpec {
   id: string;
-  name: string;
+  /**
+   * The step's display name — the title-cased PromQL function where there is
+   * one (`Rate` -> `rate()`), so it stays legible against the query text.
+   */
+  name: I18nText;
   params: PromqlStepArgSpec[];
   defaultParams: PromqlStepArg[];
   group: string;
-  documentation?: string;
+  /** Help prose for the step. */
+  documentation?: I18nText;
+  /** Kept so saved panels still render it, but no longer offered or mapped onto. */
+  retired?: boolean;
 }
 
 /** A query as the builder holds it, before it is rendered to PromQL text. */
@@ -80,6 +98,10 @@ export interface PromqlBuilderQuery {
 /**
  * How the step picker groups the catalog. Grouping is ours to choose — PromQL
  * has no notion of it; we group by what a step DOES to the data.
+ *
+ * Untranslated on purpose: each value is BOTH the bucketing key
+ * (`getStepsForGroup()` looks steps up by it) and the rendered category header,
+ * so a locale-varying value would split the buckets.
  */
 export enum PromqlStepGroup {
   /** Counter -> per-second rate, and anything else that reads over a window. */

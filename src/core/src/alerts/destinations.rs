@@ -21,13 +21,10 @@ use db::{
     self,
     alerts::{destinations::DestinationError, templates::TemplateError},
     authz::{remove_ownership, set_ownership},
-    user,
+    org_users, user,
 };
 
-use crate::{
-    auth::is_ofga_unsupported,
-    common::{infra::config::ALERTS, meta::authz::Authz},
-};
+use crate::{auth::is_ofga_unsupported, common::meta::authz::Authz};
 
 /// Helper function to ensure a prebuilt template exists for the given type.
 /// Returns the template name if successful.
@@ -126,10 +123,79 @@ async fn ensure_prebuilt_template(
     }
 }
 
+/// Rejects a recipient list naming any non-member of the org. [strong]
+async fn ensure_org_members(org_id: &str, recipients: &[String]) -> Result<(), DestinationError> {
+    reject_non_members(org_member_split(org_id, recipients).await)
+}
+
+/// Passes a split with nobody skipped; a lookup error stays an error, not a non-member. [pure]
+fn reject_non_members(
+    split: Result<(Vec<String>, Vec<String>), anyhow::Error>,
+) -> Result<(), DestinationError> {
+    let (_, skipped) = split
+        .map_err(|e| DestinationError::InfraError(infra::errors::Error::Message(e.to_string())))?;
+    if skipped.is_empty() {
+        Ok(())
+    } else {
+        Err(DestinationError::UserNotPermitted(skipped.join(", ")))
+    }
+}
+
+/// The stored row of a save, read so a row this node cannot decode is never overwritten.
+async fn existing(
+    org_id: &str,
+    name: &str,
+    create: bool,
+) -> Result<Option<Destination>, DestinationError> {
+    match db::alerts::destinations::get(org_id, name).await {
+        Ok(_) if create => Err(DestinationError::AlreadyExists),
+        Ok(found) => Ok(Some(found)),
+        Err(DestinationError::NotFound) => {
+            if infra::table::destinations::exists_row(org_id, name).await? {
+                return Err(super::slack_destination::newer_row(name));
+            }
+            if create {
+                Ok(None)
+            } else {
+                Err(DestinationError::NotFound)
+            }
+        }
+        Err(e) => Err(e),
+    }
+}
+
 pub async fn save(
+    name: &str,
+    destination: Destination,
+    create: bool,
+) -> Result<Destination, DestinationError> {
+    save_by(name, destination, create, "").await
+}
+
+/// [`save`] by `by`, who becomes the `updated_by` of a channel default a Slack app save fills.
+pub async fn save_by(
+    name: &str,
+    destination: Destination,
+    create: bool,
+    by: &str,
+) -> Result<Destination, DestinationError> {
+    save_in(
+        &super::slack_destination::LiveEnv,
+        name,
+        destination,
+        create,
+        by,
+    )
+    .await
+}
+
+/// [`save_by`] with the Slack and cluster reads a test can replace.
+pub async fn save_in(
+    env: &dyn super::slack_destination::SaveEnv,
     name: &str,
     mut destination: Destination,
     create: bool,
+    by: &str,
 ) -> Result<Destination, DestinationError> {
     // First validate the `destination` according to its `destination_type`
     match &mut destination.module {
@@ -143,16 +209,12 @@ pub async fn save(
                 if !config::get_config().smtp.smtp_enabled {
                     return Err(DestinationError::SMTPUnavailable);
                 }
-                let mut lowercase_emails = vec![];
-                for email in email.recipients.iter() {
-                    let email = email.trim().to_lowercase();
-                    // Check if the email is part of the org
-                    let res = user::get(Some(&destination.org_id), &email).await;
-                    if res.is_err() || res.is_ok_and(|usr| usr.is_none()) {
-                        return Err(DestinationError::UserNotPermitted);
-                    }
-                    lowercase_emails.push(email);
-                }
+                let lowercase_emails: Vec<String> = email
+                    .recipients
+                    .iter()
+                    .map(|email| email.trim().to_lowercase())
+                    .collect();
+                ensure_org_members(&destination.org_id, &lowercase_emails).await?;
                 email.recipients = lowercase_emails;
             }
             DestinationType::Http(endpoint) => {
@@ -163,7 +225,7 @@ pub async fn save(
                 // persisting so the alert fire path can't be tricked into reading
                 // internal services via a destination saved with a malicious URL.
                 if let Err(e) =
-                    common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(
+                    common::utils::ssrf_guard::SsrfGuard::validate_destination_url_with_config_async(
                         &endpoint.url,
                     )
                     .await
@@ -176,14 +238,19 @@ pub async fn save(
                     return Err(DestinationError::InvalidSns);
                 }
             }
+            DestinationType::SlackApp(target) => {
+                super::slack_destination::validate_fields(target)?;
+            }
         },
         Module::Pipeline { endpoint, .. } => {
             if endpoint.url.is_empty() {
                 return Err(DestinationError::EmptyUrl);
             }
             if let Err(e) =
-                common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(&endpoint.url)
-                    .await
+                common::utils::ssrf_guard::SsrfGuard::validate_destination_url_with_config_async(
+                    &endpoint.url,
+                )
+                .await
             {
                 return Err(DestinationError::SsrfBlocked(e));
             }
@@ -201,17 +268,9 @@ pub async fn save(
         return Err(DestinationError::InvalidName);
     }
 
-    match db::alerts::destinations::get(&destination.org_id, &destination.name).await {
-        Ok(_) => {
-            if create {
-                return Err(DestinationError::AlreadyExists);
-            }
-        }
-        Err(_) => {
-            if !create {
-                return Err(DestinationError::NotFound);
-            }
-        }
+    let previous = existing(&destination.org_id, &destination.name, create).await?;
+    if let Some(target) = super::slack_destination::slack_app_target(&destination) {
+        super::slack_destination::check_save(env, &destination, target, previous.as_ref()).await?;
     }
 
     // For prebuilt destinations, ensure template exists before saving destination
@@ -221,15 +280,17 @@ pub async fn save(
         ref destination_type,
     } = destination.module
     {
-        // Check if this is a prebuilt destination (has destination_type metadata)
+        // Check if this is a prebuilt destination (has destination_type metadata).
+        // Templates are optional now (design §4.4 — org-default/compiled-in
+        // fallback covers the None case), so a missing template no longer
+        // implies "assume prebuilt" — only an EXPLICIT `prebuilt_*` reference
+        // triggers the auto-association below.
         let prebuilt_type = match destination_type {
             DestinationType::Http(endpoint) => endpoint.destination_type.as_deref(),
             DestinationType::Email(_) => {
-                // Check if template is prebuilt or not set (assume prebuilt email)
-                if template.is_none()
-                    || template
-                        .as_ref()
-                        .is_some_and(|t| t.starts_with("prebuilt_"))
+                if template
+                    .as_ref()
+                    .is_some_and(|t| t.starts_with("prebuilt_"))
                 {
                     Some("email")
                 } else {
@@ -237,6 +298,7 @@ pub async fn save(
                 }
             }
             DestinationType::Sns(_) => None, // SNS doesn't have prebuilt templates yet
+            DestinationType::SlackApp(_) => template.is_none().then_some("slack"),
         };
 
         // If it's a prebuilt type and doesn't have a custom template, ensure prebuilt template
@@ -260,17 +322,12 @@ pub async fn save(
         }
     }
 
-    // Validate that alert destinations have a template
-    // Templates are REQUIRED for alert destinations to format alert messages
-    if let Module::Alert { template, .. } = &destination.module
-        && (template.is_none() || template.as_ref().is_some_and(|t| t.is_empty()))
-    {
-        return Err(DestinationError::TemplateNotFound);
-    }
-
     let saved = db::alerts::destinations::set(destination).await?;
     if name.is_empty() {
         set_ownership(&saved.org_id, "destinations", Authz::new(&saved.name)).await;
+    }
+    if let Some(target) = super::slack_destination::slack_app_target(&saved) {
+        super::slack_destination::fill_channel_default(&saved.org_id, target, by).await;
     }
     Ok(saved)
 }
@@ -294,16 +351,11 @@ pub async fn test_email(
         return Err(DestinationError::EmptyEmail);
     }
 
-    // Validate each recipient is part of the org (same as save())
-    let mut validated_recipients = Vec::with_capacity(recipients.len());
-    for email in recipients {
-        let email = email.trim().to_lowercase();
-        let res = user::get(Some(org_id), &email).await;
-        if res.is_err() || res.is_ok_and(|usr| usr.is_none()) {
-            return Err(DestinationError::UserNotPermitted);
-        }
-        validated_recipients.push(email);
-    }
+    let validated_recipients: Vec<String> = recipients
+        .iter()
+        .map(|email| email.trim().to_lowercase())
+        .collect();
+    ensure_org_members(org_id, &validated_recipients).await?;
 
     let default_body = "<html><body><h2>OpenObserve Test Email</h2>\
          <p>This is a test email from OpenObserve to verify your email destination \
@@ -318,10 +370,58 @@ pub async fn test_email(
     super::alert::send_email_notification(
         "OpenObserve - Test Email Destination",
         &email,
+        None,
         email_body,
     )
     .await
     .map_err(|e| DestinationError::EmailSendFailed(e.to_string()))
+}
+
+/// Appends the skipped addresses to a send response; unchanged when none were skipped. [pure]
+pub fn note_skipped(response: String, skipped: &[String]) -> String {
+    if skipped.is_empty() {
+        return response;
+    }
+    format!(
+        "{response} (skipped recipients not part of this org: {})",
+        skipped.join(", ")
+    )
+}
+
+/// Splits recipients into org members and non-members; a failed lookup fails the split. [pure]
+pub fn split_org_members(
+    checked: Vec<(String, Result<bool, anyhow::Error>)>,
+) -> Result<(Vec<String>, Vec<String>), anyhow::Error> {
+    let mut kept = vec![];
+    let mut skipped = vec![];
+    for (recipient, member) in checked {
+        if member? {
+            kept.push(recipient);
+        } else {
+            skipped.push(recipient);
+        }
+    }
+    Ok((kept, skipped))
+}
+
+/// Looks up each recipient's org membership and splits kept from skipped. [strong]
+pub async fn org_member_split(
+    org_id: &str,
+    recipients: &[String],
+) -> Result<(Vec<String>, Vec<String>), anyhow::Error> {
+    let mut checked = Vec::with_capacity(recipients.len());
+    for recipient in recipients {
+        let email = recipient.trim().to_lowercase();
+        let member = if user::is_root_user(&email) {
+            Ok(true)
+        } else {
+            org_users::get_optional(org_id, &email)
+                .await
+                .map(|found| found.is_some())
+        };
+        checked.push((recipient.clone(), member));
+    }
+    split_org_members(checked)
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Destination, DestinationError> {
@@ -374,35 +474,15 @@ pub async fn list(
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
-    let cacher = ALERTS.read().await;
-    for (stream_key, (_, alert)) in cacher.iter() {
-        if stream_key.starts_with(&format!("{org_id}/"))
-            && alert.destinations.contains(&name.to_string())
-        {
-            return Err(DestinationError::UsedByAlert(alert.name.to_string()));
-        }
-    }
-    drop(cacher);
-
-    if let Ok(pls) = infra::pipeline::list_by_org(org_id).await {
-        for pl in pls {
-            if pl.contains_remote_destination(name) {
-                return Err(DestinationError::UsedByPipeline(pl.name));
-            }
-        }
-    }
-
-    #[cfg(feature = "enterprise")]
-    if let Ok(workflows) = crate::workflows::list_workflows(org_id, None).await {
-        for w in workflows {
-            for node in w.nodes {
-                if let config::meta::pipeline::components::NodeData::Destination(dest) = node.data
-                    && dest.destination_id == name
-                {
-                    return Err(DestinationError::UsedByPipeline(w.id));
-                }
-            }
-        }
+    // first_use decides cheaply; only a refusal pays for the full walk to name every blocker.
+    if !super::destination_usage::first_use(org_id, name)
+        .await?
+        .is_empty()
+    {
+        let uses = super::destination_usage::destination_usage(org_id, name).await?;
+        return Err(DestinationError::InUse(
+            super::destination_usage::usage_message(name, &uses),
+        ));
     }
 
     db::alerts::destinations::delete(org_id, name).await?;
@@ -410,11 +490,107 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
     Ok(())
 }
 
+/// Every consumer's references to every destination in the org — the usage endpoint's data.
+pub async fn all_usage(
+    org_id: &str,
+) -> Result<
+    std::collections::HashMap<String, Vec<super::destination_usage::DestinationUse>>,
+    DestinationError,
+> {
+    super::destination_usage::all_usage(org_id).await
+}
+
 #[cfg(test)]
 mod tests {
     use config::meta::destinations::{DestinationType, Endpoint, HTTPType, Module};
 
     use super::*;
+
+    fn addrs(list: &[&str]) -> Vec<String> {
+        list.iter().map(|s| s.to_string()).collect()
+    }
+
+    /// Nothing else in this binary migrates the meta store `save` writes to.
+    async fn meta_store() {
+        static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+        ONCE.get_or_init(|| async {
+            std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+            infra::db_init().await.expect("meta store");
+            infra::table::migrate().await.expect("migrations");
+        })
+        .await;
+    }
+
+    #[test]
+    fn test_split_org_members() {
+        type Checked<'a> = &'a [(&'a str, Option<bool>)];
+        type Split = (Vec<String>, Vec<String>);
+        let cases: Vec<(Checked, Option<Split>)> = vec![
+            (
+                &[("a@x.com", Some(true)), ("b@x.com", Some(true))],
+                Some((addrs(&["a@x.com", "b@x.com"]), vec![])),
+            ),
+            (
+                &[("a@x.com", Some(true)), ("gone@x.com", Some(false))],
+                Some((addrs(&["a@x.com"]), addrs(&["gone@x.com"]))),
+            ),
+            (
+                &[("gone@x.com", Some(false)), ("left@x.com", Some(false))],
+                Some((vec![], addrs(&["gone@x.com", "left@x.com"]))),
+            ),
+            (&[], Some((vec![], vec![]))),
+            (&[("a@x.com", Some(true)), ("db@x.com", None)], None),
+            (&[("gone@x.com", Some(false)), ("db@x.com", None)], None),
+        ];
+        for (checked, expected) in cases {
+            let input = checked
+                .iter()
+                .map(|(r, m)| (r.to_string(), m.ok_or_else(|| anyhow::anyhow!("db down"))))
+                .collect();
+            let got = split_org_members(input);
+            assert_eq!(got.ok(), expected, "split for {checked:?}");
+        }
+    }
+
+    #[test]
+    fn test_reject_non_members() {
+        type Split = Result<(Vec<String>, Vec<String>), anyhow::Error>;
+        let cases: Vec<(Split, Result<(), String>)> = vec![
+            (Ok((addrs(&["a@x.com"]), vec![])), Ok(())),
+            (Ok((vec![], vec![])), Ok(())),
+            (
+                Ok((addrs(&["a@x.com"]), addrs(&["gone@x.com"]))),
+                Err("UserNotPermitted(\"gone@x.com\")".to_string()),
+            ),
+            (
+                Ok((vec![], addrs(&["gone@x.com", "left@x.com"]))),
+                Err("UserNotPermitted(\"gone@x.com, left@x.com\")".to_string()),
+            ),
+            (
+                Err(anyhow::anyhow!("db down")),
+                Err("InfraError(Message(\"db down\"))".to_string()),
+            ),
+        ];
+        for (split, expected) in cases {
+            let got = reject_non_members(split).map_err(|e| format!("{e:?}"));
+            assert_eq!(got, expected);
+        }
+    }
+
+    #[test]
+    fn test_note_skipped() {
+        assert_eq!(note_skipped("sent".to_string(), &[]), "sent");
+        assert_eq!(
+            note_skipped("sent".to_string(), &addrs(&["gone@x.com", "left@x.com"])),
+            "sent (skipped recipients not part of this org: gone@x.com, left@x.com)"
+        );
+    }
+
+    #[test]
+    fn test_user_not_permitted_names_the_address() {
+        let msg = DestinationError::UserNotPermitted("gone@x.com".to_string()).to_string();
+        assert!(msg.contains("gone@x.com"), "{msg}");
+    }
 
     /// Test that ensure_prebuilt_template creates a new template when it doesn't exist
     #[tokio::test]
@@ -712,22 +888,25 @@ mod tests {
         let _ = db::alerts::destinations::delete(org_id, "custom_webhook").await;
     }
 
-    /// Test that alert destinations cannot be created without a template
+    /// Templates are optional at the destination level (design §4.4) — a
+    /// missing or empty template no longer fails save(); resolution falls
+    /// through to the org default / compiled-in fallback at send time
+    /// instead. Supersedes the old `test_alert_destination_requires_template`.
     #[tokio::test]
-    async fn test_alert_destination_requires_template() {
+    async fn test_alert_destination_template_is_optional() {
+        meta_store().await;
         let org_id = "test_org_no_template";
 
         // Clean up any leftover state
         let _ = db::alerts::destinations::delete(org_id, "test_no_template").await;
         let _ = db::alerts::destinations::delete(org_id, "test_empty_template").await;
 
-        // Try to create an alert destination without a template
         let dest = Destination {
             id: None,
             org_id: org_id.to_string(),
             name: "test_no_template".to_string(),
             module: Module::Alert {
-                template: None, // No template!
+                template: None,
                 destination_type: DestinationType::Http(Endpoint {
                     url: "https://example.com/webhook".to_string(),
                     method: HTTPType::POST,
@@ -736,21 +915,27 @@ mod tests {
             },
         };
 
-        // Attempt to save should fail with TemplateNotFound error
         let result = save("test_no_template", dest, true).await;
-        assert!(result.is_err(), "Should fail when template is None");
         assert!(
-            matches!(result.unwrap_err(), DestinationError::TemplateNotFound),
-            "Should return TemplateNotFound error"
+            result.is_ok(),
+            "Should save when template is None: {result:?}"
         );
+        let saved = result.unwrap();
+        if let Module::Alert { template, .. } = &saved.module {
+            assert!(
+                template.is_none(),
+                "template stays None — no auto-association without an explicit prebuilt_* reference, got {template:?}"
+            );
+        } else {
+            panic!("expected Module::Alert");
+        }
 
-        // Try with empty string template
         let dest_empty = Destination {
             id: None,
             org_id: org_id.to_string(),
             name: "test_empty_template".to_string(),
             module: Module::Alert {
-                template: Some("".to_string()), // Empty template!
+                template: Some("".to_string()),
                 destination_type: DestinationType::Http(Endpoint {
                     url: "https://example.com/webhook".to_string(),
                     method: HTTPType::POST,
@@ -760,13 +945,126 @@ mod tests {
         };
 
         let result_empty = save("test_empty_template", dest_empty, true).await;
-        assert!(result_empty.is_err(), "Should fail when template is empty");
         assert!(
-            matches!(
-                result_empty.unwrap_err(),
-                DestinationError::TemplateNotFound
-            ),
-            "Should return TemplateNotFound error for empty template"
+            result_empty.is_ok(),
+            "Should save when template is an empty string: {result_empty:?}"
+        );
+
+        // Clean up
+        let _ = db::alerts::destinations::delete(org_id, "test_no_template").await;
+        let _ = db::alerts::destinations::delete(org_id, "test_empty_template").await;
+    }
+
+    /// A delete blocked by three kinds names all three, not just the one `first_use` stopped at.
+    #[tokio::test]
+    #[ignore] // requires the local sqlite/coordinator infra to be initialized
+    async fn test_delete_names_every_blocker_not_just_the_first() {
+        use config::meta::{
+            alerts::alert::Alert,
+            folder::{Folder, FolderType},
+            synthetics::{Synthetic, SyntheticType},
+        };
+
+        let org_id = "test_org_delete_multi";
+        let name = "du-dest-delete-multi";
+        let folder = Folder {
+            folder_id: "default".to_string(),
+            name: "default".to_string(),
+            ..Default::default()
+        };
+        infra::table::folders::get_or_create(org_id, folder, FolderType::Alerts)
+            .await
+            .unwrap();
+
+        let alert_conn = infra::db::get_orm_client_rw().await;
+        let alert: Alert = serde_json::from_value(serde_json::json!({
+            "name": "du-multi-alert",
+            "destinations": [name],
+        }))
+        .unwrap();
+        infra::table::alerts::create(alert_conn, org_id, "default", alert, false)
+            .await
+            .unwrap();
+
+        let check_conn = infra::db::get_orm_client_rw().await;
+        let check = Synthetic {
+            name: "du-multi-check".to_string(),
+            check_type: SyntheticType::Http,
+            target: "https://example.com".to_string(),
+            destinations: vec![name.to_string()],
+            ..Default::default()
+        };
+        infra::table::synthetics_checks::create(check_conn, org_id, check, false)
+            .await
+            .unwrap();
+
+        let team_id = "du-multi-team";
+        let policy = infra::table::oncall_policies::get_or_create(org_id, team_id)
+            .await
+            .unwrap();
+        infra::table::oncall_policies::update_rungs(
+            org_id,
+            team_id,
+            &policy.rungs,
+            Some(&[name.to_string()]),
+            None,
+        )
+        .await
+        .unwrap();
+
+        let err = delete(org_id, name).await.unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("alert"), "should name the alert: {msg}");
+        assert!(
+            msg.contains("synthetic check"),
+            "should name the synthetic check: {msg}"
+        );
+        assert!(
+            msg.contains("escalation policy"),
+            "should name the escalation policy: {msg}"
+        );
+    }
+
+    /// Pure regression for D1, no DB: `usage_message` itself must name every kind it is given.
+    #[test]
+    fn test_usage_message_names_every_consumer_kind_it_is_given() {
+        use crate::alerts::destination_usage::{
+            DestinationConsumer, DestinationUse, usage_message,
+        };
+
+        let uses = vec![
+            DestinationUse {
+                consumer: DestinationConsumer::Alert,
+                id: "a1".to_string(),
+                name: "cpu-hot".to_string(),
+                folder_id: Some("default".to_string()),
+                destination_name: "dest-shared".to_string(),
+            },
+            DestinationUse {
+                consumer: DestinationConsumer::CompositeAlert,
+                id: "c1".to_string(),
+                name: "disk-full".to_string(),
+                folder_id: Some("default".to_string()),
+                destination_name: "dest-shared".to_string(),
+            },
+            DestinationUse {
+                consumer: DestinationConsumer::Pipeline,
+                id: "p1".to_string(),
+                name: "ingest-pipe".to_string(),
+                folder_id: None,
+                destination_name: "dest-shared".to_string(),
+            },
+        ];
+
+        let msg = usage_message("dest-shared", &uses);
+        assert!(msg.contains("cpu-hot"), "should name the alert: {msg}");
+        assert!(
+            msg.contains("disk-full"),
+            "should name the composite alert: {msg}"
+        );
+        assert!(
+            msg.contains("ingest-pipe"),
+            "should name the pipeline: {msg}"
         );
     }
 }

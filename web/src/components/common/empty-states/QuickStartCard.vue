@@ -33,8 +33,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </span>
 
     <span class="relative min-w-0 flex-1">
-      <span class="text-text-heading block truncate text-sm font-semibold">{{ label }}</span>
-      <span v-if="sublabel" class="text-text-secondary block truncate text-xs">{{ sublabel }}</span>
+      <OTruncatedText class="text-text-heading block text-sm font-semibold">{{
+        label
+      }}</OTruncatedText>
+      <OTruncatedText v-if="sublabel" class="text-text-secondary block text-xs">{{
+        sublabel
+      }}</OTruncatedText>
     </span>
 
     <OIcon
@@ -46,12 +50,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 defineProps<{
   icon: IconName;
-  label: string;
-  sublabel?: string;
+  label: I18nText;
+  sublabel?: I18nText;
 }>();
 </script>

@@ -49,6 +49,7 @@ vi.mock("@/composables/useSyntheticResults", () => {
         lastRunStatus: "passed",
         lastRunAt: Date.now() - 120_000,
       }),
+      bucketsByEnv: ref(new Map()),
       buckets: ref([
         {
           tsMs: 1_700_000_000_000,
@@ -139,12 +140,18 @@ vi.mock("vue-i18n", () => ({
   useI18n: vi.fn(() => ({ t: $t })),
 }));
 
-vi.mock("@/services/synthetics", () => ({
-  default: {
-    run: mockRun,
-    getLocations: mockSyntheticsServiceGetLocations,
-  },
-}));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/synthetics", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      run: mockRun,
+      getLocations: mockSyntheticsServiceGetLocations,
+    },
+  });
+});
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(() => vi.fn()),
@@ -159,13 +166,17 @@ vi.mock("@/composables/synthetics/syntheticResultsSchema", () => {
     };
     return map[v] || "devices";
   });
-  const deviceLabel = vi.fn((v: string) => {
-    const map: Record<string, string> = { Desktop: "Desktop", Tablet: "Tablet", Mobile: "Mobile" };
-    return map[v] || v;
+  const deviceLabelKey = vi.fn((v: string) => {
+    const map: Record<string, string> = {
+      desktop: "synthetics.browserDevices.desktop",
+      tablet: "synthetics.browserDevices.tablet",
+      mobile: "synthetics.browserDevices.mobile",
+    };
+    return map[v];
   });
   return {
     deviceIconName,
-    deviceLabel,
+    deviceLabelKey,
     // Real implementation: the tiles read its output, and a stub returning []
     // would make "no unstable slices" untestable from here.
     computePartitionStability: (runs: any[]) => {
@@ -187,7 +198,10 @@ vi.mock("@/composables/synthetics/syntheticResultsSchema", () => {
   };
 });
 
-vi.mock("vuex", () => ({
+// Partial: the overlaid synthetics service loads `@/stores`, which needs the real
+// `createStore` — a wholesale vuex mock leaves it undefined at import time.
+vi.mock("vuex", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("vuex")>()),
   useStore: () => ({
     state: {
       selectedOrganization: { identifier: "test-org" },
@@ -206,6 +220,7 @@ vi.mock("vue-router", () => ({
 }));
 
 import MonitorRuns from "./MonitorRuns.vue";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 
 // ── Stubs for every child component ─────────────────────────────────────
 const baseStubs = {
@@ -278,6 +293,7 @@ const baseStubs = {
       "pagination",
       "pageSize",
       "pageSizeOptions",
+      "currentPage",
       "sorting",
       "sortBy",
       "sortOrder",
@@ -346,6 +362,8 @@ function mountRuns(
     monitorName: string;
     monitorStatus?: string;
     checkType?: string;
+    environments?: string[];
+    environmentScope?: string;
   } = {
     monitorId: "mon-1",
     monitorName: "Test Monitor",
@@ -364,10 +382,50 @@ describe("MonitorRuns", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetListViewState();
   });
 
   afterEach(() => {
     wrapper?.unmount();
+  });
+
+  describe("list view state", () => {
+    const runsTable = (w: VueWrapper) =>
+      w.findAllComponents({ name: "OTable" }).find((t) => t.props("pagination") === "client")!;
+
+    it("restores page, page size and sort saved for this monitor", () => {
+      Object.assign(useListViewState("synthetic-runs:mon-1", {}), {
+        currentPage: 3,
+        pageSize: 20,
+        sortBy: "duration",
+        sortOrder: "asc",
+      });
+      wrapper = mountRuns();
+      const table = runsTable(wrapper);
+      expect(table.props("currentPage")).toBe(3);
+      expect(table.props("pageSize")).toBe(20);
+      expect(table.props("sortBy")).toBe("duration");
+      expect(table.props("sortOrder")).toBe("asc");
+    });
+
+    it("does not apply another monitor's saved view", () => {
+      Object.assign(useListViewState("synthetic-runs:mon-2", {}), { currentPage: 5 });
+      wrapper = mountRuns();
+      expect(runsTable(wrapper).props("currentPage")).toBe(1);
+    });
+
+    it("saves table changes back to the view state", async () => {
+      wrapper = mountRuns();
+      const table = runsTable(wrapper);
+      table.vm.$emit("update:currentPage", 2);
+      table.vm.$emit("update:sortBy", "status");
+      table.vm.$emit("update:sortOrder", "asc");
+      await flushPromises();
+      const saved = useListViewState("synthetic-runs:mon-1", {}) as Record<string, unknown>;
+      expect(saved.currentPage).toBe(2);
+      expect(saved.sortBy).toBe("status");
+      expect(saved.sortOrder).toBe("asc");
+    });
   });
 
   describe("initial render", () => {
@@ -396,6 +454,90 @@ describe("MonitorRuns", () => {
     });
   });
 
+  describe("environment awareness", () => {
+    it("should render the env breakdown card only from two environments up", () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        environments: ["cloud", "ap1"],
+      });
+      expect(wrapper.find('[data-test="monitor-runs-env-breakdown"]').exists()).toBe(true);
+      wrapper.unmount();
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        environments: ["ap1"],
+      });
+      expect(wrapper.find('[data-test="monitor-runs-env-breakdown"]').exists()).toBe(false);
+    });
+
+    it("should add the environment column only for a multi-env check", () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        environments: ["cloud", "ap1"],
+      });
+      const withEnv = (wrapper.vm as any).runColumns.map((c: { id: string }) => c.id);
+      expect(withEnv).toContain("environment");
+      expect(withEnv[1]).toBe("environment");
+      wrapper.unmount();
+      wrapper = mountRuns();
+      const without = (wrapper.vm as any).runColumns.map((c: { id: string }) => c.id);
+      expect(without).not.toContain("environment");
+    });
+
+    it("should thread the scope into every query the page issues", async () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        environments: ["cloud", "ap1"],
+        environmentScope: "ap1",
+      });
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      await vm.refresh(1_700_000_000_000_000, 1_700_003_600_000_000);
+      await flushPromises();
+      expect(mockFetchAll).toHaveBeenCalledWith(
+        "mon-1",
+        1_700_000_000_000_000,
+        1_700_003_600_000_000,
+        "ap1",
+        // Scoped: the split is meaningless with one env selected.
+        false,
+      );
+      await wrapper.findComponent({ name: "OTabs" }).vm.$emit("update:modelValue", "steps");
+      await flushPromises();
+      expect(mockFetchSteps).toHaveBeenCalledWith(
+        "mon-1",
+        1_700_000_000_000_000,
+        1_700_003_600_000_000,
+        "ap1",
+      );
+    });
+  });
+
+  describe("synthetic_test_run_triggered analytics", () => {
+    it("tracks a run once it is accepted", async () => {
+      wrapper = mountRuns();
+      await flushPromises();
+
+      await (wrapper.vm as any).triggerRun();
+
+      expect(analytics.track).toHaveBeenCalledWith("synthetic_test_run_triggered", { count: 1 });
+    });
+
+    it("does not track a rejected run", async () => {
+      mockRun.mockRejectedValueOnce(new Error("boom"));
+      wrapper = mountRuns();
+      await flushPromises();
+
+      await (wrapper.vm as any).triggerRun();
+
+      expect(mockRun).toHaveBeenCalled();
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+  });
+
   describe("exposed refresh method", () => {
     it("should call fetchAll when refresh is invoked", async () => {
       wrapper = mountRuns();
@@ -409,6 +551,9 @@ describe("MonitorRuns", () => {
         "mon-1",
         1_700_000_000_000_000,
         1_700_003_600_000_000,
+        // No environment scope, and no split — a single-env page has one series.
+        undefined,
+        false,
       );
     });
 
@@ -460,6 +605,7 @@ describe("MonitorRuns", () => {
         "mon-1",
         1_700_000_000_000_000,
         1_700_003_600_000_000,
+        undefined,
       );
     });
 
@@ -496,6 +642,7 @@ describe("MonitorRuns", () => {
         "mon-1",
         1_700_010_000_000_000,
         1_700_013_600_000_000,
+        undefined,
       );
     });
 
@@ -521,15 +668,17 @@ describe("MonitorRuns", () => {
         "mon-1",
         1_700_010_000_000_000,
         1_700_013_600_000_000,
+        undefined,
       );
     });
   });
 
   describe("KPI tiles", () => {
-    it("should render six tiles and neither Degraded nor Unstable Slices", () => {
+    it("should render seven tiles including Error Runs, and neither Degraded nor Unstable Slices", () => {
       wrapper = mountRuns();
 
-      expect(wrapper.findAll('[data-test^="monitor-runs-kpi-"]')).toHaveLength(6);
+      expect(wrapper.findAll('[data-test^="monitor-runs-kpi-"]')).toHaveLength(7);
+      expect(wrapper.find('[data-test="monitor-runs-kpi-error-runs"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="monitor-runs-kpi-degraded-runs"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="monitor-runs-kpi-unstable-partitions"]').exists()).toBe(
         false,

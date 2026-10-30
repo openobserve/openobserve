@@ -13,30 +13,35 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { configQuery } from "@/services/config.queries";
 import { createApp } from "vue";
+import { VueQueryPlugin } from "@tanstack/vue-query";
 import store from "./stores";
 import App from "./App.vue";
 import createRouter from "./router";
-import i18n, { getLocale, loadLocaleMessages } from "./locales";
+import i18n, { applyDocumentLocale, getLocale, loadLocaleMessages } from "./locales";
 import "./styles/tailwind.css";
+import "./styles/rtl.css";
 // Global generated-content stylesheet: syntax classes (.log-key, .log-string, …)
 // applied to v-html-highlighted log output across logs/traces/RUM. Loaded once
 // here instead of re-@imported inside each consumer's <style> block.
 import "./assets/styles/log-highlighting.css";
 import config from "./aws-exports";
-import configService from "./services/config";
 
-import { openobserveRum } from "@openobserve/browser-rum";
-import { openobserveLogs } from "@openobserve/browser-logs";
 import { useReo } from "./services/reodotdev_analytics";
 import { contextRegistry, createDefaultContextProvider } from "./composables/contextProviders";
-import { buildVersionChecker } from "./utils/buildVersionChecker";
+import { buildVersionChecker, isChunkLoadError } from "./utils/buildVersionChecker";
+import { queryClient, setMutationNotifier } from "./composables/query/queryClient";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { bootstrapTheme } from "@/utils/themeManager";
+import { raw } from "@/types/i18n";
 
 // Apply the resolved theme synchronously before the app mounts so the first
 // paint already uses the correct colors (no flash of the base stylesheet theme).
 bootstrapTheme();
+
+const activeLocale = getLocale();
+applyDocumentLocale(activeLocale);
 
 const app = createApp(App);
 const router = createRouter(store);
@@ -45,6 +50,12 @@ app.use(i18n);
 
 // const router = createRouter(store);
 app.use(store).use(router);
+
+app.use(VueQueryPlugin, { queryClient });
+
+// Mutation success/error feedback. Injected rather than imported by the query
+// client so that module stays free of UI and i18n at runtime.
+setMutationNotifier((variant, message) => toast({ variant, message }));
 
 // Initialize default context provider globally
 const defaultProvider = createDefaultContextProvider(router, store);
@@ -56,131 +67,35 @@ reoInit();
 
 // app.use(SearchPlugin);
 
+// Unauthenticated bootstrap payload: only what the login page needs. The full
+// configuration is fetched authenticated (per org) once the user is signed in.
 interface ConfigResponse {
   data?: {
     telemetry_enabled?: boolean;
+    build_type?: string;
     commit_hash?: string;
-    rum?: {
-      enabled: boolean;
-      client_token: string;
-      application_id: string;
-      site: string;
-      service: string;
-      env: string;
-      version?: string;
-      organization_identifier: string;
-      insecure_http?: boolean;
-      api_version?: string;
-    };
   };
 }
 
 const getConfig = async () => {
-  await configService.get_config().then((res: ConfigResponse) => {
+  // Seeds the shared bootstrap `/config` query — Login and the version checker
+  // read the same cached entry instead of each issuing their own request. The
+  // authenticated full config is a separate entry (`configFullQuery`), fetched
+  // per org once the user is signed in.
+  await queryClient.fetchQuery(configQuery()).then((data: ConfigResponse["data"]) => {
+    const res: ConfigResponse = { data };
     if (!res.data) return;
 
-    store.dispatch("setConfig", res.data);
+    // Never clobber the authenticated full config with the bootstrap subset if
+    // the full fetch (MainLayout) happens to resolve first.
+    if (!store.state.zoConfig?.version) {
+      store.dispatch("setConfig", res.data);
+    }
     config.enableAnalytics = res.data.telemetry_enabled?.toString() ?? "false";
 
     // Store initial commit hash for version checking
     if (res.data.commit_hash) {
       buildVersionChecker.setInitialVersion(res.data.commit_hash);
-    }
-    if (res.data.rum?.enabled) {
-      const options = {
-        clientToken: res.data.rum.client_token,
-        applicationId: res.data.rum.application_id,
-        site: res.data.rum.site,
-        service: res.data.rum.service,
-        env: res.data.rum.env,
-        version: res.data.rum.version || "0.0.1",
-        organizationIdentifier: res.data.rum.organization_identifier,
-        insecureHTTP: res.data.rum.insecure_http || false,
-        apiVersion: res.data.rum.api_version || "v1",
-      };
-
-      openobserveRum.init({
-        applicationId: options.applicationId, // required, any string identifying your application
-        clientToken: options.clientToken,
-        site: options.site,
-        organizationIdentifier: options.organizationIdentifier,
-        service: options.service,
-        env: options.env,
-        version: options.version,
-        trackResources: true,
-        trackLongTasks: true,
-        trackUserInteractions: true,
-        actionNameAttribute: "data-test",
-        apiVersion: options.apiVersion,
-        insecureHTTP: options.insecureHTTP,
-        defaultPrivacyLevel: "allow",
-        allowedTracingUrls: [
-          {
-            match: store.state.API_ENDPOINT + "/api",
-            propagatorTypes: ["openobserve", "tracecontext"],
-          },
-        ],
-        beforeSend: (event) => {
-          // Filter out specific errors before sending to RUM
-          if (event.type === "error") {
-            const errorMessage = event.error?.message || "";
-            const errorStack = event.error?.stack || "";
-
-            // List of error patterns to ignore
-            const ignoredErrorPatterns = [
-              /ResizeObserver loop/i,
-              /RS SDK/i,
-              /reo.dev/i,
-              /Cannot set properties of null \(setting 'innerHTML'\)/,
-            ];
-
-            // Check if error matches any ignored pattern
-            const shouldIgnore = ignoredErrorPatterns.some(
-              (pattern) => pattern.test(errorMessage) || pattern.test(errorStack),
-            );
-
-            if (shouldIgnore) {
-              return false; // Don't send this error
-            }
-          }
-
-          // Allow all other events to be sent
-          return true;
-        },
-      });
-
-      openobserveLogs.init({
-        clientToken: options.clientToken,
-        site: options.site,
-        organizationIdentifier: options.organizationIdentifier,
-        service: options.service,
-        env: options.env,
-        version: options.version,
-        forwardErrorsToLogs: true,
-        insecureHTTP: options.insecureHTTP,
-        apiVersion: options.apiVersion,
-        beforeSend: (log) => {
-          // Filter out specific logs before sending
-          const logMessage = log.message || "";
-
-          // List of log patterns to ignore
-          const ignoredLogPatterns = [/ResizeObserver loop/i];
-
-          // Check if log matches any ignored pattern
-          const shouldIgnore = ignoredLogPatterns.some((pattern) => pattern.test(logMessage));
-
-          if (shouldIgnore) {
-            return false; // Don't send this log
-          }
-
-          // Allow all other logs to be sent
-          return true;
-        },
-      });
-
-      // Don't start session replay automatically - it will be started after login
-      // to avoid capturing login page with "Unknown" user
-      // Session replay will be started in Login.vue and MainLayout.vue after user is authenticated
     }
   });
 };
@@ -202,15 +117,14 @@ function showNewVersionNotification() {
   staleNotificationShown = true;
   toast({
     variant: "error",
-    message: i18n.global.t("common.chunkLoadErrorMsg"),
+    message: raw(i18n.global.t("common.chunkLoadErrorMsg")),
     timeout: 0, // Don't auto-dismiss
     action: {
-      label: i18n.global.t("common.refresh"),
+      label: raw(i18n.global.t("common.refresh")),
       handler: () => {
         window.location.reload();
       },
     },
-    position: "top-center",
   });
 }
 
@@ -259,10 +173,7 @@ window.addEventListener(
 
 // Handle dynamic import errors (for code splitting)
 router.onError(async (error) => {
-  const chunkFailedPattern =
-    /Loading chunk [\d]+ failed|Failed to fetch dynamically imported module/i;
-
-  if (chunkFailedPattern.test(error.message)) {
+  if (isChunkLoadError(error)) {
     // Smart detection: Check if it's stale build or network error
     const isStale = await buildVersionChecker.isStaleChunkError(error);
 
@@ -272,9 +183,19 @@ router.onError(async (error) => {
   }
 });
 
+// router.onError only sees route chunks; lazy components (e.g. the alert dialog) fail through Vite's preload hook.
+window.addEventListener("vite:preloadError", async (event) => {
+  if (
+    isChunkLoadError(event.payload) &&
+    (await buildVersionChecker.isStaleChunkError(event.payload))
+  ) {
+    showNewVersionNotification();
+  }
+});
+
 // Ensure the active locale's messages are loaded (en-us is bundled; any other
 // language is fetched as a code-split chunk) before the first render.
-loadLocaleMessages(getLocale())
+loadLocaleMessages(activeLocale)
   // On a locale-chunk load failure, fall back to the bundled en-us messages
   // (no console noise). The app must mount regardless.
   .catch(() => {})

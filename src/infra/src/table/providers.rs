@@ -22,15 +22,25 @@
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Schema, Set};
 use serde::{Deserialize, Serialize};
 
-use super::get_lock;
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors,
     table::{
         cipher,
         entity::providers::{ActiveModel, Column, Entity, Model},
     },
 };
+
+/// Optional execution limits applied independently to one configured Provider.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProviderRateLimits {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_concurrency: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requests_per_minute: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tokens_per_minute: Option<u64>,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Provider {
@@ -44,6 +54,8 @@ pub struct Provider {
     /// Plaintext auth config at the service layer (e.g. `{"api_key": "sk-..."}`).
     /// At rest, this is encrypted with the org's DEK before being stored.
     pub auth_config: serde_json::Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rate_limits: Option<ProviderRateLimits>,
     pub is_default: bool,
     pub created_at: i64,
     pub updated_at: i64,
@@ -86,6 +98,11 @@ fn model_to_provider(model: Model, dek: &[u8]) -> Result<Provider, errors::Error
         default_model: model.default_model,
         available_models: serde_json::from_value(model.available_models).unwrap_or_default(),
         auth_config,
+        rate_limits: model
+            .rate_limits
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(|error| errors::Error::Message(error.to_string()))?,
         is_default: model.is_default,
         created_at: model.created_at,
         updated_at: model.updated_at,
@@ -93,7 +110,7 @@ fn model_to_provider(model: Model, dek: &[u8]) -> Result<Provider, errors::Error
 }
 
 pub async fn create_table() -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let builder = client.get_database_backend();
 
     let schema = Schema::new(builder);
@@ -108,38 +125,24 @@ pub async fn create_table() -> Result<(), errors::Error> {
 }
 
 pub async fn add(provider: &Provider) -> Result<(), errors::Error> {
-    let encrypted_auth_config = if provider.auth_config.is_null() {
-        None
-    } else {
-        let dek = cipher::get_dek(&provider.org_id).await?;
-        let plaintext = serde_json::to_string(&provider.auth_config)
-            .map_err(|e| errors::Error::Message(e.to_string()))?;
-        Some(encrypt_data(&dek, &plaintext)?)
-    };
+    let record = provider_active_model(provider).await?;
 
-    let _lock = get_lock().await;
-
-    let record = ActiveModel {
-        id: Set(provider.id.clone()),
-        org_id: Set(provider.org_id.clone()),
-        name: Set(provider.name.clone()),
-        provider_type: Set(provider.provider_type.clone()),
-        endpoint: Set(provider.endpoint.clone()),
-        default_model: Set(provider.default_model.clone()),
-        available_models: Set(serde_json::json!(provider.available_models)),
-        auth_config: Set(encrypted_auth_config),
-        is_default: Set(provider.is_default),
-        created_at: Set(provider.created_at),
-        updated_at: Set(provider.updated_at),
-    };
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::insert(record).exec(client).await?;
 
     Ok(())
 }
 
 pub async fn update(provider: &Provider) -> Result<(), errors::Error> {
+    let record = provider_active_model(provider).await?;
+
+    let client = get_orm_client_rw().await;
+    Entity::update(record).exec(client).await?;
+
+    Ok(())
+}
+
+async fn provider_active_model(provider: &Provider) -> Result<ActiveModel, errors::Error> {
     let encrypted_auth_config = if provider.auth_config.is_null() {
         None
     } else {
@@ -149,9 +152,13 @@ pub async fn update(provider: &Provider) -> Result<(), errors::Error> {
         Some(encrypt_data(&dek, &plaintext)?)
     };
 
-    let _lock = get_lock().await;
-
-    let record = ActiveModel {
+    let rate_limits = provider
+        .rate_limits
+        .as_ref()
+        .map(serde_json::to_value)
+        .transpose()
+        .map_err(|error| errors::Error::Message(error.to_string()))?;
+    Ok(ActiveModel {
         id: Set(provider.id.clone()),
         org_id: Set(provider.org_id.clone()),
         name: Set(provider.name.clone()),
@@ -160,19 +167,15 @@ pub async fn update(provider: &Provider) -> Result<(), errors::Error> {
         default_model: Set(provider.default_model.clone()),
         available_models: Set(serde_json::json!(provider.available_models)),
         auth_config: Set(encrypted_auth_config),
+        rate_limits: Set(rate_limits),
         is_default: Set(provider.is_default),
         created_at: Set(provider.created_at),
         updated_at: Set(provider.updated_at),
-    };
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Entity::update(record).exec(client).await?;
-
-    Ok(())
+    })
 }
 
 pub async fn get(id: &str) -> Result<Option<Provider>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let model = Entity::find().filter(Column::Id.eq(id)).one(client).await?;
 
@@ -186,7 +189,7 @@ pub async fn get(id: &str) -> Result<Option<Provider>, errors::Error> {
 }
 
 pub async fn get_all_by_org(org_id: &str) -> Result<Vec<Provider>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let rows = Entity::find()
         .filter(Column::OrgId.eq(org_id))
@@ -205,7 +208,7 @@ pub async fn get_all_by_org(org_id: &str) -> Result<Vec<Provider>, errors::Error
 }
 
 pub async fn get_default(org_id: &str) -> Result<Option<Provider>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let model = Entity::find()
         .filter(Column::OrgId.eq(org_id))
@@ -223,9 +226,7 @@ pub async fn get_default(org_id: &str) -> Result<Option<Provider>, errors::Error
 }
 
 pub async fn delete(id: &str) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::Id.eq(id))
         .exec(client)
@@ -235,9 +236,7 @@ pub async fn delete(id: &str) -> Result<(), errors::Error> {
 }
 
 pub async fn delete_all_by_org(org_id: &str) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::OrgId.eq(org_id))
         .exec(client)
@@ -247,7 +246,7 @@ pub async fn delete_all_by_org(org_id: &str) -> Result<(), errors::Error> {
 }
 
 pub async fn exists(id: &str) -> Result<bool, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let record = Entity::find().filter(Column::Id.eq(id)).one(client).await?;
 
     Ok(record.is_some())
@@ -270,6 +269,7 @@ mod tests {
             default_model: "gpt-4o".to_string(),
             available_models: serde_json::json!(["gpt-4o", "gpt-4o-mini"]),
             auth_config,
+            rate_limits: None,
             is_default: true,
             created_at: 1000,
             updated_at: 2000,

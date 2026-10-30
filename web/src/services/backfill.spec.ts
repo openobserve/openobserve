@@ -16,6 +16,9 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import backfill from "@/services/backfill";
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // Mock the http service
 vi.mock("@/services/http", () => ({
@@ -324,6 +327,33 @@ describe("backfill service", () => {
           enable: true,
         }),
       ).rejects.toThrow("Job not found");
+    });
+  });
+
+  describe("product analytics", () => {
+    const data = { start_time: 1, end_time: 2, delete_before_backfill: true };
+
+    it("tracks pipeline_backfill_started once the job is created", async () => {
+      mockHttpInstance.post.mockResolvedValue({ data: { job_id: "j", message: "ok" } });
+
+      await expect(
+        backfill.createBackfillJob({ org_id: "o", pipeline_id: "p", data }),
+      ).resolves.toEqual({ job_id: "j", message: "ok" });
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("pipeline_backfill_started", {
+        delete_before_backfill: true,
+      });
+    });
+
+    it("does not track pipeline_backfill_started when creation rejects", async () => {
+      mockHttpInstance.post.mockRejectedValue(new Error("boom"));
+
+      await expect(
+        backfill.createBackfillJob({ org_id: "o", pipeline_id: "p", data }),
+      ).rejects.toThrow("boom");
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 });

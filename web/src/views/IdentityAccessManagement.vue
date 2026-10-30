@@ -30,16 +30,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import SectionRail from "@/components/common/SectionRail.vue";
-import { type SectionHubGroup, type SectionHubItem } from "@/components/common/SectionHub.vue";
+import { type SectionHubGroup } from "@/components/common/SectionHub.vue";
 import { computed, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import { useRouter, useRoute, RouterView } from "vue-router";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
+import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const route = useRoute();
 const { isMetaOrg } = useIsMetaOrg();
@@ -66,16 +67,12 @@ const routeToIamTab: Record<string, string> = {
 const activeSection = computed(() => routeToIamTab[route.name as string] ?? "");
 
 const sectionGroups = computed<SectionHubGroup[]>(() => {
-  const isEnt = config.isEnterprise == "true" || config.isCloud == "true";
   const isCloud = config.isCloud == "true";
   const meta = isMetaOrg.value;
-  const rbac = !!store.state.zoConfig.rbac_enabled;
   const svc = store.state.zoConfig.service_account_enabled ?? true;
-  // MCP is an AI feature (its endpoint requires O2_AI_ENABLED). Available on
-  // both enterprise and cloud builds, gated on the ai_enabled runtime flag.
-  const aiEnabled = isEnt && !!store.state.zoConfig.ai_enabled;
+  const rbacAccess = checkFeatureAccess("rbac", buildFeatureGateContext(store.state.zoConfig));
 
-  const groups: { label: string; items: SectionHubItem[] }[] = [
+  const groups: SectionHubGroup[] = [
     {
       label: t("iam.sectionAccess"),
       items: [
@@ -110,16 +107,18 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
           description: t("iam.syntheticsTokensDesc"),
           icon: "key",
           to: { name: "syntheticsTokens", query: orgQuery.value },
-          visible: isEnt && store.state.zoConfig?.synthetics_enabled !== false,
+          visible: store.state.zoConfig?.synthetics_enabled !== false,
           dataTest: "iam-synthetics-tokens-tab",
         },
         {
           key: "mcpServer",
           label: t("iam.mcpServerLabel"),
-          description: t("iam.mcpServerDesc"),
+          description: t("iam.mcpServerDesc", { product: raw("Model Context Protocol") }),
           icon: "mcp",
           to: { name: "mcpServer", query: orgQuery.value },
-          visible: aiEnabled,
+          // No `visible` gate: the MCP endpoint is served by every edition, so
+          // the card shows on OSS too. See the route comment in
+          // useEnterpriseRoutes.ts.
           dataTest: "iam-mcp-server-tab",
         },
         {
@@ -142,7 +141,9 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
           description: t("iam.groupsDesc"),
           icon: "group",
           to: { name: "groups", query: orgQuery.value },
-          visible: isEnt && rbac,
+          locked: !rbacAccess.allowed,
+          lockedMessage: rbacAccess.message,
+          lockedShowUpgradeCta: rbacAccess.ctaRelevant,
           dataTest: "iam-groups-tab",
         },
         {
@@ -151,7 +152,9 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
           description: t("iam.rolesDesc"),
           icon: "shield",
           to: { name: "roles", query: orgQuery.value },
-          visible: isEnt && rbac,
+          locked: !rbacAccess.allowed,
+          lockedMessage: rbacAccess.message,
+          lockedShowUpgradeCta: rbacAccess.ctaRelevant,
           dataTest: "iam-roles-tab",
         },
         {
@@ -160,7 +163,12 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
           description: t("iam.quotaDesc"),
           icon: "speed",
           to: { name: "quota", query: orgQuery.value },
-          visible: isEnt && rbac && meta,
+          // Meta-org is a cluster-topology restriction, not an edition
+          // upsell — stays a hide, not a lock.
+          visible: meta,
+          locked: !rbacAccess.allowed,
+          lockedMessage: rbacAccess.message,
+          lockedShowUpgradeCta: rbacAccess.ctaRelevant,
           dataTest: "iam-quota-tab",
         },
       ],

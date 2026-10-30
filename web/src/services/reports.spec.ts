@@ -16,6 +16,9 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import reports from "@/services/reports";
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/services/http", () => ({
   default: vi.fn(() => ({
@@ -134,6 +137,35 @@ describe("reports service", () => {
 
       const calledUrl = mockHttpInstance.get.mock.calls[0][0];
       expect(calledUrl).toContain(`/api/prod-org/reports`);
+    });
+  });
+
+  describe("history request identity", () => {
+    it.each([0, 4])("sends retry index %s on the wire", async (retries) => {
+      await reports.getHistory("org", { report_id: "r1", start_time: 100, end_time: 101, retries });
+      const url = new URL(mockHttpInstance.get.mock.calls[0][0], "http://localhost");
+      expect(url.searchParams.get("report_id")).toBe("r1");
+      expect(url.searchParams.get("retries")).toBe(String(retries));
+    });
+
+    it("serializes an org-wide run selector without selecting report GET authorization", async () => {
+      await reports.getHistory("org", {
+        run_report_id: "r2",
+        start_time: 100,
+        end_time: 101,
+        retries: 4,
+      });
+      const url = new URL(mockHttpInstance.get.mock.calls[0][0], "http://localhost");
+      expect(url.pathname).toBe("/api/v2/org/reports/history");
+      expect(url.searchParams.get("run_report_id")).toBe("r2");
+      expect(url.searchParams.has("report_id")).toBe(false);
+      expect(url.searchParams.get("retries")).toBe("4");
+    });
+
+    it("omits retry filtering for ordinary history requests", async () => {
+      await reports.getHistory("org", { start_time: 100, end_time: 200 });
+      const url = new URL(mockHttpInstance.get.mock.calls[0][0], "http://localhost");
+      expect(url.searchParams.has("retries")).toBe(false);
     });
   });
 
@@ -438,5 +470,78 @@ describe("reports service", () => {
         "Server error",
       );
     });
+  });
+
+  describe("product analytics", () => {
+    const cases: Array<[string, string, () => Promise<unknown>, unknown[]]> = [
+      ["createReportV2", "post", () => reports.createReportV2("org1", {}), ["report_created"]],
+      [
+        "updateReport",
+        "put",
+        () => reports.updateReport("org1", { name: "r" }),
+        ["report_updated"],
+      ],
+      [
+        "updateReportById",
+        "put",
+        () => reports.updateReportById("org1", "r1", {}),
+        ["report_updated"],
+      ],
+      [
+        "deleteReportById",
+        "delete",
+        () => reports.deleteReportById("org1", "r1"),
+        ["report_deleted", { count: 1 }],
+      ],
+      [
+        "bulkDeleteById",
+        "delete",
+        () => reports.bulkDeleteById("org1", { ids: ["a", "b"] }),
+        ["report_deleted", { count: 2 }],
+      ],
+      [
+        "toggleReportStateById enable",
+        "patch",
+        () => reports.toggleReportStateById("org1", "r1", true),
+        ["report_enabled", { count: 1 }],
+      ],
+      [
+        "toggleReportStateById disable",
+        "patch",
+        () => reports.toggleReportStateById("org1", "r1", false),
+        ["report_disabled", { count: 1 }],
+      ],
+    ];
+
+    it.each(cases)("%s tracks once the request resolves", async (_label, verb, call, args) => {
+      const response = { data: { successful: ["a", "b"], unsuccessful: [], success: true } };
+      mockHttpInstance[verb].mockResolvedValue(response);
+
+      await expect(call()).resolves.toBe(response);
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith(...args);
+    });
+
+    it.each(cases)("%s does not track when the request rejects", async (_label, verb, call) => {
+      mockHttpInstance[verb].mockRejectedValue(new Error("boom"));
+
+      await expect(call()).rejects.toThrow("boom");
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["bulkDeleteById", "delete", () => reports.bulkDeleteById("org1", { ids: ["a"] })],
+    ] as Array<[string, string, () => Promise<unknown>]>)(
+      "%s does not track when nothing was affected",
+      async (_label, verb, call) => {
+        mockHttpInstance[verb].mockResolvedValue({ data: { successful: [], unsuccessful: ["a"] } });
+
+        await call();
+
+        expect(analytics.track).not.toHaveBeenCalled();
+      },
+    );
   });
 });

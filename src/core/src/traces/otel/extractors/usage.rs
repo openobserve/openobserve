@@ -40,6 +40,7 @@ pub struct UsageExtractor;
 
 impl UsageExtractor {
     /// Extract usage details (token counts)
+    #[cfg(test)]
     pub fn extract_usage(
         &self,
         attributes: &HashMap<String, json::Value>,

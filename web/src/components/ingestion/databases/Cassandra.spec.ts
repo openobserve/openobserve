@@ -21,6 +21,7 @@ import { ref } from "vue";
 import Cassandra from "./Cassandra.vue";
 import cassandraCard from "@/components/ingestion/setupCard/content/cassandra";
 import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
+import { gt } from "@/types/i18n";
 
 const mockEndpoint = ref({
   url: "https://test.openobserve.ai",
@@ -52,7 +53,7 @@ const SUBS = { url: "https://test.openobserve.ai", org: "test-org", token: "dGVz
 
 describe("cassandraCard builder", () => {
   it("builds metadata + JMX step flow", () => {
-    const card = cassandraCard(SUBS);
+    const card = cassandraCard(SUBS, gt);
     expect(card.provider.name).toBe("Cassandra");
     expect(card.detect).toMatchObject({
       streamType: "metrics",
@@ -68,7 +69,7 @@ describe("cassandraCard builder", () => {
     ]);
   });
   it("downloads the JMX jar and uses a jmx receiver targeting cassandra", () => {
-    const card = cassandraCard(SUBS);
+    const card = cassandraCard(SUBS, gt);
     expect(card.steps.find((s) => s.id === "jmx-jar")!.code!.raw).toContain(
       "opentelemetry-jmx-metrics.jar",
     );
@@ -86,7 +87,7 @@ describe("Cassandra.vue", () => {
     if (wrapper) wrapper.unmount();
   });
   it("renders the shared card", () => {
-    expect(getDataSourceCard("cassandra", SUBS)?.provider.name).toBe("Cassandra");
+    expect(getDataSourceCard("cassandra", SUBS, gt)?.provider.name).toBe("Cassandra");
     wrapper = mount(Cassandra, { global: { plugins: [mockStore, mockI18n] } });
     expect(wrapper.findComponent({ name: "SetupCardRenderer" }).exists()).toBe(true);
   });

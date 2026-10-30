@@ -112,35 +112,4 @@ mod tests {
             println!("Error: {err}");
         }
     }
-
-    #[tokio::test]
-    async fn test_import_operator_with_error_type() {
-        let args = vec![
-            "openobserve",
-            "--c",
-            "stream",
-            "--o",
-            "default",
-            "--st",
-            "logs",
-            "--s",
-            "default",
-            "--t",
-            "txt",
-            "--f",
-            "day",
-            "--d",
-            "./txt",
-            "--start",
-            "1749110162176000",
-            "--end",
-            "1749111062176000",
-        ];
-
-        let cli = cli::Cli::args(args);
-
-        if let Err(err) = import::Import::operator(cli).await {
-            println!("Error: {err}");
-        }
-    }
 }

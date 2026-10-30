@@ -34,10 +34,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       concentrates it behind the illustration/text, dissolving well before the
       edges so it reads as a soft backdrop rather than an all-over grid.
     -->
+    <!-- eslint-disable local/no-hardcoded-px -- 1.25px stipple dot radius in a background texture — a device-fixed sub-pixel mark that would smear if it scaled with text -->
     <div
       aria-hidden="true"
       class="pointer-events-none absolute inset-0 bg-[radial-gradient(var(--empty-dot)_1.25px,transparent_1.25px)] mask-[radial-gradient(ellipse_60%_62%_at_50%_44%,var(--color-black)_0%,transparent_70%)] bg-size-[1.875rem_1.875rem] [-webkit-mask-image:radial-gradient(ellipse_60%_62%_at_50%_44%,var(--color-black)_0%,transparent_70%)]"
     />
+    <!-- eslint-enable local/no-hardcoded-px -->
 
     <!-- content -->
     <div
@@ -83,13 +85,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { raw, type I18nText } from "@/types/i18n";
 withDefaults(
   defineProps<{
-    title?: string;
-    description?: string;
+    title?: I18nText;
+    description?: I18nText;
     /** Optional eyebrow label rendered above the actions (e.g. "Quick start"). */
     actionsLabel?: string;
   }>(),
-  { title: "", description: "", actionsLabel: "" },
+  { title: raw(""), description: raw(""), actionsLabel: "" },
 );
 </script>

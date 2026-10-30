@@ -14,20 +14,28 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
+import { gt } from "@/types/i18n";
 import { nextTick } from "vue";
 import { usePanelDrilldown } from "./usePanelDrilldown";
 
 const resultSchemaMock = vi.fn();
 
-vi.mock("@/services/search", () => ({
-  default: {
-    result_schema: (...args: any[]) => resultSchemaMock(...args),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      result_schema: (...args: any[]) => resultSchemaMock(...args),
+    },
+  });
+});
 
 vi.mock("@/utils/zincutils", () => ({
   b64EncodeUnicode: (v: string) => `b64(${v})`,
   escapeSingleQuotes: (v: string) => v,
+  // Stubs for @/stores' own top-level init, pulled in transitively via commons -> annotationSources -> sqlIdentifiers.
+  useLocalOrganization: () => null,
+  useLocalCurrentUser: () => null,
+  useLocalTimezone: () => null,
 }));
 
 describe("usePanelDrilldown", () => {
@@ -127,6 +135,7 @@ describe("usePanelDrilldown", () => {
       selectedAnnotationData: { value: null },
       isCursorOverPanel: { value: true },
       showErrorNotification: vi.fn(),
+      t: gt,
     };
   };
 
@@ -162,6 +171,95 @@ describe("usePanelDrilldown", () => {
     expect(deps.handleAddAnnotation).not.toHaveBeenCalled();
   });
 
+  it("never drills down when a query-source band over the bars is clicked outside add mode", async () => {
+    const deps = makeDeps();
+    const api = usePanelDrilldown(deps);
+    const params = {
+      componentType: "markArea",
+      event: { offsetX: 40, offsetY: 50 },
+      data: { annotationDetails: { title: "maint", source: { id: "s2" } } },
+    };
+
+    await api.onChartClick(params);
+
+    expect(deps.editAnnotation).not.toHaveBeenCalled();
+    expect(deps.handleAddAnnotation).not.toHaveBeenCalled();
+    expect(api.drilldownArray.value).toEqual([]);
+    expect(deps.drilldownPopUpRef.value.style.display).not.toBe("block");
+  });
+
+  it("still places a manual annotation when a query-source band is clicked in add mode", async () => {
+    const deps = makeDeps();
+    deps.allowAnnotationsAdd.value = true;
+    deps.isAddAnnotationMode.value = true;
+    const api = usePanelDrilldown(deps);
+    const params = {
+      componentType: "markArea",
+      event: { offsetX: 40, offsetY: 50 },
+      data: {
+        annotationDetails: {
+          title: "maint",
+          source: { id: "s2" },
+          start_time: Date.parse("2026-03-18T00:30:00.000Z") * 1000,
+        },
+      },
+    };
+
+    await api.onChartClick(params);
+
+    expect(deps.handleAddAnnotation).toHaveBeenCalledWith(
+      new Date("2026-03-18T00:30:00.000Z"),
+      null,
+    );
+    expect(deps.editAnnotation).not.toHaveBeenCalled();
+    expect(api.drilldownArray.value).toEqual([]);
+    expect(deps.drilldownPopUpRef.value.style.display).not.toBe("block");
+  });
+
+  it("hands an exemplar marker click to the exemplar handler and never opens the drilldown menu", async () => {
+    const deps = makeDeps();
+    const onExemplarClick = vi.fn();
+    const api = usePanelDrilldown({ ...deps, onExemplarClick } as any);
+    const params = {
+      componentType: "series",
+      seriesId: "__exemplars__",
+      event: { offsetX: 40, offsetY: 50 },
+      data: { exemplar: { id: "e1", traceId: "t1" } },
+    };
+
+    await api.onChartClick(params);
+
+    expect(onExemplarClick).toHaveBeenCalledWith(params);
+    expect(api.drilldownArray.value).toEqual([]);
+    expect(deps.drilldownPopUpRef.value.style.display).not.toBe("block");
+    expect(deps.router.push).not.toHaveBeenCalled();
+  });
+
+  it("hands a stacked heatmap grid's exemplar marker click to the exemplar handler", async () => {
+    const deps = makeDeps();
+    const onExemplarClick = vi.fn();
+    const api = usePanelDrilldown({ ...deps, onExemplarClick } as any);
+    const params = { seriesId: "__exemplars__:2", data: { exemplar: { id: "e1" } } };
+
+    await api.onChartClick(params);
+
+    expect(onExemplarClick).toHaveBeenCalledWith(params);
+    expect(api.drilldownArray.value).toEqual([]);
+  });
+
+  it("does not treat an exemplar click as an annotation in add-annotation mode", async () => {
+    const deps = makeDeps();
+    deps.allowAnnotationsAdd.value = true;
+    deps.isAddAnnotationMode.value = true;
+    const onExemplarClick = vi.fn();
+    const api = usePanelDrilldown({ ...deps, onExemplarClick } as any);
+
+    await api.onChartClick({ seriesId: "__exemplars__", data: { exemplar: { id: "e1" } } });
+
+    expect(onExemplarClick).toHaveBeenCalledTimes(1);
+    expect(deps.handleAddAnnotation).not.toHaveBeenCalled();
+  });
+
   it("shows drilldown popup when panel drilldowns exist", async () => {
     const deps = makeDeps();
     const api = usePanelDrilldown(deps as any);
@@ -180,11 +278,540 @@ describe("usePanelDrilldown", () => {
     expect(deps.drilldownPopUpRef.value.style.left).toContain("px");
   });
 
-  it("fetches cross-links through result schema watch", async () => {
+  it("hides the chart tooltip when the drilldown menu opens, and only then", async () => {
+    const hideChartTooltip = vi.fn();
+    const deps: any = { ...makeDeps(), hideChartTooltip };
+    const api = usePanelDrilldown(deps);
+    await api.onChartClick({
+      componentType: "series",
+      seriesType: "funnel",
+      event: { offsetX: 40, offsetY: 50 },
+      dataIndex: 0,
+      name: "visit",
+      value: 200,
+    });
+    expect(deps.drilldownPopUpRef.value.style.display).toBe("block");
+    expect(hideChartTooltip).toHaveBeenCalledTimes(1);
+
+    const plain: any = { ...makeDeps(), hideChartTooltip: vi.fn() };
+    plain.panelSchema.value.config.drilldown = [];
+    plain.store.state.zoConfig.enable_cross_linking = false;
+    await usePanelDrilldown(plain).onChartClick({
+      componentType: "series",
+      event: { offsetX: 1, offsetY: 1 },
+      name: "visit",
+    });
+    expect(plain.hideChartTooltip).not.toHaveBeenCalled();
+  });
+
+  it("resolves variables sharing a name prefix in a custom Logs drilldown query", async () => {
+    const deps = makeDeps();
+    deps.panelSchema.value.config.drilldown = [
+      {
+        name: "Logs",
+        type: "logs",
+        targetBlank: false,
+        data: {
+          logsMode: "custom",
+          logsQuery: `SELECT * FROM "default" WHERE a = '$traceid_sql' AND b = '$traceid'`,
+        },
+      } as any,
+    ];
+    deps.variablesData.value.values = [
+      { name: "traceid", type: "textbox", value: "abc123" },
+      { name: "traceid_sql", type: "textbox", value: "xyz789" },
+    ] as any;
+    const api = usePanelDrilldown(deps as any);
+
+    await api.onChartClick({
+      componentType: "series",
+      event: { offsetX: 40, offsetY: 50 },
+      dataIndex: 0,
+      seriesName: "series-a",
+      value: ["x", 1],
+    });
+    await api.openDrilldown(0);
+
+    await vi.waitFor(() =>
+      expect(deps.router.push).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: "/logs",
+          query: expect.objectContaining({
+            query: `b64(SELECT * FROM "default" WHERE a = 'xyz789' AND b = 'abc123')`,
+          }),
+        }),
+      ),
+    );
+  });
+
+  describe("heatmap drilldown", () => {
+    const heatmapDeps = (options: any, extras: any = {}) => {
+      const deps = makeDeps();
+      deps.panelSchema.value.type = "heatmap";
+      deps.panelSchema.value.config.drilldown = [
+        {
+          name: "Cell",
+          type: "byUrl",
+          data: {
+            url: "https://example.com/?row=${series.__name}&col=${series.__axisValue}&v=${series.__value}",
+          },
+        },
+      ];
+      (deps.panelData as any).value = { options, extras };
+      return deps;
+    };
+
+    const clickAndOpen = async (deps: any, params: any) => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      const api = usePanelDrilldown(deps as any);
+      await api.onChartClick({
+        componentType: "series",
+        event: { offsetX: 1, offsetY: 1 },
+        ...params,
+      });
+      await api.openDrilldown(0);
+      const url = openSpy.mock.calls[0]?.[0];
+      openSpy.mockRestore();
+      return url;
+    };
+
+    it("passes the clicked row as the series name and the clicked column as the axis value", async () => {
+      const deps = heatmapDeps({
+        xAxis: [{ data: ["10:00:00", "10:01:00"] }],
+        yAxis: { data: ["svc-a", "svc-b"] },
+        series: [{ type: "heatmap" }],
+      });
+
+      const url = await clickAndOpen(deps, { seriesIndex: 0, name: "10:01:00", value: [1, 0, 7] });
+
+      expect(url).toBe("https://example.com/?row=svc-a&col=10:01:00&v=7");
+    });
+
+    it("passes the raw row value, not the label drawn for an empty category", async () => {
+      const deps = heatmapDeps(
+        {
+          xAxis: [{ data: ["GET"] }],
+          yAxis: { data: ["(empty)", "svc-b"] },
+          series: [{ type: "heatmap" }],
+        },
+        { heatmapRowValues: [["", "svc-b"]] },
+      );
+
+      const url = await clickAndOpen(deps, { seriesIndex: 0, name: "GET", value: [0, 0, 7] });
+
+      expect(url).toBe("https://example.com/?row=&col=GET&v=7");
+    });
+
+    it("opens a URL drilldown on a time column, passing the column start in epoch ms", async () => {
+      const start = Date.UTC(2026, 2, 18, 0, 30);
+      const deps = heatmapDeps(
+        {
+          xAxis: [{ data: ["2026-03-18 00:30:00"] }],
+          yAxis: { data: ["svc-a"] },
+          series: [{ type: "heatmap" }],
+        },
+        {
+          heatmapTimeAxis: {
+            endInclusive: false,
+            columns: [{ start, end: start + 60_000, x: null }],
+          },
+        },
+      );
+
+      const url = await clickAndOpen(deps, {
+        seriesIndex: 0,
+        name: "2026-03-18 00:30:00",
+        value: [0, 0, 7],
+      });
+
+      expect(url).toBe(`https://example.com/?row=svc-a&col=${start}&v=7`);
+    });
+
+    it("reads the row from the clicked grid of a stacked histogram heatmap", async () => {
+      const deps = heatmapDeps({
+        xAxis: [{ data: ["10:00:00"] }, { gridIndex: 1, data: ["10:00:00"] }],
+        yAxis: [{ data: ["0.1", "+Inf"] }, { gridIndex: 1, data: ["1", "5", "+Inf"] }],
+        series: [
+          { type: "heatmap", xAxisIndex: 0, yAxisIndex: 0 },
+          { type: "heatmap", xAxisIndex: 1, yAxisIndex: 1 },
+        ],
+      });
+
+      const url = await clickAndOpen(deps, { seriesIndex: 1, name: "10:00:00", value: [0, 1, 3] });
+
+      expect(url).toBe("https://example.com/?row=5&col=10:00:00&v=3");
+    });
+
+    it.each([
+      ["a SQL histogram column", 60_000, [[{ histogram_interval: 1 }]]],
+      ["a PromQL step, which has no histogram interval", 30_000, []],
+      ["a column clipped by the query range", 12_000, [[{ histogram_interval: 60 }]]],
+    ])("opens Logs over exactly the clicked column for %s", async (_name, width, meta) => {
+      const start = Date.UTC(2026, 2, 18, 0, 30);
+      const deps = heatmapDeps(
+        {
+          xAxis: [{ data: ["00:29:00", "00:30:00"] }],
+          yAxis: { data: ["svc-a"] },
+          series: [{ type: "heatmap" }],
+        },
+        {
+          heatmapTimeAxis: {
+            endInclusive: false,
+            columns: [
+              { start: start - 60_000, end: start, x: null },
+              { start, end: start + width, x: null },
+            ],
+          },
+        },
+      );
+      deps.resultMetaData.value = meta as any;
+      deps.panelSchema.value.config.drilldown = [
+        {
+          name: "Logs",
+          type: "logs",
+          targetBlank: false,
+          data: {
+            logsMode: "custom",
+            logsQuery: 'SELECT * FROM "default" WHERE svc = ${series.__name}',
+          },
+        } as any,
+      ];
+      const api = usePanelDrilldown(deps as any);
+
+      await api.onChartClick({
+        componentType: "series",
+        event: { offsetX: 1, offsetY: 1 },
+        seriesIndex: 0,
+        name: "00:30:00",
+        value: [1, 0, 4],
+      });
+      await api.openDrilldown(0);
+
+      await vi.waitFor(() =>
+        expect(deps.router.push).toHaveBeenCalledWith(
+          expect.objectContaining({
+            query: expect.objectContaining({
+              from: String(start * 1000),
+              to: String((start + width) * 1000),
+              query: `b64(SELECT * FROM "default" WHERE svc = 'svc-a')`,
+            }),
+          }),
+        ),
+      );
+    });
+
+    it("opens Logs over the dashboard range for a heatmap without a time axis", async () => {
+      const deps = heatmapDeps({
+        xAxis: [{ data: ["GET", "POST"] }],
+        yAxis: { data: ["svc-a"] },
+        series: [{ type: "heatmap" }],
+      });
+      deps.panelSchema.value.config.drilldown = [
+        {
+          name: "Logs",
+          type: "logs",
+          targetBlank: false,
+          data: { logsMode: "custom", logsQuery: 'SELECT * FROM "default"' },
+        } as any,
+      ];
+      const api = usePanelDrilldown(deps as any);
+
+      await api.onChartClick({
+        componentType: "series",
+        event: {},
+        seriesIndex: 0,
+        value: [1, 0, 4],
+      });
+      await api.openDrilldown(0);
+
+      await vi.waitFor(() =>
+        expect(deps.router.push).toHaveBeenCalledWith(
+          expect.objectContaining({
+            query: expect.objectContaining({
+              from: String(Date.UTC(2026, 2, 18)),
+              to: String(Date.UTC(2026, 2, 18, 1)),
+            }),
+          }),
+        ),
+      );
+    });
+  });
+
+  describe("state timeline segment", () => {
+    const segmentClick = {
+      componentType: "series",
+      seriesIndex: 0,
+      event: { offsetX: 40, offsetY: 50 },
+      value: [1000, 61000, 0, 0],
+      data: {
+        name: "gpu0",
+        state: "thermal",
+        start: 1000,
+        end: 61000,
+        labels: { gpu: "0" },
+      },
+    };
+
+    it("adds an annotation at the clicked segment's start in add-annotation mode", async () => {
+      const deps = makeDeps();
+      deps.panelSchema.value.type = "state-timeline";
+      deps.allowAnnotationsAdd.value = true;
+      deps.isAddAnnotationMode.value = true;
+      const api = usePanelDrilldown(deps as any);
+
+      // A zoned x (Los Angeles wall clock) that differs from the segment's UTC start.
+      const zonedStart = 1000 - 8 * 3_600_000;
+      await api.onChartClick({
+        ...segmentClick,
+        value: [zonedStart, zonedStart + 60000, 0, 0],
+      });
+
+      // The zoned x value, the unit every chart hands handleAddAnnotation.
+      expect(deps.handleAddAnnotation).toHaveBeenCalledWith(zonedStart, null);
+    });
+
+    it("opens a clicked annotation, never the segment drilldown", async () => {
+      const deps = makeDeps();
+      deps.panelSchema.value.type = "state-timeline";
+      const api = usePanelDrilldown(deps as any);
+
+      await api.onChartClick({
+        componentType: "markLine",
+        event: { offsetX: 10, offsetY: 10 },
+        data: { annotationDetails: { id: "a1", text: "Deploy v2.3" } },
+      });
+
+      expect(deps.drilldownPopUpRef.value.style.display).not.toBe("block");
+      expect(deps.annotationPopupRef.value.style.display).toBe("block");
+      expect(deps.selectedAnnotationData.value).toEqual({ id: "a1", text: "Deploy v2.3" });
+    });
+
+    it("passes the entity, its labels and the segment bounds to a URL drilldown", async () => {
+      const deps = makeDeps();
+      deps.panelSchema.value.type = "state-timeline";
+      deps.panelSchema.value.config.drilldown = [
+        {
+          name: "Open",
+          type: "byUrl",
+          targetBlank: true,
+          data: {
+            url: "https://example.com/?e=${series.__name}&v=${series.__value}&gpu=${series.labels.gpu}&from=${series.__start}&to=${series.__end}",
+          },
+        },
+      ] as any;
+      const open = vi.spyOn(window, "open").mockReturnValue(null);
+      const api = usePanelDrilldown(deps as any);
+
+      await api.onChartClick(segmentClick);
+      await api.openDrilldown(0);
+
+      expect(open).toHaveBeenCalledWith(
+        "https://example.com/?e=gpu0&v=thermal&gpu=0&from=1000&to=61000",
+        "_blank",
+        "noopener,noreferrer",
+      );
+    });
+
+    it("opens a configured cross-link from a segment click without throwing", async () => {
+      const deps = makeDeps();
+      deps.panelSchema.value.type = "state-timeline";
+      deps.panelSchema.value.config.drilldown = [];
+      deps.panelData.value = {
+        options: { xAxis: { type: "time" }, series: [{ type: "custom" }] },
+      } as any;
+      const open = vi.spyOn(window, "open").mockReturnValue(null);
+      const api = usePanelDrilldown(deps as any);
+
+      await api.onChartClick(segmentClick);
+      await expect(api.openDrilldown(0)).resolves.toBeUndefined();
+      expect(api.drilldownArray.value[0]._isCrossLink).toBe(true);
+      expect(open).toHaveBeenCalledTimes(1);
+    });
+
+    it("opens a clicked annotation range, never the segment drilldown", async () => {
+      const deps = makeDeps();
+      deps.panelSchema.value.type = "state-timeline";
+      const api = usePanelDrilldown(deps as any);
+
+      await api.onChartClick({
+        componentType: "markArea",
+        event: { offsetX: 10, offsetY: 10 },
+        data: { annotationDetails: { id: "r1", text: "Maintenance" } },
+      });
+
+      expect(deps.drilldownPopUpRef.value.style.display).not.toBe("block");
+      expect(deps.selectedAnnotationData.value).toEqual({ id: "r1", text: "Maintenance" });
+    });
+
+    it.each([
+      ["gpu0", "8080"],
+      ["gpu1", "9090"],
+    ])("fills a cross-link with the SQL row of the clicked entity %s", async (entity, port) => {
+      resultSchemaMock.mockResolvedValue({
+        data: {
+          cross_links: {
+            stream_links: [
+              {
+                name: "Port",
+                url: "https://example.com/p/${field.__value}",
+                fields: [{ name: "port", alias: "port" }],
+              },
+            ],
+            org_links: [],
+          },
+        },
+      });
+      const deps = makeDeps();
+      deps.panelSchema.value.type = "state-timeline";
+      deps.panelSchema.value.config.drilldown = [];
+      deps.panelSchema.value.queries[0].fields.x = [{ alias: "x_axis_1" }] as any;
+      deps.panelSchema.value.queries[0].fields.breakdown = [
+        { alias: "breakdown_1", args: [{ type: "field", value: { field: "gpu" } }] },
+      ] as any;
+      deps.data.value = [
+        [
+          { x_axis_1: "1970-01-01T00:00:00", breakdown_1: "gpu0", port: "7070" },
+          { x_axis_1: "1970-01-01T00:00:01", breakdown_1: "gpu0", port: "8080" },
+          { x_axis_1: "1970-01-01T00:00:02", breakdown_1: "gpu0", port: "1111" },
+          { x_axis_1: "1970-01-01T00:00:01", breakdown_1: "gpu1", port: "9090" },
+        ],
+      ] as any;
+      const open = vi.spyOn(window, "open").mockReturnValue(null);
+      const api = usePanelDrilldown(deps as any);
+
+      await api.onChartClick({
+        ...segmentClick,
+        data: { ...segmentClick.data, name: entity, entity, labels: { gpu: entity } },
+      });
+      await api.openDrilldown(0);
+
+      expect(open).toHaveBeenCalledWith(
+        `https://example.com/p/${port}`,
+        "_blank",
+        "noopener,noreferrer",
+      );
+      open.mockRestore();
+    });
+
+    it("scopes an auto Logs drilldown to the entity and the segment's time range", async () => {
+      const deps = makeDeps();
+      deps.panelSchema.value.type = "state-timeline";
+      deps.panelSchema.value.queries[0].fields.breakdown = [
+        { alias: "breakdown_1", args: [{ type: "field", value: { field: "gpu" } }] },
+      ] as any;
+      deps.panelSchema.value.config.drilldown = [
+        { name: "Logs", type: "logs", targetBlank: false, data: { logsMode: "auto" } },
+      ] as any;
+      const api = usePanelDrilldown(deps as any);
+
+      await api.onChartClick(segmentClick);
+      await api.openDrilldown(0);
+
+      await vi.waitFor(() =>
+        expect(deps.router.push).toHaveBeenCalledWith(
+          expect.objectContaining({
+            query: expect.objectContaining({
+              from: "1000000",
+              to: "61000000",
+              query: expect.stringContaining("gpu = 'gpu0'"),
+            }),
+          }),
+        ),
+      );
+    });
+  });
+
+  describe("host map cell", () => {
+    const cellClick = {
+      componentType: "series",
+      seriesIndex: 0,
+      dataIndex: 3,
+      event: { offsetX: 40, offsetY: 50 },
+      value: [3],
+      data: {
+        name: "gpu3",
+        groups: ["rack-1", "host-7"],
+        cellValue: 91.5,
+        labels: { gpu: "gpu3", rack: "rack-1", host: "host-7" },
+      },
+    };
+    const hostmapDeps = () => {
+      const deps = makeDeps();
+      deps.panelSchema.value.type = "hostmap";
+      deps.panelSchema.value.queries[0].fields.x = [{ alias: "x_axis_1", column: "gpu" }] as any;
+      deps.panelSchema.value.queries[0].fields.breakdown = [
+        { alias: "breakdown_1", column: "rack" },
+        { alias: "breakdown_2", column: "host" },
+      ] as any;
+      return deps;
+    };
+
+    it("passes the cell's name, value, group and labels to a URL drilldown", async () => {
+      const deps = hostmapDeps();
+      deps.panelSchema.value.config.drilldown = [
+        {
+          name: "Open",
+          type: "byUrl",
+          targetBlank: true,
+          data: {
+            url: "https://example.com/?e=${series.__name}&v=${series.__value}&g=${series.__group}&host=${series.labels.host}",
+          },
+        },
+      ] as any;
+      const open = vi.spyOn(window, "open").mockReturnValue(null);
+      const api = usePanelDrilldown(deps as any);
+
+      await api.onChartClick(cellClick);
+      expect(deps.drilldownPopUpRef.value.style.display).toBe("block");
+      await api.openDrilldown(0);
+
+      expect(open).toHaveBeenCalledWith(
+        "https://example.com/?e=gpu3&v=91.5&g=rack-1/host-7&host=host-7",
+        "_blank",
+        "noopener,noreferrer",
+      );
+      open.mockRestore();
+    });
+
+    it("opens nothing for a click on a group header", async () => {
+      const deps = hostmapDeps();
+      const api = usePanelDrilldown(deps as any);
+      await api.onChartClick({ ...cellClick, seriesIndex: 1, data: { value: [0] } });
+      expect(deps.drilldownPopUpRef.value.style.display).not.toBe("block");
+    });
+
+    it("scopes an auto Logs drilldown to the entity over the whole panel range", async () => {
+      const deps = hostmapDeps();
+      deps.panelSchema.value.config.drilldown = [
+        { name: "Logs", type: "logs", targetBlank: false, data: { logsMode: "auto" } },
+      ] as any;
+      const api = usePanelDrilldown(deps as any);
+
+      await api.onChartClick(cellClick);
+      await api.openDrilldown(0);
+
+      await vi.waitFor(() =>
+        expect(deps.router.push).toHaveBeenCalledWith(
+          expect.objectContaining({
+            query: expect.objectContaining({
+              from: String(new Date("2026-03-18T00:00:00Z").getTime()),
+              query: expect.stringContaining("gpu = 'gpu3'"),
+            }),
+          }),
+        ),
+      );
+    });
+  });
+
+  it("fetches cross-links lazily on the first drilldown interaction, not on panel render", async () => {
     const deps = makeDeps();
     const api = usePanelDrilldown(deps as any);
 
     await nextTick();
+    // Lazy: a panel render (dashboard refresh) must NOT fire result_schema.
+    expect(resultSchemaMock).not.toHaveBeenCalled();
+
+    await api.ensureDrilldownSchema();
 
     expect(resultSchemaMock).toHaveBeenCalledTimes(1);
     expect(api.crossLinksData.value.stream_links).toHaveLength(1);
@@ -196,8 +823,394 @@ describe("usePanelDrilldown", () => {
 
     const api = usePanelDrilldown(deps as any);
     await nextTick();
+    await api.ensureDrilldownSchema();
 
     expect(resultSchemaMock).not.toHaveBeenCalled();
     expect(api.crossLinksData.value).toEqual({ stream_links: [], org_links: [] });
+  });
+
+  describe("cross-link drilldown", () => {
+    const mockStreamLink = (url: string) =>
+      resultSchemaMock.mockResolvedValue({
+        data: {
+          cross_links: {
+            stream_links: [{ name: "Link", url, fields: [{ name: "f", alias: "f" }] }],
+            org_links: [],
+          },
+        },
+      });
+
+    const clickAndOpenCrossLink = async () => {
+      const deps = makeDeps();
+      deps.panelSchema.value.config.drilldown = [];
+      const api = usePanelDrilldown(deps as any);
+      await api.onChartClick({
+        componentType: "series",
+        event: { offsetX: 1, offsetY: 1 },
+        dataIndex: 0,
+        seriesName: "s",
+        value: ["x", 1],
+      });
+      await api.openDrilldown(0);
+    };
+
+    it.each([
+      "javascript:alert(document.domain)",
+      " JaVaScRiPt:alert(1)",
+      "data:text/html,<script>alert(1)</script>",
+      "${field.__value}",
+    ])("never opens a stored cross-link that does not resolve to http(s): %s", async (url) => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      mockStreamLink(url);
+
+      await clickAndOpenCrossLink();
+
+      expect(openSpy).not.toHaveBeenCalled();
+      openSpy.mockRestore();
+    });
+
+    it("opens an http(s) cross-link without handing the new tab an opener", async () => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      mockStreamLink("https://jaeger.example.com/trace/${field.__value}");
+
+      await clickAndOpenCrossLink();
+
+      expect(openSpy).toHaveBeenCalledWith(
+        "https://jaeger.example.com/trace/",
+        "_blank",
+        "noopener,noreferrer",
+      );
+      openSpy.mockRestore();
+    });
+  });
+
+  // ── Table cell → Logs drilldown ──────────────────────────────────────────
+  // The drillable-columns watcher parses SQL via a dynamically-imported parser.
+  // Under parallel test load that import can take longer than a few microtask
+  // turns, so poll the result rather than fixing a turn count (avoids flakiness).
+  const flush = async (ready?: () => boolean) => {
+    for (let i = 0; i < 50; i++) {
+      await new Promise((r) => setTimeout(r, 2));
+      if (ready?.()) return;
+    }
+  };
+
+  const makeTableDeps = (query: string) => {
+    const deps = makeDeps();
+    deps.panelSchema.value.type = "table";
+    (deps.panelSchema.value.queries[0] as any).query = query;
+    (deps.metadata.value.queries[0] as any).query = query;
+    return deps;
+  };
+
+  it("marks group-by dimension columns drillable and excludes aggregates", async () => {
+    const deps = makeTableDeps("select service, count(*) as cnt from logs group by service");
+    const api = usePanelDrilldown(deps as any);
+    await flush();
+
+    expect(api.drilldownColumnAliases.value).toContain("service");
+    expect(api.drilldownColumnAliases.value).not.toContain("cnt");
+    expect(api.drilldownAllColumns.value).toBe(false);
+  });
+
+  it("still resolves drillable columns when the WHERE clause is deeply nested", async () => {
+    // Regression: astify() is exponential in WHERE nesting, so a builder-generated
+    // predicate like this used to block the main thread for minutes on mount.
+    let where = `"c0" = 'v0'`;
+    for (let i = 1; i < 22; i++) where = `(${where} AND "c${i}" = 'v${i}')`;
+    const deps = makeTableDeps(
+      `select service, count(*) as cnt from logs where ${where} group by service`,
+    );
+
+    const started = Date.now();
+    const api = usePanelDrilldown(deps as any);
+    await flush(() => api.drilldownColumnAliases.value.length > 0);
+
+    expect(api.drilldownColumnAliases.value).toContain("service");
+    expect(api.drilldownColumnAliases.value).not.toContain("cnt");
+    expect(Date.now() - started).toBeLessThan(5000);
+  });
+
+  it("treats SELECT * / dynamic-columns tables as all-columns drillable", async () => {
+    const deps = makeTableDeps("select * from logs");
+    const api = usePanelDrilldown(deps as any);
+    await flush();
+
+    expect(api.drilldownAllColumns.value).toBe(true);
+  });
+
+  it("resolves each join column to its own stream (join-aware)", async () => {
+    const deps = makeTableDeps(
+      "select a.svc as svc, b.region as region, count(*) as cnt " +
+        "from stream_a a join stream_b b on a.id = b.id group by svc, region",
+    );
+    const api = usePanelDrilldown(deps as any);
+    await flush();
+
+    // Both dimension columns drillable; the aggregate excluded.
+    expect(api.drilldownColumnAliases.value).toEqual(expect.arrayContaining(["svc", "region"]));
+    expect(api.drilldownColumnAliases.value).not.toContain("cnt");
+
+    // Each column resolves to the stream its alias points at, and is flagged as a join.
+    const svc = api.getCellDrilldownField(0, "svc");
+    const region = api.getCellDrilldownField(0, "region");
+    expect(svc.streamName).toBe("stream_a");
+    expect(region.streamName).toBe("stream_b");
+    expect(svc.isJoin).toBe(true);
+  });
+
+  it("captures the backend per-stream WHERE from result_schema into panelWhereByStream", async () => {
+    resultSchemaMock.mockResolvedValue({
+      data: {
+        where_by_stream: { stream_a: "env = 'prod'", stream_b: "tier = 'gold'" },
+        cross_links: { stream_links: [], org_links: [] },
+      },
+    });
+    const deps = makeDeps();
+    const api = usePanelDrilldown(deps as any);
+    await api.ensureDrilldownSchema();
+
+    expect(api.panelWhereByStream.value).toEqual({
+      stream_a: "env = 'prod'",
+      stream_b: "tier = 'gold'",
+    });
+  });
+
+  it("captures the backend-parsed WHERE from result_schema into panelBaseWhere", async () => {
+    resultSchemaMock.mockResolvedValue({
+      data: {
+        where_clause: "level = 'error'",
+        cross_links: { stream_links: [], org_links: [] },
+      },
+    });
+    const deps = makeDeps();
+    const api = usePanelDrilldown(deps as any);
+    await api.ensureDrilldownSchema();
+
+    expect(api.panelBaseWhere.value).toBe("level = 'error'");
+  });
+
+  it("fetches per clicked query index for multi-query panels (2nd-query cell fires result_schema)", async () => {
+    // result_schema returns a WHERE keyed off the SQL it was sent, so we can tell the two apart.
+    resultSchemaMock.mockImplementation((payload: any) => {
+      const sql = payload?.query?.query?.sql ?? "";
+      return Promise.resolve({
+        data: {
+          where_clause: sql.includes("stream_b") ? "region = 'us'" : "level = 'error'",
+          cross_links: { stream_links: [], org_links: [] },
+        },
+      });
+    });
+
+    const deps = makeDeps();
+    deps.panelSchema.value.queries = [
+      { fields: { stream: "stream_a", stream_type: "logs" }, query: "select * from stream_a" },
+      { fields: { stream: "stream_b", stream_type: "logs" }, query: "select * from stream_b" },
+    ] as any;
+    deps.metadata.value.queries = [
+      { query: "select * from stream_a where level = 'error'" },
+      { query: "select * from stream_b where region = 'us'" },
+    ] as any;
+
+    const api = usePanelDrilldown(deps as any);
+
+    // Click a query-0 cell.
+    await api.ensureDrilldownSchema(0);
+    expect(api.panelBaseWhere.value).toBe("level = 'error'");
+
+    // Click a query-1 cell — must fire a fresh result_schema for query 1, not reuse query 0's cache.
+    await api.ensureDrilldownSchema(1);
+    expect(resultSchemaMock).toHaveBeenCalledTimes(2);
+    expect(api.panelBaseWhere.value).toBe("region = 'us'");
+    // The query-1 request carried query 1's SQL.
+    const secondCallSql = resultSchemaMock.mock.calls[1][0]?.query?.query?.sql ?? "";
+    expect(secondCallSql).toContain("stream_b");
+
+    // Re-clicking query 0 hits the cache (no third call).
+    await api.ensureDrilldownSchema(0);
+    expect(resultSchemaMock).toHaveBeenCalledTimes(2);
+    expect(api.panelBaseWhere.value).toBe("level = 'error'");
+  });
+
+  describe("table row drilldown", () => {
+    const clickTableRow = async (
+      deps: any,
+      row: any,
+      index: number,
+      url = "https://example.com/?job=${row.field.job}&i=${row.index}",
+    ) => {
+      deps.panelSchema.value.type = "table";
+      deps.panelSchema.value.config.drilldown = [
+        {
+          name: "Row",
+          type: "byUrl",
+          targetBlank: true,
+          data: { url },
+        },
+      ];
+      const api = usePanelDrilldown(deps as any);
+      const target = { getBoundingClientRect: () => ({ left: 0, top: 0 }) };
+      await api.onChartClick({ offsetX: 1, offsetY: 1, target }, row, index);
+      await api.openDrilldown(0);
+    };
+
+    it("fills row.field from the clicked PromQL row's labels, without the legend marker", async () => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      const deps = makeDeps();
+      deps.panelSchema.value.queryType = "promql";
+
+      await clickTableRow(deps, { job: "api", value: 3, __legend__: "{job=api}" }, 2);
+
+      expect(openSpy).toHaveBeenCalledWith(
+        "https://example.com/?job=api&i=2",
+        "_blank",
+        "noopener,noreferrer",
+      );
+      openSpy.mockRestore();
+    });
+
+    it("leaves the PromQL table's synthetic row id out of row.field", async () => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      const deps = makeDeps();
+      deps.panelSchema.value.queryType = "promql";
+
+      await clickTableRow(
+        deps,
+        { id: "row_3", job: "api", value: 3, __legend__: "{job=api}" },
+        3,
+        "https://example.com/?id=${row.field.id}&job=${row.field.job}",
+      );
+
+      const opened = String(openSpy.mock.calls[0]?.[0]);
+      expect(opened).toContain("job=api");
+      expect(opened).not.toContain("row_3");
+      openSpy.mockRestore();
+    });
+
+    it("keeps reading SQL rows through the query fields", async () => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      const deps = makeDeps();
+      deps.panelSchema.value.queries[0].fields.x = [{ alias: "job", label: "Job" }] as any;
+
+      await clickTableRow(deps, { job: "web", other: "x" }, 0);
+
+      expect(openSpy).toHaveBeenCalledWith(
+        "https://example.com/?job=web&i=0",
+        "_blank",
+        "noopener,noreferrer",
+      );
+      openSpy.mockRestore();
+    });
+  });
+
+  it("hands a metric cell's own name and raw value to a URL drilldown", async () => {
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    const deps = makeDeps();
+    deps.panelSchema.value.type = "metric";
+    deps.panelSchema.value.config.drilldown = [
+      {
+        name: "Link",
+        type: "byUrl",
+        targetBlank: true,
+        data: { url: "https://example.com/?n=${series.__name}&v=${series.__value}" },
+      } as any,
+    ];
+    deps.panelData.value.options.series = [
+      { _metricName: "api", _metricRaw: "12.5" },
+      { _metricName: "web", _metricRaw: 7 },
+    ] as any;
+    const api = usePanelDrilldown(deps as any);
+
+    await api.onChartClick({
+      componentType: "series",
+      seriesIndex: 1,
+      event: { offsetX: 1, offsetY: 1 },
+      value: [],
+    });
+    await api.openDrilldown(0);
+
+    expect(openSpy).toHaveBeenCalledWith(
+      "https://example.com/?n=web&v=7",
+      "_blank",
+      "noopener,noreferrer",
+    );
+    openSpy.mockRestore();
+  });
+
+  describe("sankey return nodes", () => {
+    const sankeyDeps = (drilldown: any) => {
+      const deps = makeDeps();
+      deps.panelSchema.value.type = "sankey";
+      deps.panelSchema.value.config.drilldown = [drilldown];
+      return deps;
+    };
+    const returnEdge = {
+      componentType: "series",
+      componentSubType: "sankey",
+      dataType: "edge",
+      event: { offsetX: 40, offsetY: 50 },
+      data: {
+        source: "B",
+        target: "\u0000\u21a9A",
+        rawSource: "B",
+        rawTarget: "A",
+        value: 4,
+      },
+    };
+    const returnNode = {
+      componentType: "series",
+      componentSubType: "sankey",
+      dataType: "node",
+      event: { offsetX: 40, offsetY: 50 },
+      name: "\u0000\u21a9A",
+      value: 4,
+      data: { name: "\u0000\u21a9A", rawName: "A", isReturn: true },
+    };
+
+    it("passes the real names of a return link to a URL drilldown", async () => {
+      const open = vi.spyOn(window, "open").mockImplementation(() => null);
+      const deps = sankeyDeps({
+        name: "Edge",
+        type: "byUrl",
+        data: { url: "https://example.com/?s=${edge.__source}&t=${edge.__target}" },
+      });
+      const api = usePanelDrilldown(deps as any);
+
+      await api.onChartClick(returnEdge);
+      await api.openDrilldown(0);
+
+      expect(open).toHaveBeenCalledWith(
+        "https://example.com/?s=B&t=A",
+        expect.anything(),
+        expect.anything(),
+      );
+      open.mockRestore();
+    });
+
+    it("passes the real name of a return node to a custom logs drilldown", async () => {
+      const deps = sankeyDeps({
+        name: "Logs",
+        type: "logs",
+        targetBlank: false,
+        data: {
+          logsMode: "custom",
+          logsQuery: `SELECT * FROM "default" WHERE svc = \${node.__name}`,
+        },
+      });
+      const api = usePanelDrilldown(deps as any);
+
+      await api.onChartClick(returnNode);
+      await api.openDrilldown(0);
+
+      await vi.waitFor(() =>
+        expect(deps.router.push).toHaveBeenCalledWith(
+          expect.objectContaining({
+            query: expect.objectContaining({
+              query: `b64(SELECT * FROM "default" WHERE svc = 'A')`,
+            }),
+          }),
+        ),
+      );
+    });
   });
 });

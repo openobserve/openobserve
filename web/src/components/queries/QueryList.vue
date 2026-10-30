@@ -1,5 +1,5 @@
 <template>
-  <OCard class="flex h-full flex-col flex-nowrap" style="min-width: 480px; max-width: 800px">
+  <OCard class="flex h-full flex-col flex-nowrap" style="min-width: 30rem; max-width: 50rem">
     <!-- Header -->
     <div class="px-2 py-3">
       <OCardSection role="header" class="w-full">
@@ -8,6 +8,7 @@
             {{ t("queries.queryList") }}
           </div>
           <OButton
+            :aria-label="t('common.close')"
             variant="ghost"
             size="icon-sm"
             data-test="queryList-cancel"
@@ -28,13 +29,18 @@
       pagination="none"
       dense
       data-test="queryList-table"
-    />
+    >
+      <template #cell-value="{ value }">
+        <div v-if="isWrappable(value)" class="wrap-anywhere whitespace-normal">{{ value }}</div>
+        <template v-else>{{ value }}</template>
+      </template>
+    </OTable>
   </OCard>
 </template>
 
 <script lang="ts">
 import { defineComponent, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { timestampToTimezoneDate, durationFormatter } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
@@ -45,6 +51,8 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
+const WRAP_MAX_CHARS = 300;
+
 export default defineComponent({
   name: "QueryList",
   components: { OSeparator, OButton, OTable, OCard, OCardSection },
@@ -54,7 +62,7 @@ export default defineComponent({
     metaData: Object,
   },
   setup(props: any) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const queryData = props.metaData?.queries || [];
     const store = useStore();
     const getRows = (query: any) => {
@@ -111,23 +119,26 @@ export default defineComponent({
           ? getUnitValue(query?.compressed_size, "megabytes", "", 2)
           : { value: "", unit: "" };
       const rows: any[] = [
-        ["Trace ID", query?.trace_id],
-        ["Status", query?.status],
-        ["User ID", query?.user_id],
-        ["Org ID", query?.org_id],
-        ["Stream Type", query?.stream_type],
-        ["Search Type", query?.search_type],
-        ["Query Source", query?.query_source],
+        [t("queries.traceId"), query?.trace_id],
+        [t("queries.status"), query?.status],
+        [t("queries.userId"), query?.user_id],
+        [t("queries.orgId"), query?.org_id],
+        [t("queries.streamType"), query?.stream_type],
+        [t("queries.searchType"), query?.search_type],
+        [t("queries.querySource"), query?.query_source],
         ["SQL", query?.sql],
-        ["Start Time", startTimeEntry],
-        ["End Time", endTimeEntry],
-        ["Exec. Duration", getDuration(query?.created_at)],
-        ["Query Range", queryRange(query?.start_time, query?.end_time)],
-        ["Scan Records", query?.records],
-        ["Files", query?.files],
-        ["Original Size", originalSize.value ? `${originalSize.value} ${originalSize.unit}` : ""],
+        [t("queries.startTime"), startTimeEntry],
+        [t("queries.endTime"), endTimeEntry],
+        [t("queries.duration"), getDuration(query?.created_at)],
+        [t("queries.queryRange"), queryRange(query?.start_time, query?.end_time)],
+        [t("queries.scanRecords"), query?.records],
+        [t("queries.files"), query?.files],
         [
-          "Compressed Size",
+          t("queries.originalSize"),
+          originalSize.value ? `${originalSize.value} ${originalSize.unit}` : "",
+        ],
+        [
+          t("queries.compressedSize"),
           compressedSize.value ? `${compressedSize.value} ${compressedSize.unit}` : "",
         ],
       ];
@@ -147,7 +158,7 @@ export default defineComponent({
     const queryListColumns = [
       {
         id: "key",
-        header: "",
+        header: raw(""),
         accessorKey: "key",
         sortable: false,
         size: COL.owner,
@@ -155,7 +166,7 @@ export default defineComponent({
       },
       {
         id: "value",
-        header: "",
+        header: raw(""),
         accessorKey: "value",
         sortable: false,
         size: COL.description,
@@ -163,7 +174,11 @@ export default defineComponent({
       },
     ];
 
+    const isWrappable = (value: unknown) =>
+      typeof value === "string" && value.length <= WRAP_MAX_CHARS;
+
     return {
+      isWrappable,
       queryData,
       t,
       getRows,

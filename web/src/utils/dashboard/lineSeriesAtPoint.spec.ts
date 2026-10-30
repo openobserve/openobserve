@@ -1,0 +1,129 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { describe, expect, it } from "vitest";
+import {
+  indexesNearX,
+  lineSeriesAtPoint,
+  nearestIndexByX,
+  type LineSeriesPixels,
+} from "./lineSeriesAtPoint";
+
+const flat: LineSeriesPixels = {
+  seriesIndex: 0,
+  points: [
+    [0, 100],
+    [100, 100],
+    [200, 100],
+  ],
+};
+const spike: LineSeriesPixels = {
+  seriesIndex: 2,
+  points: [
+    [0, 100],
+    [100, 20],
+    [200, 100],
+  ],
+};
+
+describe("lineSeriesAtPoint", () => {
+  it("finds the line a click lands on between its points, with the nearer point", () => {
+    expect(lineSeriesAtPoint([75, 40], [flat, spike])).toEqual({ seriesIndex: 2, dataIndex: 1 });
+    expect(lineSeriesAtPoint([30, 101], [flat, spike])).toEqual({ seriesIndex: 0, dataIndex: 0 });
+  });
+
+  it("finds nothing away from every line", () => {
+    expect(lineSeriesAtPoint([50, 300], [flat, spike])).toBeNull();
+  });
+
+  it("does not bridge a gap the chart leaves undrawn", () => {
+    const gapped: LineSeriesPixels = { seriesIndex: 1, points: [[0, 50], null, [200, 50]] };
+    expect(lineSeriesAtPoint([100, 50], [gapped])).toBeNull();
+    expect(lineSeriesAtPoint([2, 51], [gapped])).toEqual({ seriesIndex: 1, dataIndex: 0 });
+  });
+
+  it("takes the first of two lines drawn on top of each other", () => {
+    const twin = { ...flat, seriesIndex: 3 };
+    expect(lineSeriesAtPoint([50, 100], [flat, twin])?.seriesIndex).toBe(0);
+  });
+
+  it("reports the data index of a window that starts past the series' first point", () => {
+    expect(lineSeriesAtPoint([75, 40], [{ ...spike, offset: 500 }])).toEqual({
+      seriesIndex: 2,
+      dataIndex: 501,
+    });
+  });
+});
+
+describe("indexesNearX", () => {
+  const every10 = (index: number) => index * 10;
+
+  it("takes the points within reach of the cursor plus one either side", () => {
+    expect(indexesNearX(100, 505, every10, 6)).toEqual([49, 52]);
+  });
+
+  it("clamps to the series' ends", () => {
+    expect(indexesNearX(3, -50, every10, 6)).toEqual([0, 0]);
+    expect(indexesNearX(3, 500, every10, 6)).toEqual([2, 2]);
+  });
+
+  it("steps over gaps whose x is unknown", () => {
+    const gaps = new Set([2, 3, 4, 5, 6, 7]);
+    const xAt = (index: number) => (gaps.has(index) ? null : index * 10);
+    expect(indexesNearX(9, 15, xAt, 6)).toEqual([0, 2]);
+    expect(indexesNearX(9, 85, xAt, 6)).toEqual([1, 8]);
+  });
+
+  it("searches rows that run right to left", () => {
+    expect(indexesNearX(100, 505, (index) => (99 - index) * 10, 6)).toEqual([47, 50]);
+  });
+
+  it("steps over points whose x cannot be placed", () => {
+    const xAt = (index: number) => (index === 4 ? NaN : index * 10);
+    expect(indexesNearX(9, 45, xAt, 6)).toEqual([3, 6]);
+  });
+
+  it("gives up on a series whose x cannot be placed, or that has no points", () => {
+    expect(indexesNearX(10, 50, () => NaN)).toBeNull();
+    expect(indexesNearX(0, 50, every10)).toBeNull();
+  });
+});
+
+describe("nearestIndexByX", () => {
+  const xsAt = (xs: (number | null)[]) => (index: number) => xs[index] ?? null;
+
+  it("looks past a run of gaps to the next drawn point on the right", () => {
+    expect(nearestIndexByX(5, 48, xsAt([10, 20, null, null, 50]))).toBe(4);
+    expect(nearestIndexByX(5, 22, xsAt([10, 20, null, null, 50]))).toBe(1);
+  });
+
+  it("takes the first drawn point when the cursor is left of it, past leading gaps", () => {
+    expect(nearestIndexByX(6, 29, xsAt([null, null, null, 30, 40, 50]))).toBe(3);
+  });
+
+  it("takes the last drawn point when the cursor is right of it, before trailing gaps", () => {
+    expect(nearestIndexByX(4, 40, xsAt([10, 20, null, null]))).toBe(1);
+  });
+
+  it("finds the nearer point in rows that run right to left", () => {
+    const descending = xsAt([50, 40, null, 20, 10]);
+    expect(nearestIndexByX(5, 38, descending)).toBe(1);
+    expect(nearestIndexByX(5, 25, descending)).toBe(3);
+  });
+
+  it("finds nothing in a series with no drawn point", () => {
+    expect(nearestIndexByX(3, 10, xsAt([null, null, null]))).toBeUndefined();
+  });
+});

@@ -4,15 +4,40 @@
  * Generates human-readable summaries of anomaly detection configurations
  */
 
+import { type TranslateFn } from "@/types/i18n";
+import {
+  ANOMALY_DIRECTION_KEYS,
+  anomalyExpectedGroupingKey,
+  anomalySensitivityModel,
+  anomalyIntervalSeconds,
+  anomalyWindowShareEffective,
+} from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
+
+// Escape user-controlled strings before embedding in HTML (XSS prevention) —
+// mirrors alertSummaryGenerator.ts's esc(), so both generators emit HTML that
+// is already safe rather than leaving escaping to whoever calls v-html.
+const esc = (s: string) =>
+  String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
 export function generateAnomalySummary(
   config: any,
   destinations: any[],
-  t?: (key: string) => string,
+  t: TranslateFn,
   wizardStep: number = 3,
 ): string {
   if (!config || !config.stream_name) return "";
 
   const parts: string[] = [];
+
+  // The markup stays here rather than in en-US.json: translators get whole
+  // sentences with {placeholders} and never have to preserve a tag.
+  const chip = (value: string | number) =>
+    `<span class="summary-clickable">${esc(String(value))}</span>`;
 
   // Step 1+: Stream & query info
   if (wizardStep >= 1) {
@@ -20,15 +45,19 @@ export function generateAnomalySummary(
       (config.stream_type || "logs").charAt(0).toUpperCase() +
       (config.stream_type || "logs").slice(1);
     parts.push(
-      `✓ Data Source: <span class="summary-clickable">${displayStreamType}</span> — <span class="summary-clickable">${config.stream_name}</span>`,
+      t("alerts.anomaly.summaryDataSource", {
+        type: chip(displayStreamType),
+        name: chip(config.stream_name),
+      }),
     );
 
-    const queryModeLabel = config.query_mode === "custom_sql" ? "Custom SQL" : "Filters";
-    parts.push(`✓ Query Mode: <span class="summary-clickable">${queryModeLabel}</span>`);
+    const queryModeLabel =
+      config.query_mode === "custom_sql" ? t("alerts.customSql") : t("alerts.anomaly.filters");
+    parts.push(t("alerts.anomaly.summaryQueryMode", { mode: chip(queryModeLabel) }));
 
     if (config.query_mode === "filters" && config.detection_function) {
       parts.push(
-        `✓ Detection Function: <span class="summary-clickable">${config.detection_function}</span>`,
+        t("alerts.anomaly.summaryDetectionFunction", { fn: chip(config.detection_function) }),
       );
     }
   }
@@ -36,32 +65,76 @@ export function generateAnomalySummary(
   // Step 2+: Detection config
   if (wizardStep >= 2) {
     const resolution = `${config.histogram_interval_value}${config.histogram_interval_unit}`;
-    parts.push(`✓ Resolution: <span class="summary-clickable">${resolution}</span>`);
+    parts.push(t("alerts.anomaly.summaryResolution", { resolution: chip(resolution) }));
 
     const schedule = `${config.schedule_interval_value}${config.schedule_interval_unit}`;
-    parts.push(`✓ Schedule: every <span class="summary-clickable">${schedule}</span>`);
+    parts.push(t("alerts.anomaly.summarySchedule", { schedule: chip(schedule) }));
 
     const win = `${config.detection_window_value}${config.detection_window_unit}`;
-    parts.push(`✓ Detection Window: last <span class="summary-clickable">${win}</span>`);
+    parts.push(t("alerts.anomaly.summaryDetectionWindow", { window: chip(win) }));
 
-    const seasonality =
-      (config.training_window_days || 14) >= 7 ? "hour + day-of-week" : "hour-of-day";
+    const seasonality = t(
+      anomalyExpectedGroupingKey(
+        anomalyIntervalSeconds(
+          Number(config.histogram_interval_value),
+          String(config.histogram_interval_unit),
+        ),
+      ) as any,
+    );
     parts.push(
-      `✓ Training: <span class="summary-clickable">${config.training_window_days} days</span> (${seasonality})`,
+      t("alerts.anomaly.summaryTraining", {
+        days: chip(t("alerts.anomaly.summaryTrainingDays", { days: config.training_window_days })),
+        seasonality,
+      }),
     );
 
     const retrain =
-      config.retrain_interval_days === 0 ? "Never" : `every ${config.retrain_interval_days}d`;
-    parts.push(`✓ Retrain: <span class="summary-clickable">${retrain}</span>`);
+      config.retrain_interval_days === 0
+        ? t("alerts.anomaly.retrainNever")
+        : t("alerts.anomaly.summaryRetrainEveryDays", { days: config.retrain_interval_days });
+    parts.push(t("alerts.anomaly.summaryRetrain", { retrain: chip(retrain) }));
 
-    const anomalyRate = 100 - (config.threshold ?? 97);
-    parts.push(`✓ Threshold: <span class="summary-clickable">${anomalyRate}% anomaly rate</span>`);
+    const budget = Number(config.alert_budget_per_day);
+    if (Number.isFinite(budget) && budget > 0) {
+      // Budget mode: the enforced cap IS the sensitivity statement.
+      const round = (n: number) => Math.round(n * 1e6) / 1e6;
+      const label =
+        budget < 1
+          ? t("alerts.anomaly.summaryBudgetPerWeek", { count: round(budget * 7) })
+          : t("alerts.anomaly.summaryBudgetPerDay", { count: round(budget) });
+      parts.push(t("alerts.anomaly.summaryThreshold", { threshold: chip(label) }));
+    } else {
+      // A cleared field reaches here as "", and Number("")/Number(null) are
+      // both 0, so blanks need excluding before any number is shown.
+      const blankToNaN = (v: unknown) =>
+        v === null || v === undefined || v === "" ? NaN : Number(v);
+      const bandWidth = blankToNaN(config.band_width);
+      const model = anomalySensitivityModel(config);
+      const trainedK = model.current ? model.level : null;
+      const auto =
+        trainedK === null
+          ? t("alerts.anomaly.sensitivityAuto")
+          : t("alerts.anomaly.sensitivityAutoTrained", { k: trainedK });
+      parts.push(
+        t("alerts.anomaly.summaryThreshold", {
+          threshold: chip(
+            config.band_width == null
+              ? auto
+              : Number.isFinite(bandWidth) && bandWidth >= 1 && bandWidth <= 10
+                ? `${bandWidth}σ`
+                : t("alerts.anomaly.bandWidthRange"),
+          ),
+        }),
+      );
+    }
   }
 
   // Step 3+: Alerting
   if (wizardStep >= 3) {
     if (!config.alert_enabled) {
-      parts.push(`✓ Alerting: <span class="summary-clickable">Disabled</span>`);
+      parts.push(
+        t("alerts.anomaly.summaryAlerting", { status: chip(t("alerts.anomaly.disabled")) }),
+      );
     } else {
       const ids: string[] = Array.isArray(config.alert_destination_ids)
         ? config.alert_destination_ids
@@ -76,18 +149,29 @@ export function generateAnomalySummary(
         .filter(Boolean);
       if (destNames.length > 0) {
         parts.push(
-          `✓ Alerting: Enabled → <span class="summary-clickable">${destNames.join(", ")}</span>`,
+          t("alerts.anomaly.summaryAlertingEnabled", { destinations: chip(destNames.join(", ")) }),
         );
       } else {
         parts.push(
-          `✓ Alerting: Enabled ⚠️ <span class="summary-clickable">No destination set</span>`,
+          t("alerts.anomaly.summaryAlertingNoDestination", {
+            warning: chip(t("alerts.summary.noDestination")),
+          }),
         );
       }
     }
+    // The gates are configured whether or not notifications are on, so they show either way.
+    const directionKey =
+      ANOMALY_DIRECTION_KEYS[config.alert_direction] ?? ANOMALY_DIRECTION_KEYS.both;
+    parts.push(t("alerts.anomaly.summaryDirection", { direction: chip(t(directionKey as any)) }));
+    parts.push(
+      t("alerts.anomaly.summaryWindowShare", {
+        rule: chip(t("alerts.anomaly.windowShareCompact", anomalyWindowShareEffective(config))),
+      }),
+    );
   }
 
   const bulletPoints = parts.join("\n");
-  const plainEnglish = generatePlainEnglish(config, wizardStep);
+  const plainEnglish = generatePlainEnglish(config, wizardStep, t);
 
   if (plainEnglish) {
     return `<div class="plain-english-section">"${plainEnglish}"</div>\n${bulletPoints}`;
@@ -96,17 +180,20 @@ export function generateAnomalySummary(
   return bulletPoints;
 }
 
-function generatePlainEnglish(config: any, wizardStep: number): string {
+function generatePlainEnglish(config: any, wizardStep: number, t: TranslateFn): string {
   if (!config.stream_name) return "";
 
-  const stream = config.stream_name;
-  const fn = config.detection_function || "count";
-  const schedule = `${config.schedule_interval_value}${config.schedule_interval_unit}`;
-  const trainingDays = config.training_window_days || 14;
+  const stream = esc(config.stream_name);
+  const fn = esc(config.detection_function || "count");
+  const schedule = esc(`${config.schedule_interval_value}${config.schedule_interval_unit}`);
+  const trainingDays = config.training_window_days || 28;
 
   if (wizardStep < 2) {
-    return `Configuring anomaly detection for ${config.stream_type || "logs"} stream "${stream}"`;
+    return t("alerts.anomaly.summaryConfiguring", {
+      streamType: esc(config.stream_type || "logs"),
+      stream,
+    });
   }
 
-  return `Monitor "${stream}" every ${schedule} for ${fn} anomalies, trained on ${trainingDays} days of history`;
+  return t("alerts.anomaly.summaryMonitoring", { stream, schedule, fn, trainingDays });
 }

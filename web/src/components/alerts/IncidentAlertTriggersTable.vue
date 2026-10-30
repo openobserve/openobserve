@@ -37,7 +37,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template #empty>
         <div data-test="no-triggers-message" class="py-8 text-center">
-          <span class="text-text-secondary text-sm"> No triggers loaded </span>
+          <span class="text-text-secondary text-sm">
+            {{ t("alerts.noTriggersLoaded") }}
+          </span>
         </div>
       </template>
 
@@ -65,7 +67,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-labels="{ row }">
-        <div v-if="row.labels && Object.keys(row.labels).length" class="flex flex-wrap gap-1">
+        <OTruncatedText
+          v-if="row.labels && Object.keys(row.labels).length"
+          as="div"
+          class="flex flex-wrap gap-1"
+          :tooltip="labelsText(row.labels)"
+        >
           <OTag
             v-for="(value, key) in row.labels"
             :key="key"
@@ -74,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ key }}={{ value }}
           </OTag>
-        </div>
+        </OTruncatedText>
         <span v-else class="text-text-secondary text-xs">—</span>
       </template>
 
@@ -85,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="correlationReason"
             :value="row.correlation_reason"
           />
-          <OTooltip :content="getReasonTooltip(row.correlation_reason)" side="top" />
+          <OTooltip :content="raw(getReasonTooltip(row.correlation_reason))" side="top" />
         </span>
       </template>
 
@@ -107,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="payloadDialogOpen"
       size="md"
       :title="t('alerts.incidents.rawPayloadTitle')"
-      primary-button-label="Close"
+      :primary-button-label="t('common.close')"
       @click:primary="payloadDialogOpen = false"
     >
       <div v-if="payloadLoading" class="text-text-secondary py-4 text-center text-sm">
@@ -118,14 +125,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <template v-else-if="payloadData">
         <div class="text-text-secondary mb-2 text-xs">
-          <span>Source: {{ payloadData.detected_source }}</span>
-          <span v-if="payloadData.source_url" class="ml-3">{{ payloadData.source_url }}</span>
+          <span
+            >{{ t("alerts.incidents.payloadSourceLabel") }} {{ payloadData.detected_source }}</span
+          >
+          <span v-if="payloadData.source_url" class="ms-3">{{ payloadData.source_url }}</span>
         </div>
         <pre
           data-test="trigger-payload-json"
           class="bg-surface-secondary rounded-surface max-h-[60vh] overflow-auto p-3 text-xs"
-          >{{ formattedPayload }}</pre
-        >
+          >{{ formattedPayload }}</pre>
       </template>
     </ODialog>
   </div>
@@ -133,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, PropType, computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { formatToReadable } from "@/utils/date";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -141,6 +149,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import incidentsService, { type ExternalAlertPayload } from "@/services/incidents";
@@ -166,6 +175,7 @@ export default defineComponent({
     OTable,
     OButton,
     ODialog,
+    OTruncatedText,
   },
   props: {
     triggers: {
@@ -179,13 +189,13 @@ export default defineComponent({
   },
   emits: ["row-click"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
 
     const columns = computed<OTableColumnDef[]>(() => [
       {
         id: "alert_name",
-        header: "Alert Name",
+        header: t("alerts.incidents.alertName"),
         accessorKey: "alert_name",
         sortable: true,
         resizable: true,
@@ -196,7 +206,7 @@ export default defineComponent({
       },
       {
         id: "detected_source",
-        header: "Source",
+        header: t("alerts.incidents.source"),
         accessorKey: "detected_source",
         sortable: true,
         resizable: true,
@@ -206,7 +216,7 @@ export default defineComponent({
       },
       {
         id: "labels",
-        header: "Labels",
+        header: t("alerts.incidents.labels"),
         accessorKey: "labels",
         sortable: false,
         resizable: true,
@@ -216,7 +226,7 @@ export default defineComponent({
       },
       {
         id: "alert_fired_at",
-        header: "Fired At",
+        header: t("alerts.incidents.firedAt"),
         accessorKey: "alert_fired_at",
         sortable: true,
         resizable: true,
@@ -226,7 +236,7 @@ export default defineComponent({
       },
       {
         id: "correlation_reason",
-        header: "Correlation Reason",
+        header: t("alerts.incidents.correlationReason"),
         accessorKey: "correlation_reason",
         sortable: false,
         resizable: true,
@@ -236,7 +246,7 @@ export default defineComponent({
       },
       {
         id: "actions",
-        header: "",
+        header: raw(""),
         isAction: true,
         size: 60,
         meta: { align: "left" },
@@ -244,7 +254,7 @@ export default defineComponent({
     ]);
 
     const formatTimestamp = (timestamp: number) => {
-      if (!timestamp) return "N/A";
+      if (!timestamp) return raw("N/A");
       return formatToReadable(timestamp);
     };
 
@@ -266,6 +276,14 @@ export default defineComponent({
     const onRowClick = (row: IncidentAlert) => {
       emit("row-click", row.alert_name);
     };
+
+    // The chips hold no separators in their text, so the cut-cell tooltip spells them out.
+    const labelsText = (labels: Record<string, string>) =>
+      raw(
+        Object.entries(labels)
+          .map(([key, value]) => `${key}=${value}`)
+          .join(", "),
+      );
 
     const payloadDialogOpen = ref(false);
     const payloadLoading = ref(false);
@@ -298,17 +316,19 @@ export default defineComponent({
     };
 
     return {
+      raw,
+      t,
       columns,
       formatTimestamp,
       getReasonTooltip,
       onRowClick,
+      labelsText,
       payloadDialogOpen,
       payloadLoading,
       payloadError,
       payloadData,
       formattedPayload,
       openPayload,
-      t,
     };
   },
 });

@@ -57,7 +57,10 @@ const schema = makeStreamSchema(t);
 
 async function onSubmit(value: StreamForm) {
   // value is validated + typed. Build the request with explicit keys.
-  await streamService.create({ name: value.name, retention: Number(value.retention) });
+  await streamService.create({
+    name: value.name,
+    retention: Number(value.retention),
+  });
 }
 </script>
 
@@ -133,8 +136,10 @@ binding.
 <OFormInput name="host" :label="t('dest.host')" required />
 
 <!-- banned: a parallel ref is a second source of truth -->
-<OFormInput name="host" v-model="hostRef" />          <!-- ❌ -->
-<OInput v-model="hostRef" />                            <!-- ❌ bare, unbound -->
+<OFormInput name="host" v-model="hostRef" />
+<!-- ❌ -->
+<OInput v-model="hostRef" />
+<!-- ❌ bare, unbound -->
 ```
 
 - **No `OForm*` wrapper exists for a control you need?** Author a thin one
@@ -147,7 +152,7 @@ binding.
   widgets — a Monaco code editor, `<query-editor>`. If such a widget needs
   validation, bridge its value into the form **once** with
   `form.setFieldValue(name, value)` so the schema covers it; then it's already in
-  `value` at submit. That single bridge is the *only* sanctioned `setFieldValue`
+  `value` at submit. That single bridge is the _only_ sanctioned `setFieldValue`
   from outside a field.
 - **Data that isn't a form control** (org id from the store, a constant, the
   Monaco content) lives outside the form and is merged at submit — see
@@ -160,7 +165,7 @@ Validation timing is **submit-then-change**, owned by `OForm` (via TanStack's
 `revalidateLogic`): nothing validates while the user types or on blur, so errors
 stay hidden during first entry; the first submit reveals all errors at once; then
 each field re-validates live on every change. You don't configure this — it's
-baked into `OForm`. The schema file only describes *what* is valid, never *when*.
+baked into `OForm`. The schema file only describes _what_ is valid, never _when_.
 
 Mark required fields with the **`required` prop** on the `OForm*` component — it
 renders the required affordance and is the accessible signal. **Never hardcode a
@@ -168,7 +173,8 @@ renders the required affordance and is the accessible signal. **Never hardcode a
 refine; the prop and the schema rule go together.
 
 ```vue
-<OFormInput name="email" :label="t('user.email')" required />   <!-- prop, not "Email *" -->
+<OFormInput name="email" :label="t('user.email')" required />
+<!-- prop, not "Email *" -->
 ```
 
 ## 4. Submitting
@@ -178,7 +184,7 @@ Save button lives:
 
 - **Inline form** (button inside `<OForm>`): the Save button is
   `type="submit"`. Enter also submits.
-- **Overlay form** (button in an `ODialog`/`ODrawer` footer, *outside* the
+- **Overlay form** (button in an `ODialog`/`ODrawer` footer, _outside_ the
   `<form>`): give `<OForm id="myForm">` an `id` (it falls through to the inner
   `<form>`) and set the overlay's `form-id="myForm"`. The footer's built-in Save
   button renders as `<button form="myForm" type="submit">`, so it submits the
@@ -237,6 +243,7 @@ When a form lives inside an `ODialog` or `ODrawer`, always use the overlay's
 ```
 
 **Why:** The built-in buttons automatically:
+
 - Render with correct styling (outline/primary per the standard)
 - Wire `:form="formId"` so the primary button's type="submit" submits the form
 - Show the spinner automatically during `@submit` (no manual `:loading`)
@@ -244,6 +251,7 @@ When a form lives inside an `ODialog` or `ODrawer`, always use the overlay's
 - Cancel button fires `@click:secondary` so you control the close action
 
 **What the props do:**
+
 - `:form-id="FORM_ID"` — wires the footer buttons to the `<OForm id="FORM_ID">`
 - `:primary-button-label` — text on the Save button (localized, via `t()`)
 - `:secondary-button-label` — text on the Cancel button
@@ -260,17 +268,18 @@ async function onSubmit(value: DestForm) {
   await service.create({
     name: value.name,
     url: value.url,
-    retries: Number(value.retries),          // OFormInput emits a string
-    org: store.state.selectedOrganization.identifier,  // context, merged here
+    retries: Number(value.retries), // OFormInput emits a string
+    org: store.state.selectedOrganization.identifier, // context, merged here
   });
 }
 
 // banned: spread leaks schema-only .optional() helper fields into the body,
 // and ships string-typed numbers the API rejects
-await service.create({ ...value });          // ❌
+await service.create({ ...value }); // ❌
 ```
 
 Two concrete traps this avoids:
+
 - **Schema-only fields leak.** `.optional()` helper fields (a UI toggle, a
   discriminator) spread straight into the request and backends reject the extra
   keys. Name the keys you send.
@@ -284,7 +293,7 @@ Two concrete traps this avoids:
 Sometimes visible sections depend on form state (`v-if` on a `kind` field, an
 `OStepper`, a `v-for` over a repeatable group). `form.useStore(...)` is reactive
 **only for components rendered inside `<OForm>`** (Vue `provide` flows downward).
-Pick the pattern by *who* needs the state — and in both, everyone reads the
+Pick the pattern by _who_ needs the state — and in both, everyone reads the
 **same one form**; nobody keeps a copy.
 
 - **A descendant inside `<OForm>` needs it** → `inject(FORM_CONTEXT_KEY)` then
@@ -292,7 +301,7 @@ Pick the pattern by *who* needs the state — and in both, everyone reads the
   child and bind its fields by nested `name` (`config.akeyless.base_url`); the
   parent owns the single schema.
 
-- **The component that *owns* `<OForm>` needs it** (it renders `<OForm>`, so it
+- **The component that _owns_ `<OForm>` needs it** (it renders `<OForm>`, so it
   sits above the provide and can't inject) → create the form in `setup()` with
   `useOForm({ defaultValues, schema, onSubmit })`, read it with
   `form.useStore((s) => s.values.kind)`, write with `form.setFieldValue(...)`,
@@ -303,8 +312,9 @@ Pick the pattern by *who* needs the state — and in both, everyone reads the
 // owner setup()
 import { useOForm } from "@/lib/forms/Form/useOForm";
 const form = useOForm({ defaultValues: defaults(), schema, onSubmit });
-const kind = form.useStore((s) => s.values.kind);   // reactive, drives v-if
+const kind = form.useStore((s) => s.values.kind); // reactive, drives v-if
 ```
+
 ```vue
 <OForm :form="form">
   <OFormSelect name="kind" :options="kinds" />
@@ -312,7 +322,7 @@ const kind = form.useStore((s) => s.values.kind);   // reactive, drives v-if
 </OForm>
 ```
 
-Rule of thumb: *owns* `<OForm>` → `useOForm()`; *rendered inside* it → `inject` +
+Rule of thumb: _owns_ `<OForm>` → `useOForm()`; _rendered inside_ it → `inject` +
 `useStore`. **Never** mirror form state into a parallel `ref`/`reactive` synced
 by a `watch → setFieldValue` bridge, and never copy `form.state.values` into
 local state via a subscription — that's the two-sources-of-truth bug the whole
@@ -393,25 +403,42 @@ A complex form with non-schema fields (custom headers, reusable secret input) wi
 export const makeNotificationChannelSchema = (t: (key: string) => string) =>
   z.object({
     id: z.string().optional(),
-    name: z.string().min(1, { message: t("notificationChannels.validation.nameRequired") }).trim(),
+    name: z
+      .string()
+      .min(1, { message: t("notificationChannels.validation.nameRequired") })
+      .trim(),
     type: z.enum(["webhook", "slack", "email"]),
-    destination_url: z.string().min(1).url({ message: t("notificationChannels.validation.invalidUrl") }),
+    destination_url: z
+      .string()
+      .min(1)
+      .url({ message: t("notificationChannels.validation.invalidUrl") }),
     auth_token: z.string().optional(),
-    headers: z.record(z.string()).optional().default({}),  // map; convert rows ↔ map at submit
+    headers: z.record(z.string()).optional().default({}), // map; convert rows ↔ map at submit
     retry_count: z.coerce.number().int().min(0).max(10),
     enabled: z.boolean().default(true),
   });
 
-export type NotificationChannelForm = z.infer<ReturnType<typeof makeNotificationChannelSchema>>;
+export type NotificationChannelForm = z.infer<
+  ReturnType<typeof makeNotificationChannelSchema>
+>;
 export const notificationChannelDefaults = (): NotificationChannelForm => ({
-  name: "", type: "webhook", destination_url: "", auth_token: "", headers: {},
-  retry_count: 3, enabled: true,
+  name: "",
+  type: "webhook",
+  destination_url: "",
+  auth_token: "",
+  headers: {},
+  retry_count: 3,
+  enabled: true,
 });
 ```
 
 ```vue
 <template>
-  <ODialog :form-id="FORM_ID" primary-button-label="Save" secondary-button-label="Cancel">
+  <ODialog
+    :form-id="FORM_ID"
+    primary-button-label="Save"
+    secondary-button-label="Cancel"
+  >
     <OForm
       :id="FORM_ID"
       :schema="notificationChannelSchema"
@@ -419,11 +446,32 @@ export const notificationChannelDefaults = (): NotificationChannelForm => ({
       @submit="saveChannel"
     >
       <!-- Schema fields: OForm* components with name= -->
-      <OFormInput name="name" :label="t('notificationChannels.name')" required />
-      <OFormSelect name="type" :label="t('notificationChannels.type')" :options="typeOptions" required />
-      <OFormInput name="destination_url" :label="t('notificationChannels.destination')" required />
-      <OFormInput name="retry_count" type="number" :label="t('notificationChannels.retryCount')" required />
-      <OFormCheckbox name="enabled" :label="t('notificationChannels.enabled')" />
+      <OFormInput
+        name="name"
+        :label="t('notificationChannels.name')"
+        required
+      />
+      <OFormSelect
+        name="type"
+        :label="t('notificationChannels.type')"
+        :options="typeOptions"
+        required
+      />
+      <OFormInput
+        name="destination_url"
+        :label="t('notificationChannels.destination')"
+        required
+      />
+      <OFormInput
+        name="retry_count"
+        type="number"
+        :label="t('notificationChannels.retryCount')"
+        required
+      />
+      <OFormCheckbox
+        name="enabled"
+        :label="t('notificationChannels.enabled')"
+      />
 
       <!-- Non-schema field bridged by hand — SecretInput here is an illustrative
            custom control (not a real repo component); if it could be a form
@@ -431,7 +479,9 @@ export const notificationChannelDefaults = (): NotificationChannelForm => ({
            auth_token stays schema-owned; the control is value-dumb -->
 
       <div class="space-y-2">
-        <label class="text-sm font-medium">{{ t('notificationChannels.authToken') }}</label>
+        <label class="text-sm font-medium">{{
+          t("notificationChannels.authToken")
+        }}</label>
         <SecretInput
           :model-value="formInputs.auth_token"
           @update:model-value="formInputs.auth_token = $event"
@@ -442,16 +492,36 @@ export const notificationChannelDefaults = (): NotificationChannelForm => ({
       <!-- Dynamic field array: custom headers (map ↔ array conversion at edit/submit) -->
       <div class="space-y-3">
         <div class="flex justify-between">
-          <label class="text-sm font-medium">{{ t("notificationChannels.headers") }}</label>
-          <OButton variant="ghost" size="sm" icon-left="add" type="button" @click="addHeader">
+          <label class="text-sm font-medium">{{
+            t("notificationChannels.headers")
+          }}</label>
+          <OButton
+            variant="ghost"
+            size="sm"
+            icon-left="add"
+            type="button"
+            @click="addHeader"
+          >
             {{ t("notificationChannels.addHeader") }}
           </OButton>
         </div>
         <!-- Rendered as array of {key, value} rows; converted to map for schema at submit -->
         <div v-for="(header, idx) in headers" :key="idx" class="flex gap-2">
-          <OInput v-model="header.key" :placeholder="t('notificationChannels.headerKey')" />
-          <OInput v-model="header.value" :placeholder="t('notificationChannels.headerValue')" />
-          <OButton variant="ghost" size="sm" icon-left="delete" type="button" @click="removeHeader(idx)" />
+          <OInput
+            v-model="header.key"
+            :placeholder="t('notificationChannels.headerKey')"
+          />
+          <OInput
+            v-model="header.value"
+            :placeholder="t('notificationChannels.headerValue')"
+          />
+          <OButton
+            variant="ghost"
+            size="sm"
+            icon-left="delete"
+            type="button"
+            @click="removeHeader(idx)"
+          />
         </div>
       </div>
     </OForm>
@@ -461,13 +531,19 @@ export const notificationChannelDefaults = (): NotificationChannelForm => ({
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { makeNotificationChannelSchema, notificationChannelDefaults, type NotificationChannelForm } from "./NotificationChannels.schema";
+import {
+  makeNotificationChannelSchema,
+  notificationChannelDefaults,
+  type NotificationChannelForm,
+} from "./NotificationChannels.schema";
 
 const { t } = useI18n();
 const FORM_ID = "notification-channel-form";
 
 // Schema is computed because it needs t() at every render (translations can change)
-const notificationChannelSchema = computed(() => makeNotificationChannelSchema(t));
+const notificationChannelSchema = computed(() =>
+  makeNotificationChannelSchema(t),
+);
 const formDefaults = notificationChannelDefaults();
 const formInputs = ref<NotificationChannelForm>(structuredClone(formDefaults));
 
@@ -496,20 +572,21 @@ const openEditForm = (channel: any) => {
 // On submit: the validated schema value, + non-schema rows converted back to map
 async function saveChannel(values: NotificationChannelForm) {
   const headersObj = Object.fromEntries(
-    headers.value.filter((h) => h.key && h.value).map((h) => [h.key, h.value])
+    headers.value.filter((h) => h.key && h.value).map((h) => [h.key, h.value]),
   );
-  
+
   const data = {
     ...values,
-    headers: headersObj,  // merge the constructed map into the payload
+    headers: headersObj, // merge the constructed map into the payload
   };
-  
+
   await service.create(data);
 }
 </script>
 ```
 
 **Key patterns here:**
+
 - **Computed schema:** `makeNotificationChannelSchema(t)` wrapped in `computed()` because translations are reactive
 - **Non-schema fields don't go in Zod.** Custom headers, SecretInput are UI-only (converted at edit/submit).
 - **The split:** `formInputs` (schema-owned refs) + `headers` (ephemeral array rows) live side-by-side.
@@ -520,16 +597,16 @@ async function saveChannel(values: NotificationChannelForm) {
 
 ## Anti-patterns (banned)
 
-| Anti-pattern | Why it's wrong | Do instead |
-| --- | --- | --- |
-| `OFormInput` + `v-model="ref"` | two sources of truth → drift | `name=` only; read `value` at submit |
-| A `formData` object the `@submit` reads | same | read the validated `value` arg |
-| Mirror `ref` synced by `watch → setFieldValue` | drift, post-save "required" flash | owner: `useOForm` + `:form`; descendant: `inject` + `useStore` |
-| Per-field `:rules` / hand-rolled `validate()` / `xError` refs | forks validation off the schema | one Zod schema on `<OForm :schema>` |
-| Hardcoded `*` in a label | not accessible, drifts from the rule | `required` prop + schema rule |
-| `:primary-button-disabled` on invalid | dead-end UX; Save must explain itself | leave Save enabled (submit reveals errors) |
-| `useLoading` / `:loading` for submit | redundant | `OForm` awaits `@submit` → auto spinner |
-| `{ ...value }` as the request body | leaks `.optional()` keys, ships string numbers | explicit keys + `Number()`/`z.coerce.number()` |
-| `uuid` `:key` on a field-array row | mid-list delete shifts/blanks inputs | `:key="index"` + delete test |
-| bare control with no `OForm*` wrapper inside `<OForm>` | unvalidated, unbound | author the `OForm*` wrapper |
-| Schema tied to static `t` | translations don't react | `computed(() => makeSchema(t))` for reactive updates |
+| Anti-pattern                                                  | Why it's wrong                                 | Do instead                                                     |
+| ------------------------------------------------------------- | ---------------------------------------------- | -------------------------------------------------------------- |
+| `OFormInput` + `v-model="ref"`                                | two sources of truth → drift                   | `name=` only; read `value` at submit                           |
+| A `formData` object the `@submit` reads                       | same                                           | read the validated `value` arg                                 |
+| Mirror `ref` synced by `watch → setFieldValue`                | drift, post-save "required" flash              | owner: `useOForm` + `:form`; descendant: `inject` + `useStore` |
+| Per-field `:rules` / hand-rolled `validate()` / `xError` refs | forks validation off the schema                | one Zod schema on `<OForm :schema>`                            |
+| Hardcoded `*` in a label                                      | not accessible, drifts from the rule           | `required` prop + schema rule                                  |
+| `:primary-button-disabled` on invalid                         | dead-end UX; Save must explain itself          | leave Save enabled (submit reveals errors)                     |
+| `useLoading` / `:loading` for submit                          | redundant                                      | `OForm` awaits `@submit` → auto spinner                        |
+| `{ ...value }` as the request body                            | leaks `.optional()` keys, ships string numbers | explicit keys + `Number()`/`z.coerce.number()`                 |
+| `uuid` `:key` on a field-array row                            | mid-list delete shifts/blanks inputs           | `:key="index"` + delete test                                   |
+| bare control with no `OForm*` wrapper inside `<OForm>`        | unvalidated, unbound                           | author the `OForm*` wrapper                                    |
+| Schema tied to static `t`                                     | translations don't react                       | `computed(() => makeSchema(t))` for reactive updates           |

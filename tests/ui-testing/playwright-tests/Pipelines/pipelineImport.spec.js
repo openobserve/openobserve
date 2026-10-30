@@ -2,6 +2,7 @@ import { test, expect } from "../baseFixtures";
 import { PipelinesEP } from "../../pages/pipelinesPages/pipelinesEP";
 import { IngestionPage } from '../../pages/generalPages/ingestionPage';
 import { PipelineDestinations } from '../../pages/pipelinesPages/pipelineDestinations';
+import testLogger from '../utils/test-logger.js';
 const path = require('path');
 const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
 
@@ -19,7 +20,8 @@ test.use({
 test.describe("Pipeline Import", { tag: ['@enterprise', '@pipelines', '@pipelinesImport'] }, () => {
     let pipelinesEP, ingestionPage, pipelineDestinations;
 
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page }, testInfo) => {
+        testLogger.testStart(testInfo.title, testInfo.file);
         // Auth is handled via storageState - no login needed
         ingestionPage = new IngestionPage(page);
         pipelinesEP = new PipelinesEP(page);
@@ -31,7 +33,8 @@ test.describe("Pipeline Import", { tag: ['@enterprise', '@pipelines', '@pipeline
 
         // Navigate to base URL after data ingestion (required for storageState)
         await page.goto(`${process.env["ZO_BASE_URL"]}/web/?org_identifier=${process.env["ORGNAME"]}`);
-        await page.waitForLoadState('networkidle');
+        // Best-effort: a loaded ENT runner never lets this page idle, and every test navigates away from it at once
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     });
 
     test("Import RealTime Pipeline from URL, download and delete imported pipeline", async ({ page }) => {

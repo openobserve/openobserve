@@ -13,13 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::str::FromStr;
+use std::{collections::HashMap, str::FromStr};
 
 use config::{
     meta::{alerts::alert as meta_alerts, folder as meta_folders, triggers::Trigger},
     utils::time::parse_interval_to_minutes,
 };
-use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use svix_ksuid::Ksuid;
 use utoipa::ToSchema;
@@ -50,9 +49,10 @@ pub struct ListAlertsResponseBody {
 
 /// An item in the list returned by the `ListAlerts` endpoint.
 ///
-/// For `scheduled` and `realtime` alert types, `condition` and
-/// `trigger_condition` are always present. For `anomaly_detection` items they
-/// are absent; use `last_trained_at` and `status` instead.
+/// `condition` is always present: a concrete query for `scheduled`/`realtime`,
+/// `null` for `composite` and `anomaly_detection` (which have no query). Use
+/// `last_trained_at` and `status` for anomaly state. `trigger_condition` is
+/// present for `scheduled`/`realtime` and omitted otherwise.
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct ListAlertsResponseBodyItem {
     #[schema(value_type = String)]
@@ -62,9 +62,16 @@ pub struct ListAlertsResponseBodyItem {
     pub name: String,
     pub owner: Option<String>,
     pub description: Option<String>,
-    /// Discriminator: "scheduled" | "realtime" | "anomaly_detection"
+    /// Discriminator: "scheduled" | "realtime" | "slo" | "anomaly_detection" | "composite"
     pub alert_type: String,
+    /// The stream this alert watches. Absent for `composite` alerts (which
+    /// watch children, not a stream) and for an `anomaly_detection` config
+    /// that predates stream selection.
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream_name: Option<String>,
+    /// Paired with `stream_name` — present and absent together.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream_type: Option<String>,
     pub condition: Option<QueryCondition>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trigger_condition: Option<TriggerCondition>,
@@ -115,9 +122,30 @@ pub struct ListAlertsResponseBodyItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<u8>, example = 3)]
     pub priority: Option<u8>,
+    /// The on-call team this alert names, when it names one.
+    ///
+    /// Routing's highest-precedence tier, and the only tier a list row can
+    /// report: every other one resolves from the identity dimensions of the row
+    /// that fires, which an alert definition does not carry. Absent means
+    /// "resolved at fire time", not "pages nobody".
+    ///
+    /// The list has always had a column for this and never had the field, so
+    /// every alert read as unbound — including ones deliberately pinned.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub oncall_team: Option<String>,
     /// Normalized selection tags (PT-6). Omitted when empty.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
+    /// Names of the notification destinations this alert delivers to
+    /// (`Alert.destinations`). Lets the destination↔alert dependency view build
+    /// the linkage from the list alone; omitted when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub destinations: Vec<String>,
+    /// Alert-level template override (`Alert.template`): when set it replaces the
+    /// destination-level template for every destination above. Absent when the
+    /// alert defers to each destination's own template.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub template: Option<String>,
     /// Multi-alerts only (§5.4): how many groups the last evaluation observed,
     /// counted **before** the M-6 cap truncated them. Absent for every alert
     /// that has not opted in.
@@ -144,6 +172,194 @@ pub struct ListAlertsResponseBodyItem {
     /// SIEM detections only: the detection's context attributes minus the rule YAML.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context_attributes: Option<HashMap<String, String>>,
+    /// Composite rows only: number of referenced children.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub child_count: Option<usize>,
+    /// Count of parent composites currently readable to the caller.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub referenced_by_composite_count: Option<usize>,
+    /// Composite rows only: the trigger expression with child IDs resolved to names.
+    // Omitted when any child is unreadable by the caller, rather than leaking a
+    // name or a KSUID through the summary.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expression_summary: Option<String>,
+    /// The downtime muting this row now, for the Muted chip. Enterprise only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_downtime: Option<config::meta::downtimes::ActiveDowntime>,
+    /// Start of the alert's current firing (µs); absent when not firing or for a multi-alert.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub firing_started_at: Option<i64>,
+    /// The acks in force on the alert's current firings.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ack: Option<config::meta::alerts::ack::AlertAckSummary>,
+    /// The open incident the current firing belongs to. Enterprise only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub incident: Option<AlertIncidentLink>,
+    /// Anomaly rows only: the identity the anomaly scheduler matches downtimes on.
+    #[serde(skip)]
+    pub downtime_dimensions: HashMap<String, String>,
+}
+
+/// The incident a list row links to.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
+pub struct AlertIncidentLink {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    pub status: config::meta::alerts::incidents::IncidentStatus,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CompositeChildResponse {
+    /// Child alert ID.
+    pub alert_id: String,
+    /// Whether the caller may read this child.
+    pub accessible: bool,
+    /// Child name; `None` when the child is not accessible to the caller.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// Child alert type ("scheduled" | "composite" | "slo").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alert_type: Option<String>,
+    /// Folder containing the child.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub folder_id: Option<String>,
+    /// Whether the child is enabled.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    /// Current severity level of the child's last evaluation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub level: Option<String>,
+    /// When `level` was last recorded.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub level_at: Option<i64>,
+    /// Effective evaluation cadence in seconds.
+    ///
+    /// Reserved and currently unpopulated (always omitted) — cadence is not yet
+    /// propagated through child evaluation. Do not rely on this field being set.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub effective_cadence_seconds: Option<i64>,
+    /// Deadline after which a missing evaluation marks the child stale.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stale_deadline: Option<i64>,
+    /// Whether the child's latest state is stale.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stale: Option<bool>,
+    /// Whether the child currently evaluates true.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub truth: Option<bool>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CompositeValidationResponse {
+    /// Whether the expression is syntactically valid.
+    pub valid: bool,
+    /// Canonicalized form of the expression.
+    pub canonical_expression: Option<String>,
+    /// Resolved child references.
+    pub children: Vec<CompositeChildResponse>,
+    /// Advisory evaluation result (null when indeterminate).
+    pub result: Option<bool>,
+    /// Advisory severity of the result.
+    pub result_level: Option<String>,
+    /// Advisory warnings (e.g. disabled or never-evaluated children).
+    pub warnings: Vec<CompositeValidationWarning>,
+}
+
+/// One advisory warning on a composite validation/preview.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CompositeValidationWarning {
+    /// Machine-readable warning code.
+    pub code: String,
+    /// Alert ID the warning refers to.
+    pub alert_id: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CompositeReferenceItem {
+    /// Referencing composite alert ID.
+    pub alert_id: String,
+    /// Referencing composite alert name.
+    pub name: String,
+    /// Folder containing the referencing composite alert.
+    pub folder_id: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CompositeReferencesResponse {
+    /// Composite alerts referencing the queried alert that the caller can read.
+    pub references: Vec<CompositeReferenceItem>,
+    /// Number of referencing composites hidden from the caller by permissions.
+    pub hidden_reference_count: usize,
+}
+
+/// One conflict reported by bulk alert deletion: an alert that could not be
+/// deleted because one or more composite alerts still reference it.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct BulkDeleteConflict {
+    /// Alert ID that could not be deleted.
+    pub alert_id: String,
+    /// Machine-readable conflict code (e.g. "child_referenced").
+    pub code: String,
+    /// Referencing composites the caller can read.
+    pub references: Vec<serde_json::Value>,
+    /// Number of referencing composites hidden from the caller by permissions.
+    pub hidden_reference_count: usize,
+}
+
+/// Bulk alert deletion result. Carries a `conflicts` field that the shared
+/// `BulkDeleteResponse` does not, so generated clients can see which IDs were
+/// retained because they are referenced by composite alerts.
+#[derive(Default, Serialize, ToSchema)]
+pub struct BulkDeleteAlertResponse {
+    pub successful: Vec<String>,
+    pub unsuccessful: Vec<String>,
+    pub err: Option<String>,
+    pub conflicts: Vec<BulkDeleteConflict>,
+}
+
+/// One child-level change inside a composite status timeline window. `to_level`
+/// is in effect from `at` until the next row (or the window end).
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct CompositeTimelineTransition {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub from_level: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub to_level: Option<String>,
+    pub at: i64,
+}
+
+/// A single status lane: one child (or the composite itself) over a window.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct CompositeTimelineLane {
+    /// Redacted (`None`) when the child is not readable to the caller, so an
+    /// inaccessible child never leaks its stable KSUID.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alert_id: Option<String>,
+    /// Position among the composite's children (A=0), for the letter chip.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub slot: Option<usize>,
+    /// `None` when the child is not readable to the caller.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    pub accessible: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_level: Option<String>,
+    /// When `current_level` last changed; the lane paints this from now.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub level_since: Option<i64>,
+    pub transitions: Vec<CompositeTimelineTransition>,
+}
+
+/// HTTP response body for the composite status-timeline endpoint.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct CompositeTimelineResponse {
+    pub from: i64,
+    pub to: i64,
+    /// One lane per child, in the same display order as the detail response.
+    pub children: Vec<CompositeTimelineLane>,
+    /// The composite's own result lane.
+    pub result: CompositeTimelineLane,
 }
 
 /// One tracked group of a multi-alert (§5.4's group table).
@@ -180,6 +396,12 @@ pub struct AlertGroupResponseItem {
     /// measured against. Absent when it has never paged.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_notified_level: Option<String>,
+    /// Start of the current firing cycle (µs), the key an ack names; absent when not firing.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub firing_started_at: Option<i64>,
+    /// Present only while an ack is in force on the current firing.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ack: Option<config::meta::alerts::ack::AckView>,
 }
 
 /// One `key=value` pair of a group's label set.
@@ -232,6 +454,9 @@ pub struct AlertGroupTransitionItem {
     /// a group that vanished has no reading, and rendering 0 would be a lie.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// PromQL sample text preserves NaN and infinities; absent outside rule-mode transitions.
+    pub rule_value: Option<String>,
 }
 
 /// HTTP response body for `ListAlertGroupTransitions`.
@@ -283,7 +508,9 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             alert.get_last_triggered_at(trigger.as_ref()),
             alert.get_last_satisfied_at(trigger.as_ref()),
         );
-        let alert_type = if alert.is_real_time {
+        let alert_type = if alert.query_condition.slo_condition.is_some() {
+            "slo".to_string()
+        } else if alert.is_real_time {
             "realtime".to_string()
         } else {
             "scheduled".to_string()
@@ -292,6 +519,11 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             .context_attributes
             .as_ref()
             .and_then(siem_list_attributes);
+        // Every scheduled/realtime/slo alert is saved against a real stream —
+        // an empty `stream_name` only happens pre-save, never on a stored
+        // alert — but treat it as "no stream" defensively rather than send a
+        // stream_name/stream_type pair where one half is a lie.
+        let has_stream = !alert.stream_name.is_empty();
         Ok(Self {
             alert_id: alert.id.ok_or(())?,
             folder_id: folder.folder_id,
@@ -300,6 +532,8 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             owner: alert.owner,
             description: Some(alert.description).filter(|d| !d.is_empty()),
             alert_type,
+            stream_name: has_stream.then_some(alert.stream_name),
+            stream_type: has_stream.then(|| alert.stream_type.to_string()),
             condition: Some(alert.query_condition.into()),
             trigger_condition: Some(alert.trigger_condition.into()),
             enabled: alert.enabled,
@@ -315,7 +549,13 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             level: None,
             level_since: None,
             priority: alert.priority.map(|p| p.to_i32() as u8),
+            // Blank is the same as unset here: the field is validated at save,
+            // so an empty string is a value nothing wrote deliberately, and
+            // sending it would render an empty team chip.
+            oncall_team: alert.oncall_team.filter(|t| !t.trim().is_empty()),
             tags: alert.tags,
+            destinations: alert.destinations,
+            template: alert.template,
             // Filled from the rollup state row by `enrich_with_run_state`,
             // alongside the other run-state fields above.
             groups_observed: None,
@@ -323,6 +563,14 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             groups_observed_is_lower_bound: None,
             groups_firing_is_lower_bound: None,
             context_attributes,
+            child_count: None,
+            referenced_by_composite_count: None,
+            expression_summary: None,
+            active_downtime: None,
+            firing_started_at: None,
+            ack: None,
+            incident: None,
+            downtime_dimensions: HashMap::new(),
         })
     }
 }
@@ -362,9 +610,16 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
     let trigger_condition = Some(TriggerCondition {
         period_minutes,
         frequency_minutes,
-        frequency_type: FrequencyType::Minutes,
+        frequency_type: Some(FrequencyType::Minutes),
         ..Default::default()
     });
+
+    // Never inferred: an errored run and an empty one leave the config identical.
+    let last_outcome = v
+        .get("last_outcome")
+        .and_then(|o| o.as_str())
+        .map(String::from);
+    let last_outcome_at = v.get("last_outcome_at").and_then(|t| t.as_i64());
 
     let folder_name = v
         .get("folder_name")
@@ -372,12 +627,25 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
         .unwrap_or("")
         .to_string();
 
+    let stream_name = v
+        .get("stream_name")
+        .and_then(|s| s.as_str())
+        .filter(|s| !s.is_empty())
+        .map(String::from);
+    let stream_type = v
+        .get("stream_type")
+        .and_then(|s| s.as_str())
+        .filter(|s| !s.is_empty())
+        .map(String::from);
+
     Some(ListAlertsResponseBodyItem {
         alert_id,
         folder_id,
         folder_name,
         name: v.get("name")?.as_str()?.to_string(),
         owner: v.get("owner").and_then(|o| o.as_str()).map(String::from),
+        stream_name,
+        stream_type,
         description: v
             .get("description")
             .and_then(|d| d.as_str())
@@ -392,11 +660,12 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
         is_real_time: false,
         last_trained_at: v.get("training_completed_at").and_then(|t| t.as_i64()),
         status,
-        // Anomaly configs do not flow through the alert scheduler's state
-        // write path; leave run state unset rather than implying "never fired".
-        last_outcome: None,
-        last_outcome_at: None,
+        // No `alert_states` row exists, so `enrich_with_run_state` cannot fill these.
+        last_outcome,
+        last_outcome_at,
+        // How long the outcome has HELD is not recorded anywhere.
         last_outcome_since: None,
+        // The detector reports a count, never a warning/critical classification.
         level: None,
         level_since: None,
         last_error: v
@@ -412,21 +681,170 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
             .and_then(|p| p.as_u64())
             .and_then(|p| u8::try_from(p).ok())
             .filter(|p| (1..=5).contains(p)),
+        // Read the same way as the alert path, so an anomaly config pinned to
+        // a team reads as pinned in the same column rather than falling to
+        // "resolved at fire time" purely because it took the other branch.
+        oncall_team: v
+            .get("oncall_team")
+            .and_then(|t| t.as_str())
+            .filter(|t| !t.trim().is_empty())
+            .map(String::from),
         tags: v
             .get("tags")
             .and_then(|t| serde_json::from_value::<Vec<String>>(t.clone()).ok())
             .unwrap_or_default(),
+        // Anomaly configs deliver through their own path, not alert destinations.
+        destinations: Vec::new(),
+        template: None,
         // Anomaly configs have no grouping, so there is nothing to count.
         groups_observed: None,
         groups_firing: None,
         groups_observed_is_lower_bound: None,
         groups_firing_is_lower_bound: None,
         context_attributes: None,
+        child_count: None,
+        referenced_by_composite_count: None,
+        expression_summary: None,
+        active_downtime: None,
+        firing_started_at: None,
+        ack: None,
+        incident: None,
+        downtime_dimensions: HashMap::new(),
+    })
+}
+
+/// The anomaly configs as list items, each with the identity its scheduler mutes it by.
+#[cfg(feature = "enterprise")]
+pub async fn anomaly_list_items(
+    org: &str,
+    configs: &[serde_json::Value],
+) -> Vec<ListAlertsResponseBodyItem> {
+    // Only a downtime row turns the identity into a chip, so skip the SQL parsing without one.
+    let groups = if o2_enterprise::enterprise::common::config::get_config()
+        .downtimes
+        .enabled
+        && !db::downtimes::list_cached(org).is_empty()
+    {
+        Some(db::system_settings::get_semantic_field_groups(org).await)
+    } else {
+        None
+    };
+    configs
+        .iter()
+        .filter_map(|v| {
+            let mut item = anomaly_config_to_list_item(v)?;
+            if let Some(groups) = &groups {
+                item.downtime_dimensions = anomaly_downtime_dimensions(v, &item.tags, groups);
+            }
+            Some(item)
+        })
+        .collect()
+}
+
+/// The Muted chip, from the cache or from the downtime the last firing recorded.
+#[cfg(feature = "enterprise")]
+pub async fn fill_active_downtimes(org: &str, list: &mut [ListAlertsResponseBodyItem]) {
+    if list.is_empty()
+        || !o2_enterprise::enterprise::common::config::get_config()
+            .downtimes
+            .enabled
+    {
+        return;
+    }
+    // No downtime rows, no chip: neither branch below can yield one, so skip the state query.
+    let rows = db::downtimes::list_cached(org);
+    if rows.is_empty() {
+        return;
+    }
+    let now = config::utils::time::now_micros();
+    let ids: Vec<String> = list.iter().map(|item| item.alert_id.to_string()).collect();
+    let recorded = infra::table::alert_states::last_downtime_ids(&ids)
+        .await
+        .unwrap_or_default();
+    for item in list.iter_mut() {
+        item.active_downtime = list_item_downtime(org, item, now).or_else(|| {
+            recorded
+                .get(&item.alert_id.to_string())
+                .and_then(|id| still_active(&rows, id, now))
+        });
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn fill_active_downtimes(_org: &str, _list: &mut [ListAlertsResponseBodyItem]) {}
+
+#[cfg(feature = "enterprise")]
+fn list_item_downtime(
+    org: &str,
+    item: &ListAlertsResponseBodyItem,
+    now: i64,
+) -> Option<config::meta::downtimes::ActiveDowntime> {
+    use openobserve_core::alerts::downtimes::{active_for_anomaly, chip_for_alert};
+
+    let id = item.alert_id.to_string();
+    let dims = list_item_dimensions(item);
+    match item.alert_type.as_str() {
+        "anomaly_detection" => active_for_anomaly(org, &id, &item.folder_id, &dims, now),
+        _ => chip_for_alert(org, &id, &item.folder_id, &dims, now),
+    }
+}
+
+/// The identity a list row is matched on, the one its own scheduler matches.
+#[cfg(feature = "enterprise")]
+fn list_item_dimensions(item: &ListAlertsResponseBodyItem) -> HashMap<String, String> {
+    use o2_enterprise::enterprise::downtimes::scope::composite_dimensions;
+
+    match item.alert_type.as_str() {
+        "anomaly_detection" => item.downtime_dimensions.clone(),
+        "composite" => composite_dimensions(&item.tags),
+        _ => HashMap::new(),
+    }
+}
+
+/// The `anomaly_dimensions` of a config row, read from the keys the anomaly scheduler reads.
+#[cfg(feature = "enterprise")]
+fn anomaly_downtime_dimensions(
+    v: &serde_json::Value,
+    tags: &[String],
+    semantic_groups: &[config::meta::correlation::FieldAlias],
+) -> HashMap<String, String> {
+    use openobserve_core::alerts::downtimes::{anomaly_filters, anomaly_sql};
+
+    let query_mode = v
+        .get("query_mode")
+        .and_then(|m| m.as_str())
+        .unwrap_or_default();
+    o2_enterprise::enterprise::downtimes::scope::anomaly_dimensions(
+        anomaly_sql(query_mode, v.get("custom_sql").and_then(|s| s.as_str())),
+        anomaly_filters(query_mode, v.get("filters")),
+        tags,
+        semantic_groups,
+    )
+}
+
+#[cfg(feature = "enterprise")]
+fn still_active(
+    rows: &[config::meta::downtimes::Downtime],
+    downtime_id: &str,
+    now: i64,
+) -> Option<config::meta::downtimes::ActiveDowntime> {
+    let row = rows
+        .iter()
+        .find(|row| row.id == downtime_id && row.cancelled_at.is_none())?;
+    let window = o2_enterprise::enterprise::downtimes::schedule::window_at(&row.schedule, now)?;
+    Some(config::meta::downtimes::ActiveDowntime {
+        id: row.id.clone(),
+        name: row.name.clone(),
+        ends_at: window.end,
+        incident_mode: Default::default(),
+        ..Default::default()
     })
 }
 
 /// The list-safe subset of a SIEM detection's attributes; `None` for any other alert.
-fn siem_list_attributes(attrs: &HashMap<String, String>) -> Option<HashMap<String, String>> {
+fn siem_list_attributes(
+    attrs: &hashbrown::HashMap<String, String>,
+) -> Option<HashMap<String, String>> {
     if attrs.get("siem").map(String::as_str) != Some("true") {
         return None;
     }
@@ -465,13 +883,13 @@ mod tests {
 
     #[test]
     fn test_siem_list_attributes_skips_non_siem_alerts() {
-        let attrs = HashMap::from([("sigma_id".to_string(), "x".to_string())]);
+        let attrs = hashbrown::HashMap::from([("sigma_id".to_string(), "x".to_string())]);
         assert!(siem_list_attributes(&attrs).is_none());
     }
 
     #[test]
     fn test_siem_list_attributes_drops_yaml_and_derives_title() {
-        let attrs = HashMap::from([
+        let attrs = hashbrown::HashMap::from([
             ("siem".to_string(), "true".to_string()),
             ("sigma_level".to_string(), "high".to_string()),
             (
@@ -492,7 +910,7 @@ mod tests {
 
     #[test]
     fn test_siem_list_attributes_keeps_stored_title() {
-        let attrs = HashMap::from([
+        let attrs = hashbrown::HashMap::from([
             ("siem".to_string(), "true".to_string()),
             ("sigma_title".to_string(), "Stored".to_string()),
             ("sigma_yaml".to_string(), "title: From YAML\n".to_string()),
@@ -566,6 +984,8 @@ mod tests {
             owner: None,
             description: None,
             alert_type: "anomaly_detection".to_string(),
+            stream_name: None,
+            stream_type: None,
             condition: None,
             trigger_condition: None,
             enabled: false,
@@ -581,20 +1001,34 @@ mod tests {
             level: None,
             level_since: None,
             priority: None,
+            oncall_team: None,
             tags: vec![],
+            destinations: vec![],
+            template: None,
             groups_observed: None,
             groups_firing: None,
             groups_observed_is_lower_bound: None,
             groups_firing_is_lower_bound: None,
             context_attributes: None,
+            child_count: None,
+            referenced_by_composite_count: None,
+            expression_summary: None,
+            active_downtime: None,
+            firing_started_at: None,
+            ack: None,
+            incident: None,
+            downtime_dimensions: HashMap::new(),
         };
         let json = serde_json::to_value(&item).unwrap();
         let obj = json.as_object().unwrap();
-        assert!(!obj.contains_key("condition"));
+        assert!(obj.get("condition").is_some_and(serde_json::Value::is_null));
         assert!(!obj.contains_key("trigger_condition"));
         assert!(!obj.contains_key("last_trained_at"));
         assert!(!obj.contains_key("status"));
         assert!(!obj.contains_key("last_error"));
+        // Empty destinations / no override template are omitted from the wire.
+        assert!(!obj.contains_key("destinations"));
+        assert!(!obj.contains_key("template"));
         // §5.4: a non-multi alert must not advertise a group summary at all —
         // an absent field reads as "not a multi-alert", a zero would read as
         // "observed no groups".
@@ -602,6 +1036,10 @@ mod tests {
         assert!(!obj.contains_key("groups_firing"));
         assert!(!obj.contains_key("groups_observed_is_lower_bound"));
         assert!(!obj.contains_key("groups_firing_is_lower_bound"));
+        // Absent means "resolved at fire time", which the list renders as its
+        // own label. A `null` would be a third state the column has no words
+        // for.
+        assert!(!obj.contains_key("oncall_team"));
     }
 
     #[test]
@@ -717,10 +1155,66 @@ mod tests {
             folder_id: "f1".to_string(),
             name: "Folder".to_string(),
             description: String::new(),
+            icon: None,
         };
         let item = ListAlertsResponseBodyItem::try_from((folder, alert, None)).unwrap();
         assert_eq!(item.alert_type, "realtime");
         assert!(item.is_real_time);
+    }
+
+    /// The defect this field was added for. The list column reads the alert's
+    /// bound team, and the field was never on the item — so a deliberately
+    /// pinned alert was indistinguishable from an unbound one.
+    #[test]
+    fn test_a_bound_alert_reports_the_team_it_names() {
+        let mut alert = meta_alerts::Alert::default();
+        alert.id = Some(svix_ksuid::Ksuid::new(None, None));
+        alert.oncall_team = Some("team_payments".to_string());
+
+        let item =
+            ListAlertsResponseBodyItem::try_from((meta_folders::Folder::default(), alert, None))
+                .unwrap();
+
+        assert_eq!(item.oncall_team.as_deref(), Some("team_payments"));
+        let json = serde_json::to_value(&item).unwrap();
+        assert_eq!(
+            json.get("oncall_team").and_then(|t| t.as_str()),
+            Some("team_payments")
+        );
+    }
+
+    /// Unbound is the absence of the field, not an empty string — the column
+    /// renders "resolved at fire time" from absence, and a blank value would
+    /// draw an empty team chip instead.
+    #[test]
+    fn test_an_unbound_alert_omits_the_field_entirely() {
+        let mut blank = meta_alerts::Alert::default();
+        blank.id = Some(svix_ksuid::Ksuid::new(None, None));
+        blank.oncall_team = Some("   ".to_string());
+
+        let item =
+            ListAlertsResponseBodyItem::try_from((meta_folders::Folder::default(), blank, None))
+                .unwrap();
+
+        assert!(item.oncall_team.is_none(), "whitespace is not a team");
+        let json = serde_json::to_value(&item).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("oncall_team"));
+    }
+
+    /// An anomaly config takes the other construction path. It carried the same
+    /// column and would otherwise have kept the bug after the alert path lost it.
+    #[test]
+    fn test_an_anomaly_config_reports_its_team_too() {
+        let id = valid_ksuid_str();
+        let v = serde_json::json!({
+            "anomaly_id": id,
+            "name": "x",
+            "oncall_team": "team_search",
+        });
+
+        let item = anomaly_config_to_list_item(&v).expect("should parse");
+
+        assert_eq!(item.oncall_team.as_deref(), Some("team_search"));
     }
 
     #[test]
@@ -734,6 +1228,38 @@ mod tests {
         assert_eq!(item.alert_type, "scheduled");
         assert_eq!(item.name, "my-alert");
         assert!(!item.is_real_time);
+    }
+
+    #[test]
+    fn slo_alert_list_discriminator_precedes_realtime_and_scheduled() {
+        use config::meta::{
+            alerts::Operator,
+            slo::condition::{SloAlertKind, SloCondition},
+        };
+
+        for is_real_time in [false, true] {
+            let mut alert = meta_alerts::Alert::default();
+            alert.id = Some(svix_ksuid::Ksuid::new(None, None));
+            alert.is_real_time = is_real_time;
+            alert.query_condition.slo_condition = Some(SloCondition {
+                slo_id: "3H0eMU7B6x12345678901234567".to_string(),
+                kind: SloAlertKind::ErrorBudget,
+                operator: Operator::GreaterThan,
+                critical: 10.0,
+                warning: None,
+                long_window_secs: None,
+                short_window_secs: None,
+                multi_alert: false,
+            });
+
+            let item = ListAlertsResponseBodyItem::try_from((
+                meta_folders::Folder::default(),
+                alert,
+                None,
+            ))
+            .unwrap();
+            assert_eq!(item.alert_type, "slo");
+        }
     }
 
     #[test]
@@ -850,5 +1376,125 @@ mod anomaly_priority_tag_tests {
         let obj = json.as_object().unwrap();
         assert!(!obj.contains_key("priority"));
         assert!(!obj.contains_key("tags"));
+    }
+
+    /// `enrich_with_run_state` cannot reach an anomaly, so the scheduler records
+    /// the outcome on the trigger and `list_configs` merges it in.
+    #[test]
+    fn test_last_outcome_is_read_from_the_recorded_trigger_value() {
+        for outcome in ["firing", "normal", "error", "skipped"] {
+            let item = anomaly_config_to_list_item(&cfg(serde_json::json!({
+                "last_outcome": outcome,
+                "last_outcome_at": 1_700,
+            })))
+            .unwrap();
+            assert_eq!(item.last_outcome.as_deref(), Some(outcome));
+            // Never presented as live state — always qualified by when it ran.
+            assert_eq!(item.last_outcome_at, Some(1_700));
+        }
+    }
+
+    /// Why the outcome is recorded, not inferred: any derivation from the config
+    /// row reports a permanently broken detector as healthy.
+    #[test]
+    fn test_an_errored_run_is_not_reported_as_normal() {
+        let item = anomaly_config_to_list_item(&cfg(serde_json::json!({
+            "is_trained": true,
+            "enabled": true,
+            "last_outcome": "error",
+            "last_outcome_at": 2_000,
+            // Identical to a clean run: nothing here distinguishes the two.
+            "last_detection_run": 2_000,
+        })))
+        .unwrap();
+        assert_eq!(item.last_outcome.as_deref(), Some("error"));
+    }
+
+    /// Nothing recorded yet — never run, or last run predates the upgrade.
+    #[test]
+    fn test_last_outcome_is_unset_when_nothing_was_recorded() {
+        let item = anomaly_config_to_list_item(&cfg(serde_json::json!({
+            "is_trained": true,
+            // Present and zero: `push` binds start_time as a literal 0, so a
+            // freshly created trigger reports a run that never happened.
+            "last_detection_run": 0,
+        })))
+        .unwrap();
+        assert_eq!(item.last_outcome, None);
+        assert_eq!(item.last_outcome_at, None);
+        let json = serde_json::to_value(&item).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("last_outcome"));
+    }
+
+    /// Echoing `last_outcome_at` would claim the outcome changed on every run.
+    #[test]
+    fn test_last_outcome_since_is_not_faked_from_the_run_timestamp() {
+        let item = anomaly_config_to_list_item(&cfg(serde_json::json!({
+            "last_outcome": "normal",
+            "last_outcome_at": 2_000,
+        })))
+        .unwrap();
+        assert_eq!(item.last_outcome_since, None);
+    }
+
+    /// The detector reports a count, never a warning/critical classification.
+    #[test]
+    fn test_anomaly_configs_have_no_level() {
+        let item = anomaly_config_to_list_item(&cfg(serde_json::json!({
+            "last_outcome": "firing",
+            "last_outcome_at": 2_500,
+        })))
+        .unwrap();
+        assert_eq!(item.level, None);
+        assert_eq!(item.level_since, None);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn an_anomaly_on_a_service_in_its_sql_shows_the_chip_of_that_service() {
+        use config::meta::{
+            correlation::FieldAlias,
+            downtimes::{Downtime, TargetModule},
+        };
+        use o2_enterprise::enterprise::downtimes::scope::{TargetItem, matches, target_for};
+
+        let groups = [FieldAlias {
+            id: "service".to_string(),
+            display: "Service".to_string(),
+            group: None,
+            fields: vec!["service".to_string()],
+            is_workload_type: false,
+        }];
+        let v = cfg(serde_json::json!({
+            "query_mode": "custom_sql",
+            "custom_sql": "SELECT count(*) AS c FROM \"logs\" WHERE service = 'payments'",
+        }));
+        let mut item = anomaly_config_to_list_item(&v).expect("should parse");
+        assert!(item.tags.is_empty());
+        item.downtime_dimensions = anomaly_downtime_dimensions(&v, &item.tags, &groups);
+
+        let downtime: Downtime = serde_json::from_value(serde_json::json!({
+            "id": "dt-1", "org": "default", "name": "payments maintenance",
+            "condition": { "type": "pair", "key": "service", "operator": "=", "value": "payments" },
+            "targets": [{ "module": "anomaly_detections", "folders": { "kind": "all" } }],
+            "schedule": {
+                "repeat": "none", "starts_at": 0, "timezone": "UTC", "duration_secs": 60
+            },
+            "created_by": "lin", "created_at": 0, "updated_by": "lin", "updated_at": 0
+        }))
+        .unwrap();
+        let target = target_for(&downtime.targets, TargetModule::AnomalyDetections).unwrap();
+        let id = item.alert_id.to_string();
+        let dims = list_item_dimensions(&item);
+        let row = TargetItem {
+            id: &id,
+            folder_id: &item.folder_id,
+            dimensions: &dims,
+            tags: &[],
+        };
+        assert!(
+            matches(target, downtime.condition.as_ref(), &row),
+            "{dims:?}"
+        );
     }
 }

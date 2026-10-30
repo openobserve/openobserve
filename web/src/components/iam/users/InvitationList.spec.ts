@@ -33,23 +33,29 @@ const mockInvitations = [
   },
 ];
 
-vi.mock("@/services/users", () => ({
-  default: {
-    getPendingInvites: vi.fn(async () => ({
-      data: { data: mockInvitations },
-    })),
-  },
-}));
+vi.mock("@/services/users", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getPendingInvites: vi.fn(async () => ({
+        data: { data: mockInvitations },
+      })),
+    },
+  });
+});
 
-vi.mock("@/services/organizations", () => ({
-  default: {
-    process_subscription: vi.fn(async () => ({})),
-    decline_subscription: vi.fn(async () => ({})),
-    list: vi.fn(async () => ({
-      data: { data: [{ identifier: "org-1", name: "Org One" }] },
-    })),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      process_subscription: vi.fn(async () => ({})),
+      decline_subscription: vi.fn(async () => ({})),
+      list: vi.fn(async () => ({
+        data: { data: [{ identifier: "org-1", name: "Org One" }] },
+      })),
+    },
+  });
+});
 
 import InvitationList from "@/components/iam/users/InvitationList.vue";
 import usersService from "@/services/users";
@@ -184,11 +190,6 @@ describe("InvitationList - fetchPendingInvitations", () => {
     expect((wrapper.vm as any).invitations.length).toBe(2);
   });
 
-  it("sets resultTotal to the number of invitations", async () => {
-    const wrapper = await mountInvitationList();
-    expect((wrapper.vm as any).resultTotal).toBe(2);
-  });
-
   // Row numbering moved to OTable's built-in show-index (no '#' data field).
 
   it("formats the expiry for each invitation", async () => {
@@ -295,6 +296,17 @@ describe("InvitationList - rejectInvitation", () => {
     const dialogs = wrapper.findAllComponents(ODialogStub);
     // The second dialog is the reject dialog
     expect(dialogs[1].props("open")).toBe(true);
+  });
+
+  it("names the org in bold and uses a destructive Reject button", async () => {
+    const wrapper = await mountInvitationList();
+    (wrapper.vm as any).rejectInvitation({ token: "tok-2", org_name: "Org Two", org_id: "org-2" });
+    await flushPromises();
+    const dialog = wrapper.findAllComponents(ODialogStub)[1];
+    expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+    const message = dialog.find('[data-test="invitation-list-reject-message"]');
+    expect(message.find("span.font-semibold").text()).toBe("Org Two");
+    expect(message.text()).toContain("reject the invitation to join Org Two?");
   });
 });
 

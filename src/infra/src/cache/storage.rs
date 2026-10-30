@@ -61,6 +61,14 @@ impl ObjectStoreExt for CacheFS {
         storage::add_account(&key, acc).await;
     }
 
+    async fn remove_account(&self, key: &str) {
+        storage::accounts::remove_account(key).await;
+    }
+
+    fn has_account(&self, name: &str) -> bool {
+        storage::has_account(name)
+    }
+
     async fn put(
         &self,
         _account: &str,
@@ -153,19 +161,7 @@ impl ObjectStoreExt for CacheFS {
         location: &Path,
         ranges: &[Range<u64>],
     ) -> Result<Vec<Bytes>> {
-        if ranges.is_empty() {
-            return Ok(Vec::new());
-        }
-        let path = location.to_string();
-        // Single cache lookup for ALL ranges: memory cache → in-memory slice,
-        // disk cache → one File::open + N preads. Falls back to remote on
-        // cache miss (which itself does batched ranges per backend).
-        if let Ok(v) = file_data::get_ranges_opts(account, &path, ranges, false).await {
-            return Ok(v);
-        }
-
-        // default to storage
-        storage::get_ranges(account, &path, ranges).await
+        file_data::get_ranges_opts(account, location.as_ref(), ranges, true).await
     }
 
     async fn head(&self, account: &str, location: &Path) -> Result<ObjectMeta> {

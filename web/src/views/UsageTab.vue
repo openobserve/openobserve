@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="usage-tab h-full">
     <!-- Main content when data exists -->
     <div
-      v-if="!no_data_ingest && !isLoadingSummary"
+      v-if="!no_data_ingest && !isLoadingSummary && !summaryFailed"
       class="px-page-edge flex h-full w-full flex-col overflow-y-auto pt-2 pb-1"
     >
       <!-- Banners — each component renders nothing when inactive, so this whole
@@ -163,13 +163,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Main region — a filled resources rail beside the two status charts, so
            Functions/Dashboards live somewhere purposeful and the vertical space
            is actually used. Rail carries counts + one-click access to every area. -->
+      <!-- < lg the region must scroll, or the fixed-height grid compresses its auto rows and cards overlap. -->
       <div
-        class="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[16rem_minmax(0,1fr)_minmax(0,1fr)]"
+        class="grid min-h-0 flex-1 grid-cols-1 gap-3 max-lg:auto-rows-min max-lg:overflow-y-auto lg:grid-cols-[16rem_minmax(0,1fr)_minmax(0,1fr)]"
       >
         <!-- Resources rail -->
         <aside
           class="rounded-default bg-card-glass-bg border-card-glass-border flex min-h-0 flex-col overflow-y-auto border p-4"
-          aria-label="Resources"
+          :aria-label="t('common.resources')"
         >
           <!-- Resources — owned assets with live counts. Each row is gated to the
                same route the left nav uses, so it hides when access is missing. -->
@@ -193,9 +194,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OIcon name="function" size="sm" />
                 </span>
-                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
+                <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
                   t("home.functionTitle")
-                }}</span>
+                }}</OTruncatedText>
                 <span
                   class="text-text-heading text-sm font-semibold tabular-nums"
                   data-test="home-usage-tab-functions-count"
@@ -222,9 +223,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OIcon name="dashboard" size="sm" />
                 </span>
-                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
+                <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
                   t("home.dashboardTitle")
-                }}</span>
+                }}</OTruncatedText>
                 <span
                   class="text-text-heading text-sm font-semibold tabular-nums"
                   data-test="home-usage-tab-dashboards-count"
@@ -266,9 +267,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OIcon name="search" size="sm" />
                 </span>
-                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
+                <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
                   t("menu.search")
-                }}</span>
+                }}</OTruncatedText>
                 <OIcon
                   name="chevron-right"
                   size="sm"
@@ -290,9 +291,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OIcon name="account-tree" size="sm" />
                 </span>
-                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
+                <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
                   t("menu.traces")
-                }}</span>
+                }}</OTruncatedText>
                 <OIcon
                   name="chevron-right"
                   size="sm"
@@ -314,9 +315,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OIcon name="bar-chart" size="sm" />
                 </span>
-                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
+                <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
                   t("menu.metrics")
-                }}</span>
+                }}</OTruncatedText>
                 <OIcon
                   name="chevron-right"
                   size="sm"
@@ -338,9 +339,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OIcon name="devices" size="sm" />
                 </span>
-                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
-                  t("menu.rum")
-                }}</span>
+                <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
+                  raw("RUM")
+                }}</OTruncatedText>
                 <OIcon
                   name="chevron-right"
                   size="sm"
@@ -362,9 +363,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OIcon name="notifications-active" size="sm" />
                 </span>
-                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
+                <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
                   t("menu.incidents")
-                }}</span>
+                }}</OTruncatedText>
                 <OIcon
                   name="chevron-right"
                   size="sm"
@@ -386,9 +387,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OIcon name="description" size="sm" />
                 </span>
-                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
+                <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
                   t("menu.report")
-                }}</span>
+                }}</OTruncatedText>
                 <OIcon
                   name="chevron-right"
                   size="sm"
@@ -402,7 +403,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Alerts -->
         <section
           class="rounded-default bg-card-glass-bg border-card-glass-border flex min-h-0 flex-col border p-4"
-          aria-label="Alerts overview section"
+          :aria-label="t('home.alertsOverviewSection')"
         >
           <div class="flex items-center justify-between gap-2">
             <span class="text-text-heading flex items-center gap-2 text-sm font-semibold">
@@ -468,7 +469,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Pipelines -->
         <section
           class="rounded-default bg-card-glass-bg border-card-glass-border flex min-h-0 flex-col border p-4"
-          aria-label="Pipelines overview section"
+          :aria-label="t('home.pipelinesOverviewSection')"
         >
           <div class="flex items-center justify-between gap-2">
             <span class="text-text-heading flex items-center gap-2 text-sm font-semibold">
@@ -543,6 +544,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <HomeNoDataState />
     </div>
 
+    <div
+      v-if="summaryFailed && !isLoadingSummary"
+      class="px-page-edge flex h-full flex-col pt-2"
+      data-test="home-usage-tab-load-error"
+    >
+      <OEmptyState
+        preset="load-error"
+        size="hero"
+        data-test="usage-load-error-empty-state"
+        @action="() => getSummary(store.state.selectedOrganization.identifier)"
+      />
+    </div>
+
     <!-- Loading state -->
     <div v-if="isLoadingSummary" class="h-full" data-test="home-usage-tab-loading">
       <HomeViewSkeleton />
@@ -552,18 +566,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- UsageTab: self-contained home usage dashboard showing streams, functions, dashboards, alerts, and pipelines summary with animated counters and charts. -->
 <script setup lang="ts">
+import { configFullQuery } from "@/services/config.queries";
+import { orgSummaryQuery } from "@/services/organizations.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import orgService from "@/services/organizations";
-import configService from "@/services/config";
 import config from "@/aws-exports";
 import { formatSizeFromMB } from "@/utils/zincutils";
 import { formatEventCount } from "@/utils/formatters";
 import { chartColor } from "@/utils/chartTheme";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
 import UsageReportBanner from "@/enterprise/components/billings/UsageReportBanner.vue";
@@ -575,8 +591,9 @@ import KpiCard from "@/components/common/KpiCard.vue";
 import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import HomeNoDataState from "@/views/HomeNoDataState.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 
@@ -585,6 +602,9 @@ const no_data_ingest = ref(false);
 const alertsPanelDataKey = ref(0);
 const pipelinesPanelDataKey = ref(0);
 const isLoadingSummary = ref(false);
+const flagOn = computed(() => store.state.zoConfig?.restricted_routes_on_empty_data === true);
+// flag-on only: the flag-off page keeps its toasts and its populated fall-through
+const summaryFailed = ref(false);
 
 // Animated counters
 const animatedStreamsCount = ref(0);
@@ -632,14 +652,18 @@ const animateValue = (targetRef: any, start: number, end: number, duration: numb
 
 const getSummary = (org_id: any) => {
   isLoadingSummary.value = true;
-  const dismiss = toast({
-    variant: "loading",
-    message: "Please wait while loading summary...",
-    timeout: 0,
-  });
-  orgService
-    .get_organization_summary(org_id)
-    .then((res) => {
+  summaryFailed.value = false;
+  const dismiss = flagOn.value
+    ? () => {}
+    : toast({
+        variant: "loading",
+        message: t("toastMessages.views.pleaseWaitWhileLoadingSummary"),
+        timeout: 0,
+      });
+  queryClient
+    .fetchQuery(orgSummaryQuery(org_id))
+    .then((data: any) => {
+      const res = { data };
       if (
         res.data.streams.num_streams == 0 &&
         res.data.alerts.num_realtime == 0 &&
@@ -703,9 +727,13 @@ const getSummary = (org_id: any) => {
     .catch((err) => {
       console.log(err);
       dismiss();
+      if (flagOn.value) {
+        summaryFailed.value = true;
+        return;
+      }
       toast({
         variant: "error",
-        message: "Error while pulling summary.",
+        message: t("toastMessages.views.errorWhilePullingSummary"),
       });
     })
     .finally(() => {
@@ -748,7 +776,7 @@ const alertsPanelData = computed(() => {
   return {
     chartType: "custom_chart",
     title: {
-      text: "Last 15 minutes",
+      text: t("billing.last15Minutes"),
       left: "65%",
       top: "50%",
       textStyle: {
@@ -770,7 +798,7 @@ const alertsPanelData = computed(() => {
     },
     series: [
       {
-        name: "Alert Status",
+        name: t("billing.alertStatus"),
         type: "pie",
         radius: ["35%", "55%"],
         center: ["35%", "50%"],
@@ -793,12 +821,12 @@ const alertsPanelData = computed(() => {
         data: [
           {
             value: healthyAlerts,
-            name: "Success Alerts",
+            name: t("billing.successAlerts"),
             itemStyle: {},
           },
           {
             value: failedAlerts,
-            name: "Failed Alerts",
+            name: t("billing.failedAlerts"),
             itemStyle: {},
           },
         ],
@@ -834,8 +862,12 @@ const pipelinesPanelData = computed(() => {
     chartType: "custom_chart",
     xAxis: {
       type: "category",
-      data: ["Healthy", "Failed", "Warning"],
-      name: "Last 15 minutes",
+      data: [
+        t("billing.pipelineStatusHealthy"),
+        t("billing.pipelineStatusFailed"),
+        t("billing.pipelineStatusWarning"),
+      ],
+      name: t("billing.last15Minutes"),
       nameLocation: "middle",
       nameGap: 30,
       nameTextStyle: {
@@ -853,7 +885,7 @@ const pipelinesPanelData = computed(() => {
       min: 0,
       max: Math.ceil((healthyPipelines + failedPipelines + warningPipelines) / 3 / 10) * 10 || 10,
       interval: 10,
-      name: "Number of Pipelines",
+      name: t("billing.numberOfPipelines"),
       nameLocation: "middle",
       nameGap: 60,
       nameRotate: 90,
@@ -955,8 +987,19 @@ onMounted(() => {
 
 const refreshConfig = async () => {
   try {
-    const res: any = await configService.get_config();
-    store.dispatch("setConfig", res.data);
+    if (!orgId.value) return;
+    // Forced: the whole point of this call is a fresher last_usage_report_ts
+    // than the one the banner is already rendering.
+    store.dispatch(
+      "setConfig",
+      await queryClient
+        .invalidateQueries({
+          queryKey: configFullQuery(orgId.value).queryKey,
+          exact: true,
+          refetchType: "none",
+        })
+        .then(() => queryClient.fetchQuery(configFullQuery(orgId.value))),
+    );
   } catch (error) {
     console.log(error);
   }

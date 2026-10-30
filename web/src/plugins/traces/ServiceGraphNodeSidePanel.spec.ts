@@ -27,11 +27,14 @@ const { notifyMock, toastMock, routerPushMock } = vi.hoisted(() => ({
 }));
 
 // vi.mock calls are hoisted — must come before component import
-vi.mock("@/services/search", () => ({
-  default: {
-    search: vi.fn().mockResolvedValue({ data: { hits: [] } }),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      search: vi.fn().mockResolvedValue({ data: { hits: [] } }),
+    },
+  });
+});
 
 vi.mock("@/services/service_streams", () => ({
   correlate: vi.fn().mockResolvedValue({
@@ -39,7 +42,7 @@ vi.mock("@/services/service_streams", () => ({
       service_name: "frontend",
       matched_dimensions: {},
       additional_dimensions: {},
-      related_streams: { logs: [], metrics: [], traces: [] },
+      related_streams: { logs: [], metrics: [], traces: [], profiles: [] },
     },
   }),
   getSemanticGroups: vi.fn().mockResolvedValue({ data: [] }),
@@ -47,7 +50,7 @@ vi.mock("@/services/service_streams", () => ({
   buildChipDimensionsFromFilters: vi.fn().mockReturnValue({}),
 }));
 
-// resolveStreamSchema calls useStreams().getStream() to fetch and cache the
+// resolveStreamSchema calls useStreams(t).getStream() to fetch and cache the
 // stream schema. Mock it so those calls complete instantly instead of making
 // real HTTP requests that hang in tests.
 const { getStreamMock } = vi.hoisted(() => ({
@@ -161,6 +164,7 @@ const ODrawerStub = {
     "open",
     "width",
     "seamless",
+    "modal",
     "portalTarget",
     "title",
     "subTitle",
@@ -305,6 +309,14 @@ describe("ServiceGraphNodeSidePanel", () => {
 
     it("should render the close button", () => {
       expect(wrapper.find('[data-test="o-drawer-close-btn"]').exists()).toBe(true);
+    });
+  });
+
+  describe("drawer behaviour", () => {
+    it("renders a non-modal drawer so the page behind stays interactive", () => {
+      wrapper = mountPanel({ selectedNode: baseNode });
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.props("modal")).toBe(false);
     });
   });
 
@@ -512,7 +524,7 @@ describe("ServiceGraphNodeSidePanel", () => {
           service_name: "frontend",
           matched_dimensions: {},
           additional_dimensions: {},
-          related_streams: { logs: [], metrics: ["prom-stream"], traces: [] },
+          related_streams: { logs: [], metrics: ["prom-stream"], traces: [], profiles: [] },
         },
       } as any);
 
@@ -612,6 +624,57 @@ describe("ServiceGraphNodeSidePanel", () => {
       // Inferred deps genuinely have the caller on service_name — no agent climb.
       expect(sql).toContain("service_name as caller_service");
       expect(sql).not.toContain("LEFT JOIN");
+    });
+
+    it("filters catalog-origin inferred dependencies by type and system", async () => {
+      vi.mocked(searchService.search).mockClear();
+      vi.mocked(searchService.search).mockResolvedValue({ data: { hits: [] } } as any);
+      wrapper = mountPanel({
+        streamFilter: "default",
+        selectedNode: {
+          ...baseNode,
+          id: '["sso","sso","database","mysql"]',
+          name: "sso",
+          service_type: "database",
+          service_system: "mysql",
+        },
+      });
+      await flushPromises();
+
+      const sql = vi.mocked(searchService.search).mock.calls[0][0].query.query.sql;
+      expect(sql).toContain("infer_service_name = 'sso'");
+      expect(sql).toContain("infer_service_type = 'database'");
+      expect(sql).toContain("infer_service_system = 'mysql'");
+    });
+
+    it("does not add a catalog system to graph-origin navigation", async () => {
+      wrapper = mountPanel({
+        selectedNode: { ...baseNode, name: "postgres", service_type: "database" },
+      });
+
+      await wrapper.vm.viewRelatedTraces();
+
+      const payload = wrapper.emitted("view-traces")?.[0]?.[0] as Record<string, any>;
+      expect(payload).not.toHaveProperty("serviceSystem");
+    });
+
+    it("adds the catalog system to catalog-origin navigation", async () => {
+      wrapper = mountPanel({
+        selectedNode: {
+          ...baseNode,
+          name: "sso",
+          service_type: "database",
+          service_system: "mysql",
+        },
+      });
+
+      await wrapper.vm.viewRelatedTraces();
+
+      expect(wrapper.emitted("view-traces")?.[0]?.[0]).toMatchObject({
+        serviceName: "sso",
+        serviceType: "database",
+        serviceSystem: "mysql",
+      });
     });
   });
 
@@ -724,8 +787,8 @@ describe("ServiceGraphNodeSidePanel", () => {
 
     it("should have the expected id and label for each top-level group", () => {
       const groups = wrapper.vm.metricGroupResources;
-      expect(groups[0]).toMatchObject({ id: "pods", label: "Pods" });
-      expect(groups[1]).toMatchObject({ id: "nodes", label: "Nodes" });
+      expect(groups[0]).toMatchObject({ id: "pods", labelKey: "metrics.groups.pods" });
+      expect(groups[1]).toMatchObject({ id: "nodes", labelKey: "metrics.groups.nodes" });
     });
 
     it("should nest compute/memory/network/storage/others under each top-level group", () => {
@@ -752,6 +815,7 @@ describe("ServiceGraphNodeSidePanel", () => {
             ],
             metrics: [],
             traces: [],
+            profiles: [],
           },
         },
       } as any);
@@ -771,10 +835,29 @@ describe("ServiceGraphNodeSidePanel", () => {
           path: "/logs",
           query: expect.objectContaining({
             stream_type: "logs",
-            stream_value: "k8s-logs",
+            // `stream` (not `stream_value`) — restoreUrlQueryParams only reads `stream`,
+            // and `type` routes the Logs page through its trace-explorer restore branch.
+            stream: "k8s-logs",
+            type: "trace_explorer",
           }),
         }),
       );
+    });
+
+    it("should clear the logs isInitialized flag so the URL params win over the previous session", async () => {
+      const dispatchSpy = vi.spyOn(store, "dispatch");
+
+      const viewRelatedLogsBtn = wrapper.find(
+        '[data-test="service-graph-node-panel-view-related-logs-btn"]',
+      );
+      await viewRelatedLogsBtn.trigger("click");
+      await flushPromises();
+
+      // Without this the Logs page restores its stored session and silently drops
+      // the stream, time range and filter carried in the pushed URL.
+      expect(dispatchSpy).toHaveBeenCalledWith("logs/setIsInitialized", false);
+
+      dispatchSpy.mockRestore();
     });
 
     it("should NOT show a warning notification when a valid log stream is found", async () => {
@@ -1334,6 +1417,46 @@ describe("ServiceGraphNodeSidePanel", () => {
         '[data-test="service-graph-node-panel-workload-fields-btn"]',
       );
       expect(dropdownBtn.exists()).toBe(false);
+    });
+  });
+  // ---------------------------------------------------------------------------
+  // RED charts: per-second Rate on an explicit interval
+  // ---------------------------------------------------------------------------
+
+  describe("RED chart queries", () => {
+    const panels = (w: VueWrapper) => (w.vm as any).dashboardData?.tabs?.[0]?.panels ?? [];
+    const rate = (w: VueWrapper) => panels(w).find((p: any) => p.title === "Rate");
+    // The traces datetime this panel receives is in microseconds, like the metrics dashboard's.
+    const rangeOf = (seconds: number) => ({ startTime: NOW - seconds * 1_000_000, endTime: NOW });
+
+    it("leaves no interval placeholder in any panel query", async () => {
+      wrapper = mountPanel();
+      await flushPromises();
+      expect(panels(wrapper).length).toBeGreaterThan(0);
+      for (const panel of panels(wrapper)) {
+        expect(panel.queries[0].query).not.toContain("[INTERVAL");
+      }
+    });
+
+    it("plots Rate as spans per second over a 30-minute range", async () => {
+      wrapper = mountPanel({ timeRange: rangeOf(30 * 60) });
+      await flushPromises();
+      expect(rate(wrapper).queries[0].query).toContain("histogram(_timestamp, '15 second')");
+      expect(rate(wrapper).queries[0].query).toContain("count(*) / 15.0");
+    });
+
+    it("plots Rate per second on hourly buckets over 6 hours", async () => {
+      wrapper = mountPanel({ timeRange: rangeOf(6 * 3600) });
+      await flushPromises();
+      expect(rate(wrapper).queries[0].query).toContain("histogram(_timestamp, '1 hour')");
+      expect(rate(wrapper).queries[0].query).toContain("count(*) / 3600.0");
+    });
+
+    it("labels Rate in spans/s", async () => {
+      wrapper = mountPanel();
+      await flushPromises();
+      expect(rate(wrapper).config.unit).toBe("custom");
+      expect(rate(wrapper).config.unit_custom).toBe("spans/s");
     });
   });
 });

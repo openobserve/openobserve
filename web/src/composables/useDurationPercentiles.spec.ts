@@ -1,6 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { gt } from "@/types/i18n";
 import { flushPromises } from "@vue/test-utils";
 import store from "@/test/unit/helpers/store";
 
@@ -212,7 +213,7 @@ describe("useDurationPercentiles", () => {
 
   describe("initial state", () => {
     it("should initialise percentiles as all-null", () => {
-      const { percentiles } = useDurationPercentiles();
+      const { percentiles } = useDurationPercentiles(gt);
       expect(percentiles.value).toEqual({
         p25: null,
         p50: null,
@@ -224,19 +225,19 @@ describe("useDurationPercentiles", () => {
     });
 
     it("should initialise isLoading as false", () => {
-      const { isLoading } = useDurationPercentiles();
+      const { isLoading } = useDurationPercentiles(gt);
       expect(isLoading.value).toBe(false);
     });
 
     it("should initialise errMsg as empty string", () => {
-      const { errMsg } = useDurationPercentiles();
+      const { errMsg } = useDurationPercentiles(gt);
       expect(errMsg.value).toBe("");
     });
   });
 
   describe("fetchPercentiles", () => {
     it("should set isLoading to true and call fetchQueryDataWithHttpStream", async () => {
-      const { fetchPercentiles, isLoading } = useDurationPercentiles();
+      const { fetchPercentiles, isLoading } = useDurationPercentiles(gt);
 
       fetchPercentiles(BASE_PAYLOAD);
 
@@ -248,7 +249,7 @@ describe("useDurationPercentiles", () => {
     });
 
     it("should pass the correct org_id from the store to the stream call", () => {
-      const { fetchPercentiles } = useDurationPercentiles();
+      const { fetchPercentiles } = useDurationPercentiles(gt);
       fetchPercentiles(BASE_PAYLOAD);
 
       const callArg = mockFetchQueryDataWithHttpStream.mock.calls[0][0];
@@ -268,7 +269,7 @@ describe("useDurationPercentiles", () => {
         });
       });
 
-      const { fetchPercentiles, percentiles } = useDurationPercentiles();
+      const { fetchPercentiles, percentiles } = useDurationPercentiles(gt);
       fetchPercentiles(BASE_PAYLOAD);
       await flushPromises();
       expect(percentiles.value.p50).toBe(200);
@@ -286,7 +287,7 @@ describe("useDurationPercentiles", () => {
     });
 
     it("should build a SQL query that includes a WHERE clause when whereClause is provided", () => {
-      const { fetchPercentiles } = useDurationPercentiles();
+      const { fetchPercentiles } = useDurationPercentiles(gt);
       fetchPercentiles({ ...BASE_PAYLOAD, whereClause: "duration >= 1000" });
 
       const callArg = mockFetchQueryDataWithHttpStream.mock.calls[0][0];
@@ -303,7 +304,7 @@ describe("useDurationPercentiles", () => {
     });
 
     it("should not include a WHERE clause in the SQL when whereClause is absent", () => {
-      const { fetchPercentiles } = useDurationPercentiles();
+      const { fetchPercentiles } = useDurationPercentiles(gt);
       fetchPercentiles(BASE_PAYLOAD);
 
       const callArg = mockFetchQueryDataWithHttpStream.mock.calls[0][0];
@@ -330,7 +331,7 @@ describe("useDurationPercentiles", () => {
         });
       });
 
-      const { fetchPercentiles, percentiles, isLoading } = useDurationPercentiles();
+      const { fetchPercentiles, percentiles, isLoading } = useDurationPercentiles(gt);
       fetchPercentiles(BASE_PAYLOAD);
       await flushPromises();
 
@@ -353,7 +354,7 @@ describe("useDurationPercentiles", () => {
         });
       });
 
-      const { fetchPercentiles, percentiles, isLoading } = useDurationPercentiles();
+      const { fetchPercentiles, percentiles, isLoading } = useDurationPercentiles(gt);
       fetchPercentiles(BASE_PAYLOAD);
       await flushPromises();
 
@@ -377,7 +378,7 @@ describe("useDurationPercentiles", () => {
         });
       });
 
-      const { fetchPercentiles, percentiles } = useDurationPercentiles();
+      const { fetchPercentiles, percentiles } = useDurationPercentiles(gt);
       fetchPercentiles(BASE_PAYLOAD);
       await flushPromises();
 
@@ -396,7 +397,7 @@ describe("useDurationPercentiles", () => {
         handlers.error(_payload, { message: "Server error" });
       });
 
-      const { fetchPercentiles, errMsg, isLoading } = useDurationPercentiles();
+      const { fetchPercentiles, errMsg, isLoading } = useDurationPercentiles(gt);
       fetchPercentiles(BASE_PAYLOAD);
       await flushPromises();
 
@@ -411,7 +412,7 @@ describe("useDurationPercentiles", () => {
         handlers.complete(_payload, {});
       });
 
-      const { fetchPercentiles, isLoading } = useDurationPercentiles();
+      const { fetchPercentiles, isLoading } = useDurationPercentiles(gt);
       fetchPercentiles(BASE_PAYLOAD);
       await flushPromises();
 
@@ -421,7 +422,7 @@ describe("useDurationPercentiles", () => {
 
   describe("cancelFetch", () => {
     it("should call cancelStreamQueryBasedOnRequestId and set isLoading to false", async () => {
-      const { fetchPercentiles, cancelFetch, isLoading } = useDurationPercentiles();
+      const { fetchPercentiles, cancelFetch, isLoading } = useDurationPercentiles(gt);
 
       fetchPercentiles(BASE_PAYLOAD);
       expect(isLoading.value).toBe(true);
@@ -433,7 +434,7 @@ describe("useDurationPercentiles", () => {
     });
 
     it("should not call cancelStreamQueryBasedOnRequestId when no request is in-flight", () => {
-      const { cancelFetch } = useDurationPercentiles();
+      const { cancelFetch } = useDurationPercentiles(gt);
 
       cancelFetch(); // no fetchPercentiles called first
 
@@ -443,7 +444,7 @@ describe("useDurationPercentiles", () => {
 
   describe("second fetchPercentiles call cancels in-flight request", () => {
     it("should cancel the first request before starting the second", () => {
-      const { fetchPercentiles } = useDurationPercentiles();
+      const { fetchPercentiles } = useDurationPercentiles(gt);
 
       fetchPercentiles(BASE_PAYLOAD);
       // At this point currentTraceId is set; a second call should cancel it

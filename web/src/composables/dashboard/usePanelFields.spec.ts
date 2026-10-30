@@ -1,9 +1,8 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { reactive } from "vue";
 import { usePanelFields } from "./usePanelFields";
 
 // Mock Vue to enable computed() in unit test context
-import { vi } from "vitest";
 
 vi.mock("vue", async () => {
   const actual = await vi.importActual("vue");
@@ -180,9 +179,9 @@ describe("usePanelFields", () => {
       expect(panelData.data.queries[0].fields.x[0].alias).toBe("custom_field");
     });
 
-    it("generates label using generateLabelFromName for non-custom query", () => {
+    it("leaves the label blank so the chart generates it from the field", () => {
       fields.addXAxisItem({ name: "my_field" });
-      expect(panelData.data.queries[0].fields.x[0].label).toBe("My Field");
+      expect(panelData.data.queries[0].fields.x[0].label).toBe("");
     });
   });
 
@@ -209,6 +208,34 @@ describe("usePanelFields", () => {
       fields = usePanelFields({ dashboardPanelData: panelData, store });
       fields.addYAxisItem({ name: "value" });
       expect(panelData.data.queries[0].fields.y[0].functionName).toBeNull();
+    });
+
+    it("reads the state with max for a state timeline, never a count", () => {
+      panelData.data.type = "state-timeline";
+      fields = usePanelFields({ dashboardPanelData: panelData, store });
+      fields.addYAxisItem({ name: "link_state" });
+      expect(panelData.data.queries[0].fields.y[0].functionName).toBe("max");
+    });
+
+    it("reads a numeric host map value with max, and keeps count for text fields", () => {
+      panelData.data.type = "hostmap";
+      (panelData as any).meta.streamFields = {
+        groupedFields: [
+          {
+            stream_alias: null,
+            schema: [
+              { name: "temperature", type: "Float64" },
+              { name: "status", type: "Utf8" },
+            ],
+          },
+        ],
+      };
+      fields = usePanelFields({ dashboardPanelData: panelData, store });
+      fields.addYAxisItem({ name: "temperature" });
+      expect(panelData.data.queries[0].fields.y[0].functionName).toBe("max");
+      panelData.data.queries[0].fields.y = [];
+      fields.addYAxisItem({ name: "status" });
+      expect(panelData.data.queries[0].fields.y[0].functionName).toBe("count");
     });
 
     it("does not add second item to pie chart (max 1 y)", () => {
@@ -261,6 +288,15 @@ describe("usePanelFields", () => {
       fields.addBreakDownAxisItem({ name: "region" });
       fields.addBreakDownAxisItem({ name: "country" }); // blocked
       expect(panelData.data.queries[0].fields.breakdown).toHaveLength(1);
+    });
+
+    it("takes exactly one row field for a state timeline", () => {
+      panelData.data.type = "state-timeline";
+      fields = usePanelFields({ dashboardPanelData: panelData, store });
+      fields.addBreakDownAxisItem({ name: "gpu" });
+      fields.addBreakDownAxisItem({ name: "host" }); // blocked
+      expect(panelData.data.queries[0].fields.breakdown).toHaveLength(1);
+      expect(panelData.data.queries[0].fields.breakdown[0].args[0].value.field).toBe("gpu");
     });
   });
 
@@ -526,10 +562,37 @@ describe("usePanelFields", () => {
         "table",
       );
       // table: x fields go into x, breakdown fields stay in breakdown (for pivot table mode)
-      const xNames = panelData.data.queries[0].fields.x.map((f: any) => f.label);
-      const breakdownNames = panelData.data.queries[0].fields.breakdown.map((f: any) => f.label);
-      expect(xNames).toContain("Col1");
-      expect(breakdownNames).toContain("Col2");
+      const fieldOf = (f: any) => f.args[0].value.field;
+      const xNames = panelData.data.queries[0].fields.x.map(fieldOf);
+      const breakdownNames = panelData.data.queries[0].fields.breakdown.map(fieldOf);
+      expect(xNames).toContain("col1");
+      expect(breakdownNames).toContain("col2");
+    });
+  });
+
+  describe("sunburst slots", () => {
+    const addMany = (axis: "x" | "y" | "breakdown", count: number) => {
+      for (let i = 0; i < count; i++) {
+        const row = { name: `field_${axis}_${i}` };
+        if (axis === "x") fields.addXAxisItem(row);
+        else if (axis === "y") fields.addYAxisItem(row);
+        else fields.addBreakDownAxisItem(row);
+      }
+      return panelData.data.queries[0].fields[axis].length;
+    };
+
+    it("takes up to five rings across the x fields and one breakdown, and one y", () => {
+      panelData.data.type = "sunburst";
+      expect(addMany("x", 3)).toBe(3);
+      expect(addMany("y", 3)).toBe(1);
+      expect(addMany("breakdown", 3)).toBe(1);
+      expect(addMany("x", 3)).toBe(4);
+    });
+
+    it("refuses a breakdown once the x fields already fill all five rings", () => {
+      panelData.data.type = "sunburst";
+      expect(addMany("x", 6)).toBe(5);
+      expect(addMany("breakdown", 1)).toBe(0);
     });
   });
 
@@ -544,6 +607,180 @@ describe("usePanelFields", () => {
     it("is true when queryType is promql", () => {
       panelData.data.queryType = "promql";
       expect(fields.promqlMode.value).toBe(true);
+    });
+  });
+
+  describe("bar gauge slots", () => {
+    const addMany = (axis: "x" | "y", count: number) => {
+      for (let i = 0; i < count; i++) {
+        const row = { name: `field_${axis}_${i}` };
+        if (axis === "x") fields.addXAxisItem(row);
+        else fields.addYAxisItem(row);
+      }
+      return panelData.data.queries[0].fields[axis].length;
+    };
+
+    it("takes one x and one y field", () => {
+      panelData.data.type = "bar-gauge";
+      expect(addMany("x", 3)).toBe(1);
+      expect(addMany("y", 3)).toBe(1);
+    });
+  });
+  describe("distribution slots", () => {
+    const addMany = (axis: "x" | "y" | "breakdown", count: number) => {
+      for (let i = 0; i < count; i++) {
+        const row = { name: `field_${axis}_${i}` };
+        if (axis === "x") fields.addXAxisItem(row);
+        else if (axis === "y") fields.addYAxisItem(row);
+        else fields.addBreakDownAxisItem(row);
+      }
+      return panelData.data.queries[0].fields[axis].length;
+    };
+
+    it("takes no x, up to 3 y fields and one breakdown", () => {
+      panelData.data.type = "distribution";
+      expect(addMany("x", 3)).toBe(0);
+      expect(addMany("y", 3)).toBe(3);
+      expect(addMany("breakdown", 3)).toBe(1);
+    });
+
+    it("a distribution y field keeps raw values", () => {
+      panelData.data.type = "distribution";
+      fields.addYAxisItem({ name: "latency_ms" });
+      expect(panelData.data.queries[0].fields.y[0].functionName).toBeNull();
+    });
+  });
+  describe("treemap slots", () => {
+    const addMany = (axis: "x" | "y" | "breakdown", count: number) => {
+      for (let i = 0; i < count; i++) {
+        const row = { name: `field_${axis}_${i}` };
+        if (axis === "x") fields.addXAxisItem(row);
+        else if (axis === "y") fields.addYAxisItem(row);
+        else fields.addBreakDownAxisItem(row);
+      }
+      return panelData.data.queries[0].fields[axis].length;
+    };
+
+    it("takes up to five levels across the group fields and one sub-group, and one y", () => {
+      panelData.data.type = "treemap";
+      expect(addMany("x", 3)).toBe(3);
+      expect(addMany("y", 3)).toBe(1);
+      expect(addMany("breakdown", 3)).toBe(1);
+      expect(addMany("x", 3)).toBe(4);
+    });
+
+    it("refuses a sub-group once the group fields already fill five levels", () => {
+      panelData.data.type = "treemap";
+      expect(addMany("x", 6)).toBe(5);
+      expect(addMany("breakdown", 1)).toBe(0);
+    });
+  });
+  describe("funnel slots", () => {
+    const addMany = (axis: "x" | "y" | "breakdown", count: number) => {
+      for (let i = 0; i < count; i++) {
+        const row = { name: `field_${axis}_${i}` };
+        if (axis === "x") fields.addXAxisItem(row);
+        else if (axis === "y") fields.addYAxisItem(row);
+        else fields.addBreakDownAxisItem(row);
+      }
+      return panelData.data.queries[0].fields[axis].length;
+    };
+
+    it("funnel takes 1 x, 1 y and 0 breakdown fields", () => {
+      panelData.data.type = "funnel";
+      expect(addMany("x", 3)).toBe(1);
+      expect(addMany("y", 3)).toBe(1);
+      expect(addMany("breakdown", 3)).toBe(0);
+    });
+
+    it("a funnel y field counts", () => {
+      panelData.data.type = "funnel";
+      fields.addYAxisItem({ name: "latency_ms" });
+      expect(panelData.data.queries[0].fields.y[0].functionName).toBe("count");
+    });
+  });
+  describe("node graph slots", () => {
+    it("takes no x, y or breakdown fields", () => {
+      panelData.data.type = "node-graph";
+      for (let i = 0; i < 3; i++) {
+        fields.addXAxisItem({ name: `field_x_${i}` });
+        fields.addYAxisItem({ name: `field_y_${i}` });
+        fields.addBreakDownAxisItem({ name: `field_breakdown_${i}` });
+      }
+      expect(panelData.data.queries[0].fields.x).toHaveLength(0);
+      expect(panelData.data.queries[0].fields.y).toHaveLength(0);
+      expect(panelData.data.queries[0].fields.breakdown).toHaveLength(0);
+    });
+  });
+  describe("alert list slots", () => {
+    const addMany = (axis: "x" | "y" | "breakdown", count: number) => {
+      for (let i = 0; i < count; i++) {
+        const row = { name: `field_${axis}_${i}` };
+        if (axis === "x") fields.addXAxisItem(row);
+        else if (axis === "y") fields.addYAxisItem(row);
+        else fields.addBreakDownAxisItem(row);
+      }
+      return panelData.data.queries[0].fields[axis].length;
+    };
+
+    it("takes no x, y or breakdown fields", () => {
+      panelData.data.type = "alert-list";
+      expect(addMany("x", 3)).toBe(0);
+      expect(addMany("y", 3)).toBe(0);
+      expect(addMany("breakdown", 3)).toBe(0);
+    });
+  });
+  describe("flame graph slots", () => {
+    it("takes no x, y or breakdown fields", () => {
+      panelData.data.type = "flame-graph";
+      fields.addXAxisItem({ name: "field_x" });
+      fields.addYAxisItem({ name: "field_y" });
+      fields.addBreakDownAxisItem({ name: "field_b" });
+      expect(panelData.data.queries[0].fields.x).toHaveLength(0);
+      expect(panelData.data.queries[0].fields.y).toHaveLength(0);
+      expect(panelData.data.queries[0].fields.breakdown).toHaveLength(0);
+    });
+  });
+
+  describe("box plot slots", () => {
+    const addMany = (axis: "x" | "y" | "breakdown", count: number) => {
+      for (let i = 0; i < count; i++) {
+        const row = { name: `field_${axis}_${i}` };
+        if (axis === "x") fields.addXAxisItem(row);
+        else if (axis === "y") fields.addYAxisItem(row);
+        else fields.addBreakDownAxisItem(row);
+      }
+      return panelData.data.queries[0].fields[axis].length;
+    };
+
+    it("takes 1 x, 1 y and no breakdown fields", () => {
+      panelData.data.type = "boxplot";
+      expect(addMany("x", 3)).toBe(1);
+      expect(addMany("y", 3)).toBe(1);
+      expect(addMany("breakdown", 3)).toBe(0);
+    });
+
+    it("a box plot y field keeps raw values, a pie y field counts", () => {
+      panelData.data.type = "boxplot";
+      fields.addYAxisItem({ name: "latency_ms" });
+      expect(panelData.data.queries[0].fields.y[0].functionName).toBeNull();
+      panelData.data.queries[0].fields.y = [];
+      panelData.data.type = "pie";
+      fields.addYAxisItem({ name: "latency_ms" });
+      expect(panelData.data.queries[0].fields.y[0].functionName).toBe("count");
+    });
+  });
+
+  describe("logs slots", () => {
+    it("takes no x, y or breakdown fields", () => {
+      panelData.data.type = "logs";
+      for (let i = 0; i < 3; i++) {
+        fields.addXAxisItem({ name: `field_x_${i}` });
+        fields.addYAxisItem({ name: `field_y_${i}` });
+        fields.addBreakDownAxisItem({ name: `field_b_${i}` });
+      }
+      const { x, y, breakdown } = panelData.data.queries[0].fields;
+      expect([x.length, y.length, breakdown.length]).toEqual([0, 0, 0]);
     });
   });
 });

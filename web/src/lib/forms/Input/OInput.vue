@@ -3,7 +3,11 @@
 
 import type { InputProps, InputEmits, InputSlots } from "./OInput.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { splitControlAttrs, warnIfUnlabelled } from "@/lib/forms/controlAttrs";
+import { useI18nTyped } from "@/types/i18n";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useAttrs, useId, watch } from "vue";
+
+const { t } = useI18nTyped();
 
 // Forward the consumer's `data-test` from <OInput data-test="…"> onto the
 // root wrapper so E2E selectors can scope to the specific field instance
@@ -14,12 +18,25 @@ defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
+// Without a label the icon is aria-hidden and unreachable by assistive tech; the tooltip's own content never gets a name otherwise.
+const tooltipIconLabel = computed(() =>
+  props.label
+    ? t("components.input.moreInfoAbout", { field: props.label })
+    : t("components.input.moreInfo"),
+);
+
 // Forward tabindex to the real control; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
-const wrapperAttrs = computed(() => {
-  const { tabindex: _tabindex, ...rest } = $attrs;
-  return rest;
-});
+const split = computed(() => splitControlAttrs($attrs, { forwardRole: true }));
+const wrapperAttrs = computed(() => split.value.wrapperAttrs);
+const controlAttrs = computed(() => split.value.controlAttrs);
+onMounted(() =>
+  warnIfUnlabelled(
+    "OInput",
+    Boolean(props.label || props.placeholder || $attrs["aria-label"] || $attrs["aria-labelledby"]),
+    inputId.value,
+  ),
+);
 
 const props = withDefaults(defineProps<InputProps>(), {
   type: "text",
@@ -67,7 +84,29 @@ const effectiveError = computed(() => {
 });
 const hasError = computed(() => !!effectiveError.value);
 
+const errorId = computed(() => `${inputId.value}-error`);
+const describedBy = computed(() => {
+  const ids = String($attrs["aria-describedby"] ?? "")
+    .split(/\s+/)
+    .filter(Boolean);
+  // An external error slot has no built-in message node to reference.
+  if (effectiveError.value?.trim()) ids.push(errorId.value);
+  return [...new Set(ids)].join(" ") || undefined;
+});
+
 const isTextarea = computed(() => props.type === "textarea");
+
+// ── Password reveal ────────────────────────────────────────────────────────
+// The toggle swaps the RENDERED type only; `type` itself is untouched, so a
+// revealed field still reports itself as a password to the form and to
+// autocomplete. Resets whenever the field stops being a revealable password, so
+// a type change can never leave a value exposed.
+const revealed = ref(false);
+const canReveal = computed(() => Boolean(props.revealable) && props.type === "password");
+const effectiveType = computed(() => (canReveal.value && revealed.value ? "text" : props.type));
+watch(canReveal, (allowed) => {
+  if (!allowed) revealed.value = false;
+});
 
 // ── Width ──────────────────────────────────────────────────────────────────
 const fieldWidthClass = computed(() => {
@@ -199,15 +238,24 @@ watch(
   },
 );
 
+/** Focus the underlying input/textarea programmatically. */
+function focus() {
+  inputRef.value?.focus();
+}
+
+defineExpose({ focus });
+
 // ── Styles ─────────────────────────────────────────────────────────────────
 // Height applied to the wrapper (so border is included in the box, matching
 // OSelect); the inner input fills it via h-full. 34px control height per the
 // design system.
 const heightClasses: Record<NonNullable<InputProps["size"]>, string> = {
+  xs: "h-7",
   sm: "h-[2.125rem]",
   md: "h-[2.125rem]",
 };
 const textSizeClasses: Record<NonNullable<InputProps["size"]>, string> = {
+  xs: "text-xs",
   sm: "text-sm",
   md: "text-sm",
 };
@@ -216,14 +264,15 @@ const wrapperClasses = computed(() => [
   "flex items-stretch w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-150",
   "bg-input-bg",
   !isTextarea.value ? heightClasses[props.size ?? "md"] : "",
-  /* Focus affordance = soft glow: a 4px translucent halo hugging the border
-     plus the focus border color. When the field has an ERROR, keep the red
-     error border on focus (don't let the focus color override it) and tint the
-     glow red — otherwise the focus border (blue) would hide the error state
-     while the field is focused. */
+  /* Focus affordance = a 2px ring hugging the border, plus the focus border color.
+     The normal ring is OPAQUE (--color-focus-ring-accent): at 25% alpha it measured
+     1.38:1 against the 3:1 SC 1.4.11 floor. Only the ERROR ring stays translucent
+     (/30) — there the red border already carries the state, and the ring is a tint
+     behind it. On error, keep that red border on focus rather than letting the focus
+     color override it, or the blue would hide the error while the field is focused. */
   hasError.value
     ? "border-input-border-error focus-within:ring-[0.125rem] focus-within:ring-input-border-error/30"
-    : "border-input-border hover:border-input-border-hover focus-within:border-input-border-focus focus-within:ring-[0.125rem] focus-within:ring-accent/25",
+    : "border-input-border hover:border-input-border-hover focus-within:border-input-border-focus focus-within:ring-[0.125rem] focus-within:ring-focus-ring-accent",
   /* Disabled inputs get a muted bg + dashed border so they read as obviously
      inactive at a glance. */
   props.disabled
@@ -252,6 +301,7 @@ const wrapperClasses = computed(() => [
         v-if="$slots.tooltip"
         name="info-outline"
         size="sm"
+        :label="tooltipIconLabel"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="cursor-help"
         ><slot name="tooltip"
@@ -261,10 +311,11 @@ const wrapperClasses = computed(() => [
     <!-- Input row -->
     <div :class="wrapperClasses">
       <!-- Inside label: floating mini-label at the top of the input border -->
-      <span
+      <label
         v-if="label && labelPosition === 'inside' && !isTextarea"
+        :for="inputId"
         class="text-2xs text-text-secondary pointer-events-none absolute start-3 end-7 top-1 overflow-hidden leading-none font-medium text-ellipsis whitespace-nowrap select-none"
-        >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></span
+        >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></label
       >
 
       <!-- Icon-left slot (inside border, left — matches OButton #icon-left pattern) -->
@@ -295,11 +346,14 @@ const wrapperClasses = computed(() => [
         :disabled="disabled"
         :readonly="readonly"
         :aria-required="required || undefined"
+        :aria-invalid="hasError || undefined"
         :autofocus="autofocus"
         :maxlength="maxlength"
         :rows="autogrow ? 1 : rows"
         :autocomplete="autocomplete"
         :tabindex="inputTabindex"
+        v-bind="controlAttrs"
+        :aria-describedby="describedBy"
         :style="autogrow ? { overflow: 'hidden' } : undefined"
         :class="[
           'min-w-0 flex-1 rounded-[inherit] bg-transparent outline-none',
@@ -307,7 +361,9 @@ const wrapperClasses = computed(() => [
           'disabled:text-input-disabled-text disabled:cursor-not-allowed',
           'py-2',
           $slots['icon-left'] || $slots.prefix || prefix ? 'ps-2' : 'ps-3',
-          $slots['icon-right'] || $slots.suffix || suffix || clearable ? 'pe-2' : 'pe-3',
+          $slots['icon-right'] || $slots.suffix || suffix || clearable || canReveal
+            ? 'pe-2'
+            : 'pe-3',
           'text-sm',
           autogrow ? 'resize-none' : 'resize-y',
         ]"
@@ -327,7 +383,7 @@ const wrapperClasses = computed(() => [
         ref="inputRef"
         :data-test="parentDataTest ? `${parentDataTest}-field` : undefined"
         :value="String(modelValue ?? '')"
-        :type="type"
+        :type="effectiveType"
         :name="name"
         :placeholder="placeholder"
         :disabled="disabled"
@@ -335,9 +391,14 @@ const wrapperClasses = computed(() => [
         :aria-required="required || undefined"
         :autofocus="autofocus"
         :maxlength="maxlength"
+        :min="min"
+        :max="max"
+        :step="step"
         :autocomplete="autocomplete"
         :tabindex="inputTabindex"
         :aria-invalid="hasError || undefined"
+        v-bind="controlAttrs"
+        :aria-describedby="describedBy"
         :class="[
           'min-w-0 flex-1 rounded-[inherit] bg-transparent outline-none',
           'text-input-text placeholder:text-input-placeholder',
@@ -348,7 +409,9 @@ const wrapperClasses = computed(() => [
             ? 'pt-3 pb-0.5 text-xs font-semibold'
             : textSizeClasses[size ?? 'md'],
           $slots['icon-left'] || $slots.prefix || prefix ? 'ps-2' : 'ps-3',
-          $slots['icon-right'] || $slots.suffix || suffix || clearable ? 'pe-2' : 'pe-3',
+          $slots['icon-right'] || $slots.suffix || suffix || clearable || canReveal
+            ? 'pe-2'
+            : 'pe-3',
         ]"
         @input="handleInput"
         @blur="handleBlur"
@@ -359,12 +422,27 @@ const wrapperClasses = computed(() => [
         @paste="emit('paste', $event)"
       />
 
+      <!-- Reveal toggle. `tabindex="-1"` matches the clear button: it is a
+           convenience, not a step in the form's tab order. -->
+      <button
+        v-if="canReveal"
+        type="button"
+        tabindex="-1"
+        :aria-pressed="revealed"
+        :aria-label="revealed ? t('components.input.hideValue') : t('components.input.showValue')"
+        :data-test="parentDataTest ? `${parentDataTest}-reveal` : undefined"
+        class="text-input-clear-btn hover:text-input-clear-btn-hover flex items-center pe-2 transition-colors"
+        @click="revealed = !revealed"
+      >
+        <OIcon :name="revealed ? 'visibility-off' : 'visibility'" size="sm" />
+      </button>
+
       <!-- Clear button -->
       <button
         v-if="clearable && modelValue !== '' && modelValue !== undefined && modelValue !== null"
         type="button"
         tabindex="-1"
-        aria-label="Clear"
+        :aria-label="t('components.input.clear')"
         :data-test="parentDataTest ? `${parentDataTest}-clear` : undefined"
         class="text-input-clear-btn hover:text-input-clear-btn-hover flex items-center pe-2 transition-colors"
         @click="handleClear"
@@ -410,14 +488,15 @@ const wrapperClasses = computed(() => [
     >
       <span
         v-if="effectiveError && effectiveError.trim()"
+        :id="errorId"
         :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
         :data-test-error-text="effectiveError"
-        class="text-input-error-text text-xs leading-none"
+        class="text-input-error-text text-xs leading-snug"
         role="alert"
       >
         {{ effectiveError }}
       </span>
-      <span v-else-if="helpText" class="text-input-hint text-xs leading-none">
+      <span v-else-if="helpText" class="text-input-hint text-xs leading-snug">
         {{ helpText }}
       </span>
       <span v-else class="flex-1" />

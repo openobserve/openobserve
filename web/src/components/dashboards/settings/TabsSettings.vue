@@ -55,7 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-name="{ row }">
           <span
             v-if="row.tabId !== editTabId"
-            class="block overflow-hidden text-ellipsis whitespace-nowrap"
             data-test="dashboard-tab-settings-tab-name"
             :data-test-tab-name="row.name"
             >{{ row.name }}</span
@@ -98,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop="editItem(row.tabId)"
               data-test="dashboard-tab-settings-tab-edit-btn"
               icon-left="edit"
+              class="max-md:hidden"
             >
             </OButton>
             <OButton
@@ -107,9 +107,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('dashboard.delete')"
               @click.stop="deleteItem(row.tabId)"
               data-test="dashboard-tab-settings-tab-delete-btn"
+              class="max-md:hidden"
             >
               <template #icon-left><OIcon name="delete" size="sm" /></template>
             </OButton>
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  :title="t('dashboard.moreActions')"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="dashboard-tab-settings-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                icon-left="edit"
+                :disabled="row.tabId === editTabId"
+                class="md:hidden"
+                data-test="dashboard-tab-settings-tab-edit-btn-menu"
+                @select="editItem(row.tabId)"
+              >
+                <span>{{ t("dashboard.edit") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="currentDashboardData.data.tabs.length !== 1"
+                icon-left="delete"
+                variant="destructive"
+                class="md:hidden"
+                data-test="dashboard-tab-settings-tab-delete-btn-menu"
+                @select="deleteItem(row.tabId)"
+              >
+                <span>{{ t("dashboard.delete") }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </div>
         </template>
       </OTable>
@@ -136,23 +169,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, nextTick, ref } from "vue";
+import {
+  defineComponent,
+  nextTick,
+  ref,
+  reactive,
+  onMounted,
+  onActivated,
+  onBeforeUnmount,
+  watch,
+} from "vue";
 import Sortable from "sortablejs";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import { useStore } from "vuex";
 import { deleteTab, editTab, getDashboard, updateDashboard } from "@/utils/commons";
 import { useRoute } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
-import { reactive } from "vue";
-import { onMounted, onActivated, onBeforeUnmount } from "vue";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 import TabsDeletePopUp from "./TabsDeletePopUp.vue";
 import useNotifications from "@/composables/useNotifications";
+import { useDashboardSaveConflict } from "@/composables/dashboard/useDashboardSaveConflict";
+import { useDashboardSettingsDraft } from "./dashboardSettingsDraft";
 
 export default defineComponent({
   name: "TabsSettings",
@@ -161,6 +205,8 @@ export default defineComponent({
     AddTab,
     TabsDeletePopUp,
     OButton,
+    ODropdown,
+    ODropdownItem,
     OIcon,
     OTable,
   },
@@ -186,11 +232,8 @@ export default defineComponent({
         route.query.folder ?? "default",
       );
     };
-    const {
-      showPositiveNotification,
-      showErrorNotification,
-      showConfictErrorNotificationWithRefreshBtn,
-    } = useNotifications();
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
+    const saveConflict = useDashboardSaveConflict();
     // Attach SortableJS to OTable's rendered <tbody> so rows can be dragged
     // to reorder. Re-runnable: tears down any prior instance first.
     const initSortable = async () => {
@@ -229,8 +272,48 @@ export default defineComponent({
       });
     };
 
+    const draftContext = useDashboardSettingsDraft();
+    // Off until the tabs loaded, so the empty list never clears a rename restored from a draft.
+    let draftReady = false;
+    let unregisterDraftSection: (() => void) | null = null;
+
+    const syncDraftSection = () => {
+      if (!draftContext || !draftReady) return;
+      const tabId = editTabId.value;
+      const name = editTabObj.data?.name;
+      draftContext.pending.tabRename =
+        tabId !== null && typeof name === "string" && name !== tabNameOf(tabId)
+          ? { tabId: String(tabId), name }
+          : null;
+    };
+
+    const applyPendingRename = () => {
+      const pending = draftContext?.pending.tabRename;
+      if (!draftContext || !pending) return;
+      const tab = currentDashboardData.data?.tabs?.find(
+        (candidate: { tabId: string }) => candidate.tabId === pending.tabId,
+      );
+      if (!tab) {
+        draftContext.pending.tabRename = null;
+        return;
+      }
+      editTabId.value = pending.tabId;
+      editTabObj.data = { ...JSON.parse(JSON.stringify(tab)), name: pending.name };
+    };
+
+    const saveForDraft = async (): Promise<boolean> => {
+      if (!editTabObj.data?.name?.trim()) return false;
+      return saveEdit();
+    };
+
     onMounted(async () => {
       await getDashboardData();
+      if (draftContext) {
+        applyPendingRename();
+        draftReady = true;
+        syncDraftSection();
+        unregisterDraftSection = draftContext.register("tabRename", saveForDraft);
+      }
       await initSortable();
     });
 
@@ -239,11 +322,12 @@ export default defineComponent({
     });
 
     onBeforeUnmount(() => {
+      unregisterDraftSection?.();
       sortableInstance?.destroy();
       sortableInstance = null;
     });
 
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // Wrapper around the global OTable; used to reach its rendered <tbody>
     // so SortableJS can provide row drag-and-drop (OTable has no native row
@@ -254,7 +338,7 @@ export default defineComponent({
     const columns: OTableColumnDef[] = [
       {
         id: "drag",
-        header: "",
+        header: raw(""),
         size: 32,
         minSize: 32,
         maxSize: 32,
@@ -276,10 +360,14 @@ export default defineComponent({
       },
     ];
 
-    const editTabId = ref(null);
+    const editTabId = ref<string | null>(null);
     const editTabObj: any = reactive({
       data: {},
     });
+
+    const tabNameOf = (tabId: any) =>
+      currentDashboardData.data?.tabs?.find((tab: any) => tab.tabId === tabId)?.name ??
+      String(tabId ?? "");
 
     const handleDragEnd = async () => {
       try {
@@ -295,15 +383,17 @@ export default defineComponent({
 
         showPositiveNotification(t("dashboard.tabsSettings.dashboardUpdated"));
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              t("dashboard.tabsSettings.tabReorderFailed"),
-          );
-        } else {
-          showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabReorderFailed"));
+        if (saveConflict.isConflict(error)) {
+          void saveConflict.openConflict({
+            dashboardId: currentDashboardData.data.dashboardId,
+            folderId: (route.query.folder as string) ?? "default",
+            mine: currentDashboardData.data,
+            change: t("dashboard.saveConflict.change.reorderedTabs"),
+            onResolved: getDashboardData,
+          });
+          return;
         }
+        showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabReorderFailed"));
         emit("refresh");
         await getDashboardData();
       }
@@ -316,7 +406,9 @@ export default defineComponent({
       );
     };
 
-    const saveEdit = async () => {
+    const saveEdit = async (): Promise<boolean> => {
+      // editTab renames the cached tab in place, so read the old name before it runs.
+      const previousName = tabNameOf(editTabObj.data.tabId);
       try {
         if (editTabId.value) {
           // only allowed to edit name
@@ -335,20 +427,34 @@ export default defineComponent({
           // reset edit mode
           editTabId.value = null;
           editTabObj.data = {};
+          return true;
         }
+        return false;
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              t("dashboard.tabsSettings.tabUpdationFailed"),
-          );
-        } else {
-          showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabUpdationFailed"));
+        if (saveConflict.isConflict(error)) {
+          void saveConflict.openConflict({
+            dashboardId: currentDashboardData.data.dashboardId,
+            folderId: (route.query.folder as string) ?? "default",
+            change: t("dashboard.saveConflict.change.renamedTab", {
+              from: previousName,
+              to: editTabObj.data.name,
+            }),
+            onResolved: async () => {
+              cancelEdit();
+              await getDashboardData();
+            },
+          });
+          // The rename is already in the working copy, so show it as unsaved instead of keeping the editor open.
+          cancelEdit();
+          await getDashboardData();
+          emit("refresh");
+          return false;
         }
+        showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabUpdationFailed"));
 
         emit("refresh");
         await getDashboardData();
+        return false;
       }
     };
 
@@ -356,6 +462,16 @@ export default defineComponent({
       editTabId.value = null;
       editTabObj.data = {};
     };
+
+    watch([editTabId, () => editTabObj.data?.name], syncDraftSection);
+    watch(
+      () => draftContext?.restoreRevision,
+      () => {
+        if (!draftReady) return;
+        applyPendingRename();
+        syncDraftSection();
+      },
+    );
 
     const addNewItem = () => {
       isTabEditMode.value = false;
@@ -370,6 +486,8 @@ export default defineComponent({
     };
 
     const confirmDelete = async (moveTabId: any) => {
+      // deleteTab removes the tab from the cached dashboard, so read its name first.
+      const deletedName = tabNameOf(tabIdToBeDeleted.value);
       try {
         await deleteTab(
           store,
@@ -387,12 +505,19 @@ export default defineComponent({
 
         showPositiveNotification(t("dashboard.tabsSettings.tabDeleted"));
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              t("dashboard.tabsSettings.tabDeletionFailed"),
-          );
+        if (saveConflict.isConflict(error)) {
+          deletePopupVisible.value = false;
+          void saveConflict.openConflict({
+            dashboardId: currentDashboardData.data.dashboardId,
+            folderId: (route.query.folder as string) ?? "default",
+            change: t("dashboard.saveConflict.change.deletedTab", {
+              name: deletedName,
+            }),
+            onResolved: async () => {
+              tabIdToBeDeleted.value = null;
+              await getDashboardData();
+            },
+          });
         } else {
           showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabDeletionFailed"), {
             timeout: 2000,

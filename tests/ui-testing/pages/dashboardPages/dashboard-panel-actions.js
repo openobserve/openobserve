@@ -1,6 +1,13 @@
 // Dashboard actions page
 // Methods : AddPanelName, SavePanel, ApplyDashboardBtn, AddNextPanel, GetTableRowCount, VerifyChartRenders
 
+import { expect } from "@playwright/test";
+import { SELECTORS, visibleOnly } from "./dashboard-selectors.js";
+import { settlePanelLeave } from "./panel-leave-dialog.js";
+
+// Default unit formatting abbreviates large legend values ("2.40K"); the empty key is an unscaled value.
+const PIE_VALUE_SUFFIX_MULTIPLIER = { "": 1, K: 1e3, M: 1e6, B: 1e9, T: 1e12 };
+
 export default class DashboardactionPage {
   constructor(page) {
     this.page = page;
@@ -14,25 +21,86 @@ export default class DashboardactionPage {
     this.panelSaveBtn = page.locator('[data-test="dashboard-panel-save"]');
     this.applyDashboard = page.locator('[data-test="dashboard-apply"]');
     this.addPanelBtn = page.locator('[data-test="dashboard-panel-add"]');
+    this.layoutEditBtn = page.locator('[data-test="dashboard-edit-btn"]');
+    this.layoutEditSaveBtn = page.locator('[data-test="dashboard-edit-save-btn"]');
+    this.layoutEditDiscardBtn = page.locator('[data-test="dashboard-edit-discard-btn"]');
+    this.layoutEditUndoBtn = page.locator('[data-test="dashboard-edit-undo-btn"]');
+    this.layoutEditRedoBtn = page.locator('[data-test="dashboard-edit-redo-btn"]');
+    this.layoutEditChangesCount = page.locator('[data-test="dashboard-edit-changes-count"]');
+    this.layoutEditBadge = page.locator('[data-test="dashboard-edit-badge"]');
+    this.layoutDiscardDialog = page.locator('[data-test="dashboard-edit-discard-dialog"]');
+    this.layoutDiscardConfirmBtn = page.locator(
+      '[data-test="dashboard-edit-discard-dialog"] [data-test="o-dialog-primary-btn"]'
+    );
+    this.layoutDiscardCancelBtn = page.locator(
+      '[data-test="dashboard-edit-discard-dialog"] [data-test="o-dialog-secondary-btn"]'
+    );
+    this.layoutSettingsHeightInput = page.locator('[data-test="panel-layout-settings-height-input-field"]');
+    this.layoutSettingsApplyBtn = page.locator(
+      '[data-test="panel-layout-settings-drawer"] [data-test="o-dialog-primary-btn"]'
+    );
+    this.panelDragGrip = page.locator('[data-test="dashboard-panel-drag"]');
+    this.lockedGrid = page.locator(".grid-stack.grid-stack-static");
+    this.editingGrid = page.locator(".grid-stack.layout-editing");
+    this.panelMenuEditPanel = page.locator('[data-test="dashboard-edit-panel"]');
+    this.panelMenuEditLayout = page.locator('[data-test="dashboard-edit-layout"]');
+    this.panelMenuDuplicate = page.locator('[data-test="dashboard-duplicate-panel"]');
+    this.panelMenuDelete = page.locator('[data-test="dashboard-delete-panel"]');
+    this.shareBtn = page.locator('[data-test="dashboard-share-btn"]');
+    this.settingsBtn = page.locator('[data-test="dashboard-setting-btn"]');
+    this.addTabBtn = page.locator('[data-test="dashboard-tab-add-btn"]');
+    this.dashboardBackBtn = page.locator('[data-test="dashboard-back-btn"]');
     this.dashboardTable = page.locator('[data-test="dashboard-panel-table"]');
     this.chartRenderer = page.locator('[data-test="dashboard-panel-table"], [data-test="chart-renderer"]');
     this.chartRendererCanvas = page.locator('[data-test="chart-renderer"]');
+    this.chartRendererCanvasEl = page.locator('[data-test="chart-renderer"] canvas');
     this.noDataElement = page.locator('[data-test="no-data"]');
     this.dashboardSearchInput = page.locator('[data-test="dashboard-search"]');
     this.discardPanelBtn = page.locator('[data-test="dashboard-panel-discard"]');
     // Error toast surfaced on validation/apply/save errors
     this.errorToast = page.locator('[data-test-variant="error"]');
+    // Panel validation messages listed under the chart (DashboardErrors.vue)
+    this.dashboardErrorItems = page.locator('[data-test="dashboard-errors-list-item"]');
     // Inline OForm field error under the panel name input (shown when the
     // panel name is empty on save — the form schema blocks submit before any
     // toast is produced).
     this.panelNameError = page.locator('[data-test="dashboard-panel-name-error"]');
     // TanStack table data rows / cells (source data-tests in TenstackTable.vue)
     this.tableDataRow = page.locator('[data-test="dashboard-panel-table"] [data-test^="o2-table-row-"]');
+    // Rendered table header cells (thead th) and the prefixed per-column header
+    // cells (data-test="o2-table-th-<colId>") used for sort / pivot-total checks.
+    this.tableHeaderCells = page.locator('[data-test="dashboard-panel-table"] thead tr th');
+    this.tableThCells = page.locator('[data-test^="o2-table-th-"]');
+    // Per-cell copy button revealed on hover over a rendered table cell.
+    this.tableCellCopyBtn = page.locator("[data-test^='dashboard-table-cell-copy-']");
+
+    // Rendered chart bar + the per-panel edit dropdown/menu, used to reopen a
+    // saved panel in edit mode from the dashboard view.
+    this.panelBar = page.locator('[data-test="dashboard-panel-bar"]');
+    this.editPanelDropdownAny = page.locator('[data-test*="dashboard-edit-panel"][data-test$="-dropdown"]');
+    this.editPanelMenuItem = page.locator('[data-test="dashboard-edit-panel"]');
+  }
+
+  /**
+   * Reopen the first rendered panel in edit mode: hover its bar to reveal the
+   * hover-actions dropdown, open it, and click Edit. Encapsulates the
+   * hover → dropdown → edit chain the config specs use to verify persistence.
+   */
+  async openFirstPanelEditor() {
+    await this.panelBar.first().hover();
+    await this.editPanelDropdownAny.first().click();
+    await this.editPanelMenuItem.click();
   }
 
   // Returns the error toast locator for assertions
   getErrorToast() {
     return this.errorToast;
+  }
+
+  // Generic visible-text locator for query-output / error-message assertions
+  // (accepts a string or RegExp). Chain .first() as needed.
+  getVisibleText(text) {
+    return this.page.getByText(text);
   }
 
   // Returns the inline panel-name validation error locator for assertions
@@ -51,6 +119,11 @@ export default class DashboardactionPage {
     return this.tableDataRow;
   }
 
+  // Returns the first per-cell copy button (revealed on hovering a table cell)
+  getFirstTableCellCopyButton() {
+    return this.tableCellCopyBtn.first();
+  }
+
   // Returns the nth data cell (data-test="o2-table-cell-<columnId>") of the first data row.
   // Excludes the nested o2-table-cell-copy-* / o2-table-cell-hover-actions-* elements,
   // which share the o2-table-cell- prefix but are not data cells.
@@ -61,11 +134,6 @@ export default class DashboardactionPage {
         '[data-test^="o2-table-cell-"]:not([data-test^="o2-table-cell-copy-"]):not([data-test^="o2-table-cell-hover-actions-"])'
       )
       .nth(index);
-  }
-
-  //Click discard panel button
-  async discardPanel() {
-    await this.discardPanelBtn.click();
   }
 
   //Verify no-data element is visible
@@ -83,6 +151,15 @@ export default class DashboardactionPage {
     return this.chartRendererCanvas;
   }
 
+  // Get the inner <canvas> element inside the chart-renderer
+  getChartRendererCanvasElement() {
+    return this.chartRendererCanvasEl;
+  }
+
+  getErrorToastWithText(text) {
+    return this.errorToast.filter({ hasText: text });
+  }
+
   // Get dashboard-error locator
   // DashboardErrors.vue has two nested elements with the same data-test attribute;
   // use .first() to avoid Playwright strict-mode throws on multi-element locators.
@@ -98,10 +175,68 @@ export default class DashboardactionPage {
 
   // Add panel name
   async addPanelName(panelName) {
-    // Open the inline editor, then fill the revealed input.
-    await this.panelNameTrigger.click();
-    await this.panelNameInput.waitFor({ state: "visible" });
-    await this.panelNameInput.fill(panelName);
+    // The panel name input is NOT a plain text box — when left untouched it
+    // mirrors an auto-generated name derived from the chart config ("Count of
+    // Kubernetes Namespace Name, Count of ... by ..."). Every config change
+    // recomputes that name and re-renders the input, replacing the DOM node.
+    //
+    // A fill() issued while such a re-render is in flight hits a node that is
+    // detached mid-action; Playwright retries internally but keeps resolving
+    // into nodes that are themselves replaced, so it burns the full timeout
+    // ("element was detached from the DOM, retrying"). A re-render landing
+    // just AFTER a successful fill is equally bad: it silently restores the
+    // auto-generated name and the panel saves under the wrong title.
+    //
+    // Re-open and re-fill until the value actually sticks, so a re-render
+    // costs one attempt rather than the whole call, and verify the result
+    // instead of assuming the fill held.
+    const maxAttempts = 3;
+    let lastError;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        // The trigger is only present while the editor is closed — clicking it
+        // when the input is already open would toggle the editor shut.
+        if (!(await this.panelNameInput.isVisible().catch(() => false))) {
+          await this.panelNameTrigger.click({ timeout: 10000 });
+        }
+        await this.panelNameInput.waitFor({ state: "visible", timeout: 10000 });
+        await this.panelNameInput.fill(panelName, { timeout: 10000 });
+
+        // Confirm the value survived any re-render that raced the fill.
+        if ((await this.panelNameInput.inputValue()) === panelName) return;
+        lastError = new Error(
+          `panel name reverted after fill (auto-generated name won the race)`
+        );
+      } catch (e) {
+        lastError = e;
+      }
+    }
+
+    throw new Error(
+      `addPanelName: could not set panel name to "${panelName}" after ${maxAttempts} attempts. Last error: ${lastError?.message}`
+    );
+  }
+
+  // Save panel button locator (for callers that only need a raw click)
+  getPanelSaveBtn() {
+    return this.panelSaveBtn;
+  }
+
+  // Raw discard-button locator for callers that answer the in-app leave dialog
+  // themselves (discardPanel() answers it with Discard).
+  getPanelDiscardBtn() {
+    return this.discardPanelBtn;
+  }
+
+  getPanelBar() {
+    return this.panelBar;
+  }
+
+  // Scoped to the rendered layout branch: PanelEditor.vue mounts the field list
+  // twice, so the bare data-test matches 2 nodes.
+  getFieldListSearchInput() {
+    return this.page.locator(visibleOnly(SELECTORS.FIELD_LIST_SEARCH)).first();
   }
 
   // Save panel button
@@ -122,6 +257,50 @@ export default class DashboardactionPage {
       this.errorToast.waitFor({ state: "visible", timeout: 20000 }),
       this.panelNameError.waitFor({ state: "visible", timeout: 20000 }),
     ]).catch(() => {});
+  }
+
+  /**
+   * Save from the Save split button's menu and stay in the editor. A new panel's
+   * URL switches to its panelId; the "Panel saved" toast confirms the save.
+   */
+  async saveAndKeepEditing() {
+    await this.page.locator('[data-test="dashboard-panel-save-options-btn"]').click();
+    await this.page.locator('[data-test="dashboard-panel-save-and-stay"]').click();
+    await this.page.waitForURL((url) => url.searchParams.has("panelId"), { timeout: 20000 });
+  }
+
+  /** Ctrl/Cmd+S in the panel editor is Save and keep editing. */
+  async saveAndKeepEditingWithShortcut() {
+    await this.page.keyboard.press("ControlOrMeta+s");
+    await this.page.waitForURL((url) => url.searchParams.has("panelId"), { timeout: 20000 });
+  }
+
+  async getErrorToastText() {
+    await this.errorToast.first().waitFor({ state: "visible", timeout: 20000 });
+    return (await this.errorToast.first().innerText()).replace(/\s+/g, " ").trim();
+  }
+
+  /**
+   * Discard the current panel and return to the dashboard view page.
+   * Use this for teardown when the panel intentionally holds an
+   * incomplete/invalid config (which cannot pass save validation) or when the
+   * test does not need to persist the panel. Discarding a panel with edits
+   * opens the in-app "Leave with unsaved changes?" dialog, answered with
+   * Discard so no browser draft lingers.
+   * (Same handling as dashboard-multi-sql.js discardPanel; this is the
+   * generic home for it since discard is not a multi-SQL-specific action.)
+   */
+  async discardPanel() {
+    const discardBtn = this.page.locator('[data-test="dashboard-panel-discard"]');
+    const dialogHandler = (dialog) => dialog.accept();
+    this.page.on("dialog", dialogHandler);
+    try {
+      await discardBtn.waitFor({ state: "visible", timeout: 15000 });
+      await discardBtn.click();
+      return await settlePanelLeave(this.page);
+    } finally {
+      this.page.off("dialog", dialogHandler);
+    }
   }
 
   //Apply dashboard button
@@ -175,7 +354,36 @@ export default class DashboardactionPage {
     }, { timeout: 30000 });
   }
 
+  // The apply button stays enabled for ~100ms after the click, so waitForChartToRender alone can pass before the query starts and the table later resets to empty.
+  async applyAndWaitForPromQLQuery() {
+    const promqlResponse = this.page.waitForResponse(
+      (res) => res.url().includes("/prometheus/api/v1/query_range"),
+      { timeout: 30000 }
+    );
+    await this.applyDashboardBtn();
+    const response = await promqlResponse;
+    // A streamed (text/event-stream) response never reports finished; waitForChartToRender covers completion.
+    if (!(await response.headerValue("content-type"))?.includes("text/event-stream")) {
+      await response.finished();
+    }
+    await this.waitForChartToRender();
+  }
+
+  /** Resolves with the URL of the next PromQL query_range request; call before the action that fires it. */
+  nextPromQLQueryRangeRequest() {
+    return this.page
+      .waitForRequest((req) => req.url().includes("/prometheus/api/v1/query_range"), { timeout: 30000 })
+      .then((req) => new URL(req.url()));
+  }
+
   //Dashboard panel actions(Edit, Layout, Duplicate, Inspector, Move, Delete)
+
+  // Returns the per-panel edit dropdown locator (data-test keyed by panel name)
+  getEditPanelDropdown(panelName) {
+    return this.page.locator(
+      `[data-test="dashboard-edit-panel-${panelName}-dropdown"]`
+    );
+  }
 
   async selectPanelAction(panelName, action) {
     const actionDataTestIds = {
@@ -190,10 +398,120 @@ export default class DashboardactionPage {
     const actionTestId = actionDataTestIds[action];
     if (!actionTestId) throw new Error(`Unknown action: ${action}`);
 
+    // The panel menu offers "Edit layout" only in layout edit mode, and only that item there.
+    if (action === "Layout") await this.enterLayoutEdit();
+
     await this.page
       .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
       .click();
     await this.page.locator(`[data-test="${actionTestId}"]`).click();
+  }
+
+  async enterLayoutEdit() {
+    await this.layoutEditBtn.waitFor({ state: "visible" });
+    await this.layoutEditBtn.click();
+    await this.layoutEditSaveBtn.waitFor({ state: "visible" });
+  }
+
+  async saveLayoutEdit() {
+    await this.layoutEditSaveBtn.click();
+    await this.layoutEditSaveBtn.waitFor({ state: "hidden" });
+  }
+
+  async discardLayoutEdit() {
+    await this.layoutEditDiscardBtn.click();
+    const confirm = this.page.locator(
+      '[data-test="dashboard-edit-discard-dialog"] [data-test="o-dialog-primary-btn"]'
+    );
+    await Promise.race([
+      confirm.waitFor({ state: "visible" }),
+      this.layoutEditSaveBtn.waitFor({ state: "hidden" }),
+    ]).catch(() => {});
+    if (await confirm.isVisible()) await confirm.click();
+    await this.layoutEditSaveBtn.waitFor({ state: "hidden" });
+  }
+
+  getTabRenameBtn(tabId) {
+    return this.page.locator(`[data-test="dashboard-tab-${tabId}-rename-btn"]`);
+  }
+
+  async openPanelMenu(panelName) {
+    const dropdown = this.getEditPanelDropdown(panelName);
+    await dropdown.waitFor({ state: "visible", timeout: 30000 });
+    await dropdown.click();
+  }
+
+  async closePanelMenu() {
+    await this.page.keyboard.press("Escape");
+  }
+
+  // Already in layout edit mode: the dialog's Apply only adds a draft step, it never saves.
+  async applyPanelHeight(panelName, height) {
+    await this.openPanelMenu(panelName);
+    await this.panelMenuEditLayout.click();
+    await this.layoutSettingsHeightInput.waitFor({ state: "visible" });
+    await this.layoutSettingsHeightInput.fill(String(height));
+    await this.layoutSettingsApplyBtn.click();
+    await this.layoutSettingsHeightInput.waitFor({ state: "hidden" });
+  }
+
+  async undoLayoutEdit() {
+    await this.layoutEditUndoBtn.click();
+  }
+
+  async redoLayoutEdit() {
+    await this.layoutEditRedoBtn.click();
+  }
+
+  async requestLayoutDiscard() {
+    await this.layoutEditDiscardBtn.click();
+  }
+
+  async confirmLayoutDiscard() {
+    await this.layoutDiscardConfirmBtn.click();
+    await this.layoutDiscardDialog.waitFor({ state: "hidden" });
+  }
+
+  async cancelLayoutDiscard() {
+    await this.layoutDiscardCancelBtn.click();
+    await this.layoutDiscardDialog.waitFor({ state: "hidden" });
+  }
+
+  async clickDashboardBack() {
+    await this.dashboardBackBtn.click();
+  }
+
+  async pressLayoutShortcut(combo) {
+    await this.page.keyboard.press(combo);
+  }
+
+  /**
+   * Open a dashboard's view page directly by id.
+   */
+  async openDashboardById(dashboardId, { folderId = 'default', tabId = 'default' } = {}) {
+    const url =
+      `${process.env["ZO_BASE_URL"]}/web/dashboards/view` +
+      `?org_identifier=${process.env["ORGNAME"]}` +
+      `&dashboard=${dashboardId}&folder=${folderId}&tab=${tabId}`;
+    await this.page.goto(url, { waitUntil: 'domcontentloaded' });
+    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    await this.page
+      .locator('[data-test="dashboard-panel-container"]')
+      .first()
+      .waitFor({ state: 'visible', timeout: 30000 });
+  }
+
+  // A single-query, single-stream panel hands straight to the alert form; only a lossy prefill asks first.
+  /** Open the panel menu and pick "Create Alert". */
+  async openCreateAlertFromPanel(panelName) {
+    const dropdown = this.getEditPanelDropdown(panelName);
+    await dropdown.waitFor({ state: "visible", timeout: 30000 });
+    await dropdown.click();
+    const createAlert = this.page.locator(
+      '[data-test="dashboard-create-alert-from-panel"]'
+    );
+    await createAlert.waitFor({ state: "visible", timeout: 10000 });
+    await createAlert.click();
   }
 
   /**
@@ -305,8 +623,8 @@ export default class DashboardactionPage {
     const noDataVisible = await this.noDataElement.isVisible().catch(() => false);
     expect(noDataVisible).toBe(false);
 
-    // 2. Canvas has non-background pixels
-    const hasData = await this.page.evaluate(() => {
+    // 2. Canvas has non-background pixels; polled because a mounted canvas can still be awaiting its query.
+    const scanCanvases = () => this.page.evaluate(() => {
       const canvases = document.querySelectorAll("canvas");
       for (const canvas of canvases) {
         if (canvas.width < 10 || canvas.height < 10) continue;
@@ -330,7 +648,7 @@ export default class DashboardactionPage {
       }
       return false;
     });
-    expect(hasData).toBe(true);
+    await expect.poll(scanCanvases, { timeout: 15000 }).toBe(true);
   }
 
   /**
@@ -351,6 +669,256 @@ export default class DashboardactionPage {
     // any subsequent search/filter operates on already-loaded data.
     await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     await this.page.waitForTimeout(1000);
+  }
+
+  async getChartSeriesNames(scopeSelector = '[data-test="chart-renderer"]') {
+    const names = (await this.getChartSeries(scopeSelector)).map((s) => s.name).filter(Boolean);
+    return [...new Set(names)];
+  }
+
+  async getChartSeries(scopeSelector = '[data-test="chart-renderer"]') {
+    const charts = await this.getChartOptionSnapshots(scopeSelector);
+    return charts.flatMap((chart) =>
+      chart.series.map((s) => ({
+        name: s.name,
+        values: s.points.map((point) =>
+          Array.isArray(point) ? point[point.length - 1] : point,
+        ),
+      })),
+    );
+  }
+
+  /**
+   * Legend entries of the first rendered pie/donut, as its live legend formatter prints them.
+   * @param {string} scopeSelector
+   * @returns {Promise<Array<{name: string, value: number, label: string, valuesText: string}>>}
+   */
+  async getPieLegendEntries(scopeSelector = '[data-test="chart-renderer"]') {
+    const [chart] = await this.getChartOptionSnapshots(scopeSelector);
+    return chart?.legendEntries ?? [];
+  }
+
+  /**
+   * Poll until the first pie/donut's legend entries satisfy `predicate`, then return them.
+   * The formatter is swapped on every render, so a single read right after Apply can see the old one.
+   * @param {(entries: Array<{name: string, value: number, label: string, valuesText: string}>) => boolean} predicate
+   * @param {number} timeout
+   */
+  async waitForPieLegendEntries(predicate, timeout = 20000) {
+    let entries = [];
+    await expect
+      .poll(
+        async () => {
+          entries = await this.getPieLegendEntries();
+          return entries.length > 0 && predicate(entries);
+        },
+        { timeout, intervals: [300, 500, 1000, 2000] }
+      )
+      .toBe(true);
+    return entries;
+  }
+
+  /**
+   * Splits a legend entry's values text ("2002.00  52.05%") into its tokens; no values means none.
+   * @param {{valuesText: string}} entry
+   * @returns {string[]}
+   */
+  getPieLegendTokens(entry) {
+    return entry.valuesText ? entry.valuesText.split(/\s{2,}/) : [];
+  }
+
+  /**
+   * Poll until every pie legend entry shows exactly `count` value tokens, then return the entries.
+   * @param {number} count - 1 for Value or Percent alone, 2 for both
+   */
+  async waitForPieLegendTokenCount(count) {
+    return this.waitForPieLegendEntries((entries) =>
+      entries.every((entry) => this.getPieLegendTokens(entry).length === count)
+    );
+  }
+
+  /** Sum of the first pie's positive slice values: the basis ECharts and the legend take percents of. */
+  async getPieSliceTotal() {
+    const [pie] = await this.getChartSeries();
+    return (pie?.values ?? [])
+      .map(Number)
+      .filter((v) => Number.isFinite(v) && v > 0)
+      .reduce((a, b) => a + b, 0);
+  }
+
+  /**
+   * Assert every entry reads "<value>  <percent>%" with `decimals` digits, the value matching its slice
+   * (a K/M/B/T abbreviation is expanded) and the percent matching its share of the positive total.
+   * @param {Array<{name: string, value: number, valuesText: string}>} entries
+   * @param {number} decimals - panel Decimals setting
+   */
+  async expectPieLegendValueAndPercent(entries, decimals = 2) {
+    const total = await this.getPieSliceTotal();
+    expect(total, "pie slice total").toBeGreaterThan(0);
+    for (const entry of entries) {
+      const [valueText, percentText] = this.getPieLegendTokens(entry);
+      this._expectLegendValueMatches(entry, valueText, decimals);
+      this._expectLegendPercentMatches(entry, percentText, decimals, total);
+    }
+  }
+
+  /**
+   * Assert every entry shows its name alone, with no value or percent appended.
+   * @param {Array<{name: string, valuesText: string}>} entries
+   */
+  expectPieLegendNamesOnly(entries) {
+    for (const entry of entries) {
+      expect(entry.valuesText, `legend of ${entry.name} has no values`).toBe("");
+    }
+  }
+
+  /**
+   * Assert every entry shows only its value, with no percent.
+   * @param {Array<{name: string, value: number, valuesText: string}>} entries
+   * @param {number} decimals - panel Decimals setting
+   */
+  expectPieLegendValueOnly(entries, decimals = 2) {
+    for (const entry of entries) {
+      const tokens = this.getPieLegendTokens(entry);
+      expect(tokens, `legend tokens of ${entry.name}`).toHaveLength(1);
+      expect(tokens[0], `legend of ${entry.name}`).not.toContain("%");
+      this._expectLegendValueMatches(entry, tokens[0], decimals);
+    }
+  }
+
+  /**
+   * Assert every entry shows only a percent with `decimals` digits.
+   * @param {Array<{name: string, valuesText: string}>} entries
+   * @param {number} decimals - panel Decimals setting
+   */
+  expectPieLegendPercentOnly(entries, decimals = 2) {
+    const fraction = decimals > 0 ? `\\.\\d{${decimals}}` : "";
+    for (const entry of entries) {
+      expect(entry.valuesText, `legend of ${entry.name}`).toMatch(new RegExp(`^\\d+${fraction}%$`));
+    }
+  }
+
+  _expectLegendValueMatches(entry, valueText, decimals) {
+    const fraction = decimals > 0 ? `\\.\\d{${decimals}}` : "";
+    // A metric declared as percent seeds the panel unit, so the value can carry "%" as well as a K/M/B/T scale.
+    const match = String(valueText).match(new RegExp(`^(-?\\d+${fraction})(?:([KMBT])|%)?$`));
+    expect(match, `value of ${entry.name} ("${valueText}")`).not.toBeNull();
+    const multiplier = PIE_VALUE_SUFFIX_MULTIPLIER[match[2] ?? ""];
+    // Half a unit of the last printed digit, scaled by the abbreviation.
+    const tolerance = 0.5 * Math.pow(10, -decimals) * multiplier + 1e-9;
+    expect(
+      Math.abs(Number(match[1]) * multiplier - entry.value),
+      `value of ${entry.name} ("${valueText}" vs ${entry.value})`
+    ).toBeLessThanOrEqual(tolerance);
+  }
+
+  _expectLegendPercentMatches(entry, percentText, decimals, total) {
+    const fraction = decimals > 0 ? `\\.\\d{${decimals}}` : "";
+    expect(percentText, `percent of ${entry.name}`).toMatch(new RegExp(`^\\d+${fraction}%$`));
+    const exactShare = (Math.max(entry.value, 0) / total) * 100;
+    // Largest-remainder rounding puts a shown percent at most one last digit off its exact share.
+    const tolerance = 1.01 * Math.pow(10, -decimals);
+    expect(
+      Math.abs(parseFloat(percentText) - exactShare),
+      `percent of ${entry.name} ("${percentText}" vs ${exactShare.toFixed(4)})`
+    ).toBeLessThanOrEqual(tolerance);
+  }
+
+  /**
+   * Value-axis bounds and stacked series of the first rendered chart, read from the live ECharts option.
+   * @param {"yAxis"|"xAxis"} valueAxis - the axis that carries values (xAxis for h-stacked)
+   * @param {string} scopeSelector
+   * @returns {Promise<{min: number|null, max: number|null, series: Array<{name: string, stack: string|null, points: Array}>}|null>}
+   */
+  async getChartValueAxisFit(valueAxis = "yAxis", scopeSelector = '[data-test="chart-renderer"]') {
+    const [chart] = await this.getChartOptionSnapshots(scopeSelector);
+    if (!chart) return null;
+    const bounds = chart[valueAxis]?.[0] ?? {};
+    return { min: bounds.min ?? null, max: bounds.max ?? null, series: chart.series };
+  }
+
+  // Legend and axes are canvas-painted, so read the live option via `_vnode` (`__vueParentComponent` is dev-only).
+  async getChartOptionSnapshots(scopeSelector = '[data-test="chart-renderer"]') {
+    return this.page.evaluate((scopeSel) => {
+      const scopes = Array.from(document.querySelectorAll(scopeSel));
+      const charts = [];
+      const visited = new Set();
+      const numberOrNull = (value) => (typeof value === "number" ? value : null);
+      const axesOf = (axis) =>
+        (Array.isArray(axis) ? axis : axis ? [axis] : []).map((a) => ({
+          type: a?.type ?? null,
+          min: numberOrNull(a?.min),
+          max: numberOrNull(a?.max),
+        }));
+      const pointOf = (point) => {
+        if (Array.isArray(point)) return point.map((v) => (v instanceof Date ? v.getTime() : v));
+        return point !== null && typeof point === "object" ? point.value : point;
+      };
+      // Runs the live legend formatter per pie slice; "{b|name}  v  p%" rich text is split into label and values.
+      const legendEntriesOf = (option) => {
+        const legend = Array.isArray(option.legend) ? option.legend[0] : option.legend;
+        const slices = (option.series?.[0]?.data ?? []).filter(
+          (d) => d !== null && typeof d === "object" && d.name,
+        );
+        return slices.map((d) => {
+          let raw = String(d.name);
+          try {
+            if (typeof legend?.formatter === "function") raw = String(legend.formatter(d.name));
+          } catch {
+            // Non-pie formatters may expect ECharts params; the snapshot must not drop the chart.
+          }
+          const match = raw.match(/^\{[a-z]+\|([^}]*)\}(?:\s+(.*))?$/);
+          return {
+            name: String(d.name),
+            value: typeof d.value === "number" ? d.value : Number(d.value),
+            label: match ? match[1] : raw,
+            valuesText: match ? (match[2] ?? "").trim() : "",
+          };
+        });
+      };
+      const walk = (node, depth) => {
+        if (!node || typeof node !== "object" || depth > 400 || visited.has(node)) return;
+        visited.add(node);
+        const comp = node.component;
+        if (comp) {
+          const state = comp.setupState || {};
+          let chart = null;
+          try {
+            chart = "chart" in state ? state.chart : null;
+          } catch {
+            chart = null;
+          }
+          const host = state.chartRef;
+          if (
+            chart &&
+            typeof chart.getOption === "function" &&
+            host instanceof Element &&
+            scopes.some((scope) => scope.contains(host))
+          ) {
+            try {
+              const option = chart.getOption() ?? {};
+              charts.push({
+                xAxis: axesOf(option.xAxis),
+                yAxis: axesOf(option.yAxis),
+                series: (option.series ?? []).map((s) => ({
+                  name: s?.name ? String(s.name) : "",
+                  stack: s?.stack === undefined || s?.stack === null ? null : String(s.stack),
+                  points: (s?.data ?? []).map(pointOf),
+                })),
+                legendEntries: legendEntriesOf(option),
+              });
+            } catch {
+              // A disposed instance throws; it draws nothing anyway.
+            }
+          }
+          walk(comp.subTree, depth + 1);
+        }
+        if (node.suspense) walk(node.suspense.activeBranch, depth + 1);
+        if (Array.isArray(node.children)) for (const c of node.children) walk(c, depth + 1);
+      };
+      walk(document.querySelector("#app")?._vnode, 0);
+      return charts;
+    }, scopeSelector);
   }
 
   /**

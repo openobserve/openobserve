@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
     :secondary-button-label="t('regex_patterns.cancel')"
     form-id="add-regex-pattern-form"
+    :close-guard="guardClose"
     @click:secondary="handleClose"
     data-test="add-regex-pattern-drawer"
   >
@@ -38,17 +39,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-toolbar"
           @click="toggleAIChat"
           data-test="add-regex-pattern-open-close-ai-btn"
-          class="group text-ai-accent! [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]"
+          :aria-label="t('menu.aiAssistant')"
+          class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
           :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
           @mouseenter="isHovered = true"
           @mouseleave="isHovered = false"
         >
           <img
+            alt=""
             :src="getBtnLogo"
             class="header-icon [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
           />
         </OButton>
         <OButton
+          :aria-label="isFullScreen ? t('common.exitFullscreen') : t('common.fullscreen')"
           data-test="add-regex-pattern-fullscreen-btn"
           variant="ghost"
           size="icon-xs-sq"
@@ -62,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex h-full w-full">
       <div
         :class="
-          store.state.isAiChatEnabled ? (isFullScreen ? 'w-[75%] pl-2' : 'w-[65%] pl-2') : 'w-full'
+          store.state.isAiChatEnabled ? (isFullScreen ? 'w-[75%] ps-2' : 'w-[65%] ps-2') : 'w-full'
         "
       >
         <OForm
@@ -96,13 +100,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="text-xs leading-4.5 font-normal">
                 {{ t("regex_patterns.unsupported_lookaround_note") }}
                 {{ t("regex_patterns.unsupported_lookaround_example") }}
-                <code class="rounded-default bg-banner-info-border px-1 py-px font-mono text-xs"
-                  >(?=openobserve)\w+</code
-                >
+                <code class="rounded-default bg-banner-info-border px-1 py-px font-mono text-xs">{{
+                  raw("(?=openobserve)\\w+")
+                }}</code>
                 <OIcon name="arrow-right-alt" size="xs" class="mx-1 inline-block align-middle" />
-                <code class="rounded-default bg-banner-info-border px-1 py-px font-mono text-xs"
-                  >openobserve\w*</code
-                >
+                <code class="rounded-default bg-banner-info-border px-1 py-px font-mono text-xs">{{
+                  raw("openobserve\\w*")
+                }}</code>
               </div>
             </OBanner>
             <div class="regex-pattern-input-container">
@@ -116,11 +120,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="sm"
                   @click="toggleAIChat"
                 >
-                  <img :src="goToAILogo" class="mr-1 h-5 w-5" />
+                  <img alt="" :src="goToAILogo" class="me-1 h-5 w-5" />
                   <span class="text-brand-indigo flex items-center gap-1 text-sm">
                     {{ t("settings.addRegexPattern.tryAiAssistant") }}
                   </span>
-                  <OIcon size="sm" name="arrow-right-alt" class="text-brand-indigo ml-1 h-5 w-5" />
+                  <OIcon size="sm" name="arrow-right-alt" class="text-brand-indigo ms-1 h-5 w-5" />
                 </OButton>
               </div>
               <div class="regex-pattern-input">
@@ -162,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model:is-expanded="expandState.regexTestString"
                 :label="t('settings.addRegexPattern.inputStringLabel')"
                 class="py-md mt-1 h-6"
-                labelClass="text-text-secondary font-medium text-xs leading-5.25 -ml-1"
+                labelClass="text-text-secondary font-medium text-xs leading-5.25 -ms-1"
               >
                 <template #right> </template>
               </FullViewContainer>
@@ -184,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model:is-expanded="expandState.outputString"
                 :label="t('settings.addRegexPattern.outputLabel')"
                 class="py-md mt-1 h-6"
-                labelClass="text-text-secondary font-medium text-xs leading-5.25 -ml-1"
+                labelClass="text-text-secondary font-medium text-xs leading-5.25 -ms-1"
               >
               </FullViewContainer>
               <div v-if="expandState.outputString" class="regex-pattern-input">
@@ -220,10 +224,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </OForm>
       </div>
+      <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
       <div
-        class="ml-2 max-w-full"
+        class="ms-2 max-w-full"
         v-if="store.state.isAiChatEnabled"
-        style="width: 35%; min-width: 75px; height: calc(100vh - 90px) !important"
+        style="width: 35%; min-width: 4.6875rem; height: calc(100vh - 90px) !important"
       >
         <O2AIChat
           :aiChatInputContext="inputContext"
@@ -231,16 +236,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :is-open="store.state.isAiChatEnabled"
           @close="store.state.isAiChatEnabled = false"
         />
+        <!-- eslint-enable local/no-hardcoded-px -->
       </div>
     </div>
+    <EditorDraftDialogs :draft="regexDraft" />
   </ODrawer>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, watch, computed, nextTick } from "vue";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
-import { computed } from "vue";
 import useTheme from "@/composables/useTheme";
 import config from "@/aws-exports";
 import { getImageURL } from "@/utils/zincutils";
@@ -259,6 +265,10 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { makeAddRegexPatternSchema, type AddRegexPatternForm } from "./AddRegexPattern.schema";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+
+type RegexPatternDraftData = Omit<AddRegexPatternForm, "outputString">;
 
 export default defineComponent({
   name: "AddRegexPattern",
@@ -290,9 +300,10 @@ export default defineComponent({
     OForm,
     OFormInput,
     OFormTextarea,
+    EditorDraftDialogs,
   },
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const store = useStore();
     const { isDark } = useTheme();
@@ -351,11 +362,20 @@ export default defineComponent({
     // testString/outputString). Used by the Test button + highlight + output display.
     const testStringValue = ref<string>(addRegexPatternDefaults.value.testString ?? "");
     const outputStringValue = ref<string>("");
+    const formValues = ref<AddRegexPatternForm>({ ...addRegexPatternDefaults.value });
     watch(
       () => addRegexPatternForm.value,
       (formRef) => {
         const f = formRef?.form;
         if (!f) return;
+        const liveValues = f.useStore((s: { values: AddRegexPatternForm }) => s.values);
+        watch(
+          liveValues,
+          (v: AddRegexPatternForm) => {
+            formValues.value = { ...v };
+          },
+          { immediate: true },
+        );
         const livePattern = f.useStore((s: any) => s.values.pattern ?? "");
         watch(
           livePattern,
@@ -380,6 +400,64 @@ export default defineComponent({
           },
           { immediate: true },
         );
+      },
+      { immediate: true },
+    );
+
+    // Set while the leave dialog's Save runs, so a successful save does not close the drawer itself.
+    let leaveSave: { saved: boolean } | null = null;
+
+    const regexDraft = useEditorDraft<RegexPatternDraftData>({
+      kind: "regex_pattern",
+      entityLabel: () => t("common.editorDraft.entities.regex_pattern"),
+      entityId: () => (props.isEdit ? (props.data?.id ?? null) : null),
+      // The test output is a server result, not the user's work.
+      snapshot: () => ({
+        name: formValues.value.name ?? "",
+        pattern: formValues.value.pattern ?? "",
+        description: formValues.value.description ?? "",
+        testString: formValues.value.testString ?? "",
+      }),
+      apply: (data) => {
+        const f = addRegexPatternForm.value?.form;
+        if (!f) return;
+        // A saved pattern's name and description are locked, so the draft can never change them.
+        f.reset({
+          ...data,
+          name: props.isEdit ? f.state.values.name : data.name,
+          description: props.isEdit ? f.state.values.description : data.description,
+          outputString: "",
+        });
+      },
+      base: () =>
+        props.isEdit
+          ? {
+              name: props.data?.name ?? "",
+              pattern: props.data?.pattern ?? "",
+              description: props.data?.description ?? "",
+            }
+          : null,
+      // The editor stays mounted while the drawer is shut; only an open drawer holds work.
+      hasChanges: () => props.open,
+      save: async () => {
+        const run = { saved: false };
+        leaveSave = run;
+        try {
+          await addRegexPatternForm.value?.form?.handleSubmit();
+        } finally {
+          leaveSave = null;
+        }
+        return run.saved;
+      },
+    });
+
+    // Each open mounts a fresh form, which starts its own draft session.
+    watch(
+      () => (props.open ? addRegexPatternForm.value : null),
+      async (formRef) => {
+        if (!formRef) return;
+        await nextTick();
+        await regexDraft.start();
       },
       { immediate: true },
     );
@@ -441,7 +519,7 @@ export default defineComponent({
       const payload = {
         name: value.name,
         pattern: value.pattern,
-        description: value.description ?? "",
+        description: raw(value.description ?? ""),
       };
       try {
         const response = props.isEdit
@@ -458,15 +536,20 @@ export default defineComponent({
               : t("settings.addRegexPattern.createSuccess"),
             variant: "success",
           });
-          emit("close");
           emit("update:list");
+          if (leaveSave) {
+            leaveSave.saved = true;
+            return;
+          }
+          regexDraft.markSaved();
+          emit("close");
         }
       } catch (error) {
         const e = error as { response: { status: number; data?: { message?: string } } };
         if (e.response.status != 403) {
           toast({
             message:
-              e.response?.data?.message ||
+              raw(e.response?.data?.message) ||
               (props.isEdit
                 ? t("settings.addRegexPattern.updateFailed")
                 : t("settings.addRegexPattern.createFailed")),
@@ -495,7 +578,7 @@ export default defineComponent({
       } catch (error) {
         const e = error as { response?: { data?: { message?: string } } };
         toast({
-          message: e.response?.data?.message || t("settings.addRegexPattern.testFailed"),
+          message: raw(e.response?.data?.message || t("settings.addRegexPattern.testFailed")),
           variant: "error",
         });
       } finally {
@@ -507,12 +590,26 @@ export default defineComponent({
       emit("close");
     };
 
-    const handleClose = () => {
+    const handleClose = async () => {
+      if (!(await regexDraft.confirmLeave())) return;
       emit("update:open", false);
       emit("close");
     };
 
+    // The close button, Escape and an outside click ask first when the drawer holds unsaved work.
+    const guardClose = () => {
+      if (!regexDraft.hasUnsavedChanges()) {
+        regexDraft.discard();
+        return true;
+      }
+      void regexDraft.confirmLeave().then((allowed) => {
+        if (allowed) emit("update:open", false);
+      });
+      return false;
+    };
+
     return {
+      raw,
       t,
       store,
       config,
@@ -534,6 +631,8 @@ export default defineComponent({
       inputContext,
       closeAddRegexPatternDialog,
       handleClose,
+      guardClose,
+      regexDraft,
       // Form wiring — MUST be returned so the Options-API template can resolve
       // them (a module import alone is out of the template's scope).
       addRegexPatternForm,

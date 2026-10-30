@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * free-text path lives in the Locator block itself.
  */
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import type { CompositeRelation, LocatorCandidate } from "@/types/synthetics";
 import {
   canDefaultToAnd,
@@ -47,6 +47,7 @@ import { isPositionalSelector } from "@/utils/synthetics/locatorStability";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
@@ -64,7 +65,7 @@ const emit = defineEmits<{
   combine: [value: { value: string; from: CompositePart[] }];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 /**
  * `and` is provably safe when every selected row came from the recording.
@@ -198,9 +199,9 @@ function apply() {
           <OBadge variant="default" size="sm">
             {{ t(`synthetics.journey.locatorKind.${part.kind}`) }}
           </OBadge>
-          <span class="text-text-body min-w-0 flex-1 truncate font-mono text-xs">
+          <OTruncatedText class="text-text-body flex-1 font-mono text-xs">
             {{ part.value }}
-          </span>
+          </OTruncatedText>
           <span class="text-text-muted text-2xs shrink-0">{{ matchedLabel(part) }}</span>
         </div>
       </section>
@@ -231,7 +232,7 @@ function apply() {
             data-test="synthetics-journey-step-locator-combine-relation-has"
           />
         </ORadioGroup>
-        <p class="text-text-muted m-0 pl-6 text-xs">
+        <p class="text-text-muted m-0 ps-6 text-xs">
           {{ t("synthetics.journey.locatorCombineRelationHasHelp") }}
         </p>
       </section>
@@ -245,7 +246,7 @@ function apply() {
           :label="t('synthetics.journey.locatorCombinePosition', { position: basePosition + 1 })"
           data-test="synthetics-journey-step-locator-combine-position"
         />
-        <p class="text-text-muted m-0 pl-6 text-xs">
+        <p class="text-text-muted m-0 ps-6 text-xs">
           {{ t("synthetics.journey.locatorCombinePositionHelp") }}
         </p>
       </section>

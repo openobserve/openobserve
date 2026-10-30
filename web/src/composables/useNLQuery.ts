@@ -14,19 +14,29 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref } from "vue";
+import type { TranslateFn } from "@/types/i18n";
 import useAiChat from "@/composables/useAiChat";
+import {
+  isPaidOverageConsentError,
+  usePaidOverageConsent,
+} from "@/composables/usePaidOverageConsent";
 import useSuggestions from "@/composables/useSuggestions";
 import { parsePromQlQuery } from "@/utils/query/promQLUtils";
-import { UNAUTHORIZED_MESSAGE, isAuthError } from "@/utils/authErrors";
+import { UNAUTHORIZED_MESSAGE_KEY, isAuthError } from "@/utils/authErrors";
+import { aiCreditsNotice } from "@/utils/aiCredits";
+import analytics from "@/services/product_analytics";
 
 /**
  * Composable for Natural Language to SQL Query transformation
  * Provides auto-detection and generation capabilities without UI
  */
-export function useNLQuery() {
+export function useNLQuery(t: TranslateFn) {
   const { fetchAiChat, getStructuredContext } = useAiChat();
+  const { promptForConsent } = usePaidOverageConsent();
   const isGenerating = ref(false);
   const streamingResponse = ref(""); // Real-time streaming response for user engagement
+  // Why the server refused the request (no AI credits, consent declined); the editor shows it.
+  const refusalNotice = ref("");
 
   /**
    * Extracts function names from autocomplete suggestions dynamically
@@ -397,6 +407,7 @@ export function useNLQuery() {
 
     isGenerating.value = true;
     streamingResponse.value = ""; // Reset streaming response
+    refusalNotice.value = "";
 
     try {
       // Get page context (stream, time range, filters, etc.)
@@ -430,30 +441,68 @@ export function useNLQuery() {
         },
       ];
 
-      // Call AI assistant with streaming
-      const response = await fetchAiChat(
-        messages,
-        "", // Use default model from server config
-        orgId,
-        abortSignal, // Abort signal for request cancellation
-        context, // Explicit context with agent_type
-        sessionId, // Session ID for tracking across requests
-      );
+      // Call AI assistant with streaming. A consent retry reuses the exact
+      // messages, context, session, organization, and abort signal.
+      const fetchQuery = () =>
+        fetchAiChat(
+          messages,
+          "", // Use default model from server config
+          orgId,
+          abortSignal,
+          context,
+          sessionId,
+        );
+      let response = await fetchQuery();
 
-      if (!response || (response as any).cancelled) {
+      if (!response || "cancelled" in response) {
         return null;
       }
 
-      if (!(response as Response).ok) {
-        console.error("[NL2Q] AI assistant returned error:", (response as Response).status);
-        if ((response as Response).status === 403) {
-          streamingResponse.value = UNAUTHORIZED_MESSAGE;
+      let errorBody: unknown = null;
+      if (!response.ok) {
+        try {
+          errorBody = await response.json();
+        } catch {
+          // The body may not be JSON.
+        }
+
+        if (isPaidOverageConsentError(response.status, errorBody)) {
+          const accepted = await promptForConsent(
+            orgId,
+            "ai_credits",
+            errorBody.consent,
+            abortSignal,
+          );
+          const currentContext = await getStructuredContext();
+          const currentOrgId = currentContext?.organization_identifier || orgId;
+          if (!accepted || abortSignal?.aborted || currentOrgId !== orgId) {
+            if (!accepted && !abortSignal?.aborted && currentOrgId === orgId) {
+              refusalNotice.value = t("paidUsage.declinedNotice");
+              streamingResponse.value = refusalNotice.value;
+            }
+            return null;
+          }
+
+          response = await fetchQuery();
+          if (!response || "cancelled" in response) return null;
+        }
+      }
+
+      if (!response.ok) {
+        console.error("[NL2Q] AI assistant returned error:", response.status);
+        if (response.status === 402) {
+          // A consent retry returns a fresh, unread body; the first one was read above.
+          const body = response.bodyUsed ? errorBody : await response.json().catch(() => null);
+          refusalNotice.value = aiCreditsNotice(body, t);
+          streamingResponse.value = refusalNotice.value;
+        } else if (response.status === 403) {
+          streamingResponse.value = t(UNAUTHORIZED_MESSAGE_KEY);
         }
         return null;
       }
 
       // Read streaming response
-      const reader = (response as Response).body?.getReader();
+      const reader = response.body?.getReader();
       if (!reader) {
         console.error("[NL2Q] No reader available from response");
         return null;
@@ -487,11 +536,12 @@ export function useNLQuery() {
                 // Handle different event types
                 if (data.type === "status") {
                   // Status event (processing, etc.)
-                  streamingResponse.value = data.message || "Processing...";
+                  streamingResponse.value = data.message || t("nlMode.processing");
                 } else if (data.type === "message") {
                   // Message event (AI planning/explanation text)
                   lastMessageContent = data.content || "";
-                  streamingResponse.value = data.content?.substring(0, 100) || "Processing...";
+                  streamingResponse.value =
+                    data.content?.substring(0, 100) || t("nlMode.processing");
                 } else if (data.type === "tool_call") {
                   // Track tool execution (dashboard/alert creation)
                   toolCalls.push({
@@ -499,7 +549,8 @@ export function useNLQuery() {
                     message: data.message || "",
                     success: undefined, // Will be updated by tool_result
                   });
-                  streamingResponse.value = data.message || `Executing ${data.tool}...`;
+                  streamingResponse.value =
+                    data.message || t("nlMode.executingTool", { tool: data.tool });
                 } else if (data.type === "tool_result") {
                   // Tool execution result
                   toolResults.push({
@@ -515,15 +566,15 @@ export function useNLQuery() {
                   }
 
                   if (!data.success) {
-                    streamingResponse.value = `Tool failed: ${data.message}`;
+                    streamingResponse.value = t("nlMode.toolFailed", { message: data.message });
                   }
                 } else if (data.type === "error") {
                   // Error event
                   console.error("[NL2Q] Error event:", data.error || data.message);
                   hasError = true;
-                  const rawErr = data.error || data.message || "Unknown error";
+                  const rawErr = data.error || data.message || t("onlineEvals.unknownError");
                   errorMessage = isAuthError(rawErr, data.error_type)
-                    ? UNAUTHORIZED_MESSAGE
+                    ? t(UNAUTHORIZED_MESSAGE_KEY)
                     : rawErr;
                   streamingResponse.value = errorMessage;
                 } else if (data.type === "complete") {
@@ -573,6 +624,7 @@ export function useNLQuery() {
 
         // If SQL was successfully extracted, return it (this is the primary goal)
         if (extractedSQL) {
+          analytics.track("ai_query_generated");
           return extractedSQL;
         }
 
@@ -711,5 +763,6 @@ export function useNLQuery() {
     transformToSQL,
     isGenerating,
     streamingResponse, // Expose streaming response for real-time display
+    refusalNotice,
   };
 }

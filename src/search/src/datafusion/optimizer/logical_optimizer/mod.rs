@@ -18,3 +18,4 @@ pub mod add_sort_and_limit;
 pub mod cipher;
 pub mod limit_join_right_side;
 pub mod rewrite_histogram;
+pub mod shared_subplan;

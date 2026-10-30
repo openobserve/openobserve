@@ -12,13 +12,13 @@
       v-if="isAIMode"
       :data-test="`${dataTestPrefix}-ai-input-bar`"
       :class="[
-        'border-b-card-glass-border z-10 flex h-9 shrink-0 items-center gap-2 border-b bg-[image:var(--color-gradient-ai-faint)] px-2',
-        props.hasExpandButton && 'pr-10',
+        'border-b-card-glass-border bg-gradient-ai-faint z-10 flex h-9 shrink-0 items-center gap-2 border-b px-2',
+        props.hasExpandButton && 'pe-10',
       ]"
     >
       <!-- Show streaming status with spinner + stop button -->
       <template v-if="isGenerating">
-        <img :src="nlpIcon" alt="AI" class="h-5 w-5 shrink-0" />
+        <img :src="nlpIcon" :alt="t('search.aiIconAlt')" class="h-5 w-5 shrink-0" />
         <OSpinner variant="dots" size="xs" />
         <span class="flex-1 truncate text-sm">{{
           streamingText || aiStatusText || t("search.analyzingQuery")
@@ -44,7 +44,7 @@
           @keydown.enter="handleAIInputEnter"
         >
           <template #icon-left>
-            <img :src="nlpIcon" alt="AI" class="h-5 w-5" />
+            <img :src="nlpIcon" :alt="t('search.aiIconAlt')" class="h-5 w-5" />
           </template>
         </OInput>
         <!-- Send Button -->
@@ -55,7 +55,7 @@
           :disabled="!aiInputText.trim() || props.disableAi"
           :data-test="`${dataTestPrefix}-ai-send-btn`"
           @click="handleAIGenerate"
-          class="text-text-inverse! disabled:bg-surface-subtle! h-7! min-h-7! w-7! min-w-7! bg-[image:var(--color-gradient-ai)]! transition-all! duration-200! enabled:hover:-translate-y-px enabled:hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.4)]! enabled:active:translate-y-0 disabled:opacity-40!"
+          class="text-text-inverse! disabled:bg-surface-subtle! bg-gradient-ai! enabled:hover:shadow-ai-accent/40! h-7! min-h-7! w-7! min-w-7! transition-all! duration-200! enabled:hover:-translate-y-px enabled:hover:shadow-md enabled:active:translate-y-0 disabled:opacity-40!"
         >
           <OTooltip
             v-if="props.disableAi && props.disableAiReason"
@@ -96,7 +96,12 @@
         :suggestions="suggestions"
         :field-value-resolver="fieldValueResolver ?? undefined"
         :debounce-time="debounceTime"
+        :free-text-decorations="freeTextDecorations ?? null"
+        :filter-mode="filterMode"
+        :values-time-range="valuesTimeRange ?? null"
+        :recent-queries="recentQueries ?? []"
         @update:query="handleQueryUpdate"
+        @user-edit="(isBlank: boolean, wasBlank: boolean) => emit('user-edit', isBlank, wasBlank)"
         @run-query="emit('run-query')"
         @focus="handleEditorFocus"
         @blur="handleEditorBlur"
@@ -109,26 +114,29 @@
 
       <!-- Floating AI Icon (top-right corner of editor) - hidden when AI bar is open -->
       <OButton
-        v-if="
-          config.isEnterprise == 'true' &&
-          store.state.zoConfig.ai_enabled &&
-          !hideNlToggle &&
-          !isAIMode
-        "
+        v-if="aiFeatureVisible && !hideNlToggle && !isAIMode"
         :data-test="`${dataTestPrefix}-ai-toggle-btn`"
         variant="ghost"
         size="icon-toolbar"
         :disabled="props.disableAi"
-        @click="nlpMode = true"
-        class="group text-text-inverse! rounded-default absolute! top-0.75 z-100 h-7.5! min-h-7.5! w-7.5! min-w-7.5! bg-[image:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease]! hover:bg-[image:var(--color-gradient-ai)]! hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)]!"
+        @click="onAiToggleClick"
+        class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! hover:shadow-ai-accent/35! absolute! top-1 z-100 h-7! min-h-7! w-7! min-w-7! [transition:background_0.3s_ease,box-shadow_0.3s_ease]! hover:shadow-md"
         :style="props.hasExpandButton ? { right: '2.375rem' } : { right: '0.25rem' }"
       >
         <img
           :src="nlpIcon"
-          alt="AI Mode"
+          :alt="t('search.aiModeIconAlt')"
           class="h-4.5 w-4.5 transition-transform duration-[600ms] ease-[ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert"
         />
+        <span
+          v-if="!aiAccess.allowed"
+          aria-hidden="true"
+          class="bg-surface-overlay border-surface-base absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border shadow-sm"
+        >
+          <OIcon name="lock" size="xs" class="text-warning-600 size-2.5!" />
+        </span>
         <OTooltip
+          v-if="aiAccess.allowed"
           :content="
             props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle')
           "
@@ -141,7 +149,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useTheme } from "@/composables/useTheme";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -149,11 +157,19 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import { getImageURL, getUUIDv7 } from "@/utils/zincutils";
 import { useChatHistory } from "@/composables/useChatHistory";
+import useAiChat from "@/composables/useAiChat";
 import type { ChatMessage } from "@/ts/interfaces/chat";
-import config from "@/aws-exports";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 
 type Language = "sql" | "promql" | "vrl" | "javascript";
+
+interface QueryChangeOrigin {
+  /** false when the editor was written to (setValue), rather than typed in. */
+  fromUser: boolean;
+}
 
 interface Props {
   // Language configuration
@@ -171,6 +187,10 @@ interface Props {
   suggestions?: any[]; // Autocomplete suggestions for Monaco
   fieldValueResolver?: ((field: string) => Promise<string[]>) | null; // Field-value lookup awaited by the completion provider
   debounceTime?: number; // Debounce time for query updates (ms)
+  freeTextDecorations?: { ranges: { start: number; end: number }[]; hover: I18nText } | null;
+  filterMode?: boolean; // The query is a bare WHERE fragment (Logs without SQL mode)
+  valuesTimeRange?: { startTime: number; endTime: number } | null; // Range field values are looked up in (microseconds)
+  recentQueries?: string[]; // The user's recent queries, offered as clock rows while typing
 
   // NL Mode (optional external control)
   nlpMode?: boolean; // External NLP mode control (undefined = internal control)
@@ -179,9 +199,9 @@ interface Props {
   editorHeight?: string;
   hideNlToggle?: boolean; // Hide floating AI icon (for pages that don't want AI)
   disableAi?: boolean; // Disable AI send (e.g. no stream selected)
-  disableAiReason?: string; // Tooltip reason when AI is disabled
-  aiPlaceholder?: string; // Custom placeholder for AI input (default: 'search.askAIPlaceholder')
-  aiTooltip?: string; // Custom tooltip for AI send button (default: 'search.enterPrompt')
+  disableAiReason?: I18nText; // Tooltip reason when AI is disabled
+  aiPlaceholder?: I18nText; // Custom placeholder for AI input (default: 'search.askAIPlaceholder')
+  aiTooltip?: I18nText; // Custom tooltip for AI send button (default: 'search.enterPrompt')
   hasExpandButton?: boolean; // Reserve right padding so AI bar close btn doesn't overlap the expand btn
 
   // Testing
@@ -198,16 +218,17 @@ const props = withDefaults(defineProps<Props>(), {
   suggestions: () => [],
   debounceTime: 500,
   nlpMode: undefined,
-  editorHeight: "200px",
+  editorHeight: "12.5rem",
   hideNlToggle: false,
   disableAi: false,
-  disableAiReason: "",
+  disableAiReason: raw(""),
   hasExpandButton: false,
   dataTestPrefix: "query-editor",
 });
 
 const emit = defineEmits<{
-  "update:query": [query: string];
+  "update:query": [query: string, origin?: QueryChangeOrigin];
+  "user-edit": [isBlank: boolean, wasBlank: boolean];
   "language-change": [language: Language];
   "ask-ai": [naturalLanguage: string, language: Language];
   "run-query": [];
@@ -221,7 +242,7 @@ const emit = defineEmits<{
 }>();
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const { isDark } = useTheme();
 
 // Language state
@@ -239,6 +260,14 @@ const nlpMode = computed({
     }
   },
 });
+const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+const onAiToggleClick = () => {
+  if (!aiAccess.value.allowed) {
+    openUpgradeDialog();
+    return;
+  }
+  nlpMode.value = true;
+};
 const isNaturalLanguageDetected = ref(false);
 const isGenerating = ref(false);
 const editorRef = ref<any>(null);
@@ -256,6 +285,8 @@ const currentAbortController = ref<AbortController | null>(null);
 const { saveToHistory } = useChatHistory(
   () => store.state.userInfo.email ?? "",
   () => store.state.selectedOrganization.identifier ?? "",
+  t,
+  useAiChat().chatHistoryServer(),
 );
 const currentChatId = ref<number | null>(null);
 const chatMessages = ref<ChatMessage[]>([]);
@@ -269,6 +300,19 @@ const nlpIcon = computed(() => {
 // Computed: AI input field class based on theme
 const aiInputFieldClass = computed(() => "h-7! flex-1 my-px");
 
+// AI features require an enterprise/cloud build with ai_enabled; an
+// already-entitled org that's turned ai_enabled off (an admin preference,
+// not an upsell target) still never sees the bar. A NOT-entitled build shows
+// the toggle locked instead, regardless of ai_enabled — that flag has no
+// real meaning on a build that can't reach the feature anyway.
+const aiAccess = computed(() =>
+  checkFeatureAccess("aiAssistant", buildFeatureGateContext(store.state.zoConfig)),
+);
+const aiFeatureVisible = computed(
+  () => !aiAccess.value.allowed || Boolean(store.state.zoConfig.ai_enabled),
+);
+const aiFeatureEnabled = computed(() => aiFeatureVisible.value && aiAccess.value.allowed);
+
 // Computed: Is in AI mode?
 // When externally controlled (nlpMode prop passed), only show AI bar when nlpMode is explicitly ON.
 // The parent decides when the AI bar appears (e.g., after generation success).
@@ -278,8 +322,8 @@ const isAIMode = computed(() => {
     // External control: only nlpMode matters for showing the AI bar
     return nlpMode.value;
   }
-  // Internal control: nlpMode OR auto-detected NL
-  return nlpMode.value || isNaturalLanguageDetected.value;
+  // Internal control: explicit toggle, or auto-detected NL only where AI is available
+  return nlpMode.value || (aiFeatureEnabled.value && isNaturalLanguageDetected.value);
 });
 
 // Computed: Root container style - sets overall height
@@ -291,8 +335,8 @@ const rootStyle = computed(() => {
 });
 
 // Handle query update from editor
-const handleQueryUpdate = (newQuery: string) => {
-  emit("update:query", newQuery);
+const handleQueryUpdate = (newQuery: string, _event?: unknown, origin?: QueryChangeOrigin) => {
+  emit("update:query", newQuery, origin);
 };
 
 const handleEditorFocus = () => {
@@ -356,7 +400,10 @@ const handleAIGenerate = async () => {
   // Build the prompt based on whether there's an existing query
   let naturalLanguage = "";
   if (currentQuery && currentQuery.trim()) {
-    naturalLanguage = `Modify this ${currentLanguage.value.toUpperCase()} query to ${userInput}:\n\n${currentQuery}`;
+    // Model input, not screen copy — deliberately English.
+    naturalLanguage = raw(
+      `Modify this ${currentLanguage.value.toUpperCase()} query to ${userInput}:\n\n${currentQuery}`,
+    );
   } else {
     naturalLanguage = userInput;
   }
@@ -370,7 +417,7 @@ const handleAIGenerate = async () => {
   currentAbortController.value = new AbortController();
 
   // Track user message for chat history
-  chatMessages.value.push({ role: "user", content: userInput });
+  chatMessages.value.push({ role: "user", content: raw(userInput) });
 
   // Call the CodeQueryEditor's handleGenerateSQL method with abort + session
   if (editorRef.value && typeof editorRef.value.handleGenerateSQL === "function") {
@@ -382,8 +429,9 @@ const handleAIGenerate = async () => {
         currentSessionId.value,
       );
 
-      // Track assistant response in chat history
-      const generatedQuery = editorRef.value.getValue?.() || "";
+      // Track assistant response in chat history. A refused request (no AI credits, consent
+      // declined) left the editor unchanged, so its notice is the answer instead.
+      const generatedQuery = editorRef.value.refusalNotice || editorRef.value.getValue?.() || "";
       chatMessages.value.push({ role: "assistant", content: generatedQuery });
 
       // Save to IndexedDB (shared with O2AIChat history)
@@ -541,6 +589,7 @@ defineExpose({
   },
 
   // Editor state
+  focus: () => editorRef.value?.editorObj?.focus(),
   getValue: () => {
     return editorRef.value?.getValue();
   },
@@ -548,6 +597,10 @@ defineExpose({
     if (editorRef.value?.setValue) {
       editorRef.value.setValue(value);
     }
+  },
+  replaceValue: (value: string) => {
+    if (editorRef.value?.replaceValue) editorRef.value.replaceValue(value);
+    else if (editorRef.value?.setValue) editorRef.value.setValue(value);
   },
 
   // Cursor and autocomplete (for dashboards)

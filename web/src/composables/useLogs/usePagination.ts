@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 import { searchState } from "@/composables/useLogs/searchState";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
@@ -31,10 +32,10 @@ import useStreamFields from "@/composables/useLogs/useStreamFields";
 export const usePagination = () => {
   const store = useStore();
   const router = useRouter();
-  const { t } = useI18n();
+  const { t } = useI18nTyped();
   let { searchObj, searchObjDebug, searchAggData, notificationMsg } = searchState();
 
-  const { getHistogramTitle } = useHistogram();
+  const { getHistogramTitle, getHistogramTitleParts } = useHistogram();
   const {
     updateFieldValues,
     extractFields,
@@ -55,7 +56,7 @@ export const usePagination = () => {
     updateUrlQueryParams,
   } = logsUtils();
 
-  const { chunkedAppend } = useSearchStream();
+  const { chunkedAppend } = useSearchStream(t);
 
   // Sorting function
   interface OrderByField {
@@ -76,11 +77,11 @@ export const usePagination = () => {
   ) => {
     return new Promise((resolve, reject) => {
       if (searchObj.data.isOperationCancelled) {
-        notificationMsg.value = "Search operation is cancelled.";
+        notificationMsg.value = t("search.searchOperationCancelled");
 
         searchObj.loading = false;
         searchObj.data.isOperationCancelled = false;
-        showCancelSearchNotification();
+        showCancelSearchNotification(t);
         return;
       }
       // if (searchObj.meta.jobId != "") {
@@ -174,7 +175,13 @@ export const usePagination = () => {
               searchObj.data.queryResults.partitionDetail.partitions[0].start_time =
                 res.data.new_start_time;
             }
-            updateUrlQueryParams();
+            if (searchObj.meta.jobId === "") {
+              useLogsAutoRun().recordWindowMove(null, {
+                startUs: Number(res.data.new_start_time),
+                endUs: Number(res.data.new_end_time),
+              });
+            }
+            updateUrlQueryParams(null, null, "replace");
           }
           searchObjDebug["paginatedDataReceivedStartTime"] = performance.now();
           // check for total records update for the partition and update pagination accordingly
@@ -406,7 +413,7 @@ export const usePagination = () => {
 
           let trace_id = "";
           searchObj.data.errorMsg =
-            typeof err == "string" && err ? err : "Error while processing histogram request.";
+            typeof err == "string" && err ? err : t("search.errorWhileProcessingHistogramRequest");
           if (err.response != undefined) {
             searchObj.data.errorMsg =
               err.response?.data?.error || err.response?.data?.message || "";
@@ -441,7 +448,7 @@ export const usePagination = () => {
           if (trace_id) {
             searchObj.data.errorMsg +=
               " <br><span class='text-subtitle1'>TraceID:" + trace_id + "</span>";
-            notificationMsg.value += " TraceID:" + trace_id;
+            notificationMsg.value += raw(" TraceID:") + trace_id;
             trace_id = "";
           }
 
@@ -464,6 +471,7 @@ export const usePagination = () => {
 
     await filterHitsColumns();
     searchObj.data.histogram.chartParams.title = getHistogramTitle();
+    searchObj.data.histogram.chartParams.titleParts = getHistogramTitleParts();
   };
 
   const refreshPartitionPagination = (
@@ -641,7 +649,7 @@ export const usePagination = () => {
       }
     } catch (e: any) {
       console.log("Error while refreshing partition pagination", e);
-      notificationMsg.value = "Error while refreshing partition pagination.";
+      notificationMsg.value = t("search.errorWhileRefreshingPartitionPagination");
       return false;
     }
     return;
@@ -765,7 +773,7 @@ export const usePagination = () => {
       // console.log("searchObj.data.queryResults.pagination", searchObj.data.queryResults.pagination);
     } catch (e: any) {
       console.log("Error while refreshing pagination", e);
-      notificationMsg.value = "Error while refreshing pagination.";
+      notificationMsg.value = t("search.errorWhileRefreshingPagination");
       return false;
     }
     return;

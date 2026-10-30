@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref } from "vue";
+import type { TranslateFn } from "@/types/i18n";
 import patternsService from "@/services/patterns";
 import type { SearchRequestPayload } from "@/ts/interfaces";
 
@@ -67,7 +68,7 @@ let patternAbortController: AbortController | null = null;
 /**
  * Composable for pattern extraction - completely separate from logs flow
  */
-export default function usePatterns() {
+export default function usePatterns(t: TranslateFn) {
   /**
    * Extract patterns using the dedicated patterns API
    */
@@ -145,8 +146,12 @@ export default function usePatterns() {
         return;
       }
       console.error("[Patterns] Error extracting patterns:", error);
+      // Drop the previous run's results — otherwise the table keeps showing
+      // stale data (e.g. from an earlier single-stream query) once this run
+      // has failed.
+      patternsState.value.patterns = null;
       patternsState.value.error =
-        error?.response?.data?.message || "Error extracting patterns. Please try again.";
+        error?.response?.data?.message || t("search.errorExtractingPatterns");
       throw error;
     } finally {
       patternsState.value.loading = false;

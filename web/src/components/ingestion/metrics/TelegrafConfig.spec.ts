@@ -18,9 +18,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import TelegrafConfig from "./TelegrafConfig.vue";
 import { createStore } from "vuex";
 
-// Mock CopyContent component
-const MockCopyContent = {
-  name: "CopyContent",
+// Mock CredentialCodeBlock component
+const MockCredentialCodeBlock = {
+  name: "CredentialCodeBlock",
   props: ["content"],
   template: '<div class="copy-content-mock">{{ content }}</div>',
 };
@@ -73,10 +73,10 @@ describe("TelegrafConfig", () => {
       global: {
         plugins: [store],
         components: {
-          CopyContent: MockCopyContent,
+          CredentialCodeBlock: MockCredentialCodeBlock,
         },
         stubs: {
-          CopyContent: MockCopyContent,
+          CredentialCodeBlock: MockCredentialCodeBlock,
         },
       },
     });
@@ -95,8 +95,8 @@ describe("TelegrafConfig", () => {
       expect(wrapper.find(".p-3").exists()).toBe(true);
     });
 
-    it("should render CopyContent component", () => {
-      expect(wrapper.findComponent(MockCopyContent).exists()).toBe(true);
+    it("should render CredentialCodeBlock component", () => {
+      expect(wrapper.findComponent(MockCredentialCodeBlock).exists()).toBe(true);
     });
   });
 
@@ -221,9 +221,9 @@ describe("TelegrafConfig", () => {
     });
   });
 
-  describe("CopyContent Component Integration", () => {
-    it("should pass content to CopyContent component", () => {
-      const copyContent = wrapper.findComponent(MockCopyContent);
+  describe("CredentialCodeBlock Component Integration", () => {
+    it("should pass content to CredentialCodeBlock component", () => {
+      const copyContent = wrapper.findComponent(MockCredentialCodeBlock);
       expect(copyContent.props("content")).toBe(wrapper.vm.content);
     });
   });
@@ -248,8 +248,8 @@ describe("TelegrafConfig", () => {
         props: { currOrgIdentifier: "new_org" },
         global: {
           plugins: [store],
-          components: { CopyContent: MockCopyContent },
-          stubs: { CopyContent: MockCopyContent },
+          components: { CredentialCodeBlock: MockCredentialCodeBlock },
+          stubs: { CredentialCodeBlock: MockCredentialCodeBlock },
         },
       });
 
@@ -290,8 +290,8 @@ describe("TelegrafConfig", () => {
         props: defaultProps,
         global: {
           plugins: [storeWithEmptyOrg],
-          components: { CopyContent: MockCopyContent },
-          stubs: { CopyContent: MockCopyContent },
+          components: { CredentialCodeBlock: MockCredentialCodeBlock },
+          stubs: { CredentialCodeBlock: MockCredentialCodeBlock },
         },
       });
 
@@ -306,8 +306,8 @@ describe("TelegrafConfig", () => {
         },
         global: {
           plugins: [store],
-          components: { CopyContent: MockCopyContent },
-          stubs: { CopyContent: MockCopyContent },
+          components: { CredentialCodeBlock: MockCredentialCodeBlock },
+          stubs: { CredentialCodeBlock: MockCredentialCodeBlock },
         },
       });
 
@@ -336,8 +336,8 @@ describe("TelegrafConfig", () => {
         props: defaultProps,
         global: {
           plugins: [store],
-          components: { CopyContent: MockCopyContent },
-          stubs: { CopyContent: MockCopyContent },
+          components: { CredentialCodeBlock: MockCredentialCodeBlock },
+          stubs: { CredentialCodeBlock: MockCredentialCodeBlock },
         },
       });
 

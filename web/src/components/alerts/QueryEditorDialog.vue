@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex items-center gap-2.5">
         <div
           data-test="add-alert-back-btn"
-          class="flex size-5 flex-shrink-0 cursor-pointer items-center justify-center rounded-full border-[1.5px] opacity-60 transition-opacity hover:opacity-100"
+          class="flex size-5 flex-shrink-0 cursor-pointer items-center justify-center rounded-full border opacity-60 transition-opacity hover:opacity-100"
           :title="t('common.goBack')"
           @click="closeDialog"
         >
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-center gap-2">
           <div
             v-if="streamType"
-            class="rounded-default inline-flex flex-row items-center gap-1.25 border border-[color-mix(in_srgb,var(--color-info)_28%,transparent)] bg-[color-mix(in_srgb,var(--color-info)_10%,transparent)] px-2.5 py-0.75"
+            class="rounded-default border-info/28 bg-info/10 inline-flex flex-row items-center gap-1.25 border px-2.5 py-0.75"
           >
             <span class="text-2xs text-text-label font-semibold">{{ t("alerts.streamType") }}</span>
             <span class="text-2xs text-text-label opacity-30">:</span>
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <span v-if="streamType && streamName" class="opacity-20 select-none">|</span>
           <div
-            class="rounded-default inline-flex flex-row items-center gap-1.25 border border-[color-mix(in_srgb,var(--color-sql-accent)_28%,transparent)] bg-[color-mix(in_srgb,var(--color-sql-accent)_10%,transparent)] px-2.5 py-0.75"
+            class="rounded-default border-sql-accent/28 bg-sql-accent/10 inline-flex flex-row items-center gap-1.25 border px-2.5 py-0.75"
           >
             <span class="text-2xs text-text-label font-semibold">{{
               t("alerts.stream_name")
@@ -78,16 +78,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :ripple="false"
           @click="toggleAIChat"
           data-test="menu-link-ai-item"
+          :aria-label="t('menu.aiAssistant')"
           variant="ghost"
           size="icon-toolbar"
-          class="group transition-[background,box-shadow] duration-300 ease-[ease] [background:var(--color-gradient-ai-subtle)]! hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)] hover:[background:var(--color-gradient-ai)]!"
+          class="group hover:shadow-ai-accent/35 transition-[background,box-shadow] duration-300 ease-[ease] [background:var(--color-gradient-ai-subtle)]! hover:shadow-md hover:[background:var(--color-gradient-ai)]!"
           @mouseenter="isHovered = true"
           @mouseleave="isHovered = false"
         >
           <img
+            alt=""
             :src="getBtnLogo"
             class="transition-transform duration-[600ms] ease-[ease] group-hover:rotate-180"
-            style="width: 18px; height: 18px"
+            style="width: 1.125rem; height: 1.125rem"
           />
         </OButton>
       </div>
@@ -100,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex h-full w-full flex-col">
           <!-- Main Content Grid: field browser | editors | output -->
           <div
-            class="grid min-h-0 w-full flex-1 grid-cols-[20fr_45fr_35fr] gap-x-2 overflow-hidden px-2 py-2 pr-2"
+            class="grid min-h-0 w-full flex-1 grid-cols-[20fr_45fr_35fr] gap-x-2 overflow-hidden px-2 py-2 pe-2"
           >
             <!-- Left Section (25%) — Field Browser -->
             <div
@@ -210,16 +212,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="text-compact relative h-5.5 shrink-0 cursor-default font-medium"
                     :class="[
                       sqlStatusBarClasses,
-                      'border-border-default rounded-bl-default rounded-br-default border-r border-b border-l',
+                      'border-border-default rounded-bl-default rounded-br-default border-s border-e border-b',
                     ]"
                   >
                     <div class="absolute inset-0 flex items-center gap-1.25 overflow-hidden px-2.5">
                       <template v-if="sqlStatusState === 'sql-status-bar--error'">
                         <OIcon name="error-outline" size="xs" class="shrink-0" />
-                        <span
-                          class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
-                          >{{ localSqlQueryErrorMsg || sqlQueryErrorMsg }}</span
-                        >
+                        <OTruncatedText class="flex-1">{{
+                          localSqlQueryErrorMsg || sqlQueryErrorMsg
+                        }}</OTruncatedText>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--loading'">
                         <OSpinner size="xs" class="shrink-0" />
@@ -242,13 +243,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span>{{ t("alerts.queryEditor.eventsFound", sqlResultCount) }}</span>
                       </template>
                     </div>
-                    <OTooltip
-                      v-if="sqlStatusState === 'sql-status-bar--error'"
-                      side="top"
-                      align="center"
-                      :max-width="'520px'"
-                      :content="localSqlQueryErrorMsg || sqlQueryErrorMsg"
-                    />
                   </div>
                 </div>
 
@@ -319,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :query="vrlFunctionContent"
                       :hide-nl-toggle="false"
                       :disable-ai="false"
-                      :disable-ai-reason="''"
+                      :disable-ai-reason="raw('')"
                       :ai-placeholder="t('search.askAIFunctionPlaceholder')"
                       :ai-tooltip="t('search.enterFunctionPrompt')"
                       :debounce-time="300"
@@ -433,7 +427,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }}</span>
                     <span
                       class="text-3xs rounded-default bg-badge-purple-soft-bg border-badge-purple-ol-border text-badge-purple-ol-text border px-1.75 py-px font-bold tracking-[0.04em]"
-                      >SQL + VRL</span
+                      >{{ t("alerts.queryEditor.sqlVrlBadge") }}</span
                     >
                   </div>
                   <!-- Running indicator -->
@@ -498,7 +492,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- AI Chat Panel -->
       <div
-        class="bg-surface-base ml-2 w-[24.5vw] max-w-full min-w-18.75"
+        class="bg-surface-base ms-2 w-[24.5vw] max-w-full min-w-18.75"
         v-if="store.state.isAiChatEnabled"
       >
         <O2AIChat
@@ -513,9 +507,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, type PropType, onMounted, inject, type Ref } from "vue";
+import {
+  ref,
+  computed,
+  watch,
+  type PropType,
+  onMounted,
+  inject,
+  type Ref,
+  defineAsyncComponent,
+} from "vue";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -524,7 +527,6 @@ import { debounce } from "lodash-es";
 import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import searchService from "@/services/search";
-import { defineAsyncComponent } from "vue";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 import UnifiedQueryEditor from "@/components/QueryEditor.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
@@ -542,6 +544,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = defineProps({
@@ -603,7 +606,7 @@ const emit = defineEmits([
   "validate-sql",
 ]);
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const { isDark } = useTheme();
 const { buildQueryPayload } = useQuery();
@@ -634,8 +637,7 @@ const sqlStatusBarClasses = computed(() => {
   const map: Record<string, string> = {
     "sql-status-bar--hint": neutralBg,
     "sql-status-bar--idle": neutralBg,
-    "sql-status-bar--loading":
-      "bg-[color-mix(in_srgb,var(--color-sql-accent)_6%,transparent)] text-sql-accent",
+    "sql-status-bar--loading": "bg-sql-accent/6 text-sql-accent",
     "sql-status-bar--error": "bg-status-error-bg text-status-error-text cursor-pointer",
     "sql-status-bar--empty": "bg-status-warning-bg text-status-warning-text",
     "sql-status-bar--success": "bg-status-success-bg text-status-positive",
@@ -662,6 +664,7 @@ const getParser = (sqlQuery: string) => {
   const sqlUtilsContext: SqlUtilsContext = {
     parser: parser.value,
     sqlQueryErrorMsg: localSqlQueryErrorMsg,
+    t,
   };
   return getParserUtil(sqlQuery, sqlUtilsContext);
 };
@@ -726,6 +729,7 @@ const { placeholder: fullEditorPlaceholder } = useQueryPlaceholder(
   ref({}),
   isSqlModeForPlaceholder,
   noStreamForPlaceholder,
+  t,
   { noStreamText: t("pipeline.queryEditorPlaceholder") },
 );
 
@@ -911,10 +915,13 @@ const buildMultiWindowQuery = (sql: string, periodInMicroseconds: number) => {
 // Query execution
 const triggerQuery = async (fn = false) => {
   try {
-    const queryReq = buildQueryPayload({
-      sqlMode: true,
-      streamName: props.streamName,
-    });
+    const queryReq = buildQueryPayload(
+      {
+        sqlMode: true,
+        streamName: props.streamName,
+      },
+      t,
+    );
     queryReq.query.sql = localSqlQuery.value;
     queryReq.query.size = 10;
 
@@ -1019,10 +1026,13 @@ const runTestFunction = async () => {
 };
 
 const triggerPromqlQuery = async () => {
-  const queryReq = buildQueryPayload({
-    sqlMode: true,
-    streamName: props.streamName,
-  });
+  const queryReq = buildQueryPayload(
+    {
+      sqlMode: true,
+      streamName: props.streamName,
+    },
+    t,
+  );
 
   const periodInMicroseconds = props.period * 60 * 1000000;
   const endTime = new Date().getTime() * 1000;
@@ -1098,8 +1108,6 @@ const onQueryEditorFocus = () => {
 // ── Autocomplete ──────────────────────────────────────────────────────────
 const {
   autoCompleteData,
-  autoCompleteKeywords,
-  autoCompleteSuggestions,
   // Context-aware views: these swap in stream names after FROM and field VALUES
   // after an operator. Binding the raw lists above meant the value popup showed
   // field names exactly where values belong.
@@ -1117,7 +1125,8 @@ watch(
     if (cols?.length) {
       const fields = (cols as any[]).map((c: any) => ({
         name: typeof c === "string" ? c : (c.value ?? c.label ?? c),
-        type: c.type ?? "Utf8",
+        // An untyped column must read as unknown, so operators and quoting fall back to the value itself.
+        type: c.type,
       }));
       updateFieldKeywords(fields);
     }

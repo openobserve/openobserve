@@ -37,7 +37,7 @@ pub fn align_down(ts_secs: i64, slice_interval_secs: i64) -> i64 {
 
 /// Align a timestamp **up** to the next slice boundary, leaving an exact
 /// boundary alone.
-fn align_up(ts_secs: i64, slice_interval_secs: i64) -> i64 {
+pub fn align_up(ts_secs: i64, slice_interval_secs: i64) -> i64 {
     if slice_interval_secs <= 0 {
         return ts_secs;
     }
@@ -189,6 +189,24 @@ pub fn watermark_is_stale(
     stale_k: i64,
 ) -> bool {
     now_secs > watermark_end + stale_k * slice_interval_secs
+}
+
+/// [`watermark_is_stale`], with "there is no watermark" folded in.
+///
+/// An absent watermark means nothing has been measured under this generation
+/// at all, which is stale in the only sense that matters: there is no current
+/// data to classify against. Shared by the alert evaluator and the read-time
+/// status view, which must agree on whether an SLO is frozen.
+pub fn watermark_is_stale_or_absent(
+    now_secs: i64,
+    watermark_end: Option<i64>,
+    slice_interval_secs: i64,
+    stale_k: i64,
+) -> bool {
+    match watermark_end {
+        Some(end) => watermark_is_stale(now_secs, end, slice_interval_secs, stale_k),
+        None => true,
+    }
 }
 
 #[cfg(test)]
@@ -443,8 +461,7 @@ mod tests {
     /// added, this test is what says whether the engine agrees with us.
     #[test]
     fn every_legal_slice_interval_agrees_with_the_histogram_origin() {
-        /// 2001-01-01T00:00:00Z, from `rewrite_histogram.rs`.
-        const DATE_BIN_ORIGIN_SECS: i64 = 978_307_200;
+        use crate::meta::histogram_origin::DATE_BIN_ORIGIN_SECS;
 
         for slice in [SLICE_60_SECS, SLICE_300_SECS] {
             assert_eq!(
@@ -460,7 +477,7 @@ mod tests {
     /// bucket and the engine's are the same number.
     #[test]
     fn align_down_matches_date_bin_for_legal_intervals() {
-        const ORIGIN: i64 = 978_307_200;
+        use crate::meta::histogram_origin::DATE_BIN_ORIGIN_SECS as ORIGIN;
         let date_bin = |ts: i64, slice: i64| ORIGIN + (ts - ORIGIN).div_euclid(slice) * slice;
 
         for slice in [SLICE_60_SECS, SLICE_300_SECS] {
@@ -478,7 +495,7 @@ mod tests {
     /// that does NOT divide the origin really does drift.
     #[test]
     fn an_interval_that_does_not_divide_the_origin_would_drift() {
-        const ORIGIN: i64 = 978_307_200;
+        use crate::meta::histogram_origin::DATE_BIN_ORIGIN_SECS as ORIGIN;
         let slice = 420; // 7 minutes — not a legal SLO slice, deliberately
         let date_bin = ORIGIN + (1_000_000_000 - ORIGIN).div_euclid(slice) * slice;
         assert_ne!(
@@ -578,5 +595,28 @@ mod tests {
     #[test]
     fn a_future_watermark_is_never_stale() {
         assert!(!watermark_is_stale(10_000, 20_000, FIVE_MIN, 3));
+    }
+
+    /// An absent watermark is stale in the only sense that matters: nothing
+    /// current has been measured under this generation.
+    #[test]
+    fn an_absent_watermark_is_stale() {
+        assert!(watermark_is_stale_or_absent(10_000, None, FIVE_MIN, 3));
+    }
+
+    #[test]
+    fn a_present_watermark_follows_the_plain_rule() {
+        assert!(!watermark_is_stale_or_absent(
+            10_000,
+            Some(9_900),
+            FIVE_MIN,
+            3
+        ));
+        assert!(watermark_is_stale_or_absent(
+            10_000,
+            Some(9_000),
+            FIVE_MIN,
+            3
+        ));
     }
 }

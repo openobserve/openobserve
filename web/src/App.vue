@@ -15,9 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <router-view></router-view>
-  <OToastProvider />
-  <ConfirmDialogProvider />
+  <ConfigProvider :dir="layoutDirection">
+    <router-view></router-view>
+    <OToastProvider />
+    <ConfirmDialogProvider />
+    <CreateAlertDialogProvider />
+    <UpdatePasswordDialog />
+  </ConfigProvider>
 </template>
 
 <script lang="ts">
@@ -25,15 +29,26 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { onMounted, watch } from "vue";
 import { applyCurrentTheme } from "@/utils/themeManager";
+import { getLocale, isRtlLocale } from "@/locales";
+import { ConfigProvider } from "reka-ui";
 import OToastProvider from "@/lib/feedback/Toast/OToastProvider.vue";
 import ConfirmDialogProvider from "@/components/ConfirmDialogProvider.vue";
+import CreateAlertDialogProvider from "@/components/alerts/CreateAlertDialogProvider.vue";
+import UpdatePasswordDialog from "@/components/common/UpdatePasswordDialog.vue";
 
 export default {
-  components: { OToastProvider, ConfirmDialogProvider },
+  components: {
+    ConfigProvider,
+    OToastProvider,
+    ConfirmDialogProvider,
+    CreateAlertDialogProvider,
+    UpdatePasswordDialog,
+  },
   setup() {
     const store = useStore();
     const router = useRouter();
     const creds = localStorage.getItem("creds");
+    const layoutDirection: "rtl" | "ltr" = isRtlLocale(getLocale()) ? "rtl" : "ltr";
     if (creds) {
       router.push("/logs");
     }
@@ -72,6 +87,7 @@ export default {
 
     return {
       store,
+      layoutDirection,
     };
   },
 };

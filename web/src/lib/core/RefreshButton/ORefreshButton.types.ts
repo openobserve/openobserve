@@ -5,6 +5,16 @@ export interface RefreshButtonProps {
   loading?: boolean;
   /** Disables the button independently of loading */
   disabled?: boolean;
+  /** Reload icon-button style. `outline` draws a border; default is borderless `ghost`. */
+  variant?: "ghost" | "outline";
+  /** `split` (default) shows a dot and the age beside the button; `inline` drops the dot and puts the age inside it. */
+  layout?: "split" | "inline";
+  /** Overrides the button's `data-test` so a page keeps its own selector. */
+  dataTest?: string;
+  /** Registry id, so the tooltip shows the page's refresh shortcut. */
+  shortcutId?: string;
+  /** `inset` sizes the split-layout button to fill a 1.5rem bordered pill, so the pill need not clip it. */
+  size?: "toolbar" | "inset";
 }
 
 export interface RefreshButtonEmits {

@@ -7,6 +7,7 @@
 
 const testLogger = require('./test-logger.js');
 const { rumTestContext } = require('./rum-env.js');
+const { ingestBase } = require('./ingest-url.js');
 
 /**
  * Ingest RUM error events to OpenObserve
@@ -194,7 +195,7 @@ async function ingestErrors(page, baseUrl, orgId, rumErrors, email, password) {
 
   let fetchResponse;
   try {
-    fetchResponse = await page.request.post(`${baseUrl}/api/${orgId}/_rumdata/_json`, {
+    fetchResponse = await page.request.post(`${ingestBase(baseUrl)}/api/${orgId}/_rumdata/_json`, {
       headers: {
         'Authorization': `Basic ${basicAuth}`,
         'Content-Type': 'application/json'

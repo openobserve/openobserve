@@ -13,12 +13,26 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import type { BrowserStep } from "@/types/synthetics";
 import BrowserJourneyStepEditor from "./BrowserJourneyStepEditor.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import SubtestPicker from "./SubtestPicker.vue";
+import store from "@/test/unit/helpers/store";
+import OTemplateInput from "@/lib/forms/TemplateInput/OTemplateInput.vue";
+import type { VariableSuggestion } from "@/components/synthetics/variables/suggestions";
 import en from "@/locales/languages/en-US.json";
+
+// SubtestPicker fetches its options on mount; resolve empty, since no test here reads them.
+vi.mock("@/services/synthetics", () => ({
+  default: {
+    listByFolderId: vi.fn().mockResolvedValue({ data: { checks: [] } }),
+    get: vi.fn(),
+    getRuns: vi.fn(),
+  },
+}));
 
 const i18n = createI18n({
   legacy: false,
@@ -37,7 +51,7 @@ function render(step: Partial<BrowserStep> = {}, props: Record<string, unknown> 
   };
   return mount(BrowserJourneyStepEditor, {
     props: { step: full, ...props },
-    global: { plugins: [i18n] },
+    global: { plugins: [i18n, store] },
   });
 }
 
@@ -143,7 +157,7 @@ describe("BrowserJourneyStepEditor inline field errors", () => {
     };
     return mount(BrowserJourneyStepEditor, {
       props: { step: full, ...errors },
-      global: { plugins: [i18n] },
+      global: { plugins: [i18n, store] },
     });
   }
 
@@ -500,5 +514,211 @@ describe("BrowserJourneyStepEditor action-change notice", () => {
     expect(wrapper.find(test("synthetics-journey-step-action-changed-notice")).exists()).toBe(
       false,
     );
+  });
+});
+
+// Which button and how many clicks reached storage and the replay wire, and
+// stopped one layer short of the author: the editor rendered a recorded right or
+// double click as a plain "Click" with no control to see or change it.
+describe("BrowserJourneyStepEditor click type", () => {
+  const clickTypeSelect = (wrapper: ReturnType<typeof render>) =>
+    wrapper.findComponent(test("synthetics-journey-step-click-type-select"));
+
+  const pickClickType = async (wrapper: ReturnType<typeof render>, type: string) => {
+    await clickTypeSelect(wrapper).vm.$emit("update:modelValue", type);
+  };
+
+  const lastStep = (wrapper: ReturnType<typeof render>) => {
+    const emitted = wrapper.emitted("update:step");
+    return emitted?.[emitted.length - 1]?.[0] as BrowserStep;
+  };
+
+  it("renders the control on a click step and nowhere else", () => {
+    expect(clickTypeSelect(render({ action: "click" })).exists()).toBe(true);
+    expect(clickTypeSelect(render({ action: "hover" })).exists()).toBe(false);
+    expect(clickTypeSelect(render({ action: "navigate" })).exists()).toBe(false);
+  });
+
+  it("shows the type a recorded step actually carries", () => {
+    expect(clickTypeSelect(render({ button: "right" })).props("modelValue")).toBe("right");
+    expect(clickTypeSelect(render({ clickCount: 2 })).props("modelValue")).toBe("double");
+    expect(clickTypeSelect(render()).props("modelValue")).toBe("left");
+  });
+
+  it("writes both fields when the author picks a type", async () => {
+    const wrapper = render();
+    await pickClickType(wrapper, "double");
+    expect(lastStep(wrapper)).toMatchObject({ button: "left", clickCount: 2 });
+  });
+
+  // Left/1 is the absent-field default, so returning to a plain click serialises
+  // exactly as a step that never left one.
+  it("returns to the default pair rather than clearing the fields", async () => {
+    const wrapper = render({ button: "right" });
+    await pickClickType(wrapper, "left");
+    expect(lastStep(wrapper)).toMatchObject({ button: "left", clickCount: 1 });
+  });
+
+  // journeyToWireSteps prefers `wire`, so an edit that misses it is discarded at
+  // replay time — the same trap every other field in `update()` is wired for.
+  it("keeps a live recording's wire in step with the edit", async () => {
+    const wrapper = render({ wire: { id: "w1", action: "click" } as never });
+    await pickClickType(wrapper, "right");
+    expect(lastStep(wrapper).wire).toMatchObject({ button: "right", clickCount: 1 });
+  });
+
+  it("drops both fields when the action stops being a click", async () => {
+    const wrapper = render({ button: "right", clickCount: 1 });
+    await wrapper.findComponent({ name: "OSelect" }).vm.$emit("update:modelValue", "hover");
+    const step = lastStep(wrapper);
+    expect(step.action).toBe("hover");
+    expect(step.button).toBeUndefined();
+    expect(step.clickCount).toBeUndefined();
+  });
+});
+
+describe("BrowserJourneyStepEditor unbound variables", () => {
+  const warning = test("synthetics-journey-step-unbound-warning");
+
+  it("warns about a placeholder nothing defines", () => {
+    const wrapper = render(
+      { action: "type", value: "{{USER}} {{BASE_URL}}" },
+      { knownVariables: new Set(["BASE_URL"]) },
+    );
+    expect(wrapper.find(warning).exists()).toBe(true);
+    expect(wrapper.find(warning).text()).toContain("USER");
+    expect(wrapper.find(warning).text()).not.toContain("BASE_URL");
+  });
+
+  it("stays quiet when every placeholder resolves", () => {
+    const wrapper = render(
+      { action: "type", value: "{{BASE_URL}}" },
+      { knownVariables: new Set(["BASE_URL"]) },
+    );
+    expect(wrapper.find(warning).exists()).toBe(false);
+  });
+
+  it("stays quiet when the host cannot tell what resolves", () => {
+    const wrapper = render({ action: "type", value: "{{USER}}" });
+    expect(wrapper.find(warning).exists()).toBe(false);
+  });
+});
+
+// A reference runs no action, so its execution fields go; turning back drops the reference.
+describe("BrowserJourneyStepEditor subtest action", () => {
+  it("clears the execution fields when a step becomes a subtest, and the reference when it stops being one", async () => {
+    const click: BrowserStep = {
+      id: "s2",
+      action: "click",
+      name: "Sign in",
+      value: "x",
+      optional: true,
+      locator: { candidates: [{ kind: "css", value: "#a" }] },
+    };
+    const w = mount(BrowserJourneyStepEditor, {
+      props: { step: click },
+      global: { plugins: [i18n, store] },
+    });
+    await w.findComponent(OSelect).vm.$emit("update:modelValue", "subtest");
+    const toSubtest = w.emitted("update:step")!.at(-1)![0] as BrowserStep;
+    expect(toSubtest.action).toBe("subtest");
+    expect(toSubtest.locator).toBeUndefined();
+    expect(toSubtest.value).toBeUndefined();
+    expect(toSubtest.optional).toBeUndefined();
+    expect(toSubtest.subtest).toBeUndefined(); // the picker fills this, not the action change
+
+    const ref: BrowserStep = {
+      id: "s2",
+      action: "subtest",
+      name: "Login",
+      subtest: { id: "login-test" },
+    };
+    const w2 = mount(BrowserJourneyStepEditor, {
+      props: { step: ref },
+      global: { plugins: [i18n, store] },
+    });
+    await w2.findComponent(OSelect).vm.$emit("update:modelValue", "click");
+    expect((w2.emitted("update:step")!.at(-1)![0] as BrowserStep).subtest).toBeUndefined();
+  });
+
+  it("always offers the subtest action", () => {
+    const w = render({ action: "click" });
+    const values = w
+      .findComponent(OSelect)
+      .props("options")
+      .map((o: { value: string }) => o.value);
+    expect(values).toContain("subtest");
+  });
+
+  const pick = async (w: ReturnType<typeof render>, picked: { id: string; name: string }) => {
+    await w.findComponent(SubtestPicker).vm.$emit("update:modelValue", picked);
+    return w.emitted("update:step")!.at(-1)![0] as BrowserStep;
+  };
+
+  it("replaces a name that still names the earlier child on a re-pick", async () => {
+    const w = render({ action: "subtest", name: "Login", subtest: { id: "a", name: "Login" } });
+    const next = await pick(w, { id: "b", name: "Checkout" });
+    expect(next.name).toBe("Checkout");
+    expect(next.subtest).toEqual({ id: "b", name: "Checkout" });
+
+    // A stored `{ id }` reference names its child through the host's cache.
+    const stored = render(
+      { action: "subtest", name: "Login", subtest: { id: "a" } },
+      { childName: "Login" },
+    );
+    expect((await pick(stored, { id: "b", name: "Checkout" })).name).toBe("Checkout");
+  });
+
+  it("keeps a name the author wrote on a re-pick, and fills an empty one", async () => {
+    const w = render({
+      action: "subtest",
+      name: "Sign in first",
+      subtest: { id: "a", name: "Login" },
+    });
+    expect((await pick(w, { id: "b", name: "Checkout" })).name).toBe("Sign in first");
+
+    const empty = render({ action: "subtest", name: "", subtest: undefined });
+    expect((await pick(empty, { id: "b", name: "Checkout" })).name).toBe("Checkout");
+  });
+
+  it("renders the subtest picker only for a subtest step, in place of the target/value/advanced blocks", () => {
+    const w = render({ action: "subtest", subtest: { id: "login-test" } });
+    expect(w.find(test("synthetics-journey-step-subtest-picker")).exists()).toBe(true);
+    // A saved reference is `{ id }` only, so the step name is what the picker can display.
+    expect(w.findComponent(SubtestPicker).props("fallbackName")).toBe("Sign in");
+    expect(w.find(test("synthetics-journey-step-locator")).exists()).toBe(false);
+    expect(w.find(test("synthetics-journey-step-group-advanced")).exists()).toBe(false);
+
+    const other = render({ action: "click" });
+    expect(other.find(test("synthetics-journey-step-subtest-picker")).exists()).toBe(false);
+  });
+});
+
+describe("BrowserJourneyStepEditor variable suggestions", () => {
+  const suggestions: VariableSuggestion[] = [
+    { name: "BASE_URL", envs: ["prod"], global: false, secret: false, gap: [] },
+  ];
+  const valueField = (wrapper: ReturnType<typeof render>) => wrapper.findComponent(OTemplateInput);
+
+  it("offers the rows on a value the probe substitutes", () => {
+    const wrapper = render({ action: "type", value: "" }, { variableSuggestions: suggestions });
+    expect(valueField(wrapper).props("suggestions")).toEqual(suggestions);
+  });
+
+  it("keeps the value plain for an action whose value is never substituted", () => {
+    const wrapper = render({ action: "upload", value: "" }, { variableSuggestions: suggestions });
+    expect(valueField(wrapper).props("suggestions")).toBeUndefined();
+  });
+
+  it("writes an accepted token into the step and its wire", async () => {
+    const wrapper = render(
+      { action: "type", value: "", wire: { id: "w1", action: "type" } as never },
+      { variableSuggestions: suggestions },
+    );
+    await valueField(wrapper).vm.$emit("update:modelValue", "{{BASE_URL}}");
+    const emitted = wrapper.emitted("update:step");
+    const step = emitted?.[emitted.length - 1]?.[0] as BrowserStep;
+    expect(step.value).toBe("{{BASE_URL}}");
+    expect(step.wire).toMatchObject({ value: "{{BASE_URL}}" });
   });
 });

@@ -27,9 +27,11 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
+const mockIsMetaOrg = vi.hoisted(() => ({ value: true }));
+
 vi.mock("@/composables/useIsMetaOrg", () => ({
   default: () => ({
-    isMetaOrg: { value: true },
+    isMetaOrg: mockIsMetaOrg,
   }),
 }));
 
@@ -68,9 +70,7 @@ const router = createRouter({
 
 // Mock the router methods we need to test
 const mockRouterPush = vi.fn();
-const mockRouterReplace = vi.fn().mockResolvedValue(undefined);
 router.push = mockRouterPush;
-router.replace = mockRouterReplace;
 
 const createWrapper = (props = {}, options = {}) => {
   return mount(SettingsIndex, {
@@ -124,8 +124,8 @@ describe("SettingsIndex", () => {
     mockStore.state.theme = "light";
     mockStore.state.selectedOrganization = { identifier: "test-org" };
     mockStore.state.zoConfig = { service_streams_enabled: true };
+    mockIsMetaOrg.value = true;
     mockRouterPush.mockClear();
-    mockRouterReplace.mockClear();
 
     // Set up router state
     await router.push("/");
@@ -195,6 +195,19 @@ describe("SettingsIndex", () => {
       expect(items.some((i: any) => i.dataTest === "pipeline-destinations-tab")).toBe(true);
     });
 
+    it("lists Telephony with the page's icon, gated on enterprise and on-call", () => {
+      const telephony = () => getAllItems(createWrapper()).find((i: any) => i.key === "telephony");
+      expect(telephony()).toMatchObject({
+        icon: "call",
+        group: "Destinations",
+        dataTest: "telephony-settings-tab",
+        to: { name: "telephonySettings", query: { org_identifier: "test-org" } },
+        visible: true,
+      });
+      mockStore.state.zoConfig = { service_streams_enabled: true, oncall_enabled: false } as any;
+      expect(telephony().visible).toBe(false);
+    });
+
     it("should include synthetics_locations item with correct properties", () => {
       const wrapper = createWrapper();
       const items = getAllItems(wrapper);
@@ -212,10 +225,10 @@ describe("SettingsIndex", () => {
       const regexItem = items.find((i: any) => i.dataTest === "regex-patterns-tab");
       const pipelineItem = items.find((i: any) => i.dataTest === "pipeline-destinations-tab");
 
-      // visible=true when isEnterprise=true
-      expect(cipherItem?.visible).toBe(true);
-      expect(regexItem?.visible).toBe(true);
-      expect(pipelineItem?.visible).toBe(true);
+      // Always present now — unlocked (not just "visible") when isEnterprise=true.
+      expect(cipherItem?.locked).toBe(false);
+      expect(regexItem?.locked).toBe(false);
+      expect(pipelineItem?.locked).toBe(false);
     });
 
     it("should include meta org items when isMetaOrg is true and enterprise", () => {
@@ -238,24 +251,6 @@ describe("SettingsIndex", () => {
   });
 
   describe("Router integration", () => {
-    it("should redirect to /settings/general on settings root route", () => {
-      createWrapper();
-      expect(mockRouterReplace).toHaveBeenCalledWith(
-        expect.objectContaining({
-          path: "/settings/general",
-        }),
-      );
-    });
-
-    it("should include org_identifier in redirect query", () => {
-      createWrapper();
-      expect(mockRouterReplace).toHaveBeenCalledWith(
-        expect.objectContaining({
-          query: { org_identifier: "test-org" },
-        }),
-      );
-    });
-
     it("should map syntheticsLocations route to synthetics_locations tab", () => {
       // Save the original route reference so we can restore it after the test
       // (router.push is mocked and won't reset currentRoute on its own).
@@ -270,6 +265,17 @@ describe("SettingsIndex", () => {
       // Restore the original route to avoid cross-test contamination
       router.currentRoute.value = originalRoute;
     });
+  });
+
+  it("maps the telephonySettings route to the telephony section", () => {
+    const originalRoute = router.currentRoute.value;
+    router.currentRoute.value = {
+      ...router.currentRoute.value,
+      name: "telephonySettings",
+      path: "/telephony",
+    } as any;
+    expect(createWrapper().vm.settingsTab).toBe("telephony");
+    router.currentRoute.value = originalRoute;
   });
 
   describe("Theme integration", () => {
@@ -308,12 +314,33 @@ describe("SettingsIndex", () => {
       expect(generalGroup).toBeDefined();
     });
 
-    it("should contain a Destinations group holding only Pipeline Destinations", () => {
+    it("should contain a Destinations group holding Pipeline Destinations, then Telephony", () => {
       const wrapper = createWrapper();
       const groups = wrapper.vm.sectionGroups as any[];
       const destGroup = groups.find((g: any) => g.label === "Destinations");
       expect(destGroup).toBeDefined();
-      expect(destGroup.items.map((i: any) => i.key)).toEqual(["pipeline_destinations"]);
+      expect(destGroup.items.map((i: any) => i.key)).toEqual([
+        "pipeline_destinations",
+        "telephony",
+      ]);
+    });
+
+    it("AC-12.5 puts the Integrations group with Slack right after Destinations", () => {
+      mockStore.state.zoConfig = { service_streams_enabled: true, slack_enabled: true } as any;
+      const wrapper = createWrapper();
+      const labels = (wrapper.vm.sectionGroups as any[]).map((g: any) => g.label);
+      expect(labels.indexOf("Integrations")).toBe(labels.indexOf("Destinations") + 1);
+    });
+
+    it("AC-1.4 shows no Slack rail item on Cloud while Slack is disabled", () => {
+      mockStore.state.zoConfig = {
+        service_streams_enabled: true,
+        slack_enabled: false,
+        slack_disabled_reason: "flag",
+      } as any;
+      const wrapper = createWrapper();
+      const items = (wrapper.vm.sectionGroups as any[]).flatMap((g: any) => g.items);
+      expect(items.find((i: any) => i.key === "slack")?.visible).toBe(false);
     });
 
     it("should contain a Synthetics group", () => {
@@ -344,9 +371,12 @@ describe("SettingsIndex", () => {
       return groups.flatMap((g: any) => g.items ?? []);
     };
 
-    it("should mark enterprise-only items as not visible when not enterprise", async () => {
+    it("should mark enterprise-only items as locked (not hidden) in a true OSS build", async () => {
       const config = await import("@/aws-exports");
       vi.mocked(config.default).isEnterprise = "false";
+      // Not just "not enterprise" — this batch doesn't exist on Cloud at all
+      // (see the next test), so OSS means neither flag is set.
+      vi.mocked(config.default).isCloud = "false";
 
       const wrapper = createWrapper();
       const items = getAllItems(wrapper);
@@ -354,13 +384,48 @@ describe("SettingsIndex", () => {
       const nodesItem = items.find((i: any) => i.dataTest === "nodes-tab");
       const pipelineItem = items.find((i: any) => i.dataTest === "pipeline-destinations-tab");
       const regexItem = items.find((i: any) => i.dataTest === "regex-patterns-tab");
-      const syntheticsItem = items.find((i: any) => i.key === "synthetics_locations");
+
+      // Present but locked — not hidden — in OSS, so the feature stays discoverable.
+      expect(cipherItem?.visible).not.toBe(false);
+      expect(nodesItem?.visible).not.toBe(false);
+      expect(pipelineItem?.visible).not.toBe(false);
+      expect(regexItem?.visible).not.toBe(false);
+      expect(cipherItem?.locked).toBe(true);
+      expect(nodesItem?.locked).toBe(true);
+      expect(pipelineItem?.locked).toBe(true);
+      expect(regexItem?.locked).toBe(true);
+    });
+
+    // Cloud never offers this batch at all — not even locked — because a
+    // Cloud customer can't "upgrade" into self-hosted node/license/cipher-key
+    // management. Pure cloud (isEnterprise=false, isCloud=true) must hide it.
+    it("should hide (not lock) enterprise-only items in a pure cloud build", async () => {
+      const config = await import("@/aws-exports");
+      vi.mocked(config.default).isEnterprise = "false";
+      vi.mocked(config.default).isCloud = "true";
+
+      const wrapper = createWrapper();
+      const items = getAllItems(wrapper);
+      const cipherItem = items.find((i: any) => i.dataTest === "management-cipher-key-tab");
+      const nodesItem = items.find((i: any) => i.dataTest === "nodes-tab");
+      const pipelineItem = items.find((i: any) => i.dataTest === "pipeline-destinations-tab");
 
       expect(cipherItem?.visible).toBe(false);
       expect(nodesItem?.visible).toBe(false);
       expect(pipelineItem?.visible).toBe(false);
-      expect(regexItem?.visible).toBe(false);
-      expect(syntheticsItem?.visible).toBe(false);
+    });
+
+    // Synthetics ships in OSS: the locations hub card stays visible on an OSS
+    // build (meta org + the backend flag are the only gates).
+    it("should keep synthetics_locations visible when not enterprise", async () => {
+      const config = await import("@/aws-exports");
+      vi.mocked(config.default).isEnterprise = "false";
+
+      const wrapper = createWrapper();
+      const items = getAllItems(wrapper);
+      const syntheticsItem = items.find((i: any) => i.key === "synthetics_locations");
+
+      expect(syntheticsItem?.visible).toBe(true);
     });
 
     it("should mark cloud-only items as not visible when not cloud", async () => {
@@ -382,12 +447,6 @@ describe("SettingsIndex", () => {
       const wrapper = createWrapper();
       expect(wrapper.vm.settingsTab).toBe("general");
     });
-
-    it("should expose isHub computed property", () => {
-      const wrapper = createWrapper();
-      // On '/' route named 'settings', isHub is true
-      expect(typeof wrapper.vm.isHub).toBe("boolean");
-    });
   });
 
   describe("Edge cases", () => {
@@ -403,36 +462,134 @@ describe("SettingsIndex", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should redirect syntheticsLocations to general when meta-org guard applies", async () => {
-      // Set up meta_org guard condition: store has a meta_org configured,
-      // but isEnterprise is false so the notMeta guard triggers.
-      mockStore.state.zoConfig = {
-        meta_org: "some-meta-org",
-        service_streams_enabled: true,
-      };
-
-      const awsConfig = await import("@/aws-exports");
-      vi.mocked(awsConfig.default).isEnterprise = "false";
-
-      // Set the route name to syntheticsLocations so the guard branch activates.
+    // The guard is meta-org + the backend flag, NOT the build type: synthetics
+    // ships in OSS, and its public location registry is the only venue an OSS
+    // deployment has.
+    const onSyntheticsLocationsRoute = (run: () => void) => {
       const originalRoute = router.currentRoute.value;
       router.currentRoute.value = {
         ...router.currentRoute.value,
         name: "syntheticsLocations",
         path: "/synthetics-locations",
       } as any;
+      try {
+        run();
+      } finally {
+        // Restore the original route to avoid cross-test contamination
+        router.currentRoute.value = originalRoute;
+      }
+    };
 
-      createWrapper();
+    it("should redirect syntheticsLocations to general when synthetics is disabled", async () => {
+      mockStore.state.zoConfig = {
+        meta_org: "some-meta-org",
+        service_streams_enabled: true,
+        synthetics_enabled: false,
+      };
 
-      expect(mockRouterPush).toHaveBeenCalledWith(
-        expect.objectContaining({
-          path: "/settings/general",
-          query: { org_identifier: "test-org" },
-        }),
-      );
+      const awsConfig = await import("@/aws-exports");
+      vi.mocked(awsConfig.default).isEnterprise = "false";
 
-      // Restore the original route to avoid cross-test contamination
-      router.currentRoute.value = originalRoute;
+      onSyntheticsLocationsRoute(() => {
+        createWrapper();
+
+        expect(mockRouterPush).toHaveBeenCalledWith(
+          expect.objectContaining({
+            path: "/settings/general",
+            query: { org_identifier: "test-org" },
+          }),
+        );
+      });
+    });
+
+    const onQueryManagementRoute = (run: () => void) => {
+      const originalRoute = router.currentRoute.value;
+      router.currentRoute.value = {
+        ...router.currentRoute.value,
+        name: "query_management",
+        path: "/query_management",
+      } as any;
+      try {
+        run();
+      } finally {
+        router.currentRoute.value = originalRoute;
+      }
+    };
+
+    it("should redirect query_management to general after switching to a non-meta org", async () => {
+      mockStore.state.zoConfig = { meta_org: "_meta", service_streams_enabled: true };
+      mockIsMetaOrg.value = false;
+
+      const awsConfig = await import("@/aws-exports");
+      vi.mocked(awsConfig.default).isEnterprise = "true";
+
+      onQueryManagementRoute(() => {
+        createWrapper();
+
+        expect(mockRouterPush).toHaveBeenCalledWith(
+          expect.objectContaining({
+            path: "/settings/general",
+            query: { org_identifier: "test-org" },
+          }),
+        );
+      });
+    });
+
+    it("should NOT redirect query_management inside the meta org", async () => {
+      mockStore.state.zoConfig = { meta_org: "_meta", service_streams_enabled: true };
+      mockIsMetaOrg.value = true;
+
+      const awsConfig = await import("@/aws-exports");
+      vi.mocked(awsConfig.default).isEnterprise = "true";
+
+      onQueryManagementRoute(() => {
+        createWrapper();
+
+        expect(mockRouterPush).not.toHaveBeenCalledWith(
+          expect.objectContaining({ path: "/settings/general" }),
+        );
+      });
+    });
+
+    it.each(["announcementBanners", "announcementBannerEditor"])(
+      "should redirect %s to general outside the meta org",
+      async (name) => {
+        mockStore.state.zoConfig = { meta_org: "_meta", service_streams_enabled: true };
+        mockIsMetaOrg.value = false;
+
+        const awsConfig = await import("@/aws-exports");
+        vi.mocked(awsConfig.default).isEnterprise = "true";
+
+        const originalRoute = router.currentRoute.value;
+        router.currentRoute.value = { ...originalRoute, name } as any;
+        try {
+          createWrapper();
+          expect(mockRouterPush).toHaveBeenCalledWith(
+            expect.objectContaining({ path: "/settings/general" }),
+          );
+        } finally {
+          router.currentRoute.value = originalRoute;
+        }
+      },
+    );
+
+    it("should NOT redirect syntheticsLocations on an OSS build with synthetics on", async () => {
+      mockStore.state.zoConfig = {
+        meta_org: "some-meta-org",
+        service_streams_enabled: true,
+        synthetics_enabled: true,
+      };
+
+      const awsConfig = await import("@/aws-exports");
+      vi.mocked(awsConfig.default).isEnterprise = "false";
+
+      onSyntheticsLocationsRoute(() => {
+        createWrapper();
+
+        expect(mockRouterPush).not.toHaveBeenCalledWith(
+          expect.objectContaining({ path: "/settings/general" }),
+        );
+      });
     });
   });
 });

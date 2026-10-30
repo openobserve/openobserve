@@ -276,9 +276,21 @@ class UnflattenedPage {
             .locator('[data-test="logs-search-result-detail-dialog"] [data-test="log-detail-json-tab"]')
             .first();
         await jsonTab.waitFor({ state: 'visible', timeout: 10000 });
-        if ((await jsonTab.getAttribute('data-state')) !== 'active') {
-            await jsonTab.click();
+        // The JSON panel content can lag behind the tab activation on a slow
+        // (shared alpha) runner, so a single click + wait occasionally times
+        // out. Re-assert the tab and re-wait once before giving up.
+        for (let attempt = 0; attempt < 2; attempt++) {
+            if ((await jsonTab.getAttribute('data-state')) !== 'active') {
+                await jsonTab.click();
+            }
+            const rendered = await this.logDetailJsonContent
+                .waitFor({ state: 'visible', timeout: 10000 })
+                .then(() => true)
+                .catch(() => false);
+            if (rendered) return;
         }
+        // Last attempt with the original throwing behaviour so callers still see
+        // a clear failure if the panel genuinely never renders.
         await this.logDetailJsonContent.waitFor({ state: 'visible', timeout: 10000 });
     }
 

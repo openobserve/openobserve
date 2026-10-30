@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
       <div class="text-text-secondary mb-3 min-h-[3em] text-sm leading-normal">
-        {{ integration.description }}
+        {{ t(integration.descriptionKey) }}
       </div>
     </OCardSection>
 
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ template.name }}
             </span>
             <span class="text-muted-foreground mt-1 block text-xs">
-              {{ template.description }}
+              {{ t(template.descriptionKey) }}
             </span>
           </div>
           <OIcon name="chevron-right" size="sm" class="ms-auto shrink-0" />
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ option.name }}
             </span>
             <span class="text-muted-foreground mt-1 block text-xs">
-              {{ option.description }}
+              {{ t(option.descriptionKey) }}
             </span>
           </div>
           <OIcon name="chevron-right" size="sm" class="ms-auto shrink-0" />
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="aws-integration-tile-content-dialog"
       v-model:open="showComponentContent"
       size="xl"
-      :title="selectedComponentTitle"
+      :title="raw(selectedComponentTitle)"
     >
       <component
         :is="selectedComponent"
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, type PropType, ref, computed, shallowRef } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -165,8 +165,14 @@ import type {
 } from "@/utils/awsIntegrations";
 import { generateCloudFormationURL } from "@/utils/awsIntegrations";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import dashboardsService from "@/services/dashboards";
+import { createDashboardMutation } from "@/services/dashboards.queries";
+import { folderKeys } from "@/services/common.querykeys";
+import { dashboardKeys } from "@/services/dashboards.querykeys";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query";
+import { queryClient } from "@/composables/query/queryClient";
 import WindowsConfig from "./WindowsConfig.vue";
 import LinuxConfig from "./LinuxConfig.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -182,10 +188,12 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const { confirm } = useConfirmDialog();
     const router = useRouter();
+    const dashboardOrgId = useOrgId();
+    const createDashboard = useMutation(() => createDashboardMutation(dashboardOrgId.value));
     const showTemplateDialog = ref(false);
     const showComponentContent = ref(false);
     const selectedComponent = shallowRef<any>(null);
@@ -261,7 +269,7 @@ export default defineComponent({
       showComponentContent.value = true;
 
       // Track analytics
-      segment.track("AWS Component Config Opened", {
+      analytics.track("AWS Component Config Opened", {
         service: props.integration.name,
         platform: option.name,
         integration_id: props.integration.id,
@@ -280,7 +288,9 @@ export default defineComponent({
           console.error("Invalid endpoint:", endpoint);
           toast({
             variant: "error",
-            message: "Invalid ingestion endpoint. Please check configuration.",
+            message: t(
+              "toastMessages.recommended.invalidIngestionEndpointPleaseCheckConfiguration",
+            ),
           });
           return;
         }
@@ -299,7 +309,7 @@ export default defineComponent({
           });
           toast({
             variant: "error",
-            message: "Missing organization credentials. Please refresh the page.",
+            message: t("toastMessages.recommended.missingOrganizationCredentialsPleaseRefreshThe"),
           });
           return;
         }
@@ -324,7 +334,7 @@ export default defineComponent({
         if (!cloudFormationURL) {
           toast({
             variant: "warning",
-            message: "CloudFormation template not available yet",
+            message: t("toastMessages.recommended.cloudformationTemplateNotAvailableYet"),
           });
           return;
         }
@@ -333,7 +343,7 @@ export default defineComponent({
         window.open(cloudFormationURL, "_blank", "noopener,noreferrer");
 
         // Track analytics
-        segment.track("AWS Integration Started", {
+        analytics.track("AWS Integration Started", {
           service: props.integration.name,
           category: props.integration.category,
           integration_id: props.integration.id,
@@ -341,13 +351,17 @@ export default defineComponent({
 
         toast({
           variant: "info",
-          message: `Opening AWS Console to set up ${props.integration.displayName}`,
+          message: t("toastMessages.recommended.openingAwsConsoleToSetUp", {
+            name: props.integration.displayName,
+          }),
         });
       } catch (error) {
         console.error("Error generating CloudFormation URL:", error);
         toast({
           variant: "error",
-          message: `Error opening AWS Console: ${error instanceof Error ? error.message : "Unknown error"}`,
+          message: t("toastMessages.recommended.errorOpeningAwsConsole", {
+            error: error instanceof Error ? error.message : t("search.unknownError"),
+          }),
           timeout: 5000,
         });
       }
@@ -369,6 +383,8 @@ export default defineComponent({
             description: "AWS service dashboards",
           });
           awsFolder = createResponse.data;
+          // The dashboard mutation's scope does not cover folders, so the new folder would never reach the rail's cache.
+          await queryClient.invalidateQueries({ queryKey: folderKeys.all(orgId) });
         }
 
         return awsFolder.folderId;
@@ -388,18 +404,22 @@ export default defineComponent({
       if (existingDashboardId) {
         try {
           await dashboardsService.delete(orgId, existingDashboardId, folderId);
+          // Dropped here as well as by the create's mutation: if the create fails, the list must not keep the deleted row.
+          void queryClient.invalidateQueries({ queryKey: dashboardKeys.all(orgId) });
           // Wait a moment to ensure deletion completes
           await new Promise((resolve) => setTimeout(resolve, 500));
         } catch (deleteError) {
           console.error("Error deleting existing dashboard:", deleteError);
           throw new Error(
-            `Failed to delete existing dashboard: ${deleteError instanceof Error ? deleteError.message : "Unknown error"}`,
+            t("toastMessages.recommended.failedToDeleteExistingDashboard", {
+              error: deleteError instanceof Error ? deleteError.message : t("common.unknownError"),
+            }),
           );
         }
       }
 
-      // Import dashboard
-      await dashboardsService.create(orgId, dashboardJson, folderId);
+      await createDashboard.mutateAsync({ json: dashboardJson, folderId });
+      analytics.track("dashboard_created");
     };
 
     const handleAddDashboard = async () => {
@@ -416,7 +436,11 @@ export default defineComponent({
         // Step 2: Download dashboard JSON to get the actual title
         const response = await fetch(props.integration.dashboardGithubUrl);
         if (!response.ok) {
-          throw new Error(`Failed to fetch dashboard: ${response.statusText}`);
+          throw new Error(
+            t("toastMessages.recommended.failedToFetchDashboard", {
+              error: response.statusText,
+            }),
+          );
         }
         const dashboardJson = await response.json();
         const dashboardTitle = dashboardJson.title || props.integration.displayName;
@@ -446,16 +470,17 @@ export default defineComponent({
         if (existingDashboard) {
           // Ask user if they want to replace the existing dashboard
           const ok = await confirm({
-            title: "Dashboard Already Exists",
-            message: `A dashboard for ${props.integration.displayName} already exists. Do you wish to replace it?`,
-            confirmLabel: "Replace",
-            cancelLabel: "Cancel",
+            title: t("ingestion.awsSetup.dashboardExistsTitle"),
+            messageKeypath: "ingestion.awsSetup.dashboardExistsMessage",
+            messageName: props.integration.displayName,
+            confirmLabel: t("common.replace"),
+            confirmVariant: "destructive",
           });
           if (!ok) return;
 
           // User chose to replace
           const loadingNotif = toast({
-            message: "Replacing dashboard...",
+            message: t("toastMessages.recommended.replacingDashboard"),
             timeout: 0,
             variant: "loading",
           });
@@ -466,16 +491,18 @@ export default defineComponent({
             loadingNotif();
             toast({
               variant: "success",
-              message: `Dashboard for ${props.integration.displayName} replaced successfully!`,
+              message: t("toastMessages.recommended.dashboardForReplacedSuccessfully", {
+                name: props.integration.displayName,
+              }),
               timeout: 5000,
               action: {
-                label: "View Dashboard",
+                label: t("toastMessages.recommended.viewDashboard"),
                 handler: () => router.push(`/dashboards?org_identifier=${orgId}`),
               },
             });
 
             // Track analytics
-            segment.track("AWS Dashboard Replaced", {
+            analytics.track("AWS Dashboard Replaced", {
               service: props.integration.name,
               integration_id: props.integration.id,
             });
@@ -484,7 +511,9 @@ export default defineComponent({
             console.error("Error replacing dashboard:", error);
             toast({
               variant: "error",
-              message: `Failed to replace dashboard: ${error instanceof Error ? error.message : "Unknown error"}`,
+              message: t("toastMessages.recommended.failedToReplaceDashboard", {
+                error: error instanceof Error ? error.message : t("search.unknownError"),
+              }),
               timeout: 5000,
             });
           }
@@ -493,7 +522,7 @@ export default defineComponent({
 
         // No existing dashboard, proceed with import
         const loadingNotif = toast({
-          message: "Importing dashboard...",
+          message: t("toastMessages.recommended.importingDashboard"),
           timeout: 0,
           variant: "loading",
         });
@@ -503,16 +532,18 @@ export default defineComponent({
         loadingNotif();
         toast({
           variant: "success",
-          message: `Dashboard for ${props.integration.displayName} imported successfully!`,
+          message: t("toastMessages.recommended.dashboardForImportedSuccessfully", {
+            name: props.integration.displayName,
+          }),
           timeout: 5000,
           action: {
-            label: "View Dashboard",
+            label: t("toastMessages.recommended.viewDashboard"),
             handler: () => router.push(`/dashboards?org_identifier=${orgId}`),
           },
         });
 
         // Track analytics
-        segment.track("AWS Dashboard Imported", {
+        analytics.track("AWS Dashboard Imported", {
           service: props.integration.name,
           integration_id: props.integration.id,
         });
@@ -520,7 +551,9 @@ export default defineComponent({
         console.error("Error importing dashboard:", error);
         toast({
           variant: "error",
-          message: `Failed to import dashboard: ${error instanceof Error ? error.message : "Unknown error"}`,
+          message: t("toastMessages.recommended.failedToImportDashboard", {
+            error: error instanceof Error ? error.message : t("search.unknownError"),
+          }),
           timeout: 5000,
         });
       }
@@ -532,7 +565,7 @@ export default defineComponent({
       }
 
       // Track analytics
-      segment.track("AWS Documentation Opened", {
+      analytics.track("AWS Documentation Opened", {
         service: props.integration.name,
         integration_id: props.integration.id,
         documentation_url: props.integration.documentationUrl,
@@ -543,6 +576,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       t,
       store,
       handleAddSource,

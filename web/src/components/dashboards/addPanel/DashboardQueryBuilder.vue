@@ -21,20 +21,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       !promqlBuilderMode &&
       dashboardPanelData.data.type != 'geomap' &&
       dashboardPanelData.data.type != 'maps' &&
-      dashboardPanelData.data.type != 'sankey'
+      !isFlowChart(dashboardPanelData.data.type)
     "
   >
     <!-- x axis container -->
-    <div class="flex w-full flex-row pl-3" v-if="dashboardPanelData.data.type != 'metric'">
-      <div class="flex-1">
+    <div
+      class="flex w-full flex-row ps-3 max-md:flex-col"
+      v-if="dashboardPanelData.data.type != 'metric'"
+    >
+      <!-- A distribution buckets the y values, so it has no x field. -->
+      <div class="flex-1" v-if="dashboardPanelData.data.type != 'distribution'">
         <div class="flex flex-row">
           <div class="layout-name flex items-center whitespace-nowrap" :class="labelWidthClass">
             <span
-              class="rounded-default bg-badge-indigo-ol-text mr-1.5 h-2 w-2 shrink-0"
+              class="rounded-default bg-badge-indigo-ol-text me-1.5 h-2 w-2 shrink-0"
               aria-hidden="true"
             ></span>
             {{ currentXLabel }}
-            <OIcon name="info-outline" size="sm" class="ml-1" />
+            <OIcon name="info-outline" size="sm" class="ms-1" />
             <OTooltip :content="xAxisHint" />
           </div>
           <span class="layout-separator mx-0.5 flex items-center">:</span>
@@ -61,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-x-layout"
           >
             <div
-              class="my-0.5 mr-2 flex"
+              class="my-0.5 me-2 flex"
               v-for="(itemX, index) in dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields?.x"
@@ -78,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 &nbsp;
               </div>
               <OButtonGroup
-                class="axis-field border-border-default border-s-badge-indigo-ol-border bg-surface-panel overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
+                class="axis-field border-border-default border-s-badge-indigo-ol-border bg-surface-panel overflow-hidden border border-s-2 [&_button:focus-visible]:-outline-offset-2! [&>*:not(:first-child)]:!border-s"
                 radius="sm"
                 :divided="true"
                 :draggable="isDragArmed('x-' + index)"
@@ -87,6 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @dragenter="onDragEnter($event, 'x', index)"
               >
                 <OButton
+                  :aria-label="t('common.dragToReorder')"
                   variant="ghost"
                   size="icon-chip"
                   class="!w-4 !cursor-grab"
@@ -111,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <div
                     :data-test="`dashboard-x-item-${itemX?.alias}-menu`"
-                    class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0"
+                    class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0 max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto"
                     :style="{
                       width:
                         dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
@@ -137,6 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </ODropdown>
                 <OButton
+                  :aria-label="t('common.remove')"
                   variant="ghost"
                   size="icon-chip"
                   class="!w-4"
@@ -171,21 +177,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type == 'h-stacked' ||
           dashboardPanelData.data.type == 'scatter' ||
           dashboardPanelData.data.type == 'area-stacked' ||
-          dashboardPanelData.data.type == 'stacked'
+          dashboardPanelData.data.type == 'stacked' ||
+          dashboardPanelData.data.type == 'state-timeline' ||
+          dashboardPanelData.data.type == 'distribution' ||
+          dashboardPanelData.data.type == 'treemap' ||
+          dashboardPanelData.data.type == 'sunburst' ||
+          dashboardPanelData.data.type == 'hostmap'
         "
       >
-        <div class="flex h-full flex-row pl-3">
+        <div
+          class="max-md:border-border-default flex h-full flex-row ps-3 max-md:border-t max-md:ps-0"
+        >
           <!-- Separator between X and Breakdown/Pivot -->
-          <OSeparator vertical class="mr-4" />
-          <div class="layout-name flex min-w-0 items-center whitespace-nowrap">
+          <OSeparator
+            v-if="dashboardPanelData.data.type != 'distribution'"
+            vertical
+            class="me-4 max-md:hidden"
+          />
+          <!-- shrink-0, not min-w-0: the nowrap label would overflow onto the drop-zone hint if it shrank. -->
+          <div class="layout-name flex min-w-0 items-center whitespace-nowrap max-lg:shrink-0">
             <span
-              class="rounded-default bg-badge-orange-ol-text mr-1.5 h-2 w-2 shrink-0"
+              class="rounded-default bg-badge-orange-ol-text me-1.5 h-2 w-2 shrink-0"
               aria-hidden="true"
             ></span>
-            {{
-              dashboardPanelData.data.type == "table" ? t("panel.pivotField") : t("panel.breakdown")
-            }}
-            <OIcon name="info-outline" size="sm" class="ml-1" />
+            {{ currentBreakdownLabel }}
+            <OIcon name="info-outline" size="sm" class="ms-1" />
             <OTooltip side="top" align="center">
               <template #content>
                 <span v-if="dashboardPanelData.data.type == 'table'">{{
@@ -198,6 +214,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   >{{ t("panel.breakdownTooltipHBar") }}</span
                 >
+                <span v-else-if="dashboardPanelData.data.type == 'state-timeline'">{{
+                  t("panel.breakdownTooltipStateTimeline")
+                }}</span>
+                <span v-else-if="dashboardPanelData.data.type == 'distribution'">{{
+                  t("panel.breakdownTooltipDistribution")
+                }}</span>
+                <span v-else-if="dashboardPanelData.data.type == 'treemap'">{{
+                  t("panel.breakdownTooltipTreemap")
+                }}</span>
+                <span v-else-if="dashboardPanelData.data.type == 'sunburst'">{{
+                  t("panel.breakdownTooltipSunburst")
+                }}</span>
+                <span v-else-if="dashboardPanelData.data.type == 'hostmap'">{{
+                  t("panel.breakdownTooltipHostmap")
+                }}</span>
                 <span v-else>{{ t("panel.breakdownTooltipDefault") }}</span>
               </template>
             </OTooltip>
@@ -226,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-b-layout"
           >
             <div
-              class="my-0.5 mr-2 flex"
+              class="my-0.5 me-2 flex"
               v-for="(itemB, index) in dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields?.breakdown"
@@ -243,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 &nbsp;
               </div>
               <OButtonGroup
-                class="axis-field border-border-default border-s-badge-orange-ol-border bg-surface-panel overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
+                class="axis-field border-border-default border-s-badge-orange-ol-border bg-surface-panel overflow-hidden border border-s-2 [&_button:focus-visible]:-outline-offset-2! [&>*:not(:first-child)]:!border-s"
                 radius="sm"
                 :divided="true"
                 :draggable="isDragArmed('breakdown-' + index)"
@@ -252,6 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @dragenter="onDragEnter($event, 'breakdown', index)"
               >
                 <OButton
+                  :aria-label="t('common.dragToReorder')"
                   variant="ghost"
                   size="icon-chip"
                   class="!w-4 !cursor-grab"
@@ -276,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <div
                     :data-test="`dashboard-b-item-${itemB?.alias}-menu`"
-                    class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0"
+                    class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0 max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto"
                     :style="{
                       width:
                         dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
@@ -302,6 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </ODropdown>
                 <OButton
+                  :aria-label="t('common.remove')"
                   variant="ghost"
                   size="icon-chip"
                   class="!w-4"
@@ -327,14 +360,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <OSeparator v-if="dashboardPanelData.data.type != 'metric'" />
     <!-- y axis container -->
-    <div class="flex flex-row pl-3">
+    <div class="flex flex-row ps-3">
       <div class="layout-name flex items-center whitespace-nowrap" :class="labelWidthClass">
         <span
-          class="rounded-default bg-badge-success-ol-text mr-1.5 h-2 w-2 shrink-0"
+          class="rounded-default bg-badge-success-ol-text me-1.5 h-2 w-2 shrink-0"
           aria-hidden="true"
         ></span>
         {{ currentYLabel }}
-        <OIcon name="info-outline" size="sm" class="ml-1" />
+        <OIcon name="info-outline" size="sm" class="ms-1" />
         <OTooltip :content="yAxisHint" />
       </div>
       <span class="layout-separator mx-0.5 flex items-center">:</span>
@@ -361,7 +394,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-y-layout"
       >
         <div
-          class="my-0.5 mr-2 flex"
+          class="my-0.5 me-2 flex"
           v-for="(itemY, index) in dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].fields?.y"
@@ -378,7 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             &nbsp;
           </div>
           <OButtonGroup
-            class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
+            class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel overflow-hidden border border-s-2 [&_button:focus-visible]:-outline-offset-2! [&>*:not(:first-child)]:!border-s"
             radius="sm"
             :divided="true"
             :draggable="isDragArmed('y-' + index)"
@@ -387,6 +420,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @dragenter="onDragEnter($event, 'y', index)"
           >
             <OButton
+              :aria-label="t('common.dragToReorder')"
               variant="ghost"
               size="icon-chip"
               class="!w-4 cursor-grab"
@@ -411,7 +445,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <div
                 :data-test="`dashboard-y-item-${itemY?.alias}-menu`"
-                class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0"
+                class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0 max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto"
                 :style="{
                   width:
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
@@ -427,7 +461,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                       .fields.y[index]
                   "
-                  :allowAggregation="dashboardPanelData.data.type == 'heatmap' ? false : true"
+                  :allowAggregation="
+                    !['heatmap', 'distribution', 'boxplot'].includes(dashboardPanelData.data.type)
+                  "
                   :customQuery="
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                       .customQuery
@@ -437,6 +473,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </ODropdown>
             <OButton
+              :aria-label="t('common.remove')"
               variant="ghost"
               size="icon-chip"
               class="!w-4"
@@ -461,14 +498,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- z axis container -->
     <span v-if="dashboardPanelData.data.type === 'heatmap'">
       <OSeparator />
-      <div class="flex flex-row pl-3">
+      <div class="flex flex-row ps-3">
         <div class="layout-name flex items-center whitespace-nowrap" :class="labelWidthClass">
           <span
-            class="rounded-default bg-badge-success-ol-text mr-1.5 h-2 w-2 shrink-0"
+            class="rounded-default bg-badge-success-ol-text me-1.5 h-2 w-2 shrink-0"
             aria-hidden="true"
           ></span>
           {{ dashboardPanelData.data.type == "heatmap" ? t("panel.zAxis") : "" }}
-          <OIcon name="info-outline" size="sm" class="ml-1" />
+          <OIcon name="info-outline" size="sm" class="ms-1" />
           <OTooltip :content="zAxisHint" />
         </div>
         <span class="layout-separator mx-0.5 flex items-center">:</span>
@@ -495,7 +532,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-z-layout"
         >
           <div
-            class="my-0.5 mr-2 flex"
+            class="my-0.5 me-2 flex"
             v-for="(itemZ, index) in dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields?.z"
@@ -512,7 +549,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               &nbsp;
             </div>
             <OButtonGroup
-              class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
+              class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel overflow-hidden border border-s-2 [&_button:focus-visible]:-outline-offset-2! [&>*:not(:first-child)]:!border-s"
               radius="sm"
               :divided="true"
               :draggable="isDragArmed('z-' + index)"
@@ -521,6 +558,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @dragenter="onDragEnter($event, 'z', index)"
             >
               <OButton
+                :aria-label="t('common.dragToReorder')"
                 variant="ghost"
                 size="icon-chip"
                 class="!w-4 cursor-grab"
@@ -545,7 +583,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <div
                   :data-test="`dashboard-z-item-${itemZ?.alias}-menu`"
-                  class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0"
+                  class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0 max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto"
                   :style="{
                     width:
                       dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
@@ -571,6 +609,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </ODropdown>
               <OButton
+                :aria-label="t('common.remove')"
                 variant="ghost"
                 size="icon-chip"
                 class="!w-4"
@@ -623,6 +662,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <PromQLBuilderOptions :dashboardPanelData="dashboardPanelData" />
   </div>
+  <PromQLBuilderOptions
+    v-else-if="promqlMode && shouldShowPromQLQueryType(dashboardPanelData)"
+    :dashboardPanelData="dashboardPanelData"
+    query-type-only
+  />
 
   <DashboardGeoMapsQueryBuilder :dashboardData="dashboardData" />
   <DashboardMapsQueryBuilder :dashboardData="dashboardData" />
@@ -631,7 +675,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, reactive, watch, computed, inject, nextTick, onMounted } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import useDragHandle from "@/composables/useDragHandle";
 import { getImageURL } from "../../../utils/zincutils";
@@ -644,11 +688,13 @@ import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOpti
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
 import AxisFieldChipLabel from "@/components/dashboards/addPanel/AxisFieldChipLabel.vue";
 import { buildSQLQueryFromInput } from "@/utils/dashboard/dashboardAutoQueryBuilder";
+import { isFlowChart } from "@/utils/dashboard/chartTypeGroups";
 import { useStore } from "vuex";
-import { MAX_FIELD_LABEL_CHARS, FIELD_FUNCTION_MENU_WIDTH } from "@/utils/dashboard/constants";
+import { FIELD_FUNCTION_MENU_WIDTH } from "@/utils/dashboard/constants";
 import LabelFilterEditor from "@/components/promql/components/LabelFilterEditor.vue";
 import OperationsList from "@/components/promql/components/OperationsList.vue";
 import PromQLBuilderOptions from "@/components/promql/components/PromQLBuilderOptions.vue";
+import { shouldShowPromQLQueryType } from "@/utils/dashboard/configUtils";
 import { promqlRenderer } from "@/components/promql/operations/queryModeller";
 import {
   applyPromqlSeed,
@@ -666,6 +712,9 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import { HOSTMAP_MAX_GROUP_LEVELS } from "@/utils/dashboard/convertHostmapData";
+import { TREEMAP_MAX_LEVELS } from "@/utils/dashboard/convertTreemapData";
+import { SUNBURST_MAX_LEVELS } from "@/utils/dashboard/convertSunburstData";
 
 // Minimal shape of a dashboard panel query slot as read by the PromQL builder.
 interface DashboardQuerySlot {
@@ -701,7 +750,7 @@ export default defineComponent({
     const showXAxis = ref(true);
     const panelName = ref("");
     const panelDesc = ref("");
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { showErrorNotification } = useNotifications();
     const expansionItems = reactive({
       x: true,
@@ -732,14 +781,35 @@ export default defineComponent({
       isAddBreakdownNotAllowed,
       cleanupDraggingFields,
       isPivotMode,
-    } = useDashboardPanelData(dashboardPanelDataPageKey);
+    } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const { parsePromQlQuery } = usePromqlSuggestions();
 
     // Translated axis labels. The composable's currentXLabel/currentYLabel return
     // hardcoded English; recompute them here through t() so they respect the
     // active locale (mirrors the composable's type/pivot branching).
+    // Hierarchy, row and category charts name each well by its job, as the sankey builder does.
+    const roleLabels = computed((): { x: string; y: string; b: string | null } | null => {
+      switch (dashboardPanelData.data.type) {
+        case "treemap":
+        case "sunburst":
+          return { x: t("panel.wellGroup"), y: t("panel.wellSize"), b: t("panel.wellSubgroup") };
+        case "boxplot":
+          return { x: t("panel.wellCategory"), y: t("panel.value"), b: null };
+        default:
+          return null;
+      }
+    });
+
+    const currentBreakdownLabel = computed(() => {
+      if (dashboardPanelData.data.type == "table") return t("panel.pivotField");
+      if (dashboardPanelData.data.type == "hostmap") return t("panel.hostmapGroupBy");
+      return roleLabels.value?.b ?? t("panel.breakdown");
+    });
+
     const currentXLabel = computed(() => {
+      if (dashboardPanelData.data.type == "hostmap") return t("panel.hostmapEntity");
+      if (roleLabels.value) return roleLabels.value.x;
       if (dashboardPanelData.data.type == "table") {
         return isPivotMode.value ? t("panel.rowFields") : t("panel.firstColumn");
       }
@@ -749,6 +819,8 @@ export default defineComponent({
     });
 
     const currentYLabel = computed(() => {
+      if (dashboardPanelData.data.type == "hostmap") return t("panel.hostmapValue");
+      if (roleLabels.value) return roleLabels.value.y;
       if (dashboardPanelData.data.type == "table") {
         return isPivotMode.value ? t("panel.valueFields") : t("panel.otherColumn");
       }
@@ -850,19 +922,19 @@ export default defineComponent({
       { label: t("dashboard.min"), value: "min" },
       { label: t("dashboard.max"), value: "max" },
       {
-        label: t("dashboard.p50"),
+        label: raw("P50"),
         value: "p50",
       },
       {
-        label: t("dashboard.p90"),
+        label: raw("P90"),
         value: "p90",
       },
       {
-        label: t("dashboard.p95"),
+        label: raw("P95"),
         value: "p95",
       },
       {
-        label: t("dashboard.p99"),
+        label: raw("P99"),
         value: "p99",
       },
     ];
@@ -977,6 +1049,9 @@ export default defineComponent({
                   break;
                 case "metric":
                   maxAllowedAxisFields = targetAxis === "x" ? 0 : 1;
+                  break;
+                case "hostmap":
+                  maxAllowedAxisFields = targetAxis === "breakdown" ? HOSTMAP_MAX_GROUP_LEVELS : 1;
                   break;
                 case "table":
                   maxAllowedAxisFields = 0;
@@ -1115,8 +1190,14 @@ export default defineComponent({
       switch (dashboardPanelData.data.type) {
         case "pie":
         case "donut":
+        case "funnel":
           return t("dashboard.oneLabelFieldMessage");
+        case "treemap":
+          return t("dashboard.treemapLevelsHint", { count: TREEMAP_MAX_LEVELS });
+        case "sunburst":
+          return t("panel.sunburstLevelsHint", { count: SUNBURST_MAX_LEVELS });
         case "metric":
+        case "distribution":
           return t("dashboard.xaxisFieldNAMessage");
         case "table":
           return t("dashboard.oneOrMoreFieldsMessage");
@@ -1130,8 +1211,12 @@ export default defineComponent({
         case "scatter":
           return t("dashboard.twoFieldsMessage");
         case "heatmap":
+        case "state-timeline":
+        case "hostmap":
           return t("dashboard.oneFieldMessage");
         case "gauge":
+        case "bar-gauge":
+        case "boxplot":
           return t("dashboard.dashboardQueryBuilder.addZeroOrOneLabelField");
         default:
           return t("dashboard.maxtwofieldMessage");
@@ -1144,6 +1229,8 @@ export default defineComponent({
         case "area-stacked":
         case "h-stacked":
           return t("dashboard.twoFieldsMessage");
+        case "hostmap":
+          return t("dashboard.hostmapGroupByHint");
         default:
           return t("dashboard.zeroOrOneFieldMessage");
       }
@@ -1154,10 +1241,17 @@ export default defineComponent({
         case "pie":
         case "donut":
         case "gauge":
+        case "bar-gauge":
+        case "treemap":
+        case "sunburst":
+        case "funnel":
           return t("dashboard.oneValueFieldMessage");
         case "metric":
           return t("dashboard.oneValueFieldMessage");
         case "heatmap":
+        case "state-timeline":
+        case "boxplot":
+        case "hostmap":
           return t("dashboard.oneFieldMessage");
         default:
           return t("dashboard.oneOrMoreFieldsMessage");
@@ -1185,9 +1279,7 @@ export default defineComponent({
               ?.stream
           : "",
       );
-      return label?.length > MAX_FIELD_LABEL_CHARS
-        ? label.substring(0, MAX_FIELD_LABEL_CHARS) + "..."
-        : label;
+      return label;
     };
 
     const xLabel = computed(() => {
@@ -1227,6 +1319,9 @@ export default defineComponent({
       labels: [],
       operations: [],
     });
+
+    // Per query, the builder state as loaded from the panel; that query's text is the user's until it changes.
+    const loadedStates = new WeakMap<object, string>();
 
     /**
      * Reads a panel's saved operations, upgrading any step ids it was stored
@@ -1346,6 +1441,7 @@ export default defineComponent({
           // panel was saved under.
           promqlBuilderQuery.labels = currentQuery?.fields?.promql_labels || [];
           promqlBuilderQuery.operations = loadSavedSteps(currentQuery);
+          if (currentQuery) loadedStates.set(currentQuery, JSON.stringify(promqlBuilderQuery));
         }
       },
       { immediate: true },
@@ -1405,6 +1501,7 @@ export default defineComponent({
           // Load saved builder state, migrating any legacy step ids (see above).
           promqlBuilderQuery.labels = currentQuery?.fields?.promql_labels || [];
           promqlBuilderQuery.operations = loadSavedSteps(currentQuery);
+          if (currentQuery) loadedStates.set(currentQuery, JSON.stringify(promqlBuilderQuery));
         }
       },
     );
@@ -1419,6 +1516,8 @@ export default defineComponent({
 
         const currentQuery =
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
+        if (loadedStates.get(currentQuery) === JSON.stringify(promqlBuilderQuery)) return;
+        loadedStates.delete(currentQuery);
 
         // Save labels and operations to schema
         currentQuery.fields.promql_labels = promqlBuilderQuery.labels;
@@ -1501,7 +1600,9 @@ export default defineComponent({
     );
 
     return {
+      shouldShowPromQLQueryType,
       showXAxis,
+      isFlowChart,
       t,
       FIELD_FUNCTION_MENU_WIDTH,
       panelName,
@@ -1541,6 +1642,7 @@ export default defineComponent({
       isDragArmed,
       currentXLabel,
       currentYLabel,
+      currentBreakdownLabel,
       labelWidthClass,
       isPivotMode,
       reorderItems,

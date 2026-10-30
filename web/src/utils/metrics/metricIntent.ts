@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { I18nKey } from "@/types/i18n";
+
 import type { StreamInfo } from "@/services/service_streams";
 import { NETWORK_PATTERNS } from "@/utils/metrics/metricGrouping";
 import { resolveSetId } from "@/composables/useMetricSubjectButtons";
@@ -33,17 +35,17 @@ export type IntentId = "essentials" | "compute" | "memory" | "storage" | "networ
 
 export interface IntentDefinition {
   id: IntentId;
-  label: string;
+  labelKey: I18nKey;
   icon?: string;
 }
 
 export const INTENT_DEFINITIONS: IntentDefinition[] = [
-  { id: "essentials", label: "Essentials", icon: "star" },
-  { id: "compute", label: "Compute", icon: "memory" },
-  { id: "memory", label: "Memory", icon: "dns" },
-  { id: "storage", label: "Storage", icon: "storage" },
-  { id: "network", label: "Network", icon: "wifi" },
-  { id: "all", label: "All", icon: "apps" },
+  { id: "essentials", labelKey: "metrics.groups.essentials", icon: "star" },
+  { id: "compute", labelKey: "metrics.groups.compute", icon: "memory" },
+  { id: "memory", labelKey: "metrics.groups.memory", icon: "dns" },
+  { id: "storage", labelKey: "metrics.groups.storage", icon: "storage" },
+  { id: "network", labelKey: "metrics.groups.network", icon: "wifi" },
+  { id: "all", labelKey: "metrics.groups.all", icon: "apps" },
 ];
 
 /**

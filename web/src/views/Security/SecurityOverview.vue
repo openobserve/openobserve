@@ -5,7 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
      open cases, and whether security sources are still reporting. -->
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -55,7 +55,7 @@ import { useSecuritySources } from "@/composables/security/useSecuritySources";
 import { formatEventCount } from "@/utils/formatters";
 import config from "@/aws-exports";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
@@ -645,7 +645,7 @@ function nav(path: string, query: Record<string, string> = {}) {
       <SecurityNotices :notices="notices" data-test="security-overview-notices" />
 
       <OStatStrip
-        compact
+        compact-values
         :items="stats"
         :loading="!summaryLanded"
         selectable

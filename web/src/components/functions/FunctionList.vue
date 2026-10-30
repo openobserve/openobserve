@@ -31,25 +31,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #actions>
         <OButton
+          variant="outline"
+          size="sm"
+          icon-left="upload-file"
+          data-test="function-list-import-function-btn"
+          @click="goToImportFunction"
+        >
+          {{ t("dashboard.import") }}
+        </OButton>
+        <OButton
           variant="primary"
           size="sm"
           data-test="function-list-add-function-btn"
+          :aria-label="
+            functionDrafts.hasNew
+              ? t('common.editorDraft.newDot', { label: t('function.add') })
+              : undefined
+          "
           @click="showAddUpdateFn({})"
         >
           {{ t(`function.add`) }}
+          <EditorDraftDot
+            v-if="functionDrafts.hasNew"
+            :saved-at="functionDrafts.savedAt(null)"
+            corner
+            data-test="function-list-add-function-draft-dot"
+          />
         </OButton>
       </template>
       <div class="min-h-0 w-full flex-1 overflow-hidden">
         <div class="h-full">
           <OTable
+            ref="oTableRef"
             :frame="false"
             :data="visibleRows"
             :columns="columns"
             row-key="name"
             :loading="loading"
+            :forbidden="forbidden"
             pagination="client"
+            :current-page="currentPage"
+            @update:current-page="onPageChange"
             :page-size="pageSize"
             :page-size-options="pageSizeOptions"
+            @update:page-size="pageSize = $event"
+            :sort-by="sortBy"
+            :sort-order="sortOrder"
+            @update:sort-by="sortBy = $event"
+            @update:sort-order="sortOrder = $event"
             selection="multiple"
             v-model:selected-ids="selectedFunctionIds"
             show-index
@@ -59,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="h-full w-full"
           >
             <template #toolbar>
-              <div class="flex w-full items-center gap-2">
+              <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
                 <OSearchInput
                   data-test="functions-list-search-input"
                   v-model="filterQuery"
@@ -69,20 +98,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template #toolbar-trailing>
-              <OButton
+              <ORefreshButton
+                layout="inline"
                 variant="outline"
-                size="icon-sm"
-                icon-left="refresh"
-                :loading="loading"
+                :last-run-at="lastUpdatedAt"
+                :loading="fetching"
+                shortcut-id="functionsRefresh"
                 data-test="functions-list-refresh-btn"
-                @click="getJSTransforms"
-              >
-                <OTooltip
-                  side="bottom"
-                  :content="t('common.refresh')"
-                  shortcut-id="functionsRefresh"
-                />
-              </OButton>
+                @click="refreshJSTransforms"
+              />
             </template>
             <template #empty>
               <OEmptyState
@@ -96,11 +120,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-name="{ row, value }">
-              <span
-                class="text-text-body"
-                :data-test="`function-list-name-cell-${row?.name ?? value}`"
-                >{{ value }}</span
-              >
+              <span class="inline-flex items-center gap-2">
+                <span
+                  class="text-text-body"
+                  :data-test="`function-list-name-cell-${row?.name ?? value}`"
+                  >{{ value }}</span
+                >
+                <EditorDraftDot
+                  v-if="functionDrafts.ids.has(row?.name)"
+                  :saved-at="functionDrafts.savedAt(row?.name)"
+                  :data-test="`function-list-${row?.name}-draft-dot`"
+                />
+              </span>
             </template>
 
             <!-- Language of the transform. Its own column (sortable + hideable)
@@ -111,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :variant="row?.transType === '1' ? 'amber-soft' : 'blue-soft'"
                 :data-test="`function-list-type-badge-${row?.transType === '1' ? 'js' : 'vrl'}`"
               >
-                {{ row?.transType === "1" ? t("function.javascript") : t("function.vrl") }}
+                {{ row?.transType === "1" ? raw("JavaScript") : t("function.vrl") }}
               </OBadge>
             </template>
 
@@ -123,8 +154,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('function.updateTitle')"
                   data-test="function-list-edit-function-btn"
                   data-row-action="edit"
+                  class="max-md:hidden"
                   @click="showAddUpdateFn({ row })"
                   icon-left="edit"
+                />
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="account-tree"
+                  :title="t('function.associatedPipelines')"
+                  data-row-action="view"
+                  class="max-md:hidden"
+                  @click="getAssociatedPipelines({ row })"
+                />
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="download"
+                  :title="t('common.export')"
+                  data-test="function-list-export-function-btn"
+                  data-row-action="export"
+                  class="max-md:hidden"
+                  @click="exportFunction(row)"
                 />
                 <OButton
                   variant="ghost-destructive"
@@ -132,37 +183,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('function.delete')"
                   data-test="function-list-delete-function-btn"
                   data-row-action="delete"
+                  class="max-md:hidden"
                   @click="showDeleteDialogFn({ row })"
                   icon-left="delete"
                 />
-                <OButton
-                  variant="ghost"
-                  size="icon-sm"
-                  icon-left="account-tree"
-                  :title="'Associated Pipelines'"
-                  data-row-action="view"
-                  @click="getAssociatedPipelines({ row })"
-                />
+                <ODropdown side="bottom" align="end">
+                  <template #trigger>
+                    <OButton
+                      :aria-label="t('common.moreActions')"
+                      icon-left="more-vert"
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      class="md:hidden"
+                      data-test="function-list-row-more-actions"
+                      @click.stop
+                    />
+                  </template>
+                  <ODropdownItem
+                    icon-left="edit"
+                    class="md:hidden"
+                    data-test="function-list-edit-function-btn-menu"
+                    @select="showAddUpdateFn({ row })"
+                  >
+                    <span>{{ t("function.updateTitle") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="account-tree"
+                    class="md:hidden"
+                    data-test="function-list-associated-pipelines-menu"
+                    @select="getAssociatedPipelines({ row })"
+                  >
+                    <span>{{ t("function.associatedPipelines") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="download"
+                    class="md:hidden"
+                    data-test="function-list-export-function-btn-menu"
+                    @select="exportFunction(row)"
+                  >
+                    <span>{{ t("common.export") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="delete"
+                    variant="destructive"
+                    class="md:hidden"
+                    data-test="function-list-delete-function-btn-menu"
+                    @select="showDeleteDialogFn({ row })"
+                  >
+                    <span>{{ t("function.delete") }}</span>
+                  </ODropdownItem>
+                </ODropdown>
               </div>
             </template>
 
-            <template #bottom>
-              <div class="flex w-full items-center justify-between py-2">
-                <div class="mr-4 flex items-center text-xs font-normal">
-                  {{ resultTotal }} {{ t("function.header") }}
-                </div>
-                <OButton
-                  v-if="selectedFunctions.length > 0"
-                  data-test="function-list-delete-functions-btn"
-                  variant="outline-destructive"
-                  size="sm"
-                  :loading="bulkDeleteLoading"
-                  @click="openBulkDeleteDialog"
-                  icon-left="delete"
-                >
-                  Delete
-                </OButton>
-              </div>
+            <template #selection-actions>
+              <OButton
+                data-test="function-list-export-functions-btn"
+                variant="outline"
+                size="sm"
+                :loading="exportLoading"
+                @click="exportSelectedFunctions"
+                icon-left="download"
+              >
+                {{ t("common.export") }}
+              </OButton>
+              <OButton
+                data-test="function-list-delete-functions-btn"
+                variant="outline-destructive"
+                size="sm"
+                :loading="bulkDeleteLoading"
+                @click="openBulkDeleteDialog"
+                icon-left="delete"
+              >
+                {{ t("common.delete") }}
+              </OButton>
             </template>
           </OTable>
         </div>
@@ -179,16 +273,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <ConfirmDialog
-      title="Delete Transform"
-      message="Are you sure you want to delete transform?"
+      :title="t('function.deleteTransformDialogTitle')"
+      message-keypath="function.deleteTransformConfirmMessage"
+      :message-name="selectedDelete?.name"
+      ok-variant="destructive"
       @update:ok="deleteFn"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
 
     <ConfirmDialog
-      title="Delete Functions"
-      :message="`Are you sure you want to delete ${selectedFunctions.length} function(s)?`"
+      :title="t('function.deleteFunctionsDialogTitle')"
+      :message="t('functions.confirmDeleteFunctions', { count: selectedFunctions.length })"
+      ok-variant="destructive"
       @update:ok="bulkDeleteFunctions"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -199,7 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="confirmForceDelete"
       persistent
       size="md"
-      :title="`Pipelines Associated with ${selectedDelete?.name}`"
+      :title="t('common.pipelinesAssociatedWith', { name: selectedDelete?.name })"
     >
       <div v-if="transformedPipelineList.length > 0" class="max-h-50 overflow-y-auto">
         <ul class="scrollable-list m-0 flex list-none flex-col p-0">
@@ -216,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-else>
         <div class="text-center text-xl font-semibold">
-          No pipelines associated with this function
+          {{ t("function.noPipelinesAssociated") }}
         </div>
       </div>
     </ODialog>
@@ -227,27 +324,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineAsyncComponent, defineComponent, ref, computed, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useListViewState } from "@/composables/useListViewState";
+import { useI18nTyped, raw } from "@/types/i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import jsTransformService from "../../services/jstransform";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
-import segment from "../../services/segment_analytics";
+import analytics from "../../services/product_analytics";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import { useReo } from "@/services/reodotdev_analytics";
 import searchState from "@/composables/useLogs/searchState";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
+import { downloadFile } from "@/utils/dom";
+import { useMutation, useQuery } from "@tanstack/vue-query";
+import {
+  bulkDeleteFunctionsMutation,
+  deleteFunctionMutation,
+  functionsQuery,
+} from "@/services/jstransform.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 
 export default defineComponent({
   name: "functionList",
@@ -261,8 +372,11 @@ export default defineComponent({
     OButton,
     OBadge,
     ODialog,
+    ODropdown,
+    ODropdownItem,
     OSearchInput,
-    OTooltip,
+    ORefreshButton,
+    EditorDraftDot,
   },
   emits: [
     "updated:fields",
@@ -272,9 +386,8 @@ export default defineComponent({
   ],
   setup(props, { emit }) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
-    const jsTransforms: any = ref([]);
     const formData: any = ref({});
     const showAddJSTransformDialog: any = ref(false);
     const selectedDelete: any = ref(null);
@@ -286,8 +399,20 @@ export default defineComponent({
     const { searchObj } = searchState();
     const pipelineList = ref([]);
     const selectedPipeline = ref("");
-    const filterQuery = ref("");
+    const viewState = useListViewState("functions", {
+      filterQuery: "",
+      pageSize: 20,
+      currentPage: 1,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+    });
+    const filterQuery = ref(viewState.filterQuery);
     const { track } = useReo();
+    const functionDrafts = useEditorDraftIds("function");
+    const dropFunctionDrafts = (names: string[]) => {
+      const org = store.state.selectedOrganization.identifier;
+      names.forEach((name) => deleteEditorDraftsFor({ kind: "function", org, entityId: name }));
+    };
     const columns: OTableColumnDef[] = [
       {
         id: "name",
@@ -308,8 +433,7 @@ export default defineComponent({
         id: "actions",
         header: t("function.actions"),
         isAction: true,
-        size: 150,
-        meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
+        meta: { align: "center", cellClass: "actions-column", actionCount: 4 },
       },
     ];
 
@@ -326,69 +450,119 @@ export default defineComponent({
       window.open(routeUrl, "_blank");
     };
 
-    const loading = ref(false);
-    const getJSTransforms = () => {
-      loading.value = true;
-      // return ;
-      const dismiss = toast({
-        variant: "loading",
-        message: "Please wait while loading functions...",
-        timeout: 0,
-      });
+    const orgId = useOrgId();
 
-      jsTransformService
-        .list(1, 100000, "name", false, "", store.state.selectedOrganization.identifier)
-        .then((res) => {
-          resultTotal.value = res.data.list.length;
-          if (router.currentRoute.value.query.action == "add") {
-            showAddUpdateFn({ row: undefined });
-          }
-          jsTransforms.value = res.data.list.map((data: any) => {
-            if (router.currentRoute.value.query.action == "update") {
-              if (router.currentRoute.value.query.name == data.name) {
-                showAddUpdateFn({ row: data });
-              }
-            }
-
-            return {
-              name: data.name,
-              function: data.function,
-              params: data.params,
-              // order: data.order ? data.order : 1,
-              // stream_name: data.stream_name ? data.stream_name : "--",
-              // stream_type: data.stream_type ? data.stream_type : "--",
-              transType: data.transType.toString(),
-              // ingest: data.stream_name ? true : false,
-              actions: "",
-            };
-          });
-
-          searchObj.data.transforms = jsTransforms.value;
-
-          dismiss();
-        })
-        .catch((err) => {
-          console.error("Error while pulling function", err);
-
-          dismiss();
-          if (err?.response?.status && err?.response?.status != 403) {
-            toast({
-              variant: "error",
-              message: "Error while pulling function.",
-            });
-          }
-        })
-        .finally(() => {
-          loading.value = false;
-        });
+    // View-state seeded because the import route destroys the whole list, not just the OTable branch.
+    const currentPage = ref(viewState.currentPage);
+    const onPageChange = (page: number) => {
+      currentPage.value = page;
+    };
+    const oTableRef: any = ref(null);
+    // setTimeout(0) is a macrotask, so it runs after TanStack's own deferred auto-reset-on-data-change (its own microtask queue), letting the restored page win.
+    const restorePageIndex = () => {
+      setTimeout(() => {
+        oTableRef.value?.restorePage?.(currentPage.value);
+      }, 0);
     };
 
-    if (jsTransforms.value == "" || jsTransforms.value == undefined) {
-      getJSTransforms();
-    }
+    // The list is the query, not a copy of it. Anything that invalidates
+    // ["org", id, "functions"] — this page's writes, the two in the Logs search
+    // bar, the function form — repaints these rows with no wiring here.
+    // `Object.assign` rather than a spread: `queryOptions()` brands its key with
+    // the result type, and spreading into a fresh literal drops the brand (data
+    // degrades to `unknown`). Assigning onto the returned object keeps it.
+    const functions = useQuery(() =>
+      Object.assign(functionsQuery(orgId.value), { enabled: !!orgId.value }),
+    );
 
-    const resultTotal = ref<number>(0);
-    const pageSize = ref(20);
+    // TanStack's own distinction, bound straight to the two UI affordances:
+    // `isPending` is the cold read (OTable swaps in its skeleton), `isFetching`
+    // is any request in flight, including one with rows already on screen.
+    const loading = functions.isPending;
+    // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+    const forbidden = computed(() => {
+      const e: any = functions.error.value;
+      return e?.status === 403 || e?.response?.status === 403;
+    });
+    const fetching = functions.isFetching;
+    // Epoch ms of the last successful read — drives the button's "1m ago" label.
+    const lastUpdatedAt = functions.dataUpdatedAt;
+    // main restored the page inside the old chain's `.finally`; the query has no
+    // such hook, so the same restore rides the cold read settling instead.
+    watch(
+      loading,
+      (isLoading) => {
+        if (isLoading) return;
+        restorePageIndex();
+      },
+      { once: true },
+    );
+
+    const jsTransforms = computed(() =>
+      (functions.data.value ?? []).map((data: any) => ({
+        name: data.name,
+        function: data.function,
+        params: data.params,
+        transType: data.transType.toString(),
+        actions: "",
+      })),
+    );
+
+    // Was a manual `.catch` on every read. The query owns its own error now, so
+    // this fires once per failure however the read was triggered.
+    watch(functions.error, (err: any) => {
+      if (!err) return;
+      console.error("Error while pulling function", err);
+      if (err?.response?.status && err?.response?.status != 403) {
+        toast({
+          variant: "error",
+          message: t("toastMessages.functions.errorWhilePullingFunction"),
+        });
+      }
+    });
+
+    // Bridge for consumers still reading `searchObj.data.transforms`.
+    watch(jsTransforms, (rows) => (searchObj.data.transforms = rows), { immediate: true });
+
+    // The ?action= deep links open a dialog off the first non-empty result, so
+    // they are latched: a cached paint followed by a fresh one must not open it
+    // twice. Was folded into the row mapping, which ran on every paint.
+    let deepLinkOpened = false;
+    watch(
+      functions.data,
+      (list) => {
+        if (!list || deepLinkOpened) return;
+        const { action, name } = router.currentRoute.value.query;
+        if (action == "add") {
+          deepLinkOpened = true;
+          showAddUpdateFn({ row: undefined });
+        } else if (action == "update") {
+          const row = list.find((data: any) => data.name == name);
+          if (row) {
+            deepLinkOpened = true;
+            showAddUpdateFn({ row });
+          }
+        }
+      },
+      { immediate: true },
+    );
+
+    // Bound to the refresh button: always reaches the server.
+    const refreshJSTransforms = () => functions.refetch();
+
+    const pageSize = ref(viewState.pageSize);
+    const sortBy = ref(viewState.sortBy);
+    const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
+    watch(filterQuery, () => (currentPage.value = 1));
+    watch([filterQuery, pageSize, currentPage, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        filterQuery: filterQuery.value,
+        pageSize: pageSize.value,
+        currentPage: currentPage.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
+    });
     const pageSizeOptions = [20, 50, 100, 250, 500];
 
     const selectedFunctionIds = ref<string[]>([]);
@@ -448,10 +622,9 @@ export default defineComponent({
       }
       addTransform();
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: action,
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         page: "Functions",
       });
     };
@@ -464,7 +637,8 @@ export default defineComponent({
         },
       });
       showAddJSTransformDialog.value = false;
-      getJSTransforms();
+      // No reload call: the save mutation invalidated the scope, so the mounted
+      // query has already refetched.
     };
 
     const hideForm = () => {
@@ -477,16 +651,19 @@ export default defineComponent({
       });
     };
 
+    const deleteFunction = useMutation(() => deleteFunctionMutation(orgId.value));
+
     const deleteFn = () => {
-      jsTransformService
-        .delete(store.state.selectedOrganization.identifier, selectedDelete.value.name)
+      const name = selectedDelete.value.name;
+      deleteFunction
+        .mutateAsync(name)
         .then((res: any) => {
           if (res.data.code == 200) {
+            dropFunctionDrafts([name]);
             toast({
               variant: "success",
               message: res.data.message,
             });
-            getJSTransforms();
           } else {
             toast({
               variant: "error",
@@ -498,11 +675,10 @@ export default defineComponent({
           if (err.response.data.code == 409) {
             toast({
               variant: "error",
-              message:
-                "Function deletion failed as it is associated with pipelines. Click on view button to get associated pipelines.",
+              message: t("toastMessages.functions.functionDeletionAssociatedPipelines"),
               timeout: 10000,
               action: {
-                label: "View",
+                label: t("toastMessages.functions.view"),
                 handler: () => {
                   forceRemoveFunction(err.response.data["message"]);
                 },
@@ -513,15 +689,16 @@ export default defineComponent({
           if (err.response.status != 403) {
             toast({
               variant: "error",
-              message: JSON.stringify(err.response.data["message"]) || "Function deletion failed.",
+              message:
+                raw(JSON.stringify(err.response.data["message"])) ||
+                t("functions.functionDeletionFailed"),
             });
           }
         });
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Delete Function",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         function_name: selectedDelete.value.name,
         is_ingest_func: selectedDelete.value.ingest,
         page: "Functions",
@@ -583,24 +760,109 @@ export default defineComponent({
     });
     const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 
-    // Watch visibleRows to sync resultTotal with search filter
-    watch(
-      visibleRows,
-      (newVisibleRows) => {
-        resultTotal.value = newVisibleRows.length;
-      },
-      { immediate: true },
-    );
-
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
     };
+
+    // No dialog: the provider has no function resource, so a preview would pick between one format.
+
+    // `streams` names streams the target org lacks; `numArgs` the server derives from `params`.
+    const exportPayload = (name: string) => {
+      const fn: any = (functions.data.value ?? []).find((item: any) => item.name === name);
+      if (!fn) return null;
+      return {
+        name: fn.name,
+        function: fn.function,
+        params: fn.params,
+        transType: fn.transType,
+      };
+    };
+
+    const exportLoading = ref(false);
+
+    // The row came from this list, so a miss means the cache moved on: re-read once before giving up.
+    const collectForExport = async (names: string[]) => {
+      let payloads = names.map(exportPayload);
+      if (payloads.some((payload) => !payload)) {
+        await functions.refetch();
+        payloads = names.map(exportPayload);
+      }
+      return {
+        payloads: payloads.filter(Boolean) as Record<string, unknown>[],
+        missing: names.filter((_, i) => !payloads[i]),
+      };
+    };
+
+    // One function keeps its name; a bundle is dated, as the other lists name theirs.
+    const exportFileName = (payloads: Record<string, unknown>[]) => {
+      if (payloads.length !== 1) {
+        return `functions-${new Date().toISOString().slice(0, 10)}.json`;
+      }
+      const name = String(payloads[0]?.name ?? "").replace(/[^A-Za-z0-9._-]+/g, "-");
+      return `${name || "function"}.json`;
+    };
+
+    const runExport = async (names: string[]) => {
+      if (exportLoading.value) return;
+      exportLoading.value = true;
+      try {
+        const { payloads, missing } = await collectForExport(names);
+        if (!payloads.length) throw new Error("no exportable function");
+        // A selection outlives its rows, and the file would be short by names nobody mentioned.
+        if (missing.length) {
+          toast({
+            variant: "info",
+            message: t(
+              "toastMessages.functions.functionsMissingFromExport",
+              { names: raw(missing.join(", ")) },
+              missing.length,
+            ),
+          });
+        }
+        // Object for one, array for several: both import, and the object form is hand-editable.
+        const written = downloadFile(
+          exportFileName(payloads),
+          JSON.stringify(payloads.length === 1 ? payloads[0] : payloads, null, 2),
+          "application/json",
+        );
+        if (!written) throw new Error("download refused");
+        toast({
+          variant: "success",
+          message: t(
+            "toastMessages.functions.successfullyExportedFunctions",
+            { count: payloads.length },
+            payloads.length,
+          ),
+        });
+        selectedFunctionIds.value = [];
+      } catch (error) {
+        toast({
+          variant: "error",
+          message: t("toastMessages.functions.errorExportingFunctions"),
+        });
+      } finally {
+        exportLoading.value = false;
+      }
+    };
+
+    const exportFunction = (row: any) => runExport([row.name]);
+
+    const exportSelectedFunctions = () => runExport([...selectedFunctionIds.value]);
+
+    const goToImportFunction = () => {
+      router.push({
+        name: "importFunction",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
+    };
+
+    const bulkDelete = useMutation(() => bulkDeleteFunctionsMutation(orgId.value));
 
     const bulkDeleteFunctions = async () => {
       bulkDeleteLoading.value = true;
       const dismiss = toast({
         variant: "loading",
-        message: "Deleting functions...",
+        message: t("toastMessages.functions.deletingFunctions"),
         timeout: 0,
       });
 
@@ -608,7 +870,7 @@ export default defineComponent({
         if (selectedFunctions.value.length === 0) {
           toast({
             variant: "error",
-            message: "No functions selected for deletion",
+            message: t("toastMessages.functions.noFunctionsSelectedForDeletion"),
           });
           dismiss();
           return;
@@ -619,16 +881,14 @@ export default defineComponent({
           ids: selectedFunctions.value.map((f: any) => f.name),
         };
 
-        const response = await jsTransformService.bulkDelete(
-          store.state.selectedOrganization.identifier,
-          payload,
-        );
+        const response = await bulkDelete.mutateAsync(payload.ids);
 
         dismiss();
 
         // Handle response based on successful/unsuccessful arrays
         if (response.data) {
           const { successful = [], unsuccessful = [] } = response.data;
+          dropFunctionDrafts(successful.map(String));
           const successCount = successful.length;
           const failCount = unsuccessful.length;
 
@@ -636,33 +896,39 @@ export default defineComponent({
             // Partial success
             toast({
               variant: "warning",
-              message: `${successCount} function(s) deleted successfully, ${failCount} failed`,
+              message: t("toastMessages.functions.functionsDeletedWithFailures", {
+                count: successCount,
+                failed: failCount,
+              }),
               timeout: 5000,
             });
           } else if (failCount > 0) {
             // All failed
             toast({
               variant: "error",
-              message: `Failed to delete ${failCount} function(s)`,
+              message: t("toastMessages.functions.failedToDeleteFunctions", { count: failCount }),
             });
           } else {
             // All successful
             toast({
               variant: "success",
-              message: `${successCount} function(s) deleted successfully`,
+              message: t("toastMessages.functions.functionsDeletedSuccessfully", {
+                count: successCount,
+              }),
             });
           }
         } else {
+          dropFunctionDrafts(payload.ids);
           // Fallback success message
           toast({
             variant: "success",
-            message: `${selectedFunctions.value.length} function(s) deleted successfully`,
+            message: t("toastMessages.functions.functionsDeletedSuccessfully", {
+              count: selectedFunctions.value.length,
+            }),
           });
         }
 
         selectedFunctions.value = [];
-        // Refresh functions list
-        getJSTransforms();
       } catch (error: any) {
         dismiss();
         console.error("Error deleting functions:", error);
@@ -671,7 +937,7 @@ export default defineComponent({
         const errorMessage =
           error.response?.data?.message ||
           error?.message ||
-          "Error deleting functions. Please try again.";
+          t("functions.bulkDeleteFunctionsFailed");
         if (error.response?.status != 403 || error?.status != 403) {
           toast({
             variant: "error",
@@ -694,9 +960,15 @@ export default defineComponent({
         },
       },
       {
+        id: "functionsImport",
+        handler: () => {
+          if (!isInputFocused()) goToImportFunction();
+        },
+      },
+      {
         id: "functionsRefresh",
         handler: () => {
-          if (!isInputFocused()) getJSTransforms();
+          if (!isInputFocused()) refreshJSTransforms();
         },
       },
       {
@@ -708,20 +980,26 @@ export default defineComponent({
     ]);
     return {
       t,
+      raw,
       store,
       router,
+      functionDrafts,
       jsTransforms,
       columns,
       formData,
       hideForm,
       confirmDelete,
       selectedDelete,
-      getJSTransforms,
       loading,
-      resultTotal,
+      fetching,
+      lastUpdatedAt,
+      refreshJSTransforms,
+      forbidden,
       refreshList,
       pageSize,
       pageSizeOptions,
+      sortBy,
+      sortOrder,
       addTransform,
       deleteFn,
       isUpdated,
@@ -744,11 +1022,19 @@ export default defineComponent({
       visibleRows,
       hasVisibleRows,
       openBulkDeleteDialog,
+      exportLoading,
+      exportFunction,
+      exportSelectedFunctions,
+      goToImportFunction,
       bulkDeleteFunctions,
       bulkDeleteLoading,
       confirmBulkDelete,
       selectedFunctions,
       selectedFunctionIds,
+      currentPage,
+      onPageChange,
+      oTableRef,
+      restorePageIndex,
     };
   },
   computed: {

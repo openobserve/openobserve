@@ -37,19 +37,27 @@ router.isReady = () => Promise.resolve();
 import Quota from "@/components/iam/quota/Quota.vue";
 
 // Mocks
-vi.mock("@/services/organizations", () => ({
-  default: {
-    os_list: vi.fn(async () => ({
-      data: {
-        data: [
-          { name: "Org A", identifier: "org_a" },
-          { name: "Org B", identifier: "org_b" },
-        ],
-      },
-    })),
-  },
-}));
-vi.mock("@/services/iam", () => ({ getRoles: vi.fn(async () => ({ data: ["admin", "member"] })) }));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      os_list: vi.fn(async () => ({
+        data: {
+          data: [
+            { name: "Org A", identifier: "org_a" },
+            { name: "Org B", identifier: "org_b" },
+          ],
+        },
+      })),
+    },
+  });
+});
+vi.mock("@/services/iam", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    getRoles: vi.fn(async () => ({ data: ["admin", "member"] })),
+  });
+});
 
 // Mock toast — Quota.vue notifies via toast(), not a legacy notify plugin
 const mockToast = vi.hoisted(() => vi.fn(() => vi.fn())); // toast returns a dismiss fn
@@ -256,12 +264,11 @@ describe.skip("Quota page", () => {
     expect(wrapper.vm.editTable).toBe(true);
   });
 
-  it("getRolesByOrganization populates rolesLimitRows and resultTotal", async () => {
+  it("getRolesByOrganization populates rolesLimitRows", async () => {
     const wrapper = await mountQuota();
     await wrapper.vm.updateActiveTab("role-limits");
     await flushPromises();
     expect(wrapper.vm.rolesLimitRows.length).toBeGreaterThan(0);
-    expect(wrapper.vm.resultTotal).toBe(wrapper.vm.rolesLimitRows.length);
   });
 
   it("restrictToNumbers prevents invalid keypress", async () => {

@@ -135,7 +135,11 @@
               class="w-full"
               :disabled="getFoldersListLoading.isLoading.value"
               data-test="dashboard-drilldown-folder-select"
-            />
+            >
+              <template v-if="drilldownData.data.folder" #icon-left>
+                <FolderIcon :token="selectedFolderIcon" class="text-select-text" />
+              </template>
+            </OFormSelect>
           </div>
           <div class="my-2.5 flex w-full items-center" v-if="drilldownData.data.folder">
             <OFormSelect
@@ -233,18 +237,25 @@
 </template>
 
 <script lang="ts">
-import { defineAsyncComponent, inject, nextTick, reactive, ref } from "vue";
+import {
+  defineAsyncComponent,
+  inject,
+  nextTick,
+  reactive,
+  ref,
+  defineComponent,
+  watch,
+  computed,
+  onMounted,
+} from "vue";
 import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import { defineComponent } from "vue";
-import { useI18n } from "vue-i18n";
-import { watch } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
-import { computed } from "vue";
 import { getAllDashboardsByFolderId, getDashboard, getFoldersList } from "../../../utils/commons";
-import { onMounted } from "vue";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
+import { getFieldLabel } from "@/utils/dashboard/fieldLabel";
 import DrilldownUserGuide from "@/components/dashboards/addPanel/DrilldownUserGuide.vue";
 import OFormCombobox from "@/lib/forms/Combobox/OFormCombobox.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -259,11 +270,17 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { makeDrilldownPopUpSchema, type DrilldownPopUpForm } from "./DrilldownPopUp.schema";
+import { useFolderIcons } from "@/composables/useFolderIcons";
+import { folderIconOption } from "@/components/common/sidebar/folderIconOption";
+import FolderIcon from "@/components/common/sidebar/FolderIcon.vue";
+import { isFlowChart, isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
+import { hostmapLabelNames } from "@/utils/dashboard/convertHostmapData";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
 export default defineComponent({
   name: "DrilldownPopUp",
   components: {
+    FolderIcon,
     ODialog,
     OForm,
     OFormInput,
@@ -300,11 +317,13 @@ export default defineComponent({
   },
   emits: ["close"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const route = useRoute();
+    // This dropdown lists dashboard folders, so it reads the dashboards icon scope.
+    const { iconFor } = useFolderIcons();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     // Inject variablesManager to access all dashboard variables
     const variablesManager = inject<any>("variablesManager", null);
@@ -398,15 +417,7 @@ export default defineComponent({
     });
 
     onMounted(async () => {
-      // if no folders in organization, get folders
-      if (
-        !store.state.organizationData.folders ||
-        (Array.isArray(store.state.organizationData.folders) &&
-          store.state.organizationData.folders.length === 0)
-      ) {
-        // get folders(will be api call)
-        await getFoldersListLoading.execute();
-      }
+      await getFoldersListLoading.execute();
 
       // get dashboard list
       // get tab list
@@ -442,6 +453,15 @@ export default defineComponent({
       },
     );
 
+    // `data.folder` holds the folder NAME here, not its id — see folderList below.
+    const selectedFolderIcon = computed(() =>
+      iconFor(
+        store.state.organizationData.folders?.find(
+          (folder: any) => folder.name === drilldownData.value?.data?.folder,
+        ),
+      ),
+    );
+
     const folderList = computed(() => {
       // if no folders in organization, return []
       if (!store.state.organizationData.folders) {
@@ -453,6 +473,8 @@ export default defineComponent({
           return {
             label: folder.name,
             value: folder.name,
+            // Same FolderIcon the rail and the other folder dropdowns render.
+            iconComponent: folderIconOption(iconFor(folder)),
           };
         }) ?? []
       );
@@ -593,13 +615,13 @@ export default defineComponent({
             value: "${" + variable.name + "}",
           })) ?? [];
 
-      if (dashboardPanelData.data.type === "sankey") {
+      if (isFlowChart(dashboardPanelData.data.type)) {
         selectedValues = [
-          { label: "Edge Source", value: "${edge.__source}" },
-          { label: "Edge Target", value: "${edge.__target}" },
-          { label: "Edge Value", value: "${edge.__value}" },
-          { label: "Node Name", value: "${node.__name}" },
-          { label: "Node Value", value: "${node.__value}" },
+          { label: t("dashboard.edgeSource"), value: "${edge.__source}" },
+          { label: t("dashboard.edgeTarget"), value: "${edge.__target}" },
+          { label: t("dashboard.edgeValue"), value: "${edge.__value}" },
+          { label: t("dashboard.nodeName"), value: "${node.__name}" },
+          { label: t("dashboard.nodeValue"), value: "${node.__value}" },
           ...variableListName,
         ];
       } else if (dashboardPanelData.data.type === "table") {
@@ -611,29 +633,54 @@ export default defineComponent({
             ...variableListName,
           ];
           panelFields.forEach((field) => {
-            const displayName = field.label || field.alias;
+            const displayName =
+              getFieldLabel(field, dashboardPanelData.data.config, query.customQuery) ||
+              field.alias;
             selectedValues.push({
               label: displayName,
               value: '${row.field["' + displayName + '"]}',
             });
           });
         });
-      } else if (["pie", "donut", "gauge"].includes(dashboardPanelData.data.type)) {
+      } else if (
+        ["pie", "donut", "gauge", "bar-gauge", "treemap", "sunburst", "funnel", "boxplot"].includes(
+          dashboardPanelData.data.type,
+        )
+      ) {
         selectedValues = [
-          { label: "Series Name", value: "${series.__name}" },
-          { label: "Series Value", value: "${series.__value}" },
+          { label: t("dashboard.seriesName"), value: "${series.__name}" },
+          { label: t("dashboard.seriesValue"), value: "${series.__value}" },
+          ...variableListName,
+        ];
+      } else if (isRowTimeline(dashboardPanelData.data.type)) {
+        selectedValues = [
+          { label: t("dashboard.seriesName"), value: "${series.__name}" },
+          { label: t("dashboard.seriesValue"), value: "${series.__value}" },
+          { label: t("dashboard.segmentStart"), value: "${series.__start}" },
+          { label: t("dashboard.segmentEnd"), value: "${series.__end}" },
+          ...variableListName,
+        ];
+      } else if (dashboardPanelData.data.type === "hostmap") {
+        selectedValues = [
+          { label: t("dashboard.hostmapCellName"), value: "${series.__name}" },
+          { label: t("dashboard.seriesValue"), value: "${series.__value}" },
+          { label: t("dashboard.hostmapCellGroup"), value: "${series.__group}" },
+          ...hostmapLabelNames(dashboardPanelData.data).map((label) => ({
+            label,
+            value: "${series.labels." + label + "}",
+          })),
           ...variableListName,
         ];
       } else if (dashboardPanelData.data.type === "metric") {
         selectedValues = [
-          { label: "Series Value", value: "${series.__value}" },
+          { label: t("dashboard.seriesValue"), value: "${series.__value}" },
           ...variableListName,
         ];
       } else {
         selectedValues = [
-          { label: "Series Name", value: "${series.__name}" },
-          { label: "Series Value", value: "${series.__value}" },
-          { label: "Axis Value", value: "${series.__axisValue}" },
+          { label: t("dashboard.seriesName"), value: "${series.__name}" },
+          { label: t("dashboard.seriesValue"), value: "${series.__value}" },
+          { label: t("dashboard.axisValue"), value: "${series.__axisValue}" },
           ...variableListName,
         ];
       }
@@ -729,6 +776,7 @@ export default defineComponent({
       delete: "delete",
       store,
       folderList,
+      selectedFolderIcon,
       dashboardList,
       tabList,
       options,

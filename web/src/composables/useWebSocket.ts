@@ -1,6 +1,7 @@
 // useWebSocket.ts
 
 import { onBeforeUnmount } from "vue";
+import { patchLargeNumbersInJson } from "@/utils/nsFieldsPatch";
 
 type MessageHandler = (event: MessageEvent, socketId: string) => void;
 type OpenHandler = (event: Event, socketId: string) => void;
@@ -51,7 +52,9 @@ const onOpen = (socketId: string, event: Event) => {
 };
 
 const onMessage = (socketId: string, event: MessageEvent) => {
-  const data = JSON.parse(event.data);
+  // Patches large integers (any field, e.g. a user-defined `userid`, #14376) so
+  // JSON.parse can't silently round them.
+  const data = JSON.parse(patchLargeNumbersInJson(event.data));
 
   if (data.type === "error") {
     errorHandlers[socketId]?.forEach((handler) => handler(data, socketId));

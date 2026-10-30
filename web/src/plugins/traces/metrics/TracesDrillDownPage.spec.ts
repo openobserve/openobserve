@@ -1,0 +1,166 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { describe, expect, it, afterEach, vi } from "vitest";
+import { mount, type VueWrapper } from "@vue/test-utils";
+import i18n from "@/locales";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import TracesDrillDownPage from "./TracesDrillDownPage.vue";
+
+function mountPage(props: Record<string, unknown> = {}): VueWrapper<any> {
+  return mount(TracesDrillDownPage, {
+    attachTo: document.body,
+    props: { open: true, title: "Volume Insights", ...props },
+    slots: {
+      actions: '<span data-test="header-actions-content" />',
+      default: '<div data-test="body-content"><input data-test="inner-input" /></div>',
+    },
+    global: { plugins: [i18n] },
+  });
+}
+
+describe("TracesDrillDownPage", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  it("should render the standard page header with the title, the actions and the body", () => {
+    wrapper = mountPage();
+
+    const header = wrapper.findComponent(OPageHeader);
+    expect(header.exists()).toBe(true);
+    expect(header.props("title")).toBe("Volume Insights");
+    expect(wrapper.find('[data-test="header-actions-content"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="body-content"]').exists()).toBe(true);
+  });
+
+  it("should label the back button Back to results", () => {
+    wrapper = mountPage();
+
+    expect(wrapper.find('[data-test="traces-drill-down-back-btn"]').attributes("aria-label")).toBe(
+      "Back to results",
+    );
+  });
+
+  it("should focus the Back button on mount", () => {
+    wrapper = mountPage();
+
+    expect(document.activeElement).toBe(
+      wrapper.find('[data-test="traces-drill-down-back-btn"]').element,
+    );
+  });
+
+  it("should return focus to the Drill down button when focus was on the page at close", () => {
+    const drillDown = document.createElement("button");
+    drillDown.setAttribute("data-test", "insights-button");
+    document.body.appendChild(drillDown);
+    wrapper = mountPage();
+
+    wrapper.unmount();
+
+    expect(document.activeElement).toBe(drillDown);
+    drillDown.remove();
+  });
+
+  it("should leave focus alone when it was outside the page at close", () => {
+    const drillDown = document.createElement("button");
+    drillDown.setAttribute("data-test", "insights-button");
+    const editor = document.createElement("input");
+    document.body.append(drillDown, editor);
+    wrapper = mountPage();
+    editor.focus();
+
+    wrapper.unmount();
+
+    expect(document.activeElement).toBe(editor);
+    drillDown.remove();
+    editor.remove();
+  });
+
+  it("should make the content it covers inert while open, and restore it on close", () => {
+    const container = document.createElement("div");
+    const covered = document.createElement("div");
+    const alreadyInert = document.createElement("div");
+    alreadyInert.setAttribute("inert", "");
+    container.append(covered, alreadyInert);
+    document.body.appendChild(container);
+
+    wrapper = mount(TracesDrillDownPage, {
+      attachTo: container,
+      props: { open: true, title: "Volume Insights" },
+    });
+
+    expect(covered.hasAttribute("inert")).toBe(true);
+    expect(wrapper.element.hasAttribute("inert")).toBe(false);
+
+    wrapper.unmount();
+
+    expect(covered.hasAttribute("inert")).toBe(false);
+    expect(alreadyInert.hasAttribute("inert")).toBe(true);
+    container.remove();
+  });
+
+  it("should render nothing when closed", () => {
+    wrapper = mountPage({ open: false });
+
+    expect(wrapper.find('[data-test="traces-drill-down-back-btn"]').exists()).toBe(false);
+  });
+
+  it("should emit update:open=false when Back is clicked", async () => {
+    wrapper = mountPage();
+
+    await wrapper.find('[data-test="traces-drill-down-back-btn"]').trigger("click");
+    expect(wrapper.emitted("update:open")).toEqual([[false]]);
+  });
+
+  it("should close on Escape pressed inside the page", async () => {
+    wrapper = mountPage();
+
+    const input = wrapper.find('[data-test="inner-input"]').element as HTMLInputElement;
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(wrapper.emitted("update:open")).toEqual([[false]]);
+  });
+
+  it("should ignore Escape from elements outside the page, such as teleported popovers", async () => {
+    wrapper = mountPage();
+    const outside = document.createElement("div");
+    document.body.appendChild(outside);
+
+    outside.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(wrapper.emitted("update:open")).toBeUndefined();
+    outside.remove();
+  });
+
+  it("should ignore Escape another handler already consumed", async () => {
+    wrapper = mountPage();
+
+    const input = wrapper.find('[data-test="inner-input"]').element as HTMLInputElement;
+    const event = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+    event.preventDefault();
+    input.dispatchEvent(event);
+    expect(wrapper.emitted("update:open")).toBeUndefined();
+  });
+
+  it("should stop listening for Escape after unmount", async () => {
+    wrapper = mountPage();
+    const emitted = wrapper.emitted();
+    wrapper.unmount();
+
+    document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(emitted["update:open"]).toBeUndefined();
+  });
+});

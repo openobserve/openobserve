@@ -1,0 +1,106 @@
+[
+  {
+    "id": "ping-select-1",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "SELECT 1"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT ?",
+      "operation": "SELECT",
+      "stmt_class": "ping",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_ping",
+    "literals": [],
+    "source": "authored"
+  },
+  {
+    "id": "session-control-set",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "SET application_name = 'checkout-worker-77'"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SET application_name = ?",
+      "operation": "SET",
+      "stmt_class": "session-control",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_set_application_name",
+    "literals": ["checkout-worker-77"],
+    "source": "authored"
+  },
+  {
+    "id": "bare-commit-is-transaction-control",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "COMMIT"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "COMMIT",
+      "operation": "COMMIT",
+      "stmt_class": "transaction-control",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_tcl_commit",
+    "literals": [],
+    "source": "authored"
+  },
+  {
+    "id": "bare-rollback-is-transaction-control",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "ROLLBACK"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "ROLLBACK",
+      "operation": "ROLLBACK",
+      "stmt_class": "transaction-control",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_tcl_rollback",
+    "literals": [],
+    "source": "authored"
+  }
+]

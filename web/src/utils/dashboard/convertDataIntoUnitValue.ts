@@ -1,4 +1,4 @@
-import { getNumberLocale } from "@/locales/numberFormat";
+import { getNumberLocale, localeFromUnit, resolveNumberLocale } from "@/locales/numberFormat";
 
 const units: any = {
   bytes: [
@@ -87,6 +87,149 @@ const units: any = {
   ],
 };
 
+type UnitStep = { unit: string; divisor: number };
+
+const DECIMAL_STEPS = [1, 1e3, 1e6, 1e9, 1e12, 1e15];
+const SI_BYTE_LABELS = ["B", "kB", "MB", "GB", "TB", "PB"];
+const SI_BIT_LABELS = ["bit", "kbit", "Mbit", "Gbit", "Tbit", "Pbit"];
+const HERTZ_LABELS = ["Hz", "kHz", "MHz", "GHz", "THz"];
+const IEC_RATE_LABELS = ["B/s", "KiB/s", "MiB/s", "GiB/s", "TiB/s", "PiB/s"];
+
+const CURRENCY_LOCALES: Record<string, string> = {
+  "currency-dollar": "en-US",
+  "currency-euro": "de-DE",
+  "currency-pound": "en-GB",
+  "currency-yen": "ja-JP",
+  "currency-rupee": "en-IN",
+  "currency-yuan": "zh-CN",
+  "currency-won": "ko-KR",
+};
+
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  "currency-dollar": "$",
+  "currency-euro": "€",
+  "currency-pound": "£",
+  "currency-yen": "¥",
+  "currency-rupee": "₹",
+  "currency-yuan": "¥",
+  "currency-won": "₩",
+};
+
+const TEMPERATURE_SUFFIXES: Record<string, string> = { celsius: "°C", fahrenheit: "°F" };
+
+// Largest unit first, so "from now" names the coarsest whole step (90s reads as 1m).
+const RELATIVE_STEPS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
+  ["year", 31536000],
+  ["month", 2592000],
+  ["week", 604800],
+  ["day", 86400],
+  ["hour", 3600],
+  ["minute", 60],
+  ["second", 1],
+];
+
+// `own` is the step the input is in; its divisor must stay exactly 1 so zero keeps the panel's unit.
+const decimalLadder = (labels: string[], own = 0): UnitStep[] =>
+  labels.map((unit, index) => ({ unit, divisor: DECIMAL_STEPS[index] / DECIMAL_STEPS[own] }));
+
+const timeLadder = (ownSeconds: number): UnitStep[] =>
+  units.seconds.map(({ unit, divisor }: UnitStep) => ({ unit, divisor: divisor / ownSeconds }));
+
+// Named rates carry their leading space in the suffix because callers join value and unit with nothing between.
+const rateLadder = (suffix: string): UnitStep[] =>
+  units.numbers.map(({ unit, divisor }: UnitStep) => ({ unit: `${unit}${suffix}`, divisor }));
+
+Object.assign(units, {
+  "bytes-si": decimalLadder(SI_BYTE_LABELS),
+  "kilobytes-si": decimalLadder(SI_BYTE_LABELS, 1),
+  "megabytes-si": decimalLadder(SI_BYTE_LABELS, 2),
+  bits: decimalLadder(SI_BIT_LABELS),
+  "bps-si": decimalLadder(SI_BYTE_LABELS.map((label) => `${label}/s`)),
+  "bits-per-sec": decimalLadder(SI_BIT_LABELS.map((label) => `${label}/s`)),
+  "req-per-sec": rateLadder(" req/s"),
+  "ops-per-sec": rateLadder(" ops/s"),
+  "events-per-sec": rateLadder(" events/s"),
+  "req-per-min": rateLadder(" req/min"),
+  "ops-per-min": rateLadder(" ops/min"),
+  "events-per-min": rateLadder(" events/min"),
+  "per-sec": rateLadder("/s"),
+  "per-min": rateLadder("/min"),
+  hertz: decimalLadder(HERTZ_LABELS),
+  "bytes-per-sec": IEC_RATE_LABELS.map((unit, index) => ({ unit, divisor: 1024 ** index })),
+  minutes: timeLadder(60),
+  hours: timeLadder(3600),
+  days: timeLadder(86400),
+});
+
+const TEXT_UNITS = new Set(["datetime", "from-now", "boolean"]);
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+/** Epoch milliseconds from seconds, milliseconds, microseconds or nanoseconds, told apart by magnitude. */
+export const epochToMillis = (value: number): number => {
+  const magnitude = Math.abs(value);
+  if (magnitude < 1e11) return value * 1000;
+  if (magnitude < 1e14) return value;
+  if (magnitude < 1e17) return value / 1000;
+  return value / 1e6;
+};
+
+const toEpochMillis = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === "" || typeof value === "boolean") {
+    return null;
+  }
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) return epochToMillis(numeric);
+  const parsed = typeof value === "string" ? Date.parse(value) : NaN;
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const formatLocalDateTime = (millis: number): string => {
+  const d = new Date(millis);
+  return (
+    `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ` +
+    `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`
+  );
+};
+
+const formatFromNow = (millis: number, now = Date.now()): string => {
+  const seconds = Math.round((millis - now) / 1000);
+  const [unit, size] = RELATIVE_STEPS.find(([, step]) => Math.abs(seconds) >= step) ?? [
+    "second",
+    1,
+  ];
+  // -0 reads "0s ago" where 0 would read "in 0s".
+  const amount = Math.trunc(seconds / size) || -0;
+  return new Intl.RelativeTimeFormat(getNumberLocale(), {
+    style: "narrow",
+    numeric: "always",
+  }).format(amount, unit);
+};
+
+const toBoolean = (value: unknown): boolean | null => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const text = value.trim().toLowerCase();
+    if (text === "true") return true;
+    if (text === "false") return false;
+  }
+  if (value === null || value === undefined || value === "") return null;
+  const numeric = Number(value);
+  return Number.isNaN(numeric) ? null : numeric !== 0;
+};
+
+/** Text for the units that do not scale a number; null when the unit is numeric or the value cannot be read. */
+const formatTextUnit = (value: unknown, unit: string): string | null => {
+  if (!TEXT_UNITS.has(unit)) return null;
+  if (unit === "boolean") {
+    const flag = toBoolean(value);
+    return flag === null ? null : String(flag);
+  }
+  const millis = toEpochMillis(value);
+  if (millis === null) return null;
+  return unit === "datetime" ? formatLocalDateTime(millis) : formatFromNow(millis);
+};
+
 /**
  * Converts a value to a specific unit of measurement.
  *
@@ -101,33 +244,21 @@ export const getUnitValue = (
   customUnit: string,
   decimals: number = 2,
 ) => {
+  const pinnedLocale = localeFromUnit(unit);
   // console.time("getUnitValue:");
   let formattedValue;
-  if (
-    [
-      "currency-dollar",
-      "currency-euro",
-      "currency-pound",
-      "currency-yen",
-      "currency-rupee",
-    ].includes(unit)
-  ) {
+  if (CURRENCY_LOCALES[unit]) {
     const numericValue = parseFloat(value) || 0;
     const formattedNumber = numericValue.toFixed(decimals);
 
-    const localeMap: any = {
-      "currency-dollar": "en-US", // US Dollar
-      "currency-euro": "de-DE", // Euro
-      "currency-pound": "en-GB", // British Pound
-      "currency-yen": "ja-JP", // Japanese Yen
-      "currency-rupee": "en-IN", // Indian Rupee
-    };
-
-    formattedValue = new Intl.NumberFormat(localeMap[unit], {
+    formattedValue = new Intl.NumberFormat(CURRENCY_LOCALES[unit], {
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals,
     }).format(Number(formattedNumber));
   }
+
+  const textValue = formatTextUnit(value, unit);
+  if (textValue !== null) return { value: textValue, unit: "" };
 
   // value sign: positive = 1, negative = -1
   const sign = Math.sign(value);
@@ -143,7 +274,7 @@ export const getUnitValue = (
     return { value: value === "" ? "-" : value, unit: "" };
   }
 
-  switch (unit) {
+  switch (pinnedLocale === null ? unit : "locale") {
     case "numbers":
     case "bytes":
     case "seconds":
@@ -152,12 +283,38 @@ export const getUnitValue = (
     case "nanoseconds":
     case "kilobytes":
     case "bps":
-    case "megabytes": {
+    case "megabytes":
+    case "bytes-si":
+    case "kilobytes-si":
+    case "megabytes-si":
+    case "bits":
+    case "bps-si":
+    case "bits-per-sec":
+    case "req-per-sec":
+    case "ops-per-sec":
+    case "events-per-sec":
+    case "req-per-min":
+    case "ops-per-min":
+    case "events-per-min":
+    case "per-sec":
+    case "per-min":
+    case "minutes":
+    case "hours":
+    case "days":
+    case "hertz":
+    case "bytes-per-sec": {
       // start with last index
       let unitIndex = units[unit].length - 1;
       // while the value is smaller than the divisor
       while (unitIndex > 0 && absValue < units[unit][unitIndex].divisor) {
         unitIndex--;
+      }
+      // zero has nothing to scale, so it stays in the panel's own unit (divisor 1)
+      if (absValue === 0) {
+        const ownUnit = units[unit].findIndex((entry: { divisor: number }) => entry.divisor === 1);
+        if (ownUnit !== -1) {
+          unitIndex = ownUnit;
+        }
       }
 
       // calculate the final value: sign * absValue / divisor
@@ -178,7 +335,7 @@ export const getUnitValue = (
       const num = Number(value);
       if (Number.isNaN(num)) return { value: value, unit: "" };
       return {
-        value: new Intl.NumberFormat(getNumberLocale(), {
+        value: new Intl.NumberFormat(resolveNumberLocale(pinnedLocale), {
           minimumFractionDigits: decimals,
           maximumFractionDigits: decimals,
         }).format(num),
@@ -199,34 +356,23 @@ export const getUnitValue = (
         unit: "%",
       };
     }
-    case "currency-pound": {
+    case "celsius":
+    case "fahrenheit": {
       return {
-        value: `${formattedValue}`,
-        unit: "£",
+        value: `${parseFloat(value)?.toFixed(decimals) ?? 0}`,
+        unit: TEMPERATURE_SUFFIXES[unit],
       };
     }
-    case "currency-dollar": {
+    case "currency-pound":
+    case "currency-dollar":
+    case "currency-euro":
+    case "currency-yen":
+    case "currency-rupee":
+    case "currency-yuan":
+    case "currency-won": {
       return {
         value: `${formattedValue}`,
-        unit: "$",
-      };
-    }
-    case "currency-euro": {
-      return {
-        value: `${formattedValue}`,
-        unit: "€",
-      };
-    }
-    case "currency-yen": {
-      return {
-        value: `${formattedValue}`,
-        unit: "¥",
-      };
-    }
-    case "currency-rupee": {
-      return {
-        value: `${formattedValue}`,
-        unit: "₹",
+        unit: CURRENCY_SYMBOLS[unit],
       };
     }
     case "default":
@@ -248,7 +394,7 @@ export const getUnitValue = (
 export const formatUnitValue = (obj: any) => {
   const { unit } = obj;
 
-  if (["$", "€", "£", "¥", "₹"].includes(unit)) {
+  if (Object.values(CURRENCY_SYMBOLS).includes(unit)) {
     return `${obj.unit}${obj.value}`;
   }
   return `${obj.value}${obj.unit}`;

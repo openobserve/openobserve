@@ -12,165 +12,6 @@
       "name": "Default",
       "panels": [
         {
-          "id": "Panel_ID1425310",
-          "type": "scatter",
-          "title": "Duration",
-          "description": "",
-          "config": {
-            "show_legends": false,
-            "legends_position": null,
-            "unit": "microseconds",
-            "decimals": 2,
-            "line_thickness": 1.5,
-            "step_value": "0",
-            "top_results_others": false,
-            "axis_border_show": false,
-            "label_option": {
-              "rotate": 0
-            },
-            "custom_chart_options": {
-              "tooltip": {
-                "appendToBody": true,
-                "confine": false
-              }
-            },
-            "show_symbol": false,
-            "line_interpolation": "smooth",
-            "legend_width": {
-              "unit": "px"
-            },
-            "base_map": {
-              "type": "osm"
-            },
-            "map_type": {
-              "type": "world"
-            },
-            "map_view": {
-              "zoom": 1,
-              "lat": 0,
-              "lng": 0
-            },
-            "map_symbol_style": {
-              "size": "by Value",
-              "size_by_value": {
-                "min": 1,
-                "max": 100
-              },
-              "size_fixed": 2
-            },
-            "drilldown": [],
-            "mark_line": [],
-            "override_config": [],
-            "connect_nulls": true,
-            "no_value_replacement": "",
-            "wrap_table_cells": false,
-            "table_transpose": false,
-            "table_dynamic_columns": false,
-            "color": {
-              "mode": "palette-classic-by-series",
-              "colorBySeries": [
-                { "value": "p50 (Median)", "color": "#4caf50" },
-                { "value": "p70", "color": "#cddc39" },
-                { "value": "p95", "color": "#ff9800" },
-                { "value": "p99", "color": "#f44336" }
-              ]
-            },
-            "trellis": {
-              "layout": null,
-              "num_of_columns": 1,
-              "group_by_y_axis": false
-            },
-            "dataZoom": { "yAxisIndex": 0 }
-          },
-          "queryType": "sql",
-          "queries": [
-            {
-              "query": "SELECT histogram(_timestamp) AS x_axis, approx_percentile_cont(duration, 0.50) AS p50, approx_percentile_cont(duration, 0.75) AS p75, approx_percentile_cont(duration, 0.95) AS p95, approx_percentile_cont(duration, 0.99) AS p99 FROM [STREAM_NAME] [WHERE_CLAUSE] GROUP BY x_axis ORDER BY x_axis ASC",
-              "vrlFunctionQuery": "",
-              "customQuery": true,
-              "fields": {
-                "stream": "default",
-                "stream_type": "traces",
-                "x": [
-                  {
-                    "label": "",
-                    "alias": "x_axis",
-                    "column": "x_axis",
-                    "color": null,
-                    "isDerived": true,
-                    "havingConditions": [],
-                    "treatAsNonTimestamp": true
-                  }
-                ],
-                "y": [
-                  {
-                    "label": "p50 (Median)",
-                    "alias": "p50",
-                    "column": "p50",
-                    "color": "#4caf50",
-                    "isDerived": true,
-                    "havingConditions": [],
-                    "treatAsNonTimestamp": true
-                  },
-                  {
-                    "label": "p75",
-                    "alias": "p75",
-                    "column": "p75",
-                    "color": "#cddc39",
-                    "isDerived": true,
-                    "havingConditions": [],
-                    "treatAsNonTimestamp": true
-                  },
-                  {
-                    "label": "p95",
-                    "alias": "p95",
-                    "column": "p95",
-                    "color": "#ff9800",
-                    "isDerived": true,
-                    "havingConditions": [],
-                    "treatAsNonTimestamp": true
-                  },
-                  {
-                    "label": "p99",
-                    "alias": "p99",
-                    "column": "p99",
-                    "color": "#f44336",
-                    "isDerived": true,
-                    "havingConditions": [],
-                    "treatAsNonTimestamp": true
-                  }
-                ],
-                "z": [],
-                "breakdown": [],
-                "filter": {
-                  "filterType": "group",
-                  "logicalOperator": "AND",
-                  "conditions": []
-                }
-              },
-              "config": {
-                "promql_legend": "",
-                "layer_type": "scatter",
-                "weight_fixed": 1,
-                "limit": 0,
-                "min": 0,
-                "max": 100,
-                "time_shift": []
-              }
-            }
-          ],
-          "layout": {
-            "x": 33,
-            "y": 0,
-            "w": 15,
-            "h": 4.5,
-            "i": 2
-          },
-          "htmlContent": "",
-          "markdownContent": "",
-          "customChartContent": " // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};\n  "
-        },
-        {
           "id": "Panel_ID8254010",
           "type": "line",
           "title": "Rate",
@@ -178,7 +19,9 @@
           "config": {
             "show_legends": false,
             "legends_position": null,
-            "decimals": 0,
+            "decimals": 2,
+            "unit": "custom",
+            "unit_custom": "",
             "line_thickness": 1.5,
             "step_value": "0",
             "top_results_others": false,
@@ -240,7 +83,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT histogram(_timestamp) AS time_bucket, max(duration) AS max_trace_duration, approx_distinct(trace_id) AS max_rate, approx_distinct(trace_id) filter (where span_status = 'ERROR') AS error_rate FROM [STREAM_NAME] [WHERE_CLAUSE] GROUP BY time_bucket ORDER BY time_bucket ASC",
+              "query": "SELECT histogram(_timestamp, '[INTERVAL]') AS time_bucket, approx_distinct(trace_id) / [INTERVAL_SECONDS].0 AS max_rate FROM [STREAM_NAME] [WHERE_CLAUSE] GROUP BY time_bucket ORDER BY time_bucket ASC",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {
@@ -291,7 +134,7 @@
           "layout": {
             "x": 0,
             "y": 0,
-            "w": 16,
+            "w": 24,
             "h": 4.5,
             "i": 3
           },
@@ -369,7 +212,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT histogram(_timestamp) AS time_bucket, max(duration) AS max_trace_duration, approx_distinct(trace_id) AS max_rate, approx_distinct(trace_id) filter (where span_status = 'ERROR') AS error_rate FROM [STREAM_NAME] [WHERE_CLAUSE] GROUP BY time_bucket ORDER BY time_bucket ASC",
+              "query": "SELECT histogram(_timestamp, '[INTERVAL]') AS time_bucket, max(duration) AS max_trace_duration, approx_distinct(trace_id) AS max_rate, approx_distinct(trace_id) filter (where span_status = 'ERROR') AS error_rate FROM [STREAM_NAME] [WHERE_CLAUSE] GROUP BY time_bucket ORDER BY time_bucket ASC",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {
@@ -430,9 +273,9 @@
             }
           ],
           "layout": {
-            "x": 16,
+            "x": 24,
             "y": 0,
-            "w": 17,
+            "w": 24,
             "h": 4.5,
             "i": 1
           },

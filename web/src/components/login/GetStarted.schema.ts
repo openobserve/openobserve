@@ -1,25 +1,38 @@
 // Copyright 2026 OpenObserve Inc.
 //
-// Validation schema for GetStarted.vue (onboarding form). Both fields required.
+// Validation schema for GetStarted.vue (onboarding form). Both text fields required; the first source is optional.
 
 import { z } from "zod";
 
-export const getStartedSchema = z.object({
-  hearAboutUs: z.string().trim().min(1, "This field is required"),
-  whereDoYouWork: z.string().trim().min(1, "This field is required"),
-  // Terms-agreement gate: must be checked (true) to allow submit. Using
-  // `boolean().refine(...)` (not `literal(true)`) so the inferred type is
-  // `boolean` and the default can start `false` without a cast.
-  isAgree: z.boolean().refine((v) => v === true, {
-    message: "You must accept the terms to continue",
-  }),
-});
+import type { TranslateFn } from "@/types/i18n";
 
-export type GetStartedForm = z.infer<typeof getStartedSchema>;
+// Factory, not a const: the caller threads its own `t`, matching the
+// makeXSchema(t) convention used by the other form schemas.
+export const makeGetStartedSchema = (t: TranslateFn) =>
+  z.object({
+    hearAboutUs: z
+      .string()
+      .trim()
+      .min(1, { error: () => t("validation.required") }),
+    whereDoYouWork: z
+      .string()
+      .trim()
+      .min(1, { error: () => t("validation.required") }),
+    // Terms-agreement gate: must be checked (true) to allow submit. Using
+    // `boolean().refine(...)` (not `literal(true)`) so the inferred type is
+    // `boolean` and the default can start `false` without a cast.
+    isAgree: z.boolean().refine((v) => v === true, {
+      error: () => t("login.mustAcceptTerms"),
+    }),
+    firstSource: z.string().optional(),
+  });
 
-export const getStartedDefaults = (): GetStartedForm => ({
+export type GetStartedForm = z.infer<ReturnType<typeof makeGetStartedSchema>>;
+
+export const getStartedDefaults = (firstSource?: string): GetStartedForm => ({
   hearAboutUs: "",
   whereDoYouWork: "",
   // Start unchecked; `false` fails the `isAgree` gate until the user checks it.
   isAgree: false,
+  firstSource,
 });

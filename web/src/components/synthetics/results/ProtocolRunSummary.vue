@@ -20,12 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // timing waterfall, and assertion outcomes. No steps/screenshots/replay
 // (those are browser-run concepts).
 import { computed, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ProtocolRunSummarySkeleton from "./ProtocolRunSummarySkeleton.vue";
 import useSyntheticResults from "@/composables/useSyntheticResults";
@@ -48,16 +49,22 @@ const props = withDefaults(
 const emit = defineEmits<{
   (
     e: "update-status",
-    status: { variant: BadgeVariant; icon: string; label: string; url: string; timestamp: string },
+    status: {
+      variant: BadgeVariant;
+      icon: string;
+      label: I18nText;
+      url: string;
+      timestamp: string;
+    },
   ): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 // The check's folder ID, carried on the results-page route as ?folder=.
 const folderId = computed(() => String(route.query.folder ?? ""));
-const synthetics = useSyntheticResults();
+const synthetics = useSyntheticResults(t);
 
 const run = computed(() => synthetics.protocolRunDetail.value);
 
@@ -249,7 +256,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
     <template #header v-if="!drawerMode">
       <OPageHeader
         class=""
-        :subtitle="run ? fmtTs(run.timestamp) : ''"
+        :subtitle="raw(run ? fmtTs(run.timestamp) : '')"
         :back="{
           label: t('synthetics.results.monitors'),
           to: backTo,
@@ -269,9 +276,9 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
             variant="default"
             size="sm"
             icon="link"
-            class="max-w-60 truncate"
+            class="max-w-60 min-w-0"
           >
-            {{ run.target }}
+            <OTruncatedText>{{ run.target }}</OTruncatedText>
           </OBadge>
         </template>
       </OPageHeader>
@@ -290,7 +297,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
         <!-- ── Result ── -->
         <div class="rounded-default border-border-default border">
           <div class="border-border-default flex items-center border-b px-3 py-2">
-            <div class="rounded-default bg-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+            <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0" />
             <h3 class="text-text-heading text-base font-semibold">
               {{ t("synthetics.protocolRun.result") }}
             </h3>
@@ -350,7 +357,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
         <!-- ── Timing breakdown ── -->
         <div v-if="timingBars.length" class="rounded-default border-border-default border">
           <div class="border-border-default flex items-center border-b px-3 py-2">
-            <div class="rounded-default bg-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+            <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0" />
             <h3 class="text-text-heading text-base font-semibold">
               {{ t("synthetics.protocolRun.timings") }}
             </h3>
@@ -382,12 +389,12 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
         <!-- ── Assertions (http) ── -->
         <div v-if="showAssertions" class="rounded-default border-border-default border">
           <div class="border-border-default flex items-center border-b px-3 py-2">
-            <div class="rounded-default bg-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+            <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0" />
             <h3 class="text-text-heading text-base font-semibold">
               {{ t("synthetics.protocolRun.assertions") }}
             </h3>
             <OBadge
-              class="ml-2"
+              class="ms-2"
               :variant="
                 !assertionsEvaluated
                   ? 'default'
@@ -447,7 +454,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
         <!-- ── TLS certificate ── -->
         <div v-if="certExpiryDate" class="rounded-default border-border-default border">
           <div class="border-border-default flex items-center border-b px-3 py-2">
-            <div class="rounded-default bg-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+            <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0" />
             <h3 class="text-text-heading text-base font-semibold">
               {{ t("synthetics.protocolRun.tlsCert") }}
             </h3>
@@ -467,7 +474,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
         <!-- ── Probe ── -->
         <div class="rounded-default border-border-default border">
           <div class="border-border-default flex items-center border-b px-3 py-2">
-            <div class="rounded-default bg-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+            <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0" />
             <h3 class="text-text-heading text-base font-semibold">
               {{ t("synthetics.protocolRun.probe") }}
             </h3>
@@ -507,8 +514,10 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
                 t("synthetics.protocolRun.timeline")
               }}</span>
               <span class="text-xs">
-                {{ t("synthetics.protocolRun.scheduled") }} {{ fmtTs(run.scheduledTs) }} →
-                {{ t("synthetics.protocolRun.started") }} {{ fmtTs(run.startedTs) }} →
+                {{ t("synthetics.protocolRun.scheduled") }} {{ fmtTs(run.scheduledTs) }}
+                {{ t("synthetics.protocolRun.timelineArrow") }}
+                {{ t("synthetics.protocolRun.started") }} {{ fmtTs(run.startedTs) }}
+                {{ t("synthetics.protocolRun.timelineArrow") }}
                 {{ t("synthetics.protocolRun.completed") }} {{ fmtTs(run.completedTs) }}
               </span>
             </div>

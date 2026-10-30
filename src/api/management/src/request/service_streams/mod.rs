@@ -26,6 +26,15 @@ use openobserve_core::auth::check_permissions;
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
+/// One registry row as the service list returns it.
+#[derive(Debug, serde::Serialize)]
+struct ServiceRow {
+    #[serde(flatten)]
+    record: infra::table::service_streams::ServiceRecord,
+    /// Discovery fell back to the stream's name, so the row names no service.
+    named_after_stream: bool,
+}
+
 /// GET /api/{org_id}/service_streams/_analytics
 ///
 /// Get comprehensive dimension analytics including cardinality classification
@@ -41,6 +50,7 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 #[utoipa::path(
     get,
     path = "/{org_id}/service_streams/_analytics",
+    context_path = "/api",
     tag = "Service Streams",
     operation_id = "GetServiceStreamAnalytics",
     params(
@@ -100,6 +110,7 @@ pub async fn get_dimension_analytics(
 #[utoipa::path(
     get,
     path = "/{org_id}/service_streams",
+    context_path = "/api",
     tag = "Service Streams",
     operation_id = "ListServiceStreams",
     params(
@@ -115,10 +126,27 @@ pub async fn get_dimension_analytics(
 )]
 pub async fn list_services(
     Path(org_id): Path<String>,
-    Headers(_user_email): Headers<UserEmail>,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Response {
+    #[cfg(not(feature = "enterprise"))]
+    let _ = &user_email;
     #[cfg(feature = "enterprise")]
     {
+        if !check_permissions(
+            &org_id,
+            &org_id,
+            &user_email.user_id,
+            "service_streams",
+            "GET",
+            None,
+            true,
+            false,
+            false,
+        )
+        .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
         let records = match infra::table::service_streams::list(&org_id).await {
             Ok(r) => r,
             Err(e) => {
@@ -131,11 +159,44 @@ pub async fn list_services(
         } else {
             records
         };
-        MetaHttpResponse::json(records)
+        // The ids ingest names a service from, set `distinguish_by` included.
+        let tracked = &identity_config.naming_alias_ids();
+        let rows: Vec<ServiceRow> = records
+            .into_iter()
+            .map(|record| {
+                let dimensions: std::collections::HashMap<String, String> = record
+                    .all_dimensions
+                    .as_object()
+                    .map(|m| {
+                        m.iter()
+                            .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                ServiceRow {
+                    named_after_stream:
+                        o2_enterprise::enterprise::service_streams::processor::named_after_its_stream(
+                            &dimensions,
+                            tracked,
+                        ),
+                    record,
+                }
+            })
+            .collect();
+        MetaHttpResponse::json(rows)
     }
     #[cfg(not(feature = "enterprise"))]
     match infra::table::service_streams::list(&org_id).await {
-        Ok(records) => MetaHttpResponse::json(records),
+        // Without discovery's identity config there is no stream-name fallback to detect.
+        Ok(records) => MetaHttpResponse::json(
+            records
+                .into_iter()
+                .map(|record| ServiceRow {
+                    record,
+                    named_after_stream: false,
+                })
+                .collect::<Vec<_>>(),
+        ),
         Err(e) => MetaHttpResponse::internal_error(format!("Failed to list services: {e}")),
     }
 }
@@ -248,12 +309,16 @@ pub async fn correlate_streams(
         )
         .await
         {
-            Ok(Some(response)) => {
+            Ok(Some(mut response)) => {
                 log::debug!(
                     "[correlation] success: found match for org_id={}, source_stream={}",
                     org_id,
                     req.source_stream
                 );
+                // F27: echo the request's source stream/type so the FE never has to
+                // guess which resolved stream (and field aliases) the source maps to.
+                response.source_stream = Some(req.source_stream.clone());
+                response.source_type = Some(req.source_type.clone());
                 MetaHttpResponse::json(response)
             }
             Ok(None) => {
@@ -306,6 +371,7 @@ pub struct CorrelationRequest {
 #[utoipa::path(
     get,
     path = "/{org_id}/service_streams/config/identity",
+    context_path = "/api",
     tag = "Service Streams",
     operation_id = "GetServiceIdentityConfig",
     params(("org_id" = String, Path, description = "Organization ID")),
@@ -347,6 +413,7 @@ pub async fn get_identity_config(
 #[utoipa::path(
     put,
     path = "/{org_id}/service_streams/config/identity",
+    context_path = "/api",
     tag = "Service Streams",
     operation_id = "SaveServiceIdentityConfig",
     params(("org_id" = String, Path, description = "Organization ID")),
@@ -416,7 +483,28 @@ pub async fn save_identity_config(
                 unknown.join(", ")
             ));
         }
+        // F26: a typo in distinguish_by creates a set with permanent zero coverage —
+        // discovery never extracts the unknown id, so its rows can never match.
+        for set in &body.sets {
+            let unknown: Vec<&str> = set
+                .distinguish_by
+                .iter()
+                .filter(|id| !known_ids.contains(*id))
+                .map(String::as_str)
+                .collect();
+            if !unknown.is_empty() {
+                return MetaHttpResponse::bad_request(format!(
+                    "set '{}': unknown distinguish_by group IDs: {}",
+                    set.id,
+                    unknown.join(", ")
+                ));
+            }
+        }
     }
+
+    // Captured before the write so we can find sets that disappeared or changed shape (F10).
+    #[cfg(feature = "enterprise")]
+    let old_config = db::system_settings::get_service_identity_config(&org_id).await;
 
     let value = match serde_json::to_value(&body) {
         Ok(v) => v,
@@ -426,7 +514,7 @@ pub async fn save_identity_config(
     let setting = SystemSetting {
         id: None,
         scope: SettingScope::Org,
-        org_id: Some(org_id),
+        org_id: Some(org_id.clone()),
         user_id: None,
         setting_key: "service_identity".to_string(),
         setting_category: Some("service_streams".to_string()),
@@ -439,7 +527,31 @@ pub async fn save_identity_config(
     };
 
     match infra::table::system_settings::set(&setting).await {
-        Ok(_) => MetaHttpResponse::json(serde_json::json!({"message": "saved"})),
+        Ok(_) => {
+            #[cfg(feature = "enterprise")]
+            {
+                // F10: rows filed under removed/changed sets would otherwise match every
+                // request for their service (anchor rule) until the 24h stale job fires.
+                for set_id in config::meta::correlation::obsolete_set_ids(&old_config, &body) {
+                    if let Err(e) =
+                        infra::table::service_streams::delete_by_set_id(&org_id, &set_id).await
+                    {
+                        log::warn!(
+                            "[ServiceStreams] save_identity_config: failed to delete rows for obsolete set '{set_id}' in org '{org_id}': {e}"
+                        );
+                    }
+                }
+                o2_enterprise::enterprise::service_streams::cache::clear_org_cache(&org_id).await;
+                if let Err(e) =
+                    infra::coordinator::service_streams::emit_reload_event(&org_id).await
+                {
+                    log::warn!(
+                        "[ServiceStreams] save_identity_config: failed to emit reload event for org '{org_id}': {e}"
+                    );
+                }
+            }
+            MetaHttpResponse::json(serde_json::json!({"message": "saved"}))
+        }
         Err(e) => MetaHttpResponse::internal_error(format!("Failed to save config: {e}")),
     }
 }
@@ -490,12 +602,30 @@ pub async fn reset_services(
         {
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
-        match infra::table::service_streams::delete_all(&org_id).await {
-            Ok(deleted_count) => MetaHttpResponse::json(serde_json::json!({
-                "deleted_count": deleted_count,
-                "message": format!("Successfully deleted {} discovered service(s) for org '{}'", deleted_count, org_id),
-                "note": "Services will be automatically re-discovered as new telemetry data arrives. This typically begins within minutes of the next data ingestion."
-            })),
+        // Go through the enterprise storage layer so the local cache is cleared and the
+        // reset is replicated to the super-cluster.
+        match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::delete_all(
+            &org_id,
+        )
+        .await
+        {
+            Ok(deleted_count) => {
+                // Org-scope reload: other nodes wholesale-replace their org cache from
+                // the now-empty DB. Without this the pre-reset rows are served forever
+                // (the cache has no TTL) (F6).
+                if let Err(e) =
+                    infra::coordinator::service_streams::emit_reload_event(&org_id).await
+                {
+                    log::warn!(
+                        "[ServiceStreams] _reset: failed to emit reload event for org '{org_id}': {e}"
+                    );
+                }
+                MetaHttpResponse::json(serde_json::json!({
+                    "deleted_count": deleted_count,
+                    "message": format!("Successfully deleted {} discovered service(s) for org '{}'", deleted_count, org_id),
+                    "note": "Services will be automatically re-discovered as new telemetry data arrives. This typically begins within minutes of the next data ingestion."
+                }))
+            }
             Err(e) => MetaHttpResponse::internal_error(format!("Failed to reset services: {e}")),
         }
     }
@@ -526,7 +656,7 @@ mod tests {
         stream::StreamType,
     };
 
-    use super::CorrelationRequest;
+    use super::{CorrelationRequest, ServiceRow};
 
     // -----------------------------------------------------------------------
     // Group A: CorrelationRequest serialization / deserialization
@@ -598,16 +728,6 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[test]
-    fn test_correlation_request_missing_dimensions_field() {
-        let json = r#"{
-            "source_stream": "default",
-            "source_type": "logs"
-        }"#;
-        let result = serde_json::from_str::<CorrelationRequest>(json);
-        assert!(result.is_err());
-    }
-
     // -----------------------------------------------------------------------
     // Group B: CardinalityClass — boundary values and methods
     // -----------------------------------------------------------------------
@@ -650,38 +770,6 @@ mod tests {
             CardinalityClass::from_cardinality(10001),
             CardinalityClass::VeryHigh
         );
-    }
-
-    #[test]
-    fn test_cardinality_class_is_suitable_for_correlation() {
-        assert!(CardinalityClass::VeryLow.is_suitable_for_correlation());
-        assert!(CardinalityClass::Low.is_suitable_for_correlation());
-        assert!(CardinalityClass::Medium.is_suitable_for_correlation());
-        assert!(!CardinalityClass::High.is_suitable_for_correlation());
-        assert!(!CardinalityClass::VeryHigh.is_suitable_for_correlation());
-    }
-
-    #[test]
-    fn test_cardinality_class_priority_score_ordering() {
-        assert!(
-            CardinalityClass::VeryLow.priority_score() < CardinalityClass::Low.priority_score()
-        );
-        assert!(CardinalityClass::Low.priority_score() < CardinalityClass::Medium.priority_score());
-        assert!(
-            CardinalityClass::Medium.priority_score() < CardinalityClass::High.priority_score()
-        );
-        assert!(
-            CardinalityClass::High.priority_score() < CardinalityClass::VeryHigh.priority_score()
-        );
-    }
-
-    #[test]
-    fn test_cardinality_class_priority_score_values() {
-        assert_eq!(CardinalityClass::VeryLow.priority_score(), 1);
-        assert_eq!(CardinalityClass::Low.priority_score(), 2);
-        assert_eq!(CardinalityClass::Medium.priority_score(), 3);
-        assert_eq!(CardinalityClass::High.priority_score(), 4);
-        assert_eq!(CardinalityClass::VeryHigh.priority_score(), 5);
     }
 
     // -----------------------------------------------------------------------
@@ -773,6 +861,7 @@ mod tests {
                     "app_metrics".to_string(),
                     StreamType::Metrics,
                 )],
+                profiles: vec![],
             },
         );
 
@@ -806,6 +895,7 @@ mod tests {
                 logs: vec![],
                 traces: vec![],
                 metrics: vec![],
+                profiles: vec![],
             },
         );
 
@@ -834,12 +924,14 @@ mod tests {
             logs: vec!["app_logs".to_string()],
             traces: vec![],
             metrics: vec![],
+            profiles: vec![],
         };
 
         let json = serde_json::to_value(&streams).unwrap();
         assert!(json.get("logs").is_some());
         assert!(json.get("traces").is_none());
         assert!(json.get("metrics").is_none());
+        assert!(json.get("profiles").is_none());
     }
 
     #[test]
@@ -847,12 +939,6 @@ mod tests {
         let stream = StreamInfo::new("my_stream".to_string());
         assert_eq!(stream.stream_type, StreamType::Logs);
         assert!(stream.filters.is_empty());
-    }
-
-    #[test]
-    fn test_stream_info_set_stream_type_builder() {
-        let stream = StreamInfo::new("my_stream".to_string()).set_stream_type(StreamType::Metrics);
-        assert_eq!(stream.stream_type, StreamType::Metrics);
     }
 
     #[test]
@@ -946,11 +1032,29 @@ mod tests {
         }
     }
 
+    /// The picker reads the flag beside the row's own fields, not nested under it.
     #[test]
-    fn test_cardinality_class_ordering() {
-        assert!(CardinalityClass::VeryLow < CardinalityClass::Low);
-        assert!(CardinalityClass::Low < CardinalityClass::Medium);
-        assert!(CardinalityClass::Medium < CardinalityClass::High);
-        assert!(CardinalityClass::High < CardinalityClass::VeryHigh);
+    fn test_a_service_row_carries_named_after_stream_beside_its_fields() {
+        let record = infra::table::service_streams::ServiceRecord {
+            id: "s1".into(),
+            org_id: "default".into(),
+            service_name: "slo_slices".into(),
+            set_id: "default".into(),
+            disambiguation: serde_json::json!({}),
+            all_dimensions: serde_json::json!({}),
+            logs_streams: serde_json::json!(["slo_slices"]),
+            traces_streams: serde_json::json!([]),
+            metrics_streams: serde_json::json!([]),
+            profiles_streams: serde_json::json!([]),
+            field_name_mapping: None,
+            last_seen: 0,
+        };
+        let row = serde_json::to_value(ServiceRow {
+            record,
+            named_after_stream: true,
+        })
+        .unwrap();
+        assert_eq!(row["service_name"], "slo_slices");
+        assert_eq!(row["named_after_stream"], true);
     }
 }

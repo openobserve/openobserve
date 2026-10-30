@@ -92,8 +92,8 @@ describe("TraceDetails - Missing span_kind Field", () => {
         reference_parent_span_id: "",
         reference_parent_trace_id: "eab4575014a1fe101dba7de80a3cf6c3",
         reference_ref_type: "ChildOf",
-        service_name: "alertmanager",
-        service_service_instance: "dev2-openobserve-alertmanager-0",
+        service_name: "scheduler",
+        service_service_instance: "dev2-openobserve-scheduler-0",
         service_service_version: "v0.15.0-rc5",
         span_id: "6b080023171f5767",
         // span_kind is intentionally missing
@@ -121,8 +121,8 @@ describe("TraceDetails - Missing span_kind Field", () => {
         reference_parent_span_id: "6b080023171f5767",
         reference_parent_trace_id: "eab4575014a1fe101dba7de80a3cf6c3",
         reference_ref_type: "ChildOf",
-        service_name: "alertmanager",
-        service_service_instance: "dev2-openobserve-alertmanager-0",
+        service_name: "scheduler",
+        service_service_instance: "dev2-openobserve-scheduler-0",
         service_service_version: "v0.15.0-rc5",
         span_id: "d427ced59acf399b",
         // span_kind is intentionally missing
@@ -152,8 +152,8 @@ describe("TraceDetails - Missing span_kind Field", () => {
         reference_parent_span_id: "d427ced59acf399b",
         reference_parent_trace_id: "eab4575014a1fe101dba7de80a3cf6c3",
         reference_ref_type: "ChildOf",
-        service_name: "alertmanager",
-        service_service_instance: "dev2-openobserve-alertmanager-0",
+        service_name: "scheduler",
+        service_service_instance: "dev2-openobserve-scheduler-0",
         service_service_version: "v0.15.0-rc5",
         span_id: "bf6bde74cdcc245f",
         span_kind: null, // span_kind is explicitly null
@@ -190,6 +190,10 @@ describe("TraceDetails - Missing span_kind Field", () => {
 
     // Mock API to return data without span_kind
     globalThis.server.use(
+      http.get(
+        `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/:stream/traces/:traceId/details`,
+        () => HttpResponse.json(mockSpansWithoutSpanKind),
+      ),
       http.post(
         `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
         async ({ request }) => {
@@ -242,7 +246,7 @@ describe("TraceDetails - Missing span_kind Field", () => {
           },
           meta: {
             serviceColors: {
-              alertmanager: "#b7885e",
+              scheduler: "#b7885e",
             },
             redirectedFromLogs: false,
           },

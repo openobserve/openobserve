@@ -44,10 +44,11 @@
 
     <!-- Group content -->
 
-    <div v-if="isOpen" class="group-container overflow-x-auto">
+    <!-- -m-1 p-1: padding so a row's focus ring isn't clipped by this scroll container, margin keeps alignment -->
+    <div v-if="isOpen" class="group-container -m-1 overflow-x-auto p-1">
       <!-- Items in group (V2 uses 'conditions' array) -->
       <div
-        class="ml-2 whitespace-nowrap"
+        class="ms-2 whitespace-nowrap"
         v-for="(item, index) in props.group.conditions"
         :key="index"
       >
@@ -70,14 +71,14 @@
         <div
           v-else
           class="mb-2 flex items-center gap-2"
-          :class="store.state.isAiChatEnabled ? 'pl-0' : 'pl-4'"
+          :class="store.state.isAiChatEnabled ? 'ps-0' : 'ps-4'"
         >
           <FilterCondition
             :condition="item"
             :stream-fields="props.streamFields"
             @input:update="(name, field) => inputUpdate(name, field)"
             :index="Number(index)"
-            :label="group.logicalOperator?.toLowerCase() || 'and'"
+            :label="group.logicalOperator?.toLowerCase() || t('common.and')"
             :depth="depth"
             :input-width="props.conditionInputWidth"
             :is-first-in-group="index === 0"
@@ -86,6 +87,7 @@
             :name-prefix="childNamePrefix(index)"
           />
           <OButton
+            :aria-label="t('common.remove')"
             data-test="alert-conditions-delete-condition-btn"
             size="icon-xs-circle"
             variant="ghost"
@@ -97,27 +99,27 @@
       </div>
       <!-- Action buttons -->
 
-      <div class="ml-4 flex items-center justify-start">
+      <div class="ms-4 flex items-center justify-start">
         <OButton
           data-test="alert-conditions-add-condition-btn"
-          class="ml-3"
+          class="ms-3"
           size="sm"
           variant="ghost-primary"
           @click="addCondition(props.group.groupId)"
         >
-          <OIcon class="mr-1 rounded-full border font-bold" size="xs" name="add" />
+          <OIcon class="me-1 rounded-full border font-bold" size="xs" name="add" />
           <span class="text-xs font-bold">{{ t("alerts.conditions.condition") }}</span>
           <OTooltip :delay="300" :content="t('alerts.conditions.addConditionTooltip')" />
         </OButton>
         <OButton
           data-test="alert-conditions-add-condition-group-btn"
-          class="ml-1"
+          class="ms-1"
           size="sm"
           variant="ghost-primary"
           @click="addGroup(props.group.groupId)"
           :disabled="depth >= 2"
         >
-          <OIcon class="mr-1 rounded-full border font-bold" size="xs" name="add" />
+          <OIcon class="me-1 rounded-full border font-bold" size="xs" name="add" />
           <span class="text-xs font-bold">{{ t("alerts.conditions.conditionGroup") }}</span>
           <OTooltip
             v-if="depth < 2"
@@ -128,12 +130,12 @@
         </OButton>
         <OButton
           data-test="alert-conditions-reorder-btn"
-          class="ml-1"
+          class="ms-1"
           size="sm"
           variant="ghost-primary"
           @click="reorderItems()"
         >
-          <OIcon class="mr-1 font-bold" size="xs" name="swap-vert" />
+          <OIcon class="me-1 font-bold" size="xs" name="swap-vert" />
           <span class="text-xs font-bold">{{ t("alerts.filters.reorder") }}</span>
           <OTooltip :delay="300" :content="t('alerts.filters.reorderTooltip')" />
         </OButton>
@@ -161,7 +163,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { getUUID } from "@/utils/zincutils";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
@@ -264,19 +266,19 @@ const isOpen = ref(true);
 // mode; the handlers mutate this clone and emit it, and the ancestor writes it
 // back through the form (which re-syncs via the watch below).
 const groups = ref(cloneDeep(props.group));
-const showPreview = ref(true);
 
 const store = useStore();
 const { isDark } = useTheme();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const label = ref(props.group.logicalOperator?.toLowerCase() || "and");
 
 const confirmDialog = ref({
   show: false,
-  title: "",
-  message: "",
-  warningMessage: "",
+  // raw("") is only the empty placeholder — the real values are assigned from t().
+  title: raw(""),
+  message: raw(""),
+  warningMessage: raw(""),
   okCallback: () => {},
 });
 
@@ -340,7 +342,7 @@ function isGroup(item: any) {
 
 // Handlers mutate the clone `groups` (never the readonly `props.group`) and emit
 // it; the ancestor writes it back through the form, re-syncing via the watch above.
-const addCondition = (groupId: string) => {
+const addCondition = (_groupId: string) => {
   // Capture any in-place bare-mode leaf edits before mutating + emitting.
   syncWorkingCopyFromProp();
   // V2: Create condition with filterType and logicalOperator
@@ -357,7 +359,7 @@ const addCondition = (groupId: string) => {
   emit("add-condition", groups.value);
 };
 
-const addGroup = (groupId: string) => {
+const addGroup = (_groupId: string) => {
   // Capture any in-place bare-mode leaf edits before mutating + emitting.
   syncWorkingCopyFromProp();
   // V2: Create group with filterType, logicalOperator, and conditions array
@@ -583,26 +585,3 @@ defineExpose({
   confirmDialog,
 });
 </script>
-
-<style scoped>
-/* keep(scrollbar): ::-webkit-scrollbar pseudo-elements and scrollbar-color have no utility equivalent. */
-
-.group-container {
-  scrollbar-color: var(--color-border-strong) var(--color-surface-base); /* thumb color, track color */
-}
-
-/* For more control using WebKit scrollbar styling */
-.group-container::-webkit-scrollbar {
-  width: 0.5rem;
-  height: 0.25rem !important;
-}
-
-.group-container::-webkit-scrollbar-track {
-  background: var(--color-surface-base);
-}
-
-.group-container::-webkit-scrollbar-thumb {
-  background-color: var(--color-border-strong);
-  border-radius: var(--radius-default);
-}
-</style>

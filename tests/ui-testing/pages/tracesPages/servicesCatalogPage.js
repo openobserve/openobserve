@@ -86,13 +86,22 @@ export class ServicesCatalogPage {
     // data-test="service-graph-side-panel" from ServiceGraphNodeSidePanel.vue)
     // =====================================================================
     this.sidePanel = page.locator('[data-test="service-graph-side-panel"]');
+    this.sidePanelViewRelatedBtn = page.locator('[data-test="service-graph-node-panel-view-related-btn"]');
+    this.sidePanelViewRelatedTracesItem = page.locator('[data-test="service-graph-node-panel-view-related-traces-btn"]');
+    this.tracesSearchBar = page.locator('[data-test="logs-search-bar"]');
 
     // =====================================================================
-    // Service-catalog tab (in traces module)
+    // Navigation — Services Catalog is reached from the Traces rail tile's hover
+    // flyout; since #13852 the flyout item lands on the Traces page's in-page
+    // `?tab=services-catalog` view (the old /traces/services route now only
+    // exists as a legacy redirect).
     // =====================================================================
-    this.servicesCatalogTabBtn = page.locator(
-      '[data-test="traces-search-mode-services-catalog-btn"]',
-    );
+    this.tracesRailTile = page.locator('[data-test="nav-group-traces"]');
+    // #13852 rerouted the flyout children through the Traces page's ?tab= views, so the
+    // Services Catalog flyout item is now `nav-group-item-traces-services-catalog`
+    // (childDataTest = `nav-group-item-${child.name}-${child.tab}`), not the old
+    // standalone `nav-group-item-servicesCatalog`.
+    this.servicesCatalogNavItem = page.locator('[data-test="nav-group-item-traces-services-catalog"]');
 
     // =====================================================================
     // Factory locators — runtime-bound (allowed by POM strict policy)
@@ -154,37 +163,28 @@ export class ServicesCatalogPage {
   async navigate(period = '24h') {
     const org = process.env['ORGNAME'] || 'default';
     const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
-    // Use the trailing-slash form `/web/traces/` — without it some dev servers
-    // route the request to the SPA fallback and drop query params before the
-    // Vue router can read them. The trailing-slash form is what Vue Router
-    // canonicalises to and what the index.vue page reads from on mount.
     await this.page.goto(
-      `${baseUrl}/web/traces/?tab=services-catalog&org_identifier=${org}&period=${period}`,
+      `${baseUrl}/web/traces/services?org_identifier=${org}&period=${period}`,
       { timeout: 60000 },
     );
     // Use load instead of networkidle — networkidle hangs on SPAs with websockets
     await this.page.waitForLoadState('load', { timeout: 15000 });
-    // Ensure the services-catalog tab is the active one. If the URL param was
-    // dropped (e.g. due to a router replace during mount), click the tab button
-    // explicitly. This is defensive — keeps the tab activation deterministic.
-    const filterVisible = await this.filterInputField
-      .waitFor({ state: 'attached', timeout: 8000 })
-      .then(() => true)
-      .catch(() => false);
-    if (!filterVisible) {
-      // Fallback: click the services-catalog tab button explicitly.
-      await this.servicesCatalogTabBtn
-        .waitFor({ state: 'visible', timeout: 8000 })
-        .catch(() => {});
-      await this.servicesCatalogTabBtn.click().catch(() => {});
-      await this.filterInputField
-        .waitFor({ state: 'attached', timeout: 15000 })
-        .catch(() => {});
-    }
+    await this.filterInputField
+      .waitFor({ state: 'attached', timeout: 15000 })
+      .catch(() => {});
   }
 
+  /** Navigate to Services via the left-rail flyout (the discovery path a user takes). */
   async clickServiceCatalogTab() {
-    await this.servicesCatalogTabBtn.click();
+    await this.tracesRailTile.hover();
+    // The flyout is teleported to <body> and opens after ONavGroup's 120ms OPEN_DELAY, so the
+    // item is not in the DOM the instant hover() resolves — wait for it before clicking, else
+    // the click races the debounce and times out.
+    await this.servicesCatalogNavItem.waitFor({ state: 'visible', timeout: 10000 });
+    await this.servicesCatalogNavItem.click();
+    // #13852 lands Services Catalog on the Traces page as `?tab=services-catalog`; the old
+    // /traces/services path now only exists as a legacy redirect.
+    await this.page.waitForURL(/\/traces\?.*tab=services-catalog/, { timeout: 10000 });
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
@@ -449,6 +449,14 @@ export class ServicesCatalogPage {
 
   async expectSidePanelVisible() {
     await expect(this.sidePanel).toBeVisible({ timeout: 30000 });
+  }
+
+  /** Leaves the catalog for the service's traces; the catalog component unmounts. */
+  async viewServiceTracesFromSidePanel() {
+    await this.sidePanelViewRelatedBtn.click();
+    await this.sidePanelViewRelatedTracesItem.click();
+    await expect(this.tracesSearchBar).toBeVisible({ timeout: 15000 });
+    await expect(this.filterInputField).toHaveCount(0, { timeout: 15000 });
   }
 
   // =========================================================================

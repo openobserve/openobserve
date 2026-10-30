@@ -19,7 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="move-across-folders-dialog"
     :open="open"
     size="md"
-    :title="`Move ${type.charAt(0).toUpperCase() + type.slice(1)} To Another Folder`"
+    :title="
+      t(folderKey(type, 'dashboard.moveToAnotherFolder'), {
+        type: type.charAt(0).toUpperCase() + type.slice(1),
+      })
+    "
     :secondary-button-label="t('dashboard.cancel')"
     :primary-button-label="t('common.move')"
     :primary-button-loading="onSubmit.isLoading.value"
@@ -35,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             (item: any) => item.folderId === activeFolderId,
           )?.name ?? ''
         "
-        :label="t('dashboard.currentFolderLabel')"
+        :label="t(folderKey(type, 'dashboard.currentFolderLabel'))"
         disabled
         :data-test="`${type}-folder-move-name`"
       />
@@ -60,7 +64,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
+import { folderKey } from "./folderTerms";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import { moveModuleToAnotherFolder } from "@/utils/commons";
@@ -102,7 +107,7 @@ export default defineComponent({
     // The picker excludes the active folder, so seeding it here would name a
     // destination the list cannot offer and cannot be re-picked.
     const selectedFolder = ref({ label: "", value: "" });
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { showPositiveNotification, showErrorNotification } = useNotifications();
 
     const onSubmit = useLoading(async () => {
@@ -118,7 +123,9 @@ export default defineComponent({
         await moveModuleToAnotherFolder(store, data, props.type, props.activeFolderId);
 
         showPositiveNotification(
-          `${props?.type?.charAt?.(0)?.toUpperCase() + props?.type?.slice?.(1)} moved successfully`,
+          t(folderKey(props.type, "toastMessages.sidebar.movedSuccessfully"), {
+            type: props?.type?.charAt?.(0)?.toUpperCase() + props?.type?.slice?.(1),
+          }),
           {
             timeout: 5000,
           },
@@ -127,8 +134,11 @@ export default defineComponent({
         emit("updated", props.activeFolderId, selectedFolder.value.value);
       } catch (err: any) {
         showErrorNotification(
-          err?.message ??
-            `${props?.type?.charAt?.(0)?.toUpperCase() + props?.type?.slice?.(1)} move failed.`,
+          err?.response?.data?.message ??
+            err?.message ??
+            t(folderKey(props.type, "toastMessages.sidebar.moveFailed"), {
+              type: props?.type?.charAt?.(0)?.toUpperCase() + props?.type?.slice?.(1),
+            }),
           {
             timeout: 5000,
           },
@@ -146,6 +156,10 @@ export default defineComponent({
           return "report_ids";
         case "synthetics":
           return "synthetic_ids";
+        case "workflows":
+          return "workflow_ids";
+        case "downtimes":
+          return "downtime_ids";
         default:
           return "alert_ids";
       }
@@ -153,6 +167,7 @@ export default defineComponent({
 
     return {
       t,
+      folderKey,
       store,
       getImageURL,
       selectedFolder,

@@ -22,22 +22,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   (`dest:<name>` / `wf:<id>`) and split back apart on change — the payload wiring,
   validation, and backend contract are unchanged.
 
-  When `workflowsEnabled` is false — OSS, or an enterprise/cloud deployment with
-  the backend `/config` flag `workflows_enabled` off — no Workflows group is
-  built, no group headers are shown, and the control behaves exactly like the old
-  Destinations dropdown.
+  `workflowsEnabled` (interactive) and `workflowsLocked` (visible, disabled) are
+  two different reasons the Workflows group might not be pickable: an edition
+  that doesn't unlock workflows at all shows the group LOCKED (so it stays
+  discoverable); an entitled deployment with the backend `/config` flag
+  `workflows_enabled` off just HIDES it, same as before. Only when neither is
+  true does the control fall back to a plain Destinations dropdown.
   Only the control row lives here; the field label + inline required-error stay
   in the parent (AlertSettings) so the two alert-type layouts keep their chrome.
 -->
 <template>
-  <div class="flex items-center">
+  <div class="flex items-center max-md:flex-wrap max-md:gap-y-2">
     <OSelect
       :model-value="model"
+      :aria-label="t('alerts.destination')"
       :options="options"
       multiple
+      :placeholder="placeholder"
       :error="error"
       :collapsible-groups="workflowsEnabled"
-      class="max-w-[18.75rem] min-w-[11.25rem]"
+      pin-selected-in-groups
+      class="max-w-[18.75rem] min-w-[11.25rem] max-md:max-w-none max-md:min-w-0 max-md:flex-1 max-md:basis-[calc(100%-2rem)]"
       data-test="alert-destinations-select"
       @update:model-value="onUpdate"
     >
@@ -50,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OButton
       data-test="alert-settings-refresh-destinations-btn"
-      class="ml-1"
+      class="ms-1"
       variant="ghost"
       size="icon-circle-sm"
       :title="t('alerts.alertSettings.refreshDestinations')"
@@ -62,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="create-destination-btn"
       variant="outline"
       size="sm"
-      class="ml-2"
+      class="ms-2 max-md:ms-0"
       @click="emit('create-destination')"
     >
       {{ t("alerts.alertSettings.addNewDestination") }}
@@ -72,23 +77,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="create-workflow-btn"
       variant="outline"
       size="sm"
-      class="ml-2"
+      class="ms-2"
       @click="emit('create-workflow')"
     >
       {{ t("workflow.create") }}
     </OButton>
+    <!-- Locked (not hidden): the family supports workflow routing, but this
+         edition doesn't unlock it — kept as the discovery point since the
+         dropdown's own "Workflows" header has no icon/tooltip slot to attach. -->
+    <template v-else-if="workflowsLocked">
+      <OButton
+        data-test="create-workflow-btn"
+        variant="outline"
+        size="sm"
+        class="ms-2"
+        @click="openUpgradeDialog"
+      >
+        <template #icon-left><OIcon name="lock" size="sm" class="text-warning-600" /></template>
+        {{ t("workflow.create") }}
+      </OButton>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+
+const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
 interface Option {
-  label: string;
+  label: I18nText;
   value: string;
 }
 // Option lists may be plain strings (destinations = `getFormattedDestinations`
@@ -100,7 +123,11 @@ const props = defineProps<{
   destinationOptions: RawOption[];
   workflowOptions: RawOption[];
   workflowsEnabled: boolean;
+  /** Family supports workflows but this edition doesn't unlock them — show the group locked instead of hiding it. */
+  workflowsLocked?: boolean;
+  workflowsLockMessage?: I18nText;
   error?: boolean;
+  placeholder?: I18nText;
 }>();
 
 const emit = defineEmits<{
@@ -111,7 +138,7 @@ const emit = defineEmits<{
   (e: "create-workflow"): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const DEST = "dest:";
 const WF = "wf:";
@@ -152,12 +179,12 @@ watch(propsCombined, (next) => {
 // Normalize a raw option (string or {label,value}) to a { name, label } pair.
 // Returns null for anything unusable (see the isFilled note above) so the caller
 // can drop it rather than render a `dest:undefined` row or throw.
-const norm = (o: RawOption): { name: string; label: string } | null => {
+const norm = (o: RawOption): { name: string; label: I18nText } | null => {
   if (!isFilled(o)) return null;
-  if (typeof o === "string") return { name: o, label: o };
+  if (typeof o === "string") return { name: o, label: raw(o) };
   if (!isFilled((o as Option).value)) return null;
   const value = String((o as Option).value);
-  return { name: value, label: (o as Option).label ?? value };
+  return { name: value, label: (o as Option).label ?? raw(value) };
 };
 
 const toTagged = (list: RawOption[] | undefined, tag: string) =>
@@ -166,15 +193,50 @@ const toTagged = (list: RawOption[] | undefined, tag: string) =>
     .filter(isFilled)
     .map(({ name, label }) => ({ label, value: `${tag}${name}` }));
 
+// A selected name absent from its options list — flagged, not dropped, so it stays until removed.
+const missingOptions = (
+  selected: string[] | undefined,
+  known: { value: string }[],
+  tag: string,
+) => {
+  const knownValues = new Set(known.map((o) => o.value));
+  return (selected || [])
+    .filter(isFilled)
+    .map((v) => `${tag}${v}`)
+    .filter((v) => !knownValues.has(v))
+    .map((value) => ({
+      label: raw(value.slice(tag.length)),
+      value,
+      badge: t("alert_dependencies.missingTag"),
+      badgeMuted: true,
+    }));
+};
+
 const options = computed(() => {
   const dests = toTagged(props.destinationOptions, DEST);
-  if (!props.workflowsEnabled) return dests;
+  const missingDests = missingOptions(props.destinations, dests, DEST);
+  if (!props.workflowsEnabled && !props.workflowsLocked) return [...dests, ...missingDests];
+  const workflowsHeader = { header: true, label: t("alerts.alertSettings.targetsWorkflowsGroup") };
+  if (!props.workflowsEnabled) {
+    // Locked: the header stays visible (so the capability is discoverable
+    // while browsing), but there's nothing selectable beneath it — this
+    // edition has no entitlement to produce real options for.
+    return [
+      { header: true, label: t("alerts.alertSettings.targetsDestinationsGroup") },
+      ...dests,
+      ...missingDests,
+      workflowsHeader,
+    ];
+  }
   const wfs = toTagged(props.workflowOptions, WF);
+  const missingWfs = missingOptions(props.workflows, wfs, WF);
   return [
     { header: true, label: t("alerts.alertSettings.targetsDestinationsGroup") },
     ...dests,
-    { header: true, label: t("alerts.alertSettings.targetsWorkflowsGroup") },
+    ...missingDests,
+    workflowsHeader,
     ...wfs,
+    ...missingWfs,
   ];
 });
 

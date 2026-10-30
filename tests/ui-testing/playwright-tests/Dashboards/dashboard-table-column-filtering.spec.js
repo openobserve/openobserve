@@ -12,8 +12,6 @@ import {
   reopenPanelConfig,
 } from "./utils/configPanelHelpers.js";
 import {
-  TABLE_SELECTOR,
-  TABLE_DATA_ROW_SELECTOR,
   getColumnFilterBtn,
   openColumnFilter,
   columnFilter,
@@ -41,7 +39,7 @@ test.describe("Dashboard Table — Column Filtering (PR #12531)", () => {
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Table filtering enabled");
 
-    await expect(page.locator(TABLE_SELECTOR)).toBeVisible();
+    await expect(pm.dashboardPanelActions.dashboardTable).toBeVisible();
     await expect(getColumnFilterBtn(page, 0)).toBeVisible();
     testLogger.info("Filter icon visible in column header");
 
@@ -62,7 +60,7 @@ test.describe("Dashboard Table — Column Filtering (PR #12531)", () => {
     // mid-click — see waitForPanelTableSettled.
     await waitForPanelTableSettled(page);
 
-    const rows = page.locator(TABLE_DATA_ROW_SELECTOR);
+    const rows = pm.dashboardPanelActions.getTableDataRows();
     await rows.first().waitFor({ state: "visible", timeout: 15000 });
     const totalRowCount = await rows.count();
     expect(totalRowCount).toBeGreaterThan(0);
@@ -98,7 +96,7 @@ test.describe("Dashboard Table — Column Filtering (PR #12531)", () => {
     await pm.dashboardPanelActions.applyDashboardBtn();
     await waitForPanelTableSettled(page);
 
-    const rows = page.locator(TABLE_DATA_ROW_SELECTOR);
+    const rows = pm.dashboardPanelActions.getTableDataRows();
     await rows.first().waitFor({ state: "visible", timeout: 15000 });
     const totalRowCount = await rows.count();
 
@@ -157,20 +155,34 @@ test.describe("Dashboard Table — Column Filtering (PR #12531)", () => {
 
     const panel = await openColumnFilter(page, 0);
     const items = columnFilter.valueItems(panel);
-    const initialCount = await items.count();
-    // Must have more than the eventual 1-item "no matches" placeholder, otherwise a
-    // panel that failed to load any values at all would be indistinguishable from
-    // "search narrowed the list down to nothing".
-    expect(initialCount).toBeGreaterThan(1);
+    // Value <li>s populate a reactive tick after the panel shell becomes visible; poll so
+    // count() never snapshots the still-filling list. How MANY values there are is not this
+    // test's business: column 0 is histogram(_timestamp), so its bucket count depends on when
+    // unrelated ingests landed in the panel's window and a single-bucket run is legitimate.
+    await expect.poll(async () => items.count(), { timeout: 10000 }).toBeGreaterThan(0);
+    const initialTexts = await items.allInnerTexts();
 
     // A search term that matches nothing real should collapse the list to the
     // "no matches" placeholder row.
     await columnFilter.search(panel, "zzz_no_such_value_zzz");
     await expect(items).toHaveCount(1);
-    const narrowedCount = await items.count();
-    expect(narrowedCount).toBeLessThan(initialCount);
     await expect(items.first()).toContainText(/no matches/i);
-    testLogger.info("Filter search narrowed value list to no-matches placeholder", { initialCount, narrowedCount });
+
+    // A term taken from a real value narrows the list to the values that match it.
+    const term = initialTexts[0].trim();
+    await columnFilter.search(panel, term);
+    await expect
+      .poll(async () => {
+        const texts = await items.allInnerTexts();
+        return texts.length > 0 && texts.every((t) => t.toLowerCase().includes(term.toLowerCase()));
+      }, { timeout: 10000 })
+      .toBe(true);
+    const narrowedTexts = await items.allInnerTexts();
+    expect(narrowedTexts.length).toBeLessThanOrEqual(initialTexts.length);
+    testLogger.info("Filter search narrowed value list", {
+      initialCount: initialTexts.length,
+      narrowedCount: narrowedTexts.length,
+    });
 
     await page.keyboard.press("Escape");
     await pm.dashboardPanelActions.savePanel();

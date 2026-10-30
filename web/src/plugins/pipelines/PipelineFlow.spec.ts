@@ -16,23 +16,13 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import PipelineFlow from "./PipelineFlow.vue";
-import { nextTick } from "vue";
-import { createI18n } from "vue-i18n";
+import { nextTick, reactive } from "vue";
 
-// Create i18n instance
-const i18n = createI18n({
-  legacy: false,
-  locale: "en",
-  messages: {
-    en: {
-      pipeline: {
-        unsavedChanges: "You have unsaved changes",
-        emptyCanvas: "Drag and drop nodes from the sidebar to start building your pipeline",
-        dropHere: "Drop here",
-      },
-    },
-  },
-});
+const breakpoint = vi.hoisted(() => ({ lgUp: { value: true } }));
+const dnd = vi.hoisted(() => ({ pipelineObj: null as any }));
+vi.mock("@/composables/useBreakpoint", () => ({
+  default: () => ({ lgUp: breakpoint.lgUp }),
+}));
 
 // Mock dependencies
 vi.mock("@/utils/zincutils", () => ({
@@ -157,7 +147,7 @@ let mockValidateConnection: any;
 
 vi.mock("./useDnD", () => ({
   default: () => {
-    mockPipelineObj = {
+    mockPipelineObj = dnd.pipelineObj ?? {
       currentSelectedPipeline: {
         nodes: [],
         edges: [],
@@ -200,6 +190,9 @@ describe("PipelineFlow.vue", () => {
     mockZoomOut.mockClear();
     mockSetViewport.mockClear();
 
+    breakpoint.lgUp.value = true;
+    dnd.pipelineObj = null;
+
     // Reset mock pipelineObj for each test
     mockPipelineObj = {
       currentSelectedPipeline: {
@@ -227,7 +220,7 @@ describe("PipelineFlow.vue", () => {
   const mountComponent = () => {
     return mount(PipelineFlow, {
       global: {
-        plugins: [i18n],
+        plugins: [],
         stubs: {
           OIcon: OIconStub,
         },
@@ -287,7 +280,7 @@ describe("PipelineFlow.vue", () => {
     wrapper = mountComponent();
     const startNode = wrapper.find('[data-test="pipeline-flow-start-node"]');
     expect(startNode.exists()).toBe(true);
-    expect(startNode.text()).toBe("pipeline.chooseSource");
+    expect(startNode.text()).toBe("Choose a Source");
   });
 
   // Test 9: Empty canvas text is hidden when nodes exist
@@ -550,5 +543,57 @@ describe("PipelineFlow.vue", () => {
     const warningText = wrapper.find('[data-test="pipeline-flow-unsaved-changes-warning-text"]');
     expect(warningText.text()).toContain("Unsaved changes detected");
     expect(warningText.find('[data-test-stub="o-icon"]').exists()).toBe(true);
+  });
+
+  describe("re-fit after the mount-time fit", () => {
+    const mountAndSettle = async () => {
+      dnd.pipelineObj = reactive({
+        currentSelectedPipeline: { nodes: [], edges: [] },
+        dirtyFlag: false,
+        isDragOver: false,
+      });
+      wrapper = mountComponent();
+      wrapper.vm.vueFlowRef = { fitView: mockFitView };
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      mockFitView.mockClear();
+    };
+
+    it("does not re-fit when the user adds a node below lg", async () => {
+      breakpoint.lgUp.value = false;
+      await mountAndSettle();
+
+      wrapper.vm.pipelineObj.currentSelectedPipeline.nodes.push({ id: "n1" });
+      await nextTick();
+      // The re-render re-binds the template ref, so the fitView spy goes back on after it.
+      wrapper.vm.vueFlowRef = { fitView: mockFitView };
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      expect(mockFitView).not.toHaveBeenCalled();
+    });
+
+    it("re-fits when a saved pipeline loads below lg", async () => {
+      breakpoint.lgUp.value = false;
+      await mountAndSettle();
+
+      wrapper.vm.pipelineObj.currentSelectedPipeline = { nodes: [{ id: "n1" }], edges: [] };
+      await nextTick();
+      // The re-render re-binds the template ref, so the fitView spy goes back on after it.
+      wrapper.vm.vueFlowRef = { fitView: mockFitView };
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      expect(mockFitView).toHaveBeenCalledWith({ padding: 1 });
+    });
+
+    it("does not re-fit a loaded pipeline on desktop", async () => {
+      await mountAndSettle();
+
+      wrapper.vm.pipelineObj.currentSelectedPipeline = { nodes: [{ id: "n1" }], edges: [] };
+      await nextTick();
+      // The re-render re-binds the template ref, so the fitView spy goes back on after it.
+      wrapper.vm.vueFlowRef = { fitView: mockFitView };
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      expect(mockFitView).not.toHaveBeenCalled();
+    });
   });
 });

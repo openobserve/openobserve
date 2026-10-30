@@ -31,7 +31,7 @@ use super::{EMPTY_FILE_EXT, FOOTER_CACHE, caching_directory::CachingDirectory};
 
 pub(crate) static FOOTER_DATA_CACHE: LazyLock<BytesCache> = LazyLock::new(|| {
     let max_size = config::get_config()
-        .limit
+        .search
         .inverted_index_footer_cache_max_size;
     BytesCache::new(max_size, "tantivy_footer_cache".to_string())
 });

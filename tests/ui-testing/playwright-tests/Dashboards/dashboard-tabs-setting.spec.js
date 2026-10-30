@@ -1,4 +1,5 @@
 const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
+const testLogger = require('../utils/test-logger.js');
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
@@ -9,7 +10,8 @@ test.describe("dashboard tabs setting", () => {
   const generateDashboardName = (prefix = "Dashboard") =>
     `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     await ingestion(page);
   });
@@ -29,11 +31,7 @@ test.describe("dashboard tabs setting", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Open dashboard settings and add a tab
     await pm.dashboardSetting.openSetting();
@@ -63,18 +61,14 @@ test.describe("dashboard tabs setting", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Open dashboard settings and add a tab
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.addTabSetting(newTabName);
     await pm.dashboardSetting.saveTabSetting();
 
-    await expect(page.locator('[data-test="o-toast-message"]').filter({ hasText: "Tab added successfully" })).toBeVisible({
+    await expect(pm.dashboardSetting.getToastMessageByText("Tab added successfully")).toBeVisible({
       timeout: 5000,
     });
 
@@ -99,20 +93,13 @@ test.describe("dashboard tabs setting", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Open dashboard settings and add a tab
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.addTabSetting(newTabName);
     await pm.dashboardSetting.saveTabSetting();
-    // await expect(page.getByText("Dashboard added successfully.")).toBeVisible({
-    //   timeout: 3000,
-    // });
-    await expect(page.locator('[data-test="o-toast-message"]').filter({ hasText: "Tab added successfully" })).toBeVisible({
+    await expect(pm.dashboardSetting.getToastMessageByText("Tab added successfully")).toBeVisible({
       timeout: 5000,
     });
 
@@ -123,10 +110,7 @@ test.describe("dashboard tabs setting", () => {
     );
 
     await pm.dashboardSetting.saveEditedtab();
-    // await expect(page.getByText("Tab added successfully")).toBeVisible({
-    //   timeout: 2000,
-    // });
-    await expect(page.locator('[data-test="o-toast-message"]').filter({ hasText: "Tab updated successfully" })).toBeVisible({
+    await expect(pm.dashboardSetting.getToastMessageByText("Tab updated successfully")).toBeVisible({
       timeout: 5000,
     });
     await pm.dashboardSetting.closeSettingDashboard();
@@ -149,21 +133,14 @@ test.describe("dashboard tabs setting", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Open dashboard settings and add a tab
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.addTabSetting(newTabName);
     await pm.dashboardSetting.saveTabSetting();
 
-    // await expect(page.getByText("Dashboard added successfully.")).toBeVisible({
-    //   timeout: 3000,
-    // });
-    await expect(page.locator('[data-test="o-toast-message"]').filter({ hasText: "Tab added successfully" })).toBeVisible({
+    await expect(pm.dashboardSetting.getToastMessageByText("Tab added successfully")).toBeVisible({
       timeout: 5000,
     });
 
@@ -192,27 +169,20 @@ test.describe("dashboard tabs setting", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Open dashboard settings, add a tab, and delete it
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.addTabSetting(newTabName);
     await pm.dashboardSetting.saveTabSetting();
 
-    // await expect(page.getByText("Dashboard added successfully.")).toBeVisible({
-    //   timeout: 3000,
-    // });
-    await expect(page.locator('[data-test="o-toast-message"]').filter({ hasText: "Tab added successfully" })).toBeVisible({
+    await expect(pm.dashboardSetting.getToastMessageByText("Tab added successfully")).toBeVisible({
       timeout: 5000,
     });
 
     // Delete the tab
     await pm.dashboardSetting.deleteTab(newTabName);
-    await expect(page.locator('[data-test="o-toast-message"]').filter({ hasText: "Tab deleted successfully" })).toBeVisible({
+    await expect(pm.dashboardSetting.getToastMessageByText("Tab deleted successfully")).toBeVisible({
       timeout: 5000,
     });
     await pm.dashboardSetting.closeSettingDashboard();

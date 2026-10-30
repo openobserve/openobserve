@@ -34,7 +34,7 @@ pub fn get_cipher_key_names(sql: &str) -> Result<Vec<String>, Error> {
     let mut statement = Parser::parse_sql(dialect, sql)
         .map_err(|e| Error::Message(e.to_string()))?
         .pop()
-        .unwrap();
+        .ok_or_else(|| Error::Message("empty sql".to_string()))?;
     let mut visitor = ExtractKeyNamesVisitor::new();
     let _ = statement.visit(&mut visitor);
     if let Some(e) = visitor.error {
@@ -72,11 +72,18 @@ impl VisitorMut for ExtractKeyNamesVisitor {
             if names.len() != 1 {
                 return ControlFlow::Continue(());
             }
-            let fname = names.first().unwrap();
-            let fname = fname.as_ident().unwrap();
-            if fname.value == ENCRYPT_UDF_NAME
-                || fname.value == DECRYPT_UDF_NAME
-                || fname.value == DECRYPT_SLOW_UDF_NAME
+            let Some(fname) = names.first().and_then(|name| name.as_ident()) else {
+                return ControlFlow::Continue(());
+            };
+            // DataFusion lowercases an unquoted function name before it resolves the UDF, so
+            // `DECRYPT(..)` reaches the cipher UDF and must be matched here the same way.
+            let fname = match fname.quote_style {
+                Some(_) => fname.value.clone(),
+                None => fname.value.to_ascii_lowercase(),
+            };
+            if fname == ENCRYPT_UDF_NAME
+                || fname == DECRYPT_UDF_NAME
+                || fname == DECRYPT_SLOW_UDF_NAME
             {
                 let list = match args {
                     FunctionArguments::List(list) => list,
@@ -156,6 +163,45 @@ mod tests {
         let mut keys = get_cipher_key_names(sql).unwrap();
         keys.sort();
         assert_eq!(keys, vec!["k1", "k2"]);
+    }
+
+    #[test]
+    fn test_get_cipher_key_names_uppercase_and_mixed_case() {
+        for sql in [
+            "SELECT DECRYPT(col, 'secret') FROM t",
+            "SELECT DeCrYpT(col, 'secret') FROM t",
+            "SELECT ENCRYPT(col, 'secret') FROM t",
+            "SELECT Decrypt_Path(col, 'secret') FROM t",
+        ] {
+            assert_eq!(get_cipher_key_names(sql).unwrap(), vec!["secret"], "{sql}");
+        }
+    }
+
+    #[test]
+    fn test_get_cipher_key_names_quoted_name_keeps_case() {
+        // DataFusion resolves a quoted name verbatim, so "DECRYPT" is not the cipher UDF.
+        assert!(
+            get_cipher_key_names("SELECT \"DECRYPT\"(col, 'secret') FROM t")
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(
+            get_cipher_key_names("SELECT \"decrypt\"(col, 'secret') FROM t").unwrap(),
+            vec!["secret"]
+        );
+    }
+
+    #[test]
+    fn test_get_cipher_key_names_where_only() {
+        let sql =
+            "SELECT _timestamp FROM t WHERE id = 'x' AND substr(decrypt(col, 'wkey'), 1, 1) = 'S'";
+        let keys = get_cipher_key_names(sql).unwrap();
+        assert_eq!(keys, vec!["wkey"]);
+    }
+
+    #[test]
+    fn test_get_cipher_key_names_empty_sql_returns_error() {
+        assert!(get_cipher_key_names("").is_err());
     }
 
     #[test]

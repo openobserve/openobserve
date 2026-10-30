@@ -44,7 +44,18 @@
       <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
         {{ title }}<span v-if="required" class="text-text-body"> *</span>
       </span>
-      <div v-if="$slots.actions" class="ml-auto flex items-center gap-2">
+      <span
+        v-if="info"
+        tabindex="0"
+        role="img"
+        class="text-text-secondary -ms-1 flex items-center"
+        :aria-label="info"
+        :data-test="dataTest ? `${dataTest}-info` : undefined"
+      >
+        <OIcon name="info-outline" size="xs" />
+        <OTooltip :content="info" />
+      </span>
+      <div v-if="$slots.actions" class="ms-auto flex items-center gap-2">
         <slot name="actions" />
       </div>
     </div>
@@ -55,8 +66,14 @@
 </template>
 
 <script setup lang="ts">
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import type { I18nText } from "@/types/i18n";
+
 defineProps<{
-  title: string;
+  title: I18nText;
+  /** Explains the section in a tooltip on an info icon after the heading. */
+  info?: I18nText;
   /** Appends the required marker to the heading. */
   required?: boolean;
   dataTest?: string;

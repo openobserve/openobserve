@@ -13,7 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{
+    hash::{DefaultHasher, Hash, Hasher},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+};
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -28,6 +34,7 @@ pub mod nats;
 pub mod postgres;
 pub mod sqlite;
 pub mod tantivy_index;
+pub mod trace_time_index;
 
 pub static NEED_WATCH: bool = true;
 pub static NO_NEED_WATCH: bool = false;
@@ -39,23 +46,44 @@ static SUPER_CLUSTER: OnceCell<Box<dyn Db>> = OnceCell::const_new();
 
 pub const SQLITE_STORE: &str = "sqlite";
 
-pub static ORM_CLIENT: OnceCell<DatabaseConnection> = OnceCell::const_new();
-pub static ORM_CLIENT_DDL: OnceCell<DatabaseConnection> = OnceCell::const_new();
+static ORM_CLIENT_RO: OnceCell<DatabaseConnection> = OnceCell::const_new();
+pub(crate) static ORM_CLIENT_RW: OnceCell<DatabaseConnection> = OnceCell::const_new();
+static ORM_CLIENT_DDL: OnceCell<DatabaseConnection> = OnceCell::const_new();
 
-pub async fn connect_to_orm() -> DatabaseConnection {
+/// ORM client for reads.
+pub async fn get_orm_client_ro() -> &'static DatabaseConnection {
+    ORM_CLIENT_RO.get_or_init(connect_to_orm_ro).await
+}
+
+/// ORM client for writes. On SQLite they serialize on a single connection.
+pub async fn get_orm_client_rw() -> &'static DatabaseConnection {
+    ORM_CLIENT_RW.get_or_init(connect_to_orm_rw).await
+}
+
+/// ORM client for schema migrations.
+pub async fn get_orm_client_ddl() -> &'static DatabaseConnection {
+    ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await
+}
+
+async fn connect_to_orm_ro() -> DatabaseConnection {
     match get_config().common.meta_store.as_str().into() {
         MetaStore::PostgreSQL => {
-            let pool = postgres::CLIENT.clone();
-            SqlxPostgresConnector::from_sqlx_postgres_pool(pool)
+            SqlxPostgresConnector::from_sqlx_postgres_pool(postgres::CLIENT_RO.clone())
         }
-        _ => {
-            let pool = { sqlite::CLIENT_RW.lock().await.clone() };
-            SqlxSqliteConnector::from_sqlx_sqlite_pool(pool)
-        }
+        _ => SqlxSqliteConnector::from_sqlx_sqlite_pool(sqlite::CLIENT_RO.clone()),
     }
 }
 
-pub async fn connect_to_orm_ddl() -> DatabaseConnection {
+async fn connect_to_orm_rw() -> DatabaseConnection {
+    match get_config().common.meta_store.as_str().into() {
+        MetaStore::PostgreSQL => {
+            SqlxPostgresConnector::from_sqlx_postgres_pool(postgres::CLIENT_RW.clone())
+        }
+        _ => SqlxSqliteConnector::from_sqlx_sqlite_pool(sqlite::CLIENT_RW.clone()),
+    }
+}
+
+async fn connect_to_orm_ddl() -> DatabaseConnection {
     match get_config().common.meta_store.as_str().into() {
         MetaStore::PostgreSQL => {
             let pool = postgres::CLIENT_DDL.clone();
@@ -63,8 +91,7 @@ pub async fn connect_to_orm_ddl() -> DatabaseConnection {
         }
         _ => {
             // for sqlite, there is no separate ddl client, use the common one
-            let pool = { sqlite::CLIENT_RW.lock().await.clone() };
-            SqlxSqliteConnector::from_sqlx_sqlite_pool(pool)
+            SqlxSqliteConnector::from_sqlx_sqlite_pool(sqlite::CLIENT_RW.clone())
         }
     }
 }
@@ -180,6 +207,51 @@ pub trait Db: Sync + Send + 'static {
     async fn create_table(&self) -> Result<()>;
     async fn stats(&self) -> Result<Stats>;
     async fn get(&self, key: &str) -> Result<Bytes>;
+
+    /// Like `get`, but returns `None` when `key` is missing. Prefer it for
+    /// exact-key lookups expected to miss: `get` falls back to a prefix scan,
+    /// which on NATS costs a full bucket listing per miss.
+    async fn get_if_exists(&self, key: &str) -> Result<Option<Bytes>> {
+        match self.get(key).await {
+            Ok(v) => Ok(Some(v)),
+            Err(Error::DbError(DbError::KeyNotExists(_))) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// The value with a revision for `put_if_revision`, or `None` when `key` is missing.
+    async fn get_with_revision(&self, key: &str) -> Result<Option<(Bytes, u64)>> {
+        Ok(self.get_if_exists(key).await?.map(|value| {
+            let revision = value_revision(&value);
+            (value, revision)
+        }))
+    }
+
+    /// Writes `value` only while `key` still holds `revision` (`None`: only while missing).
+    async fn put_if_revision(
+        &self,
+        key: &str,
+        value: Bytes,
+        revision: Option<u64>,
+    ) -> Result<bool> {
+        let applied = Arc::new(AtomicBool::new(false));
+        let written = applied.clone();
+        self.get_for_update(
+            key,
+            false,
+            None,
+            Box::new(move |current| {
+                if current.as_deref().map(value_revision) != revision {
+                    return Ok(None);
+                }
+                written.store(true, Ordering::Release);
+                Ok(Some((Some(value), None)))
+            }),
+        )
+        .await?;
+        Ok(applied.load(Ordering::Acquire))
+    }
+
     async fn put(
         &self,
         key: &str,
@@ -258,6 +330,17 @@ pub fn parse_key(mut key: &str) -> (String, String, String) {
     (module, key1, key2)
 }
 
+pub fn escape_like_prefix(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        if matches!(c, '\\' | '%' | '_') {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out
+}
+
 pub fn build_key(module: &str, key1: &str, key2: &str, start_dt: i64) -> String {
     if key1.is_empty() {
         format!("/{module}/")
@@ -268,6 +351,12 @@ pub fn build_key(module: &str, key1: &str, key2: &str, start_dt: i64) -> String 
     } else {
         format!("/{module}/{key1}/{key2}/{start_dt}")
     }
+}
+
+fn value_revision(value: &[u8]) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    value.hash(&mut hasher);
+    hasher.finish()
 }
 
 #[derive(Debug, Default)]
@@ -327,6 +416,12 @@ impl<'a> IndexStatement<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_escape_like_prefix_escapes_wildcards() {
+        assert_eq!(escape_like_prefix("a_b%c\\d"), "a\\_b\\%c\\\\d");
+        assert_eq!(escape_like_prefix("acme-prod"), "acme-prod");
+    }
 
     #[test]
     fn test_parse_key_three_parts() {
@@ -438,5 +533,11 @@ mod tests {
         db.put("/foo/del/bar3", hello, false, None).await.unwrap();
         assert_eq!(db.list_keys("/foo/del/").await.unwrap().len(), 3);
         assert_eq!(db.list_values("/foo/del/").await.unwrap().len(), 3);
+    }
+
+    #[tokio::test]
+    async fn write_pool_is_single_connection_on_sqlite() {
+        // a second write connection reintroduces SQLITE_BUSY_SNAPSHOT (517)
+        assert_eq!(sqlite::CLIENT_RW.options().get_max_connections(), 1);
     }
 }

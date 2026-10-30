@@ -16,7 +16,7 @@
 // AddAlert orchestrator schema.
 //
 // AddAlert owns the ONE <OForm> for the whole wizard. The step children
-// (QueryConfig, AlertSettings, Advanced, Deduplication) render as descendants
+// (QueryConfig, AlertSettings, Advanced) render as descendants
 // and bind their fields by nested `name=` into THIS form, so the schema below
 // must cover every nested path they bind. This file composes their exported
 // rules (single source of truth) and adds the topbar scalars:
@@ -26,7 +26,7 @@
 //   • stream_name  — required (min 1)
 //   + QueryConfig  — queryConfigSchema, self-gated by its `_meta` discriminators.
 //   + AlertSettings — createAlertSettingsSchema(isRealTime) (silence ≥ 0,
-//                     destinations ≥ 1, period ≥ 1 scheduled-only).
+//                     period ≥ 1 scheduled-only; destinations optional).
 //
 // Discriminator `is_real_time`: "false" (scheduled) | "true" (realtime) |
 // "anomaly". The anomaly branch enforces only `name`; AnomalyDetectionConfig
@@ -41,6 +41,7 @@ import {
   type Translator,
 } from "./steps/QueryConfig.schema";
 import { createAlertSettingsSchema } from "./steps/AlertSettings.schema";
+import { validateExpression } from "./composite/expression";
 
 // Topbar messages are i18n-driven, resolved via the injected `t`:
 //   name required      → alerts.nameRequired
@@ -51,10 +52,10 @@ import { createAlertSettingsSchema } from "./steps/AlertSettings.schema";
 /** Unsupported characters in an alert name. Requiredness = min 1 AND this regex. */
 export const ALERT_NAME_UNSUPPORTED_CHARS = /[:#?\s'"%&]+/;
 
-const isBlank = (v: unknown): boolean =>
+export const isBlank = (v: unknown): boolean =>
   v === undefined || v === null || (typeof v === "string" && v.trim() === "");
 
-// Step-B field schemas (Advanced / Deduplication / CompareWithPast wizard step
+// Step-B field schemas (Advanced / CompareWithPast wizard step
 // children). All optional/permissive. The step components bind these exact paths
 // by nested `name=` into THIS orchestrator form.
 
@@ -82,22 +83,11 @@ export const advancedShape = {
   description: z.string().optional(),
   row_template: z.string().optional(),
   row_template_type: z.string().optional(),
+  oncall_team: z.string().optional(),
 } as const;
 
 export const createAdvancedSchema = () => z.looseObject({ ...advancedShape });
 export type AdvancedForm = z.infer<ReturnType<typeof createAdvancedSchema>>;
-
-/** Deduplication (scheduled-only). All fields optional. `enabled` is derived
- *  from `fingerprint_fields.length > 0` by the component; `time_window_minutes`
- *  is sanitized to number|undefined by the component — the raw form state may
- *  transiently hold a string, so the union keeps validation permissive (never
- *  rejects while typing). */
-export const deduplicationSchema = z.object({
-  enabled: z.boolean().optional(),
-  fingerprint_fields: z.array(z.string()).optional(),
-  time_window_minutes: z.union([z.number(), z.string(), z.undefined()]).optional(),
-});
-export type DeduplicationForm = z.infer<typeof deduplicationSchema>;
 
 /** Compare-with-past reference-window row. `offSet` is a relative-time string
  *  (e.g. "15m") edited by the bare CustomDateTimePicker. `uuid` is the row
@@ -119,27 +109,24 @@ export const multiTimeRangeSchema = z.array(multiTimeRangeRowSchema);
  * `is_real_time` discriminates; the QueryConfig `_meta` discriminators (bridged
  * into this form by QueryConfig's syncMeta watcher) gate the QueryConfig rules.
  */
-export const makeAddAlertSchema = (
-  t: Translator,
-  // ENTERPRISE/CLOUD only — see createAlertSettingsSchema. Defaults to false so
-  // OSS (and existing callers/specs passing only `t`) keep main's exact rules.
-  allowWorkflows = false,
-) =>
+export const makeAddAlertSchema = (t: Translator) =>
   z
     .looseObject({
       name: z.string().optional(),
       stream_type: z.string().optional(),
       stream_name: z.string().optional(),
       is_real_time: z.string().optional(),
+      alert_type: z.string().optional(),
+      composite_condition: z.looseObject({}).optional(),
+      children: z.array(z.looseObject({})).optional(),
       destinations: z.array(z.string()).optional(),
       creates_incident: z.boolean().optional(),
       trigger_condition: z.looseObject({}).optional(),
       query_condition: z.looseObject({}).optional(),
       logGroupBy: z.array(z.string()).optional(),
-      // Step-B fields (Advanced / Deduplication tabs). Permissive pass-throughs,
+      // Step-B fields (Advanced tab). Permissive pass-throughs,
       // not validated — the superRefine below adds no issues for them.
       context_attributes: contextAttributesSchema.optional(),
-      deduplication: deduplicationSchema.optional(),
       template: z.string().optional(),
       description: z.string().optional(),
       row_template: z.string().optional(),
@@ -159,6 +146,60 @@ export const makeAddAlertSchema = (
             code: z.ZodIssueCode.custom,
             path: ["name"],
             message: t("alerts.anomalyNameRequired"),
+          });
+        }
+        return;
+      }
+
+      if (mode === "composite") {
+        if (isBlank(val.name)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["name"],
+            message: t("alerts.nameRequired"),
+          });
+        } else if (ALERT_NAME_UNSUPPORTED_CHARS.test(String(val.name))) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["name"],
+            message: t("alerts.nameNoSpecialChars"),
+          });
+        }
+
+        const localValidation = validateExpression(
+          String(val.composite_condition?.expression ?? ""),
+          Array.isArray(val.children) ? val.children : [],
+        );
+        if (!localValidation.valid) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["composite_condition", "expression"],
+            message: t("alerts.composite.invalidExpression"),
+          });
+        }
+
+        const silence = val.trigger_condition?.silence;
+        if (isBlank(silence) || Number.isNaN(Number(silence)) || Number(silence) < 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["trigger_condition", "silence"],
+            message: t("alerts.validation.silenceNonNegative"),
+          });
+        }
+        // Pending period is optional (blank = 0 = fire immediately), so unlike
+        // silence a blank value is NOT an error — only an explicit negative is.
+        // AlertSettings.vue owns the field for composite too, but this branch
+        // returns before reaching createAlertSettingsSchema below, so the rule
+        // is duplicated here (same message/path convention as makePendingPeriodSchema).
+        const pendingPeriod = val._ui?.pendingPeriod;
+        if (
+          !isBlank(pendingPeriod) &&
+          (Number.isNaN(Number(pendingPeriod)) || Number(pendingPeriod) < 0)
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["_ui", "pendingPeriod"],
+            message: t("alerts.validation.pendingPeriodNonNegative"),
           });
         }
         return;
@@ -185,7 +226,14 @@ export const makeAddAlertSchema = (
           message: t("alerts.validation.streamTypeRequired"),
         });
       }
-      if (isBlank(val.stream_name)) {
+      // No SLO exemption here any more: SLO alerts are authored on the SLO
+      // page, never in this form, so every alert this schema validates does
+      // have a stream. Re-adding an exemption would quietly re-open
+      // generic-form SLO authoring.
+      if (
+        isBlank(val.stream_name) &&
+        !(val.query_condition?.promql_rule_mode && val._meta?.tab === "promql")
+      ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["stream_name"],
@@ -209,9 +257,9 @@ export const makeAddAlertSchema = (
 
       // AlertSettings rules. Period is enforced ≥ 1 for scheduled only; realtime
       // keeps period rule-free (createAlertSettingsSchema toggles it). silence ≥ 0
-      // + destinations ≥ 1 apply in both non-anomaly modes.
+      // applies in both non-anomaly modes.
       const isRealTime = mode === "true";
-      const as = createAlertSettingsSchema(t, isRealTime, allowWorkflows).safeParse(val);
+      const as = createAlertSettingsSchema(t, isRealTime).safeParse(val);
       if (!as.success) {
         for (const issue of as.error.issues) {
           ctx.addIssue({

@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
       :subtitle="t('alerts.incidents.incident')"
       title-overflow="visible"
+      tabs-below
       bleed
     >
       <!-- Incident name — click the title to rename, Enter or blur saves,
@@ -51,22 +52,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTag type="incidentStatus" :value="incidentDetails.status" />
             <OTooltip
               :content="
-                t('alerts.incidents.status') + ': ' + getStatusLabel(incidentDetails.status)
+                raw(t('alerts.incidents.status') + ': ' + getStatusLabel(incidentDetails.status))
               "
             />
           </span>
 
-          <span class="inline-flex cursor-default">
-            <OTag type="severity" :value="incidentDetails.severity" />
-            <OTooltip :content="t('alerts.incidents.severity') + ': ' + incidentDetails.severity" />
+          <span
+            v-if="incidentDetails.acknowledged_by"
+            class="inline-flex cursor-default items-center gap-1"
+          >
+            <span class="text-text-secondary text-xs">{{
+              t("alerts.incidents.acknowledgedBy")
+            }}</span>
+            <OUserCell :value="incidentDetails.acknowledged_by" />
           </span>
 
           <span class="inline-flex cursor-default">
-            <OTag type="countChip" value="alerts">{{ triggers.length }} Alerts</OTag>
+            <OTag type="severity" :value="incidentDetails.severity" />
             <OTooltip
-              :content="
-                t('alerts.incidents.alertCount') + ': ' + triggers.length + ' correlated alerts'
-              "
+              :content="raw(t('alerts.incidents.severity') + ': ' + incidentDetails.severity)"
+            />
+          </span>
+
+          <span class="inline-flex cursor-default">
+            <OTag type="countChip" value="alerts"
+              >{{ triggers.length }} {{ t("alerts.incidents.alertCount") }}</OTag
+            >
+            <OTooltip
+              :content="t('alerts.incidents.correlatedAlertsCount', { count: triggers.length })"
             />
           </span>
 
@@ -77,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTag>
             <OTooltip
               :content="
-                t('alerts.incidents.externalSourceTooltip') + ': ' + externalSources.join(', ')
+                raw(t('alerts.incidents.externalSourceTooltip') + ': ' + externalSources.join(', '))
               "
             />
           </span>
@@ -91,8 +104,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm"
             :loading="updating"
+            :aria-label="t('alerts.incidents.acknowledgeAriaLabel')"
             @click="acknowledgeIncident"
-            ><OIcon name="visibility" size="sm" />{{ t("alerts.incidents.acknowledge")
+            ><OIcon name="check-circle" size="sm" aria-hidden="true" />{{
+              t("alerts.incidents.acknowledge")
             }}<OTooltip :delay="500" :content="t('alerts.incidents.markAsAcknowledgedTooltip')"
           /></OButton>
           <OButton
@@ -116,58 +131,106 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </template>
 
+      <template #header-tabs>
+        <OTabs
+          v-model="activeTab"
+          align="left"
+          class="flex-1"
+          mobile-arrows
+          :breakpoint="0"
+          reorderable
+          @reorder="onTabReorder"
+        >
+          <OTab
+            v-for="tab in tabOrder"
+            :key="tab"
+            :name="tab"
+            :label="tab === 'alertTriggers' ? undefined : tabLabels[tab]"
+            :data-test="TAB_TEST_IDS[tab]"
+          >
+            <template v-if="tab === 'alertTriggers'" #default>
+              <div class="flex items-center gap-1.5">
+                <span>{{ tabLabels.alertTriggers }}</span>
+                <OTag type="countChip" value="neutral">{{ triggers.length }}</OTag>
+              </div>
+            </template>
+          </OTab>
+        </OTabs>
+      </template>
+
       <!-- Content -->
       <div
         v-if="!loading && incidentDetails"
         class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden"
       >
-        <div class="px-page-edge border-border-default flex-shrink-0 border-b">
-          <OTabs v-model="activeTab" align="left" class="flex-1" mobile-arrows :breakpoint="0">
-            <OTab name="overview" label="Overview" data-test="incident-overview-tab" />
-            <OTab name="activity" label="Activity" data-test="incident-activity-tab" />
-            <OTab
-              name="incidentAnalysis"
-              :label="t('alerts.incidents.incidentAnalysis')"
-              data-test="incident-analysis-tab"
-            />
-            <OTab name="serviceGraph" label="Alert Graph" data-test="incident-alert-graph-tab" />
-            <OTab name="alertTriggers" data-test="incident-alert-triggers-tab">
-              <template #default>
-                <div class="flex items-center gap-1.5">
-                  <span>{{ t("alerts.incidents.alertTriggers") }}</span>
-                  <OTag type="countChip" value="neutral">{{ triggers.length }}</OTag>
-                </div>
-              </template>
-            </OTab>
-
-            <!-- Telemetry tabs always inline -->
-            <OTab name="logs" :label="t('common.logs')" data-test="incident-logs-tab" />
-            <OTab name="metrics" :label="t('search.metrics')" data-test="incident-metrics-tab" />
-            <OTab name="traces" :label="t('menu.traces')" data-test="incident-traces-tab" />
-          </OTabs>
+        <div v-if="incidentDetails.muted_by_downtime_id" class="shrink-0 px-3 pt-2">
+          <OBanner
+            variant="warning"
+            dense
+            inline-actions
+            icon="notifications-paused"
+            data-test="incident-detail-muted-banner"
+          >
+            {{ mutedBannerText }}
+            <template #actions>
+              <OButton
+                variant="ghost"
+                size="sm"
+                data-test="incident-detail-muted-view"
+                @click="openMutingDowntime"
+              >
+                {{ t("toastMessages.downtimes.viewDowntime") }}
+              </OButton>
+            </template>
+          </OBanner>
         </div>
-
         <!-- Tab Content Container -->
         <div class="flex flex-1 overflow-hidden">
-          <!-- Left Column: Incident Details (only show on Incident Analysis tab, HIDDEN for Overview) -->
-          <div
-            v-if="activeTab === 'incidentAnalysis'"
-            class="order-1 flex h-full w-100 max-w-100 min-w-100 flex-shrink-0 flex-col"
-          >
-            <!-- Table of Contents (only on Incident Analysis) -->
-            <IncidentTableOfContents
-              :table-of-contents="tableOfContents"
-              :expanded-sections="expandedSections"
-              :is-dark-mode="isDarkMode"
-              @scroll-to-section="scrollToSection"
-              @toggle-section="toggleSection"
+          <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
+            <!-- Incident Analysis tab: its own analysis column + thread column (02 E5) -->
+            <IncidentRCAAnalysis
+              v-if="activeTab === 'incidentAnalysis'"
+              :org-id="incidentOrgId"
+              :incident-id="incidentDetails?.id || ''"
+              :rca="rcaSummary"
+              :report-run="rcaReportRun"
+              :viewed-run="rcaViewedRun"
+              :history="rcaHistory"
+              :stale="rcaStale"
+              :error="rcaError"
+              :report-text="rcaReportText"
+              :report-verdict="rcaReportVerdict"
+              :report-loading="rcaReportLoading"
+              :thread-run-id="rcaThreadRunId"
+              :thread-live="rcaThreadLive"
+              :thread-run-is-v1="rcaThreadRunIsV1"
+              :thread="rcaThread"
+              :thread-status="rcaThreadStatus"
+              :run-summary="rcaRunSummary"
+              :run-summary-status="rcaRunSummaryStatus"
+              :steering="rcaSteering"
+              :steering-status="rcaSteeringStatus"
+              :triggering="rcaTriggering"
+              :cancelling="rcaCancelling"
+              :resume-run-id="rcaResumeRunId"
+              :resuming="rcaResuming"
+              :incident-title="incidentDetails?.title || ''"
+              :refusal="rcaRefusal"
+              :analyze-credit-cost="aiCreditCosts?.incident ?? null"
+              :reanalyze-credit-cost="aiCreditCosts?.incident_reanalysis ?? null"
+              @trigger-rca="triggerRca"
+              @cancel-rca="cancelRca"
+              @view-run="viewRcaRun"
+              @retry-live="retryRcaLive"
+              @resume-rca="resumeRca"
+              @ask-ai="askAboutRca"
             />
-          </div>
 
-          <!-- Right Column: Content -->
-          <div class="order-2 flex min-w-0 flex-1 flex-col overflow-hidden">
             <!-- Tab Content Area -->
-            <div class="px-page-edge relative flex flex-1 flex-col overflow-hidden pt-4 pb-2">
+            <div
+              v-else
+              class="px-page-edge relative flex flex-1 flex-col overflow-hidden pt-4 pb-2"
+            >
               <!-- Overview Tab Content - REDESIGNED -->
               <div v-if="activeTab === 'overview'" class="flex flex-1 flex-col overflow-hidden">
                 <!-- SECTION 1: Hero Metrics (100px height) -->
@@ -179,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Top: Title and Icon -->
                     <div class="flex items-start justify-between">
                       <div :class="'text-text-secondary'" class="text-sm font-medium">
-                        Total Alerts
+                        {{ t("alerts.incidents.totalAlerts") }}
                       </div>
                       <div
                         class="rounded-default bg-badge-amber-soft-bg flex h-8 w-8 items-center justify-center"
@@ -227,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Top: Title and Icon -->
                     <div class="flex items-start justify-between">
                       <div :class="'text-text-secondary'" class="text-sm font-medium">
-                        Affected Services
+                        {{ t("alerts.incidents.affectedServices") }}
                       </div>
                       <div
                         class="rounded-default bg-badge-purple-soft-bg flex h-8 w-8 items-center justify-center"
@@ -249,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Top: Title and Icon -->
                     <div class="flex items-start justify-between">
                       <div :class="'text-text-secondary'" class="text-sm font-medium">
-                        Active Duration
+                        {{ t("alerts.incidents.activeDuration") }}
                       </div>
                       <div
                         class="rounded-default bg-badge-success-soft-bg flex h-8 w-8 items-center justify-center"
@@ -266,7 +329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               incidentDetails.first_alert_at,
                               incidentDetails.last_alert_at,
                             )
-                          : "N/A"
+                          : raw("N/A")
                       }}
                     </div>
                   </div>
@@ -278,7 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Top: Title and Icon -->
                     <div class="flex items-start justify-between">
                       <div :class="'text-text-secondary'" class="text-sm font-medium">
-                        Alert Frequency
+                        {{ t("alerts.incidents.alertFrequency") }}
                       </div>
                       <div
                         class="rounded-default bg-badge-error-soft-bg flex h-8 w-8 items-center justify-center"
@@ -312,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <div
                             class="rounded-default bg-surface-panel text-text-secondary px-2 py-0.5 text-xs font-medium"
                           >
-                            UTC
+                            {{ t("alerts.incidents.utc") }}
                           </div>
                         </div>
 
@@ -330,13 +393,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ></div>
                             <div class="flex-1">
                               <div :class="'text-text-heading'" class="mb-1 text-sm font-medium">
-                                First Alert Received
+                                {{ t("alerts.incidents.firstAlertReceived") }}
                               </div>
                               <div :class="'text-text-secondary'" class="text-xs">
                                 {{
                                   incidentDetails?.first_alert_at
                                     ? formatTimestampUTC(incidentDetails.first_alert_at)
-                                    : "N/A"
+                                    : raw("N/A")
                                 }}
                                 <span :class="'text-text-muted'" class="mx-1.5">|</span>
                                 <span>{{ t("alerts.incidents.initialTrigger") }}</span>
@@ -351,16 +414,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ></div>
                             <div class="flex-1">
                               <div :class="'text-text-heading'" class="mb-1 text-sm font-medium">
-                                Peak Activity
+                                {{ t("alerts.incidents.peakActivity") }}
                               </div>
                               <div :class="'text-text-secondary'" class="text-xs">
                                 {{
                                   peakActivity.timestamp
                                     ? formatTimestampUTC(peakActivity.timestamp)
-                                    : "N/A"
+                                    : raw("N/A")
                                 }}
                                 <span :class="'text-text-muted'" class="mx-1.5">|</span>
-                                <span>{{ peakActivity.count }} alerts in 5 mins</span>
+                                <span
+                                  >{{ peakActivity.count }}
+                                  {{ t("alerts.incidents.alertsInFiveMins") }}</span
+                                >
                               </div>
                             </div>
                           </div>
@@ -377,19 +443,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ></div>
                             <div class="flex-1">
                               <div :class="'text-text-heading'" class="mb-1 text-sm font-medium">
-                                Latest Alert
+                                {{ t("alerts.incidents.latestAlert") }}
                               </div>
                               <div :class="'text-text-secondary'" class="text-xs">
                                 {{
                                   incidentDetails?.last_alert_at
                                     ? formatTimestampUTC(incidentDetails.last_alert_at)
-                                    : "N/A"
+                                    : raw("N/A")
                                 }}
                                 <span :class="'text-text-muted'" class="mx-1.5">|</span>
                                 <span>{{
                                   incidentDetails?.status === "resolved"
-                                    ? "Resolved"
-                                    : "Still ongoing"
+                                    ? t("common.resolved")
+                                    : t("common.stillOngoing")
                                 }}</span>
                               </div>
                             </div>
@@ -403,7 +469,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             size="sm"
                             @click="activeTab = 'activity'"
                             data-test="incident-timeline-show-full-activity"
-                            ><span class="text-xs">Show Full Activity</span></OButton
+                            ><span class="text-xs">{{
+                              t("alerts.incidents.showFullActivity")
+                            }}</span></OButton
                           >
                         </div>
                       </div>
@@ -428,9 +496,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <div
                               class="rounded-default bg-surface-panel border-border-default text-text-body flex min-w-0 items-center gap-2 border px-2.5 py-1 font-mono text-xs"
                             >
-                              <span class="min-w-0 flex-1 truncate">{{
-                                incidentDetails?.id || "N/A"
-                              }}</span>
+                              <OTruncatedText class="flex-1">{{
+                                incidentDetails?.id || raw("N/A")
+                              }}</OTruncatedText>
                               <OIcon
                                 :name="copiedField === 'incident_id' ? 'check' : 'content-copy'"
                                 size="sm"
@@ -453,9 +521,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <div
                               class="rounded-default bg-surface-panel border-border-default text-text-body flex min-w-0 items-center gap-2 border px-2.5 py-1 text-xs"
                             >
-                              <span class="min-w-0 flex-1 truncate">{{
-                                incidentDetails?.title || "N/A"
-                              }}</span>
+                              <OTruncatedText class="flex-1">{{
+                                incidentDetails?.title || raw("N/A")
+                              }}</OTruncatedText>
                               <OIcon
                                 :name="copiedField === 'incident_title' ? 'check' : 'content-copy'"
                                 size="sm"
@@ -473,7 +541,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <!-- Correlated By -->
                           <div class="grid grid-cols-[7.5rem_1fr] gap-2">
                             <div :class="'text-text-secondary'" class="text-xs font-medium">
-                              Correlated By
+                              {{ t("alerts.incidents.correlatedBy") }}
                             </div>
                             <div
                               class="rounded-default bg-surface-panel border-border-default text-text-body flex min-w-0 items-center gap-2 border px-2.5 py-1 text-xs"
@@ -503,13 +571,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <!-- Created At -->
                           <div class="grid grid-cols-[7.5rem_1fr] gap-2">
                             <div :class="'text-text-secondary'" class="text-xs font-medium">
-                              Created At
+                              {{ t("alerts.createdAt") }}
                             </div>
                             <div :class="'text-text-body'" class="text-sm">
                               {{
                                 incidentDetails?.created_at
                                   ? formatTimestamp(incidentDetails.created_at)
-                                  : "N/A"
+                                  : raw("N/A")
                               }}
                             </div>
                           </div>
@@ -517,13 +585,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <!-- Updated At -->
                           <div class="grid grid-cols-[7.5rem_1fr] gap-2">
                             <div :class="'text-text-secondary'" class="text-xs font-medium">
-                              Updated At
+                              {{ t("common.updated_at") }}
                             </div>
                             <div :class="'text-text-body'" class="text-sm">
                               {{
                                 incidentDetails?.updated_at
                                   ? formatTimestamp(incidentDetails.updated_at)
-                                  : "N/A"
+                                  : raw("N/A")
                               }}
                             </div>
                           </div>
@@ -538,7 +606,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Header -->
                       <div class="px-4 pt-2 pb-1">
                         <div :class="'text-text-heading'" class="text-sm font-semibold">
-                          Alert Activity
+                          {{ t("alerts.incidents.alertActivity") }}
                         </div>
                       </div>
 
@@ -555,13 +623,150 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- PART 2: Sidebar Content (33.33% width) - 3 sections -->
                   <div class="flex h-full w-1/3 flex-col gap-2">
+                    <!-- Who this incident woke. Absent entirely when it paged
+                         nobody, which is also the OSS and on-call-disabled
+                         case, so no feature flag is needed. -->
+                    <div
+                      v-if="oncallResponse"
+                      class="border-card-glass-border rounded-default bg-card-glass-bg flex min-h-0 shrink flex-col overflow-hidden border"
+                      data-test="incident-oncall-panel"
+                    >
+                      <div class="px-4 pt-2 pb-1">
+                        <div class="text-text-heading text-sm font-semibold">
+                          {{ t("alerts.incidents.onCall") }}
+                        </div>
+                      </div>
+                      <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 pb-3">
+                        <!-- Which team is carrying this, at what priority. The
+                             panel used to answer neither, so an incident named
+                             no owner while the record behind it did. -->
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-text-secondary text-xs">
+                            {{ t("alerts.incidents.onCallTeam") }}
+                          </span>
+                          <OTruncatedText class="text-text-body text-xs">
+                            {{ raw(oncallTeamName) }}
+                          </OTruncatedText>
+                        </div>
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-text-secondary text-xs">
+                            {{ t("alerts.incidents.onCallPriority") }}
+                          </span>
+                          <OTag type="alertPriority" :value="oncallPriority" size="sm" />
+                        </div>
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-text-secondary text-xs">
+                            {{ t("alerts.incidents.onCallState") }}
+                          </span>
+                          <OTag
+                            type="oncallResponseState"
+                            :value="oncallResponse.state"
+                            size="sm"
+                          />
+                        </div>
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-text-secondary text-xs">
+                            {{ t("alerts.incidents.onCallOpened") }}
+                          </span>
+                          <OTimeCell :value="oncallResponse.opened_at" unit="us" />
+                        </div>
+                        <!-- Who answered, and when. An unanswered page is the
+                             fact worth a colour: it is still climbing. -->
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-text-secondary text-xs">
+                            {{ t("alerts.incidents.onCallAckedBy") }}
+                          </span>
+                          <OUserCell
+                            v-if="oncallResponse.acked_by"
+                            :value="oncallResponse.acked_by"
+                          />
+                          <span v-else class="text-status-warning-text text-xs">
+                            {{ t("alerts.incidents.onCallUnanswered") }}
+                          </span>
+                        </div>
+                        <!-- A snoozed page looks identical to a quiet one, and
+                             it is the reading that gets an incident forgotten. -->
+                        <div
+                          v-if="oncallResponse.snoozed_until"
+                          class="flex items-center justify-between gap-2"
+                          data-test="incident-oncall-snoozed"
+                        >
+                          <span class="text-text-secondary text-xs">
+                            {{ t("alerts.incidents.onCallSnoozedUntil") }}
+                          </span>
+                          <OTimeCell :value="oncallResponse.snoozed_until" unit="us" />
+                        </div>
+                        <div
+                          v-if="oncallResponse.closed_at"
+                          class="flex items-center justify-between gap-2"
+                        >
+                          <span class="text-text-secondary text-xs">
+                            {{ t("alerts.incidents.onCallResolved") }}
+                          </span>
+                          <OTimeCell :value="oncallResponse.closed_at" unit="us" />
+                        </div>
+                        <!-- The ladder ran a second time because the record
+                             changed hands. Without it the timeline reads as one
+                             very long escalation. -->
+                        <div
+                          v-if="(oncallResponse.ladder_run ?? 1) > 1"
+                          class="flex items-center justify-between gap-2"
+                          data-test="incident-oncall-ladder-run"
+                        >
+                          <span class="text-text-secondary text-xs">
+                            {{ t("alerts.incidents.onCallLadderRun") }}
+                          </span>
+                          <span class="text-text-body text-xs">
+                            {{ raw(String(oncallResponse.ladder_run)) }}
+                          </span>
+                        </div>
+
+                        <!-- Impacted teams are paged alongside the owner to
+                             contain the blast radius. Listing only the first
+                             record hid every one of them. -->
+                        <div
+                          v-if="oncallLiaisons.length"
+                          class="border-border-default flex flex-col gap-1 border-t pt-2"
+                          data-test="incident-oncall-liaisons"
+                        >
+                          <span class="text-text-secondary text-xs">
+                            {{ t("alerts.incidents.onCallAlsoPaged") }}
+                          </span>
+                          <span
+                            v-for="liaison in oncallLiaisons"
+                            :key="liaison.id"
+                            class="flex items-center justify-between gap-2"
+                          >
+                            <OTruncatedText class="text-text-body text-xs">
+                              {{ raw(oncallTeamNameFor(liaison.team_id)) }}
+                            </OTruncatedText>
+                            <OTag type="oncallResponseState" :value="liaison.state" size="sm" />
+                          </span>
+                        </div>
+
+                        <router-link
+                          class="text-accent text-xs"
+                          :to="{
+                            name: 'onCallResponseDetail',
+                            params: { responseId: oncallResponse.id },
+                            query: { org_identifier: store.state.selectedOrganization.identifier },
+                          }"
+                          data-test="incident-oncall-link"
+                        >
+                          {{ t("alerts.incidents.openPage") }}
+                        </router-link>
+                      </div>
+                    </div>
+
                     <!-- 2.2A: Manage Panel (40% of available height after gaps) -->
                     <div
                       class="border-card-glass-border rounded-default bg-card-glass-bg flex h-[calc(35%-0.4rem)] flex-col overflow-hidden border"
                     >
                       <!-- Header -->
                       <div class="px-4 pt-2 pb-1">
-                        <div :class="'text-text-heading'" class="text-sm font-semibold">Manage</div>
+                        <div :class="'text-text-heading'" class="text-sm font-semibold">
+                          {{ t("alerts.incidents.manage") }}
+                        </div>
                       </div>
 
                       <!-- Content -->
@@ -569,7 +774,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <!-- Status Section -->
                         <div class="flex flex-col gap-2">
                           <div :class="'text-text-secondary'" class="text-xs font-semibold">
-                            Status
+                            {{ t("common.status") }}
                           </div>
                           <div class="flex flex-wrap gap-2">
                             <button
@@ -605,7 +810,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <!-- Severity Section -->
                         <div class="flex flex-col gap-2">
                           <div :class="'text-text-secondary'" class="text-xs font-semibold">
-                            Severity
+                            {{ t("alerts.incidents.severity") }}
                           </div>
                           <div class="flex flex-wrap gap-2">
                             <button
@@ -651,7 +856,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Header -->
                       <div class="px-4 pt-2 pb-1">
                         <div :class="'text-text-heading'" class="text-sm font-semibold">
-                          Dimensions
+                          {{ t("alerts.incidents.stableDimensions") }}
                         </div>
                       </div>
 
@@ -728,14 +933,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 {{ index + 1 }}.
                               </span>
                               <div class="min-w-0 flex-1">
-                                <OTooltip v-if="alert.name.length > 30" :content="alert.name" />
-                                <span class="block truncate font-medium">
-                                  {{
-                                    alert.name.length > 30
-                                      ? alert.name.substring(0, 30) + "..."
-                                      : alert.name
-                                  }}
-                                </span>
+                                <OTruncatedText class="block font-medium">
+                                  {{ alert.name }}
+                                </OTruncatedText>
                               </div>
                               <div class="w-30 flex-shrink-0">
                                 <span :class="'text-text-secondary'">
@@ -759,30 +959,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :visible="activeTab === 'activity'"
                 :refresh-trigger="timelineRefreshTrigger"
               />
-
-              <!-- Incident Analysis Tab Content -->
-              <IncidentRCAAnalysis
-                v-if="activeTab === 'incidentAnalysis'"
-                :has-existing-rca="hasExistingRca"
-                :rca-loading="rcaLoading"
-                :rca-stream-content="rcaStreamContent"
-                :formatted-rca-content="formattedRcaContent"
-                :rca-error="rcaError"
-                :rca-cancelling="rcaCancelling"
-                :analysis-elapsed-label="analysisElapsedLabel"
-                :analysis-is-stale="analysisIsStale"
-                :rca-history="rcaHistory"
-                :viewing-archived-index="viewingArchivedIndex"
-                :analyzed-at="rcaAnalyzedAt"
-                @cancel-rca="cancelRca"
-                @view-report="viewReport"
-                @copy-report="copyReport"
-                @download-report="downloadReport"
-                :is-dark-mode="isDarkMode"
-                :analysis-in-flight="analysisInFlight"
-                @trigger-rca="triggerRca"
-              />
-
               <!-- Service Graph Tab Content -->
               <div v-if="activeTab === 'serviceGraph'" class="absolute inset-0">
                 <IncidentServiceGraph
@@ -794,7 +970,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Alert Triggers Tab Content -->
               <div v-if="activeTab === 'alertTriggers'" class="flex flex-1 overflow-hidden">
                 <!-- Left Section: Alert Triggers Table -->
-                <div class="flex flex-1 flex-col overflow-hidden pt-4 pr-2">
+                <div class="flex flex-1 flex-col overflow-hidden pe-2 pt-4">
                   <div
                     :class="[
                       'border-card-glass-border rounded-default flex flex-1 flex-col overflow-hidden border',
@@ -818,13 +994,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Header -->
                     <div
                       :class="[
-                        'flex flex-shrink-0 items-center gap-2 border-b !bg-[var(--color-theme-table-header-bg)] px-3 py-2',
+                        '!bg-theme-table-header-bg flex flex-shrink-0 items-center gap-2 border-b px-3 py-2',
                         'border-border-default',
                       ]"
                     >
                       <OIcon name="info" size="sm" class="opacity-80" />
                       <span :class="'text-text-secondary'" class="text-sm font-semibold">
-                        Alert Details
+                        {{ t("alerts.incidents.alertDetailsHeader") }}
                       </span>
                     </div>
                     <!-- Content -->
@@ -853,67 +1029,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div class="space-y-2">
                           <!-- Alert Name -->
                           <div class="flex flex-col gap-0.5">
-                            <span
-                              :class="'text-text-secondary'"
-                              class="text-3xs tracking-wide uppercase"
-                            >
-                              Alert Name
+                            <span :class="'text-text-secondary'" class="text-3xs">
+                              {{ t("alerts.incidents.alertName") }}
                             </span>
                             <span :class="'text-text-body'" class="text-sm font-medium">
-                              {{ alerts[selectedAlertIndex]?.name || "N/A" }}
+                              {{ alerts[selectedAlertIndex]?.name || raw("N/A") }}
                             </span>
                           </div>
 
+                          <!-- Composite members have no stream/query — show the type. -->
+                          <div
+                            v-if="alerts[selectedAlertIndex]?.alert_type === 'composite'"
+                            class="flex flex-col gap-0.5"
+                          >
+                            <span :class="'text-text-secondary'" class="text-3xs">
+                              {{ t("alerts.alertType") }}
+                            </span>
+                            <OTag type="alertType" :value="'composite'" class="w-fit" />
+                          </div>
+
                           <!-- Stream Type & Name -->
-                          <div class="grid grid-cols-2 gap-2">
+                          <div v-if="!isSelectedComposite" class="grid grid-cols-2 gap-2">
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
-                                Stream Type
+                              <span :class="'text-text-secondary'" class="text-3xs">
+                                {{ t("alerts.streamType") }}
                               </span>
                               <OTag
                                 type="streamType"
-                                :value="alerts[selectedAlertIndex]?.stream_type || 'N/A'"
+                                :value="alerts[selectedAlertIndex]?.stream_type || raw('N/A')"
                                 class="w-fit"
                               />
                             </div>
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
-                                Stream Name
+                              <span :class="'text-text-secondary'" class="text-3xs">
+                                {{ t("alerts.stream_name") }}
                               </span>
-                              <span :class="'text-text-body'" class="truncate text-sm font-medium">
-                                {{ alerts[selectedAlertIndex]?.stream_name || "N/A" }}
-                              </span>
+                              <OTruncatedText :class="'text-text-body'" class="text-sm font-medium">
+                                {{ alerts[selectedAlertIndex]?.stream_name || raw("N/A") }}
+                              </OTruncatedText>
                             </div>
                           </div>
 
                           <!-- Threshold & Period -->
-                          <div class="grid grid-cols-2 gap-2">
+                          <div v-if="!isSelectedComposite" class="grid grid-cols-2 gap-2">
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
-                                Threshold
+                              <span :class="'text-text-secondary'" class="text-3xs">
+                                {{ t("alerts.messages.thresholdMarkLine") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
                                 {{ alerts[selectedAlertIndex]?.trigger_condition?.operator || "" }}
                                 {{
-                                  alerts[selectedAlertIndex]?.trigger_condition?.threshold || "N/A"
+                                  alerts[selectedAlertIndex]?.trigger_condition?.threshold ||
+                                  raw("N/A")
                                 }}
                               </span>
                             </div>
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
-                                Period
+                              <span :class="'text-text-secondary'" class="text-3xs">
+                                {{ t("alerts.incidents.period") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
                                 {{
@@ -926,36 +1099,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
 
                           <!-- Frequency & Silence -->
-                          <div class="grid grid-cols-2 gap-2">
+                          <div v-if="!isSelectedComposite" class="grid grid-cols-2 gap-2">
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
-                                Frequency
+                              <span :class="'text-text-secondary'" class="text-3xs">
+                                {{ t("alerts.incidents.frequency") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
-                                {{
-                                  alerts[selectedAlertIndex]?.trigger_condition?.frequency || "N/A"
-                                }}
-                                {{
-                                  alerts[selectedAlertIndex]?.trigger_condition?.frequency_type ||
-                                  "min"
-                                }}
+                                {{ formatFrequency(alerts[selectedAlertIndex]?.trigger_condition) }}
                               </span>
                             </div>
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
-                                Silence
+                              <span :class="'text-text-secondary'" class="text-3xs">
+                                {{ t("alerts.incidents.silence") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
                                 {{
-                                  alerts[selectedAlertIndex]?.trigger_condition?.silence || "N/A"
+                                  alerts[selectedAlertIndex]?.trigger_condition?.silence ||
+                                  raw("N/A")
                                 }}
-                                min
+                                {{ t("common.min") }}
                               </span>
                             </div>
                           </div>
@@ -963,6 +1125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                         <!-- Alert Conditions Section -->
                         <div
+                          v-if="!isSelectedComposite"
                           :class="[
                             'rounded-default border-card-glass-border rounded-default flex flex-col border',
                           ]"
@@ -970,20 +1133,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                           <div
                             :class="[
-                              'flex flex-shrink-0 items-center justify-between border-b !bg-[var(--color-theme-table-header-bg)] px-2.5 py-1.5',
+                              '!bg-theme-table-header-bg flex flex-shrink-0 items-center justify-between border-b px-2.5 py-1.5',
                               'border-border-default',
                             ]"
                           >
-                            <span
-                              :class="'text-text-secondary'"
-                              class="text-2xs font-semibold tracking-wide uppercase"
-                            >
+                            <span :class="'text-text-secondary'" class="text-2xs font-semibold">
                               {{
                                 alerts[selectedAlertIndex]?.query_condition?.type === "sql"
-                                  ? "SQL Query"
+                                  ? t("alerts.alertDetails.sqlQuery")
                                   : alerts[selectedAlertIndex]?.query_condition?.type === "promql"
-                                    ? "PromQL Query"
-                                    : "Conditions"
+                                    ? t("alerts.alertDetails.promqlQuery")
+                                    : t("alerts.alertDetails.conditions")
                               }}
                             </span>
                           </div>
@@ -995,8 +1155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   'text-compact overflow-x-auto break-words whitespace-pre-wrap',
                                   'text-text-body',
                                 ]"
-                                >{{ alerts[selectedAlertIndex]?.query_condition?.sql }}</pre
-                              >
+                                >{{ alerts[selectedAlertIndex]?.query_condition?.sql }}</pre>
                             </div>
 
                             <!-- PromQL Query -->
@@ -1006,8 +1165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   'text-compact overflow-x-auto break-words whitespace-pre-wrap',
                                   'text-text-body',
                                 ]"
-                                >{{ alerts[selectedAlertIndex]?.query_condition?.promql }}</pre
-                              >
+                                >{{ alerts[selectedAlertIndex]?.query_condition?.promql }}</pre>
                             </div>
 
                             <!-- Custom Conditions -->
@@ -1019,14 +1177,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   'text-compact overflow-x-auto break-words whitespace-pre-wrap',
                                   'text-text-body',
                                 ]"
-                              >
-if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.conditions) }}</pre
-                              >
+                                >{{ t("alerts.incidents.ifPrefix") }} {{
+                                  formatCustomConditions(
+                                    alerts[selectedAlertIndex]?.query_condition?.conditions,
+                                  )
+                                }}</pre>
                             </div>
 
                             <!-- No conditions -->
                             <div v-else :class="'text-text-muted'" class="text-sm italic">
-                              No conditions defined
+                              {{ t("alerts.incidents.noConditionsDefined") }}
                             </div>
                           </div>
                         </div>
@@ -1073,14 +1233,13 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
                     ]"
                   />
                   <div class="mt-3 text-xl font-semibold">
-                    {{ correlationError || "No correlated logs found" }}
+                    {{ correlationError || t("alerts.incidents.noCorrelatedLogs") }}
                   </div>
                   <div
                     v-if="correlationError && correlationError.includes('disambiguation fields')"
                     class="text-text-secondary mt-2 max-w-125 text-center text-sm"
                   >
-                    The service discovery configuration (disambiguation fields) was changed after
-                    this incident was created.
+                    {{ t("alerts.incidents.disambiguationChangedMessage") }}
                   </div>
                   <OButton
                     v-if="correlationError && !correlationError.includes('disambiguation fields')"
@@ -1088,7 +1247,7 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
                     size="md"
                     @click="refreshCorrelation"
                     class="mt-3"
-                    ><OIcon name="refresh" size="sm" class="mr-1" />Retry</OButton
+                    ><OIcon name="refresh" size="sm" class="me-1" />{{ t("common.retry") }}</OButton
                   >
                 </div>
 
@@ -1105,6 +1264,7 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
                     :source-stream="'incidents'"
                     :source-type="'incidents'"
                     :available-dimensions="availableDimensions"
+                    :semantic-groups="semanticGroups"
                     :fts-fields="ftsFields"
                     :time-range="telemetryTimeRange"
                     :hide-view-related-button="true"
@@ -1131,7 +1291,7 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
                     class="mb-4"
                     data-test="incident-telemetry-loading-indicator"
                   />
-                  <div class="text-base">Loading correlated metrics...</div>
+                  <div class="text-base">{{ t("alerts.incidents.loadingCorrelatedMetrics") }}</div>
                 </div>
 
                 <!-- Error/No Data State -->
@@ -1157,14 +1317,13 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
                     ]"
                   />
                   <div class="mt-3 text-xl font-semibold">
-                    {{ correlationError || "No correlated metrics found" }}
+                    {{ correlationError || t("alerts.incidents.noCorrelatedMetrics") }}
                   </div>
                   <div
                     v-if="correlationError && correlationError.includes('disambiguation fields')"
                     class="text-text-secondary mt-2 max-w-125 text-center text-sm"
                   >
-                    The service discovery configuration (disambiguation fields) was changed after
-                    this incident was created.
+                    {{ t("alerts.incidents.disambiguationChangedMessage") }}
                   </div>
                   <OButton
                     v-if="correlationError && !correlationError.includes('disambiguation fields')"
@@ -1172,7 +1331,7 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
                     size="md"
                     @click="refreshCorrelation"
                     class="mt-3"
-                    ><OIcon name="refresh" size="sm" class="mr-1" />Retry</OButton
+                    ><OIcon name="refresh" size="sm" class="me-1" />{{ t("common.retry") }}</OButton
                   >
                 </div>
 
@@ -1233,7 +1392,7 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
                     class="mb-4"
                     data-test="incident-telemetry-loading-indicator"
                   />
-                  <div class="text-base">Loading correlated traces...</div>
+                  <div class="text-base">{{ t("alerts.incidents.loadingCorrelatedTraces") }}</div>
                 </div>
 
                 <!-- Error/No Data State -->
@@ -1259,14 +1418,13 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
                     ]"
                   />
                   <div class="mt-3 text-xl font-semibold">
-                    {{ correlationError || "No correlated traces found" }}
+                    {{ correlationError || t("alerts.incidents.noCorrelatedTraces") }}
                   </div>
                   <div
                     v-if="correlationError && correlationError.includes('disambiguation fields')"
                     class="text-text-secondary mt-2 max-w-125 text-center text-sm"
                   >
-                    The service discovery configuration (disambiguation fields) was changed after
-                    this incident was created.
+                    {{ t("alerts.incidents.disambiguationChangedMessage") }}
                   </div>
                   <OButton
                     v-if="correlationError && !correlationError.includes('disambiguation fields')"
@@ -1274,7 +1432,7 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
                     size="md"
                     @click="refreshCorrelation"
                     class="mt-3"
-                    ><OIcon name="refresh" size="sm" class="mr-1" />Retry</OButton
+                    ><OIcon name="refresh" size="sm" class="me-1" />{{ t("common.retry") }}</OButton
                   >
                 </div>
 
@@ -1311,6 +1469,9 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
 </template>
 
 <script lang="ts">
+import { useDowntimeLookup } from "@/composables/downtimes/useDowntimeLookup";
+import { formatWindowTime } from "@/utils/downtimes/schedule";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import {
@@ -1318,35 +1479,36 @@ import {
   ref,
   watch,
   computed,
-  nextTick,
   onMounted,
   onBeforeUnmount,
   onUnmounted,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { formatToReadable } from "@/utils/date";
 import incidentsService, {
   Incident,
   IncidentWithAlerts,
   IncidentAlert,
   IncidentCorrelatedStreams,
-  ArchivedRcaReport,
 } from "@/services/incidents";
-import streamService from "@/services/stream";
+import { oncallTeamsQuery, responsesForIncidentQuery } from "@/services/oncall.queries";
+import type { OnCallResponse } from "@/ts/interfaces/oncall";
+import { streamSchemaQuery } from "@/services/stream.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { updateIncidentMutation, updateIncidentStatusMutation } from "@/services/incidents.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query";
 import serviceStreamsApi, {
   buildChipDimensionsFromFilters,
   type CorrelationResponse,
 } from "@/services/service_streams";
-import { marked } from "marked";
-import DOMPurify from "dompurify";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import IncidentServiceGraph from "./IncidentServiceGraph.vue";
-import IncidentTableOfContents from "./IncidentTableOfContents.vue";
 import IncidentRCAAnalysis from "./IncidentRCAAnalysis.vue";
 import IncidentTimeline from "./IncidentTimeline.vue";
 import IncidentAlertTriggersTable from "./IncidentAlertTriggersTable.vue";
@@ -1356,12 +1518,59 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard as copyToClipboardUtil } from "@/utils/clipboard";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { useIncidentRca } from "@/composables/useIncidentRca";
+import type { RcaAskPayload } from "@/utils/incidents/rcaAskAttachment";
+import BillingService, { type AiCreditCounts } from "@/services/billings";
+import config from "@/aws-exports";
+
+const LS_INCIDENT_TAB_ORDER_KEY = "o2_incident_detail_tab_order";
+const DEFAULT_INCIDENT_TAB_ORDER = [
+  "incidentAnalysis",
+  "overview",
+  "activity",
+  "serviceGraph",
+  "alertTriggers",
+  "logs",
+  "metrics",
+  "traces",
+] as const;
+type IncidentTab = (typeof DEFAULT_INCIDENT_TAB_ORDER)[number];
+const TAB_TEST_IDS: Record<IncidentTab, string> = {
+  incidentAnalysis: "incident-analysis-tab",
+  overview: "incident-overview-tab",
+  activity: "incident-activity-tab",
+  serviceGraph: "incident-alert-graph-tab",
+  alertTriggers: "incident-alert-triggers-tab",
+  logs: "incident-logs-tab",
+  metrics: "incident-metrics-tab",
+  traces: "incident-traces-tab",
+};
+
+function isIncidentTab(name: unknown): name is IncidentTab {
+  return DEFAULT_INCIDENT_TAB_ORDER.includes(name as IncidentTab);
+}
+
+/** The saved order minus unknown names, with tabs added since it was saved appended. */
+function loadIncidentTabOrder(): IncidentTab[] {
+  try {
+    const saved: unknown = JSON.parse(localStorage.getItem(LS_INCIDENT_TAB_ORDER_KEY) ?? "[]");
+    if (Array.isArray(saved)) {
+      return [...new Set([...saved.filter(isIncidentTab), ...DEFAULT_INCIDENT_TAB_ORDER])];
+    }
+  } catch {
+    /* unreadable: fall back to the default order */
+  }
+  return [...DEFAULT_INCIDENT_TAB_ORDER];
+}
 
 export default defineComponent({
   name: "IncidentDetailDrawer",
@@ -1373,23 +1582,33 @@ export default defineComponent({
     CorrelatedLogsTable,
     IncidentServiceGraph,
     IncidentAlertTriggersTable,
-    IncidentTableOfContents,
     IncidentRCAAnalysis,
     IncidentTimeline,
     CustomChartRenderer,
     OButton,
     OSpinner,
     OTooltip,
+    OTimeCell,
+    OUserCell,
     OIcon,
     OTag,
+    OTruncatedText,
     OInlineEdit,
+    OBanner,
   },
   emits: ["close", "status-updated", "sendToAiChat"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
+    const route = useRoute();
     const { confirm } = useConfirmDialog();
+
+    const incidentOrgId = useOrgId();
+    const updateIncidentStatus = useMutation(() =>
+      updateIncidentStatusMutation(incidentOrgId.value),
+    );
+    const updateIncident = useMutation(() => updateIncidentMutation(incidentOrgId.value));
 
     // Copy to clipboard state
     const copiedField = ref<string | null>(null);
@@ -1398,10 +1617,7 @@ export default defineComponent({
     const copyToClipboard = (text: string | undefined, fieldName: string) => {
       if (!text) return;
 
-      copyToClipboardUtil(text, {
-        successMessage: "Copied to clipboard",
-        errorMessage: "Failed to copy to clipboard",
-      }).then((success) => {
+      copyToClipboardUtil(text, t).then((success) => {
         if (success) {
           copiedField.value = fieldName;
           // Reset the icon after 2 seconds
@@ -1418,22 +1634,147 @@ export default defineComponent({
     const incidentDetails = ref<(IncidentWithAlerts & { correlation_reason?: string }) | null>(
       null,
     );
+    // The downtimes list is read only to name the downtime that mutes this incident.
+    const { downtimeOf, nameOf } = useDowntimeLookup(
+      () => !!incidentDetails.value?.muted_by_downtime_id,
+    );
+
+    const viewerZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    const mutedBannerText = computed(() => {
+      const id = incidentDetails.value?.muted_by_downtime_id;
+      if (!id) return "";
+      const end = downtimeOf(id)?.current_window?.end;
+      return end
+        ? t("alerts.downtimes.incident.bannerUntil", {
+            name: nameOf(id),
+            end: formatWindowTime(end, viewerZone),
+          })
+        : t("alerts.downtimes.incident.banner", { name: nameOf(id) });
+    });
+    const openMutingDowntime = () => {
+      const id = incidentDetails.value?.muted_by_downtime_id;
+      if (!id) return;
+      void router.push({
+        name: "downtimeDetail",
+        params: { id },
+        query: {
+          org_identifier: store.state.selectedOrganization?.identifier,
+          folder: downtimeOf(id)?.folder_id,
+        },
+      });
+    };
+    // The on-call record this incident paged, if any. Null in OSS, when
+    // on-call is off, and when nothing was routed — all of which mean the
+    // panel simply does not render.
+    const oncallResponse = ref<OnCallResponse | null>(null);
+    /// Every record this incident opened. The owner's is the headline; an
+    /// impacted team gets its own record and used to be dropped on the floor
+    /// by taking `[0]` and discarding the rest.
+    const oncallResponses = ref<OnCallResponse[]>([]);
+    const oncallTeamNames = ref<Record<string, string>>({});
     const triggers = ref<IncidentAlert[]>([]);
+
+    /// Newest firing wins: an incident can page more than once, and the panel
+    /// answers "who has it now". A failure leaves the panel hidden rather than
+    /// claiming nobody was paged.
+    async function loadOnCallResponse(org: string, incidentId: string) {
+      // With on-call off the route is unregistered, and cloud answers it with a 401 that logs the user out.
+      if (store.state.zoConfig?.oncall_enabled !== true) return;
+      try {
+        const records = await queryClient.fetchQuery(responsesForIncidentQuery(org, incidentId));
+        oncallResponses.value = records;
+        // The owner fixes the thing; a liaison contains the blast radius. The
+        // owner's record is the one the panel is about.
+        oncallResponse.value =
+          records.find((record) => record.responder_role !== "impacted") ?? records[0] ?? null;
+        await loadOnCallTeamNames(org, records);
+      } catch {
+        oncallResponse.value = null;
+        oncallResponses.value = [];
+      }
+    }
+
+    /// A team id is a ksuid, and printing one asks the reader to look it up
+    /// somewhere else. One list call resolves every record's team at once.
+    async function loadOnCallTeamNames(org: string, records: OnCallResponse[]) {
+      if (!records.some((record) => record.team_id)) return;
+      try {
+        const teams = await queryClient.fetchQuery(oncallTeamsQuery(org));
+        oncallTeamNames.value = Object.fromEntries(teams.map((team) => [team.id, team.name]));
+      } catch {
+        // The ids still render; a failed lookup must not blank the panel.
+        oncallTeamNames.value = {};
+      }
+    }
+
+    // A page nothing routed has no team, so it reads as unrouted rather than as a blank name.
+    const oncallTeamNameFor = (teamId: string | null): string =>
+      teamId ? (oncallTeamNames.value[teamId] ?? teamId) : String(t("oncall.statUnrouted"));
+
+    const oncallTeamName = computed(() =>
+      oncallResponse.value ? oncallTeamNameFor(oncallResponse.value.team_id) : "",
+    );
+
+    /// `OTag` keys its palette on the lowercase name, and the wire sends 1–5.
+    const oncallPriority = computed(() =>
+      oncallResponse.value ? `p${oncallResponse.value.priority}` : "",
+    );
+
+    const oncallLiaisons = computed(() =>
+      oncallResponses.value.filter((record) => record.id !== oncallResponse.value?.id),
+    );
     const alerts = ref<any[]>([]);
 
     // Title editing
     const isEditingTitle = ref(false);
-    const rcaLoading = ref(false);
-    const rcaStreamContent = ref("");
 
-    // Tab management
-    const activeTab = ref("overview");
+    // Tabs are drag-reorderable (OTabs `reorderable`); the page opens on the first one.
+    const tabOrder = ref<IncidentTab[]>(loadIncidentTabOrder());
+    const activeTab = ref<string>(tabOrder.value[0]);
+    const tabLabels = computed<Record<IncidentTab, I18nText>>(() => ({
+      incidentAnalysis: t("alerts.incidents.incidentAnalysis"),
+      overview: t("alerts.insights.tabs.overview"),
+      activity: t("alerts.incidents.activityTab"),
+      serviceGraph: t("alerts.incidents.alertGraph"),
+      alertTriggers: t("alerts.incidents.alertTriggers"),
+      logs: t("common.logs"),
+      metrics: t("search.metrics"),
+      traces: t("menu.traces"),
+    }));
+
+    function onTabReorder({
+      from,
+      to,
+      before = true,
+    }: {
+      from: string | number;
+      to: string | number;
+      before?: boolean;
+    }) {
+      if (from === to || !isIncidentTab(from)) return;
+      const order = tabOrder.value.filter((name) => name !== from);
+      const toIdx = order.indexOf(to as IncidentTab);
+      if (toIdx === -1) return;
+      order.splice(before ? toIdx : toIdx + 1, 0, from);
+      tabOrder.value = order;
+      try {
+        localStorage.setItem(LS_INCIDENT_TAB_ORDER_KEY, JSON.stringify(order));
+      } catch {
+        /* storage unavailable: the order still applies until reload */
+      }
+    }
 
     // Counter to trigger timeline refresh (prop-based approach)
     const timelineRefreshTrigger = ref(0);
 
     // Alert Triggers tab - selected alert for detail view
     const selectedAlertIndex = ref(-1);
+
+    // A composite member has no stream/query/threshold/frequency, so those
+    // sections and the query panel are hidden for it (§9.6).
+    const isSelectedComposite = computed(
+      () => alerts.value[selectedAlertIndex.value]?.alert_type === "composite",
+    );
 
     // Computed property to process alerts with formatted conditions upfront
     // Editable status and severity for Overview tab
@@ -1442,28 +1783,17 @@ export default defineComponent({
 
     // Status and Severity options
     const statusOptions = [
-      { label: "Open", value: "open" },
-      { label: "Acknowledged", value: "acknowledged" },
-      { label: "Resolved", value: "resolved" },
+      { label: t("alerts.incidents.statusOpen"), value: "open" },
+      { label: t("alerts.incidents.statusAcknowledged"), value: "acknowledged" },
+      { label: t("alerts.incidents.statusResolved"), value: "resolved" },
     ];
 
     const severityOptions = [
-      { label: "P1 - Critical", value: "P1" },
-      { label: "P2 - High", value: "P2" },
-      { label: "P3 - Medium", value: "P3" },
-      { label: "P4 - Low", value: "P4" },
+      { label: t("alerts.incidents.severityP1"), value: "P1" },
+      { label: t("alerts.incidents.severityP2"), value: "P2" },
+      { label: t("alerts.incidents.severityP3"), value: "P3" },
+      { label: t("alerts.incidents.severityP4"), value: "P4" },
     ];
-
-    // Table of Contents
-    interface TocItem {
-      id: string;
-      text: string;
-      level: number;
-      children: TocItem[];
-      expanded: boolean;
-    }
-    const tableOfContents = ref<TocItem[]>([]);
-    const expandedSections = ref<Record<string, boolean>>({});
 
     // Telemetry correlation state
     const correlationData = ref<IncidentCorrelatedStreams | null>(null);
@@ -1474,11 +1804,6 @@ export default defineComponent({
     const semanticGroups = ref<
       Array<{ id: string; display: string; group?: string; fields: string[] }>
     >([]);
-
-    // Computed to check if analysis already exists
-    const hasExistingRca = computed(() => {
-      return !!incidentDetails.value?.topology_context?.suggested_root_cause;
-    });
 
     // Create a lookup map for semantic group ID to display name
     const semanticGroupDisplayMap = computed(() => {
@@ -1507,162 +1832,50 @@ export default defineComponent({
       return resp ? buildChipDimensionsFromFilters(resp, semanticGroups.value) : {};
     });
 
-    // True when a background AI analysis run has started but not yet completed.
-    const analysisInFlight = ref(false);
-    // Epoch micros of the AIAnalysisBegin that is currently in flight, so the panel can
-    // show elapsed time and flag a run that has outlived the server's staleness window.
-    const analysisStartedAt = ref<number | null>(null);
-    // Last terminal failure, surfaced persistently in the panel instead of a transient toast.
-    const rcaError = ref<{ reason: string; details: string } | null>(null);
-    const rcaCancelling = ref(false);
+    // Run state, history and report text come from the detail's `rca`; while the
+    // run is live or the Analysis tab is open, one live stream keeps them current.
+    const {
+      summary: rcaSummary,
+      stale: rcaStale,
+      currentError: rcaError,
+      reportRun: rcaReportRun,
+      history: rcaHistory,
+      viewedRun: rcaViewedRun,
+      reportText: rcaReportText,
+      reportVerdict: rcaReportVerdict,
+      reportLoading: rcaReportLoading,
+      threadRunId: rcaThreadRunId,
+      threadLive: rcaThreadLive,
+      threadRunIsV1: rcaThreadRunIsV1,
+      thread: rcaThread,
+      threadStatus: rcaThreadStatus,
+      runSummary: rcaRunSummary,
+      runSummaryStatus: rcaRunSummaryStatus,
+      steering: rcaSteering,
+      steeringStatus: rcaSteeringStatus,
+      retryLive: retryRcaLive,
+      triggering: rcaTriggering,
+      cancelling: rcaCancelling,
+      resuming: rcaResuming,
+      resumeRunId: rcaResumeRunId,
+      refusal: rcaRefusal,
+      reload: reloadRca,
+      viewRun: viewRcaRun,
+      trigger: triggerRca,
+      cancel: cancelRca,
+      resume: resumeRca,
+    } = useIncidentRca(
+      incidentOrgId,
+      incidentDetails,
+      computed(() => activeTab.value === "incidentAnalysis"),
+    );
 
-    // Superseded reports (newest first) and which one is being viewed.
-    // null index = the current report.
-    const rcaHistory = ref<ArchivedRcaReport[]>([]);
-    const viewingArchivedIndex = ref<number | null>(null);
-    // Epoch micros of the last ai_analysis_complete, powering "Analyzed X ago".
-    const rcaAnalyzedAt = ref<number | null>(null);
+    // J5: this routed page hands Ask to MainLayout; a new chat with the analysis attached.
+    const askAboutRca = (payload: RcaAskPayload) => emit("sendToAiChat", payload);
 
-    const loadRcaHistory = async (incidentId: string) => {
-      try {
-        const org = store.state.selectedOrganization.identifier;
-        const response = await incidentsService.getRcaHistory(org, incidentId);
-        rcaHistory.value = response.data?.previous || [];
-      } catch (error) {
-        // History is supplementary — a failure here must not block the report itself.
-        console.error("Failed to load RCA history:", error);
-        rcaHistory.value = [];
-      }
-    };
-
-    const viewReport = (index: number | null) => {
-      viewingArchivedIndex.value = index;
-    };
-
-    // Mirrors the backend stale threshold (reanalysis_cooldown_minutes * 2, default 30*2).
-    // A begin older than this is ignored server-side, so the run is almost certainly dead.
-    const RCA_STALE_AFTER_MS = 60 * 60 * 1000;
-
-    // Ticks while an analysis is in flight so the elapsed-time label stays live.
-    const nowTick = ref(Date.now());
-    let nowTickTimer: ReturnType<typeof setInterval> | null = null;
-
-    const analysisElapsedMs = computed(() => {
-      if (!analysisStartedAt.value) return null;
-      // Event timestamps are microseconds since epoch.
-      return nowTick.value - analysisStartedAt.value / 1000;
-    });
-
-    const analysisIsStale = computed(() => {
-      const elapsed = analysisElapsedMs.value;
-      return elapsed !== null && elapsed > RCA_STALE_AFTER_MS;
-    });
-
-    const analysisElapsedLabel = computed(() => {
-      const elapsed = analysisElapsedMs.value;
-      if (elapsed === null || elapsed < 0) return "";
-      const totalSeconds = Math.floor(elapsed / 1000);
-      if (totalSeconds < 60) return `${totalSeconds}s`;
-      const minutes = Math.floor(totalSeconds / 60);
-      if (minutes < 60) return `${minutes}m`;
-      const hours = Math.floor(minutes / 60);
-      return `${hours}h ${minutes % 60}m`;
-    });
-
-    const checkAnalysisInFlight = async (incidentId: string) => {
-      try {
-        const org = store.state.selectedOrganization.identifier;
-        const response = await incidentsService.getEvents(org, incidentId);
-        const events: any[] = response.data?.events || [];
-
-        // Walk the log once, tracking the latest begin and the latest terminal event.
-        // Cancelled is terminal alongside complete/failed — it clears the in-flight guard
-        // on the server, so the UI must agree or it would show a phantom running state.
-        let lastBegin = -1;
-        let lastTerminal = -1;
-        let lastTerminalEvent: any = null;
-        let lastComplete = -1;
-        for (const ev of events) {
-          if (ev.type === "ai_analysis_begin") lastBegin = ev.timestamp;
-          if (ev.type === "ai_analysis_complete") lastComplete = ev.timestamp;
-          if (
-            ev.type === "ai_analysis_complete" ||
-            ev.type === "ai_analysis_failed" ||
-            ev.type === "ai_analysis_cancelled"
-          ) {
-            lastTerminal = ev.timestamp;
-            lastTerminalEvent = ev;
-          }
-        }
-        const nowInFlight = lastBegin > lastTerminal;
-
-        // When the report was produced, for the "Analyzed X ago" label.
-        rcaAnalyzedAt.value = lastComplete > 0 ? lastComplete : null;
-
-        analysisStartedAt.value = nowInFlight ? lastBegin : null;
-
-        // Keep the failure visible until the next run starts. Only the most recent
-        // terminal event matters: a later success or cancel clears a older failure.
-        rcaError.value =
-          !nowInFlight && lastTerminalEvent?.type === "ai_analysis_failed"
-            ? {
-                reason: lastTerminalEvent.data?.reason || t("alerts.incidents.rcaFailed"),
-                details: lastTerminalEvent.data?.error_details || "",
-              }
-            : null;
-
-        // Transition: banner was showing and analysis just finished — reload to pick up
-        // the new report. Skipped when the run failed, since there is nothing new to fetch.
-        if (analysisInFlight.value && !nowInFlight) {
-          analysisInFlight.value = false;
-          if (lastTerminalEvent?.type === "ai_analysis_complete") {
-            await loadDetails(incidentId);
-          }
-          timelineRefreshTrigger.value++;
-        } else {
-          analysisInFlight.value = nowInFlight;
-        }
-      } catch (error) {
-        // A failed events fetch says nothing about the run — leave the last known
-        // in-flight state alone rather than silently claiming "never analyzed".
-        console.error("Failed to check analysis state:", error);
-      }
-    };
-
-    // Poll while an analysis is in flight so the panel resolves on its own.
-    // Stops as soon as nothing is running to avoid a background request loop.
-    let inFlightPollTimer: ReturnType<typeof setInterval> | null = null;
-
-    const stopInFlightPolling = () => {
-      if (inFlightPollTimer) {
-        clearInterval(inFlightPollTimer);
-        inFlightPollTimer = null;
-      }
-      if (nowTickTimer) {
-        clearInterval(nowTickTimer);
-        nowTickTimer = null;
-      }
-    };
-
-    const startInFlightPolling = () => {
-      if (inFlightPollTimer) return;
-      nowTick.value = Date.now();
-      nowTickTimer = setInterval(() => {
-        nowTick.value = Date.now();
-      }, 1000);
-      inFlightPollTimer = setInterval(() => {
-        const id = incidentDetails.value?.id;
-        if (!id) {
-          stopInFlightPolling();
-          return;
-        }
-        checkAnalysisInFlight(id);
-      }, 10000);
-    };
-
-    watch(analysisInFlight, (running) => {
-      if (running) startInFlightPolling();
-      else stopInFlightPolling();
+    // A run that starts or ends adds an AI event to the Activity timeline.
+    watch([() => rcaSummary.value?.run_id, () => rcaSummary.value?.state], () => {
+      timelineRefreshTrigger.value++;
     });
 
     // Dark mode via the single sanctioned JS seam
@@ -1675,24 +1888,24 @@ export default defineComponent({
     });
 
     const alertFrequency = computed(() => {
-      if (!incidentDetails.value || triggers.value.length === 0) return "N/A";
+      if (!incidentDetails.value || triggers.value.length === 0) return raw("N/A");
 
       const durationMs =
         (incidentDetails.value.last_alert_at - incidentDetails.value.first_alert_at) / 1000;
       const durationSeconds = Math.floor(durationMs / 1000);
 
-      if (durationSeconds === 0) return "Immediate";
+      if (durationSeconds === 0) return t("alerts.incidents.frequencyImmediate");
 
       const frequency = triggers.value.length / (durationSeconds / 60); // alerts per minute
 
       if (frequency >= 1) {
-        return `${frequency.toFixed(1)} per minute`;
+        return t("alerts.incidents.frequencyPerMinute", { rate: frequency.toFixed(1) });
       } else if (frequency >= 1 / 60) {
         const perHour = frequency * 60;
-        return `${perHour.toFixed(1)} per hour`;
+        return t("alerts.incidents.frequencyPerHour", { rate: perHour.toFixed(1) });
       } else {
         const minutesBetween = Math.floor(durationSeconds / triggers.value.length / 60);
-        return `1 Per ${minutesBetween} Mins`;
+        return t("alerts.incidents.frequencyOnePerMins", { minutes: minutesBetween });
       }
     });
 
@@ -1744,7 +1957,7 @@ export default defineComponent({
 
       triggers.value.forEach((trigger) => {
         const alertId = trigger.alert_id;
-        const alertName = trigger.alert_name || "Unknown";
+        const alertName = trigger.alert_name || t("common.unknown");
 
         if (alertsMap.has(alertId)) {
           alertsMap.get(alertId)!.count++;
@@ -1763,7 +1976,7 @@ export default defineComponent({
 
     // Peak Alert Rate - find the highest concentration of alerts
     const peakAlertRate = computed(() => {
-      if (!incidentDetails.value || triggers.value.length === 0) return "N/A";
+      if (!incidentDetails.value || triggers.value.length === 0) return raw("N/A");
 
       // Sort triggers by timestamp
       const sortedTriggers = [...triggers.value].sort(
@@ -1791,7 +2004,9 @@ export default defineComponent({
         maxCount = Math.max(maxCount, count);
       }
 
-      return maxCount > 1 ? `${maxCount} alerts in 5 min` : "1 alert";
+      return maxCount > 1
+        ? t("alerts.incidents.peakAlertRateMany", { count: maxCount })
+        : t("alerts.incidents.peakAlertRateOne");
     });
 
     // Peak activity details for timeline
@@ -1856,11 +2071,11 @@ export default defineComponent({
     const correlationTooltip = computed(() => {
       const type = correlationType.value;
       if (type === "Temporal") {
-        return "Alerts correlated by time - they occurred close together";
+        return t("alerts.incidents.correlationTooltipTemporal");
       } else if (type === "Spatial") {
-        return "Alerts correlated by common dimensions (same service, host, etc.)";
+        return t("alerts.incidents.correlationTooltipSpatial");
       }
-      return "Correlation type for this incident";
+      return t("alerts.incidents.correlationTooltipDefault");
     });
 
     // Fetch correlated telemetry streams
@@ -1878,6 +2093,7 @@ export default defineComponent({
         correlationData.value = await incidentsService.getCorrelatedStreams(
           org,
           incidentDetails.value,
+          t,
         );
 
         // Check if correlation failed (null response or no data) — try fallback
@@ -1888,7 +2104,7 @@ export default defineComponent({
           !correlationData.value?.traceStreams?.length
         ) {
           // No correlation data found - try building fallback correlation
-          await buildFallbackCorrelation(org, incidentDetails.value);
+          await buildFallbackCorrelation(org, incidentDetails.value, force);
         }
       } catch (error: any) {
         console.error("Failed to load correlated streams:", error);
@@ -1900,7 +2116,7 @@ export default defineComponent({
     };
 
     // Build fallback correlation using first alert's stream schema
-    const buildFallbackCorrelation = async (org: string, incident: Incident) => {
+    const buildFallbackCorrelation = async (org: string, incident: Incident, force = false) => {
       try {
         const groupValues: Record<string, string> = incident.group_values ?? {};
         // Get first alert to determine source stream
@@ -1915,8 +2131,16 @@ export default defineComponent({
         const streamName = firstAlert.stream_name || "default";
 
         // Step 1: Get stream schema (like logs page does)
-        const schemaResponse = await streamService.schema(org, streamName, streamType);
-        const schema = schemaResponse.data;
+        const schemaOptions = streamSchemaQuery(org, streamName, streamType);
+        // Retry is the user asking again, so a field added since the last read must show up.
+        if (force) {
+          await queryClient.invalidateQueries({
+            queryKey: schemaOptions.queryKey,
+            exact: true,
+            refetchType: "none",
+          });
+        }
+        const schema = await queryClient.fetchQuery(schemaOptions);
 
         // Step 2: Extract schema fields (like logs page does)
         // CRITICAL FIX: Use uds_schema (user-defined schema) if available!
@@ -2008,6 +2232,7 @@ export default defineComponent({
               logs: streamType === "logs" ? [streamInfo] : [],
               metrics: streamType === "metrics" ? [streamInfo] : [],
               traces: streamType === "traces" ? [streamInfo] : [],
+              profiles: [],
             },
             // Extra marker consumed downstream; not part of CorrelationResponse.
             correlation_method: "frontend-fallback",
@@ -2020,9 +2245,8 @@ export default defineComponent({
     };
 
     // Refresh correlation data
-    const refreshCorrelation = () => {
-      fetchCorrelatedStreams(true);
-    };
+    // Returns the promise so callers (and specs) can await the refresh.
+    const refreshCorrelation = () => fetchCorrelatedStreams(true);
 
     // Lazy load correlation when user clicks telemetry tab for the first time
     watch(activeTab, (newTab) => {
@@ -2033,10 +2257,6 @@ export default defineComponent({
         !correlationError.value
       ) {
         fetchCorrelatedStreams();
-      }
-      // Switching to the Analysis tab re-checks in-flight state without polling
-      if (newTab === "incidentAnalysis" && incidentDetails.value?.id) {
-        checkAnalysisInFlight(incidentDetails.value.id);
       }
     });
 
@@ -2055,9 +2275,7 @@ export default defineComponent({
         group_values: incidentDetails.value.group_values,
         topology_context: incidentDetails.value.topology_context,
         triggers: triggers.value,
-        rca_analysis: hasExistingRca.value
-          ? incidentDetails.value?.topology_context?.suggested_root_cause
-          : rcaStreamContent.value,
+        rca_analysis: rcaReportText.value,
       };
     });
 
@@ -2117,29 +2335,6 @@ export default defineComponent({
       return [];
     });
 
-    // The raw markdown currently on screen — streaming chunks, an archived report
-    // the user selected, or the current report. Copy/download operate on this.
-    const activeRcaMarkdown = computed(() => {
-      if (rcaLoading.value && rcaStreamContent.value) return rcaStreamContent.value;
-
-      const archivedIndex = viewingArchivedIndex.value;
-      if (archivedIndex !== null) {
-        return rcaHistory.value[archivedIndex]?.content || "";
-      }
-
-      return hasExistingRca.value
-        ? incidentDetails.value?.topology_context?.suggested_root_cause || ""
-        : "";
-    });
-
-    // Computed property for formatted RCA content
-    const formattedRcaContent = computed(() => {
-      const content = activeRcaMarkdown.value;
-      if (!content) return "";
-
-      return formatRcaContent(content);
-    });
-
     // Alert Activity Chart Data - groups triggers by day and creates a bar chart
     const alertActivityChartData = computed(() => {
       if (!triggers.value || triggers.value.length === 0) {
@@ -2172,7 +2367,7 @@ export default defineComponent({
 
         triggersByDay[dayKey].total++;
 
-        const alertName = trigger.alert_name || "Unknown";
+        const alertName = trigger.alert_name || t("common.unknown");
         triggersByDay[dayKey].byAlert[alertName] =
           (triggersByDay[dayKey].byAlert[alertName] || 0) + 1;
       });
@@ -2274,7 +2469,7 @@ export default defineComponent({
         },
         yAxis: {
           type: "value",
-          name: "Alert Count",
+          name: t("alerts.incidents.alertCountAxis"),
           nameTextStyle: {
             color: isDarkMode.value ? "#B7B7B7" : "#72777B",
           },
@@ -2308,8 +2503,12 @@ export default defineComponent({
         const response = await incidentsService.get(org, incidentId);
 
         incidentDetails.value = response.data;
+        void loadOnCallResponse(org, incidentId);
         triggers.value = response.data.triggers || [];
-        alerts.value = response.data.alerts || [];
+        // Composites have no `alerts` row, so the live-definition resolver
+        // returns them under `composite_alerts`; merge so the name-based
+        // trigger→details lookup finds them too (§9.6).
+        alerts.value = [...(response.data.alerts || []), ...(response.data.composite_alerts || [])];
 
         // Initialize editable status and severity from incident data
         editableStatus.value = response.data.status;
@@ -2323,17 +2522,11 @@ export default defineComponent({
           console.warn("Failed to load semantic groups:", semanticError);
           semanticGroups.value = [];
         }
-
-        // Check if a background AI analysis is already running
-        await checkAnalysisInFlight(incidentId);
-
-        // Load superseded reports so the version picker is populated
-        await loadRcaHistory(incidentId);
       } catch (error) {
         console.error("Failed to load incident details:", error);
         toast({
           variant: "error",
-          message: "Failed to load incident details",
+          message: t("toastMessages.alerts.failedToLoadIncidentDetails"),
         });
       } finally {
         loading.value = false;
@@ -2348,6 +2541,15 @@ export default defineComponent({
           // Load incident from URL route parameter
           // Validate incident ID format (e.g., UUID validation)
           if (incidentIdFromUrl.trim().length > 0) {
+            // `?tab=incidentAnalysis` opens the page on the Analysis tab (the list's AI analysis cell).
+            // The key is consumed once: dropping it keeps a later reload on the tab the user chose.
+            const { tab, ...restQuery } = router.currentRoute.value.query;
+            if (tab !== undefined) {
+              if (tab === "incidentAnalysis") {
+                activeTab.value = "incidentAnalysis";
+              }
+              void router.replace({ query: restQuery });
+            }
             loadDetails(incidentIdFromUrl);
           } else {
             console.warn("Invalid incident ID in URL");
@@ -2382,11 +2584,6 @@ export default defineComponent({
     onUnmounted(() => {
       contextRegistry.setActive("");
       contextRegistry.unregister("incidents");
-      // Stop the poll/tick timers and drop any pending manual run so it cannot
-      // resolve against an unmounted component.
-      stopInFlightPolling();
-      rcaAbortController?.abort();
-      rcaAbortController = null;
     });
 
     const close = () => {
@@ -2394,51 +2591,83 @@ export default defineComponent({
       correlationData.value = null;
       correlationError.value = null;
 
-      // Drop RCA state too, so reopening another incident never shows the previous
-      // incident's error or spinner before the event log is re-read.
-      stopInFlightPolling();
-      rcaAbortController?.abort();
-      rcaAbortController = null;
-      rcaLoading.value = false;
-      rcaStreamContent.value = "";
-      rcaError.value = null;
-      analysisInFlight.value = false;
-      analysisStartedAt.value = null;
-      rcaHistory.value = [];
-      viewingArchivedIndex.value = null;
-      rcaAnalyzedAt.value = null;
-
       // Clear incident context when explicitly closing
       contextRegistry.setActive("");
       contextRegistry.unregister("incidents");
 
-      // Navigate back to incident list
+      // Navigate back to incident list, carrying over this route's own query (e.g. page)
+      // instead of dropping it. `tab` never reaches here: the load consumes it.
       router.push({
         name: "incidentList",
         query: {
+          ...route.query,
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
     };
 
-    // Handle ESC key to close incident detail
-    const handleEscapeKey = (event: KeyboardEvent) => {
+    // Esc leaves the page only when nothing else on it owns the key: no
+    // text field has focus and no dialog, menu, listbox or popover is open. Leaving
+    // never cancels a run. Overlays close themselves on Esc, so whether one was open
+    // is read in the capture phase, before their own handlers run.
+    const OPEN_OVERLAY_SELECTOR = [
+      '[role="dialog"]',
+      '[role="alertdialog"]',
+      '[role="menu"]',
+      '[role="listbox"]',
+    ]
+      .map((selector) => `${selector}:not([data-state="closed"]):not([hidden])`)
+      .join(", ");
+    const TEXT_FIELD_SELECTOR =
+      'textarea, select, input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="reset"])';
+
+    const escapeOwnedElsewhere = () => {
+      const active = document.activeElement;
+      if (
+        active instanceof HTMLElement &&
+        (active.isContentEditable || active.matches(TEXT_FIELD_SELECTOR))
+      ) {
+        return true;
+      }
+      return document.querySelector(OPEN_OVERLAY_SELECTOR) !== null;
+    };
+
+    let escapeCapturedAsOwned = false;
+
+    const captureEscapeKey = (event: KeyboardEvent) => {
       if (event.key === "Escape" || event.key === "Esc") {
-        // Don't close if user is editing title
-        if (isEditingTitle.value) {
-          return;
-        }
-        close();
+        escapeCapturedAsOwned = escapeOwnedElsewhere();
       }
     };
 
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" && event.key !== "Esc") return;
+      const owned =
+        escapeCapturedAsOwned ||
+        event.defaultPrevented ||
+        isEditingTitle.value ||
+        escapeOwnedElsewhere();
+      escapeCapturedAsOwned = false;
+      if (!owned) close();
+    };
+
+    // Credit costs label the analysis actions; without them the actions show no cost.
+    const aiCreditCosts = ref<AiCreditCounts | null>(null);
+
     // Add keyboard event listener on mount
     onMounted(() => {
+      window.addEventListener("keydown", captureEscapeKey, true);
       window.addEventListener("keydown", handleEscapeKey);
+      if (config.isCloud === "true") {
+        BillingService.get_ai_usage(store.state.selectedOrganization.identifier)
+          .then((res) => (aiCreditCosts.value = res.data.costs ?? null))
+          .catch(() => {});
+      }
     });
 
-    // Remove keyboard event listener on unmount
+    // Remove keyboard event listeners on unmount
     onBeforeUnmount(() => {
+      window.removeEventListener("keydown", captureEscapeKey, true);
       window.removeEventListener("keydown", handleEscapeKey);
     });
 
@@ -2450,14 +2679,15 @@ export default defineComponent({
       if (!incidentDetails.value) return;
       updating.value = true;
       try {
-        const org = store.state.selectedOrganization.identifier;
-        const response = await incidentsService.updateStatus(
-          org,
-          incidentDetails.value.id,
-          newStatus,
-        );
+        const response = await updateIncidentStatus.mutateAsync({
+          id: incidentDetails.value.id,
+          status: newStatus,
+        });
         // Update local state with the actual status from the API response
         incidentDetails.value.status = response.data.status;
+        incidentDetails.value.acknowledged_by = response.data.acknowledged_by;
+        incidentDetails.value.acknowledged_at = response.data.acknowledged_at;
+        incidentDetails.value.resolved_at = response.data.resolved_at ?? undefined;
         incidentDetails.value.updated_at = response.data.updated_at || Date.now() * 1000;
         editableStatus.value = response.data.status;
         toast({
@@ -2473,9 +2703,9 @@ export default defineComponent({
           timelineRefreshTrigger.value++;
         }
 
-        // Reopening may trigger a background RCA reanalysis — check immediately
-        if (newStatus === "open" && incidentDetails.value?.id) {
-          await checkAnalysisInFlight(incidentDetails.value.id);
+        // Reopening may start an automatic run — re-read the run state now
+        if (newStatus === "open") {
+          await reloadRca();
         }
       } catch (error) {
         console.error("[UPDATE STATUS] Failed to update status:", error);
@@ -2488,9 +2718,41 @@ export default defineComponent({
       }
     };
 
-    const acknowledgeIncident = () => updateStatus("acknowledged");
-    const resolveIncident = () => updateStatus("resolved");
-    const reopenIncident = () => updateStatus("open");
+    const acknowledgeIncident = async () => {
+      const ok = await confirm({
+        title: t("alerts.incidents.acknowledgeConfirmTitle"),
+        message: t("alerts.incidents.acknowledgeConfirmMessage"),
+        confirmLabel: t("alerts.incidents.acknowledgeConfirmLabel"),
+        cancelLabel: t("alerts.incidents.acknowledgeConfirmCancelLabel"),
+        persistent: false,
+      });
+      if (!ok) return;
+      // The caller's promise must cover the update, not just the confirm dialog.
+      return updateStatus("acknowledged");
+    };
+    // Resolving closes the incident, so it confirms like Acknowledge; Reopen too.
+    const resolveIncident = async () => {
+      const ok = await confirm({
+        title: t("alerts.incidents.resolveConfirmTitle"),
+        message: t("alerts.incidents.resolveConfirmMessage"),
+        confirmLabel: t("alerts.incidents.resolve"),
+        cancelLabel: t("common.cancel"),
+        persistent: false,
+      });
+      if (!ok) return;
+      return updateStatus("resolved");
+    };
+    const reopenIncident = async () => {
+      const ok = await confirm({
+        title: t("alerts.incidents.reopenConfirmTitle"),
+        message: t("alerts.incidents.reopenConfirmMessage"),
+        confirmLabel: t("alerts.incidents.reopen"),
+        cancelLabel: t("common.cancel"),
+        persistent: false,
+      });
+      if (!ok) return;
+      return updateStatus("open");
+    };
 
     // Title editing. OInlineEdit owns the open/close and the Escape-restores
     // behaviour; this only has to persist a committed value. `isEditingTitle`
@@ -2512,9 +2774,9 @@ export default defineComponent({
       }
 
       try {
-        const org = store.state.selectedOrganization.identifier;
-        const response = await incidentsService.updateIncident(org, incidentDetails.value.id, {
-          title: nextTitle,
+        const response = await updateIncident.mutateAsync({
+          id: incidentDetails.value.id,
+          updates: { title: nextTitle },
         });
 
         // Update local state with the actual title from the API response
@@ -2536,7 +2798,7 @@ export default defineComponent({
         console.error("Failed to update title:", error);
         toast({
           variant: "error",
-          message: error?.response?.data?.message || "Failed to update incident title",
+          message: error?.response?.data?.message || t("alerts.incidents.titleUpdateFailed"),
         });
         cancelTitleEdit();
       }
@@ -2555,35 +2817,34 @@ export default defineComponent({
       }
     };
 
-    const getSeverityColorHex = (severity: string) => {
-      switch (severity) {
-        case "P1":
-          return "#b91c1c"; // red-700
-        case "P2":
-          return "#c2410c"; // orange-700
-        case "P3":
-          return "#d97706"; // amber-600
-        case "P4":
-          return "#6b7280"; // gray-500
-        default:
-          return "#6b7280"; // gray-500
+    const formatSeconds = (totalSeconds: number | undefined) => {
+      if (!totalSeconds) return raw("N/A");
+
+      if (totalSeconds >= 60) {
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        if (seconds === 0) {
+          return t("alerts.incidents.periodMinutes", { minutes });
+        }
+        return t("alerts.incidents.periodMinutesSeconds", { minutes, seconds });
       }
+
+      return t("alerts.incidents.periodSeconds", { seconds: totalSeconds });
     };
 
-    const formatPeriod = (periodInSeconds: number | undefined) => {
-      if (!periodInSeconds) return "N/A";
+    // The stored alert keeps `period` in minutes but `frequency` in seconds.
+    const formatPeriod = (periodInMinutes: number | undefined) =>
+      formatSeconds(periodInMinutes ? periodInMinutes * 60 : undefined);
 
-      // Convert seconds to minutes
-      if (periodInSeconds >= 60) {
-        const minutes = Math.floor(periodInSeconds / 60);
-        const seconds = periodInSeconds % 60;
-        if (seconds === 0) {
-          return `${minutes} min`;
-        }
-        return `${minutes} min ${seconds} sec`;
+    const formatFrequency = (triggerCondition?: {
+      frequency?: number;
+      frequency_type?: string;
+      cron?: string;
+    }) => {
+      if (triggerCondition?.frequency_type === "cron") {
+        return triggerCondition?.cron || raw("N/A");
       }
-
-      return `${periodInSeconds} sec`;
+      return formatSeconds(triggerCondition?.frequency);
     };
 
     // Transform V1 format conditions (or/and structure) to readable expression
@@ -2653,45 +2914,15 @@ export default defineComponent({
       return typeof conditionData === "string" ? conditionData : "--";
     };
 
-    // Handle status change from dropdown
-    const handleStatusChange = async (newStatus: "open" | "acknowledged" | "resolved") => {
-      if (!incidentDetails.value || updating.value) return;
-
-      updating.value = true;
-      try {
-        const org = store.state.selectedOrganization.identifier;
-        const response = await incidentsService.updateStatus(
-          org,
-          incidentDetails.value.id,
-          newStatus,
-        );
-
-        // Update local state with the actual status from the API response
-        incidentDetails.value.status = response.data.status;
-        editableStatus.value = response.data.status;
-
-        toast({
-          variant: "success",
-          message: `Incident status updated to ${response.data.status}`,
-        });
-        // Mark data as stale so incident list will refresh
-        store.dispatch("incidents/setShouldRefresh", true);
-
-        // Refresh events in timeline if Activity tab is active
-        if (activeTab.value === "activity") {
-          timelineRefreshTrigger.value++;
-        }
-      } catch (error: any) {
-        console.error("Failed to update status:", error);
-        toast({
-          variant: "error",
-          message: error?.response?.data?.message || "Failed to update incident status",
-        });
-        // Revert on error
-        editableStatus.value = incidentDetails.value.status;
-      } finally {
-        updating.value = false;
-      }
+    // The Manage panel chips take the same confirmed path as the header buttons.
+    const handleStatusChange = (newStatus: "open" | "acknowledged" | "resolved") => {
+      if (updating.value) return;
+      const actions = {
+        open: reopenIncident,
+        acknowledged: acknowledgeIncident,
+        resolved: resolveIncident,
+      };
+      return actions[newStatus]();
     };
 
     // Handle trigger row click - find the alert index by name
@@ -2708,10 +2939,10 @@ export default defineComponent({
 
       updating.value = true;
       try {
-        const org = store.state.selectedOrganization.identifier;
         const incidentId = incidentDetails.value.id;
-        const response = await incidentsService.updateIncident(org, incidentId, {
-          severity: newSeverity,
+        const response = await updateIncident.mutateAsync({
+          id: incidentId,
+          updates: { severity: newSeverity },
         });
 
         const data = response.data;
@@ -2722,41 +2953,36 @@ export default defineComponent({
 
         toast({
           variant: "success",
-          message: `Incident severity updated to ${data.severity}`,
+          message: t("toastMessages.alerts.incidentSeverityUpdatedTo", { severity: data.severity }),
         });
         // Mark data as stale so incident list will refresh
         store.dispatch("incidents/setShouldRefresh", true);
 
         // Handle reanalysis prompt based on in-flight state
         if ("analysis_in_flight" in data) {
-          analysisInFlight.value = !!data.analysis_in_flight;
           if (data.analysis_in_flight) {
             toast({
               variant: "info",
-              message: "AI analysis is already running for this incident",
+              message: t("toastMessages.alerts.aiAnalysisIsAlreadyRunningFor"),
             });
+            await reloadRca();
           } else {
+            const reanalysisCost = aiCreditCosts.value?.incident_reanalysis;
             const ok = await confirm({
-              title: "Re-run AI Analysis?",
-              message: "Severity has changed. Would you like AI to re-analyze this incident?",
-              confirmLabel: "Re-run AI analysis",
-              cancelLabel: "No thanks",
+              title: t("alerts.incidents.rerunAnalysisTitle"),
+              message: reanalysisCost
+                ? t(
+                    "alerts.incidents.rerunAnalysisMessageWithCost",
+                    { cost: reanalysisCost },
+                    reanalysisCost,
+                  )
+                : t("alerts.incidents.rerunAnalysisMessage"),
+              confirmLabel: t("alerts.incidents.rerunAnalysisConfirmLabel"),
+              cancelLabel: t("alerts.incidents.rerunAnalysisCancelLabel"),
               persistent: false,
             });
             if (ok) {
-              try {
-                await incidentsService.triggerRca(org, incidentId, { reanalysis: true });
-                toast({
-                  variant: "success",
-                  message: "AI reanalysis started",
-                });
-                await loadDetails(incidentId);
-              } catch (e: any) {
-                toast({
-                  variant: "error",
-                  message: e?.response?.data?.message || "Failed to start reanalysis",
-                });
-              }
+              await triggerRca();
             }
           }
         }
@@ -2764,7 +2990,7 @@ export default defineComponent({
         console.error("Failed to update severity:", error);
         toast({
           variant: "error",
-          message: error?.response?.data?.message || "Failed to update incident severity",
+          message: error?.response?.data?.message || t("alerts.incidents.severityUpdateFailed"),
         });
         // Revert on error
         editableSeverity.value = incidentDetails.value.severity;
@@ -2813,496 +3039,6 @@ export default defineComponent({
       }
     };
 
-    // Extract headings from markdown content to build table of contents
-    const extractTableOfContents = (content: string): TocItem[] => {
-      // Handle both actual newlines and escaped \n in JSON strings
-      const normalizedContent = content.replace(/\\n/g, "\n");
-      const lines = normalizedContent.split("\n");
-      const toc: TocItem[] = [];
-      const stack: TocItem[] = [];
-      let inCodeBlock = false;
-
-      lines.forEach((line) => {
-        // Check for code block delimiters (````)
-        if (line.trim().startsWith("```")) {
-          inCodeBlock = !inCodeBlock;
-          return;
-        }
-
-        // Skip lines inside code blocks
-        if (inCodeBlock) {
-          return;
-        }
-
-        const match = line.match(/^(#{1,3})\s+(.+)$/);
-        if (match) {
-          const level = match[1].length;
-          const text = match[2].trim();
-          const id =
-            "section-" +
-            text
-              .toLowerCase()
-              .replace(/[^a-z0-9]+/g, "-")
-              .replace(/(^-|-$)/g, "");
-
-          // Skip h1 headings (document title) - only show h2 and h3 in TOC
-          if (level === 1) {
-            return;
-          }
-
-          const tocItem: TocItem = {
-            id,
-            text,
-            level,
-            children: [],
-            expanded: true, // Changed from false to true to expand by default
-          };
-
-          // Set expanded state to true for all sections by default, but only if not already set
-          if (expandedSections.value[id] === undefined) {
-            expandedSections.value[id] = true;
-          }
-
-          // Adjust level for display (h2 becomes level 1, h3 becomes level 2)
-          const displayLevel = level - 1;
-
-          // Find the correct parent based on adjusted level
-          while (stack.length > 0 && stack[stack.length - 1].level >= displayLevel) {
-            stack.pop();
-          }
-
-          // Update the item with display level
-          tocItem.level = displayLevel;
-
-          if (stack.length === 0) {
-            // Top level item
-            toc.push(tocItem);
-          } else {
-            // Child item
-            stack[stack.length - 1].children.push(tocItem);
-          }
-
-          stack.push(tocItem);
-        }
-      });
-
-      return toc;
-    };
-
-    // Scroll to a section in the RCA report
-    const scrollToSection = (id: string) => {
-      // Use setTimeout to ensure DOM is ready
-      setTimeout(() => {
-        // Only search within RCA content areas (not left sidebar)
-        const rcaContainers = Array.from(document.querySelectorAll(".rca-container"));
-        let element: HTMLElement | null = null;
-        let scrollContainer: Element | null = null;
-
-        // Search for the element only within RCA containers
-        for (const container of rcaContainers) {
-          const foundElement = container.querySelector(`#${id}`) as HTMLElement;
-          if (foundElement) {
-            element = foundElement;
-            scrollContainer = container;
-            break;
-          }
-        }
-
-        if (element && scrollContainer) {
-          // Get the element's position relative to the scroll container
-          const containerRect = scrollContainer.getBoundingClientRect();
-          const elementRect = element.getBoundingClientRect();
-          const relativeTop = elementRect.top - containerRect.top;
-          const offsetPosition = scrollContainer.scrollTop + relativeTop - 20;
-
-          // Scroll within the container with offset
-          scrollContainer.scrollTo({
-            top: offsetPosition,
-            behavior: "smooth",
-          });
-        }
-      }, 50);
-    };
-
-    // Toggle section expansion in TOC
-    const toggleSection = (item: TocItem, event?: Event) => {
-      if (event) {
-        event.stopPropagation();
-      }
-      // Create a new object to avoid triggering reactive updates during render
-      expandedSections.value = {
-        ...expandedSections.value,
-        [item.id]: !expandedSections.value[item.id],
-      };
-    };
-
-    const convertKeyValueListsToTables = (content: string): string => {
-      // Pattern: Lists where items follow "**Key**: Value" or "- **Key**: Value" format
-      // Convert these to markdown tables for better readability
-      const lines = content.split("\n");
-      const result: string[] = [];
-      let i = 0;
-
-      while (i < lines.length) {
-        const line = lines[i];
-
-        // Check if this line starts a key-value list pattern
-        const isKeyValueItem = /^-\s+\*\*([^*]+)\*\*:\s*(.+)$/.test(line.trim());
-
-        if (isKeyValueItem) {
-          // Found a key-value list, collect all consecutive items
-          const tableRows: Array<{ key: string; value: string }> = [];
-          let j = i;
-
-          while (j < lines.length) {
-            const currentLine = lines[j].trim();
-            const match = currentLine.match(/^-\s+\*\*([^*]+)\*\*:\s*(.+)$/);
-
-            if (match) {
-              tableRows.push({ key: match[1] ?? "", value: match[2] ?? "" });
-              j++;
-            } else if (currentLine === "" && j < lines.length - 1) {
-              // Allow one blank line within the list
-              const nextLine = lines[j + 1]?.trim();
-              if (/^-\s+\*\*([^*]+)\*\*:\s*(.+)$/.test(nextLine)) {
-                j++; // Skip the blank line
-                continue;
-              } else {
-                break;
-              }
-            } else {
-              break;
-            }
-          }
-
-          // Convert to table if we have 3 or more items
-          if (tableRows.length >= 3) {
-            result.push(""); // Add blank line before table
-            result.push("| Field | Value |");
-            result.push("|-------|-------|");
-            tableRows.forEach((row) => {
-              result.push(`| ${row.key} | ${row.value} |`);
-            });
-            result.push(""); // Add blank line after table
-            i = j;
-          } else {
-            // Not enough items for a table, keep as list
-            result.push(line);
-            i++;
-          }
-        } else {
-          result.push(line);
-          i++;
-        }
-      }
-
-      return result.join("\n");
-    };
-
-    const formatRcaContent = (content: string) => {
-      // First, extract table of contents - only update if content changed
-      const newToc = extractTableOfContents(content);
-      if (JSON.stringify(newToc) !== JSON.stringify(tableOfContents.value)) {
-        tableOfContents.value = newToc;
-      }
-
-      // Convert key-value lists to tables
-      const processedContent = convertKeyValueListsToTables(content);
-
-      // Configure marked with custom renderer using marked.use() extension API
-      marked.use({
-        renderer: {
-          heading({ tokens, depth }: any) {
-            // Parse inline tokens to get the heading text
-            const parsedText = this.parser.parseInline(tokens);
-
-            // Generate ID for heading - extract raw text from tokens first
-            let rawText = "";
-            if (tokens && Array.isArray(tokens)) {
-              rawText = tokens
-                .map((t: any) => {
-                  // Handle different token types
-                  if (t.type === "text" && t.text) return t.text;
-                  if (t.raw) return t.raw;
-                  if (t.text) return t.text;
-                  return "";
-                })
-                .join("")
-                .trim();
-            }
-
-            // Fallback: extract plain text from parsed HTML using DOM
-            if (!rawText) {
-              const tempDiv = document.createElement("div");
-              tempDiv.innerHTML = parsedText || "";
-              rawText = (tempDiv.textContent || tempDiv.innerText || "").trim();
-            }
-
-            const id =
-              "section-" +
-              rawText
-                .toLowerCase()
-                .replace(/[^a-z0-9]+/g, "-")
-                .replace(/(^-|-$)/g, "");
-
-            // Colours/backgrounds for these rca-* classes come from the
-            // `:deep(.rca-report-content)` rules in IncidentRCAAnalysis.vue (the
-            // component that v-htmls this string). Those rules are unlayered, so
-            // they beat any layered colour utility named here — only structural
-            // utilities (spacing, size, weight, border-width) are live.
-            const classes = [
-              "rca-h1 font-bold text-lg text-center mb-4 pb-2 border-b-2",
-              // TODO: Discuss with team - h2 section separators with background and left border
-              // Remove 'rca-section-bg px-4 py-3 rounded-default border-l-4' if not approved
-              "rca-h2 font-bold text-lg mt-5 mb-3 rca-section-bg px-4 py-3 rounded-default border-l-4",
-              "rca-h3 font-semibold text-base mt-4 mb-2",
-              "rca-h4 font-semibold text-sm mt-3 mb-2",
-            ];
-            return `<div id="${id}" class="${classes[depth - 1] || ""}">${parsedText}</div>`;
-          },
-          code({ text }: any) {
-            return `<div class="rca-code-block border rounded-default p-3 my-3 overflow-x-auto"><pre class="text-sm font-mono whitespace-pre m-0"><code>${text}</code></pre></div>`;
-          },
-          codespan({ text }: any) {
-            return `<code class="rca-inline-code px-1.5 py-0.5 rounded-default text-sm font-mono">${text}</code>`;
-          },
-          list(token: any) {
-            const body = token.items.map((item: any) => this.listitem(item)).join("");
-            const tag = token.ordered ? "ol" : "ul";
-            const classes = token.ordered
-              ? "rca-ol pl-5 my-3 space-y-1.5 list-decimal"
-              : "rca-ul pl-5 my-3 space-y-1.5 list-disc";
-            return `<${tag} class="${classes}">${body}</${tag}>`;
-          },
-          listitem(item: any) {
-            const text = this.parser.parse(item.tokens);
-            return `<li class="rca-list-item">${text}</li>`;
-          },
-          table(token: any) {
-            let header = "<tr>";
-            for (let i = 0; i < token.header.length; i++) {
-              const cell = token.header[i];
-              const content = this.parser.parseInline(cell.tokens);
-              const cellClass = i === 0 ? "rca-first-cell" : "";
-              header += `<th class="px-3 py-2 text-left font-semibold text-sm text-table-header-text border-b border-table-header-border ${cellClass}">${content}</th>`;
-            }
-            header += "</tr>";
-
-            let body = "";
-            for (const row of token.rows) {
-              body += '<tr class="hover:bg-table-row-hover-bg">';
-              for (let i = 0; i < row.length; i++) {
-                const cell = row[i];
-                const content = this.parser.parseInline(cell.tokens);
-                const cellClass = i === 0 ? "rca-first-cell" : "";
-                body += `<td class="px-3 py-2 text-sm border-b border-table-row-divider ${cellClass}">${content}</td>`;
-              }
-              body += "</tr>";
-            }
-
-            return `<div class="rca-table-wrapper my-4 overflow-x-auto"><table class="rca-table w-full border border-table-header-border rounded-default"><thead class="bg-table-header-bg">${header}</thead><tbody>${body}</tbody></table></div>`;
-          },
-          blockquote({ tokens }: any) {
-            const text = this.parser.parse(tokens);
-            return `<blockquote class="rca-blockquote border-l-4 pl-4 py-2 my-3 italic">${text}</blockquote>`;
-          },
-          paragraph({ tokens }: any) {
-            const text = this.parser.parseInline(tokens);
-            return `<p class="mb-3">${text}</p>`;
-          },
-          strong({ tokens }: any) {
-            const text = this.parser.parseInline(tokens);
-            return `<strong class="font-semibold">${text}</strong>`;
-          },
-          em({ tokens }: any) {
-            const text = this.parser.parseInline(tokens);
-            return `<em class="italic">${text}</em>`;
-          },
-          hr() {
-            return `<hr class="my-4 border-t" />`;
-          },
-        },
-      });
-
-      // Configure marked options
-      marked.setOptions({
-        gfm: true,
-        breaks: false,
-      });
-
-      // Parse markdown
-      const html = marked.parse(processedContent) as string;
-
-      // Sanitize HTML to prevent XSS
-      const sanitized = DOMPurify.sanitize(html, {
-        ALLOWED_TAGS: [
-          "h1",
-          "h2",
-          "h3",
-          "h4",
-          "p",
-          "ul",
-          "ol",
-          "li",
-          "strong",
-          "em",
-          "code",
-          "pre",
-          "table",
-          "thead",
-          "tbody",
-          "tr",
-          "th",
-          "td",
-          "blockquote",
-          "hr",
-          "div",
-          "span",
-        ],
-        ALLOWED_ATTR: ["class", "value", "style", "id"],
-        ADD_ATTR: ["id"],
-        KEEP_CONTENT: true,
-        RETURN_TRUSTED_TYPE: false,
-      });
-
-      // Wrap in container
-      return `<div class="rca-report-content">${sanitized}</div>`;
-    };
-
-    // Aborts the client side of a manual run so closing the drawer or hitting Cancel
-    // stops the pending request instead of letting it resolve against a dead component.
-    let rcaAbortController: AbortController | null = null;
-
-    const copyReport = async () => {
-      const content = activeRcaMarkdown.value;
-      if (!content) return;
-
-      try {
-        await navigator.clipboard.writeText(content);
-        toast({ variant: "success", message: t("alerts.incidents.rcaCopied") });
-      } catch (error) {
-        console.error("Failed to copy RCA report:", error);
-        toast({ variant: "error", message: t("alerts.incidents.rcaCopyFailed") });
-      }
-    };
-
-    const downloadReport = () => {
-      const content = activeRcaMarkdown.value;
-      if (!content || !incidentDetails.value) return;
-
-      const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `incident-${incidentDetails.value.id}-rca.md`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    };
-
-    const triggerRca = async (options: { buildOnPrevious?: boolean } = {}) => {
-      if (!incidentDetails.value) return;
-
-      const incidentId = incidentDetails.value.id;
-      const org = store.state.selectedOrganization.identifier;
-
-      rcaLoading.value = true;
-      rcaStreamContent.value = "";
-      // Clear the previous failure so a retry doesn't show a stale error beside the spinner.
-      rcaError.value = null;
-      // A re-run always produces a new current report — drop back from any archived view.
-      viewingArchivedIndex.value = null;
-      analysisStartedAt.value = Date.now() * 1000;
-      startInFlightPolling();
-
-      rcaAbortController = new AbortController();
-
-      try {
-        const response = await incidentsService.triggerRca(
-          org,
-          incidentId,
-          // Fresh analysis unless the user explicitly asked to build on the previous one.
-          { build_on_previous: options.buildOnPrevious === true },
-          { signal: rcaAbortController.signal },
-        );
-
-        // Set the RCA content immediately
-        rcaStreamContent.value = response.data.rca_content;
-
-        toast({
-          variant: "success",
-          message: t("alerts.incidents.rcaCompleted"),
-        });
-
-        // Reload incident to get the saved RCA in topology context, and pick up the
-        // report this run just superseded.
-        await loadDetails(incidentId);
-        await loadRcaHistory(incidentId);
-      } catch (error: any) {
-        rcaStreamContent.value = "";
-
-        // A cancel is a deliberate user action, not a failure — handled by cancelRca.
-        if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED") {
-          return;
-        }
-
-        console.error("Failed to trigger RCA:", error);
-        const message =
-          error?.response?.data?.message ||
-          error?.message ||
-          t("alerts.incidents.rcaFailedGeneric");
-        // Persist the failure in the panel; the toast alone disappears.
-        rcaError.value = { reason: message, details: "" };
-        toast({ variant: "error", message });
-        // Surface the failure event in the Activity timeline too.
-        timelineRefreshTrigger.value++;
-      } finally {
-        rcaLoading.value = false;
-        rcaAbortController = null;
-        analysisStartedAt.value = null;
-        if (!analysisInFlight.value) stopInFlightPolling();
-      }
-    };
-
-    const cancelRca = async () => {
-      if (!incidentDetails.value || rcaCancelling.value) return;
-
-      const incidentId = incidentDetails.value.id;
-      const org = store.state.selectedOrganization.identifier;
-
-      rcaCancelling.value = true;
-
-      // Drop the client request first so the UI frees up immediately, regardless of
-      // how long the server takes to acknowledge.
-      rcaAbortController?.abort();
-
-      try {
-        await incidentsService.cancelRca(org, incidentId);
-
-        analysisInFlight.value = false;
-        analysisStartedAt.value = null;
-        rcaError.value = null;
-        stopInFlightPolling();
-
-        toast({ variant: "info", message: t("alerts.incidents.rcaCancelled") });
-        timelineRefreshTrigger.value++;
-      } catch (error: any) {
-        console.error("Failed to cancel RCA:", error);
-        toast({
-          variant: "error",
-          message:
-            error?.response?.data?.message ||
-            error?.message ||
-            t("alerts.incidents.rcaCancelFailed"),
-        });
-        // Resync from the event log — the run may have finished while we were cancelling.
-        await checkAnalysisInFlight(incidentId);
-      } finally {
-        rcaCancelling.value = false;
-      }
-    };
-
     // Humanize key_type for display
     const getCorrelationMethodLabel = (keyType: string | undefined) => {
       switch (keyType?.toLowerCase()) {
@@ -3313,40 +3049,66 @@ export default defineComponent({
         case "alert_id":
           return t("alerts.incidents.correlatedByAlertId");
         default:
-          return keyType || "Unknown";
+          return keyType || t("common.unknown");
       }
     };
 
     return {
+      mutedBannerText,
+      openMutingDowntime,
+      raw,
       t,
       store,
       loading,
       updating,
       incidentDetails,
+      oncallResponse,
+      oncallLiaisons,
+      oncallTeamName,
+      oncallTeamNameFor,
+      oncallPriority,
       triggers,
       alerts,
       selectedAlertIndex,
-      rcaLoading,
+      isSelectedComposite,
+      incidentOrgId,
+      rcaSummary,
+      rcaStale,
       rcaError,
-      rcaCancelling,
-      analysisElapsedLabel,
-      analysisIsStale,
-      cancelRca,
+      rcaReportRun,
       rcaHistory,
-      viewingArchivedIndex,
-      rcaAnalyzedAt,
-      viewReport,
-      copyReport,
-      downloadReport,
-      rcaStreamContent,
-      hasExistingRca,
-      analysisInFlight,
+      rcaViewedRun,
+      rcaReportText,
+      rcaReportVerdict,
+      rcaReportLoading,
+      rcaThreadRunId,
+      rcaThreadLive,
+      rcaThreadRunIsV1,
+      rcaThread,
+      rcaThreadStatus,
+      rcaRunSummary,
+      rcaRunSummaryStatus,
+      rcaSteering,
+      rcaSteeringStatus,
+      rcaRefusal,
+      aiCreditCosts,
+      retryRcaLive,
+      rcaTriggering,
+      rcaCancelling,
+      rcaResuming,
+      rcaResumeRunId,
+      reloadRca,
+      viewRcaRun,
+      cancelRca,
+      resumeRca,
+      askAboutRca,
       isDarkMode,
       activeTab,
+      tabOrder,
+      tabLabels,
+      TAB_TEST_IDS,
+      onTabReorder,
       timelineRefreshTrigger,
-      tableOfContents,
-      expandedSections,
-      formattedRcaContent,
       correlationData,
       correlationMatchedSetId,
       correlationChipDimensions,
@@ -3357,6 +3119,7 @@ export default defineComponent({
       telemetryTimeRange,
       actualMatchedDimensions,
       availableDimensions,
+      semanticGroups,
       ftsFields,
       incidentContextData,
       affectedServicesCount,
@@ -3382,8 +3145,6 @@ export default defineComponent({
       cancelTitleEdit,
       saveTitleEdit,
       triggerRca,
-      scrollToSection,
-      toggleSection,
       editableStatus,
       editableSeverity,
       statusOptions,
@@ -3392,8 +3153,8 @@ export default defineComponent({
       handleSeverityChange,
       handleTriggerRowClick,
       getStatusLabel,
-      getSeverityColorHex,
       formatPeriod,
+      formatFrequency,
       formatCustomConditions,
       formatTimestamp,
       formatTimestampUTC,
@@ -3401,8 +3162,6 @@ export default defineComponent({
       copyToClipboard,
       copiedField,
       calculateDuration,
-      formatRcaContent,
-      checkAnalysisInFlight,
       updateSeverity: handleSeverityChange,
     };
   },

@@ -45,25 +45,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-sm font-[600]" data-test="log-stream-title-text">
             {{ t("logStream.header") }}
           </div>
-          <div class="ml-auto" data-test="stream-association-search-input">
+          <div class="ms-auto" data-test="stream-association-search-input">
             <OSearchInput v-model="filterQuery" class="mb-1" :placeholder="t('logStream.search')" />
           </div>
-          <OButton
-            data-test="log-stream-refresh-stats-btn"
-            class="mb-1 ml-3"
+          <ORefreshButton
+            layout="inline"
             variant="outline"
-            size="sm-action"
-            @click="getLogStream"
-            icon-left="refresh"
-          >
-            {{ t(`logStream.refreshStats`) }}
-          </OButton>
+            class="ms-3 mb-1"
+            :last-run-at="lastUpdatedAt"
+            data-test="log-stream-refresh-stats-btn"
+            @click="() => getLogStream(true)"
+          />
         </div>
       </template>
 
       <template #expansion>
-        <div v-show="loadingFunctions" class="py-1 pl-3" style="height: 60px">
-          <OInnerLoading :showing="loadingFunctions" label="Fetching functions..." size="sm" />
+        <div v-show="loadingFunctions" class="py-1 ps-3" style="height: 3.75rem">
+          <OInnerLoading
+            :showing="loadingFunctions"
+            :label="t('logStream.fetchingFunctions')"
+            size="sm"
+          />
         </div>
         <div v-show="!loadingFunctions">
           <OTable
@@ -85,10 +87,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="stream-association-associate-function-btn"
                   variant="outline"
                   size="sm-action"
-                  class="mb-1 ml-3"
+                  class="ms-3 mb-1"
                   @click="addFunctionInProgress = true"
                 >
-                  Associate Function
+                  {{ t("logStream.associateFunction") }}
                 </OButton>
               </div>
             </template>
@@ -132,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="!row._isAddRow"
                 data-test="stream-association-delete-function-btn"
                 :title="t('function.deleteAssociatedFunction')"
-                class="ml-1"
+                class="ms-1"
                 variant="ghost-destructive"
                 size="icon-sm"
                 icon-left="delete"
@@ -140,7 +142,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #empty>
-              <div v-if="!addFunctionInProgress" class="w-full text-center">No functions found</div>
+              <div v-if="!addFunctionInProgress" class="w-full text-center">
+                {{ t("logStream.noFunctionsFound") }}
+              </div>
             </template>
           </OTable>
         </div>
@@ -161,16 +165,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onActivated, onMounted, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import jsTransformService from "../../services/jstransform";
 
 import streamService from "../../services/stream";
 import SchemaIndex from "../logstream/schema.vue";
 import NoData from "../shared/grid/NoData.vue";
-import segment from "../../services/segment_analytics";
+import analytics from "../../services/product_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import useStreams from "@/composables/useStreams";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -187,6 +192,7 @@ export default defineComponent({
     SchemaIndex,
     NoData,
     OButton,
+    ORefreshButton,
     ODrawer,
     OInnerLoading,
     OSwitch,
@@ -197,9 +203,10 @@ export default defineComponent({
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const logStream = ref([]);
+    const lastUpdatedAt = ref<number | null>(null);
     const showIndexSchemaDialog = ref(false);
     const schemaData = ref({ name: "", schema: [Object], stream_type: "" });
     const resultTotal = ref<number>(0);
@@ -251,7 +258,7 @@ export default defineComponent({
     ];
     const addFunctionInProgress = ref(false);
     const addFunctionInProgressLoading = ref(false);
-    const { getStreams } = useStreams();
+    const { getStreams, getStreamsFetchedAt } = useStreams(t);
 
     let deleteStreamName = "";
     let deleteStreamType = "";
@@ -308,7 +315,7 @@ export default defineComponent({
       const cols: OTableColumnDef[] = [
         {
           id: "#",
-          header: "#",
+          header: raw("#"),
           cell: " ",
           size: 50,
           meta: { align: "left" },
@@ -325,7 +332,7 @@ export default defineComponent({
         {
           id: "order",
           accessorKey: "order",
-          header: "Order",
+          header: t("function.order"),
           cell: " ",
           sortable: true,
           size: COL.count,
@@ -334,7 +341,7 @@ export default defineComponent({
         {
           id: "applyBeforeFlattening",
           accessorKey: "applyBeforeFlattening",
-          header: "Apply Before Flattening",
+          header: t("function.applyBeforeFlattening"),
           cell: " ",
           sortable: true,
           size: 180,
@@ -354,16 +361,16 @@ export default defineComponent({
       return cols;
     });
 
-    const getLogStream = () => {
+    const getLogStream = (force = false) => {
       if (store.state.selectedOrganization != null) {
         previousOrgIdentifier.value = store.state.selectedOrganization.identifier;
         const dismiss = toast({
           variant: "loading",
-          message: "Please wait while loading streams...",
+          message: t("toastMessages.functions.pleaseWaitWhileLoadingStreams"),
           timeout: 0,
         });
 
-        getStreams("", false)
+        getStreams("", false, false, force)
           .then((res: any) => {
             let doc_num = "";
             let storage_size = "";
@@ -390,6 +397,9 @@ export default defineComponent({
                   stream_type: data.stream_type,
                 };
               });
+            void getStreamsFetchedAt().then((at) => {
+              lastUpdatedAt.value = at ?? Date.now();
+            });
 
             if (logStream.value.length > 0) {
               getAllFunctions();
@@ -401,15 +411,14 @@ export default defineComponent({
             dismiss();
             toast({
               variant: "error",
-              message: "Error while pulling stream.",
+              message: t("toastMessages.functions.errorWhilePullingStream"),
             });
           });
       }
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Refresh Streams",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         page: "Streams",
       });
     };
@@ -436,7 +445,9 @@ export default defineComponent({
         .catch((err) => {
           toast({
             variant: "error",
-            message: JSON.stringify(err.response.data["error"]) || "Function fetching failed",
+            message:
+              raw(JSON.stringify(err.response.data["error"])) ||
+              t("functions.functionFetchingFailed"),
           });
         });
     };
@@ -485,7 +496,9 @@ export default defineComponent({
         .catch((err) => {
           toast({
             variant: "error",
-            message: JSON.stringify(err.response.data["error"]) || "Function creation failed",
+            message:
+              raw(JSON.stringify(err.response.data["error"])) ||
+              t("functions.functionCreationFailed"),
           });
         })
         .finally(() => {
@@ -515,7 +528,7 @@ export default defineComponent({
     //   schemaData.value.stream_type = props.row.stream_type;
     //   showIndexSchemaDialog.value = true;
 
-    //   segment.track("Button Click", {
+    //   analytics.track("Button Click", {
     //     button: "Actions",
     //     user_org: store.state.selectedOrganization.identifier,
     //     user_id: store.state.userInfo.email,
@@ -533,7 +546,7 @@ export default defineComponent({
         .then((res: any) => {
           if (res.data.code == 200) {
             toast({
-              message: "Stream deleted successfully.",
+              message: t("toastMessages.functions.streamDeletedSuccessfully"),
               variant: "success",
             });
             getLogStream();
@@ -541,7 +554,7 @@ export default defineComponent({
         })
         .catch(() => {
           toast({
-            message: "Error while deleting stream.",
+            message: t("toastMessages.functions.errorWhileDeletingStream"),
             variant: "error",
           });
         });
@@ -580,6 +593,7 @@ export default defineComponent({
       selectedIds,
       orgData,
       getLogStream: getLogStream,
+      lastUpdatedAt,
       resultTotal,
       // listSchema,
       deleteStream,

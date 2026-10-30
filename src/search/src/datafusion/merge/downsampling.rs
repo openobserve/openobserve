@@ -26,90 +26,33 @@ use config::{
 };
 use datafusion::{
     arrow::datatypes::Schema,
-    catalog::TableProvider,
     error::{DataFusionError, Result},
-    physical_plan::execute_stream,
 };
-use futures::TryStreamExt;
 use vortex::{
-    VortexSessionDefault,
-    array::ArrayRef,
-    arrow::{FromArrowArray, FromArrowType},
-    dtype::DType,
-    file::VortexWriteOptions,
-    io::session::RuntimeSessionExt,
-    session::VortexSession,
+    VortexSessionDefault, array::ArrayRef, arrow::ArrowSessionExt, file::VortexWriteOptions,
+    io::session::RuntimeSessionExt, session::VortexSession,
 };
 
 use crate::datafusion::{
-    exec::DataFusionContextBuilder,
-    merge::{MergeParquetResult, append_metadata},
-    table_provider::uniontable::NewUnionTable,
+    merge::{MergedFile, append_metadata},
     vortex::{VORTEX_RUNTIME, vortex_write_strategy},
 };
 
 const TIMESTAMP_ALIAS: &str = "_timestamp_alias";
 
-pub async fn merge_parquet_files_with_downsampling(
-    schema: Arc<Schema>,
-    tables: Vec<Arc<dyn TableProvider>>,
+/// Write the downsampled batches into size-split files of `file_format`.
+pub(super) async fn write_files(
+    schema: &Arc<Schema>,
     bloom_filter_fields: &[String],
-    rule: &DownsamplingRule,
     metadata: &FileMeta,
     file_format: FileFormat,
-) -> Result<MergeParquetResult> {
-    let start = std::time::Instant::now();
+    rx: tokio::sync::mpsc::Receiver<RecordBatch>,
+    read_task: tokio::task::JoinHandle<Result<()>>,
+) -> Result<Vec<MergedFile>> {
     let cfg = get_config();
-    let sql = generate_downsampling_sql(&schema, rule);
-
-    log::debug!("merge_parquet_files_with_downsampling sql: {sql}");
-
-    // create datafusion context
-    let ctx = DataFusionContextBuilder::new()
-        .trace_id("merge_parquet_files_with_downsampling")
-        .sorted_by_time(true)
-        .build(get_config().limit.datafusion_min_partition_num)
-        .await?;
-    // register union table
-    let union_table = Arc::new(NewUnionTable::new(schema.clone(), tables));
-    ctx.register_table("tbl", union_table)?;
-
-    let plan = ctx.state().create_logical_plan(&sql).await?;
-    let physical_plan = ctx.state().create_physical_plan(&plan).await?;
-    let schema = physical_plan.schema();
-
-    // write result to parquet or vortex file based on config
-    let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
-
-    // Create a shared channel for streaming batches
-    let (tx, rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
-
-    // Spawn task to read from batch_stream and send to channel
-    let read_task = tokio::task::spawn(async move {
-        loop {
-            match batch_stream.try_next().await {
-                Ok(None) => break,
-                Ok(Some(batch)) => {
-                    if let Err(e) = tx.send(batch).await {
-                        log::error!(
-                            "merge_parquet_files_with_downsampling send to channel error: {e}"
-                        );
-                        return Err(DataFusionError::External(Box::new(e)));
-                    }
-                }
-                Err(e) => {
-                    log::error!("merge_parquet_files_with_downsampling execute stream error: {e}");
-                    return Err(e);
-                }
-            }
-        }
-        Ok(())
-    });
-
-    // Write batches to the appropriate format
     let (bufs, file_metas) = match file_format {
         FileFormat::Parquet => {
-            write_downsampled_parquet(rx, &schema, bloom_filter_fields, metadata, &cfg).await?
+            write_downsampled_parquet(rx, schema, bloom_filter_fields, metadata, &cfg).await?
         }
         FileFormat::Vortex => {
             write_downsampled_vortex(rx, schema.clone(), cfg.compact.max_file_size as i64).await?
@@ -121,16 +64,11 @@ pub async fn merge_parquet_files_with_downsampling(
         .await
         .map_err(|e| DataFusionError::External(Box::new(e)))??;
 
-    log::debug!(
-        "merge_parquet_files_with_downsampling took {} ms",
-        start.elapsed().as_millis()
-    );
-
-    Ok(MergeParquetResult::Multiple {
-        bufs,
-        file_metas,
-        file_format,
-    })
+    Ok(bufs
+        .into_iter()
+        .zip(file_metas)
+        .map(|(buf, meta)| MergedFile::Standard { data: buf, meta })
+        .collect())
 }
 
 async fn write_downsampled_parquet(
@@ -215,10 +153,10 @@ async fn write_downsampled_vortex(
             let mut last_min_ts = 0;
 
             let session = VortexSession::default().with_tokio();
-            let dtype = DType::from_arrow(schema.as_ref());
+            let dtype = session.arrow().from_arrow_schema(schema.as_ref())?;
 
             // Reuse the strategy across files; write options are recreated for each writer.
-            let strategy = vortex_write_strategy();
+            let strategy = vortex_write_strategy(&session);
 
             let write_options =
                 VortexWriteOptions::new(session.clone()).with_strategy(strategy.clone());
@@ -256,11 +194,14 @@ async fn write_downsampled_vortex(
                 last_min_ts = get_min_timestamp(&batch_result);
 
                 // Write batch to current file (convert to Vortex array)
-                let array: ArrayRef = ArrayRef::from_arrow(batch_result, false).map_err(|e| {
-                    DataFusionError::Execution(format!(
-                        "Failed to convert arrow array to vortex array: {e}"
-                    ))
-                })?;
+                let array: ArrayRef = session
+                    .arrow()
+                    .from_arrow_record_batch(batch_result, schema.as_ref())
+                    .map_err(|e| {
+                        DataFusionError::Execution(format!(
+                            "Failed to convert arrow array to vortex array: {e}"
+                        ))
+                    })?;
                 writer.push(array).await?;
             }
 
@@ -282,7 +223,7 @@ async fn write_downsampled_vortex(
         .map_err(|e| DataFusionError::Execution(format!("Failed to write vortex file: {e}")))
 }
 
-fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> String {
+pub(super) fn generate_downsampling_sql(schema: &Schema, rule: &DownsamplingRule) -> String {
     let step = rule.step;
     let fields = schema
         .fields()
@@ -313,16 +254,19 @@ fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> S
         )
     };
 
+    // a NULL value is a stale marker, which downsampling skips like any SQL aggregate
     let sql = format!(
-        "SELECT {}, to_unixtime(date_bin(interval '{} second', to_timestamp_micros({}), to_timestamp('2001-01-01T00:00:00'))) * 1000000 as {}, {}, {} FROM tbl GROUP BY {}, {}",
+        "SELECT {}, to_unixtime(date_bin(interval '{} second', to_timestamp_micros({}), to_timestamp('{origin}'))) * 1000000 as {}, {}, {} FROM tbl WHERE {} IS NOT NULL GROUP BY {}, {}",
         HASH_LABEL,
         step,
         TIMESTAMP_COL_NAME,
         TIMESTAMP_ALIAS,
         fields.join(", "),
         fun_str,
+        VALUE_LABEL,
         HASH_LABEL,
         TIMESTAMP_ALIAS,
+        origin = config::meta::histogram_origin::ORIGIN_LITERAL,
     );
 
     let fields = schema
@@ -478,5 +422,75 @@ mod tests {
         assert!(sql.contains("__value__"));
         assert!(sql.contains("300 second"));
         assert!(sql.contains("ORDER BY"));
+    }
+
+    #[tokio::test]
+    async fn test_downsampling_skips_stale_markers() {
+        use arrow::array::{AsArray, Float64Array, UInt64Array};
+        use arrow_schema::Schema;
+        use config::meta::promql::{DownsamplingRule, Function};
+        use datafusion::{datasource::MemTable, prelude::SessionContext};
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(HASH_LABEL, DataType::UInt64, false),
+            Field::new(VALUE_LABEL, DataType::Float64, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("instance", DataType::Utf8, true),
+        ]));
+        let second = 1_000_000;
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(UInt64Array::from(vec![1, 1, 1, 1])),
+                Arc::new(Float64Array::from(vec![Some(1.0), Some(2.0), None, None])),
+                Arc::new(Int64Array::from(vec![
+                    0,
+                    10 * second,
+                    20 * second,
+                    400 * second,
+                ])),
+                Arc::new(StringArray::from(vec!["a"; 4])),
+            ],
+        )
+        .unwrap();
+        for (function, expected) in [
+            (Function::Last, 2.0),
+            (Function::First, 1.0),
+            (Function::Avg, 1.5),
+            (Function::Count, 2.0),
+        ] {
+            let ctx = SessionContext::new();
+            let table = MemTable::try_new(schema.clone(), vec![vec![batch.clone()]]).unwrap();
+            ctx.register_table("tbl", Arc::new(table)).unwrap();
+            let rule = DownsamplingRule {
+                rule: None,
+                function: function.clone(),
+                offset: 0,
+                step: 300,
+            };
+            let batches = ctx
+                .sql(&generate_downsampling_sql(&schema, &rule))
+                .await
+                .unwrap()
+                .collect()
+                .await
+                .unwrap();
+            let values: Vec<Option<f64>> = batches
+                .iter()
+                .flat_map(|batch| {
+                    let values = arrow::compute::cast(
+                        batch.column_by_name(VALUE_LABEL).unwrap(),
+                        &DataType::Float64,
+                    )
+                    .unwrap();
+                    values
+                        .as_primitive::<arrow::datatypes::Float64Type>()
+                        .iter()
+                        .collect::<Vec<_>>()
+                })
+                .collect();
+            // the bucket holding only a marker writes no row
+            assert_eq!(values, vec![Some(expected)], "{function:?}");
+        }
     }
 }

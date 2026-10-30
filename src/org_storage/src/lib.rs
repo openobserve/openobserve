@@ -39,29 +39,28 @@ pub(crate) async fn get_provider(
     typ: ProviderType,
     data: &str,
 ) -> Result<Box<dyn ObjectStore>, anyhow::Error> {
-    let ret: Box<dyn ObjectStore>;
-    match typ {
+    let ret: Box<dyn ObjectStore> = match typ {
         ProviderType::AwsCredentials => {
             let creds: AwsCredentials = serde_json::from_str(data)?;
             let store = get_aws(creds)?;
-            ret = Box::new(store);
+            Box::new(store)
         }
         ProviderType::AwsRoleArn => {
             let creds: AwsRoleArn = serde_json::from_str(data)?;
             let store = aws_role_utils::get_aws_from_role(org_id, creds).await?;
-            ret = Box::new(store);
+            Box::new(store)
         }
         ProviderType::GcpCredentials => {
             let creds: GcpCredentials = serde_json::from_str(data)?;
             let store = get_gcp(creds)?;
-            ret = Box::new(store);
+            Box::new(store)
         }
         ProviderType::AzureCredentials => {
             let creds: AzureCredentials = serde_json::from_str(data)?;
             let store = get_azure(creds)?;
-            ret = Box::new(store);
+            Box::new(store)
         }
-    }
+    };
     Ok(ret)
 }
 

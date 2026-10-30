@@ -1,6 +1,7 @@
 const testLogger = require('./test-logger.js');
 const logsdata = require('../../../test-data/logs_data.json');
 const { getOrgIdentifier, getAuthHeaders } = require('./cloud-auth.js');
+const { ingestBase } = require('./ingest-url.js');
 
 /**
  * Ingest test data via Playwright request fixture (for beforeAll).
@@ -13,7 +14,7 @@ async function ingestForQueryBuilderTest(request, streamName = "e2e_automate") {
         ? process.env.INGESTION_URL.slice(0, -1)
         : process.env.INGESTION_URL;
 
-    const response = await request.post(`${baseUrl}/api/${orgId}/${streamName}/_json`, {
+    const response = await request.post(`${ingestBase(baseUrl)}/api/${orgId}/${streamName}/_json`, {
         headers: headers,
         data: logsdata
     });
@@ -57,6 +58,7 @@ async function setupQueryAndSwitchToBuild(pm, page, query) {
     await pm.logsPage.enableSqlModeIfNeeded();
     await page.waitForLoadState('domcontentloaded');
     await pm.logsPage.setQueryEditorContent(query);
+    await pm.logsPage.waitForSearchQueryCommitted(query);
     await pm.logsPage.runQueryAndWaitForResults();
     await pm.logsPage.clickBuildToggle();
     await pm.logsPage.waitForBuildTabLoaded();

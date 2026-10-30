@@ -1,13 +1,15 @@
+import type { I18nText } from "@/types/i18n";
+
 export interface OCollapsibleProps {
   /** Trigger label text (used when no #trigger slot is provided) */
-  label?: string;
+  label?: I18nText;
   /**
    * Material icon name shown before the label.
    * Pass the icon name string e.g. `"settings"` or `"expand_more"`.
    */
   icon?: string;
   /** Secondary caption text below the label */
-  caption?: string;
+  caption?: I18nText;
   /**
    * Initial open state (uncontrolled).
    * When `modelValue` is also provided, `modelValue` takes precedence.

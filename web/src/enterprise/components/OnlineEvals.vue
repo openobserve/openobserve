@@ -23,6 +23,7 @@ the Free Software Foundation, either version 3 of the License, or
       :score-config-versions="scoreConfigVersions"
       :is-refreshing-providers="isRefreshingProviders"
       @saved="handleSaved"
+      @persisted="reloadLists()"
       @cancel="closeFormPage"
       @request-versions="(id) => ensureScoreConfigVersions(orgId, id)"
       @refresh-providers="refreshProviders"
@@ -34,6 +35,7 @@ the Free Software Foundation, either version 3 of the License, or
       :row="jobFormRow"
       :scorers="scorers"
       @saved="handleSaved"
+      @persisted="reloadLists()"
       @cancel="closeFormPage"
     />
     <ImportScoreConfig
@@ -66,9 +68,9 @@ the Free Software Foundation, either version 3 of the License, or
       </div>
 
       <OPageHeader
-        v-if="hideTabBar && embeddedHeader"
-        :title="embeddedHeader.title"
-        :subtitle="embeddedHeader.subtitle"
+        v-if="hideTabBar && embeddedHeader && activeTab !== 'quality'"
+        :title="raw(embeddedHeader.title)"
+        :subtitle="raw(embeddedHeader.subtitle)"
         :icon="embeddedHeader.icon"
         class="border-border-default shrink-0 border-b"
       >
@@ -116,9 +118,20 @@ the Free Software Foundation, either version 3 of the License, or
             :data-test="`${activeTab}-list-add-btn`"
             variant="primary"
             size="sm"
+            :aria-label="
+              activeTab === 'scorers' && hasNewScorerDraft
+                ? t('common.editorDraft.newDot', { label: addButtonLabel })
+                : undefined
+            "
             @click="openCreateDialog"
           >
             {{ addButtonLabel }}
+            <EditorDraftDot
+              v-if="activeTab === 'scorers' && hasNewScorerDraft"
+              :saved-at="newScorerDraftSavedAt"
+              corner
+              data-test="scorers-list-add-draft-dot"
+            />
           </OButton>
         </template>
         <template v-else-if="activeTab === 'jobs'" #actions>
@@ -127,76 +140,105 @@ the Free Software Foundation, either version 3 of the License, or
             data-test="eval-job-list-add-btn"
             variant="primary"
             size="sm"
+            :aria-label="
+              jobDrafts.hasNew
+                ? t('common.editorDraft.newDot', { label: addButtonLabel })
+                : undefined
+            "
             @click="openCreateDialog"
           >
             {{ addButtonLabel }}
+            <EditorDraftDot
+              v-if="jobDrafts.hasNew"
+              :saved-at="jobDrafts.savedAt(null)"
+              corner
+              data-test="eval-job-list-add-draft-dot"
+            />
           </OButton>
         </template>
-        <template v-else-if="activeTab === 'quality'" #actions>
-          <!-- Agent filter is rendered inside QualityPage (right-aligned, above
-               the KPIs) so it sits within the content container alongside the
-               data it filters — only the date picker + refresh stay here. -->
+      </OPageHeader>
+
+      <!-- Quality draws its own page header, so an open config can take it over as the detail header. -->
+      <QualityPage
+        v-if="activeTab === 'quality'"
+        :score-configs="scoreConfigs"
+        :configs-loading="isLoading"
+        :date-window="qualityDateWindow"
+        :agent-params="qualityAgentParams"
+        :enabled="qualityScopeReady"
+        @status="(status) => (qualityStatus = status)"
+      >
+        <template #header-actions>
+          <!-- Last-refreshed indicator + labeled primary Refresh button, matching the other AI pages. -->
+          <AiLastRefreshed
+            class="me-1 max-lg:hidden"
+            :last-run-at="qualityStatus.updatedAt"
+            :loading="qualityBusy"
+            data-test="quality-last-refreshed"
+          />
           <DateTimePickerDashboard
             ref="qualityDatePickerRef"
             v-model="qualitySelectedDate"
             :auto-apply-dashboard="true"
+            calendar-presets
+            class="max-lg:[&_.date-time-label]:hidden"
             data-test="quality-time-range-picker"
           />
-          <!-- Bordered wrapper matches the Sessions / LLM Insights headers —
-               ORefreshButton renders no border of its own. -->
-          <div
-            class="border-border-default rounded-default inline-flex h-8 items-center overflow-hidden border px-1"
+          <OButton
+            variant="primary"
+            size="sm-toolbar"
+            icon-left="refresh"
+            :disabled="qualityBusy"
+            :loading="qualityBusy"
+            data-test="quality-refresh-btn"
+            @click="onQualityRefresh"
           >
-            <ORefreshButton
-              :last-run-at="qualityLastRunAt"
-              :loading="qualityRefreshing"
-              :disabled="qualityRefreshing"
-              data-test="quality-refresh-btn"
-              @click="onQualityRefresh"
-            />
-          </div>
+            {{ t("common.refresh") }}
+          </OButton>
         </template>
-      </OPageHeader>
+        <template #filters>
+          <AgentScopeCascade
+            prefix="quality"
+            :envs="qualityEnvs"
+            :agent-names="qualityAgentNames"
+            :versions="qualityVersions"
+            v-model:selected-env="qualitySelectedEnv"
+            v-model:selected-agent-name="qualitySelectedAgentName"
+            v-model:selected-version="qualitySelectedVersion"
+          />
+        </template>
+      </QualityPage>
 
       <section
+        v-else
         class="online-evals__content bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden"
       >
-        <div
+        <OTabs
           v-if="!hideTabBar"
-          class="online-evals__tabs border-border-default flex shrink-0 items-center gap-2 border-b bg-transparent px-3.5 py-0"
+          :model-value="activeTab"
+          bordered
+          class="online-evals__tabs shrink-0 px-3.5"
+          data-test="online-evals-tabs"
+          @update:model-value="activeTab = $event as ActiveTab"
         >
-          <button
+          <OTab
             v-for="tab in tabs"
             :key="tab.value"
-            class="online-evals__tab text-text-muted text-compact inline-flex h-9.5 cursor-pointer items-center gap-1.75 border-0 border-b-2 border-b-transparent bg-transparent px-3.5 py-0 font-semibold"
-            :class="
-              activeTab === tab.value ? 'is-active text-text-body border-b-accent -mb-px' : ''
-            "
-            type="button"
-            @click="activeTab = tab.value"
+            :name="tab.value"
+            :data-test="`online-evals-tab-${tab.value}`"
           >
-            <span>{{ tab.label }}</span>
-          </button>
-        </div>
+            {{ tab.label }}
+          </OTab>
+        </OTabs>
 
         <div class="online-evals__body flex min-h-0 flex-1">
-          <QualityPage
-            v-if="activeTab === 'quality'"
-            ref="qualityPageRef"
-            :agent-key="qualityAgentKey"
-            :agent-options="qualityAgentOptions"
-            :agents-loading="qualityAgentsLoading"
-            :date-window="qualityDateWindow"
-            :agent-filter="selectedQualityAgent"
-            :score-configs="scoreConfigs"
-            :configs-loading="isLoading"
-            @update:agent-key="onQualityAgentChange"
-            @ready="reloadQuality"
-          />
           <ScoreConfigList
-            v-else-if="activeTab === 'scoreConfigs'"
+            v-if="activeTab === 'scoreConfigs'"
+            :forbidden="scoreConfigsForbidden"
             :rows="filteredRows as ScoreConfig[]"
             :all-score-configs="scoreConfigs"
+            :last-run-at="listsLastRunAt"
+            :refreshing="listsRefreshing"
             :scorers="scorers"
             :search="filterQuery"
             :loading="isLoading"
@@ -209,12 +251,15 @@ the Free Software Foundation, either version 3 of the License, or
             @import-custom="goToImportScoreConfig"
             @export="exportScoreConfigRow"
             @export-bulk="exportScoreConfigBulk"
-            @refresh="loadAll(orgId)"
+            @refresh="reloadLists()"
           />
           <ScorerList
             v-else-if="activeTab === 'scorers'"
+            :forbidden="scorersForbidden"
             :rows="filteredRows as Scorer[]"
             :all-scorers="scorers"
+            :last-run-at="listsLastRunAt"
+            :refreshing="listsRefreshing"
             :jobs="jobs"
             :score-configs="scoreConfigs"
             :providers="providers"
@@ -230,14 +275,17 @@ the Free Software Foundation, either version 3 of the License, or
             @export="exportScorerRow"
             @export-bulk="exportScorerBulk"
             @add-provider="goToAddProvider"
-            @refresh="loadAll(orgId)"
+            @refresh="reloadLists()"
           />
           <EvalJobList
             v-else-if="activeTab === 'jobs'"
+            :forbidden="jobsForbidden"
             :rows="filteredRows as EvalJob[]"
             :search="filterQuery"
             :loading="isLoading"
             :action-loading="jobsBulkDeleting"
+            :last-run-at="listsLastRunAt"
+            :refreshing="listsRefreshing"
             :pending-status-id="pendingJobStatusId"
             @update:search="filterQuery = $event"
             @create="openCreateDialog"
@@ -247,7 +295,7 @@ the Free Software Foundation, either version 3 of the License, or
             @pause="(row: EvalJob) => pauseJob(row)"
             @delete="(row: EvalJob) => deleteRow(row)"
             @delete-bulk="(ids: string[]) => deleteJobsBulk(ids)"
-            @refresh="loadAll(orgId)"
+            @refresh="reloadLists()"
           />
         </div>
       </section>
@@ -279,8 +327,10 @@ the Free Software Foundation, either version 3 of the License, or
         side="right"
         size="lg"
         :title="t('onlineEvals.scoreConfig.import.libraryDrawerTitle')"
-        secondary-button-label="Cancel"
-        :primary-button-label="`Import (${scoreConfigLibrarySelectedCount})`"
+        :secondary-button-label="t('onlineEvals.buttons.cancel')"
+        :primary-button-label="
+          t('onlineEvals.importCount', { count: scoreConfigLibrarySelectedCount })
+        "
         :primary-button-disabled="scoreConfigLibrarySelectedCount === 0"
         :primary-button-loading="scoreConfigLibraryImporting"
         data-test="score-config-library-drawer"
@@ -301,8 +351,8 @@ the Free Software Foundation, either version 3 of the License, or
         side="right"
         size="lg"
         :title="t('onlineEvals.scorer.import.libraryDrawerTitle')"
-        secondary-button-label="Cancel"
-        :primary-button-label="`Import (${scorerLibrarySelectedCount})`"
+        :secondary-button-label="t('onlineEvals.buttons.cancel')"
+        :primary-button-label="t('onlineEvals.importCount', { count: scorerLibrarySelectedCount })"
         :primary-button-disabled="scorerLibrarySelectedCount === 0"
         :primary-button-loading="scorerLibraryImporting"
         data-test="scorer-library-drawer"
@@ -351,6 +401,9 @@ the Free Software Foundation, either version 3 of the License, or
         v-model="confirmDeleteOpen"
         :title="deleteDialogTitle"
         :message="deleteDialogMessage"
+        :message-keypath="isBulkDelete ? undefined : 'onlineEvals.deleteConfirmMessage'"
+        :message-name="pendingDeleteRow?.name ?? ''"
+        ok-variant="destructive"
         @update:ok="performDelete"
         @update:cancel="cancelDelete"
       />
@@ -359,27 +412,31 @@ the Free Software Foundation, either version 3 of the License, or
 </template>
 
 <script setup lang="ts">
+import {
+  setJobActiveMutation,
+  deleteEvalEntityMutation,
+} from "@/services/online-evals.service.queries";
+import { useMutation, type Query } from "@tanstack/vue-query";
 import { computed, nextTick, onBeforeMount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import onlineEvalsService, {
+import {
   type EvalJob,
   type ScoreConfig,
   type Scorer,
   type ScorerType,
 } from "@/services/online-evals.service";
 import { useOnlineEvalsData } from "./onlineEvals/composables/useOnlineEvalsData";
-import { entityId, statusOf } from "./onlineEvals/utils/evalEntity";
+import { entityId } from "./onlineEvals/utils/evalEntity";
 import { showError } from "./onlineEvals/utils/evalFormat";
 import {
   buildCrossNavigationQuery,
   computeViewState,
-  findRowById as findRowByIdPure,
+  findRowById,
   parseTabFromRoute,
   rowIdOf as rowIdOfPure,
-  VALID_TABS,
   type ActiveTab,
   type AnyRow,
   type FullPageEntity,
@@ -398,29 +455,39 @@ import EvalJobDetail from "./onlineEvals/forms/EvalJobDetail.vue";
 import ScorerFormPage from "./onlineEvals/forms/ScorerFormPage.vue";
 import JobFormPage from "./onlineEvals/forms/JobFormPage.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor, type EditorDraftKind } from "@/utils/drafts/editorDraftStore";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ScoreConfigLibrary from "./onlineEvals/ScoreConfigLibrary.vue";
 import ScorerLibrary from "./onlineEvals/ScorerLibrary.vue";
 import ImportScoreConfig from "./onlineEvals/ImportScoreConfig.vue";
 import ImportScorer from "./onlineEvals/ImportScorer.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import AiLastRefreshed from "@/enterprise/components/AIObservability/AiLastRefreshed.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
-import type { DateWindow } from "./onlineEvals/composables/useQualityData";
-import { useAiDateRange, resolveAiDateWindow } from "@/enterprise/composables/useAiDateRange";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
-import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
-import { downloadFile } from "@/utils/dom";
+import AgentScopeCascade from "@/enterprise/components/AIObservability/AgentScopeCascade.vue";
+import { useAgentScope } from "@/enterprise/composables/useAgentScope";
+import type { DateWindow } from "./onlineEvals/composables/useQualityList";
 import {
-  ALL_AGENTS_VALUE,
-  agentFilterKey,
-  agentFilterLabel,
-  type AgentFilterSelection,
-} from "./onlineEvals/utils/agentFilterSql";
+  DEFAULT_QUALITY_RANGE,
+  agentParamsFor,
+  qualityRangeFromQuery,
+  qualityRangeQuery,
+} from "./onlineEvals/utils/qualityFormat";
+import { ALL_AGENTS_VALUE } from "@/plugins/traces/llmAgentFilter";
+import { resolveAiDateWindow, type AiDateState } from "@/enterprise/composables/useAiDateRange";
+import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { onlineEvalKeys } from "@/services/online-evals.service.querykeys";
+import { downloadFile } from "@/utils/dom";
+import type { I18nKey } from "@/types/i18n";
 import {
   bulkExportFileName as bulkExportScoreConfigFileName,
   exportScoreConfigFileName,
@@ -440,7 +507,7 @@ withDefaults(defineProps<{ hideTabBar?: boolean }>(), { hideTabBar: false });
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
 const activeTab = ref<ActiveTab>(parseTabFromRoute(route.query.tab));
@@ -478,7 +545,6 @@ const pendingDeleteTab = ref<ActiveTab | null>(null);
 // performDelete operate on the whole batch instead of a single `pendingDeleteRow`.
 const pendingBulkDeleteIds = ref<string[]>([]);
 const jobsBulkDeleting = ref(false);
-const catalogOpenTab = ref<ActiveTab | null>(null);
 const showScoreConfigLibrary = ref(false);
 const scoreConfigLibrarySelectedCount = ref(0);
 const scoreConfigLibraryImporting = ref(false);
@@ -489,6 +555,22 @@ const scorerLibraryImporting = ref(false);
 const scorerLibraryRef = ref<InstanceType<typeof ScorerLibrary> | null>(null);
 const importingEntity = ref<"scoreConfigs" | "scorers" | null>(null);
 
+const jobDrafts = useEditorDraftIds("eval_job");
+const scorerDrafts = useEditorDraftIds("eval_scorer");
+const SCORER_TYPES: ScorerType[] = ["llm_judge", "remote"];
+// A new scorer's draft is kept per type, so the button shows either type's draft.
+const hasNewScorerDraft = computed(() =>
+  SCORER_TYPES.some((type) => scorerDrafts.hasNewVariant(type)),
+);
+const newScorerDraftSavedAt = computed(() => {
+  const times = SCORER_TYPES.flatMap((type) => scorerDrafts.savedAtVariant(type) ?? []);
+  return times.length ? Math.max(...times) : null;
+});
+const DRAFT_KIND_BY_TAB: Partial<Record<ActiveTab, EditorDraftKind>> = {
+  jobs: "eval_job",
+  scorers: "eval_scorer",
+};
+
 const {
   jobs,
   scorers,
@@ -496,10 +578,38 @@ const {
   scoreConfigVersions,
   providers,
   isLoading,
+  jobsForbidden,
+  scorersForbidden,
+  scoreConfigsForbidden,
   loadAll,
   loadProviders,
   ensureScoreConfigVersions,
 } = useOnlineEvalsData();
+
+// The three list tabs load together, so one stamp serves all of them. Read back
+// from the cache, not `Date.now()`: a cached read leaves the rows as old as the
+// fetch that filled them, and the oldest list is what the rows on screen are.
+const listsLastRunAt = ref<number | null>(null);
+// Separate from `isLoading`, which only rises on a cold read: without it the
+// refresh button never spins on a warm reload and a second click fires again.
+const listsRefreshing = ref(false);
+const reloadLists = async (force = true) => {
+  listsRefreshing.value = true;
+  try {
+    await loadAll(orgId.value, force);
+  } finally {
+    listsRefreshing.value = false;
+  }
+  const org = orgId.value;
+  const times = [
+    onlineEvalKeys.scoreConfigs(org),
+    onlineEvalKeys.scorers(org),
+    onlineEvalKeys.jobs(org),
+  ]
+    .map((key) => queryClient.getQueryState(key)?.dataUpdatedAt)
+    .filter((at): at is number => !!at);
+  listsLastRunAt.value = times.length ? Math.min(...times) : Date.now();
+};
 
 const isRefreshingProviders = ref(false);
 
@@ -532,7 +642,7 @@ const filteredRows = computed<AnyRow[]>(() => {
   );
 });
 
-const tabs = computed<Array<{ value: ActiveTab; label: string; badge?: string }>>(() => [
+const tabs = computed<Array<{ value: ActiveTab; label: I18nText; badge?: string }>>(() => [
   { value: "quality", label: t("onlineEvals.tabs.quality") },
   { value: "jobs", label: t("onlineEvals.tabs.jobs") },
   { value: "scorers", label: t("onlineEvals.tabs.scorers") },
@@ -544,7 +654,7 @@ const tabs = computed<Array<{ value: ActiveTab; label: string; badge?: string }>
 // shares the same title strip. Title + icon track the active rail item.
 const EMBEDDED_HEADER_META: Record<
   ActiveTab,
-  { i18nKey: string; subtitleKey: string; icon: IconName }
+  { i18nKey: I18nKey; subtitleKey: I18nKey; icon: IconName }
 > = {
   quality: {
     i18nKey: "aiObservability.nav.quality",
@@ -596,181 +706,160 @@ const importI18nKey = computed<"scorer" | "scoreConfig">(() =>
   activeTab.value === "scorers" ? "scorer" : "scoreConfig",
 );
 
-// ── Quality tab: date picker + refresh state ─────────────────────────────
-// The picker + refresh button live in the embedded OPageHeader's #actions
-// slot (matching LLM Insights / Sessions). QualityPage consumes
-// `qualityDateWindow` as a prop and exposes `refreshAll` + `isAnyLoading` for
-// the Refresh button below.
-//
-// Date state is the shared `useAiDateRange()` ref — the same singleton
-// driving LLM Insights and Sessions — so picking a window on one page
-// lands on the other two (incl. across reloads via localStorage).
-const { state: qualitySelectedDate } = useAiDateRange();
-
-// Seed the window from the *persisted* AI date range (relative or absolute),
-// resolved synchronously, so QualityPage's initial onMounted refresh queries
-// the correct window from the very first paint. Fall back to the 15m default
-// only if the persisted state can't be resolved.
-const initialQualityWindow = resolveAiDateWindow(qualitySelectedDate.value);
-const qualityDateWindow = ref<DateWindow>(
-  initialQualityWindow
-    ? {
-        startUs: initialQualityWindow.startTime,
-        endUs: initialQualityWindow.endTime,
-      }
-    : {
-        startUs: (Date.now() - 15 * 60 * 1000) * 1000,
-        endUs: Date.now() * 1000,
-      },
+// ── Quality tab: its own range (default Past 24 Hours, kept in the URL); LLM Insights and Sessions keep the shared AI range.
+const qualitySelectedDate = ref<AiDateState>(
+  qualityRangeFromQuery(route.query) ?? { ...DEFAULT_QUALITY_RANGE },
 );
-const qualityAgents = ref<AgentFilterSelection[]>([]);
-const qualityAgentKey = ref(ALL_AGENTS_VALUE);
+const initialQualityWindow =
+  resolveAiDateWindow(qualitySelectedDate.value) ?? resolveAiDateWindow(DEFAULT_QUALITY_RANGE)!;
+const qualityDateWindow = ref<DateWindow>({
+  startUs: initialQualityWindow.startTime,
+  endUs: initialQualityWindow.endTime,
+});
 const qualityDatePickerRef = ref<{
   getConsumableDateTime: () => { startTime: number; endTime: number };
 } | null>(null);
-const qualityPageRef = ref<{
-  refreshAll: () => Promise<void>;
-  isAnyLoading: boolean;
-} | null>(null);
 
-const qualityAgentOptions = computed(() => [
-  { label: "All Agents", value: ALL_AGENTS_VALUE },
-  ...qualityAgents.value.map((agent) => ({
-    label: agentFilterLabel(agent),
-    value: agentFilterKey(agent),
-  })),
-]);
-
-const selectedQualityAgent = computed<AgentFilterSelection | null>(() => {
-  if (qualityAgentKey.value === ALL_AGENTS_VALUE) return null;
-  return (
-    qualityAgents.value.find((agent) => agentFilterKey(agent) === qualityAgentKey.value) ?? null
-  );
+// Env, Agent and Version start at "All"; the selection is local to the page and mirrored in the URL.
+const {
+  agents: qualityAgents,
+  loadAgents: loadQualityAgentList,
+  envs: qualityEnvs,
+  agentNames: qualityAgentNames,
+  versions: qualityVersions,
+  selectedEnv: qualitySelectedEnv,
+  selectedAgentName: qualitySelectedAgentName,
+  selectedVersion: qualitySelectedVersion,
+} = useAgentScope({
+  filterMode: ref<"stream" | "agent">("agent"),
+  activeStream: ref(""),
+  orgId: () => orgId.value,
+  getWindow: () => ({
+    start: qualityDateWindow.value.startUs,
+    end: qualityDateWindow.value.endUs,
+  }),
+  cascade: true,
+  allOption: true,
+  t,
 });
 
-// True while the agent list is being fetched (the FIRST phase of reloadQuality,
-// before any quality data loader runs). QualityPage uses this to skeleton the
-// agent dropdown + the KPI/table so the page reads as "loading" from the very
-// start of a reload instead of looking idle until the data queries kick in.
-const qualityAgentsLoading = ref(false);
+const qualityAgentParams = computed(() =>
+  agentParamsFor(
+    qualityAgents.value,
+    qualitySelectedEnv.value,
+    qualitySelectedAgentName.value,
+    qualitySelectedVersion.value,
+  ),
+);
 
-async function loadQualityAgents() {
+// Quality queries wait for the first agent list, so a deep-linked agent applies before the first request.
+const qualityScopeReady = ref(false);
+const qualityRefreshing = ref(false);
+const qualityStatus = ref<{ updatedAt: number | null; fetching: boolean }>({
+  updatedAt: null,
+  fetching: false,
+});
+const qualityBusy = computed(() => qualityRefreshing.value || qualityStatus.value.fetching);
+
+// `?env=&type=agent&agent=&version=`, the same keys LLM Insights writes; old `?type=agent&agent=` links still apply.
+function applyQualityScopeFromUrl() {
+  const { env, type, agent, version } = route.query;
+  if (typeof env === "string") qualitySelectedEnv.value = env;
+  if (type === "agent" && typeof agent === "string") qualitySelectedAgentName.value = agent;
+  if (typeof version === "string") qualitySelectedVersion.value = version;
+}
+
+// One writer for the scope levels and the range, so two replaces in one tick cannot drop each other's keys.
+function syncQualityUrl() {
+  // The route, not activeTab, decides: a link away from Quality may not have reached activeTab yet.
+  if (parseTabFromRoute(route.query.tab) !== "quality") return;
+  const query: Record<string, any> = { ...route.query };
+  const params: Record<string, string | undefined> = {
+    env: qualitySelectedEnv.value,
+    agent: qualitySelectedAgentName.value,
+    version: qualitySelectedVersion.value,
+    ...qualityRangeQuery(qualitySelectedDate.value),
+  };
+  for (const [key, value] of Object.entries(params)) {
+    if (value && value !== ALL_AGENTS_VALUE) query[key] = value;
+    else delete query[key];
+  }
+  if (query.agent) query.type = "agent";
+  else if (query.type === "agent") delete query.type;
+  // Unchanged URLs are left alone, so this cannot race the page's own page and score replace.
+  const sorted = (q: Record<string, unknown>) => JSON.stringify(Object.entries(q).sort());
+  if (sorted(query) === sorted(route.query)) return;
+  router.replace({ query }).catch(() => {});
+}
+
+async function loadQualityAgents(force = false) {
   const { startUs, endUs } = qualityDateWindow.value;
-  if (!orgId.value || !startUs || !endUs) return;
-  qualityAgentsLoading.value = true;
-  try {
-    const response = await genAiAgentMappingService.listAgents(orgId.value, startUs, endUs);
-    qualityAgents.value = response.agents;
-    if (
-      qualityAgentKey.value !== ALL_AGENTS_VALUE &&
-      !qualityAgents.value.some((agent) => agentFilterKey(agent) === qualityAgentKey.value)
-    ) {
-      qualityAgentKey.value = ALL_AGENTS_VALUE;
-    }
-  } catch (err) {
-    console.warn("Failed to load GenAI agents", err);
-    qualityAgents.value = [];
-    qualityAgentKey.value = ALL_AGENTS_VALUE;
-  } finally {
-    qualityAgentsLoading.value = false;
+  if (!orgId.value) return;
+  // Agents appear as they emit spans and no write expires the list, so a user refresh forces.
+  if (force) {
+    await queryClient.invalidateQueries({
+      queryKey: genAiAgentsQuery(orgId.value, startUs, endUs).queryKey,
+      exact: true,
+      refetchType: "none",
+    });
+  }
+  await loadQualityAgentList(startUs, endUs);
+  if (!qualityScopeReady.value) {
+    applyQualityScopeFromUrl();
+    qualityScopeReady.value = true;
+    syncQualityUrl();
   }
 }
 
 function syncQualityDateWindow() {
-  const picker = qualityDatePickerRef.value;
-  if (!picker) return;
-  const dt = picker.getConsumableDateTime();
-  if (dt && typeof dt.startTime === "number" && typeof dt.endTime === "number") {
-    qualityDateWindow.value = { startUs: dt.startTime, endUs: dt.endTime };
-  }
+  const picked = qualityDatePickerRef.value?.getConsumableDateTime();
+  const resolved =
+    picked && typeof picked.startTime === "number" && typeof picked.endTime === "number"
+      ? picked
+      : resolveAiDateWindow(qualitySelectedDate.value);
+  if (resolved) qualityDateWindow.value = { startUs: resolved.startTime, endUs: resolved.endTime };
 }
 
-// ── Quality reload orchestration ─────────────────────────────────────────
-// ONE path drives every quality fetch. Exactly three triggers reload
-// everything (agent list + KPIs + table + charts):
-//   1. The Quality page mounts            → @ready
-//   2. The user clicks Refresh            → onQualityRefresh
-//   3. The date-time window changes       → watch(qualitySelectedDate)
-// All three run the SAME sequence: re-anchor the window from the picker, load
-// the agent list FIRST, then load the quality data — so the agent filter is
-// always populated before the data it scopes is fetched.
-//
-// Changing the agent filter is a data-only reload (the agent list itself is
-// unchanged) and is handled separately by onQualityAgentChange below.
-const qualityReloading = ref(false);
-
-async function reloadQuality() {
-  qualityReloading.value = true;
-  try {
-    // On the @ready trigger this runs from QualityPage's onMounted; wait a
-    // tick so the parent's `qualityPageRef` is guaranteed assigned before we
-    // call into it.
-    await nextTick();
-    syncQualityDateWindow();
-    await loadQualityAgents();
-    await qualityPageRef.value?.refreshAll?.();
-  } finally {
-    qualityReloading.value = false;
-  }
-}
-
-// Trigger 2 — Refresh button. Re-anchors relative ranges ("Past 15 minutes")
-// to "now" via the shared reload path.
-function onQualityRefresh() {
-  void reloadQuality();
-}
-
-// Trigger 3 — date-time change. DateTimePickerDashboard's inner DateTime emits
-// `update:modelValue` ONCE on mount (its onMounted calls saveDate → on:date-change),
-// re-anchoring qualitySelectedDate to the same window it already holds. That echo
-// would fire a second full reloadQuality on top of the @ready one, double-hitting
-// every quality API. The picker remounts every time the quality tab is (re-)entered
-// (it lives in the tab-scoped header slot), so this echo recurs on each entry — not
-// just first load. `qualityDateEchoPending` is armed on entry (see watch(activeTab))
-// and here swallows exactly the next (mount) change; genuine user date changes reload.
-let qualityDateEchoPending = true;
 watch(qualitySelectedDate, () => {
-  if (qualityDateEchoPending) {
-    qualityDateEchoPending = false;
-    return;
-  }
-  void reloadQuality();
+  syncQualityDateWindow();
+  if (qualityScopeReady.value) syncQualityUrl();
 });
 
-// Org switch — reset the agent filter and reload from scratch.
-watch(orgId, () => {
-  qualityAgentKey.value = ALL_AGENTS_VALUE;
-  void reloadQuality();
-});
-
-// User picked a different agent — only the data needs refetching; the agent
-// list is unchanged. Driven explicitly from the dropdown's update event (not a
-// watch on the key) so the programmatic reset inside loadQualityAgents()
-// during reloadQuality() never double-fires a data reload.
-async function onQualityAgentChange(key: string) {
-  qualityAgentKey.value = key;
-  // `selectedQualityAgent` → the `agent-filter` prop → the child's
-  // `agentFilterRef` only update on the next render tick. Wait for it so
-  // `refreshAll()` queries the newly selected agent, not the previous one.
-  await nextTick();
-  await qualityPageRef.value?.refreshAll?.();
-}
-
-// Aggregated "is a quality reload in flight" — covers the agent-load phase
-// plus every in-flight QualityPage loader, so the Refresh button spins from
-// click to settle.
-const qualityRefreshing = computed(
-  () => qualityReloading.value || (qualityPageRef.value?.isAnyLoading ?? false),
+watch(
+  () => [activeTab.value, orgId.value, qualityDateWindow.value] as const,
+  ([tab]) => {
+    if (tab === "quality" && !qualityRefreshing.value) void loadQualityAgents();
+  },
+  { immediate: true },
 );
 
-// Last-refresh timestamp for the header's ORefreshButton — stamped when a
-// reload settles (true → false), mirroring the Sessions / LLM Insights pages.
-const qualityLastRunAt = ref<number | null>(null);
-watch(qualityRefreshing, (isLoading, wasLoading) => {
-  if (wasLoading && !isLoading) qualityLastRunAt.value = Date.now();
-});
+// The config key is watched too: Back to the list restores an entry written before a later Env/Agent/Version change.
+watch(
+  [qualitySelectedEnv, qualitySelectedAgentName, qualitySelectedVersion, () => route.query.config],
+  () => {
+    if (qualityScopeReady.value) syncQualityUrl();
+  },
+);
 
-const currentSingularLabel = computed(() => t(`onlineEvals.singular.${activeTab.value}`));
+// Refresh moves a relative range to now and forces every read on the Quality view.
+async function onQualityRefresh() {
+  if (qualityRefreshing.value) return;
+  qualityRefreshing.value = true;
+  const startedAt = Date.now();
+  try {
+    syncQualityDateWindow();
+    await Promise.all([reloadLists(true), loadQualityAgents(true)]);
+    // Once the moved window has reached the keys, expire every quality read the Refresh has not already fetched; the active ones refetch.
+    await nextTick();
+    await queryClient.invalidateQueries({
+      queryKey: onlineEvalKeys.quality(orgId.value),
+      predicate: (query: Query) =>
+        query.state.dataUpdatedAt < startedAt && query.state.fetchStatus !== "fetching",
+    });
+  } finally {
+    qualityRefreshing.value = false;
+  }
+}
 
 const pendingDeleteLabel = computed(() => {
   const tab = pendingDeleteTab.value;
@@ -791,17 +880,11 @@ const deleteDialogMessage = computed(() =>
     ? t("onlineEvals.job.deleteBulkConfirm", {
         count: pendingBulkDeleteIds.value.length,
       })
-    : t("onlineEvals.deleteConfirmMessage", {
-        name: pendingDeleteRow.value?.name ?? "",
-      }),
+    : undefined,
 );
 
 watch(activeTab, (next) => {
   filterQuery.value = "";
-  // Re-arm the date-picker mount-echo guard: entering quality remounts the
-  // picker, which emits `update:modelValue` once on mount. @ready already owns
-  // the entry reload, so that echo must be swallowed to avoid a double fetch.
-  if (next === "quality") qualityDateEchoPending = true;
   if (route.query.tab !== next) {
     router.replace({ query: { ...route.query, tab: next } }).catch(() => {});
   }
@@ -817,16 +900,13 @@ watch(
 );
 
 onBeforeMount(async () => {
-  await loadAll(orgId.value);
+  // Mount reads the cache; only the refresh button and post-write reloads force.
+  await reloadLists(false);
   syncFromRoute();
 });
 
 function rowIdOf(row: AnyRow): string {
   return rowIdOfPure(row, activeTab.value);
-}
-
-function findRowById(tab: ActiveTab, id: string): AnyRow | null {
-  return findRowByIdPure(tab, id, rowsByTab.value);
 }
 
 function pushRouteAction(extra: Record<string, string | undefined>) {
@@ -910,16 +990,19 @@ function crossNavigateToJob(row: EvalJob) {
   router.push({ name: route.name as string, query }).catch(() => {});
 }
 
+const setJobActive = useMutation(() => setJobActiveMutation(orgId.value));
+const deleteEvalEntity = useMutation(() => deleteEvalEntityMutation(orgId.value));
+
 async function activateJob(row: EvalJob) {
   if (pendingJobStatusId.value !== null) return;
   pendingJobStatusId.value = row.id;
   try {
-    await onlineEvalsService.jobs.activate(orgId.value, row.id);
+    await setJobActive.mutateAsync({ id: row.id, active: true });
     toast({
       variant: "success",
       message: t("onlineEvals.actions.activated"),
     });
-    await loadAll(orgId.value);
+    await reloadLists();
   } catch (err: any) {
     showError(err, t("onlineEvals.actions.activateError"));
   } finally {
@@ -931,22 +1014,17 @@ async function pauseJob(row: EvalJob) {
   if (pendingJobStatusId.value !== null) return;
   pendingJobStatusId.value = row.id;
   try {
-    await onlineEvalsService.jobs.pause(orgId.value, row.id);
+    await setJobActive.mutateAsync({ id: row.id, active: false });
     toast({
       variant: "success",
       message: t("onlineEvals.actions.paused"),
     });
-    await loadAll(orgId.value);
+    await reloadLists();
   } catch (err: any) {
     showError(err, t("onlineEvals.actions.pauseError"));
   } finally {
     pendingJobStatusId.value = null;
   }
-}
-
-function openFormPage(entity: FullPageEntity, mode: "create" | "edit") {
-  activeTab.value = entity;
-  formPage.value = { entity, mode };
 }
 
 function closeFormPage() {
@@ -970,15 +1048,7 @@ async function handleSaved() {
   dialog.value = { open: false, mode: "create", row: null };
   scorerTypeDialog.value = false;
   clearRouteAction();
-  await loadAll(orgId.value);
-}
-
-async function handleCatalogImported() {
-  await loadAll(orgId.value);
-}
-
-function toggleCatalog(tab: ActiveTab) {
-  catalogOpenTab.value = catalogOpenTab.value === tab ? null : tab;
+  await reloadLists();
 }
 
 function goToImportScoreConfig() {
@@ -991,7 +1061,7 @@ function closeImport() {
 
 async function handleImportSaved() {
   importingEntity.value = null;
-  await loadAll(orgId.value);
+  await reloadLists();
 }
 
 function openScoreConfigLibrary() {
@@ -1010,7 +1080,7 @@ async function triggerScoreConfigLibraryImport() {
 
 async function handleScoreConfigLibraryImported() {
   showScoreConfigLibrary.value = false;
-  await loadAll(orgId.value);
+  await reloadLists();
 }
 
 function exportScoreConfigRow(row: ScoreConfig) {
@@ -1021,7 +1091,7 @@ function exportScoreConfigRow(row: ScoreConfig) {
     "application/json",
   );
   if (!ok) {
-    toast({ variant: "error", message: "Failed to export score config" });
+    toast({ variant: "error", message: t("toastMessages.components.failedToExportScoreConfig") });
   }
 }
 
@@ -1052,7 +1122,7 @@ async function triggerScorerLibraryImport() {
 
 async function handleScorerLibraryImported() {
   showScorerLibrary.value = false;
-  await loadAll(orgId.value);
+  await reloadLists();
 }
 
 function exportScorerRow(row: Scorer) {
@@ -1066,7 +1136,7 @@ function exportScorerRow(row: Scorer) {
     "application/json",
   );
   if (!ok) {
-    toast({ variant: "error", message: "Failed to export scorer" });
+    toast({ variant: "error", message: t("toastMessages.components.failedToExportScorer") });
   }
 }
 
@@ -1075,7 +1145,7 @@ function exportScorerBulk(ids: string[]) {
     (row) => ids.includes(entityId(row)) || ids.includes(row.id),
   );
   if (selected.length === 0) {
-    toast({ variant: "warning", message: "No scorers selected" });
+    toast({ variant: "warning", message: t("toastMessages.components.noScorersSelected") });
     return;
   }
   const payload = selected.map((row) =>
@@ -1092,10 +1162,12 @@ function exportScorerBulk(ids: string[]) {
   if (ok) {
     toast({
       variant: "success",
-      message: `Exported ${selected.length} scorer${selected.length > 1 ? "s" : ""}`,
+      message: t("toastMessages.components.exportedScorer", {
+        count: selected.length,
+      }),
     });
   } else {
-    toast({ variant: "error", message: "Failed to export scorers" });
+    toast({ variant: "error", message: t("toastMessages.components.failedToExportScorers") });
   }
 }
 
@@ -1104,7 +1176,7 @@ function exportScoreConfigBulk(ids: string[]) {
     (row) => ids.includes(entityId(row)) || ids.includes(row.id),
   );
   if (selected.length === 0) {
-    toast({ variant: "warning", message: "No score configs selected" });
+    toast({ variant: "warning", message: t("toastMessages.components.noScoreConfigsSelected") });
     return;
   }
   const payload = selected.map(stripScoreConfigForExport);
@@ -1116,10 +1188,12 @@ function exportScoreConfigBulk(ids: string[]) {
   if (ok) {
     toast({
       variant: "success",
-      message: `Exported ${selected.length} score config${selected.length > 1 ? "s" : ""}`,
+      message: t("toastMessages.components.exportedScoreConfig", {
+        count: selected.length,
+      }),
     });
   } else {
-    toast({ variant: "error", message: "Failed to export score configs" });
+    toast({ variant: "error", message: t("toastMessages.components.failedToExportScoreConfigs") });
   }
 }
 
@@ -1140,6 +1214,7 @@ function syncFromRoute() {
 
   switch (state.kind) {
     case "none":
+      void dropDeletedItemDraft();
       return;
     case "viewScoreConfig":
       viewRow.value = state.row;
@@ -1182,6 +1257,39 @@ watch(
   () => syncFromRoute(),
 );
 
+function dropDrafts(tab: ActiveTab, ids: string[]) {
+  const kind = DRAFT_KIND_BY_TAB[tab];
+  if (!kind) return;
+  for (const id of ids) deleteEditorDraftsFor({ kind, org: orgId.value, entityId: id });
+}
+
+/** Opening the edit form of an item that is gone drops its draft and says so, once a fresh read of its list confirms it. */
+async function dropDeletedItemDraft() {
+  const { action, id, tab: tabQuery } = route.query;
+  const tab = parseTabFromRoute(tabQuery);
+  const kind = DRAFT_KIND_BY_TAB[tab];
+  if (action !== "update" || typeof id !== "string" || !kind) return;
+  const drafts = tab === "jobs" ? jobDrafts : scorerDrafts;
+  if (!drafts.ids.has(id)) return;
+  // The cached list may predate the item (made in another tab within its stale time).
+  await reloadLists(true);
+  if (route.query.action !== "update" || route.query.id !== id) return;
+  if (findRowById(tab, id, rowsByTab.value)) {
+    syncFromRoute();
+    return;
+  }
+  const listKey =
+    tab === "jobs" ? onlineEvalKeys.jobs(orgId.value) : onlineEvalKeys.scorers(orgId.value);
+  if (queryClient.getQueryState(listKey)?.status !== "success") return;
+  deleteEditorDraftsFor({ kind, org: orgId.value, entityId: id });
+  toast({
+    variant: "info",
+    message: t("common.editorDraft.itemDeleted", {
+      entity: t(`common.editorDraft.entities.${kind}`),
+    }),
+  });
+}
+
 function deleteRow(row: AnyRow) {
   pendingDeleteRow.value = row;
   pendingDeleteTab.value = activeTab.value;
@@ -1212,17 +1320,20 @@ async function performDelete() {
   if (!row || !tab) return;
   const singular = t(`onlineEvals.singular.${tab}`);
   try {
-    if (tab === "scoreConfigs")
-      await onlineEvalsService.scoreConfigs.delete(orgId.value, entityId(row as ScoreConfig));
-    else if (tab === "scorers")
-      await onlineEvalsService.scorers.delete(orgId.value, entityId(row as Scorer));
-    else if (tab === "jobs") await onlineEvalsService.jobs.delete(orgId.value, (row as EvalJob).id);
+    const id =
+      tab === "scoreConfigs"
+        ? entityId(row as ScoreConfig)
+        : tab === "scorers"
+          ? entityId(row as Scorer)
+          : (row as EvalJob).id;
+    await deleteEvalEntity.mutateAsync({ tab, id });
+    dropDrafts(tab, [id]);
 
     toast({
       variant: "success",
       message: t("onlineEvals.deleted", { label: singular }),
     });
-    await loadAll(orgId.value);
+    await reloadLists();
   } catch (err: any) {
     showError(err, t("onlineEvals.deleteError", { label: singular.toLowerCase() }));
   } finally {
@@ -1239,7 +1350,11 @@ async function performBulkJobsDelete() {
   jobsBulkDeleting.value = true;
   try {
     const results = await Promise.allSettled(
-      ids.map((id) => onlineEvalsService.jobs.delete(orgId.value, id)),
+      ids.map((id) => deleteEvalEntity.mutateAsync({ tab: "jobs", id })),
+    );
+    dropDrafts(
+      "jobs",
+      ids.filter((_, index) => results[index].status === "fulfilled"),
     );
     const failed = results.filter((r) => r.status === "rejected").length;
     if (failed > 0) {
@@ -1255,7 +1370,7 @@ async function performBulkJobsDelete() {
         message: t("onlineEvals.job.deletedBulk", { count: ids.length }),
       });
     }
-    await loadAll(orgId.value);
+    await reloadLists();
   } finally {
     pendingBulkDeleteIds.value = [];
     pendingDeleteTab.value = null;

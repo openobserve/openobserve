@@ -23,10 +23,24 @@
 // in an otherwise dot-only group). Values are matched case-insensitively and
 // separator-insensitively, so "real_time", "realTime", "Real-Time" all resolve
 // to the same entry.
+//
+// i18n RULE: a value entry that renders user-facing PROSE must carry a
+// `labelKey`. Without one the badge falls back to the humanised raw value
+// ("real_time" → "Real Time"), which is English in every locale. Only three
+// kinds of entry may skip it, and each is commented where it appears:
+//   • protocol / spec tokens and acronyms (GET, OK, SSO, LDAP, HTTP, P95, 2xx,
+//     OTel SpanKind) and product names (Slack, Stripe) — identical everywhere;
+//   • style / intent selectors whose "value" is a colour choice, never text
+//     (countChip, fieldTag, logsResultChip, diffCategory, dimensionKey, …);
+//   • entries whose text is always supplied by the caller as a slot or `label`
+//     prop, so the registry text never reaches the screen.
 // ─────────────────────────────────────────────────────────────────────────
+
+import { raw, type I18nKey, I18nText } from "@/types/i18n";
 
 import type { BadgeVariant, BadgeSize, BadgeShape } from "./OBadge.types";
 import { statusVariant } from "@/lib/core/Table/cells/statusVariant";
+import { translateBadgeLabel } from "./badgeI18n";
 
 /** How a badge presents its leading affordance. */
 export type BadgeRenderMode = "icon" | "dot" | "plain";
@@ -37,14 +51,20 @@ export interface BadgeValueConfig {
   /** OIcon name — shown when the effective mode is "icon". */
   icon?: string;
   /** Display text. Defaults to the humanised value. */
-  label?: string;
+  label?: I18nText;
   /**
    * i18n key for the label. Resolved by `OTag` via `t(labelKey)` (the registry
-   * is a plain module with no i18n context). Use this instead of `label` when
-   * the text must be translated. A literal `label` (or a per-call `label` prop)
-   * still wins over `labelKey`.
+   * is a plain module with no i18n context, so the key is stored as DATA and
+   * translated at render time — never `t()` here, that would freeze the locale
+   * at import time). Use this instead of `label` for any user-facing prose;
+   * `label` is reserved for text that is the same in every locale (protocol
+   * tokens, acronyms, product names).
+   *
+   * Precedence in `OTag`: per-call `label` prop → `labelKey` → literal `label`
+   * → humanised value. Note `labelKey` beats a literal `label` in the registry;
+   * only the per-call prop outranks it.
    */
-  labelKey?: string;
+  labelKey?: I18nKey;
   /** Force the leading dot on/off regardless of group mode. */
   dot?: boolean;
   /** Per-value size override (wins over the group `size`). For groups whose
@@ -96,9 +116,31 @@ export const BADGE_GROUPS = {
     mode: "icon",
     shape: "pill",
     values: {
-      scheduled: { variant: "teal-soft", icon: "schedule" },
-      realtime: { variant: "blue-soft", icon: "bolt", label: "Real-time" },
-      anomalydetection: { variant: "purple-soft", icon: "query-stats", label: "Anomaly Detection" },
+      scheduled: {
+        variant: "teal-soft",
+        icon: "schedule",
+        labelKey: "components.badge.alertType.scheduled",
+      },
+      realtime: {
+        variant: "blue-soft",
+        icon: "bolt",
+        labelKey: "components.badge.alertType.realtime",
+      },
+      anomalydetection: {
+        variant: "purple-soft",
+        icon: "query-stats",
+        labelKey: "components.badge.alertType.anomalydetection",
+      },
+      composite: {
+        variant: "purple-soft",
+        icon: "account-tree",
+        labelKey: "components.badge.alertType.composite",
+      },
+      slo: {
+        variant: "indigo-soft",
+        icon: "monitor-heart",
+        labelKey: "components.badge.alertType.slo",
+      },
     },
   },
 
@@ -107,13 +149,87 @@ export const BADGE_GROUPS = {
     mode: "dot",
     shape: "pill",
     values: {
-      active: { variant: "success-soft" },
-      ready: { variant: "success-soft" },
-      running: { variant: "blue-soft" },
-      training: { variant: "warning-soft" },
-      failed: { variant: "error-soft" },
-      disabled: { variant: "default-soft" },
-      paused: { variant: "warning-soft" },
+      active: { variant: "success-soft", labelKey: "components.badge.alertStatus.active" },
+      // Every anomaly config starts here and stays until its first model trains.
+      waiting: { variant: "default-soft", labelKey: "components.badge.alertStatus.waiting" },
+      ready: { variant: "success-soft", labelKey: "components.badge.alertStatus.ready" },
+      running: { variant: "blue-soft", labelKey: "components.badge.alertStatus.running" },
+      training: { variant: "warning-soft", labelKey: "components.badge.alertStatus.training" },
+      failed: { variant: "error-soft", labelKey: "components.badge.alertStatus.failed" },
+      disabled: { variant: "default-soft", labelKey: "components.badge.alertStatus.disabled" },
+      paused: { variant: "warning-soft", labelKey: "components.badge.alertStatus.paused" },
+    },
+  },
+
+  // Public dashboard link state, derived server-side; only live is green so exceptions stand out.
+  publicLinkStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      live: { variant: "success-soft", labelKey: "components.badge.publicLinkStatus.live" },
+      paused: { variant: "default-soft", labelKey: "components.badge.publicLinkStatus.paused" },
+      notviewed: {
+        variant: "default-soft",
+        labelKey: "components.badge.publicLinkStatus.notViewed",
+      },
+      needsattention: {
+        variant: "warning-soft",
+        labelKey: "components.badge.publicLinkStatus.needsAttention",
+      },
+      expired: { variant: "default-soft", labelKey: "components.badge.publicLinkStatus.expired" },
+      dashboarddeleted: {
+        variant: "error-soft",
+        labelKey: "components.badge.publicLinkStatus.dashboardDeleted",
+      },
+      // The organization has public links turned off.
+      disabled: { variant: "default-soft", labelKey: "components.badge.publicLinkStatus.disabled" },
+    },
+  },
+
+  // One chip per downtime target, plus the shared condition. The caller always supplies the label.
+  downtimeTarget: {
+    mode: "icon",
+    shape: "pill",
+    values: {
+      condition: { variant: "primary-soft", icon: "tune" },
+      group: { variant: "primary-soft", icon: "bar-chart" },
+      alerts: { variant: "default-soft", icon: "shield-alert-outline" },
+      anomalydetections: { variant: "default-soft", icon: "query-stats" },
+      synthetics: { variant: "default-soft", icon: "radar" },
+      slos: { variant: "default-soft", icon: "target" },
+    },
+  },
+
+  // Downtime lifecycle. Active is amber, not green: notifications are off while it runs.
+  downtimeStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      scheduled: { variant: "blue-soft", labelKey: "components.badge.downtimeStatus.scheduled" },
+      active: { variant: "warning-soft", labelKey: "components.badge.downtimeStatus.active" },
+      ended: { variant: "default-soft", labelKey: "components.badge.downtimeStatus.ended" },
+      cancelled: {
+        variant: "default-outline",
+        labelKey: "components.badge.downtimeStatus.cancelled",
+      },
+      endedearly: {
+        variant: "default-soft",
+        labelKey: "components.badge.downtimeStatus.endedEarly",
+      },
+    },
+  },
+
+  licenseWaiverStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      scheduled: {
+        variant: "blue-soft",
+        labelKey: "components.badge.licenseWaiverStatus.scheduled",
+      },
+      active: { variant: "success-soft", labelKey: "components.badge.licenseWaiverStatus.active" },
+      past: { variant: "default-soft", labelKey: "components.badge.licenseWaiverStatus.past" },
+      ended: { variant: "default-soft", labelKey: "components.badge.licenseWaiverStatus.ended" },
     },
   },
 
@@ -132,11 +248,47 @@ export const BADGE_GROUPS = {
     mode: "dot",
     shape: "pill",
     values: {
-      p1: { variant: "error-soft", label: "P1" },
-      p2: { variant: "orange-soft", label: "P2" },
-      p3: { variant: "amber-soft", label: "P3" },
-      p4: { variant: "blue-soft", label: "P4" },
-      p5: { variant: "default-soft", label: "P5" },
+      p1: { variant: "error-soft", label: raw("P1") },
+      p2: { variant: "orange-soft", label: raw("P2") },
+      p3: { variant: "amber-soft", label: raw("P3") },
+      p4: { variant: "blue-soft", label: raw("P4") },
+      p5: { variant: "default-soft", label: raw("P5") },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // On-call RESPONSE state — where a page is in its life, not how bad it is.
+  //
+  // Distinct from `alertState`: an alert can be firing while its page is
+  // acknowledged. Triaged is the agent having looked without taking the ball,
+  // so it stays warm rather than reading as owned.
+  oncallResponseState: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      triggered: { variant: "error-soft", labelKey: "oncall.state_triggered" },
+      triaged: { variant: "amber-soft", labelKey: "oncall.state_triaged" },
+      acknowledged: { variant: "blue-soft", labelKey: "oncall.state_acknowledged" },
+      resolved: { variant: "success-soft", labelKey: "oncall.state_resolved" },
+      exhausted: { variant: "error-soft", labelKey: "oncall.state_exhausted" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // Whether a team would reach anybody if something broke right now.
+  //
+  // Rostered and reachable are two different questions, and a team can pass the
+  // first while failing the second — somebody is on the rota, and no transport
+  // exists to wake them. A green `Covered` beside "no page can be delivered to
+  // anyone" told the reader the team was fine, so the third value exists to say
+  // which half is true.
+  oncallCoverage: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      covered: { variant: "success-soft", labelKey: "oncall.coverage_covered" },
+      gap: { variant: "warning-soft", labelKey: "oncall.coverage_gap" },
+      unreachable: { variant: "error-soft", labelKey: "oncall.coverage_unreachable" },
     },
     fallback: { variant: "default-soft" },
   },
@@ -150,12 +302,12 @@ export const BADGE_GROUPS = {
     mode: "dot",
     shape: "pill",
     values: {
-      critical: { variant: "error-soft" },
-      warning: { variant: "warning-soft" },
-      ok: { variant: "success-soft", label: "Ok" },
+      critical: { variant: "error-soft", labelKey: "components.badge.alertLevel.critical" },
+      warning: { variant: "warning-soft", labelKey: "components.badge.alertLevel.warning" },
+      ok: { variant: "success-soft", labelKey: "components.badge.alertLevel.ok" },
       // Reserved: the policy that produces it ships in Phase 2. Neutral rather
       // than warning-coloured — "we don't know" is not "we know it's bad".
-      nodata: { variant: "default-soft", label: "No Data" },
+      nodata: { variant: "default-soft", labelKey: "components.badge.alertLevel.nodata" },
     },
     fallback: { variant: "default-soft" },
   },
@@ -166,10 +318,10 @@ export const BADGE_GROUPS = {
     shape: "pill",
     values: {
       open: { variant: "error-soft", labelKey: "alerts.incidents.statusOpen" },
-      firing: { variant: "error-soft" },
+      firing: { variant: "error-soft", labelKey: "components.badge.incidentStatus.firing" },
       acknowledged: { variant: "warning-soft", labelKey: "alerts.incidents.statusAcknowledged" },
       resolved: { variant: "success-soft", labelKey: "alerts.incidents.statusResolved" },
-      closed: { variant: "default-soft" },
+      closed: { variant: "default-soft", labelKey: "components.badge.incidentStatus.closed" },
     },
   },
 
@@ -179,15 +331,15 @@ export const BADGE_GROUPS = {
     mode: "dot",
     shape: "pill",
     values: {
-      critical: { variant: "error-soft" },
-      high: { variant: "orange-soft" },
-      medium: { variant: "amber-soft" },
-      low: { variant: "blue-soft" },
-      info: { variant: "default-soft" },
-      p1: { variant: "error-soft", label: "P1" },
-      p2: { variant: "orange-soft", label: "P2" },
-      p3: { variant: "amber-soft", label: "P3" },
-      p4: { variant: "blue-soft", label: "P4" },
+      critical: { variant: "error-soft", labelKey: "components.badge.severity.critical" },
+      high: { variant: "orange-soft", labelKey: "components.badge.severity.high" },
+      medium: { variant: "amber-soft", labelKey: "components.badge.severity.medium" },
+      low: { variant: "blue-soft", labelKey: "components.badge.severity.low" },
+      info: { variant: "default-soft", labelKey: "components.badge.severity.info" },
+      p1: { variant: "error-soft", label: raw("P1") },
+      p2: { variant: "orange-soft", label: raw("P2") },
+      p3: { variant: "amber-soft", label: raw("P3") },
+      p4: { variant: "blue-soft", label: raw("P4") },
     },
   },
 
@@ -196,13 +348,19 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "pill",
     values: {
-      trace: { variant: "default-soft" },
-      debug: { variant: "default-soft" },
-      info: { variant: "blue-soft" },
-      warn: { variant: "amber-soft", label: "WARN" },
-      warning: { variant: "amber-soft", label: "WARN" },
-      error: { variant: "error-soft" },
-      fatal: { variant: "purple-soft" },
+      trace: { variant: "default-soft", labelKey: "components.badge.logLevel.trace" },
+      debug: { variant: "default-soft", labelKey: "components.badge.logLevel.debug" },
+      info: { variant: "blue-soft", labelKey: "components.badge.logLevel.info" },
+      warn: { variant: "amber-soft", labelKey: "components.badge.logLevel.warn" },
+      warning: { variant: "amber-soft", labelKey: "components.badge.logLevel.warn" },
+      error: { variant: "error-soft", labelKey: "common.error" },
+      fatal: { variant: "purple-soft", labelKey: "components.badge.logLevel.fatal" },
+      emergency: { variant: "purple-soft", labelKey: "components.badge.logLevel.emergency" },
+      alert: { variant: "error-soft", labelKey: "components.badge.logLevel.alert" },
+      critical: { variant: "error-soft", labelKey: "components.badge.logLevel.critical" },
+      notice: { variant: "success-soft", labelKey: "components.badge.logLevel.notice" },
+      ok: { variant: "success-soft", labelKey: "components.badge.logLevel.ok" },
+      unknown: { variant: "default-soft", labelKey: "components.badge.logLevel.unknown" },
     },
   },
 
@@ -211,8 +369,16 @@ export const BADGE_GROUPS = {
     mode: "icon",
     shape: "pill",
     values: {
-      realtime: { variant: "blue-soft", icon: "bolt", label: "Real-time" },
-      scheduled: { variant: "teal-soft", icon: "schedule" },
+      realtime: {
+        variant: "blue-soft",
+        icon: "bolt",
+        labelKey: "components.badge.pipelineType.realtime",
+      },
+      scheduled: {
+        variant: "teal-soft",
+        icon: "schedule",
+        labelKey: "components.badge.pipelineType.scheduled",
+      },
     },
   },
 
@@ -232,9 +398,21 @@ export const BADGE_GROUPS = {
         icon: "account-tree",
         labelKey: "settings.correlation.traces",
       },
-      metadata: { variant: "default-soft", icon: "info" },
-      enrichmenttables: { variant: "amber-soft", icon: "database", label: "Enrichment" },
-      index: { variant: "cyan-soft", icon: "database" },
+      metadata: {
+        variant: "default-soft",
+        icon: "info",
+        labelKey: "components.badge.streamType.metadata",
+      },
+      enrichmenttables: {
+        variant: "amber-soft",
+        icon: "database",
+        labelKey: "components.badge.streamType.enrichment",
+      },
+      index: {
+        variant: "cyan-soft",
+        icon: "database",
+        labelKey: "components.badge.streamType.index",
+      },
     },
   },
 
@@ -243,12 +421,15 @@ export const BADGE_GROUPS = {
     mode: "dot",
     shape: "pill",
     values: {
-      paid: { variant: "success-soft" },
-      open: { variant: "blue-soft" },
-      draft: { variant: "default-soft" },
-      void: { variant: "default-soft" },
-      uncollectible: { variant: "error-soft" },
-      pending: { variant: "warning-soft" },
+      paid: { variant: "success-soft", labelKey: "components.badge.invoiceStatus.paid" },
+      open: { variant: "blue-soft", labelKey: "components.badge.invoiceStatus.open" },
+      draft: { variant: "default-soft", labelKey: "components.badge.invoiceStatus.draft" },
+      void: { variant: "default-soft", labelKey: "components.badge.invoiceStatus.void" },
+      uncollectible: {
+        variant: "error-soft",
+        labelKey: "components.badge.invoiceStatus.uncollectible",
+      },
+      pending: { variant: "warning-soft", labelKey: "components.badge.invoiceStatus.pending" },
     },
   },
 
@@ -260,8 +441,19 @@ export const BADGE_GROUPS = {
       active: { variant: "success-soft" },
       draft: { variant: "default-soft" },
       paused: { variant: "warning-soft" },
-      degraded: { variant: "orange-soft" },
       archived: { variant: "default-soft" },
+    },
+  },
+
+  // No labelKeys: EvalJobList always passes the translated `label`.
+  evalJobHealth: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      healthy: { variant: "success-soft" },
+      degraded: { variant: "orange-soft" },
+      waitingforcredentials: { variant: "error-soft" },
+      norecentruns: { variant: "default-soft" },
     },
   },
 
@@ -270,16 +462,17 @@ export const BADGE_GROUPS = {
     mode: "dot",
     shape: "pill",
     values: {
-      running: { variant: "blue-soft" },
-      processing: { variant: "blue-soft" },
-      pending: { variant: "warning-soft" },
-      queued: { variant: "warning-soft" },
-      waiting: { variant: "warning-soft" },
-      completed: { variant: "success-soft" },
-      finished: { variant: "success-soft" },
-      failed: { variant: "error-soft" },
-      cancelled: { variant: "default-soft" },
-      canceled: { variant: "default-soft" },
+      running: { variant: "blue-soft", labelKey: "components.badge.queryStatus.running" },
+      processing: { variant: "blue-soft", labelKey: "components.badge.queryStatus.processing" },
+      pending: { variant: "warning-soft", labelKey: "components.badge.queryStatus.pending" },
+      queued: { variant: "warning-soft", labelKey: "components.badge.queryStatus.queued" },
+      waiting: { variant: "warning-soft", labelKey: "components.badge.queryStatus.waiting" },
+      completed: { variant: "success-soft", labelKey: "components.badge.queryStatus.completed" },
+      finished: { variant: "success-soft", labelKey: "components.badge.queryStatus.finished" },
+      failed: { variant: "error-soft", labelKey: "components.badge.queryStatus.failed" },
+      // Both spellings are in the wild; each keeps the exact word it renders today.
+      cancelled: { variant: "default-soft", labelKey: "components.badge.queryStatus.cancelled" },
+      canceled: { variant: "default-soft", labelKey: "components.badge.queryStatus.canceled" },
     },
   },
 
@@ -293,19 +486,34 @@ export const BADGE_GROUPS = {
     shape: "pill",
     values: {
       // Current RunOutcome vocabulary.
-      firing: { variant: "success-soft" },
-      normal: { variant: "success-soft" },
-      succeeded: { variant: "success-soft" },
-      error: { variant: "error-soft" },
-      notifyfailed: { variant: "error-soft" },
-      skipped: { variant: "warning-soft" },
+      // Derived-stream runs record a successful run as `firing`.
+      firing: {
+        variant: "success-soft",
+        labelKey: "components.badge.pipelineRunOutcome.succeeded",
+      },
+      normal: { variant: "success-soft", labelKey: "components.badge.pipelineRunOutcome.normal" },
+      succeeded: {
+        variant: "success-soft",
+        labelKey: "components.badge.pipelineRunOutcome.succeeded",
+      },
+      error: { variant: "error-soft", labelKey: "common.error" },
+      // Shares the `alertState` wording so the same outcome reads identically in
+      // pipeline history and alert history.
+      notifyfailed: { variant: "error-soft", labelKey: "components.badge.alertState.notifyfailed" },
+      skipped: { variant: "warning-soft", labelKey: "components.badge.pipelineRunOutcome.skipped" },
       // Legacy trigger status vocabulary and older UI aliases.
-      completed: { variant: "success-soft" },
-      conditionnotsatisfied: { variant: "success-soft" },
-      failed: { variant: "error-soft" },
-      success: { variant: "success-soft" },
-      ok: { variant: "success-soft" },
-      warning: { variant: "warning-soft" },
+      completed: {
+        variant: "success-soft",
+        labelKey: "components.badge.pipelineRunOutcome.completed",
+      },
+      conditionnotsatisfied: {
+        variant: "success-soft",
+        labelKey: "components.badge.pipelineRunOutcome.conditionnotsatisfied",
+      },
+      failed: { variant: "error-soft", labelKey: "components.badge.pipelineRunOutcome.failed" },
+      success: { variant: "success-soft", labelKey: "common.success" },
+      ok: { variant: "success-soft", labelKey: "components.badge.pipelineRunOutcome.ok" },
+      warning: { variant: "warning-soft", labelKey: "components.badge.pipelineRunOutcome.warning" },
     },
     fallback: { variant: "default-soft" },
   },
@@ -315,19 +523,22 @@ export const BADGE_GROUPS = {
     mode: "dot",
     shape: "pill",
     values: {
-      up: { variant: "success-soft" },
-      passed: { variant: "success-soft" },
-      healthy: { variant: "success-soft" },
-      online: { variant: "success-soft" },
-      degraded: { variant: "warning-soft" },
-      warning: { variant: "amber-soft" },
+      up: { variant: "success-soft", labelKey: "components.badge.serviceStatus.up" },
+      passed: { variant: "success-soft", labelKey: "components.badge.serviceStatus.passed" },
+      healthy: { variant: "success-soft", labelKey: "components.badge.serviceStatus.healthy" },
+      online: { variant: "success-soft", labelKey: "components.badge.serviceStatus.online" },
+      degraded: { variant: "warning-soft", labelKey: "components.badge.serviceStatus.degraded" },
+      warning: { variant: "amber-soft", labelKey: "components.badge.serviceStatus.warning" },
       // A cluster node that is starting up but not yet serving.
-      prepare: { variant: "warning-soft" },
-      critical: { variant: "error-soft" },
-      offline: { variant: "error-soft" },
-      failed: { variant: "error-soft" },
-      down: { variant: "error-soft" },
-      unknown: { variant: "default-soft" },
+      prepare: { variant: "warning-soft", labelKey: "components.badge.serviceStatus.prepare" },
+      critical: { variant: "error-soft", labelKey: "components.badge.serviceStatus.critical" },
+      offline: { variant: "error-soft", labelKey: "components.badge.serviceStatus.offline" },
+      failed: { variant: "error-soft", labelKey: "components.badge.serviceStatus.failed" },
+      down: { variant: "error-soft", labelKey: "components.badge.serviceStatus.down" },
+      // Synthetics infrastructure error (backend status 4): the probe could not
+      // run, which is not the same as the target failing.
+      error: { variant: "error-soft", labelKey: "components.badge.serviceStatus.error" },
+      unknown: { variant: "default-soft", labelKey: "common.unknown" },
     },
   },
 
@@ -337,15 +548,17 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "pill",
     values: {
-      all: { variant: "primary-soft", label: "All" },
-      ingester: { variant: "teal-soft" },
-      querier: { variant: "blue-soft" },
-      compactor: { variant: "purple-soft" },
-      flattencompactor: { variant: "purple-soft", label: "Flatten Compactor" },
-      router: { variant: "orange-soft" },
-      alertmanager: { variant: "amber-soft", label: "Alert Manager" },
-      actionserver: { variant: "lime-soft", label: "Action Server" },
-      script: { variant: "default-soft" },
+      all: { variant: "primary-soft", labelKey: "components.badge.nodeRole.all" },
+      ingester: { variant: "teal-soft", labelKey: "components.badge.nodeRole.ingester" },
+      querier: { variant: "blue-soft", labelKey: "components.badge.nodeRole.querier" },
+      compactor: { variant: "purple-soft", labelKey: "components.badge.nodeRole.compactor" },
+      flattencompactor: {
+        variant: "purple-soft",
+        labelKey: "components.badge.nodeRole.flattencompactor",
+      },
+      router: { variant: "orange-soft", labelKey: "components.badge.nodeRole.router" },
+      scheduler: { variant: "amber-soft", labelKey: "components.badge.nodeRole.scheduler" },
+      script: { variant: "default-soft", labelKey: "components.badge.nodeRole.script" },
     },
   },
 
@@ -354,37 +567,75 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "pill",
     values: {
-      root: { variant: "error-soft" },
-      admin: { variant: "orange-soft" },
-      editor: { variant: "blue-soft" },
-      member: { variant: "blue-soft" },
-      viewer: { variant: "default-soft" },
-      user: { variant: "default-soft" },
-      serviceaccount: { variant: "teal-soft", label: "Service Account" },
+      root: { variant: "error-soft", labelKey: "components.badge.userRole.root" },
+      admin: { variant: "orange-soft", labelKey: "components.badge.userRole.admin" },
+      editor: { variant: "blue-soft", labelKey: "components.badge.userRole.editor" },
+      member: { variant: "blue-soft", labelKey: "components.badge.userRole.member" },
+      viewer: { variant: "default-soft", labelKey: "components.badge.userRole.viewer" },
+      user: { variant: "default-soft", labelKey: "components.badge.userRole.user" },
+      serviceaccount: {
+        variant: "teal-soft",
+        labelKey: "components.badge.userRole.serviceaccount",
+      },
     },
   },
 
   // Authentication method — plain.
+  // SSO / LDAP are protocol acronyms: identical in every locale, so they stay
+  // literal (no labelKey).
   authType: {
     mode: "plain",
     shape: "pill",
     values: {
-      sso: { variant: "blue-soft", label: "SSO" },
-      native: { variant: "default-soft" },
-      ldap: { variant: "purple-soft", label: "LDAP" },
+      sso: { variant: "blue-soft", label: raw("SSO") },
+      native: { variant: "default-soft", labelKey: "components.badge.authType.native" },
+      ldap: { variant: "purple-soft", label: raw("LDAP") },
     },
   },
 
-  // HTTP methods — plain, REST-conventional colours.
+  // HTTP methods — plain, REST-conventional colours. Deliberately NOT translated:
+  // the verbs are HTTP spec tokens, identical in every locale.
   httpMethod: {
     mode: "plain",
     shape: "pill",
     values: {
-      get: { variant: "blue-soft", label: "GET" },
-      post: { variant: "success-soft", label: "POST" },
-      put: { variant: "warning-soft", label: "PUT" },
-      patch: { variant: "purple-soft", label: "PATCH" },
-      delete: { variant: "error-soft", label: "DELETE" },
+      get: { variant: "blue-soft", label: raw("GET") },
+      post: { variant: "success-soft", label: raw("POST") },
+      put: { variant: "warning-soft", label: raw("PUT") },
+      patch: { variant: "purple-soft", label: raw("PATCH") },
+      delete: { variant: "error-soft", label: raw("DELETE") },
+    },
+  },
+
+  // Remote Task auth shape — plain. Says HOW the platform authenticates, never
+  // whether a secret is present; that is a separate column.
+  remoteTaskAuth: {
+    mode: "plain",
+    shape: "pill",
+    values: {
+      none: { variant: "default-soft", labelKey: "aiObservability.remoteTasks.auth.none" },
+      bearer: { variant: "blue-soft", labelKey: "aiObservability.remoteTasks.auth.bearer" },
+      basic: { variant: "purple-soft", labelKey: "aiObservability.remoteTasks.auth.basic" },
+      apikeyheader: {
+        variant: "orange-soft",
+        labelKey: "aiObservability.remoteTasks.auth.apiKeyHeader",
+      },
+    },
+  },
+
+  // Remote Task registry state — dot. This is NOT verification_status: it answers
+  // "can an Experiment pin this?", which is the question a reader actually has.
+  remoteTaskStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      published: {
+        variant: "success-soft",
+        labelKey: "aiObservability.remoteTasks.status.published",
+      },
+      draft: { variant: "default-soft", labelKey: "aiObservability.remoteTasks.status.draft" },
+      failed: { variant: "error-soft", labelKey: "aiObservability.remoteTasks.status.failed" },
+      retired: { variant: "default-soft", labelKey: "aiObservability.remoteTasks.status.retired" },
     },
   },
 
@@ -393,16 +644,16 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "rounded",
     values: {
-      utf8: { variant: "blue-soft", label: "String" },
-      string: { variant: "blue-soft" },
-      int64: { variant: "purple-soft", label: "Int" },
-      integer: { variant: "purple-soft", label: "Int" },
-      float64: { variant: "cyan-soft", label: "Float" },
-      float: { variant: "cyan-soft" },
-      boolean: { variant: "teal-soft", label: "Bool" },
-      bool: { variant: "teal-soft", label: "Bool" },
-      object: { variant: "default-soft" },
-      array: { variant: "default-soft" },
+      utf8: { variant: "blue-soft", labelKey: "common.typeString" },
+      string: { variant: "blue-soft", labelKey: "common.typeString" },
+      int64: { variant: "purple-soft", labelKey: "components.badge.fieldType.int" },
+      integer: { variant: "purple-soft", labelKey: "components.badge.fieldType.int" },
+      float64: { variant: "cyan-soft", labelKey: "components.badge.fieldType.float" },
+      float: { variant: "cyan-soft", labelKey: "components.badge.fieldType.float" },
+      boolean: { variant: "teal-soft", labelKey: "components.badge.fieldType.bool" },
+      bool: { variant: "teal-soft", labelKey: "components.badge.fieldType.bool" },
+      object: { variant: "default-soft", labelKey: "components.badge.fieldType.object" },
+      array: { variant: "default-soft", labelKey: "components.badge.fieldType.array" },
     },
   },
 
@@ -411,12 +662,25 @@ export const BADGE_GROUPS = {
     mode: "icon",
     shape: "pill",
     values: {
-      email: { variant: "blue-soft", icon: "mail" },
-      webhook: { variant: "teal-soft", icon: "webhook" },
+      email: {
+        variant: "blue-soft",
+        icon: "mail",
+        labelKey: "components.badge.destinationType.email",
+      },
+      webhook: {
+        variant: "teal-soft",
+        icon: "webhook",
+        labelKey: "components.badge.destinationType.webhook",
+      },
+      // Product name — never translated.
       slack: { variant: "purple-soft", icon: "webhook" },
-      http: { variant: "teal-soft", icon: "webhook", label: "HTTP" },
-      sns: { variant: "orange-soft", icon: "cloud", label: "SNS" },
-      remotepipeline: { variant: "cyan-soft", icon: "hub", label: "Remote Pipeline" },
+      http: { variant: "teal-soft", icon: "webhook", label: raw("HTTP") },
+      sns: { variant: "orange-soft", icon: "cloud", label: raw("SNS") },
+      remotepipeline: {
+        variant: "cyan-soft",
+        icon: "hub",
+        labelKey: "components.badge.destinationType.remotepipeline",
+      },
     },
   },
 
@@ -478,7 +742,11 @@ export const BADGE_GROUPS = {
     values: {
       runtime: { variant: "default-outline", icon: "code" },
       setuptime: { variant: "primary-soft", icon: "schedule" },
-      cost: { variant: "default-outline", icon: "attach-money", label: "Cost & Tokens Captured" },
+      cost: {
+        variant: "default-outline",
+        icon: "attach-money",
+        labelKey: "components.badge.setupCardMeta.cost",
+      },
       meta: { variant: "default-outline" },
     },
     fallback: { variant: "default-outline" },
@@ -537,7 +805,7 @@ export const BADGE_GROUPS = {
     shape: "pill",
     size: "md",
     values: {
-      invited: { variant: "warning-soft", label: "Invited" },
+      invited: { variant: "warning-soft", labelKey: "components.badge.userStatus.invited" },
     },
     fallback: { variant: "default-soft" },
   },
@@ -547,7 +815,7 @@ export const BADGE_GROUPS = {
     shape: "pill",
     size: "md",
     values: {
-      weakest: { variant: "warning" },
+      weakest: { variant: "warning", labelKey: "components.badge.evalBadge.weakest" },
       template: { variant: "primary-outline", labelKey: "traces.evaluations.templateBadge" },
     },
     fallback: { variant: "default" },
@@ -558,8 +826,8 @@ export const BADGE_GROUPS = {
     shape: "pill",
     size: "sm",
     values: {
-      enabled: { variant: "success" },
-      disabled: { variant: "error" },
+      enabled: { variant: "success", labelKey: "components.badge.featureStatus.enabled" },
+      disabled: { variant: "error", labelKey: "components.badge.featureStatus.disabled" },
     },
     fallback: { variant: "default" },
   },
@@ -604,13 +872,13 @@ export const BADGE_GROUPS = {
     // xs: this badge lives in dense card footers and dialog headers.
     size: "xs",
     values: {
-      counter: { variant: "blue-soft", label: "Counter" },
-      gauge: { variant: "success-soft", label: "Gauge" },
-      histogram: { variant: "purple-soft", label: "Histogram" },
-      summary: { variant: "orange-soft", label: "Summary" },
-      other: { variant: "default-soft", label: "Other" },
+      counter: { variant: "blue-soft", labelKey: "metrics.badge.counter" },
+      gauge: { variant: "success-soft", labelKey: "metrics.badge.gauge" },
+      histogram: { variant: "purple-soft", labelKey: "metrics.badge.histogram" },
+      summary: { variant: "orange-soft", labelKey: "metrics.badge.summary" },
+      other: { variant: "default-soft", labelKey: "metrics.badge.other" },
     },
-    fallback: { variant: "default-soft", label: "Other" },
+    fallback: { variant: "default-soft", labelKey: "metrics.badge.other" },
   },
 
   // Metric/info chip — trace & thread toolbar chips (Service/Duration/Cost/Steps…)
@@ -664,9 +932,9 @@ export const BADGE_GROUPS = {
     shape: "pill",
     size: "md",
     values: {
-      p50: { variant: "default-soft", label: "P50" },
-      p95: { variant: "default-soft", label: "P95" },
-      p99: { variant: "default-soft", label: "P99" },
+      p50: { variant: "default-soft", label: raw("P50") },
+      p95: { variant: "default-soft", label: raw("P95") },
+      p99: { variant: "default-soft", label: raw("P99") },
     },
     fallback: { variant: "default-soft" },
   },
@@ -689,8 +957,8 @@ export const BADGE_GROUPS = {
     shape: "pill",
     size: "md",
     values: {
-      png: { variant: "primary-outline", label: "PNG" },
-      preview: { variant: "default-outline", label: "Preview" },
+      png: { variant: "primary-outline", label: raw("PNG") },
+      preview: { variant: "default-outline", labelKey: "components.badge.reportTag.preview" },
     },
     fallback: { variant: "default-outline" },
   },
@@ -726,7 +994,11 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "pill",
     values: {
-      system: { variant: "primary-outline", size: "sm", label: "system" },
+      system: {
+        variant: "primary-outline",
+        size: "sm",
+        labelKey: "components.badge.serviceAccountKind.system",
+      },
       managed: {
         variant: "default-outline",
         size: "md",
@@ -744,7 +1016,9 @@ export const BADGE_GROUPS = {
     shape: "pill",
     size: "sm",
     values: {
-      global: { variant: "primary-soft" },
+      global: { variant: "primary-soft", labelKey: "components.badge.variableScope.global" },
+      // `tabs` / `panels` always render a caller-supplied count slot ("3 Tabs"),
+      // so they carry colour only — no registry text to translate.
       tabs: { variant: "primary-outline" },
       panels: { variant: "primary-outline" },
     },
@@ -795,10 +1069,10 @@ export const BADGE_GROUPS = {
     shape: "pill",
     size: "md",
     values: {
-      true: { variant: "primary", label: "Normalized" },
-      false: { variant: "default", label: "Not Normalized" },
+      true: { variant: "primary", labelKey: "components.badge.normalizeState.true" },
+      false: { variant: "default", labelKey: "components.badge.normalizeState.false" },
     },
-    fallback: { variant: "default", label: "Not Normalized" },
+    fallback: { variant: "default", labelKey: "components.badge.normalizeState.fallback" },
   },
 
   // Field diff status (ImportSemanticGroups modification compare) — a proposed
@@ -910,8 +1184,12 @@ export const BADGE_GROUPS = {
     mode: "icon",
     shape: "pill",
     values: {
-      file: { variant: "blue-soft", icon: "description" },
-      url: { variant: "teal-soft", icon: "cloud" },
+      file: {
+        variant: "blue-soft",
+        icon: "description",
+        labelKey: "components.badge.enrichmentType.file",
+      },
+      url: { variant: "teal-soft", icon: "cloud", labelKey: "components.badge.enrichmentType.url" },
     },
   },
 
@@ -948,43 +1226,46 @@ export const BADGE_GROUPS = {
     mode: "dot",
     shape: "pill",
     values: {
-      true: { variant: "success-soft", label: "Yes" },
-      yes: { variant: "success-soft" },
-      enabled: { variant: "success-soft" },
-      on: { variant: "success-soft", label: "On" },
-      false: { variant: "default-soft", label: "No" },
-      no: { variant: "default-soft" },
-      disabled: { variant: "default-soft" },
-      off: { variant: "default-soft", label: "Off" },
+      true: { variant: "success-soft", labelKey: "components.badge.booleanState.yes" },
+      yes: { variant: "success-soft", labelKey: "components.badge.booleanState.yes" },
+      enabled: { variant: "success-soft", labelKey: "components.badge.booleanState.enabled" },
+      on: { variant: "success-soft", labelKey: "components.badge.booleanState.on" },
+      false: { variant: "default-soft", labelKey: "components.badge.booleanState.no" },
+      no: { variant: "default-soft", labelKey: "components.badge.booleanState.no" },
+      disabled: { variant: "default-soft", labelKey: "components.badge.booleanState.disabled" },
+      off: { variant: "default-soft", labelKey: "components.badge.booleanState.off" },
     },
   },
 
   // ── Tracing ───────────────────────────────────────────────────────────────
 
   // Span / trace status — dot.
+  // `OK` is the OTel status-code spec token and stays literal; the other two are
+  // display words.
   spanStatus: {
     mode: "dot",
     shape: "pill",
     values: {
-      ok: { variant: "success-soft", label: "OK" },
-      success: { variant: "success-soft" },
-      error: { variant: "error-soft", label: "Error" },
-      unset: { variant: "default-soft", label: "Unset" },
+      ok: { variant: "success-soft", label: raw("OK") },
+      success: { variant: "success-soft", labelKey: "common.success" },
+      error: { variant: "error-soft", labelKey: "common.error" },
+      unset: { variant: "default-soft", labelKey: "components.badge.spanStatus.unset" },
     },
   },
 
   // OpenTelemetry span kind — plain. Labels are the full words; consumers that
   // want the C/S/P/CO/I abbreviation should pass an explicit `label`.
+  // Deliberately NOT translated: these are the OTel SpanKind spec terms.
   spanKind: {
     mode: "plain",
     shape: "rounded",
     size: "xs",
     values: {
-      client: { variant: "blue-soft", label: "Client" },
-      server: { variant: "purple-soft", label: "Server" },
-      producer: { variant: "teal-soft", label: "Producer" },
-      consumer: { variant: "amber-soft", label: "Consumer" },
-      internal: { variant: "default-soft", label: "Internal" },
+      client: { variant: "blue-soft", label: raw("Client") },
+      server: { variant: "purple-soft", label: raw("Server") },
+      producer: { variant: "teal-soft", label: raw("Producer") },
+      consumer: { variant: "amber-soft", label: raw("Consumer") },
+      internal: { variant: "default-soft", label: raw("Internal") },
     },
   },
 
@@ -1012,10 +1293,10 @@ export const BADGE_GROUPS = {
     shape: "pill",
     size: "sm",
     values: {
-      remote: { variant: "teal-soft" },
-      code: { variant: "purple-soft" },
-      llmjudge: { variant: "blue-soft", label: "LLM Judge" },
-      llm: { variant: "blue-soft", label: "LLM Judge" },
+      remote: { variant: "teal-soft", labelKey: "components.badge.scorerType.remote" },
+      code: { variant: "purple-soft", labelKey: "components.badge.scorerType.code" },
+      llmjudge: { variant: "blue-soft", labelKey: "components.badge.scorerType.llmjudge" },
+      llm: { variant: "blue-soft", labelKey: "components.badge.scorerType.llm" },
     },
   },
 
@@ -1024,9 +1305,12 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "pill",
     values: {
-      categorical: { variant: "purple-soft" },
-      boolean: { variant: "teal-soft" },
-      numeric: { variant: "blue-soft" },
+      categorical: {
+        variant: "purple-soft",
+        labelKey: "components.badge.evalDataType.categorical",
+      },
+      boolean: { variant: "teal-soft", labelKey: "common.typeBoolean" },
+      numeric: { variant: "blue-soft", labelKey: "components.badge.evalDataType.numeric" },
     },
   },
 
@@ -1079,9 +1363,12 @@ export const BADGE_GROUPS = {
     mode: "dot",
     shape: "pill",
     values: {
-      completed: { variant: "success" },
-      failed: { variant: "error" },
-      processing: { variant: "primary" },
+      completed: { variant: "success", labelKey: "components.badge.enrichmentJobStatus.completed" },
+      failed: { variant: "error", labelKey: "components.badge.enrichmentJobStatus.failed" },
+      processing: {
+        variant: "primary",
+        labelKey: "components.badge.enrichmentJobStatus.processing",
+      },
     },
     fallback: { variant: "default" },
   },
@@ -1119,26 +1406,52 @@ export const BADGE_GROUPS = {
     mode: "icon",
     shape: "pill",
     values: {
-      pass: { variant: "success-soft", icon: "check-circle", label: "PASS" },
-      fail: { variant: "error-soft", icon: "cancel", label: "FAIL" },
-      unknown: { variant: "default-soft", icon: "help-outline", label: "Unknown" },
+      pass: {
+        variant: "success-soft",
+        icon: "check-circle",
+        labelKey: "components.badge.evaluationVerdict.pass",
+      },
+      fail: {
+        variant: "error-soft",
+        icon: "cancel",
+        labelKey: "components.badge.evaluationVerdict.fail",
+      },
+      unknown: {
+        variant: "default-soft",
+        icon: "help-outline",
+        labelKey: "components.badge.evaluationVerdict.unknown",
+      },
     },
     fallback: { variant: "default-soft", icon: "help-outline" },
   },
 
   // ── Anomaly detection ─────────────────────────────────────────────────────
 
+  // Field-value rarity (log-explorer anomaly profile): rarer = hotter colour.
+  fieldRarity: {
+    mode: "plain",
+    shape: "pill",
+    size: "sm",
+    values: {
+      anomalous: { variant: "error-soft" },
+      rare: { variant: "error-soft" },
+      uncommon: { variant: "warning-soft" },
+      common: { variant: "default-soft" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
   // Anomaly-detection job status — dot (soft variants for table density).
   anomalyStatus: {
     mode: "dot",
     shape: "pill",
     values: {
-      active: { variant: "success-soft" },
-      ready: { variant: "success-soft" },
-      training: { variant: "blue-soft" },
-      failed: { variant: "error-soft" },
-      waiting: { variant: "default-soft" },
-      disabled: { variant: "default-soft" },
+      active: { variant: "success-soft", labelKey: "components.badge.anomalyStatus.active" },
+      ready: { variant: "success-soft", labelKey: "components.badge.anomalyStatus.ready" },
+      training: { variant: "blue-soft", labelKey: "components.badge.anomalyStatus.training" },
+      failed: { variant: "error-soft", labelKey: "components.badge.anomalyStatus.failed" },
+      waiting: { variant: "default-soft", labelKey: "components.badge.anomalyStatus.waiting" },
+      disabled: { variant: "default-soft", labelKey: "components.badge.anomalyStatus.disabled" },
     },
   },
 
@@ -1149,10 +1462,10 @@ export const BADGE_GROUPS = {
     mode: "dot",
     shape: "pill",
     values: {
-      completed: { variant: "success-soft" },
-      inprogress: { variant: "blue-soft", label: "In Progress" },
-      pending: { variant: "warning-soft" },
-      failed: { variant: "error-soft" },
+      completed: { variant: "success-soft", labelKey: "components.badge.deletionStatus.completed" },
+      inprogress: { variant: "blue-soft", labelKey: "components.badge.deletionStatus.inprogress" },
+      pending: { variant: "warning-soft", labelKey: "components.badge.deletionStatus.pending" },
+      failed: { variant: "error-soft", labelKey: "components.badge.deletionStatus.failed" },
     },
     fallback: { variant: "default-soft" },
   },
@@ -1175,11 +1488,26 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "pill",
     values: {
-      rageclick: { variant: "warning-soft", label: "Rage Click" },
-      deadclick: { variant: "default-soft", label: "Dead Click" },
-      errorclick: { variant: "error-soft", label: "Error Click" },
-      ragetap: { variant: "warning-soft", label: "Rage Tap" },
-      errortap: { variant: "error-soft", label: "Error Tap" },
+      rageclick: {
+        variant: "warning-soft",
+        labelKey: "components.badge.frustrationEventType.rageclick",
+      },
+      deadclick: {
+        variant: "default-soft",
+        labelKey: "components.badge.frustrationEventType.deadclick",
+      },
+      errorclick: {
+        variant: "error-soft",
+        labelKey: "components.badge.frustrationEventType.errorclick",
+      },
+      ragetap: {
+        variant: "warning-soft",
+        labelKey: "components.badge.frustrationEventType.ragetap",
+      },
+      errortap: {
+        variant: "error-soft",
+        labelKey: "components.badge.frustrationEventType.errortap",
+      },
     },
   },
 
@@ -1208,38 +1536,121 @@ export const BADGE_GROUPS = {
     shape: "pill",
     values: {
       // ── firing states ──
-      firing: { variant: "error-soft", icon: "error-outline" },
-      anomaly: { variant: "error-soft", icon: "error-outline" },
+      firing: {
+        variant: "error-soft",
+        icon: "error-outline",
+        labelKey: "components.badge.alertState.firing",
+      },
+      anomaly: {
+        variant: "error-soft",
+        icon: "error-outline",
+        labelKey: "components.badge.alertState.anomaly",
+      },
       // Condition matched but delivery failed — still a firing state, flagged
       // distinctly so a broken destination is visible.
-      notifyfailed: { variant: "error-soft", icon: "sync-problem", label: "Notify Failed" },
+      notifyfailed: {
+        variant: "error-soft",
+        icon: "sync-problem",
+        labelKey: "components.badge.alertState.notifyfailed",
+      },
       // LEGACY: `completed` meant "the alert fired" for condition-bearing
       // modules. It is a firing state — the previous green rendering
       // contradicted both the backend and the timeline aggregation.
-      completed: { variant: "error-soft", icon: "error-outline", label: "Firing" },
+      completed: {
+        variant: "error-soft",
+        icon: "error-outline",
+        labelKey: "components.badge.alertState.firing",
+      },
 
       // ── non-firing states ──
-      normal: { variant: "success-soft", icon: "check-circle-outline" },
-      succeeded: { variant: "success-soft", icon: "check-circle-outline" },
+      // Explicit key, not the humanised (English-only) fallback: `conditionnotsatisfied`
+      // below is the same state and must resolve the same key in every locale.
+      normal: {
+        variant: "success-soft",
+        icon: "check-circle-outline",
+        labelKey: "components.badge.alertState.normal",
+      },
+      succeeded: {
+        variant: "success-soft",
+        icon: "check-circle-outline",
+        labelKey: "components.badge.alertState.succeeded",
+      },
       // LEGACY aliases for `normal`.
-      ok: { variant: "success-soft", icon: "check-circle-outline", label: "Ok" },
-      success: { variant: "success-soft", icon: "check-circle-outline" },
+      ok: {
+        variant: "success-soft",
+        icon: "check-circle-outline",
+        labelKey: "components.badge.alertState.ok",
+      },
+      success: {
+        variant: "success-soft",
+        icon: "check-circle-outline",
+        labelKey: "common.success",
+      },
       conditionnotsatisfied: {
         variant: "success-soft",
         icon: "check-circle-outline",
-        label: "Normal",
+        labelKey: "components.badge.alertState.normal",
       },
 
       // ── evaluation problems ──
-      error: { variant: "error-soft", icon: "cancel" },
-      failed: { variant: "error-soft", icon: "cancel" },
+      error: { variant: "error-soft", icon: "cancel", labelKey: "common.error" },
+      failed: {
+        variant: "error-soft",
+        icon: "cancel",
+        labelKey: "components.badge.alertState.failed",
+      },
 
       // ── neither ──
-      skipped: { variant: "warning-soft", icon: "block" },
-      flapping: { variant: "warning-soft", icon: "bolt", label: "Flapping" },
-      pending: { variant: "blue-soft", icon: "schedule" },
+      skipped: {
+        variant: "warning-soft",
+        icon: "block",
+        labelKey: "components.badge.alertState.skipped",
+      },
+      flapping: {
+        variant: "warning-soft",
+        icon: "bolt",
+        labelKey: "components.badge.alertState.flapping",
+      },
+      pending: {
+        variant: "blue-soft",
+        icon: "schedule",
+        labelKey: "components.badge.alertState.pending",
+      },
+
+      // ── acknowledged: someone owns a firing; blue keeps it apart from firing red and muted amber ──
+      acknowledged: {
+        variant: "blue-soft",
+        icon: "person",
+        labelKey: "components.badge.alertState.acknowledged",
+      },
+      // An ack, unack or take-over recorded as its own history row, not a run.
+      ackevent: {
+        variant: "default-soft",
+        icon: "person",
+        labelKey: "components.badge.alertState.ackevent",
+      },
     },
     fallback: { variant: "default-soft", icon: "help-outline" },
+  },
+
+  // Report run outcome — dot. "Sent" names the email, not the job; overdue/never/paused are list-only.
+  reportRunStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      succeeded: { variant: "success-soft", labelKey: "components.badge.reportRunStatus.sent" },
+      partial: { variant: "success-soft", labelKey: "components.badge.reportRunStatus.partial" },
+      cached: { variant: "blue-soft", labelKey: "components.badge.reportRunStatus.cached" },
+      error: { variant: "error-soft", labelKey: "components.badge.reportRunStatus.failed" },
+      skipped: { variant: "warning-soft", labelKey: "components.badge.reportRunStatus.skipped" },
+      overdue: { variant: "warning-soft", labelKey: "components.badge.reportRunStatus.overdue" },
+      unrecorded: {
+        variant: "default-soft",
+        labelKey: "components.badge.reportRunStatus.unrecorded",
+      },
+      paused: { variant: "default-soft", labelKey: "components.badge.reportRunStatus.paused" },
+    },
+    fallback: { variant: "default-soft" },
   },
 
   // Recent-event result (overview) — plain. Failed/Firing run hot (red), Error
@@ -1248,9 +1659,12 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "pill",
     values: {
-      failed: { variant: "error-soft" },
-      firing: { variant: "error-soft" },
-      error: { variant: "warning-soft" },
+      failed: { variant: "error-soft", labelKey: "components.badge.eventStatus.failed" },
+      firing: { variant: "error-soft", labelKey: "components.badge.eventStatus.firing" },
+      error: { variant: "warning-soft", labelKey: "common.error" },
+      // Same neutral tone the fallback gave it — declared explicitly so the word
+      // is translated rather than humanised from the raw value.
+      anomaly: { variant: "default-soft", labelKey: "components.badge.eventStatus.anomaly" },
     },
     fallback: { variant: "default-soft" },
   },
@@ -1282,10 +1696,11 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "pill",
     values: {
-      mcp: { variant: "primary-soft", label: "MCP" },
-      cli: { variant: "success-soft", label: "CLI" },
-      skill: { variant: "warning-soft" },
-      generic: { variant: "default-soft" },
+      // MCP / CLI are acronyms — identical in every locale.
+      mcp: { variant: "primary-soft", label: raw("MCP") },
+      cli: { variant: "success-soft", label: raw("CLI") },
+      skill: { variant: "warning-soft", labelKey: "components.badge.aiToolsetKind.skill" },
+      generic: { variant: "default-soft", labelKey: "components.badge.aiToolsetKind.generic" },
     },
     fallback: { variant: "default-soft" },
   },
@@ -1295,17 +1710,90 @@ export const BADGE_GROUPS = {
     mode: "dot",
     shape: "pill",
     values: {
-      verylow: { variant: "success-soft", label: "Very Low" },
-      low: { variant: "success-soft" },
-      medium: { variant: "warning-soft" },
-      high: { variant: "error-soft" },
-      veryhigh: { variant: "error-soft", label: "Very High" },
-      unknown: { variant: "default-soft" },
+      verylow: { variant: "success-soft", labelKey: "components.badge.cardinalityClass.verylow" },
+      low: { variant: "success-soft", labelKey: "components.badge.cardinalityClass.low" },
+      medium: { variant: "warning-soft", labelKey: "components.badge.cardinalityClass.medium" },
+      high: { variant: "error-soft", labelKey: "components.badge.cardinalityClass.high" },
+      veryhigh: { variant: "error-soft", labelKey: "components.badge.cardinalityClass.veryhigh" },
+      unknown: { variant: "default-soft", labelKey: "common.unknown" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // The two window-over-window states that are NOT a percentage. A fingerprint
+  // absent from the previous window has no delta at all, and rendering it as
+  // -100% would invert its meaning — so it gets a chip instead of a number.
+  // Both stay neutral: an arrival is not itself an alarm.
+  dbmDelta: {
+    mode: "plain",
+    shape: "rounded",
+    size: "xs",
+    values: {
+      new: { variant: "blue-soft" },
+      gone: { variant: "default-soft" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // Database engine, from the OTel `db.system` value. Identity colour, not
+  // severity — an engine is never "bad", so the palette is decorative-soft and
+  // each engine keeps one colour everywhere it appears. Unregistered engines
+  // fall through to the humanised generic chip, which is correct: `db.system`
+  // is an open vocabulary and a new engine must still render.
+  dbSystem: {
+    mode: "plain",
+    size: "xs",
+    values: {
+      postgresql: { variant: "blue-soft", label: raw("PostgreSQL") },
+      mysql: { variant: "orange-soft", label: raw("MySQL") },
+      mariadb: { variant: "orange-soft", label: raw("MariaDB") },
+      mssql: { variant: "error-soft", label: raw("SQL Server") },
+      oracle: { variant: "error-soft", label: raw("Oracle") },
+      mongodb: { variant: "success-soft", label: raw("MongoDB") },
+      redis: { variant: "error-soft", label: raw("Redis") },
+      elasticsearch: { variant: "amber-soft", label: raw("Elasticsearch") },
+      cassandra: { variant: "indigo-soft", label: raw("Cassandra") },
+      clickhouse: { variant: "amber-soft", label: raw("ClickHouse") },
+      cockroachdb: { variant: "teal-soft", label: raw("CockroachDB") },
+      dynamodb: { variant: "blue-soft", label: raw("DynamoDB") },
+      sqlite: { variant: "default-soft", label: raw("SQLite") },
+      snowflake: { variant: "teal-soft", label: raw("Snowflake") },
+      spanner: { variant: "indigo-soft", label: raw("Spanner") },
     },
     fallback: { variant: "default-soft" },
   },
 
   // Service-graph latency/error delta vs baseline — plain.
+  // How far a shown number can be trusted. Only `gap` is red — it is the one
+  // state that means data is MISSING rather than approximate, and a tinted chip
+  // on every view would signal nothing.
+  dataConfidence: {
+    mode: "plain",
+    shape: "rounded",
+    size: "xs",
+    values: {
+      estimated: {
+        variant: "default-soft",
+        labelKey: "components.badge.dataConfidence.estimated",
+      },
+      topnsubset: {
+        variant: "amber-soft",
+        labelKey: "components.badge.dataConfidence.topNSubset",
+      },
+      live: { variant: "blue-soft", labelKey: "components.badge.dataConfidence.live" },
+      belowtopn: {
+        variant: "default-soft",
+        labelKey: "components.badge.dataConfidence.belowTopN",
+      },
+      truncated: {
+        variant: "amber-soft",
+        labelKey: "components.badge.dataConfidence.truncated",
+      },
+      gap: { variant: "error-soft", labelKey: "components.badge.dataConfidence.gap" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
   deltaTrend: {
     mode: "plain",
     shape: "rounded",
@@ -1324,13 +1812,14 @@ export const BADGE_GROUPS = {
     mode: "dot",
     shape: "pill",
     values: {
-      success: { variant: "success-soft" },
-      ok: { variant: "success-soft", label: "OK" },
-      error: { variant: "error-soft" },
-      timeout: { variant: "warning-soft" },
-      skipped: { variant: "default-soft" },
-      warn: { variant: "warning-soft" },
-      bad: { variant: "error-soft" },
+      success: { variant: "success-soft", labelKey: "common.success" },
+      // `OK` is a protocol token — same in every locale.
+      ok: { variant: "success-soft", label: raw("OK") },
+      error: { variant: "error-soft", labelKey: "common.error" },
+      timeout: { variant: "warning-soft", labelKey: "components.badge.evalRunStatus.timeout" },
+      skipped: { variant: "default-soft", labelKey: "components.badge.evalRunStatus.skipped" },
+      warn: { variant: "warning-soft", labelKey: "components.badge.evalRunStatus.warn" },
+      bad: { variant: "error-soft", labelKey: "components.badge.evalRunStatus.bad" },
     },
     fallback: { variant: "default-soft" },
   },
@@ -1340,8 +1829,8 @@ export const BADGE_GROUPS = {
     mode: "dot",
     shape: "pill",
     values: {
-      ok: { variant: "success-soft", label: "Ok" },
-      error: { variant: "error-soft", label: "Error" },
+      ok: { variant: "success-soft", labelKey: "components.badge.sessionStatus.ok" },
+      error: { variant: "error-soft", labelKey: "components.badge.sessionStatus.error" },
     },
     fallback: { variant: "default-soft" },
   },
@@ -1350,12 +1839,12 @@ export const BADGE_GROUPS = {
     mode: "dot",
     shape: "pill",
     class: "!bg-transparent !p-0 !ring-0",
+    // Keys are the Quality API `status` values (`no_data` normalises to `nodata`).
     values: {
-      healthy: { variant: "success-soft" },
-      warn: { variant: "warning-soft" },
-      unhealthy: { variant: "error-soft" },
-      nothreshold: { variant: "default-soft", label: "No Threshold" },
-      nodata: { variant: "default-soft", label: "No Data" },
+      attention: { variant: "error-soft", labelKey: "components.badge.qualityStatus.attention" },
+      healthy: { variant: "success-soft", labelKey: "components.badge.qualityStatus.healthy" },
+      unset: { variant: "default-soft", labelKey: "components.badge.qualityStatus.unset" },
+      nodata: { variant: "default-soft", labelKey: "components.badge.qualityStatus.nodata" },
     },
     fallback: { variant: "default-soft" },
   },
@@ -1382,11 +1871,11 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "rounded",
     values: {
-      view: { variant: "blue-soft" },
-      action: { variant: "purple-soft" },
-      error: { variant: "error-soft" },
-      resource: { variant: "teal-soft" },
-      longtask: { variant: "warning-soft", label: "Long Task" },
+      view: { variant: "blue-soft", labelKey: "components.badge.rumEventType.view" },
+      action: { variant: "purple-soft", labelKey: "components.badge.rumEventType.action" },
+      error: { variant: "error-soft", labelKey: "common.error" },
+      resource: { variant: "teal-soft", labelKey: "components.badge.rumEventType.resource" },
+      longtask: { variant: "warning-soft", labelKey: "components.badge.rumEventType.longtask" },
     },
     fallback: { variant: "default-soft" },
   },
@@ -1396,8 +1885,8 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "pill",
     values: {
-      stream: { variant: "primary-soft", label: "Stream" },
-      global: { variant: "default-soft", label: "Global" },
+      stream: { variant: "primary-soft", labelKey: "components.badge.crossLinkSource.stream" },
+      global: { variant: "default-soft", labelKey: "components.badge.crossLinkSource.global" },
     },
     fallback: { variant: "default-soft" },
   },
@@ -1407,9 +1896,15 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "pill",
     values: {
-      free: { variant: "default-soft" },
-      payasyougo: { variant: "blue-soft", label: "Pay as you go" },
-      enterprise: { variant: "purple-soft" },
+      free: { variant: "default-soft", labelKey: "components.badge.subscriptionPlan.free" },
+      payasyougo: {
+        variant: "blue-soft",
+        labelKey: "components.badge.subscriptionPlan.payasyougo",
+      },
+      enterprise: {
+        variant: "purple-soft",
+        labelKey: "components.badge.subscriptionPlan.enterprise",
+      },
     },
     fallback: { variant: "default-soft" },
   },
@@ -1420,12 +1915,13 @@ export const BADGE_GROUPS = {
     shape: "pill",
     size: "sm",
     values: {
-      http: { variant: "blue-soft", label: "HTTP" },
-      browser: { variant: "purple-soft", label: "Browser" },
-      api: { variant: "success-soft", label: "API" },
-      tcp: { variant: "orange-soft", label: "TCP" },
-      ping: { variant: "default-soft", label: "Ping" },
-      dns: { variant: "amber-soft", label: "DNS" },
+      // HTTP / API / TCP / DNS are protocol acronyms — identical in every locale.
+      http: { variant: "blue-soft", label: raw("HTTP") },
+      browser: { variant: "purple-soft", labelKey: "components.badge.syntheticType.browser" },
+      api: { variant: "success-soft", label: raw("API") },
+      tcp: { variant: "orange-soft", label: raw("TCP") },
+      ping: { variant: "default-soft", labelKey: "components.badge.syntheticType.ping" },
+      dns: { variant: "amber-soft", label: raw("DNS") },
     },
   },
 
@@ -1434,11 +1930,12 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "pill",
     values: {
-      payasyougo: { variant: "primary-soft", labelKey: "billing.aiModePayAsYouGo" },
-      exhausted: { variant: "error-soft", labelKey: "billing.aiModeExhausted" },
-      free: { variant: "success-soft", labelKey: "billing.aiModeFree" },
+      payasyougo: { variant: "primary-soft", labelKey: "paidUsage.modePayAsYouGo" },
+      consentrequired: { variant: "warning-soft", labelKey: "paidUsage.modeConsentRequired" },
+      exhausted: { variant: "error-soft", labelKey: "paidUsage.modeExhausted" },
+      free: { variant: "success-soft", labelKey: "paidUsage.modeFree" },
     },
-    fallback: { variant: "success-soft", labelKey: "billing.aiModeFree" },
+    fallback: { variant: "default-soft", labelKey: "paidUsage.modeUnknown" },
   },
 
   // Billing-group member status — dot, PILL. i18n labels.
@@ -1458,10 +1955,13 @@ export const BADGE_GROUPS = {
     shape: "pill",
     class: "px-3 py-2",
     values: {
-      aws: { variant: "success-soft", label: "AWS Marketplace" },
-      azure: { variant: "success-soft", label: "Azure Marketplace" },
-      stripe: { variant: "default-soft", label: "Stripe" },
-      contract: { variant: "default-soft", label: "Contract" },
+      aws: { variant: "success-soft", labelKey: "components.badge.billingManagement.aws" },
+      azure: { variant: "success-soft", labelKey: "components.badge.billingManagement.azure" },
+      stripe: { variant: "default-soft", label: raw("Stripe") },
+      contract: {
+        variant: "default-soft",
+        labelKey: "components.badge.billingManagement.contract",
+      },
     },
     fallback: { variant: "default-soft" },
   },
@@ -1472,9 +1972,17 @@ export const BADGE_GROUPS = {
     shape: "pill",
     size: "sm",
     values: {
-      applied: { variant: "success-soft", icon: "check-circle", label: "Applied" },
+      applied: {
+        variant: "success-soft",
+        icon: "check-circle",
+        labelKey: "components.badge.themeApplied.applied",
+      },
     },
-    fallback: { variant: "success-soft", icon: "check-circle", label: "Applied" },
+    fallback: {
+      variant: "success-soft",
+      icon: "check-circle",
+      labelKey: "components.badge.themeApplied.fallback",
+    },
   },
 
   // Feature flags — PILL, extra-small (compact BETA / HA / Coming Soon chips).
@@ -1483,9 +1991,67 @@ export const BADGE_GROUPS = {
     shape: "pill",
     size: "xs",
     values: {
-      beta: { variant: "primary-soft", label: "BETA" },
-      ha: { variant: "primary-soft", label: "HA" },
-      comingsoon: { variant: "default-soft", label: "Coming Soon" },
+      beta: { variant: "primary-soft", label: raw("BETA") },
+      ha: { variant: "primary-soft", label: raw("HA") },
+      comingsoon: { variant: "default-soft", labelKey: "components.badge.featureFlag.comingsoon" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // Fleet Manager rollout lifecycle — dot + soft colour, attention states run hot.
+  fleetRolloutStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      scheduled: { variant: "default-soft", labelKey: "fleet.badge.scheduled" },
+      inprogress: { variant: "primary-soft", labelKey: "fleet.badge.inProgress" },
+      completed: { variant: "success-soft", labelKey: "fleet.badge.completed" },
+      halted: { variant: "error-soft", labelKey: "fleet.badge.halted" },
+      superseded: { variant: "default-soft", labelKey: "fleet.badge.superseded" },
+      rolledback: { variant: "warning-soft", labelKey: "fleet.badge.rolledBack" },
+      // A completed rollout of an empty fleet; not a status the server sends.
+      empty: { variant: "default-soft", labelKey: "fleet.rollouts.noneTargeted" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // Fleet rollout batching — a category, so plain with one hue per kind.
+  fleetBatching: {
+    mode: "plain",
+    shape: "pill",
+    values: {
+      one: { variant: "default-soft", labelKey: "fleet.rollouts.oneBatch" },
+      canary: { variant: "amber-soft", labelKey: "fleet.badge.canary" },
+      progressive: { variant: "blue-soft", labelKey: "fleet.badge.progressive" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // Fleet Manager config delivery — the one vocabulary for a collector's config lifecycle.
+  fleetDelivery: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      assigned: { variant: "default-soft", labelKey: "fleet.delivery.assigned" },
+      sent: { variant: "blue-soft", labelKey: "fleet.delivery.sent" },
+      accepted: { variant: "teal-soft", labelKey: "fleet.delivery.accepted" },
+      running: { variant: "success-soft", labelKey: "fleet.delivery.running" },
+      rejected: { variant: "error-soft", labelKey: "fleet.delivery.rejected" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  slackInstallStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      healthy: { variant: "success-soft", labelKey: "components.badge.slackInstallStatus.healthy" },
+      degraded: {
+        variant: "warning-soft",
+        labelKey: "components.badge.slackInstallStatus.degraded",
+      },
+      pending: { variant: "blue-soft", labelKey: "components.badge.slackInstallStatus.pending" },
+      revoked: { variant: "error-soft", labelKey: "components.badge.slackInstallStatus.revoked" },
     },
     fallback: { variant: "default-soft" },
   },
@@ -1495,10 +2061,10 @@ export type BadgeGroupName = keyof typeof BADGE_GROUPS;
 
 export interface ResolvedBadge {
   variant: BadgeVariant;
-  label: string;
+  label: I18nText;
   /** i18n key for the label, if the matched value declared one. `OTag`
    *  translates this when no explicit `label` is supplied. */
-  labelKey?: string;
+  labelKey?: I18nKey;
   icon?: string;
   dot: boolean;
   mode: BadgeRenderMode;
@@ -1524,7 +2090,8 @@ export function resolveBadge(
   group: BadgeGroupName | string | undefined,
   value: unknown,
 ): ResolvedBadge {
-  const raw = String(value ?? "").trim();
+  // `raw` is the imported i18n opt-out, so the local value keeps a distinct name.
+  const rawValue = String(value ?? "").trim();
   const key = normalizeKey(value);
   const cfg = group ? (BADGE_GROUPS as Record<string, BadgeGroupConfig>)[group] : undefined;
 
@@ -1533,7 +2100,7 @@ export function resolveBadge(
     const generic = statusVariant(value);
     return {
       variant: generic.variant,
-      label: raw ? humanize(raw) : "—",
+      label: raw(rawValue ? humanize(rawValue) : "—"),
       dot: true,
       mode: "dot",
     };
@@ -1544,7 +2111,7 @@ export function resolveBadge(
 
   return {
     variant: entry.variant,
-    label: entry.label ?? (raw ? humanize(raw) : "—"),
+    label: entry.label ?? raw(rawValue ? humanize(rawValue) : "—"),
     labelKey: entry.labelKey,
     icon: mode === "icon" ? entry.icon : undefined,
     dot: entry.dot ?? mode === "dot",
@@ -1554,6 +2121,20 @@ export function resolveBadge(
     shape: cfg.shape,
     class: cfg.class,
   };
+}
+
+/**
+ * The label `OTag` would render, for callers that use `<OBadge>` directly.
+ *
+ * `resolveBadge().label` deliberately does NOT resolve `labelKey` — it returns
+ * the literal label or the humanised value. Reading `.label` straight from it
+ * therefore renders English even when the entry has a `labelKey`. This applies
+ * the same precedence OTag does (labelKey → literal label → humanised), so the
+ * two paths cannot drift.
+ */
+export function resolveBadgeLabel(group: string, value: unknown): I18nText {
+  const resolved = resolveBadge(group, value);
+  return resolved.labelKey ? (translateBadgeLabel(resolved.labelKey) as I18nText) : resolved.label;
 }
 
 /** Generic single-value fallback derived from the semantic engine. */

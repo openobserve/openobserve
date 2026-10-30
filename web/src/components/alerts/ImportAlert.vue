@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <BaseImport
     ref="baseImportRef"
-    title="Import Alert"
+    :title="t('alerts.importAlertTitle')"
     test-prefix="alert"
     class="min-h-0 flex-1"
     :is-importing="isAlertImporting"
@@ -27,8 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Custom URL Input Section with Folder Dropdown -->
     <template #url-input-section="{ url, updateUrl }">
-      <div class="my-[0.725rem] flex items-end gap-2">
-        <div class="w-[69%]">
+      <div class="my-[0.725rem] flex items-end gap-2 max-md:flex-wrap">
+        <div class="w-[69%] max-md:w-full">
           <OInput
             data-test="alert-import-url-input"
             :model-value="url"
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div class="w-[30%]" data-test="alert-folder-dropdown">
+        <div class="w-[30%] max-md:w-full" data-test="alert-folder-dropdown">
           <SelectFolderDropDown
             :type="'alerts'"
             @folder-selected="updateActiveFolderId"
@@ -50,8 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Custom File Input Section with Folder Dropdown -->
     <template #file-input-section="{ jsonFiles, updateFiles }">
-      <div class="mb-1 flex w-[calc(100%-0.625rem)] items-start gap-2">
-        <div class="w-[69%]">
+      <div class="mb-1 flex w-[calc(100%-0.625rem)] items-start gap-2 max-md:flex-wrap">
+        <div class="w-[69%] max-md:w-full">
           <OFile
             data-test="alert-import-json-file-input"
             :model-value="jsonFiles"
@@ -60,11 +60,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             accept=".json"
             multiple
             drop-zone
-            help-text=".json files only"
+            :help-text="t('alerts.jsonFilesOnlyHint')"
             size="md"
           />
         </div>
-        <div class="w-[30%]">
+        <div class="w-[30%] max-md:w-full">
           <SelectFolderDropDown
             :type="'alerts'"
             @folder-selected="updateActiveFolderId"
@@ -76,15 +76,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Output Section with Alert-specific Error Display -->
     <template #output-content>
-      <div class="border-border-default flex h-full w-full min-w-100 flex-col border-l">
+      <div
+        class="border-border-default flex h-full w-full min-w-100 flex-col border-s max-md:min-w-0"
+      >
         <div
           v-if="alertErrorsToDisplay.length > 0"
           class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
         >
-          Error Validations
+          {{ t("dashboard.importDashboardPage.errorValidations") }}
         </div>
         <div v-else class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold">
-          Output Messages
+          {{ t("alerts.outputMessages") }}
         </div>
         <OSeparator class="mt-1 shrink-0" />
         <div class="error-report-container min-h-0 flex-1 resize-none overflow-auto">
@@ -114,9 +116,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OInput
                         data-test="alert-import-name-input"
                         :model-value="userSelectedAlertName[index] || ''"
-                        :label="t('alerts.name') + ' *'"
+                        :label="raw(t('alerts.name') + ' *')"
                         :error="!userSelectedAlertName[index]?.toString().trim()"
-                        error-message="Field is required!"
+                        :error-message="t('alerts.validation.fieldRequired')"
                         @update:model-value="
                           (val) => {
                             userSelectedAlertName[index] = val as string;
@@ -139,10 +141,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="alert-import-stream-name-input"
                         :model-value="userSelectedStreamName[index] || ''"
                         :options="streamList"
-                        :label="t('alerts.stream_name') + ' *'"
+                        :label="raw(t('alerts.stream_name') + ' *')"
                         searchable
                         :error="!userSelectedStreamName[index]"
-                        error-message="Field is required!"
+                        :error-message="t('alerts.validation.fieldRequired')"
                         @update:model-value="
                           (val) => {
                             userSelectedStreamName[index] = val as string;
@@ -164,13 +166,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="alert-import-destination-name-input"
                         :model-value="userSelectedDestinations[index] || []"
                         :options="filteredDestinations"
-                        label="Destinations *"
+                        :label="t('alerts.destinationsLabel')"
+                        :placeholder="t('alerts.summary.noDestination')"
+                        :help-text="
+                          userSelectedDestinations[index]?.length
+                            ? undefined
+                            : t('alerts.alertSettings.noDestinationNote')
+                        "
                         multiple
                         searchable
                         @search="filterDestinations"
                         class="w-75!"
-                        :error="!userSelectedDestinations[index]?.length"
-                        error-message="Field is required!"
                         @update:model-value="
                           (val) => {
                             userSelectedDestinations[index] = val as string[];
@@ -192,10 +198,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="alert-import-stream-type-input"
                         :model-value="userSelectedStreamType[index] || ''"
                         :options="streamTypes"
-                        :label="t('alerts.streamType') + ' *'"
+                        :label="raw(t('alerts.streamType') + ' *')"
                         class="w-75!"
                         :error="!userSelectedStreamType[index]"
-                        error-message="Field is required!"
+                        :error-message="t('alerts.validation.fieldRequired')"
                         @update:model-value="
                           (val) => {
                             userSelectedStreamType[index] = val as string;
@@ -214,13 +220,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OSelect
                         data-test="alert-import-timezone-input"
                         :model-value="userSelectedTimezone[index] || ''"
-                        :options="filteredTimezone"
-                        label="Timezone *"
+                        :options="timezoneSelectOptions"
+                        :label="t('alerts.timezoneRequiredLabel')"
                         searchable
                         @search="timezoneFilterFn"
                         class="w-75!"
                         :error="!userSelectedTimezone[index]"
-                        error-message="Field is required!"
+                        :error-message="t('alerts.validation.fieldRequired')"
                         @update:model-value="
                           (val) => {
                             userSelectedTimezone[index] = val as string;
@@ -240,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="alert-import-org-id-input"
                         :model-value="userSelectedOrgId[index] || null"
                         :options="organizationDataList"
-                        label="Organization Id"
+                        :label="t('alerts.organizationIdLabel')"
                         labelKey="label"
                         valueKey="value"
                         @update:model-value="
@@ -256,18 +262,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </span>
 
-                  <span v-else>{{ errorMessage }}</span>
+                  <!-- Errors with no inline fix-up are pushed as plain strings, and must read as errors too. -->
+                  <span v-else class="text-status-negative">{{ errorMessage }}</span>
                 </div>
               </div>
             </div>
           </div>
 
           <div class="mb-2.5 p-2.5" v-if="alertCreators.length > 0">
-            <div
-              class="text-primary mb-2.5 text-base uppercase"
-              data-test="alert-import-creation-title"
-            >
-              Alert Creation
+            <div class="text-primary mb-2.5 text-base" data-test="alert-import-creation-title">
+              {{ t("alerts.alertCreationTitle") }}
             </div>
             <div
               class="error-list"
@@ -294,12 +298,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
+import { timezoneSearchText } from "@/utils/timezoneAliases";
 import { defineComponent, ref, onMounted, computed, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import alertsService from "../../services/alerts";
-import anomalyDetectionService from "../../services/anomaly_detection";
+import { saveAnomalyConfigMutation } from "@/services/anomaly_detection.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query";
 import useStreams from "@/composables/useStreams";
 import BaseImport from "../common/BaseImport.vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
@@ -313,7 +321,9 @@ import {
   convertV0ToV2,
   convertV1ToV2,
   convertV1BEToV2,
+  ensureUnaryConditionValues,
 } from "@/utils/alerts/alertDataTransforms";
+import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
 
 export default defineComponent({
   name: "ImportAlert",
@@ -347,19 +357,19 @@ export default defineComponent({
   setup(props, { emit }) {
     type ErrorMessage = {
       field: string;
-      message: string;
+      message: I18nText;
     };
     type alertCreator = {
-      message: string;
+      message: I18nText;
       success: boolean;
     }[];
 
     type AlertErrors = (ErrorMessage | string)[][];
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
 
-    const { getStreams } = useStreams();
+    const { getStreams } = useStreams(t);
 
     const baseImportRef = ref<any>(null);
     const alertErrorsToDisplay = ref<AlertErrors>([]);
@@ -386,6 +396,12 @@ export default defineComponent({
       },
     });
     const streamTypes = ["logs", "metrics", "traces"];
+    const anomalyOrgId = useOrgId();
+    // The anomaly import branch is a create; the mutation drops the anomaly scope.
+    const createAnomalyConfig = useMutation(() =>
+      saveAnomalyConfigMutation(anomalyOrgId.value, () => undefined),
+    );
+
     const selectedFolderId = ref<any>(
       props.folderId || router.currentRoute.value.query.folder || "default",
     );
@@ -400,7 +416,7 @@ export default defineComponent({
     const organizationDataList = computed(() => {
       return store.state.organizations.map((org: any) => {
         return {
-          label: org.identifier,
+          label: raw(org.identifier),
           value: org.identifier,
           disabled:
             !org.identifier || org.identifier !== store.state.selectedOrganization.identifier,
@@ -427,18 +443,20 @@ export default defineComponent({
 
     const userSelectedTimezone = ref<string[]>([]);
 
-    // @ts-ignore
-    let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz: any) => {
-      return tz;
-    });
-    const filteredTimezone = ref<any>([]);
-    filteredTimezone.value = [...timezoneOptions];
+    const {
+      browserTz,
+      browserTimeValue: browserTime,
+      zones: timezoneOptions,
+    } = useTimezoneOptions({ browserEntry: true });
+    const filteredTimezone = ref<any>([...timezoneOptions.value]);
 
-    const browserTime = "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
-
-    // Add the UTC option
-    timezoneOptions.unshift("UTC");
-    timezoneOptions.unshift(browserTime);
+    const timezoneSelectOptions = computed(() =>
+      (filteredTimezone.value as string[]).map((tz: string) =>
+        tz === browserTime
+          ? { label: t("common.browserTimeWithZone", { zone: browserTz }), value: tz }
+          : { label: raw(tz), value: tz, searchText: timezoneSearchText(tz) },
+      ),
+    );
 
     const updateUserSelectedDestinations = (destinations: string[], index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
@@ -482,7 +500,7 @@ export default defineComponent({
       try {
         // Check if jsonStr is empty or null
         if (!jsonString || jsonString.trim() === "") {
-          throw new Error("JSON string is empty");
+          throw new Error(t("alerts.import.jsonStringEmpty"));
         }
 
         const parsedJson = JSON.parse(jsonString);
@@ -491,11 +509,11 @@ export default defineComponent({
       } catch (e: any) {
         toast({
           variant: "error",
-          message: e.message || "Invalid JSON format",
+          message: e.message || t("alerts.import.invalidJsonFormat"),
         });
         // Reset BaseImport's importing flag on validation error
         if (baseImportRef.value) {
-          baseImportRef.value.isImporting = false;
+          baseImportRef.value.isImportingLocal = false;
         }
         return;
       }
@@ -514,7 +532,9 @@ export default defineComponent({
       if (allAlertsCreated) {
         toast({
           variant: "success",
-          message: "Alert(s) imported successfully",
+          message: t("toastMessages.alerts.alertsImportedSuccessfully", {
+            count: jsonArrayOfObj.value.length,
+          }),
         });
 
         // Delay navigation to allow Monaco editor to complete all debounced operations
@@ -534,45 +554,54 @@ export default defineComponent({
 
       // Reset BaseImport's importing flag
       if (baseImportRef.value) {
-        baseImportRef.value.isImporting = false;
+        baseImportRef.value.isImportingLocal = false;
       }
     };
 
     const importAnomalyConfig = async (jsonObj: any, index: number) => {
       try {
-        const org = store.state.selectedOrganization.identifier;
         // Convert the exported anomaly config (GET format) back to the create (POST) format.
         const payload: any = {
           alert_type: "anomaly_detection",
           name: jsonObj.name,
           stream_name: jsonObj.stream_name,
           stream_type: jsonObj.stream_type,
-          destinations: [],
+          // Destinations ride the flattened Alert; nested in anomaly_config they are dropped unread.
+          destinations: jsonObj.alert_destinations ?? [],
           anomaly_config: {
             detection_function: jsonObj.detection_function,
             histogram_interval: jsonObj.histogram_interval,
             schedule_interval: jsonObj.schedule_interval,
             detection_window_seconds: jsonObj.detection_window_seconds,
             training_window_days: jsonObj.training_window_days,
-            retrain_interval_days: jsonObj.retrain_interval_days ?? 0,
-            threshold: jsonObj.threshold,
-            seasonality: jsonObj.seasonality ?? "none",
+            // Absent must mean the create path's default, not the operator's explicit "Never" (0).
+            retrain_interval_days: jsonObj.retrain_interval_days ?? 7,
+            threshold: jsonObj.threshold ?? 97,
             query_mode: jsonObj.query_mode ?? "filters",
             filters: jsonObj.filters ?? [],
             custom_sql: jsonObj.custom_sql ?? "",
-            alert_destinations: jsonObj.alert_destinations ?? [],
             alert_enabled: jsonObj.alert_enabled ?? true,
           },
         };
-        await anomalyDetectionService.create(org, payload);
+        // This branch returns before the regular path's refresh below, so it emits its own.
+        await createAnomalyConfig.mutateAsync({
+          payload,
+          folderId: selectedFolderId.value || "default",
+        });
         alertCreators.value.push({
-          message: `Anomaly Detection - ${index}: "${jsonObj.name}" imported successfully`,
+          message: t("alerts.import.anomalyImportSuccess", { index, name: jsonObj.name }),
           success: true,
         });
+        emit("update:alerts", store, selectedFolderId.value);
+        getActiveFolderAlerts(selectedFolderId.value);
         return true;
       } catch (e: any) {
         alertCreators.value.push({
-          message: `Anomaly Detection - ${index}: "${jsonObj.name}" import failed — ${e?.response?.data?.message || "Unknown Error"}`,
+          message: t("alerts.import.anomalyImportFailed", {
+            index,
+            name: jsonObj.name,
+            reason: e?.response?.data?.message || t("alerts.import.unknownError"),
+          }),
           success: false,
         });
         return false;
@@ -598,7 +627,7 @@ export default defineComponent({
       } catch (e: any) {
         toast({
           variant: "error",
-          message: "Error importing Alert(s) please check the JSON",
+          message: t("toastMessages.alerts.errorImportingAlertPleaseCheck"),
         });
         return false;
       }
@@ -606,12 +635,12 @@ export default defineComponent({
     };
 
     const validateAlertInputs = async (input: any, index: number) => {
-      let alertErrors: (string | { message: string; field: string })[] = [];
+      let alertErrors: (string | ErrorMessage)[] = [];
 
       // 1. Validate 'name' field
       if (!input.name || typeof input.name !== "string" || input.name.trim() === "") {
         alertErrors.push({
-          message: `Alert - ${index}: Name is mandatory and should be a valid string.`,
+          message: t("alerts.import.nameRequired", { index }),
           field: "alert_name",
         });
       }
@@ -624,7 +653,10 @@ export default defineComponent({
         input.org_id != store.state.selectedOrganization.identifier
       ) {
         alertErrors.push({
-          message: `Alert - ${index}: Organization Id is mandatory, should exist in organization list and should be equal to ${store.state.selectedOrganization.identifier}.`,
+          message: t("alerts.import.orgIdInvalid", {
+            index,
+            orgId: store.state.selectedOrganization.identifier,
+          }),
           field: "org_id",
         });
       }
@@ -633,7 +665,7 @@ export default defineComponent({
       const validStreamTypes = ["logs", "metrics", "traces"];
       if (!input.stream_type || !validStreamTypes.includes(input.stream_type)) {
         alertErrors.push({
-          message: `Alert - ${index}: Stream Type is mandatory and should be one of: 'logs', 'metrics', 'traces'.`,
+          message: t("alerts.import.streamTypeInvalid", { index }),
           field: "stream_type",
         });
       }
@@ -643,7 +675,7 @@ export default defineComponent({
         streamList.value = streamResponse.list.map((stream: any) => stream.name);
       } catch (e) {
         const err: any = {
-          message: `Alert - ${index}: Error fetching stream list. Please try again.`,
+          message: t("alerts.import.streamListFetchFailed", { index }),
           field: "stream_list",
         };
         alertErrors.push(err);
@@ -656,16 +688,14 @@ export default defineComponent({
         !streamList.value.includes(input.stream_name)
       ) {
         alertErrors.push({
-          message: `Alert - ${index}: Stream Name is mandatory, should exist in the stream list and should be a valid string.`,
+          message: t("alerts.import.streamNameInvalid", { index }),
           field: "stream_name",
         });
       }
 
       // 5. Validate 'is_real_time' field
       if (typeof input.is_real_time !== "boolean") {
-        alertErrors.push(
-          `Alert - ${index}: Is Real-Time is mandatory and should be a boolean value.`,
-        );
+        alertErrors.push(t("alerts.import.isRealTimeBoolean", { index }));
       }
 
       // 6. Validate 'query_condition' field
@@ -674,17 +704,19 @@ export default defineComponent({
           if (item.filterType === "group") {
             // V2 group - validate it has conditions array
             if (!Array.isArray(item.conditions)) {
-              alertErrors.push(`Alert - ${index}: V2 group must have a conditions array.`);
+              alertErrors.push(t("alerts.import.v2GroupConditionsArray", { index }));
               return false;
             }
             // Recursively validate nested conditions
             return item.conditions.every((nestedItem: any) => validateV2Condition(nestedItem));
           } else if (item.filterType === "condition") {
             // V2 condition - validate required fields
-            if (!item.column || !item.operator || item.value === undefined) {
-              alertErrors.push(
-                `Alert - ${index}: V2 condition must have column, operator, and value.`,
-              );
+            if (
+              !item.column ||
+              !item.operator ||
+              (item.value === undefined && !isUnaryOperator(item.operator))
+            ) {
+              alertErrors.push(t("alerts.import.v2ConditionFieldsRequired", { index }));
               return false;
             }
             // Validate operator for custom type
@@ -701,10 +733,11 @@ export default defineComponent({
                 "NotContains",
                 "contains",
                 "not_contains",
-              ].includes(item.operator)
+              ].includes(item.operator) &&
+              !isUnaryOperator(item.operator)
             ) {
               alertErrors.push(
-                `Alert - ${index}: Invalid operator '${item.operator}'. Allowed: '=', '!=', '>', '<', '>=', '<=', 'Contains', 'NotContains'.`,
+                t("alerts.import.invalidOperator", { index, operator: item.operator }),
               );
               return false;
             }
@@ -715,7 +748,11 @@ export default defineComponent({
 
         const validateV1Condition = (condition: any) => {
           // Check if it's a simple condition (V0/V1 format)
-          if (condition.column && condition.operator && condition.value !== undefined) {
+          if (
+            condition.column &&
+            condition.operator &&
+            (condition.value !== undefined || isUnaryOperator(condition.operator))
+          ) {
             if (
               input.query_condition.type === "custom" &&
               ![
@@ -729,11 +766,10 @@ export default defineComponent({
                 "NotContains",
                 "contains",
                 "not_contains",
-              ].includes(condition.operator)
+              ].includes(condition.operator) &&
+              !isUnaryOperator(condition.operator)
             ) {
-              alertErrors.push(
-                `Alert - ${index}: Invalid operator in query condition. Allowed operators: '=', '!=', '>', '<', '>=', '<=', 'Contains', 'NotContains'.`,
-              );
+              alertErrors.push(t("alerts.import.invalidQueryConditionOperator", { index }));
             }
             return;
           }
@@ -742,7 +778,7 @@ export default defineComponent({
           if (condition.and || condition.or) {
             const conditions = condition.and || condition.or;
             if (!Array.isArray(conditions)) {
-              alertErrors.push(`Alert - ${index}: 'and'/'or' conditions must be an array.`);
+              alertErrors.push(t("alerts.import.andOrConditionsArray", { index }));
               return;
             }
             conditions.forEach(validateV1Condition);
@@ -750,9 +786,7 @@ export default defineComponent({
           }
 
           // If neither a simple condition nor a nested condition
-          alertErrors.push(
-            `Alert - ${index}: Invalid condition format. Must have either column/operator/value or and/or operators.`,
-          );
+          alertErrors.push(t("alerts.import.invalidConditionFormat", { index }));
         };
 
         let conditionsToValidate = input.query_condition.conditions;
@@ -767,10 +801,12 @@ export default defineComponent({
         if (Array.isArray(conditionsToValidate)) {
           // V0 format - flat array of conditions
           conditionsToValidate.forEach((condition: any) => {
-            if (!condition.column || !condition.operator || condition.value === undefined) {
-              alertErrors.push(
-                `Alert - ${index}: Each query condition must have 'column', 'operator', and 'value'.`,
-              );
+            if (
+              !condition.column ||
+              !condition.operator ||
+              (condition.value === undefined && !isUnaryOperator(condition.operator))
+            ) {
+              alertErrors.push(t("alerts.import.queryConditionFieldsRequired", { index }));
             }
           });
         } else if (conditionsToValidate.filterType === "group") {
@@ -781,19 +817,19 @@ export default defineComponent({
           validateV1Condition(conditionsToValidate);
         } else {
           // Unknown format
-          alertErrors.push(`Alert - ${index}: Unrecognized query condition format.`);
+          alertErrors.push(t("alerts.import.unrecognizedQueryConditionFormat", { index }));
         }
       }
       // 7. Validate 'sql' and 'promql'
       if (input.query_condition.type === "sql" && typeof input.query_condition.sql !== "string") {
-        alertErrors.push(`Alert - ${index}: SQL should be provided when the type is 'sql'.`);
+        alertErrors.push(t("alerts.import.sqlRequired", { index }));
       }
 
       if (
         input.query_condition.type === "promql" &&
         typeof input.query_condition.promql !== "string"
       ) {
-        alertErrors.push(`Alert - ${index}: PromQL should be provided when the type is 'promql'.`);
+        alertErrors.push(t("alerts.import.promqlRequired", { index }));
       }
 
       // 8. Validate 'vrl_function'
@@ -801,7 +837,7 @@ export default defineComponent({
         input.query_condition.vrl_function &&
         typeof input.query_condition.vrl_function !== "string"
       ) {
-        alertErrors.push(`Alert - ${index}: VRL function should be a string or null.`);
+        alertErrors.push(t("alerts.import.vrlFunctionString", { index }));
       }
 
       // 9. Validate 'multi_time_range'
@@ -811,29 +847,25 @@ export default defineComponent({
         (!Array.isArray(input.query_condition.multi_time_range) ||
           input.query_condition.multi_time_range.length > 0)
       ) {
-        alertErrors.push(`Alert - ${index}: Multi Time Range should be an empty array or null.`);
+        alertErrors.push(t("alerts.import.multiTimeRangeEmpty", { index }));
       }
 
       // 10. Validate 'trigger_condition'
       const triggerCondition = input.trigger_condition;
       if (!triggerCondition) {
-        alertErrors.push(`Alert - ${index}: Trigger Condition is required.`);
+        alertErrors.push(t("alerts.import.triggerConditionRequired", { index }));
       }
       if (
         isNaN(Number(triggerCondition.period)) ||
         triggerCondition.period < 1 ||
         typeof triggerCondition.period !== "number"
       ) {
-        alertErrors.push(
-          `Alert - ${index}: Period should be a positive number greater than 0 and should be a number.`,
-        );
+        alertErrors.push(t("alerts.import.periodPositiveNumber", { index }));
       }
 
       const validOperators = ["=", "!=", ">=", "<=", ">", "<", "Contains", "NotContains"];
       if (!validOperators.includes(triggerCondition.operator)) {
-        alertErrors.push(
-          `Alert - ${index}: Operator should be one of: '=', '!=', '>=', '<=', '>', '<', 'Contains', 'NotContains'.`,
-        );
+        alertErrors.push(t("alerts.import.triggerOperatorInvalid", { index }));
       }
 
       if (
@@ -841,13 +873,11 @@ export default defineComponent({
         triggerCondition.frequency < 1 ||
         typeof triggerCondition.frequency !== "number"
       ) {
-        alertErrors.push(
-          `Alert - ${index}: Frequency should be a positive number greater than 0 and should be a number.`,
-        );
+        alertErrors.push(t("alerts.import.frequencyPositiveNumber", { index }));
       }
 
       if (triggerCondition.cron && typeof triggerCondition.cron !== "string") {
-        alertErrors.push(`Alert - ${index}: Cron expression should be a string.`);
+        alertErrors.push(t("alerts.import.cronExpressionString", { index }));
       }
 
       if (
@@ -855,9 +885,7 @@ export default defineComponent({
         triggerCondition.threshold < 1 ||
         typeof triggerCondition.threshold !== "number"
       ) {
-        alertErrors.push(
-          `Alert - ${index}: Threshold should be a positive number greater than 0 and should be a number.`,
-        );
+        alertErrors.push(t("alerts.import.thresholdPositiveNumber", { index }));
       }
 
       if (
@@ -865,9 +893,7 @@ export default defineComponent({
         triggerCondition.silence < 0 ||
         typeof triggerCondition.silence !== "number"
       ) {
-        alertErrors.push(
-          `Alert - ${index}: Silence should be a positive number greater than or equal to 0 and should be a number.`,
-        );
+        alertErrors.push(t("alerts.import.silenceNonNegativeNumber", { index }));
       }
 
       if (
@@ -875,35 +901,30 @@ export default defineComponent({
           triggerCondition.frequency_type !== "cron") ||
         typeof triggerCondition.frequency_type !== "string"
       ) {
-        alertErrors.push(
-          `Alert - ${index}: Frequency Type must be 'minutes' or 'cron' and should be a string.`,
-        );
+        alertErrors.push(t("alerts.import.frequencyTypeInvalid", { index }));
       }
 
       if (
         triggerCondition.frequency_type === "cron" &&
         (triggerCondition.cron.trim() === "" || typeof triggerCondition.cron !== "string")
       ) {
-        alertErrors.push(`Alert - ${index}: Cron expression should be a valid cron expression.`);
+        alertErrors.push(t("alerts.import.cronExpressionInvalid", { index }));
       }
 
-      if (
-        !input.destinations ||
-        !Array.isArray(input.destinations) ||
-        input.destinations.length === 0
-      ) {
+      // Absent or empty is valid; null is not, since the server reads it as a wrong type.
+      if (input.destinations !== undefined && !Array.isArray(input.destinations)) {
         alertErrors.push({
-          message: `Alert - ${index}: Destinations are required and should be an array.`,
+          message: t("alerts.import.destinationsArray", { index }),
           field: "destination_name",
         });
       }
 
       if (typeof input.enabled !== "boolean") {
-        alertErrors.push(`Alert - ${index}: Enabled should be Boolean.`);
+        alertErrors.push(t("alerts.import.enabledBoolean", { index }));
       }
 
       if (input.tz_offset && (typeof input.tz_offset !== "number" || input.tz_offset < 0)) {
-        alertErrors.push(`Alert - ${index}: Timezone offset should be a number.`);
+        alertErrors.push(t("alerts.import.tzOffsetNumber", { index }));
       }
 
       if (
@@ -912,19 +933,21 @@ export default defineComponent({
         input.trigger_condition.timezone === ""
       ) {
         alertErrors.push({
-          message: `Alert - ${index}: Timezone is required when frequency type is 'cron'.`,
+          message: t("alerts.import.timezoneRequiredForCron", { index }),
           field: "timezone",
         });
       }
 
-      input.destinations.forEach((destination: any) => {
-        if (!checkDestinationInList(props.destinations, destination)) {
-          alertErrors.push({
-            message: `Alert - ${index}: "${destination}" destination does not exist`,
-            field: "destination_name",
-          });
-        }
-      });
+      if (Array.isArray(input.destinations)) {
+        input.destinations.forEach((destination: any) => {
+          if (!checkDestinationInList(props.destinations, destination)) {
+            alertErrors.push({
+              message: t("alerts.import.destinationNotExist", { index, destination }),
+              field: "destination_name",
+            });
+          }
+        });
+      }
 
       // This condition is added to avoid the error when the updated_at is not a number
       if (typeof input.updated_at !== "number") {
@@ -933,6 +956,15 @@ export default defineComponent({
 
       // Log all alert errors at the end
       if (alertErrors.length > 0) {
+        // Show in the picker what a retry will import: the names this org has, or none.
+        // Otherwise the picker reads empty while the JSON still holds the failing value.
+        if (alertErrors.some((e: any) => e?.field === "destination_name")) {
+          const known = Array.isArray(input.destinations)
+            ? input.destinations.filter((d: any) => checkDestinationInList(props.destinations, d))
+            : [];
+          userSelectedDestinations.value[alertErrorsToDisplay.value.length] = known;
+          updateUserSelectedDestinations(known, index - 1);
+        }
         alertErrorsToDisplay.value.push(alertErrors);
         return false;
       }
@@ -991,7 +1023,7 @@ export default defineComponent({
         // Backend expects: query_condition: { conditions: { version: 2, conditions: {...} } }
         input.query_condition.conditions = {
           version: 2,
-          conditions: convertedConditions,
+          conditions: ensureUnaryConditionValues(convertedConditions),
         };
       }
 
@@ -1004,7 +1036,7 @@ export default defineComponent({
 
         // Success
         alertCreators.value.push({
-          message: `Alert - ${index}: "${input.name}" created successfully \nNote: please remove the created alert object ${input.name} from the json file`,
+          message: t("alerts.import.createSuccess", { index, name: input.name }),
           success: true,
         });
         // Emit update after each successful creation
@@ -1014,7 +1046,11 @@ export default defineComponent({
       } catch (error: any) {
         // Failure
         alertCreators.value.push({
-          message: `Alert - ${index}: "${input.name}" creation failed --> \n Reason: ${error?.response?.data?.message || "Unknown Error"}`,
+          message: t("alerts.import.createFailed", {
+            index,
+            name: input.name,
+            reason: error?.response?.data?.message || t("alerts.import.unknownError"),
+          }),
           success: false,
         });
         return false;
@@ -1076,12 +1112,12 @@ export default defineComponent({
 
     const timezoneFilterFn = (val: string) => {
       if (val === "") {
-        filteredTimezone.value = timezoneOptions;
+        filteredTimezone.value = timezoneOptions.value;
         return;
       }
       const needle = val.toLowerCase();
-      filteredTimezone.value = timezoneOptions.filter((timezone: string) =>
-        timezone.toLowerCase().includes(needle),
+      filteredTimezone.value = timezoneOptions.value.filter((timezone: string) =>
+        (timezoneSearchText(timezone) ?? timezone).toLowerCase().includes(needle),
       );
     };
 
@@ -1132,6 +1168,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       importJson,
       router,
       baseImportRef,
@@ -1158,6 +1195,7 @@ export default defineComponent({
       toggleDestination,
       userSelectedTimezone,
       filteredTimezone,
+      timezoneSelectOptions,
       updateTimezone,
       timezoneFilterFn,
       activeFolderId,

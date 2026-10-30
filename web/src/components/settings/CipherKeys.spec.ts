@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import CipherKeys from "./CipherKeys.vue";
@@ -27,20 +28,24 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 // Mock external services and components
-vi.mock("@/services/cipher_keys", () => ({
-  default: {
-    list: vi.fn(),
-    delete: vi.fn(),
-  },
-}));
+vi.mock("@/services/cipher_keys", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+      delete: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/segment_analytics", () => ({
+vi.mock("@/services/product_analytics", () => ({
   default: {
     track: vi.fn(),
   },
 }));
 
-vi.mock("@/utils/zincutils", () => ({
+vi.mock("@/utils/zincutils", async (importOriginal) => ({
+  ...(await importOriginal<any>()),
   convertToTitleCase: vi.fn((str) => str),
 }));
 
@@ -70,20 +75,6 @@ vi.mock("@/components/shared/grid/NoData.vue", () => ({
   default: {
     name: "NoData",
     template: "<div data-test='no-data'>No Data Available</div>",
-  },
-}));
-
-vi.mock("@/components/ConfirmDialog.vue", () => ({
-  default: {
-    name: "ConfirmDialog",
-    template: `<div data-test='confirm-dialog' v-if='modelValue'>
-      <div data-test='confirm-title'>{{ title }}</div>
-      <div data-test='confirm-message'>{{ message }}</div>
-      <button data-test='confirm-ok' @click='$emit("update:ok")'>OK</button>
-      <button data-test='confirm-cancel' @click='$emit("update:cancel")'>Cancel</button>
-    </div>`,
-    props: ["title", "message", "modelValue"],
-    emits: ["update:ok", "update:cancel", "update:modelValue"],
   },
 }));
 
@@ -196,6 +187,8 @@ const createWrapperAndWait = async (options = {}) => {
   return wrapper;
 };
 
+beforeEach(() => resetListViewState());
+
 describe("CipherKeys", () => {
   const mockCipherKeysData = {
     data: {
@@ -263,8 +256,8 @@ describe("CipherKeys", () => {
   describe("Data loading", () => {
     it("should populate table data after successful fetch", async () => {
       const wrapper = createWrapper();
-      await nextTick();
-      await wrapper.vm.$nextTick();
+      // The read resolves through the query cache, which needs more than one tick.
+      await flushPromises();
 
       expect(wrapper.vm.tabledata).toHaveLength(2);
       expect(wrapper.vm.tabledata[0]).toEqual({
@@ -272,7 +265,6 @@ describe("CipherKeys", () => {
         store_type: "env",
         mechanism_type: "aes",
       });
-      expect(wrapper.vm.resultTotal).toBe(2);
     });
 
     it("should handle fetch error gracefully", async () => {
@@ -425,6 +417,39 @@ describe("CipherKeys", () => {
 
       expect(wrapper.vm.confirmDelete.visible).toBe(true);
       expect(wrapper.vm.confirmDelete.data).toEqual(testRow);
+    });
+
+    it("names the key in bold in the real ConfirmDialog with a destructive OK", async () => {
+      const ODialogStub = {
+        name: "ODialog",
+        props: ["open", "title", "primaryButtonVariant"],
+        template: "<div data-test='o-dialog-stub'><slot /></div>",
+      };
+      const wrapper = mount(CipherKeys, {
+        global: {
+          plugins: [i18n, router],
+          mocks: { $store: mockStore, $router: router },
+          provide: { store: mockStore },
+          stubs: { AddCipherKey: true, ODialog: ODialogStub },
+        },
+      });
+      await wrapper.vm.confirmDeleteCipherKey({ name: "test-key-1" });
+      await nextTick();
+
+      const dialog = wrapper.findAllComponents({ name: "ConfirmDialog" })[0];
+      expect(dialog.props("okVariant")).toBe("destructive");
+      const name = dialog.find('[data-test="confirm-dialog-name"]');
+      expect(name.text()).toBe("test-key-1");
+      expect(name.classes()).toContain("font-semibold");
+      expect(dialog.text()).toContain("delete the test-key-1 cipher key?");
+      const bulkDialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find(
+          (c: any) =>
+            c.props("title") === i18n.global.t("settings.cipherKeysPage.deleteCipherKeysTitle"),
+        );
+      expect(bulkDialog!.props("okVariant")).toBe("destructive");
+      wrapper.unmount();
     });
 
     it("should hide confirmation dialog when cancel is clicked", async () => {
@@ -638,7 +663,6 @@ describe("CipherKeys", () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
 
       expect(wrapper.vm.tabledata).toHaveLength(0);
-      expect(wrapper.vm.resultTotal).toBe(0);
     });
 
     it("should handle deletion when no data is selected", async () => {
@@ -681,6 +705,43 @@ describe("CipherKeys", () => {
         // If data processing fails, component should handle it gracefully
         expect(wrapper.vm.tabledata).toHaveLength(0);
       }
+    });
+  });
+});
+
+describe("list view state", () => {
+  it("restores search, page size, page and sort from the saved view", async () => {
+    Object.assign(useListViewState("cipher-keys", {}), {
+      filterQuery: "abc",
+      pageSize: 50,
+      currentPage: 2,
+      sortBy: "name",
+      sortOrder: "desc",
+    });
+    const w: any = await createWrapperAndWait();
+    await flushPromises();
+    expect(w.vm.filterQuery).toBe("abc");
+    expect(w.vm.pageSize).toBe(50);
+    expect(w.vm.currentPage).toBe(2);
+    expect(w.vm.sortBy).toBe("name");
+    expect(w.vm.sortOrder).toBe("desc");
+    w.unmount();
+  });
+
+  it("saves list state so it survives unmount", async () => {
+    const w: any = await createWrapperAndWait();
+    await flushPromises();
+    w.vm.filterQuery = "xyz";
+    w.vm.pageSize = 100;
+    w.vm.sortBy = "name";
+    w.vm.sortOrder = "desc";
+    await flushPromises();
+    w.unmount();
+    expect(useListViewState("cipher-keys", {})).toMatchObject({
+      filterQuery: "xyz",
+      pageSize: 100,
+      sortBy: "name",
+      sortOrder: "desc",
     });
   });
 });

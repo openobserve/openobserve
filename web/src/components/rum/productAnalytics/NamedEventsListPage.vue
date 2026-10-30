@@ -1,0 +1,663 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<template>
+  <div class="flex h-full min-h-0 flex-col" data-test="rum-analytics-events-list">
+    <OBanner
+      v-if="permission === 'read'"
+      variant="warning"
+      dense
+      class="mx-page-edge mt-2"
+      :content="t('rum.analytics.events.readOnly')"
+      data-test="rum-analytics-named-events-read-only"
+    />
+    <OBanner
+      v-if="invalidCount > 0"
+      variant="warning"
+      dense
+      class="mx-page-edge mt-2"
+      :content="t('rum.analytics.events.unreadable', { count: invalidCount }, invalidCount)"
+      data-test="rum-analytics-named-events-unreadable"
+    />
+    <OBanner
+      v-if="status === 'failed' && events.length > 0"
+      variant="warning"
+      dense
+      class="mx-page-edge mt-2"
+      :content="t('rum.analytics.events.loadFailed')"
+      data-test="rum-analytics-named-events-stale"
+    >
+      <template #actions>
+        <OButton
+          variant="ghost"
+          size="sm"
+          data-test="rum-analytics-named-events-retry-btn"
+          @click="refresh"
+          >{{ t("common.retry") }}</OButton
+        >
+      </template>
+    </OBanner>
+    <div class="min-h-0 flex-1 overflow-hidden">
+      <OTable
+        ref="oTableRef"
+        v-model:selected-ids="selectedIds"
+        :frame="false"
+        :data="filtered"
+        :columns="columns"
+        row-key="id"
+        :loading="status === 'loading'"
+        :forbidden="status === 'forbidden'"
+        selection="multiple"
+        :is-row-selectable="() => canWrite"
+        pagination="client"
+        :page-size="pageSize"
+        :page-size-options="[20, 50]"
+        :current-page="currentPage"
+        @update:current-page="currentPage = $event"
+        @update:page-size="pageSize = $event"
+        sorting="client"
+        :sort-by="sortBy"
+        :sort-order="sortOrder"
+        @update:sort-by="sortBy = $event"
+        @update:sort-order="sortOrder = $event"
+        :default-columns="false"
+        :show-global-filter="false"
+        :persist-columns="true"
+        table-id="rum-analytics-named-events"
+        :enable-column-resize="true"
+        data-test="rum-analytics-named-events-table"
+        @row-click="(row: NamedEvent) => openEdit(row)"
+      >
+        <template #toolbar>
+          <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
+            <OSearchInput
+              v-model="filter"
+              class="min-w-0 flex-1 max-md:min-w-40"
+              :placeholder="t('rum.analytics.events.search')"
+              clearable
+              data-test="rum-analytics-named-events-search"
+            />
+          </div>
+        </template>
+        <template #toolbar-trailing>
+          <ORefreshButton
+            layout="inline"
+            variant="outline"
+            :loading="loading"
+            data-test="rum-analytics-named-events-refresh-btn"
+            @click="refresh"
+          />
+        </template>
+        <template #empty>
+          <OEmptyState
+            v-if="status === 'failed'"
+            size="hero"
+            preset="load-error"
+            :description="t('rum.analytics.events.loadFailed')"
+            data-test="rum-analytics-named-events-load-error"
+            @action="refresh"
+          />
+          <OEmptyState
+            v-else
+            size="hero"
+            preset="no-named-events"
+            :filtered="!!filter.trim()"
+            :actions="canCreate ? undefined : []"
+            data-test="rum-analytics-named-events-empty"
+            @action="onEmptyAction"
+          />
+        </template>
+        <template #cell-name="{ row, index }">
+          <span class="flex min-w-0 items-center gap-2">
+            <span
+              class="text-text-body truncate font-medium"
+              :data-test="`rum-analytics-named-events-row-${index}`"
+              >{{ row.name }}</span
+            >
+            <EditorDraftDot
+              v-if="eventDrafts.ids.has(row.id)"
+              :saved-at="eventDrafts.savedAt(row.id)"
+              :data-test="`rum-analytics-named-events-row-${index}-draft-dot`"
+            />
+          </span>
+        </template>
+        <template #cell-rules="{ row, index }">
+          <span
+            class="text-text-secondary truncate"
+            :data-test="`rum-analytics-named-events-row-${index}-rules`"
+            >{{ summary(row) }}</span
+          >
+        </template>
+        <template #cell-usedBy="{ row, index }">
+          <span
+            :class="usage(row) ? 'text-text-body' : 'text-text-muted'"
+            :data-test="`rum-analytics-named-events-row-${index}-used-by`"
+            >{{
+              usage(row)
+                ? t("rum.analytics.events.usedByCount", { count: usage(row) }, usage(row) ?? 0)
+                : ABSENT
+            }}</span
+          >
+        </template>
+        <template #cell-updated="{ row }">
+          <span class="flex min-w-0 items-baseline gap-1.5">
+            <OTimeCell :value="row.updatedAt" unit="ms" :timezone="store.state.timezone" />
+            <span class="text-text-secondary truncate text-xs">{{ row.updatedBy }}</span>
+          </span>
+        </template>
+        <template #cell-actions="{ row, index }">
+          <div class="flex items-center justify-end gap-0.5" @click.stop>
+            <span class="max-md:hidden">
+              <OButton
+                variant="ghost"
+                size="icon-sm"
+                icon-left="edit"
+                :disabled="!canWrite"
+                :aria-label="t('rum.analytics.events.edit')"
+                :data-test="`rum-analytics-named-events-row-${index}-edit-btn`"
+                @click="openEdit(row)"
+              />
+              <OTooltip :content="canWrite ? t('rum.analytics.events.edit') : readOnlyTip" />
+            </span>
+            <span class="max-md:hidden">
+              <OButton
+                variant="ghost"
+                size="icon-sm"
+                :disabled="!canCreate"
+                :aria-label="duplicateDraftLabel(row, t('rum.analytics.events.duplicate'))"
+                :data-test="`rum-analytics-named-events-row-${index}-duplicate-btn`"
+                @click="duplicate(row)"
+              >
+                <OIcon name="content-copy" size="sm" />
+                <EditorDraftDot
+                  v-if="hasDuplicateDraft(row)"
+                  corner
+                  :tooltip="false"
+                  :data-test="`rum-analytics-named-events-row-${index}-duplicate-draft-dot`"
+                />
+              </OButton>
+              <OTooltip :content="duplicateTip(row)" />
+            </span>
+            <span class="max-md:hidden">
+              <OButton
+                variant="ghost-destructive"
+                size="icon-sm"
+                icon-left="delete"
+                :disabled="!canWrite"
+                :aria-label="t('rum.analytics.events.delete')"
+                :data-test="`rum-analytics-named-events-row-${index}-delete-btn`"
+                @click="remove(row)"
+              />
+              <OTooltip :content="canWrite ? t('rum.analytics.events.delete') : readOnlyTip" />
+            </span>
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  :aria-label="duplicateDraftLabel(row, t('rum.analytics.events.moreActions'))"
+                  :data-test="`rum-analytics-named-events-row-${index}-more-btn`"
+                  @click.stop
+                >
+                  <EditorDraftDot
+                    v-if="hasDuplicateDraft(row)"
+                    corner
+                    :saved-at="duplicateDraftSavedAt(row)"
+                    :data-test="`rum-analytics-named-events-row-${index}-more-draft-dot`"
+                  />
+                </OButton>
+              </template>
+              <ODropdownItem
+                icon-left="edit"
+                class="md:hidden"
+                :disabled="!canWrite"
+                :data-test="`rum-analytics-named-events-row-${index}-edit-btn-menu`"
+                @select="openEdit(row)"
+              >
+                <span>{{ t("rum.analytics.events.edit") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="content-copy"
+                class="md:hidden"
+                :disabled="!canCreate"
+                :data-test="`rum-analytics-named-events-row-${index}-duplicate-btn-menu`"
+                @select="duplicate(row)"
+              >
+                <span>{{ t("rum.analytics.events.duplicate") }}</span>
+                <EditorDraftDot
+                  v-if="hasDuplicateDraft(row)"
+                  :saved-at="duplicateDraftSavedAt(row)"
+                  :data-test="`rum-analytics-named-events-row-${index}-duplicate-menu-draft-dot`"
+                />
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="delete"
+                variant="destructive"
+                class="md:hidden"
+                :disabled="!canWrite"
+                :data-test="`rum-analytics-named-events-row-${index}-delete-btn-menu`"
+                @select="remove(row)"
+              >
+                <span>{{ t("rum.analytics.events.delete") }}</span>
+              </ODropdownItem>
+            </ODropdown>
+          </div>
+        </template>
+        <template #selection-actions>
+          <OButton
+            variant="outline-destructive"
+            size="sm"
+            icon-left="delete"
+            :loading="bulkDeleting"
+            data-test="rum-analytics-named-events-bulk-delete-btn"
+            @click="removeSelected"
+          >
+            {{ t("rum.analytics.events.delete") }}
+          </OButton>
+        </template>
+        <template v-if="status === 'ready'" #footer-note>
+          <span class="max-md:hidden" data-test="rum-analytics-named-events-cap">{{
+            t("rum.analytics.events.capUsage", { count: events.length, max: MAX_EVENTS_PER_APP })
+          }}</span>
+        </template>
+      </OTable>
+    </div>
+
+    <ODialog
+      :open="removeAsk !== null"
+      size="sm"
+      persistent
+      :title="t('rum.analytics.events.deleteTitle')"
+      :primary-button-label="t('rum.analytics.events.delete')"
+      primary-button-variant="destructive"
+      :secondary-button-label="t('common.cancel')"
+      data-test="rum-analytics-named-events-delete-dialog"
+      @update:open="(open: boolean) => !open && answerRemove(false)"
+      @click:primary="answerRemove(true)"
+      @click:secondary="answerRemove(false)"
+    >
+      <i18n-t
+        :keypath="
+          removeShown.funnels.length
+            ? 'rum.analytics.events.deleteInUseMessage'
+            : 'rum.analytics.events.deleteMessage'
+        "
+        :plural="removeShown.funnels.length || undefined"
+        tag="p"
+      >
+        <template #name>
+          <span
+            data-test="rum-analytics-named-events-delete-name"
+            class="text-text-heading font-semibold break-all"
+            >{{ removeShown.name }}</span
+          >
+        </template>
+        <template #names>{{ funnelNames(removeShown.funnels) }}</template>
+      </i18n-t>
+    </ODialog>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, ref, watch } from "vue";
+import { useRouter, type HistoryState } from "vue-router";
+import { useStore } from "vuex";
+import { useListViewState } from "@/composables/useListViewState";
+import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import useNamedEvents, {
+  namedEventDraftVariant,
+  namedEventHandoffState,
+  useNewEventDraftTimes,
+  type FunnelUsage,
+} from "@/composables/rum/useNamedEvents";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import { useDraftLabel } from "@/components/common/drafts/useDraftLabel";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import useSavedFunnels from "@/composables/rum/useSavedFunnels";
+import useProductAnalytics from "@/composables/rum/useProductAnalytics";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import {
+  MAX_EVENTS_PER_APP,
+  type NamedEvent,
+  type NamedRule,
+} from "@/utils/rum/productAnalyticsModel";
+import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
+
+defineOptions({ name: "NamedEventsListPage" });
+
+const ABSENT = raw("—");
+
+const { t } = useI18nTyped();
+const router = useRouter();
+const store = useStore();
+const pa = useProductAnalytics();
+const ne = useNamedEvents();
+const savedFunnels = useSavedFunnels();
+const { confirm } = useConfirmDialog();
+const { events, permission, invalidCount, loading } = ne;
+const eventDrafts = useEditorDraftIds("rum_named_event");
+
+const viewState = useListViewState("rumNamedEvents", {
+  filter: "",
+  pageSize: 20,
+  currentPage: 1,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+});
+const filter = ref(viewState.filter);
+const pageSize = ref(viewState.pageSize);
+const currentPage = ref(viewState.currentPage);
+const sortBy = ref(viewState.sortBy);
+const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
+const oTableRef = ref<any>(null);
+watch([filter, pageSize, currentPage, sortBy, sortOrder], () => {
+  Object.assign(viewState, {
+    filter: filter.value,
+    pageSize: pageSize.value,
+    currentPage: currentPage.value,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+  });
+});
+watch(filter, () => (currentPage.value = 1));
+const selectedIds = ref<string[]>([]);
+const bulkDeleting = ref(false);
+
+const org = (): string => store.state.selectedOrganization?.identifier ?? "";
+const app = computed(() => pa.state.app);
+const status = computed(() => ne.status(org(), app.value));
+let pageRestored = false;
+watch(
+  () => status.value === "ready",
+  (ready) => {
+    if (!ready || pageRestored) return;
+    pageRestored = true;
+    // Macrotask so the restored page wins over the table's own reset on data change.
+    setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
+  },
+  { immediate: true },
+);
+const canWrite = computed(() => permission.value === "write");
+const canCreate = computed(() => canWrite.value && events.value.length < MAX_EVENTS_PER_APP);
+const readOnlyTip = computed(() => t("rum.analytics.events.readOnly"));
+const draftLabel = useDraftLabel();
+
+// Per row: a Duplicate with a kept copy says so, with the copy's date, in its own tooltip.
+const duplicateTip = (ev: NamedEvent): I18nText => {
+  if (!canWrite.value) return readOnlyTip.value;
+  if (!canCreate.value) return t("rum.analytics.events.capReached", { max: MAX_EVENTS_PER_APP });
+  return duplicateDraftLabel(ev, t("rum.analytics.events.duplicate"));
+};
+// The corner dot is presentational, so an action that reopens a kept copy says so, dated, in its own name.
+const duplicateDraftLabel = (ev: NamedEvent, label: I18nText): I18nText =>
+  hasDuplicateDraft(ev) ? draftLabel(label, duplicateDraftSavedAt(ev)) : label;
+
+const filtered = computed(() => {
+  const term = filter.value.trim().toLowerCase();
+  return term ? events.value.filter((e) => e.name.toLowerCase().includes(term)) : [...events.value];
+});
+
+// Only a ready funnel list can say "no funnel uses this"; until then the count stays absent.
+const usageCounts = computed<Record<string, number> | null>(() => {
+  if (savedFunnels.status(org(), app.value) !== "ready") return null;
+  const counts: Record<string, number> = {};
+  for (const f of savedFunnels.funnels.value)
+    for (const id of new Set(f.eventIds)) counts[id] = (counts[id] ?? 0) + 1;
+  return counts;
+});
+const usage = (ev: NamedEvent): number | null => usageCounts.value?.[ev.id] ?? null;
+
+const columns = computed<OTableColumnDef<NamedEvent>[]>(() => [
+  {
+    id: "name",
+    header: t("rum.analytics.events.name"),
+    accessorKey: "name",
+    size: 220,
+    sortable: true,
+    meta: { isName: true },
+  },
+  {
+    id: "rules",
+    header: t("rum.analytics.events.rules"),
+    size: 320,
+    meta: { autoWidth: true, fillRemaining: true },
+  },
+  {
+    id: "usedBy",
+    header: t("rum.analytics.events.usedBy"),
+    accessorFn: (row) => usage(row) ?? 0,
+    size: 120,
+    sortable: true,
+    hideable: true,
+  },
+  {
+    id: "updated",
+    header: t("rum.analytics.events.updated"),
+    accessorKey: "updatedAt",
+    size: 220,
+    sortable: true,
+    hideable: true,
+  },
+  {
+    id: "actions",
+    header: raw(""),
+    isAction: true,
+    meta: { align: "right", actionCount: 3 },
+  },
+]);
+
+const CLICK_SUMMARY = {
+  prefix: "summaryClickPrefix",
+  contains: "summaryClickContains",
+  regex: "summaryClickRegex",
+} as const;
+const ERROR_SUMMARY = {
+  eq: "summaryErrorEq",
+  prefix: "summaryErrorPrefix",
+  contains: "summaryErrorContains",
+  regex: "summaryErrorRegex",
+} as const;
+const PAGE_SUMMARY = { eq: "summaryEq", prefix: "summaryPrefix", regex: "summaryRegex" } as const;
+
+const ruleSummary = (r: NamedRule): I18nText => {
+  if (r.t === "action") {
+    if (r.op && r.op !== "in")
+      return t(`rum.analytics.events.${CLICK_SUMMARY[r.op]}`, { value: raw(r.value) });
+    const targets = raw((r.targets ?? []).join(", "));
+    return r.onPage
+      ? t("rum.analytics.events.summaryClickOn", { targets, page: raw(r.onPage) })
+      : t("rum.analytics.events.summaryClick", { targets });
+  }
+  if (r.t === "error")
+    return t(`rum.analytics.events.${ERROR_SUMMARY[r.op]}`, { value: raw(r.value) });
+  if (r.op === "param")
+    return r.value
+      ? t("rum.analytics.events.summaryParamValue", { name: raw(r.name), value: raw(r.value) })
+      : t("rum.analytics.events.summaryParam", { name: raw(r.name) });
+  if (r.op === "ref") return t("rum.analytics.events.summaryRef", { value: raw(r.value) });
+  return t(`rum.analytics.events.${PAGE_SUMMARY[r.op]}`, { value: raw(r.value) });
+};
+
+const summary = (ev: NamedEvent): I18nText => raw(ev.rules.map(ruleSummary).join(" · "));
+
+const load = (force = false) => {
+  if (!app.value) return;
+  if (force) {
+    void ne.load(org(), app.value, true);
+    void savedFunnels.load(org(), app.value, true, true);
+    return;
+  }
+  void ne.ensure(org(), app.value);
+  void savedFunnels.ensure(org(), app.value, false, true);
+};
+
+const refresh = () => load(true);
+
+const openNew = (state?: HistoryState) =>
+  router.push({ name: PA_ROUTES.eventNew, query: pa.toQuery(), state });
+
+const onEmptyAction = (id?: string) => {
+  if (id === "clear-filters") filter.value = "";
+  else void openNew();
+};
+
+const openEdit = (ev: NamedEvent) => {
+  if (!canWrite.value) return;
+  void router.push({ name: PA_ROUTES.eventEdit, params: { id: ev.id }, query: pa.toQuery() });
+};
+
+const duplicate = (ev: NamedEvent) => {
+  if (!canCreate.value) return;
+  const name = t("rum.analytics.events.copyName", { name: raw(ev.name) });
+  void openNew(namedEventHandoffState({ draft: { name, rules: ev.rules }, source: ev.id }));
+};
+
+const newEventDrafts = useNewEventDraftTimes();
+const duplicateDraftSavedAt = (ev: NamedEvent) =>
+  newEventDrafts.savedAt(namedEventDraftVariant(app.value, { draft: null, source: ev.id }));
+const hasDuplicateDraft = (ev: NamedEvent) => duplicateDraftSavedAt(ev) !== null;
+
+// A duplicate's draft is keyed by its source, so every user's copy goes with the source.
+const dropDrafts = (ids: string[]) => {
+  for (const entityId of ids) {
+    deleteEditorDraftsFor({
+      kind: "rum_named_event",
+      org: org(),
+      entityId,
+      variant: namedEventDraftVariant(app.value, { draft: null, source: entityId }),
+    });
+  }
+};
+
+const funnelNames = (funnels: FunnelUsage[]) =>
+  raw([...new Set(funnels.map((f) => f.name))].join(", "));
+
+const removeAsk = ref<{
+  name: string;
+  funnels: FunnelUsage[];
+  resolve: (ok: boolean) => void;
+} | null>(null);
+// Set on open only, so the message stays put while the dialog fades out.
+const removeShown = ref<{ name: string; funnels: FunnelUsage[] }>({ name: "", funnels: [] });
+
+const askRemove = (ev: NamedEvent, funnels: FunnelUsage[]) =>
+  new Promise<boolean>((resolve) => {
+    removeAsk.value?.resolve(false);
+    removeAsk.value = { name: ev.name, funnels, resolve };
+    removeShown.value = { name: ev.name, funnels };
+  });
+
+const answerRemove = (ok: boolean) => {
+  const ask = removeAsk.value;
+  removeAsk.value = null;
+  ask?.resolve(ok);
+};
+
+/** Resolves true only once the event is gone, so a cancel or a failure keeps the row's selection. */
+const confirmRemove = async (ev: NamedEvent, funnels: FunnelUsage[]): Promise<boolean> => {
+  if (!(await askRemove(ev, funnels))) return false;
+  try {
+    const inUse = await ne.remove(org(), app.value, ev.id, funnels.length > 0);
+    // A funnel saved with this event after the usage check: ask again, naming it.
+    if (inUse) return confirmRemove(ev, inUse);
+    dropDrafts([ev.id]);
+    return true;
+  } catch {
+    // useNamedEvents has already toasted, read-only included.
+    return false;
+  }
+};
+
+const remove = async (ev: NamedEvent) => {
+  const funnels = await ne.usages(org(), app.value, ev.id).catch(() => []);
+  if (await confirmRemove(ev, funnels))
+    selectedIds.value = selectedIds.value.filter((id) => id !== ev.id);
+};
+
+type InUse = { ev: NamedEvent; funnels: FunnelUsage[] };
+
+const inUseNames = (rows: InUse[]) =>
+  raw(rows.map(({ ev, funnels }) => `${ev.name} (${funnelNames(funnels)})`).join("; "));
+
+const confirmBulk = (count: number, inUse: InUse[]) =>
+  confirm({
+    title: t("rum.analytics.events.bulkDeleteTitle"),
+    message: inUse.length
+      ? t("rum.analytics.events.bulkDeleteInUseMessage", { count, names: inUseNames(inUse) }, count)
+      : t("rum.analytics.events.bulkDeleteMessage", { count }, count),
+    confirmLabel: t("rum.analytics.events.delete"),
+    confirmVariant: "destructive",
+  });
+
+// A funnel saved with an event after the usage check refuses its delete: confirm those once more, then force.
+const deleteChosen = async (chosen: NamedEvent[], inUse: InUse[]): Promise<string[]> => {
+  const ids = chosen.map((e) => e.id);
+  const first = await ne.removeMany(
+    org(),
+    app.value,
+    ids,
+    inUse.map((u) => u.ev.id),
+  );
+  const late = first.inUse.flatMap(({ id, funnels }) => {
+    const ev = chosen.find((e) => e.id === id);
+    return ev ? [{ ev, funnels }] : [];
+  });
+  if (!late.length || !(await confirmBulk(late.length, late))) return first.gone;
+  const lateIds = late.map((u) => u.ev.id);
+  const second = await ne.removeMany(org(), app.value, lateIds, lateIds);
+  return [...first.gone, ...second.gone];
+};
+
+const removeSelected = async () => {
+  const chosen = events.value.filter((e) => selectedIds.value.includes(e.id));
+  if (!chosen.length) return;
+  bulkDeleting.value = true;
+  try {
+    const used = await Promise.all(
+      chosen.map((e) => ne.usages(org(), app.value, e.id).catch(() => [] as FunnelUsage[])),
+    );
+    const inUse = chosen.map((ev, i) => ({ ev, funnels: used[i] })).filter((u) => u.funnels.length);
+    if (!(await confirmBulk(chosen.length, inUse))) return;
+    const gone = await deleteChosen(chosen, inUse);
+    dropDrafts(gone);
+    selectedIds.value = selectedIds.value.filter((id) => !gone.includes(id));
+  } finally {
+    bulkDeleting.value = false;
+  }
+};
+
+watch(app, () => load(), { immediate: true });
+watch(app, () => {
+  selectedIds.value = [];
+  filter.value = "";
+});
+</script>

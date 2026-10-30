@@ -19,6 +19,7 @@ use config::{
     cluster::is_offline,
     meta::stream::{FileKey, StreamType},
 };
+use search::datafusion::merge::MergeMode;
 use tokio::sync::{Mutex, mpsc};
 
 #[derive(Clone)]
@@ -29,6 +30,8 @@ pub struct MergeBatch {
     pub stream_name: String,
     pub prefix: String,
     pub files: Vec<FileKey>,
+    /// What the merge produces; decided by the scheduler, read by the worker.
+    pub mode: MergeMode,
 }
 
 pub struct MergeResult {
@@ -36,7 +39,8 @@ pub struct MergeResult {
     pub new_file: FileKey,
 }
 
-pub type MergeSender = mpsc::Sender<Result<(usize, Vec<FileKey>), anyhow::Error>>;
+/// Payload: `(batch_id, new_files, retire_files)`; only `retire_files` leave `file_list`.
+pub type MergeSender = mpsc::Sender<Result<(usize, Vec<FileKey>, Vec<FileKey>), anyhow::Error>>;
 
 #[derive(Clone)]
 pub struct MergeJob {
@@ -212,11 +216,14 @@ impl MergeWorker {
                                 &msg.stream_name,
                                 &msg.prefix,
                                 &msg.files,
+                                &msg.mode,
                             )
                             .await
                             {
-                                Ok((new_files, _)) => {
-                                    if let Err(e) = tx.send(Ok((msg.batch_id, new_files))).await {
+                                Ok((new_files, retire_files)) => {
+                                    if let Err(e) =
+                                        tx.send(Ok((msg.batch_id, new_files, retire_files))).await
+                                    {
                                         log::error!(
                                             "[COMPACTOR:WORKER:{thread_id}] Error sending file to merge_job: {e}"
                                         );

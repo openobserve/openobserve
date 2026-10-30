@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="dashboard-config-aggregation"
     >
       <template #tooltip>
-        <OTooltip max-width="300px">
+        <OTooltip max-width="18.75rem">
           <template #content>
             <b>{{ t("dashboard.promQLChartConfig.aggTooltipTitle") }}</b>
             {{ t("dashboard.promQLChartConfig.aggTooltipDesc") }}
@@ -63,11 +63,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OInput
         v-model="geoLatLabel"
         :label="t('dashboard.geoLatLabel')"
-        :placeholder="t('dashboard.promQLChartConfig.geoLatPlaceholder')"
+        :placeholder="raw('latitude or lat')"
         data-test="dashboard-config-geo-lat-label"
       >
         <template #tooltip>
-          <OTooltip max-width="300px">
+          <OTooltip max-width="18.75rem">
             <template #content>
               {{ t("dashboard.promQLChartConfig.geoLatTooltip") }}
             </template>
@@ -78,11 +78,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OInput
         v-model="geoLonLabel"
         :label="t('dashboard.geoLonLabel')"
-        :placeholder="t('dashboard.promQLChartConfig.geoLonPlaceholder')"
+        :placeholder="raw('longitude or lon')"
         data-test="dashboard-config-geo-lon-label"
       >
         <template #tooltip>
-          <OTooltip max-width="300px">
+          <OTooltip max-width="18.75rem">
             <template #content>
               {{ t("dashboard.promQLChartConfig.geoLonTooltip") }}
             </template>
@@ -93,11 +93,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OInput
         v-model="geoWeightLabel"
         :label="t('dashboard.geoWeightLabel')"
-        :placeholder="t('dashboard.promQLChartConfig.geoWeightPlaceholder')"
+        :placeholder="raw('weight')"
         data-test="dashboard-config-geo-weight-label"
       >
         <template #tooltip>
-          <OTooltip max-width="300px">
+          <OTooltip max-width="18.75rem">
             <template #content>
               {{ t("dashboard.promQLChartConfig.geoWeightTooltip") }}
             </template>
@@ -111,11 +111,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OInput
         v-model="mapsNameLabel"
         :label="t('dashboard.mapsNameLabel')"
-        :placeholder="t('dashboard.promQLChartConfig.mapsNamePlaceholder')"
+        :placeholder="raw('country or location')"
         data-test="dashboard-config-maps-name-label"
       >
         <template #tooltip>
-          <OTooltip max-width="300px">
+          <OTooltip max-width="18.75rem">
             <template #content>
               {{ t("dashboard.promQLChartConfig.mapsNameTooltip") }}
             </template>
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-config-promql-table-mode"
       >
         <template #tooltip>
-          <OTooltip max-width="300px">
+          <OTooltip max-width="18.75rem">
             <template #content>
               <b>{{ t("dashboard.promQLChartConfig.promqlTableModeTooltipTitle") }}</b>
               {{ t("dashboard.promQLChartConfig.promqlTableModeTooltipDesc") }}
@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-table-aggregations"
         >
           <template #tooltip>
-            <OTooltip max-width="350px">
+            <OTooltip max-width="21.875rem">
               <template #content>
                 <b>{{ t("dashboard.promQLChartConfig.tableAggTooltipTitle") }}</b>
                 {{ t("dashboard.promQLChartConfig.tableAggTooltipDesc") }}
@@ -203,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @create="addToVisibleColumns"
         >
           <template #tooltip>
-            <OTooltip max-width="400px">
+            <OTooltip max-width="25rem">
               <template #content>
                 <b>{{ t("dashboard.promQLChartConfig.visibleColumnsTitle") }}</b>
                 <br /><br />
@@ -234,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @create="addToHiddenColumns"
         >
           <template #tooltip>
-            <OTooltip max-width="400px">
+            <OTooltip max-width="25rem">
               <template #content>
                 <b>{{ t("dashboard.promQLChartConfig.hiddenColumnsTitle") }}</b>
                 <br /><br />
@@ -274,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="lg"
         >
           <template #tooltip>
-            <OTooltip max-width="300px">
+            <OTooltip max-width="18.75rem">
               <template #content>
                 <b>{{ t("dashboard.promQLChartConfig.stickyFirstColumnTooltipTitle") }}</b>
                 {{ t("dashboard.promQLChartConfig.stickyFirstColumnTooltipDesc") }}
@@ -298,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @create="addToStickyColumns"
         >
           <template #tooltip>
-            <OTooltip max-width="400px">
+            <OTooltip max-width="25rem">
               <template #content>
                 <b>{{ t("dashboard.promQLChartConfig.stickyColumns") }}</b>
                 <br /><br />
@@ -350,8 +350,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, computed, ref, inject } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
+import { allVisibleQueriesInstant } from "@/utils/dashboard/configUtils";
 import ColumnOrderPopUp from "./ColumnOrderPopUp.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -380,9 +381,9 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     // Aggregation function options
     const aggregationOptions = [
@@ -398,9 +399,26 @@ export default defineComponent({
     ];
 
     // Chart types that support aggregation
-    const chartsWithAggregation = ["pie", "donut", "geomap", "maps"];
+    const chartsWithAggregation = [
+      "pie",
+      "donut",
+      "geomap",
+      "maps",
+      "metric",
+      "gauge",
+      "bar-gauge",
+      "h-bar",
+    ];
 
-    const showAggregationConfig = computed(() => chartsWithAggregation.includes(props.chartType));
+    // A pie or metric reduces each series to one value, which an instant query already is.
+    const showAggregationConfig = computed(
+      () =>
+        chartsWithAggregation.includes(props.chartType) &&
+        !(
+          ["pie", "donut", "metric"].includes(props.chartType) &&
+          allVisibleQueriesInstant(dashboardPanelData)
+        ),
+    );
 
     // Aggregation value
     const aggregationValue = computed({
@@ -475,16 +493,6 @@ export default defineComponent({
           dashboardPanelData.data.config = {};
         }
         dashboardPanelData.data.config.map_type = value;
-      },
-    });
-
-    const mapsEnableRoam = computed({
-      get: () => dashboardPanelData.data.config?.enable_roam !== false,
-      set: (value: boolean) => {
-        if (!dashboardPanelData.data.config) {
-          dashboardPanelData.data.config = {};
-        }
-        dashboardPanelData.data.config.enable_roam = value;
       },
     });
 
@@ -674,6 +682,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       aggregationOptions,
       showAggregationConfig,
       aggregationValue,
@@ -683,7 +692,6 @@ export default defineComponent({
       geoNameLabel,
       mapsNameLabel,
       mapsMapType,
-      mapsEnableRoam,
       tableAggregations,
       promqlTableMode,
       promqlTableModeOptions,

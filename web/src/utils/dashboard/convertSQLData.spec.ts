@@ -15,6 +15,7 @@
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { convertMultiSQLData, convertSQLData } from "@/utils/dashboard/convertSQLData";
+import { calculateGridPositions } from "@/utils/dashboard/calculateGridForSubPlot";
 
 // Mock external dependencies
 vi.mock("date-fns-tz", () => ({
@@ -60,6 +61,7 @@ vi.mock("@/utils/dashboard/chartDimensionUtils", () => ({
   calculateWidthText: vi.fn(() => 100),
   calculateDynamicNameGap: vi.fn(() => 25),
   calculateRotatedLabelBottomSpace: vi.fn(() => 0),
+  X_AXIS_TICK_LABEL_BAND: 20,
 }));
 
 vi.mock("@/utils/dashboard/chartColorUtils", () => ({
@@ -89,6 +91,7 @@ vi.mock("../query/sqlUtils", () => ({
 }));
 
 vi.mock("./colorPalette", () => ({
+  createDistinctSeriesColor: vi.fn(() => () => undefined),
   ColorModeWithoutMinMax: vi.fn(),
   getSeriesColor: vi.fn(() => "#ff0000"),
   getSQLMinMaxValue: vi.fn(() => [0, 100]),
@@ -2856,6 +2859,71 @@ describe("convertSQLData", () => {
         expect(narrow.options.yAxis.name).toBe("");
       });
 
+      describe("axis labels", () => {
+        const searchData = [
+          [
+            { timestamp: "2023-01-01", value: 10 },
+            { timestamp: "2023-01-02", value: 20 },
+          ],
+        ];
+        const convert = (config: Record<string, unknown>, labels = { x: "Day", y: "Requests" }) =>
+          convertSQLData(
+            {
+              ...mockPanelSchema,
+              type: "bar",
+              config: { ...mockPanelSchema.config, ...config },
+              queries: [
+                {
+                  ...mockPanelSchema.queries[0],
+                  fields: {
+                    ...mockPanelSchema.queries[0].fields,
+                    x: [{ alias: "timestamp", label: labels.x, column: "timestamp" }],
+                    y: [{ alias: "value", label: labels.y, column: "request_count" }],
+                  },
+                },
+              ],
+            },
+            searchData,
+            mockStore,
+            mockChartPanelRef,
+            mockHoveredSeriesState,
+            mockResultMetaData,
+            mockMetadata,
+            mockChartPanelStyle,
+            mockAnnotations,
+          );
+
+        it("shows typed axis names unless the mode is hide", async () => {
+          const hidden = await convert({ axis_label_mode: "hide" });
+          expect(hidden.options.xAxis[0].name).toBe("");
+          expect(hidden.options.yAxis.name).toBe("");
+
+          for (const config of [{ axis_label_mode: "auto" }, { axis_label_mode: "show" }, {}]) {
+            const shown = await convert(config);
+            expect(shown.options.xAxis[0].name).toBe("Day");
+            expect(shown.options.yAxis.name).toBe("Requests");
+          }
+        });
+
+        it("names blank fields from the field but never puts that name on an axis", async () => {
+          const blank = { x: "", y: "" };
+
+          for (const mode of ["auto", "show"]) {
+            const chart = await convert({ axis_label_mode: mode }, blank);
+            expect(chart.options.xAxis[0].name).toBe("");
+            expect(chart.options.yAxis.name).toBe("");
+            expect(chart.options.series[0].name).toBe("Request Count");
+          }
+        });
+
+        it("leaves blank labels blank on a panel saved before the mode existed", async () => {
+          const legacy = await convert({}, { x: "", y: "" });
+          expect(legacy.options.xAxis[0].name).toBe("");
+          expect(legacy.options.yAxis.name).toBe("");
+          expect(legacy.options.series[0].name).toBe("");
+        });
+      });
+
       it("should handle horizontal bar charts (h-bar and h-stacked)", async () => {
         const hBarTypes = ["h-bar", "h-stacked"];
 
@@ -4061,6 +4129,51 @@ describe("convertSQLData", () => {
         expect(result).toBeDefined();
         expect(result.options).toBeDefined();
         expect(result.options.series).toBeDefined();
+      });
+
+      it("tags each query's series with its panel query and role, for right-click alerts", async () => {
+        const searchData = [
+          [{ timestamp: "2023-01-01", value: 10 }],
+          [{ timestamp: "2023-01-02", value: 20 }],
+        ];
+        const resultMetaData = { value: [[mockResultMetaData[0]], [mockResultMetaData[0]]] };
+        const metadata = {
+          queries: [
+            { panelQueryIndex: 0, timeRangeGap: { seconds: 0, periodAsStr: "" } },
+            { panelQueryIndex: 0, timeRangeGap: { seconds: 86_400_000, periodAsStr: "1d" } },
+          ],
+        };
+
+        const schema = {
+          ...mockPanelSchema,
+          queries: [
+            {
+              fields: {
+                x: [{ alias: "timestamp", label: "Timestamp" }],
+                y: [{ alias: "value", label: "Value" }],
+                z: [],
+                breakdown: [],
+              },
+            },
+          ],
+        };
+        const result = await convertMultiSQLData(
+          schema,
+          searchData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          resultMetaData,
+          metadata,
+          mockChartPanelStyle,
+          mockAnnotations,
+        );
+
+        const tagged = result.options.series.filter((s: any) => s._panelQueryIndex !== undefined);
+        expect(tagged.map((s: any) => [s._panelQueryIndex, s._seriesRole])).toEqual([
+          [0, "primary"],
+          [0, "shifted"],
+        ]);
       });
 
       it("should handle metadata queries without periodAsStr", async () => {
@@ -8313,7 +8426,7 @@ describe("convertSQLData", () => {
         );
 
         expect(result).toBeDefined();
-        expect(result.options.grid.left).toBe(5);
+        expect(result.options.grid.left).toBeGreaterThan(5);
         expect(result.options.grid.right).toBe(20);
         expect(result.options.yAxis).toBeDefined();
       });
@@ -9536,6 +9649,51 @@ describe("convertSQLData", () => {
   });
 
   describe("Show Gridlines Configuration", () => {
+    it.each([
+      [true, true],
+      [false, false],
+      [undefined, true],
+    ])(
+      "h-bar with show_gridlines=%s draws value-axis gridlines=%s and none on the category axis",
+      async (showGridlines, expected) => {
+        const schema = {
+          ...mockPanelSchema,
+          type: "h-bar",
+          config: { ...mockPanelSchema.config, show_gridlines: showGridlines },
+          queries: [
+            {
+              fields: { x: [{ alias: "category" }], y: [{ alias: "value" }], z: [], breakdown: [] },
+            },
+          ],
+        };
+        const searchData = [
+          [
+            { category: "A", value: 100 },
+            { category: "B", value: 200 },
+          ],
+        ];
+
+        const result = await convertSQLData(
+          schema,
+          searchData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockResultMetaData,
+          mockMetadata,
+          mockChartPanelStyle,
+          mockAnnotations,
+        );
+
+        const valueAxes = [result.options.xAxis].flat();
+        const categoryAxes = [result.options.yAxis].flat();
+        expect(valueAxes[0].type).toBe("value");
+        expect(categoryAxes[0].type).toBe("category");
+        valueAxes.forEach((axis: any) => expect(axis.splitLine.show).toBe(expected));
+        categoryAxes.forEach((axis: any) => expect(axis.splitLine.show).toBe(false));
+      },
+    );
+
     it("should use default gridlines (true) when config is undefined", async () => {
       const schema = {
         ...mockPanelSchema,
@@ -9735,6 +9893,42 @@ describe("convertSQLData", () => {
         expect(result.options.yAxis.splitLine.show).toBe(null);
       }
       expect(result.options).toBeDefined();
+    });
+  });
+
+  describe("Scatter point size and opacity", () => {
+    const searchData = [
+      [
+        { timestamp: "2024-01-01T00:00:00Z", value: 10 },
+        { timestamp: "2024-01-01T01:00:00Z", value: 30 },
+      ],
+    ];
+    const scatterSeries = async (config: Record<string, any>) => {
+      const result = await convertSQLData(
+        { ...mockPanelSchema, type: "scatter", config },
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations,
+      );
+      return result.options.series.find((s: any) => s.type === "scatter");
+    };
+
+    it("keeps 5 px points and the chart's default opacity when unset", async () => {
+      const series = await scatterSeries({});
+      expect(series.symbolSize).toBe(5);
+      expect(series.itemStyle?.opacity).toBeUndefined();
+    });
+
+    it("draws points at the configured size and opacity", async () => {
+      const series = await scatterSeries({ symbol_size: 11, symbol_opacity: 30 });
+      expect(series.symbolSize).toBe(11);
+      expect(series.itemStyle.opacity).toBe(0.3);
+      expect(series.color).toBeDefined();
     });
   });
 
@@ -10841,5 +11035,395 @@ describe("convertSQLData", () => {
       expect(result.options.legend.top).toBeGreaterThan(0); // Bottom legend calculation applied
       expect(result.options.grid.bottom).toBeGreaterThan(0);
     });
+  });
+  // A conditional overlay series (`CASE WHEN ... THEN value END`) is NULL on
+  // every healthy bucket. Filtering rows on ALL y keys being non-null deleted
+  // those rows outright, taking the base series' value and the x category with
+  // them — the anomaly detection charts lost their whole baseline.
+  describe("sparse y column does not delete the row", () => {
+    const sparsePanel = () => ({
+      queries: [
+        {
+          fields: {
+            x: [{ alias: "zo_sql_key" }],
+            y: [{ alias: "zo_sql_num" }, { alias: "anomaly_value" }],
+            z: [],
+            breakdown: [],
+          },
+        },
+      ],
+      config: { top_results: 10, top_results_others: false, connect_nulls: false },
+      type: "line",
+    });
+
+    // Ten buckets, three of them flagged; the overlay column is null on the rest.
+    const rows = [
+      { zo_sql_key: "16:25", zo_sql_num: 1900, anomaly_value: null },
+      { zo_sql_key: "16:30", zo_sql_num: 2000, anomaly_value: null },
+      { zo_sql_key: "16:35", zo_sql_num: 2050, anomaly_value: null },
+      { zo_sql_key: "16:40", zo_sql_num: 2140, anomaly_value: null },
+      { zo_sql_key: "16:45", zo_sql_num: 3000, anomaly_value: 3000 },
+      { zo_sql_key: "16:50", zo_sql_num: 3000, anomaly_value: 3000 },
+      { zo_sql_key: "16:55", zo_sql_num: 2100, anomaly_value: null },
+      { zo_sql_key: "17:00", zo_sql_num: 2980, anomaly_value: 2980 },
+      { zo_sql_key: "17:05", zo_sql_num: 2000, anomaly_value: null },
+      { zo_sql_key: "17:10", zo_sql_num: 1950, anomaly_value: null },
+    ];
+
+    const render = async (panel: any, data: any[]) =>
+      await convertSQLData(
+        panel,
+        [data],
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations,
+      );
+
+    it("keeps every bucket on the x axis", async () => {
+      const result = await render(sparsePanel(), rows);
+      expect(result.options.xAxis[0].data).toHaveLength(10);
+    });
+
+    it("keeps the dense series complete", async () => {
+      const result = await render(sparsePanel(), rows);
+      const base = result.options.series.find((s: any) => s.data.includes(1900));
+      expect(base.data).toEqual([1900, 2000, 2050, 2140, 3000, 3000, 2100, 2980, 2000, 1950]);
+    });
+
+    // The gap is what breaks the overlay line at a bucket that is NOT flagged.
+    it("holds the sparse series null where it has no value", async () => {
+      const result = await render(sparsePanel(), rows);
+      const overlay = result.options.series.find((s: any) => !s.data.includes(1900));
+      expect(overlay.data).toHaveLength(10);
+      expect(overlay.data[6]).toBeNull();
+      expect(overlay.data[4]).toBe(3000);
+    });
+
+    // Unchanged behaviour: a row carrying no y value at all is still dropped.
+    it("still drops a row where every y column is null", async () => {
+      const withEmptyRow = [
+        ...rows.slice(0, 2),
+        { zo_sql_key: "16:33", zo_sql_num: null, anomaly_value: null },
+        ...rows.slice(2),
+      ];
+      const result = await render(sparsePanel(), withEmptyRow);
+      expect(result.options.xAxis[0].data).toHaveLength(10);
+      expect(result.options.xAxis[0].data).not.toContain("16:33");
+    });
+
+    // A single-y panel takes the same path; `some` and `every` agree there.
+    it("leaves a single-y panel unchanged", async () => {
+      const panel = sparsePanel();
+      panel.queries[0].fields.y = [{ alias: "zo_sql_num" }];
+      const result = await render(panel, rows);
+      expect(result.options.xAxis[0].data).toHaveLength(10);
+    });
+  });
+});
+
+describe("multi-query heatmap pinned colour range", () => {
+  const store = { state: { theme: "light", zoConfig: { max_dashboard_series: 100 } } };
+  const query = () => ({
+    customQuery: true,
+    fields: {
+      x: [{ alias: "x" }],
+      y: [{ alias: "y" }],
+      z: [{ alias: "z" }],
+      breakdown: [],
+    },
+  });
+  const searchData = [
+    [
+      { x: "a", y: "r", z: 5 },
+      { x: "b", y: "r", z: 20 },
+    ],
+    [
+      { x: "a", y: "r", z: 40 },
+      { x: "b", y: "r", z: 80 },
+    ],
+  ];
+
+  const render = (config: Record<string, any>) => {
+    vi.mocked(calculateGridPositions).mockReturnValueOnce({
+      gridArray: [
+        { left: "0%", top: "0%", width: "50%", height: "100%" },
+        { left: "50%", top: "0%", width: "50%", height: "100%" },
+      ],
+      gridWidth: 400,
+      gridHeight: 400,
+      gridNoOfRow: 1,
+      gridNoOfCol: 2,
+    } as any);
+    return convertMultiSQLData(
+      { type: "heatmap", config: { decimals: 2, ...config }, queries: [query(), query()] },
+      searchData,
+      store,
+      { value: { offsetWidth: 800, offsetHeight: 400 } },
+      {},
+      { value: [[{}], [{}]] },
+      { queries: [{}, {}] },
+      {},
+      [],
+    );
+  };
+
+  it("keeps the shared automatic range when nothing is pinned", async () => {
+    const { visualMap } = (await render({})).options;
+    expect([visualMap.min, visualMap.max]).toEqual([0, 80]);
+  });
+
+  it("replaces the shared range with both pins", async () => {
+    const { visualMap } = (await render({ heatmap_color_min: 10, heatmap_color_max: 30 })).options;
+    expect([visualMap.min, visualMap.max]).toEqual([10, 30]);
+  });
+
+  it("pins only the max over the shared automatic min", async () => {
+    const { visualMap } = (await render({ heatmap_color_max: 30 })).options;
+    expect([visualMap.min, visualMap.max]).toEqual([0, 30]);
+  });
+
+  it("keeps a min pin that one query alone would reject", async () => {
+    // 50 is above query 0's own max of 20 but below the shared max of 80.
+    const { visualMap } = (await render({ heatmap_color_min: 50 })).options;
+    expect([visualMap.min, visualMap.max]).toEqual([50, 80]);
+  });
+
+  it("ignores an inverted pair and uses the shared automatic range", async () => {
+    const { visualMap } = (await render({ heatmap_color_min: 30, heatmap_color_max: 10 })).options;
+    expect([visualMap.min, visualMap.max]).toEqual([0, 80]);
+  });
+
+  it("keeps real values in every query's cells", async () => {
+    const { series } = (await render({ heatmap_color_max: 30 })).options;
+    expect(series[1].data.map((cell: any) => cell[2])).toEqual([40, 80]);
+  });
+
+  it("colours every tile from one palette and scale over the shared range", async () => {
+    const { visualMap } = (await render({ heatmap_palette: "viridis", heatmap_color_scale: "log" }))
+      .options;
+    // The log floor is the smallest positive cell of any query: query 0's 5.
+    expect([visualMap.min, visualMap.max]).toEqual([5, 80]);
+    expect(visualMap.inRange.color[0]).toBe("#440154");
+    expect(visualMap.inRange.color.at(-1)).toBe("#fde725");
+  });
+});
+
+describe("multi-query heatmap tiles", () => {
+  const store = { state: { theme: "light", zoConfig: { max_dashboard_series: 100 } } };
+  const query = () => ({
+    customQuery: true,
+    fields: {
+      x: [{ alias: "x" }],
+      y: [{ alias: "y" }],
+      z: [{ alias: "z" }],
+      breakdown: [],
+    },
+  });
+
+  const render = (searchData: any[]) => {
+    vi.mocked(calculateGridPositions).mockReturnValueOnce({
+      gridArray: [
+        { left: "0%", top: "0%", width: "50%", height: "100%" },
+        { left: "50%", top: "0%", width: "50%", height: "100%" },
+      ],
+      gridWidth: 400,
+      gridHeight: 400,
+      gridNoOfRow: 1,
+      gridNoOfCol: 2,
+    } as any);
+    return convertMultiSQLData(
+      { type: "heatmap", config: { decimals: 2 }, queries: [query(), query()] },
+      searchData,
+      store,
+      { value: { offsetWidth: 800, offsetHeight: 400 } },
+      {},
+      { value: [[{}], [{}]] },
+      { queries: [{}, {}] },
+      {},
+      [],
+    );
+  };
+
+  it("colours all-negative tiles over their negative range", async () => {
+    const { visualMap } = (
+      await render([
+        [
+          { x: "a", y: "r", z: -5 },
+          { x: "b", y: "r", z: -20 },
+        ],
+        [
+          { x: "a", y: "r", z: -40 },
+          { x: "b", y: "r", z: -2 },
+        ],
+      ])
+    ).options;
+    expect([visualMap.min, visualMap.max]).toEqual([-40, -2]);
+  });
+
+  it("hands drilldowns each tile's raw row values by its y axis", async () => {
+    const result: any = await render([[{ x: "a", y: "", z: 1 }], [{ x: "a", y: "r2", z: 1 }]]);
+    expect(result.extras.heatmapRowValues).toEqual([[""], ["r2"]]);
+  });
+
+  it("surfaces a later tile's duplicate-row warning on the panel", async () => {
+    const result: any = await render([
+      [{ x: "a", y: "r", z: 1 }],
+      [
+        { x: "a", y: "r", z: 1 },
+        { x: "a", y: "r", z: 2 },
+      ],
+    ]);
+    expect(result.extras.limitNumberOfSeriesWarningMessage).toBe(
+      "Duplicate (x, y) rows found: 1; each affected cell shows the first row's value",
+    );
+  });
+});
+
+describe("heatmap drag-to-zoom and cursor sync", () => {
+  const store = {
+    state: {
+      theme: "light",
+      timezone: "UTC",
+      zoConfig: { max_dashboard_series: 100, timestamp_column: "_timestamp" },
+    },
+  };
+  const builderQuery = () => ({
+    customQuery: false,
+    fields: {
+      x: [{ alias: "x", functionName: "histogram", args: [{ value: { field: "_timestamp" } }] }],
+      y: [{ alias: "y" }],
+      z: [{ alias: "z" }],
+      breakdown: [],
+    },
+  });
+  const customQuery = () => ({ ...builderQuery(), customQuery: true });
+  const rows = [
+    { x: "2024-01-15T10:00:00", y: "r", z: 1 },
+    { x: "2024-01-15T10:01:00", y: "r", z: 2 },
+  ];
+  const range = {
+    startTime: Date.parse("2024-01-15T10:00:00Z") * 1000,
+    endTime: Date.parse("2024-01-15T10:02:00Z") * 1000,
+  };
+  const render = (query: any, resultMetaData: any = [{ histogram_interval: 60 }]) =>
+    convertSQLData(
+      { type: "heatmap", config: {}, queries: [query] },
+      [rows],
+      store,
+      { value: { offsetWidth: 800, offsetHeight: 400 } },
+      { value: null },
+      resultMetaData,
+      { queries: [range] },
+      {},
+      [],
+    );
+
+  it("zooms and syncs a builder heatmap whose x is histogram(_timestamp)", async () => {
+    const result: any = await render(builderQuery());
+    expect(result.options.toolbox.show).toBe(true);
+    expect(result.extras.isTimeSeries).toBe(true);
+    // The bucket starting at the range end is drawn too, as the filled x axis has always done.
+    expect(result.extras.heatmapTimeAxis.columns).toHaveLength(3);
+  });
+
+  it("keeps a heatmap with a categorical x without zoom or sync", async () => {
+    const result: any = await render(customQuery());
+    expect(result.options.toolbox.show).toBe(false);
+    expect(result.extras.isTimeSeries).toBe(false);
+    expect(result.extras.heatmapTimeAxis).toBeUndefined();
+  });
+
+  it("keeps a builder histogram heatmap without a known interval without zoom", async () => {
+    const result: any = await render(builderQuery(), [{}]);
+    expect(result.options.toolbox.show).toBe(false);
+    expect(result.extras.heatmapTimeAxis).toBeUndefined();
+  });
+
+  it("drops zoom and sync from heatmap tiles whose columns differ", async () => {
+    vi.mocked(calculateGridPositions).mockReturnValueOnce({
+      gridArray: [
+        { left: "0%", top: "0%", width: "50%", height: "100%" },
+        { left: "50%", top: "0%", width: "50%", height: "100%" },
+      ],
+      gridWidth: 400,
+      gridHeight: 400,
+      gridNoOfRow: 1,
+      gridNoOfCol: 2,
+    } as any);
+    const result: any = await convertMultiSQLData(
+      { type: "heatmap", config: {}, queries: [builderQuery(), builderQuery()] },
+      [rows, rows],
+      store,
+      { value: { offsetWidth: 800, offsetHeight: 400 } },
+      { value: null },
+      { value: [[{ histogram_interval: 60 }], [{ histogram_interval: 30 }]] },
+      { queries: [range, range] },
+      {},
+      [],
+    );
+    expect(result.extras.heatmapTimeAxis).toBeUndefined();
+    expect(result.extras.isTimeSeries).toBe(false);
+    expect(result.options.toolbox.show).toBe(false);
+  });
+});
+
+describe("multi-query heatmap tiles share one cell budget", () => {
+  const store = { state: { theme: "light", zoConfig: { max_dashboard_series: 100 } } };
+  const query = () => ({
+    customQuery: true,
+    fields: { x: [{ alias: "x" }], y: [{ alias: "y" }], z: [{ alias: "z" }], breakdown: [] },
+  });
+  const grid = () =>
+    vi.mocked(calculateGridPositions).mockReturnValueOnce({
+      gridArray: [
+        { left: "0%", top: "0%", width: "50%", height: "100%" },
+        { left: "50%", top: "0%", width: "50%", height: "100%" },
+      ],
+      gridWidth: 400,
+      gridHeight: 400,
+      gridNoOfRow: 1,
+      gridNoOfCol: 2,
+    } as any);
+  const render = (searchData: any[]) => {
+    grid();
+    return convertMultiSQLData(
+      { type: "heatmap", config: { decimals: 2 }, queries: [query(), query()] },
+      searchData,
+      store,
+      { value: { offsetWidth: 800, offsetHeight: 400 } },
+      {},
+      { value: [[{}], [{}]] },
+      { queries: [{}, {}] },
+      {},
+      [],
+    );
+  };
+
+  it("cuts each tile to half the budget, so the panel stays within it", async () => {
+    const tile = Array.from({ length: 300 }, (_u, row) =>
+      Array.from({ length: 100 }, (_v, col) => ({ x: `c${col}`, y: `r${row}`, z: 1 })),
+    ).flat();
+    const result: any = await render([tile, tile]);
+    const cells = result.options.series.map((series: any) => series.data.length);
+    expect(cells.every((count: number) => count <= 25_000)).toBe(true);
+    expect(cells.reduce((sum: number, count: number) => sum + count, 0)).toBeLessThanOrEqual(
+      50_000,
+    );
+  });
+
+  it("labels a hovered cell from its own tile's y axis when an earlier tile is empty", async () => {
+    const result: any = await render([[], [{ x: "a", y: "row-b", z: 5 }]]);
+    expect(result.options.series).toHaveLength(1);
+    const text = result.options.tooltip.formatter({
+      seriesIndex: 0,
+      value: [0, 0, 5],
+      name: "a",
+      marker: "",
+    });
+    expect(text).toContain("row-b");
   });
 });

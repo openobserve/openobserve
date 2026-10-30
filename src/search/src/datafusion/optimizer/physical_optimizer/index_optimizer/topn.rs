@@ -29,8 +29,10 @@ use datafusion::{
 use hashbrown::HashSet;
 
 use crate::datafusion::optimizer::physical_optimizer::{
-    index_optimizer::utils::is_complex_plan,
-    utils::{get_column_name, is_column, is_count_rows_aggregate},
+    index_optimizer::utils::{
+        aggregate_input_drops_rows, is_complex_plan, is_unfiltered_count_rows,
+    },
+    utils::{get_column_name, is_column},
 };
 
 #[rustfmt::skip]
@@ -144,8 +146,8 @@ impl<'n> TreeNodeVisitor<'n> for SimpleTopnVisitor {
         } else if let Some(aggregate) = node.downcast_ref::<AggregateExec>() {
             let group_len = aggregate.group_expr().expr().len();
             if !(1..=MAX_SIMPLE_TOPN_FIELDS).contains(&group_len)
-                || aggregate.aggr_expr().len() != 1
-                || !is_count_rows_aggregate(&aggregate.aggr_expr()[0])
+                || !is_unfiltered_count_rows(aggregate)
+                || aggregate_input_drops_rows(aggregate)
                 // the projection (if any) should be exactly the group by fields + count(*)
                 || self.projection_len.is_some_and(|len| len != group_len + 1)
             {
@@ -305,6 +307,18 @@ mod tests {
             // count(*)
             (
                 "select name, count(id) as cnt from t where match_all('error') group by name order by cnt desc limit 10",
+                None,
+            ),
+            (
+                "select name, count(_timestamp) filter (where status = 'error') as cnt from t group by name order by cnt desc limit 10",
+                None,
+            ),
+            (
+                "select name, count(*) as cnt from (select * from t limit 100) group by name order by cnt desc limit 10",
+                None,
+            ),
+            (
+                "select name, count(*) as cnt from (select name, id from t group by name, id) group by name order by cnt desc limit 10",
                 None,
             ),
             ("SELECT count(*) from t", None),

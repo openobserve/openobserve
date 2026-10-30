@@ -13,7 +13,7 @@ import {
   ref,
   watch,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -100,7 +100,7 @@ import {
 
 const CodeQueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
@@ -2135,7 +2135,7 @@ function widenTo(period: string) {
       >
         <OStatStrip
           v-if="severityField"
-          compact
+          compact-values
           data-test="security-events-severity-strip"
           :items="severityStats"
           :loading="histogramLoading && !histogram"

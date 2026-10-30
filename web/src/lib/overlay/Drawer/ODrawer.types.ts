@@ -6,6 +6,8 @@
  * in positioning and transition (slide instead of zoom/fade).
  */
 
+import type { I18nText } from "@/types/i18n";
+
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 
 /** Which viewport edge the drawer slides in from. */
@@ -63,7 +65,7 @@ export interface DrawerProps {
    * Convenience prop: plain-text title rendered in the header.
    * Ignored when the `header` slot is provided.
    */
-  title?: string;
+  title?: I18nText;
 
   /**
    * Optional data-test attribute rendered on the structured title element,
@@ -86,15 +88,6 @@ export interface DrawerProps {
   seamless?: boolean;
 
   /**
-   * When false the drawer is non-modal: no focus trap, the page behind stays
-   * clickable, and an outside click does not close it (the page decides what a
-   * click means — e.g. a list opening the clicked row in the same drawer).
-   * Escape and the close button still close it. Pair with `seamless`.
-   * @default true
-   */
-  modal?: boolean;
-
-  /**
    * Accessible name for a drawer that renders its own header (no `title`).
    * Screen readers announce this instead of the generic fallback.
    */
@@ -106,7 +99,7 @@ export interface DrawerProps {
    * Optional subtitle rendered below the title in the header, left-aligned.
    * Ignored when the `header` slot is provided.
    */
-  subTitle?: string;
+  subTitle?: I18nText;
 
   // ── Inbuilt footer buttons ──────────────────────────────────────────────
 
@@ -117,11 +110,13 @@ export interface DrawerProps {
   formId?: string;
 
   /** Label for the primary action button (right side). Omit to hide. */
-  primaryButtonLabel?: string;
+  primaryButtonLabel?: I18nText;
+  /** data-test for the primary button. @default "o-drawer-primary-btn" */
+  primaryButtonDataTest?: string;
   /** Label for the secondary action button (right of neutral, left of primary). Omit to hide. */
-  secondaryButtonLabel?: string;
+  secondaryButtonLabel?: I18nText;
   /** Label for the neutral action button (left side). Omit to hide. */
-  neutralButtonLabel?: string;
+  neutralButtonLabel?: I18nText;
 
   /** OButton variant for the primary button. @default "primary" */
   primaryButtonVariant?: ButtonVariant;
@@ -161,6 +156,23 @@ export interface DrawerProps {
    * @default undefined  (portals to document.body with fixed positioning)
    */
   portalTarget?: string | HTMLElement | null;
+
+  /** Element (or CSS selector) the drawer starts from, so app chrome above it stays visible; re-measured on resize. */
+  anchor?: string | HTMLElement | null;
+
+  /** Which edge of `anchor` the drawer starts at. Default: "top". */
+  anchorEdge?: "top" | "bottom";
+
+  /** Render the portal in place for a contained drawer surface. Default: false. */
+  inline?: boolean;
+
+  /** Called before the close button, Escape or an outside click closes the drawer; return false to keep it open. */
+  closeGuard?: () => boolean;
+
+  /** When false, the page behind stays interactive and only the close button or Escape outside a field closes it. Default: true. */
+  modal?: boolean;
+
+  returnFocusTo?: () => HTMLElement | null;
 }
 
 export interface DrawerEmits {
@@ -172,6 +184,7 @@ export interface DrawerEmits {
   (e: "click:secondary"): void;
   /** Fires when the neutral inbuilt button is clicked. */
   (e: "click:neutral"): void;
+  (e: "after-close"): void;
 }
 
 export interface DrawerSlots {

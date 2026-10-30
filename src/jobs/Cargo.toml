@@ -11,6 +11,7 @@ path = "src/lib.rs"
 [features]
 default = []
 enterprise = [
+    "dep:audit",
     "dep:o2_dex",
     "dep:o2_enterprise",
     "dep:o2_openfga",
@@ -18,6 +19,7 @@ enterprise = [
     "enrichment-data/enterprise",
     "openobserve-core/enterprise",
     "openobserve-org-storage/enterprise",
+    "openobserve-synthetics/enterprise",
     "promql-service/enterprise",
     "search_service/enterprise",
     "stream/enterprise",
@@ -28,23 +30,28 @@ cloud = [
     "enterprise",
     "o2_enterprise/cloud",
     "openobserve-core/cloud",
+    "openobserve-synthetics/cloud",
     "stream/cloud",
 ]
 vectorscan = [
+    "enrichment-data/vectorscan",
     "openobserve-core/vectorscan",
     "promql-service/vectorscan",
     "search_service/vectorscan",
     "stream/vectorscan",
 ]
+cpu-profiling = ["openobserve-core/cpu-profiling"]
+profiling = ["cpu-profiling", "openobserve-core/profiling"]
 
 [dependencies]
-audit.workspace = true
+audit = { workspace = true, optional = true }
 common.workspace = true
 db.workspace = true
 openobserve-core.workspace = true
 openobserve-node.workspace = true
 openobserve-builtins.workspace = true
-openobserve-org-storage.workspace = true
+openobserve-org-storage = { workspace = true, optional = true }
+openobserve-synthetics.workspace = true
 ingestion-common.workspace = true
 schema.workspace = true
 compaction.workspace = true
@@ -64,6 +71,7 @@ chrono.workspace = true
 config.workspace = true
 datafusion.workspace = true
 futures.workspace = true
+http.workspace = true
 hashbrown.workspace = true
 infra.workspace = true
 ingester.workspace = true
@@ -73,10 +81,13 @@ o2_dex = { workspace = true, optional = true }
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 o2_openfga = { workspace = true, optional = true }
 prometheus.workspace = true
+rand.workspace = true
+sea-orm.workspace = true
 proto.workspace = true
 regex.workspace = true
 report_server.workspace = true
 reqwest.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
 tonic.workspace = true

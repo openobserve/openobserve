@@ -13,13 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { defineComponent } from "vue";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import store from "@/test/unit/helpers/store";
 import useSearchBar from "./useSearchBar";
 import searchState from "./searchState";
+import { resetLogsAutoRunForTests, useLogsAutoRun } from "./logsAutoRun";
+import { REFRESH_QUERY_ORIGIN } from "./logsRowNav";
+import i18nInstance from "@/locales";
+const t = (i18nInstance.global as any).t;
 
 const i18n = createI18n({
   legacy: false,
@@ -35,7 +39,7 @@ const i18n = createI18n({
 
 const TestComponent = defineComponent({
   setup() {
-    const searchBar = useSearchBar();
+    const searchBar = useSearchBar(t);
     return { ...searchBar };
   },
   template: "<div></div>",
@@ -59,28 +63,24 @@ vi.mock("@/composables/useSearchWebSocket", () => ({
 const { mockDeleteRunningQueries } = vi.hoisted(() => ({
   mockDeleteRunningQueries: vi.fn(),
 }));
-vi.mock("@/services/search", () => ({
-  default: {
-    delete_running_queries: mockDeleteRunningQueries,
-    get_regions: vi.fn().mockResolvedValue({ data: {} }),
-    search: vi.fn(),
-    partition: vi.fn(),
-    result_schema: vi.fn(),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      delete_running_queries: mockDeleteRunningQueries,
+      get_regions: vi.fn().mockResolvedValue({ data: {} }),
+      search: vi.fn(),
+      partition: vi.fn(),
+      result_schema: vi.fn(),
+    },
+  });
+});
 
 const { mockGetAllFunctions } = vi.hoisted(() => ({
   mockGetAllFunctions: vi.fn(),
 }));
 vi.mock("@/composables/useFunctions", () => ({
   default: () => ({ getAllFunctions: mockGetAllFunctions }),
-}));
-
-const { mockGetAllActions } = vi.hoisted(() => ({
-  mockGetAllActions: vi.fn(),
-}));
-vi.mock("@/composables/useActions", () => ({
-  default: () => ({ getAllActions: mockGetAllActions }),
 }));
 
 const { mockShowErrorNotification } = vi.hoisted(() => ({
@@ -113,16 +113,27 @@ vi.mock("@/composables/useLogs/useStreamFields", () => ({
   default: () => ({ extractFields: vi.fn().mockResolvedValue(undefined) }),
 }));
 
-vi.mock("@/aws-exports", () => ({
-  default: { isEnterprise: "false", isCloud: "false" },
+const { mockConfig, mockLoadSemanticGroups, mockGetCachedSemanticGroups } = vi.hoisted(() => ({
+  mockConfig: { isEnterprise: "false", isCloud: "false" },
+  mockLoadSemanticGroups: vi.fn(),
+  mockGetCachedSemanticGroups: vi.fn(() => null as unknown[] | null),
+}));
+vi.mock("@/aws-exports", () => ({ default: mockConfig }));
+vi.mock("@/utils/semanticGroupsCache", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/semanticGroupsCache")>()),
+  loadSemanticGroups: mockLoadSemanticGroups,
+  getCachedSemanticGroups: mockGetCachedSemanticGroups,
 }));
 
 const { mockSavedViewsGet } = vi.hoisted(() => ({
   mockSavedViewsGet: vi.fn(),
 }));
-vi.mock("@/services/saved_views", () => ({
-  default: { get: mockSavedViewsGet },
-}));
+vi.mock("@/services/saved_views", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { get: mockSavedViewsGet },
+  });
+});
 
 vi.mock("@/utils/query/sqlIdentifiers", () => ({
   quoteSqlIdentifierIfNeeded: vi.fn((s: string) => `"${s}"`),
@@ -144,6 +155,7 @@ describe("useSearchBar Composable", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetLogsAutoRunForTests();
     mockDeleteRunningQueries.mockResolvedValue({
       data: [{ is_success: true }],
     });
@@ -160,10 +172,6 @@ describe("useSearchBar Composable", () => {
 
     it("should expose getFunctions", () => {
       expect(typeof wrapper.vm.getFunctions).toBe("function");
-    });
-
-    it("should expose getActions", () => {
-      expect(typeof wrapper.vm.getActions).toBe("function");
     });
 
     it("should expose getSavedViews", () => {
@@ -199,6 +207,132 @@ describe("useSearchBar Composable", () => {
     });
   });
 
+  describe("getQueryData — drawer-close rule and selection reset (4a §3.2.5, §3.2.7)", () => {
+    const prime = (pending: boolean) => {
+      const { searchObj } = searchState();
+      searchObj.data.stream.streamLists = [{ label: "app", value: "app" }];
+      searchObj.data.stream.selectedStream = ["app"];
+      searchObj.meta.showDetailTab = true;
+      searchObj.meta.resultGrid.navigation = {
+        currentRowIndex: 49,
+        selectionActive: true,
+        pendingPageSelection: pending ? { page: 2, position: "first", requestId: null } : null,
+      };
+      return searchObj;
+    };
+
+    it("a new query closes the drawer and drops the open row", async () => {
+      const searchObj = prime(true);
+      await (wrapper.vm as any).getQueryData(false);
+      expect(searchObj.meta.showDetailTab).toBe(false);
+      expect(searchObj.meta.resultGrid.navigation).toEqual({
+        currentRowIndex: null,
+        selectionActive: false,
+        pendingPageSelection: null,
+      });
+      expect(mockGetDataThroughStream).toHaveBeenCalledWith(false, undefined, {
+        reuseSchema: false,
+      });
+    });
+
+    it("a J/K crossing's page query keeps the drawer and the selection", async () => {
+      const searchObj = prime(true);
+      await (wrapper.vm as any).getQueryData(true);
+      expect(searchObj.meta.showDetailTab).toBe(true);
+      expect(searchObj.meta.resultGrid.navigation.currentRowIndex).toBe(49);
+      expect(searchObj.meta.resultGrid.navigation.pendingPageSelection?.page).toBe(2);
+      expect(mockGetDataThroughStream).toHaveBeenCalledWith(true, undefined, {
+        reuseSchema: false,
+      });
+    });
+
+    it("a mouse page query still closes the drawer", async () => {
+      const searchObj = prime(false);
+      await (wrapper.vm as any).getQueryData(true);
+      expect(searchObj.meta.showDetailTab).toBe(false);
+    });
+
+    it("an auto-refresh query keeps the drawer and drops only the stale row index", async () => {
+      const searchObj = prime(false);
+      await (wrapper.vm as any).getQueryData(false, { origin: REFRESH_QUERY_ORIGIN });
+      expect(searchObj.meta.showDetailTab).toBe(true);
+      expect(searchObj.meta.resultGrid.navigation).toEqual({
+        currentRowIndex: null,
+        selectionActive: true,
+        pendingPageSelection: null,
+      });
+      expect(mockGetDataThroughStream).toHaveBeenCalledWith(false, undefined, {
+        reuseSchema: false,
+      });
+    });
+
+    it("an auto-refresh query with the drawer closed still drops the selection", async () => {
+      const searchObj = prime(false);
+      searchObj.meta.showDetailTab = false;
+      await (wrapper.vm as any).getQueryData(false, { origin: REFRESH_QUERY_ORIGIN });
+      expect(searchObj.meta.resultGrid.navigation.currentRowIndex).toBeNull();
+      expect(searchObj.meta.resultGrid.navigation.selectionActive).toBe(false);
+    });
+  });
+
+  describe("getQueryData — semantic groups a filter needs", () => {
+    let releaseGroups: (groups: unknown[]) => void;
+
+    const prime = (query: string) => {
+      const { searchObj } = searchState();
+      searchObj.data.stream.streamLists = [{ label: "app", value: "app" }];
+      searchObj.data.stream.selectedStream = ["app"];
+      searchObj.data.query = query;
+    };
+
+    beforeEach(() => {
+      mockConfig.isEnterprise = "true";
+      mockGetCachedSemanticGroups.mockReturnValue(null);
+      mockLoadSemanticGroups.mockReturnValue(
+        new Promise((resolve) => {
+          releaseGroups = resolve;
+        }),
+      );
+    });
+
+    afterEach(() => {
+      mockConfig.isEnterprise = "false";
+      searchState().searchObj.data.query = "";
+    });
+
+    it("waits for uncached groups before building a filtered search", async () => {
+      prime("host = 'a'");
+      const run = (wrapper.vm as any).getQueryData(false);
+      await flushPromises();
+      expect(mockGetDataThroughStream).not.toHaveBeenCalled();
+
+      releaseGroups([]);
+      await run;
+      expect(mockGetDataThroughStream).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ["no filter", "", null, "true"],
+      ["cached groups", "host = 'a'", [], "true"],
+      ["an OSS build", "host = 'a'", null, "false"],
+    ])("dispatches in the same tick with %s", (_case, query, cached, enterprise) => {
+      mockConfig.isEnterprise = enterprise as string;
+      mockGetCachedSemanticGroups.mockReturnValue(cached as unknown[] | null);
+      prime(query as string);
+      void (wrapper.vm as any).getQueryData(false);
+      expect(mockGetDataThroughStream).toHaveBeenCalledTimes(1);
+      expect(mockLoadSemanticGroups).not.toHaveBeenCalled();
+    });
+
+    it("does not send a search superseded while it waited", async () => {
+      prime("host = 'a'");
+      const run = (wrapper.vm as any).getQueryData(false, { generationId: 987654 });
+      releaseGroups([]);
+      await run;
+      expect(mockGetDataThroughStream).not.toHaveBeenCalled();
+    });
+  });
+
   describe("onStreamChange", () => {
     it("clears carried-over selectedFields so FTS re-selects for the new stream", async () => {
       // Carried over from a previously selected stream. "field1" even exists
@@ -212,6 +346,95 @@ describe("useSearchBar Composable", () => {
       await wrapper.vm.onStreamChange("");
 
       expect(searchObj.data.stream.selectedFields).toEqual([]);
+    });
+
+    it("drops the previous stream's values, so autocomplete never offers them for the new one", async () => {
+      const { searchObj, fieldValues } = searchState();
+      fieldValues.value = { field1: new Set(["old-stream-only"]) };
+      const held = fieldValues.value;
+      searchObj.data.stream.selectedStream = ["new_stream"];
+
+      await wrapper.vm.onStreamChange("");
+
+      expect(fieldValues.value).toBe(held);
+      expect(fieldValues.value).toEqual({});
+    });
+
+    // searchObj.loading drives the results-grid skeleton, so it must stay off
+    // when the stream change only refreshes the schema.
+    describe("results-grid loading flag", () => {
+      const originalQueryOnStreamSelection = store.state.zoConfig.query_on_stream_selection;
+      const originalAutoQueryEnabled = store.state.zoConfig.auto_query_enabled;
+
+      afterEach(() => {
+        store.state.zoConfig.query_on_stream_selection = originalQueryOnStreamSelection;
+        store.state.zoConfig.auto_query_enabled = originalAutoQueryEnabled;
+      });
+
+      it("stays false when Auto Run Query is off and search is button-triggered", async () => {
+        store.state.zoConfig.query_on_stream_selection = true;
+        store.state.zoConfig.auto_query_enabled = true;
+        const { searchObj } = searchState();
+        searchObj.data.stream.selectedStream = ["new_stream"];
+        searchObj.meta.liveMode = false;
+        searchObj.loading = false;
+
+        // Asserted before the first await, where the flag is set.
+        const pending = wrapper.vm.onStreamChange("");
+        expect(searchObj.loading).toBe(false);
+        await pending;
+
+        expect(searchObj.loading).toBe(false);
+      });
+
+      it("requests one guarded 'stream' run after the fields load when Auto Run is on", async () => {
+        store.state.zoConfig.query_on_stream_selection = true;
+        store.state.zoConfig.auto_query_enabled = true;
+        const { searchObj } = searchState();
+        searchObj.data.stream.selectedStream = ["new_stream"];
+        searchObj.data.stream.streamLists = [{ label: "new_stream", value: "new_stream" }];
+        searchObj.meta.liveMode = true;
+        searchObj.meta.editorDirty = false;
+        searchObj.loading = false;
+        const logs = vi.fn();
+        useLogsAutoRun().setExecutors({ logs });
+
+        await wrapper.vm.onStreamChange("", { origin: "selector" });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(logs).toHaveBeenCalledTimes(1);
+        expect(logs.mock.calls[0][0]).toMatchObject({ reason: "stream", kind: "refinement" });
+      });
+
+      it("never runs for an editor-origin stream change (D3)", async () => {
+        store.state.zoConfig.query_on_stream_selection = true;
+        store.state.zoConfig.auto_query_enabled = true;
+        const { searchObj } = searchState();
+        searchObj.data.stream.selectedStream = ["typed_stream"];
+        searchObj.meta.liveMode = true;
+        const logs = vi.fn();
+        useLogsAutoRun().setExecutors({ logs });
+
+        await wrapper.vm.onStreamChange("", { origin: "editor" });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(logs).not.toHaveBeenCalled();
+      });
+
+      it("keeps the legacy run when the deployment auto-queries on stream selection", async () => {
+        store.state.zoConfig.query_on_stream_selection = false;
+        const { searchObj } = searchState();
+        searchObj.data.stream.selectedStream = ["new_stream"];
+        searchObj.meta.liveMode = false;
+        searchObj.loading = false;
+        const logs = vi.fn();
+        useLogsAutoRun().setExecutors({ logs });
+
+        await wrapper.vm.onStreamChange("");
+
+        expect(logs).toHaveBeenCalledTimes(1);
+        expect(logs.mock.calls[0][0]).toMatchObject({ reason: "explicit", kind: "explicit" });
+      });
     });
   });
 
@@ -270,6 +493,38 @@ describe("useSearchBar Composable", () => {
       wrapper.vm.getSavedViews();
       // Loading state is set before the async call
     });
+
+    it("lists only logs views: untyped ones and view_type logs", async () => {
+      mockSavedViewsGet.mockResolvedValue({
+        data: {
+          views: [
+            { view_id: "1", view_name: "legacy" },
+            { view_id: "2", view_name: "logs", view_type: "logs" },
+            { view_id: "3", view_name: "traces", view_type: "traces" },
+            { view_id: "4", view_name: "grid", view_type: "metrics_explorer" },
+          ],
+        },
+      });
+
+      wrapper.vm.getSavedViews(true);
+      await flushPromises();
+
+      const ids = searchState().searchObj.data.savedViews.map((v: any) => v.view_id);
+      expect(ids).toEqual(["1", "2"]);
+    });
+
+    it("resolves with the complete list on success and undefined on failure", async () => {
+      const views = [
+        { view_id: "1", view_name: "legacy" },
+        { view_id: "3", view_name: "traces", view_type: "traces" },
+      ];
+      mockSavedViewsGet.mockResolvedValue({ data: { views } });
+      await expect(wrapper.vm.getSavedViews(true)).resolves.toEqual(views);
+
+      mockSavedViewsGet.mockRejectedValue(new Error("boom"));
+      await expect(wrapper.vm.getSavedViews(true)).resolves.toBeUndefined();
+      expect(searchState().searchObj.loadingSavedView).toBe(false);
+    });
   });
 
   describe("getFunctions", () => {
@@ -281,14 +536,16 @@ describe("useSearchBar Composable", () => {
       expect(mockGetAllFunctions).toHaveBeenCalled();
     });
 
-    it("should not call getAllFunctions when already loaded", async () => {
+    /// Asking every time is the point: the query answers from cache while it is
+    /// fresh, so a populated store must not be what decides.
+    it("still calls getAllFunctions when the store already holds a list", async () => {
       store.state.organizationData.functions = [
         { name: "existing", num_args: 1, function: "fn() {}" },
       ];
       mockGetAllFunctions.mockResolvedValue(undefined);
 
       await wrapper.vm.getFunctions();
-      expect(mockGetAllFunctions).not.toHaveBeenCalled();
+      expect(mockGetAllFunctions).toHaveBeenCalled();
     });
 
     it("should show error notification on failure", async () => {
@@ -297,34 +554,6 @@ describe("useSearchBar Composable", () => {
 
       await wrapper.vm.getFunctions();
       expect(mockShowErrorNotification).toHaveBeenCalledWith("Error while fetching functions");
-    });
-  });
-
-  describe("getActions", () => {
-    it("should call getAllActions when actions list is empty", async () => {
-      store.state.organizationData.actions = [];
-      mockGetAllActions.mockResolvedValue(undefined);
-
-      await wrapper.vm.getActions();
-      expect(mockGetAllActions).toHaveBeenCalled();
-    });
-
-    it("should not call getAllActions when already loaded", async () => {
-      store.state.organizationData.actions = [
-        { name: "existing", id: "act-1", execution_details_type: "service" },
-      ];
-      mockGetAllActions.mockResolvedValue(undefined);
-
-      await wrapper.vm.getActions();
-      expect(mockGetAllActions).not.toHaveBeenCalled();
-    });
-
-    it("should show error notification on failure", async () => {
-      store.state.organizationData.actions = [];
-      mockGetAllActions.mockRejectedValue(new Error("Network error"));
-
-      await wrapper.vm.getActions();
-      expect(mockShowErrorNotification).toHaveBeenCalledWith("Error while fetching actions");
     });
   });
 

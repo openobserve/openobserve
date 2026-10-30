@@ -18,6 +18,10 @@ pub struct Model {
     pub last_error: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
+    #[sea_orm(nullable)]
+    pub running_by: Option<String>,
+    #[sea_orm(nullable)]
+    pub lease_until: Option<i64>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

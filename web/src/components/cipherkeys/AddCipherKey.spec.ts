@@ -28,15 +28,18 @@ import i18n from "@/locales";
 // exercise the actual schema wiring — an empty required field must block submit
 // and NOT call the service (the gap that let the AddToDashboard bug ship).
 
-vi.mock("@/services/cipher_keys", () => ({
-  default: {
-    create: vi.fn(),
-    update: vi.fn(),
-    get_by_name: vi.fn(),
-    list: vi.fn(),
-    delete: vi.fn(),
-  },
-}));
+vi.mock("@/services/cipher_keys", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create: vi.fn(),
+      update: vi.fn(),
+      get_by_name: vi.fn(),
+      list: vi.fn(),
+      delete: vi.fn(),
+    },
+  });
+});
 
 // toast returns a dismiss() fn — keep it a no-op so the loading toast teardown
 // in the save handlers doesn't blow up.
@@ -316,17 +319,20 @@ describe("AddCipherKey.vue", () => {
     it("emits cancel:hideform directly when there are no changes", async () => {
       wrapper = await createWrapper();
       await wrapper.find('[data-test="add-cipher-key-cancel-btn"]').trigger("click");
+      await flush();
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
-      expect(wrapper.vm.dialog.show).toBe(false);
+      expect(document.body.querySelector('[data-test="editor-draft-leave-dialog"]')).toBeNull();
     });
 
-    it("opens the discard-changes dialog when there are unsaved changes", async () => {
+    it("asks through the draft leave dialog when there are unsaved changes", async () => {
       wrapper = await createWrapper();
+      window.dispatchEvent(new Event("pointerdown"));
       setField(wrapper, "name", "dirty-name");
       await nextTick();
       await wrapper.find('[data-test="add-cipher-key-cancel-btn"]').trigger("click");
-      expect(wrapper.vm.dialog.show).toBe(true);
-      expect(wrapper.vm.dialog.title).toBe("Discard Changes");
+      await flush();
+      expect(wrapper.emitted("cancel:hideform")).toBeFalsy();
+      expect(document.body.querySelector('[data-test="editor-draft-leave-dialog"]')).not.toBeNull();
     });
   });
 });

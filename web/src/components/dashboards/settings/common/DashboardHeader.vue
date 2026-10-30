@@ -19,10 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div data-test="dashboard-header-row" class="mx-2 my-2 flex flex-nowrap items-center">
       <div v-if="backButton" data-test="dashboard-header-back-button-container" class="col-auto">
         <OButton
+          :aria-label="t('common.goBack')"
           data-test="dashboard-header-back-button"
           variant="outline"
           size="icon-xs"
-          class="mr-2"
+          class="me-2"
           @click="onBackClicked"
           icon-left="arrow-back-ios-new"
         >
@@ -42,7 +43,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent } from "vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { defineComponent, type PropType } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
@@ -51,8 +53,8 @@ export default defineComponent({
   components: { OSeparator, OButton },
   props: {
     title: {
-      type: String,
-      default: "",
+      type: String as unknown as PropType<I18nText>,
+      default: raw(""),
     },
     backButton: {
       type: Boolean,
@@ -61,11 +63,14 @@ export default defineComponent({
   },
   emits: ["back"],
   setup(props, { emit }) {
+    const { t } = useI18nTyped();
     const onBackClicked = () => {
       emit("back");
     };
 
     return {
+      t,
+      raw,
       onBackClicked,
     };
   },

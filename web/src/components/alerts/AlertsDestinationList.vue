@@ -17,36 +17,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex h-full flex-col p-0">
     <OPageLayout
+      overflow-first
       bleed
       v-if="!showDestinationEditor && !showImportDestination"
-      :title="t('alert_destinations.header')"
+      :title="t('alerts.header')"
       title-data-test="alert-destinations-list-title"
-      icon="location-on"
-      subtitle="Where triggered alerts are delivered"
+      icon="shield-alert-outline"
+      :subtitle="t('alerts.subtitle')"
+      tabs-below
     >
+      <template #header-tabs>
+        <AlertSectionTabs />
+      </template>
+
       <template #actions>
-        <OToggleGroup
-          :model-value="activeTab"
-          @update:model-value="
-            (v) => {
-              activeTab = v as 'all' | 'prebuilt' | 'custom';
-            }
+        <OButton
+          data-test="alert-destination-list-add-alert-btn"
+          variant="primary"
+          size="sm"
+          :disabled="!templates.length"
+          :aria-label="
+            destinationDrafts.hasNew
+              ? t('common.editorDraft.newDot', { label: t('alert_destinations.add') })
+              : undefined
           "
-          data-test="destination-list-tabs"
-        >
-          <OToggleGroupItem value="all" size="sm" data-test="destination-tab-all">
-            <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
-            {{ t("alert_destinations.filterAll") }}
-          </OToggleGroupItem>
-          <OToggleGroupItem value="prebuilt" size="sm" data-test="destination-tab-prebuilt">
-            <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
-            {{ t("alert_destinations.filterPrebuilt") }}
-          </OToggleGroupItem>
-          <OToggleGroupItem value="custom" size="sm" data-test="destination-tab-custom">
-            <template #icon-left><OIcon name="settings" size="sm" /></template>
-            {{ t("alert_destinations.filterCustom") }}
-          </OToggleGroupItem>
-        </OToggleGroup>
+          @click="editDestination(null)"
+          >{{ t(`alert_destinations.add`) }}
+          <EditorDraftDot
+            v-if="destinationDrafts.hasNew"
+            :saved-at="destinationDrafts.savedAt(null)"
+            corner
+            data-test="alert-destination-list-add-draft-dot"
+        /></OButton>
+      </template>
+      <template #actions-overflow>
         <OButton
           variant="outline"
           size="sm"
@@ -54,29 +58,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="destination-import"
           >{{ t(`dashboard.import`) }}</OButton
         >
-        <OButton
-          data-test="alert-destination-list-add-alert-btn"
-          variant="primary"
-          size="sm"
-          :disabled="!templates.length"
-          @click="editDestination(null)"
-          >{{ t(`alert_destinations.add`) }}</OButton
-        >
       </template>
+
       <div class="bg-card-glass-bg min-h-0 flex-1">
         <OTable
+          ref="oTableRef"
           data-test="alert-destinations-list-table"
           :data="visibleRows"
           :columns="columns"
           row-key="name"
           :loading="loading"
+          :forbidden="forbidden"
           :selected-ids="selectedDestinationIds"
           selection="multiple"
           pagination="client"
-          :page-size="20"
+          :page-size="pageSize"
           :page-size-options="[5, 10, 20, 50, 100]"
-          :footer-title="t('alert_destinations.header')"
+          :current-page="currentPage"
+          @update:page-size="pageSize = $event"
           sorting="client"
+          :sort-by="sortBy"
+          :sort-order="sortOrder"
+          @update:sort-by="sortBy = $event"
+          @update:sort-order="sortOrder = $event"
           :default-columns="false"
           :enable-column-resize="true"
           :persist-columns="true"
@@ -84,38 +88,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           show-index
           :show-global-filter="false"
           @update:selected-ids="handleSelectedIdsUpdate"
+          @update:current-page="onPageChange"
         >
           <template #toolbar>
-            <OSearchInput
-              v-model="filterQuery"
-              data-test="destination-list-search-input"
-              class="flex-1"
-              :placeholder="t('alert_destinations.search')"
-            />
+            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
+              <OToggleGroup
+                mobile-dropdown
+                :model-value="activeTab"
+                @update:model-value="
+                  (v) => {
+                    activeTab = v as 'all' | 'prebuilt' | 'custom';
+                  }
+                "
+                data-test="destination-list-tabs"
+              >
+                <OToggleGroupItem value="all" size="sm" data-test="destination-tab-all">
+                  <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+                  {{ t("alert_destinations.filterAll") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem value="prebuilt" size="sm" data-test="destination-tab-prebuilt">
+                  <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
+                  {{ t("alert_destinations.filterPrebuilt") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem value="custom" size="sm" data-test="destination-tab-custom">
+                  <template #icon-left><OIcon name="settings" size="sm" /></template>
+                  {{ t("alert_destinations.filterCustom") }}
+                </OToggleGroupItem>
+              </OToggleGroup>
+              <OSearchInput
+                v-model="filterQuery"
+                data-test="destination-list-search-input"
+                class="min-w-0 flex-1 max-md:min-w-40"
+                :placeholder="t('alert_destinations.search')"
+              />
+            </div>
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
-              :loading="loading"
+              :last-run-at="lastUpdatedAt"
+              :loading="fetching"
+              shortcut-id="alertDestinationsRefresh"
               data-test="alert-destinations-list-refresh-btn"
-              @click="getDestinations"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="alertDestinationsRefresh"
-              />
-            </OButton>
+              @click="refreshDestinations"
+            />
           </template>
 
-          <template #bottom="{ totalRows }">
-            <span class="text-xs font-normal">
-              {{ totalRows.toLocaleString() }} {{ t("alert_destinations.header") }}
-            </span>
+          <template #selection-actions>
             <OButton
-              v-if="selectedDestinations.length > 0"
               data-test="destination-list-delete-destinations-btn"
               variant="outline-destructive"
               size="sm"
@@ -159,13 +180,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
 
+          <template #cell-name="{ row }">
+            <div class="flex min-w-0 items-center gap-2">
+              <OTruncatedText>{{ row.name }}</OTruncatedText>
+              <EditorDraftDot
+                v-if="destinationDrafts.ids.has(row.name)"
+                :saved-at="destinationDrafts.savedAt(row.name)"
+                :data-test="`alert-destination-list-${row.name}-draft-dot`"
+              />
+            </div>
+          </template>
+
           <template #cell-template="{ row }">
             <div
               v-if="row.template"
               class="flex min-w-0 items-center gap-2"
               :data-test="`destination-template-${row.name}`"
             >
-              <span class="min-w-0 truncate" :title="row.template">{{ row.template }}</span>
+              <OTruncatedText>{{ row.template }}</OTruncatedText>
               <OTag
                 v-if="isDefaultPrebuiltTemplate(row)"
                 :data-test="`destination-template-default-badge-${row.name}`"
@@ -177,8 +209,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span v-else class="text-text-secondary">—</span>
           </template>
 
+          <template #cell-url="{ row }">
+            <OTruncatedText v-if="isSlackApp(row)" :data-test="`destination-channel-${row.name}`">{{
+              slackChannelLabel(row)
+            }}</OTruncatedText>
+            <OTruncatedText v-else :tooltip="false">{{ destinationUrl(row) }}</OTruncatedText>
+          </template>
+
           <template #cell-type="{ row }">
-            <div class="flex items-center gap-2">
+            <div v-if="isSlackApp(row)" class="flex flex-col items-start gap-1">
+              <div class="flex items-center gap-2">
+                <OTag
+                  :data-test="`destination-type-badge-slack-app-${row.name}`"
+                  type="destinationKind"
+                  value="prebuilt"
+                  >{{ t("slackApp.destination.appTile", { product: slackProduct }) }}</OTag
+                >
+                <OTag
+                  :data-test="`destination-type-two-way-${row.name}`"
+                  variant="success-soft"
+                  size="sm"
+                  :label="t('slackApp.destination.twoWay')"
+                />
+              </div>
+              <OButton
+                v-if="row.previous_webhook"
+                variant="ghost-primary"
+                size="xs"
+                icon-left="undo"
+                :loading="switchPending.has(row.name)"
+                :data-test="`destination-switch-back-${row.name}`"
+                @click="switchBack(row)"
+                >{{ t("slackApp.destination.switchBack") }}</OButton
+              >
+            </div>
+            <div v-else-if="isSlackWebhook(row)" class="flex flex-col items-start gap-1">
+              <div class="flex items-center gap-2">
+                <OTag
+                  :data-test="`destination-type-badge-slack-webhook-${row.name}`"
+                  type="destinationKind"
+                  value="prebuilt"
+                  >{{ t("slackApp.destination.webhookTile", { product: slackProduct }) }}</OTag
+                >
+                <OIcon
+                  name="auto-awesome"
+                  size="sm"
+                  :title="t('alerts.prebuiltDestination', { type: slackProduct })"
+                />
+              </div>
+              <OButton
+                v-if="switchInstallation(row)"
+                variant="ghost-primary"
+                size="xs"
+                icon-left="sync"
+                :loading="switchPending.has(row.name)"
+                :data-test="`destination-switch-to-app-${row.name}`"
+                @click="switchToApp(row)"
+                >{{ t("slackApp.destination.switchToApp", { product: slackProduct }) }}</OButton
+              >
+            </div>
+            <div v-else class="flex items-center gap-2">
               <template v-if="getPrebuiltTypeName(row)">
                 <OTag
                   :data-test="`destination-type-badge-${getPrebuiltTypeName(row)?.toLowerCase()}`"
@@ -189,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon
                   name="auto-awesome"
                   size="sm"
-                  :title="'Prebuilt ' + getPrebuiltTypeName(row) + ' destination'"
+                  :title="t('alerts.prebuiltDestination', { type: getPrebuiltTypeName(row) })"
                 />
               </template>
               <template v-else>
@@ -211,7 +301,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="export"
                 variant="ghost"
                 size="icon-sm"
-                title="Export Destination"
+                class="max-md:hidden"
+                :title="t('alert_destinations.exportDestination')"
                 @click.stop="exportDestination(row)"
               >
                 <OIcon name="download" size="sm" />
@@ -221,6 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="edit"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 :title="t('alert_destinations.edit')"
                 @click="editDestination(row)"
               >
@@ -231,12 +323,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="delete"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 :title="t('alert_destinations.delete')"
+                :loading="deletingDestinations.has(row.name)"
                 @click="conformDeleteDestination(row)"
               >
                 <OIcon name="delete" size="sm" />
               </OButton>
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    :aria-label="t('common.moreActions')"
+                    icon-left="more-vert"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    class="md:hidden"
+                    data-test="alert-destination-list-row-more-actions"
+                    @click.stop
+                  />
+                </template>
+                <ODropdownItem
+                  icon-left="download"
+                  class="md:hidden"
+                  data-test="destination-export-menu"
+                  @select="exportDestination(row)"
+                >
+                  <span>{{ t("alert_destinations.exportDestination") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="edit"
+                  class="md:hidden"
+                  :data-test="`alert-destination-list-${row.name}-update-destination-menu`"
+                  @select="editDestination(row)"
+                >
+                  <span>{{ t("alert_destinations.edit") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="delete"
+                  variant="destructive"
+                  class="md:hidden"
+                  :data-test="`alert-destination-list-${row.name}-delete-destination-menu`"
+                  @select="conformDeleteDestination(row)"
+                >
+                  <span>{{ t("alert_destinations.delete") }}</span>
+                </ODropdownItem>
+              </ODropdown>
             </div>
+          </template>
+
+          <template #cell-used_by="{ row }">
+            <DependencyUsageCell
+              :graph="depGraph"
+              :focus="{ kind: 'destination', name: row.name }"
+              @deleted="onDependencyDeleted"
+            />
           </template>
         </OTable>
       </div>
@@ -247,28 +387,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :destination="editingDestination"
         :templates="templates"
         @cancel:hideform="toggleDestinationEditor"
-        @get:destinations="getDestinations"
+        @get:destinations="refreshDestinations"
       />
     </div>
     <div v-else class="min-h-0 flex-1">
       <ImportDestination
         :destinations="destinations"
         :templates="templates"
-        @update:destinations="getDestinations"
+        @update:destinations="refreshDestinations"
       />
     </div>
 
     <ConfirmDialog
-      title="Delete Destination"
-      message="Are you sure you want to delete destination?"
+      :title="t('alert_destinations.deleteDestinationTitle')"
+      message-keypath="alert_destinations.deleteDestinationMessage"
+      :message-name="confirmDelete.data?.name"
+      ok-variant="destructive"
       @update:ok="deleteDestination"
       @update:cancel="cancelDeleteDestination"
       v-model="confirmDelete.visible"
     />
 
     <ConfirmDialog
-      title="Delete Destinations"
-      :message="`Are you sure you want to delete ${selectedDestinations.length} destination(s)?`"
+      :title="t('alert_destinations.deleteDestinationsTitle')"
+      :message="t('alerts.confirmDeleteDestinations', { count: selectedDestinations.length })"
+      ok-variant="destructive"
       @update:ok="bulkDeleteDestinations"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -276,38 +419,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 </template>
 <script lang="ts">
+import { bulkDeleteDestinationsMutation } from "@/services/alert_destination.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation, useQuery } from "@tanstack/vue-query";
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { destinationKeys } from "@/services/alert_destination.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import { ref, onBeforeMount, onActivated, watch, defineComponent, onMounted, computed } from "vue";
 import type { Ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { getImageURL } from "@/utils/zincutils";
 import AddDestination from "./AddDestination.vue";
 import destinationService from "@/services/alert_destination";
-import templateService from "@/services/alert_templates";
+import { templatesQuery } from "@/services/alert_templates.queries";
 import { useStore } from "vuex";
 import ConfirmDialog from "../ConfirmDialog.vue";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
+import { useListViewState } from "@/composables/useListViewState";
 import type { DestinationPayload } from "@/ts/interfaces";
 import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import type { Template } from "@/ts/interfaces/index";
 
 import ImportDestination from "./ImportDestination.vue";
-import useActions from "@/composables/useActions";
+import DependencyUsageCell from "./DependencyUsageCell.vue";
+import useDependencyGraph, {
+  invalidateDependencyGraphCache,
+  applyDependencyDeletion,
+  depNodeId,
+} from "@/composables/alerts/useDependencyGraph";
+import type { DepNodeKind } from "@/composables/alerts/useDependencyGraph";
 import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { slackInstallationsQuery } from "@/services/slack.queries";
+import { readSlackOrgConfig } from "@/utils/slackSettings";
+import { useOncallRoomNames, useSlackAppSwitch } from "@/composables/slack/useSlackAppSwitch";
+import {
+  isSlackAppDestination,
+  isSlackWebhookDestination,
+  slackWebhookTarget,
+  withoutSlackAppReview,
+  type SlackAppDestination,
+} from "@/utils/slackAppDestination";
 
 interface ConformDelete {
   visible: boolean;
@@ -317,27 +490,77 @@ export default defineComponent({
   name: "PageAlerts",
   components: {
     OIcon,
+    ORefreshButton,
     AddDestination,
     OEmptyState,
     ConfirmDialog,
     ImportDestination,
     OButton,
-    OTooltip,
+    ODropdown,
+    ODropdownItem,
     OSearchInput,
     OTag,
+    OTruncatedText,
     OTable,
     OToggleGroup,
     OToggleGroupItem,
     OPageLayout,
+    AlertSectionTabs,
+    DependencyUsageCell,
+    EditorDraftDot,
   },
   setup() {
     const store = useStore();
     const editingDestination: Ref<DestinationPayload | null> = ref(null);
-    const { t } = useI18n();
-    const { getAllActions } = useActions();
+    const { t } = useI18nTyped();
+    const { graph: depGraph, loadGraph: loadDepGraph } = useDependencyGraph();
     const { track } = useReo();
+    const destinationDrafts = useEditorDraftIds("alert_destination");
 
     const { detectPrebuiltType, availableTypes } = usePrebuiltDestinations();
+
+    const slackProduct = raw("Slack");
+    const slackEnabled = computed(() => readSlackOrgConfig(store.state.zoConfig).enabled);
+    const slackOrg = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
+    const slackInstallations = useQuery(() =>
+      Object.assign(slackInstallationsQuery(slackOrg.value, { silentForbidden: true }), {
+        enabled: slackEnabled.value && !!slackOrg.value,
+      }),
+    );
+    const workspaces = computed(() =>
+      (slackInstallations.data.value?.installations ?? []).filter(
+        (i) => i.status !== "revoked" && i.status !== "pending",
+      ),
+    );
+    const isSlackApp = (row: any): boolean => isSlackAppDestination(row);
+    const isSlackWebhook = (row: any): boolean => isSlackWebhookDestination(row);
+    const slackChannelLabel = (row: any) =>
+      t("slackApp.destination.channelInWorkspace", {
+        channel: raw(row.channel_name || row.channel_id),
+        workspace: raw(workspaces.value.find((i) => i.id === row.installation_id)?.team_name ?? ""),
+      });
+    const switchInstallation = (row: any): string | null => {
+      const target = slackWebhookTarget(row);
+      if (!target.channelId || oncallRooms.value.has(row.name)) return null;
+      return workspaces.value.find((i) => i.team_id === target.teamId)?.id ?? null;
+    };
+    const { pending: switchPending, switchOne, switchBack: switchBackOne } = useSlackAppSwitch();
+    const switchToApp = async (row: any) => {
+      const installationId = switchInstallation(row);
+      if (installationId && (await switchOne(row, installationId))) refreshDestinations();
+    };
+    const switchBack = async (row: SlackAppDestination) => {
+      if (await switchBackOne(row)) refreshDestinations();
+    };
+
+    // Email destinations store recipients in emails[], not url. Method is HTTP-only.
+    const destinationUrl = (row: DestinationPayload): string => {
+      if (row.type === "email") return (row.emails ?? []).join(", ");
+      if (isSlackAppDestination(row)) return `#${(row as any).channel_name ?? ""}`;
+      return row.url ?? "";
+    };
+    const destinationMethod = (row: DestinationPayload): string =>
+      row.type === "email" || isSlackAppDestination(row) ? "" : (row.method ?? "").toUpperCase();
 
     const columns: OTableColumnDef[] = [
       {
@@ -353,7 +576,7 @@ export default defineComponent({
       },
       {
         id: "type",
-        header: "Type",
+        header: t("common.type"),
         accessorKey: "type",
         sortable: true,
         resizable: true,
@@ -363,12 +586,15 @@ export default defineComponent({
       },
       {
         id: "url",
-        header: t("alert_destinations.url"),
-        accessorKey: "url",
+        header: slackEnabled.value
+          ? t("alert_destinations.urlRecipientsChannel")
+          : t("alert_destinations.urlOrRecipients"),
+        accessorFn: destinationUrl,
         resizable: true,
         hideable: true,
         size: COL.url,
-        meta: { align: "left" },
+        // A webhook URL is its own secret: anyone holding it can post to the channel.
+        meta: { align: "left", cellOverflowTooltip: false },
       },
       {
         id: "template",
@@ -383,7 +609,7 @@ export default defineComponent({
       {
         id: "method",
         header: t("alert_destinations.method"),
-        accessorKey: "method",
+        accessorFn: destinationMethod,
         sortable: true,
         resizable: true,
         hideable: true,
@@ -391,15 +617,29 @@ export default defineComponent({
         meta: { align: "left" },
       },
       {
+        id: "used_by",
+        header: t("alert_dependencies.usedByColumn"),
+        cell: " ",
+        sortable: false,
+        resizable: true,
+        hideable: true,
+        size: 200,
+        meta: { align: "left" },
+      },
+      {
         id: "actions",
         header: t("alert_destinations.actions"),
         isAction: true,
         pinned: "right",
-        size: 120,
+        size: 130,
         meta: { align: "center", actionCount: 3 },
       },
     ];
     const destinations: Ref<DestinationPayload[]> = ref([]);
+    const hasSlackWebhooks = computed(
+      () => slackEnabled.value && destinations.value.some((d: any) => isSlackWebhookDestination(d)),
+    );
+    const oncallRooms = useOncallRoomNames(hasSlackWebhooks);
     const templates: Ref<Template[]> = ref([{ name: "test", body: "", type: "http" }]);
     const confirmDelete: Ref<ConformDelete> = ref({
       visible: false,
@@ -411,8 +651,28 @@ export default defineComponent({
     const showDestinationEditor = ref(false);
     const showImportDestination = ref(false);
     const router = useRouter();
-    const filterQuery = ref("");
-    const resultTotal = ref(0);
+    const route = useRoute();
+    const viewState = useListViewState("alertDestinations", {
+      filterQuery: "",
+      tab: "all" as "all" | "prebuilt" | "custom",
+      pageSize: 20,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+    });
+    const filterQuery = ref(viewState.filterQuery);
+    const pageSize = ref(viewState.pageSize);
+    const sortBy = ref(viewState.sortBy);
+    const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
+    const deletingDestinations = ref(new Set<string>());
+    const oTableRef: any = ref(null);
+
+    // URL-synced so returning from add/edit/import (Back/Update/Cancel) lands on the same page instead of resetting to page 1.
+    const currentPage = ref(Number(route.query.page) || 1);
+    const onPageChange = (page: number) => {
+      currentPage.value = page;
+      if (String(route.query.page ?? "1") === String(page)) return;
+      router.replace({ query: { ...route.query, page: String(page) } });
+    };
 
     const selectedDestinationIds = computed(() =>
       selectedDestinations.value.map((d: any) => d.name),
@@ -430,15 +690,16 @@ export default defineComponent({
     onBeforeMount(() => {
       getDestinations();
       getTemplates();
-      getActions();
     });
 
     watch(
-      () => router.currentRoute.value.query.action,
-      (action) => {
+      () => [router.currentRoute.value.query.action, router.currentRoute.value.query.name],
+      ([action]) => {
         if (!action) {
           showDestinationEditor.value = false;
           showImportDestination.value = false;
+        } else {
+          updateRoute();
         }
       },
     );
@@ -447,104 +708,200 @@ export default defineComponent({
       updateRoute();
     });
 
-    const getActions = async () => {
-      const dismiss = toast({
-        variant: "loading",
-        message: "Please wait while loading alert destination...",
-        timeout: 0,
-      });
-      if (store.state.organizationData.actions.length == 0) {
-        await getAllActions()
-          .catch(() => {
-            toast({
-              variant: "error",
-              message: "Error while loading actions.",
-            });
-          })
-          .finally(() => dismiss());
-      }
+    // A delete is one row leaving a list the server has already confirmed. Splice
+    // it out and prune the shared dependency graph rather than refetching: a
+    // refetch blanks the table behind its spinner and a "please wait" toast, which
+    // reads as a page reload, and takes the user's scroll and page with it.
+    const dropDestinations = (names: string[]) => {
+      if (!names.length) return;
+      const gone = new Set(names);
+      destinations.value = destinations.value.filter((d: any) => !gone.has(d.name));
+      // Anything that failed to delete stays selected, so a bulk retry is one click.
+      selectedDestinations.value = selectedDestinations.value.filter((d: any) => !gone.has(d.name));
+      const org = store.state.selectedOrganization.identifier;
+      for (const name of gone)
+        deleteEditorDraftsFor({ kind: "alert_destination", org, entityId: name });
+      // The rows above are a render of the cached list, not the cache itself —
+      // splice the names out of every cached module list too, or the row returns
+      // on the next visit inside staleTime.
+      queryClient.setQueriesData({ queryKey: destinationKeys.all(org) }, (list: any) =>
+        Array.isArray(list) ? list.filter((d: any) => !gone.has(d.name)) : list,
+      );
+      for (const name of gone)
+        depGraph.value = applyDependencyDeletion(
+          org,
+          depNodeId("destination", name),
+          depGraph.value,
+        );
+    };
+
+    const dropDraftsOfMissing = (names: string[]) => {
+      const org = store.state.selectedOrganization.identifier;
+      const present = new Set(destinations.value.map((d) => d.name));
+      for (const name of names)
+        if (!present.has(name))
+          deleteEditorDraftsFor({ kind: "alert_destination", org, entityId: name });
+    };
+
+    // Deleting an alert in the impact dialog leaves this list's rows untouched, so
+    // re-read the (already pruned) shared graph for the Used by counts instead of
+    // reloading the page's data.
+    const onDependencyDeleted = (kind: DepNodeKind) => {
+      if (kind === "destination") getDestinations();
+      else loadDepGraph(store.state.selectedOrganization.identifier);
     };
 
     const loading = ref(false);
-    const getDestinations = () => {
-      const dismiss = toast({
-        variant: "loading",
-        message: "Please wait while loading destinations...",
-        timeout: 0,
-      });
-      loading.value = true;
-      destinationService
-        .list({
-          page_num: 1,
-          page_size: 100000,
-          sort_by: "name",
-          desc: false,
-          org_identifier: store.state.selectedOrganization.identifier,
-          module: "alert",
+    const forbidden = ref(false);
+    // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
+    watch(
+      loading,
+      (isLoading) => {
+        if (isLoading) return;
+        setTimeout(() => {
+          oTableRef.value?.restorePage?.(currentPage.value);
+        }, 0);
+      },
+      { once: true },
+    );
+    // Request in flight with rows still on screen — the refresh button's
+    // spinner. `loading` is the skeleton, for a cold read only.
+    const fetching = ref(false);
+    const lastUpdatedAt = ref<number | null>(null);
+    // Bound to refresh / post-write reloads: always reaches the server.
+    const refreshDestinations = () => getDestinations(true);
+
+    const getDestinations = (force = false) => {
+      const org = store.state.selectedOrganization.identifier;
+      // Only a cold read spins and toasts — the rows stay put on a refresh.
+      const warm = queryClient.getQueryData(destinationKeys.list(org, "alert", true)) !== undefined;
+      const dismiss = warm
+        ? () => {}
+        : toast({
+            variant: "loading",
+            message: t("toastMessages.alerts.pleaseWaitWhileLoadingDestinations"),
+            timeout: 0,
+          });
+
+      // includeUsage=true: same key loadDepGraph asks for below, so the two share one request.
+      const options = destinationsQuery(org, "alert", true);
+      const applyRows = (list: any[]) => {
+        const rows = list.filter(
+          (destination: any) =>
+            destination.type == "http" ||
+            destination.type == "email" ||
+            isSlackAppDestination(destination),
+        );
+        destinations.value = rows;
+        updateRoute();
+      };
+
+      // Paint the cached rows before the request goes out, so a refresh never
+      // blanks the table.
+      const cached = queryClient.getQueryData<any[]>(options.queryKey);
+      if (cached !== undefined) applyRows(cached);
+      loading.value = cached === undefined;
+      fetching.value = true;
+      forbidden.value = false;
+
+      // TODO: fold into `useQuery` — kept imperative for now because the
+      // surrounding toast/dependency-graph flow is sequenced by hand.
+      if (force) {
+        void queryClient.invalidateQueries({
+          queryKey: options.queryKey,
+          exact: true,
+          refetchType: "none",
+        });
+      }
+      return queryClient
+        .fetchQuery(options)
+        .then((list: any[]) => {
+          applyRows(list);
+          lastUpdatedAt.value =
+            queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? Date.now();
+          // Kept out of `apply`, which runs again for the cached paint:
+          // rebuilding the graph is three more list calls. Only a forced read
+          // can have changed it — every add/edit/delete reloads with force — so
+          // a plain mount leaves the graph's own cache to answer, and the
+          // "Used by" counts still follow every write.
+          if (force) invalidateDependencyGraphCache();
+          loadDepGraph(org, force ? ["alerts", "templates"] : []);
+          return true;
         })
-        .then((res) => {
-          res.data = res.data.filter(
-            (destination: any) =>
-              destination.type == "http" ||
-              destination.type == "email" ||
-              destination.type === "action",
-          );
-          resultTotal.value = res.data.length;
-          destinations.value = res.data;
-          updateRoute();
-        })
-        .catch((err) => {
-          if (err.response.status != 403) {
+        .catch((err: any) => {
+          forbidden.value = err?.response?.status === 403;
+          if (!forbidden.value) {
             toast({
               variant: "error",
-              message: "Error while pulling destinations.",
+              message: t("toastMessages.alerts.errorWhilePullingDestinations"),
             });
           }
           dismiss();
+          return false;
         })
         .finally(() => {
           dismiss();
           loading.value = false;
+          fetching.value = false;
         });
     };
     const getTemplates = () => {
-      templateService
-        .list({
-          org_identifier: store.state.selectedOrganization.identifier,
-        })
-        .then((res) => (templates.value = res.data));
+      queryClient
+        .fetchQuery(templatesQuery(store.state.selectedOrganization.identifier))
+        .then((list: any) => (templates.value = list))
+        // Template read can be denied (403) to users who may still manage destinations.
+        .catch(() => (templates.value = []));
     };
+    // Called both on mount and every time `getDestinations()` resolves (cache-hit
+    // paint and the async fetch that follows it), so it can run more than once for
+    // the same `?action=add|update` — guard against re-opening (and thereby
+    // re-toggling closed) an editor that's already showing the right target.
     const updateRoute = () => {
-      if (router.currentRoute.value.query.action === "add") editDestination(null);
-      if (router.currentRoute.value.query.action === "update")
-        editDestination(getDestinationByName(router.currentRoute.value.query.name as string));
-      if (router.currentRoute.value.query.action === "import") showImportDestination.value = true;
+      const action = router.currentRoute.value.query.action;
+      if (action === "add") {
+        if (!showDestinationEditor.value || editingDestination.value) editDestination(null);
+      } else if (action === "update") {
+        const name = router.currentRoute.value.query.name as string;
+        const destination = getDestinationByName(name);
+        if (
+          destination &&
+          (!showDestinationEditor.value || editingDestination.value?.name !== name)
+        )
+          editDestination(destination, true);
+      } else if (action === "import") {
+        showImportDestination.value = true;
+      }
     };
     const getDestinationByName = (name: string) => {
       return destinations.value.find((destination) => destination.name === name);
     };
-    const editDestination = (destination: any) => {
+    // Only the route's own Review may open the switch form; every other open drops its params.
+    const editDestination = (destination?: DestinationPayload | null, fromRoute = false) => {
       if (!destination) {
         track("Button Click", {
           button: "Add Destination",
           page: "Alert Destinations",
         });
       }
-      toggleDestinationEditor();
+      if (!showDestinationEditor.value) toggleDestinationEditor();
       resetEditingDestination();
       if (!destination) {
+        const { name: _name, ...restQuery } = router.currentRoute.value.query;
         router.push({
           name: "alertDestinations",
           query: {
+            ...withoutSlackAppReview(restQuery),
             action: "add",
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
       } else {
         editingDestination.value = { ...destination };
+        const query = router.currentRoute.value.query;
         router.push({
           name: "alertDestinations",
           query: {
+            ...(fromRoute ? query : withoutSlackAppReview(query)),
             action: "update",
             name: destination.name,
             org_identifier: store.state.selectedOrganization.identifier,
@@ -556,32 +913,34 @@ export default defineComponent({
       editingDestination.value = null;
     };
     const deleteDestination = () => {
-      if (confirmDelete.value?.data?.name) {
-        destinationService
-          .delete({
-            org_identifier: store.state.selectedOrganization.identifier,
-            destination_name: confirmDelete.value.data.name,
-          })
-          .then(() => {
-            toast({
-              variant: "success",
-              message: `Destination ${confirmDelete.value.data.name} deleted successfully`,
-            });
-            getDestinations();
-          })
-          .catch((err) => {
-            if (err.response.data.code === 409) {
-              const message =
-                err.response.data?.message ||
-                err.response.data?.error ||
-                "Error while deleting destination";
-              toast({
-                variant: "error",
-                message,
-              });
-            }
+      const name = confirmDelete.value?.data?.name;
+      if (!name) return;
+      deletingDestinations.value.add(name);
+      destinationService
+        .delete({
+          org_identifier: store.state.selectedOrganization.identifier,
+          destination_name: name,
+        })
+        .then(() => {
+          toast({
+            variant: "success",
+            message: t("toastMessages.alerts.destinationDeletedSuccessfully", { name }),
           });
-      }
+          dropDestinations([name]);
+        })
+        .catch((err: any) => {
+          // A network failure has no `err.response` at all, and a non-409 code used
+          // to fall through silently; the row stays either way, so it has to say why.
+          if (err?.response?.status === 403) return;
+          const message =
+            err?.response?.data?.message ||
+            err?.response?.data?.error ||
+            t("alerts.messages.deleteDestinationFailed");
+          toast({ variant: "error", message });
+        })
+        .finally(() => {
+          deletingDestinations.value.delete(name);
+        });
     };
     const conformDeleteDestination = (destination: any) => {
       confirmDelete.value.visible = true;
@@ -593,13 +952,16 @@ export default defineComponent({
     };
     const toggleDestinationEditor = () => {
       showDestinationEditor.value = !showDestinationEditor.value;
-      if (!showDestinationEditor.value)
+      if (!showDestinationEditor.value) {
+        const { action: _action, name: _name, ...restQuery } = router.currentRoute.value.query;
         router.push({
           name: "alertDestinations",
           query: {
+            ...withoutSlackAppReview(restQuery),
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
+      }
     };
     const filterData = (rows: any, terms: any) => {
       var filtered = [];
@@ -636,9 +998,11 @@ export default defineComponent({
     };
     const importDestination = () => {
       showImportDestination.value = true;
+      const { name: _name, ...restQuery } = router.currentRoute.value.query;
       router.push({
         name: "alertDestinations",
         query: {
+          ...restQuery,
           action: "import",
           org_identifier: store.state.selectedOrganization.identifier,
         },
@@ -667,18 +1031,21 @@ export default defineComponent({
         return t("alert_destinations.customWebhook");
       } else if (destination.type === "email") {
         return t("alert_destinations.customEmail");
-      } else if (destination.type === "action") {
-        return t("alert_destinations.customAction");
       }
       return t("alert_destinations.custom");
     };
 
-    // Top-right tab filter — mirrors the alerts list and templates list.
-    // "prebuilt" matches any destination detectable as a prebuilt type
-    // (Slack/Opsgenie/PagerDuty/ServiceNow/etc., identified via the
-    // `prebuilt_type` metadata or URL/template pattern); "custom" is the
-    // negation, capturing user-defined HTTP/Email/Action destinations.
-    const activeTab = ref<"all" | "prebuilt" | "custom">("all");
+    // "prebuilt" is what the server treats as prebuilt (`detectPrebuiltType`); "custom" is everything else.
+    const activeTab = ref<"all" | "prebuilt" | "custom">(viewState.tab);
+    watch([filterQuery, activeTab, pageSize, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        filterQuery: filterQuery.value,
+        tab: activeTab.value,
+        pageSize: pageSize.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
+    });
 
     const visibleRows = computed(() => {
       const base = destinations.value || [];
@@ -692,6 +1059,9 @@ export default defineComponent({
       return filterData(byTab, filterQuery.value);
     });
 
+    const orgIdForWrites = useOrgId();
+    const bulkDeleteWrite = useMutation(() => bulkDeleteDestinationsMutation(orgIdForWrites.value));
+
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
     };
@@ -700,7 +1070,7 @@ export default defineComponent({
       bulkDeleteLoading.value = true;
       const dismiss = toast({
         variant: "loading",
-        message: "Deleting destinations...",
+        message: t("toastMessages.alerts.deletingDestinations"),
         timeout: 0,
       });
 
@@ -708,7 +1078,7 @@ export default defineComponent({
         if (selectedDestinations.value.length === 0) {
           toast({
             variant: "error",
-            message: "No destinations selected for deletion",
+            message: t("toastMessages.alerts.noDestinationsSelectedForDeletion"),
           });
           dismiss();
           return;
@@ -718,10 +1088,7 @@ export default defineComponent({
           ids: selectedDestinations.value.map((d: any) => d.name),
         };
 
-        const response = await destinationService.bulkDelete(
-          store.state.selectedOrganization.identifier,
-          payload,
-        );
+        const response = await bulkDeleteWrite.mutateAsync(payload.ids);
 
         dismiss();
 
@@ -733,35 +1100,50 @@ export default defineComponent({
           if (failCount > 0 && successCount > 0) {
             toast({
               variant: "warning",
-              message: `${successCount} destination(s) deleted successfully, ${failCount} failed`,
+              message: t("toastMessages.alerts.destinationsDeletedWithFailures", {
+                count: successCount,
+                failed: failCount,
+              }),
               timeout: 5000,
             });
           } else if (failCount > 0) {
             toast({
               variant: "error",
-              message: `Failed to delete ${failCount} destination(s)`,
+              message: t("toastMessages.alerts.failedToDeleteDestinations", { count: failCount }),
             });
           } else {
             toast({
               variant: "success",
-              message: `${successCount} destination(s) deleted successfully`,
+              message: t("toastMessages.alerts.destinationsDeletedSuccessfully", {
+                count: successCount,
+              }),
             });
           }
         } else {
           toast({
             variant: "success",
-            message: `${selectedDestinations.value.length} destination(s) deleted successfully`,
+            message: t("toastMessages.alerts.destinationsDeletedSuccessfully", {
+              count: selectedDestinations.value.length,
+            }),
           });
         }
 
-        selectedDestinations.value = [];
-        getDestinations();
+        // An unrecognised shape is NOT taken as "all of them" — splicing rows the
+        // server may have kept would show a delete that never happened.
+        if (Array.isArray(response.data?.successful)) {
+          dropDestinations(response.data.successful.map((entry: any) => entry?.name ?? entry));
+        } else {
+          selectedDestinations.value = [];
+          // Forced: this branch exists to hear it from the server, and an unforced
+          // read inside staleTime answers from cache without asking.
+          if (await getDestinations(true)) dropDraftsOfMissing(payload.ids);
+        }
       } catch (error: any) {
         dismiss();
         const errorMessage =
           error.response?.data?.message ||
           error?.message ||
-          "Error deleting destinations. Please try again.";
+          t("alerts.messages.bulkDeleteDestinationsFailed");
         if (error.response?.status != 403 || error?.status != 403) {
           toast({
             variant: "error",
@@ -775,14 +1157,6 @@ export default defineComponent({
       confirmBulkDelete.value = false;
     };
 
-    watch(
-      visibleRows,
-      (newVisibleRows) => {
-        resultTotal.value = newVisibleRows.length;
-      },
-      { immediate: true },
-    );
-
     // ── Keyboard shortcuts ────────────────────────────────────────────────
     useShortcuts([
       {
@@ -794,7 +1168,7 @@ export default defineComponent({
       {
         id: "alertDestinationsRefresh",
         handler: () => {
-          if (!isInputFocused()) getDestinations();
+          if (!isInputFocused()) refreshDestinations();
         },
       },
       {
@@ -806,29 +1180,38 @@ export default defineComponent({
     ]);
     return {
       t,
+      lastUpdatedAt,
+      depGraph,
+      destinationDrafts,
       showDestinationEditor,
       destinations,
       columns,
       editDestination,
       getImageURL,
       loading,
+      fetching,
+      refreshDestinations,
+      forbidden,
       conformDeleteDestination,
       filterQuery,
+      pageSize,
+      sortBy,
+      sortOrder,
       filterData,
       editingDestination,
       templates,
       toggleDestinationEditor,
       getDestinations,
+      onDependencyDeleted,
+      deletingDestinations,
       deleteDestination,
       cancelDeleteDestination,
       confirmDelete,
-      resultTotal,
       routeTo,
       exportDestination,
       showImportDestination,
       importDestination,
       store,
-      getActions,
       getTemplates,
       updateRoute,
       getDestinationByName,
@@ -844,7 +1227,19 @@ export default defineComponent({
       selectedDestinations,
       getPrebuiltTypeName,
       getCustomDestinationLabel,
+      destinationUrl,
+      slackProduct,
+      isSlackApp,
+      isSlackWebhook,
+      slackChannelLabel,
+      switchInstallation,
+      switchPending,
+      switchToApp,
+      switchBack,
       isDefaultPrebuiltTemplate,
+      oTableRef,
+      currentPage,
+      onPageChange,
     };
   },
 });

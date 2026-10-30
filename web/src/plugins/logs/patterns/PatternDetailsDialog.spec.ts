@@ -286,7 +286,7 @@ describe("PatternDetailsDialog", () => {
     it("should display variables summary", () => {
       const text = wrapper.text();
       expect(text).toContain("Variables");
-      expect(text).toContain("2 variable(s) detected");
+      expect(text).toContain("2 variables detected");
     });
 
     it("should display fallback text when no variables are available", async () => {
@@ -298,7 +298,7 @@ describe("PatternDetailsDialog", () => {
       });
 
       const text = wrapper.text();
-      expect(text).toContain("0 variable(s) detected");
+      expect(text).toContain("0 variables detected");
     });
   });
 

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <mask id="html-glyph">
+      <rect width="512" height="512" fill="#fff"/>
+      <path d="M213 186L158 245L213 304" fill="none" stroke="#000" stroke-width="22"/>
+      <path d="M279.5 148L230 336" fill="none" stroke="#000" stroke-width="15"/>
+      <path d="M298 186L353 245L298 304" fill="none" stroke="#000" stroke-width="22"/>
+    </mask>
+  </defs>
+  <path fill-rule="evenodd" fill="#60C3D8" d="M24 361V123Q24 77 70 77H441Q487 77 487 123V361H460.5V159Q460.5 104 405.5 104H105.5Q50.5 104 50.5 159V361Z"/>
+  <path fill="#60C3D8" mask="url(#html-glyph)" d="M66 361V157.5Q66 119.5 104 119.5H406.5Q444.5 119.5 444.5 157.5V361Z"/>
+  <path fill-rule="evenodd" fill="#C7C7C6" d="M0 377H511.5V403Q511.5 436 478 436H34Q0 436 0 403ZM184 377H327.5V381Q327.5 406 302.5 406H209Q184 406 184 381Z"/>
+  <path fill="#60C3D8" d="M199 377H312.5V378Q312.5 390 300.5 390H211Q199 390 199 378Z"/>
+</svg>

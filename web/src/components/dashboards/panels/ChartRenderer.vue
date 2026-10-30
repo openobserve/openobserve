@@ -18,7 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     data-test="chart-renderer"
     ref="chartRef"
-    id="chart1"
+    :id="chartId"
+    :role="label ? 'img' : undefined"
+    :aria-label="label || undefined"
     class="chart-container h-full w-full"
     @mouseover="
       () => {
@@ -26,13 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         if (hoveredSeriesState) hoveredSeriesState.panelId = data?.extras?.panelId;
       }
     "
-    @mouseleave="
-      (e) => {
-        if ((e?.relatedTarget as Element | null)?.closest?.('.o2-echarts-tooltip')) return;
-        // if hoveredSeriesState is not null then set -1
-        if (hoveredSeriesState) hoveredSeriesState.setIndex(-1, -1, -1, null);
-      }
-    "
+    @mouseleave="onChartMouseLeave"
     @contextmenu="handleNativeContextMenu"
   ></div>
 </template>
@@ -73,6 +69,7 @@ import { throttle } from "lodash-es";
 import {
   defineComponent,
   ref,
+  useId,
   onMounted,
   watch,
   onUnmounted,
@@ -80,8 +77,12 @@ import {
   onActivated,
   onDeactivated,
   inject,
+  toRaw,
+  type PropType,
 } from "vue";
+import type { I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { useTheme } from "@/composables/useTheme";
 import { chartColor } from "@/utils/chartTheme";
 import * as echarts from "echarts/core";
@@ -96,6 +97,11 @@ import {
   SankeyChart,
   TreeChart,
   GraphChart,
+  PictorialBarChart,
+  TreemapChart,
+  SunburstChart,
+  FunnelChart,
+  BoxplotChart,
 } from "echarts/charts";
 import {
   TitleComponent,
@@ -110,60 +116,34 @@ import {
   MarkLineComponent,
   MarkAreaComponent,
   GraphicComponent,
+  AriaComponent,
 } from "echarts/components";
 import { LabelLayout, UniversalTransition } from "echarts/features";
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
-import type {
-  BarSeriesOption,
-  LineSeriesOption,
-  CustomSeriesOption,
-  GaugeSeriesOption,
-  PieSeriesOption,
-  ScatterSeriesOption,
-  HeatmapSeriesOption,
-  SankeySeriesOption,
-  TreeSeriesOption,
-} from "echarts/charts";
-import type { ComposeOption } from "echarts/core";
 import { withChartFont } from "@/utils/fonts";
-import type {
-  TitleComponentOption,
-  TooltipComponentOption,
-  GridComponentOption,
-  ToolboxComponentOption,
-  DatasetComponentOption,
-  LegendComponentOption,
-  PolarComponentOption,
-  VisualMapComponentOption,
-  DataZoomComponentOption,
-  MarkLineComponentOption,
-  MarkAreaComponentOption,
-  GraphicComponentOption,
-} from "echarts/components";
-
-type ECOption = ComposeOption<
-  | BarSeriesOption
-  | LineSeriesOption
-  | CustomSeriesOption
-  | GaugeSeriesOption
-  | PieSeriesOption
-  | ScatterSeriesOption
-  | HeatmapSeriesOption
-  | SankeySeriesOption
-  | TreeSeriesOption
-  | TitleComponentOption
-  | TooltipComponentOption
-  | GridComponentOption
-  | ToolboxComponentOption
-  | DatasetComponentOption
-  | LegendComponentOption
-  | PolarComponentOption
-  | VisualMapComponentOption
-  | DataZoomComponentOption
-  | MarkLineComponentOption
-  | MarkAreaComponentOption
-  | GraphicComponentOption
->;
+import {
+  heatmapHoverTime,
+  heatmapSyncPointer,
+  heatmapZoomRange,
+} from "@/utils/dashboard/heatmapTimeAxis";
+import {
+  STATE_TIMELINE_ROW_ZOOM_IDS,
+  readRowWindow,
+  rowWindowFromEvent,
+  withRowWindow,
+  type RowWindow,
+} from "@/utils/dashboard/convertStateTimelineData";
+import {
+  indexesNearX,
+  isLineStrokeEvent,
+  lineSeriesAtPoint,
+  lineStrokeEventsPatch,
+  nearestIndexByX,
+  withLineStrokeEvents,
+  type LineStrokeEvent,
+  type LineSeriesPixels,
+  type PixelPoint,
+} from "@/utils/dashboard/lineSeriesAtPoint";
 
 echarts.use([
   TitleComponent,
@@ -178,6 +158,7 @@ echarts.use([
   MarkLineComponent,
   MarkAreaComponent,
   GraphicComponent,
+  AriaComponent,
   BarChart,
   LineChart,
   CustomChart,
@@ -188,11 +169,48 @@ echarts.use([
   SankeyChart,
   TreeChart,
   GraphChart,
+  PictorialBarChart,
+  TreemapChart,
+  SunburstChart,
+  FunnelChart,
+  BoxplotChart,
   LabelLayout,
   UniversalTransition,
   CanvasRenderer,
   SVGRenderer,
 ]);
+
+// Right-click reads a y-axis value, so only cartesian series types can answer it
+const CONTEXT_MENU_SERIES_TYPES = ["bar", "line", "scatter"];
+
+interface LineSeriesOption {
+  type?: string;
+  name?: string;
+  stack?: string;
+  step?: string | boolean;
+  smooth?: boolean | number;
+  connectNulls?: boolean;
+  data?: unknown;
+}
+
+interface ChartOptionLike {
+  series?: unknown;
+  legend?: unknown;
+}
+
+// A line datum is `[x, y]`, `{ value: [x, y] }`, or a bare y on a category axis.
+const datumValue = (datum: unknown, dataIndex: number): (string | number)[] => {
+  if (Array.isArray(datum)) return datum;
+  const inner = (datum as { value?: unknown } | null)?.value;
+  if (Array.isArray(inner)) return inner;
+  return [dataIndex, (inner ?? datum) as string | number];
+};
+
+/** A datum the line does not draw: missing, or with no finite y (PromQL sends "NaN" samples). */
+const isGap = (datum: unknown): boolean => {
+  const y = datum === null || datum === undefined ? null : datumValue(datum, 0)[1];
+  return y === null || y === undefined || y === "" || !Number.isFinite(Number(y));
+};
 
 export default defineComponent({
   name: "ChartRenderer",
@@ -206,6 +224,7 @@ export default defineComponent({
     "mouseout",
     "contextmenu",
     "domcontextmenu",
+    "finished",
   ],
   props: {
     data: {
@@ -221,9 +240,20 @@ export default defineComponent({
       type: String,
       default: "100%",
     },
+    /** Accessible name of the chart, normally the panel title. */
+    label: {
+      type: String as unknown as PropType<I18nText | undefined>,
+      default: undefined,
+    },
+    /** Name the line under a right-click that hit no symbol, so the alert can tell which query was meant. */
+    findLineOnContextMenu: {
+      type: Boolean,
+      default: false,
+    },
   },
   setup(props: any, { emit }) {
     const chartRef: any = ref(null);
+    const chartId = `chart-${useId()}`;
     let chart: any;
     const store = useStore();
     const { isDark } = useTheme();
@@ -239,6 +269,7 @@ export default defineComponent({
       chart?.off("click");
       chart?.off("mouseover");
       chart?.off("contextmenu");
+      chart?.getZr().off("mousemove", reportPointerTime);
 
       //dispose
       if (chart) {
@@ -253,9 +284,19 @@ export default defineComponent({
         await nextTick();
         await nextTick();
         chart?.resize();
+        applySvgPrintViewBox();
       } catch (e) {
         console.error("Error during resizing", e);
       }
+    };
+
+    // print-only: viewBox lets print CSS scale the SVG to the narrower page instead of clipping it (ECharts' SVG renderer omits it)
+    const applySvgPrintViewBox = () => {
+      if (!store.state.printMode || props.renderType !== "svg") return;
+      const svg = chartRef.value?.querySelector("svg");
+      const w = Number(svg?.getAttribute("width"));
+      const h = Number(svg?.getAttribute("height"));
+      if (svg && w > 0 && h > 0) svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
     };
 
     // currently hovered series state
@@ -281,8 +322,12 @@ export default defineComponent({
         params.seriesIndex = params?.dataIndex;
       }
 
-      // if sankey chart then do not set seriesName and seriesIndex
-      if (params?.componentSubType === "sankey") {
+      // These series are not lines to single out, and unnamed heatmaps share ECharts' default name.
+      if (
+        ["sankey", "heatmap", "treemap", "sunburst", "funnel", "graph"].includes(
+          params?.componentSubType,
+        )
+      ) {
         params.seriesName = "";
         params.seriesIndex = -1;
       }
@@ -311,6 +356,14 @@ export default defineComponent({
       throttledSetHoveredSeriesName("");
     };
 
+    // A pie legend that shows percents reads its selection from the source option, so keep it in step.
+    const syncPieLegendSelection = (selected: Record<string, boolean>) => {
+      const sourceOptions = toRaw(props.data?.options);
+      if (sourceOptions?.legend?.selected && sourceOptions.series?.[0]?.type === "pie") {
+        sourceOptions.legend.selected = selected;
+      }
+    };
+
     const legendSelectChangedFn = (params: any) => {
       // check if all series are selected (all will be false)
       if (Object.values(params.selected).every((value: any) => value === false)) {
@@ -326,6 +379,19 @@ export default defineComponent({
           params.selected[name] = params.name === name ? true : false;
         });
       }
+
+      // A series left out of the legend has no entry to toggle, so it follows the series it overlays.
+      for (const series of props.data?.options?.series ?? []) {
+        if (series?._legendFollows !== undefined) {
+          params.selected[series.name] = params.selected[series._legendFollows] !== false;
+        }
+        // A series an override hides from the chart shows only while it is the one clicked.
+        if (series?._hiddenFromChart && params.name !== series.name) {
+          params.selected[series.name] = false;
+        }
+      }
+
+      syncPieLegendSelection({ ...params.selected });
 
       // get legend
       const legendOption = chart?.getOption()?.legend[0];
@@ -344,6 +410,8 @@ export default defineComponent({
       chart?.dispatchAction({
         type: "restore",
       });
+      // Restore returns to the last full option, which may carry an isolated slice, not to all visible.
+      syncPieLegendSelection({ ...(chart?.getOption()?.legend?.[0]?.selected ?? {}) });
       // we need that toolbox datazoom button initially selected
       chart?.dispatchAction({
         type: "takeGlobalCursor",
@@ -352,13 +420,98 @@ export default defineComponent({
       });
     };
 
+    // Rows a panel scrolled to, kept across re-renders; only panels whose extras flag rowScroll set it.
+    let lastRowWindow: RowWindow | null = null;
+    const isRowScrollZoom = (ids: unknown[]) =>
+      !!props.data?.extras?.rowScroll &&
+      ids.length > 0 &&
+      ids.every((id) => STATE_TIMELINE_ROW_ZOOM_IDS.includes(id as string));
+    const noteRowWindow = (window: RowWindow | null) => {
+      if (!window) return;
+      lastRowWindow = window;
+      props.data?.extras?.setRowWindow?.(window.start, window.end);
+    };
+    const keepRowWindow = (options: Record<string, unknown>) => {
+      if (!props.data?.extras?.rowScroll) return options;
+      const kept = withRowWindow(options, lastRowWindow);
+      noteRowWindow(readRowWindow(kept));
+      return kept;
+    };
+
+    const reportPointerTime = (event: { offsetX: number }) => {
+      const report = props.data?.extras?.setPointerTime;
+      if (!report || !chart) return;
+      report(Number(chart.convertFromPixel({ xAxisIndex: 0 }, event.offsetX)));
+    };
+
+    // Registered before setOption, so it runs ahead of the tooltip's own zr handler and the tooltip reads this move's time.
+    const trackPointer = () => chart?.getZr().on("mousemove", reportPointerTime);
+
+    const chartOptions = (options: Record<string, unknown>) =>
+      withChartFont(
+        withLineStrokeEvents(
+          { aria: { enabled: !props.label }, ...keepRowWindow(options) },
+          props.findLineOnContextMenu,
+        ),
+      );
+
+    // The data point nearest the cursor along x, for a right-click on a line's stroke between points.
+    const nearestDataIndex = (seriesIndex: number, data: unknown[], cursorX: number) => {
+      const xAt = (dataIndex: number) => {
+        if (isGap(data[dataIndex])) return null;
+        const pixel = chart?.convertToPixel(
+          { seriesIndex },
+          datumValue(data[dataIndex], dataIndex),
+        );
+        return Array.isArray(pixel) && Number.isFinite(pixel[0]) ? Number(pixel[0]) : null;
+      };
+      return nearestIndexByX(data.length, cursorX, xAt);
+    };
+
+    // The stroke has no data point of its own, so the threshold is read at the cursor.
+    const handleLineStrokeContextMenu = (params: LineStrokeEvent) => {
+      const event = params.event?.event;
+      const series = (chart?.getOption()?.series as LineSeriesOption[] | undefined)?.[
+        params.seriesIndex
+      ];
+      const data = Array.isArray(series?.data) ? series.data : [];
+      const cursorX = Number(params.event?.offsetX);
+      const dataIndex = nearestDataIndex(params.seriesIndex, data, cursorX);
+      // The series' own grid, so a trellis subplot reads its own axis.
+      const point = chart?.convertFromPixel({ seriesIndex: params.seriesIndex }, [
+        cursorX,
+        params.event?.offsetY,
+      ]);
+      // A stacked line is drawn at the stack total, so its own value is read at the nearest point instead.
+      const value = series?.stack
+        ? dataIndex === undefined
+          ? NaN
+          : Number(datumValue(data[dataIndex], dataIndex)[1])
+        : Array.isArray(point)
+          ? Number(point[1])
+          : NaN;
+      if (!event || !Number.isFinite(value)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      emit("domcontextmenu", {
+        x: event.clientX,
+        y: event.clientY,
+        value,
+        seriesIndex: params.seriesIndex,
+        dataIndex,
+      });
+    };
+
     // Handle ECharts contextmenu event when clicking on data points
     const handleContextMenu = (params: any) => {
+      if (isLineStrokeEvent(params)) {
+        handleLineStrokeContextMenu(params);
+        return;
+      }
       // Get chart type from the first series
       const chartType = chart?.getOption()?.series?.[0]?.type;
 
-      // Only handle contextmenu for bar and line charts
-      if (!chartType || !["bar", "line"].includes(chartType)) {
+      if (!chartType || !CONTEXT_MENU_SERIES_TYPES.includes(chartType)) {
         return;
       }
 
@@ -410,8 +563,85 @@ export default defineComponent({
           x: event.clientX,
           y: event.clientY,
           value: Number(dataPointValue),
+          seriesIndex: params.seriesIndex,
+          dataIndex: params.dataIndex,
         });
       }
+    };
+
+    const linePixels = (cursor: PixelPoint, option: ChartOptionLike): LineSeriesPixels[] => {
+      const series = (Array.isArray(option.series) ? option.series : []) as LineSeriesOption[];
+      // Off-stroke clicks only: a stacked, step, smooth or null-bridging line is not straight segments between neighbours.
+      if (
+        series.some(
+          (entry) =>
+            entry?.type === "line" &&
+            (entry.stack || entry.step || entry.smooth || entry.connectNulls),
+        )
+      )
+        return [];
+      const legends = (Array.isArray(option.legend) ? option.legend : []) as {
+        selected?: Record<string, boolean>;
+      }[];
+      const legendOff = (name: string | undefined) =>
+        name !== undefined && legends.some((legend) => legend?.selected?.[name] === false);
+      return series.flatMap((entry, seriesIndex) => {
+        const data = entry?.data;
+        if (entry?.type !== "line" || !Array.isArray(data) || legendOff(entry.name)) return [];
+        const pixelOf = (value: (string | number)[]) => {
+          const pixel = chart?.convertToPixel({ seriesIndex }, value);
+          return Array.isArray(pixel) && pixel.every(Number.isFinite)
+            ? (pixel as PixelPoint)
+            : null;
+        };
+        // A merged x-axis leaves bare nulls whose x is unknown, so the search steps over them.
+        const xAt = (dataIndex: number) =>
+          isGap(data[dataIndex])
+            ? null
+            : (pixelOf(datumValue(data[dataIndex], dataIndex))?.[0] ?? null);
+        const nearby = indexesNearX(data.length, cursor[0], xAt);
+        if (!nearby) return [];
+        const points: (PixelPoint | null)[] = [];
+        for (let dataIndex = nearby[0]; dataIndex <= nearby[1]; dataIndex++) {
+          const datum = data[dataIndex];
+          points.push(isGap(datum) ? null : pixelOf(datumValue(datum, dataIndex)));
+        }
+        return [{ seriesIndex, offset: nearby[0], points }];
+      });
+    };
+
+    // The series lookup only refines the menu; a failure must not cost the user the menu itself.
+    const lineSeriesHit = (pixelPoint: PixelPoint, option: ChartOptionLike) => {
+      try {
+        return lineSeriesAtPoint(pixelPoint, linePixels(pixelPoint, option));
+      } catch {
+        return null;
+      }
+    };
+
+    const HOVER_OVERLAYS = ".o2-echarts-tooltip, .o2-exemplar-card";
+
+    // Entering the tooltip or exemplar card keeps the hover; a reset restores, and so repaints, every panel.
+    const onChartMouseLeave = (event: MouseEvent) => {
+      const overlay = (event?.relatedTarget as Element | null)?.closest?.(HOVER_OVERLAYS);
+      if (overlay) {
+        followOverlayLeave(overlay);
+        return;
+      }
+      hoveredSeriesState?.value?.setIndex(-1, -1, -1, null);
+    };
+
+    // The overlays are teleported out of the chart, so leaving one for anywhere but the chart is leaving the chart.
+    const followOverlayLeave = (overlay: Element) => {
+      overlay.addEventListener(
+        "mouseleave",
+        (event) => {
+          const to = (event as MouseEvent).relatedTarget as Node | null;
+          if (to && chartRef.value?.contains(to)) return;
+          onChartMouseLeave(event as MouseEvent);
+        },
+        { once: true },
+      );
     };
 
     // Handle native DOM contextmenu event for alert creation
@@ -419,10 +649,10 @@ export default defineComponent({
     const handleNativeContextMenu = async (event: MouseEvent) => {
       // Get chart type from the first series
       await nextTick();
-      const chartType = chart?.getOption()?.series?.[0]?.type;
+      const option = chart?.getOption();
+      const chartType = option?.series?.[0]?.type;
 
-      // Only handle contextmenu for bar and line charts
-      if (!chartType || !["bar", "line"].includes(chartType)) {
+      if (!chartType || !CONTEXT_MENU_SERIES_TYPES.includes(chartType)) {
         return;
       }
 
@@ -448,10 +678,20 @@ export default defineComponent({
 
           // Emit domcontextmenu event for alert creation
           if (yAxisValue !== null && yAxisValue !== undefined && !isNaN(Number(yAxisValue))) {
+            // A click just off a straight line still names it; a click on any stroke arrives as a line-stroke event.
+            const hit = props.findLineOnContextMenu
+              ? lineSeriesHit(pixelPoint as PixelPoint, option ?? {})
+              : null;
+            // A trellis subplot past the first has its own axis, so a named line is read on it.
+            const ownPoint = hit
+              ? chart.convertFromPixel({ seriesIndex: hit.seriesIndex }, pixelPoint)
+              : null;
+            const ownValue = Array.isArray(ownPoint) ? Number(ownPoint[1]) : NaN;
             emit("domcontextmenu", {
               x: event.clientX,
               y: event.clientY,
-              value: Number(yAxisValue),
+              value: Number.isFinite(ownValue) ? ownValue : Number(yAxisValue),
+              ...(hit ?? {}),
             });
           }
         }
@@ -462,10 +702,12 @@ export default defineComponent({
 
     const chartInitialSetUp = () => {
       chart?.on("mousemove", (params: any) => {
+        if (isLineStrokeEvent(params)) return;
         emit("mousemove", params);
         mouseHoverEffectFn(params);
       });
       chart?.on("mouseout", (params: any) => {
+        if (isLineStrokeEvent(params)) return;
         emit("mouseout", params);
         mouseOutEffectFn();
       });
@@ -487,7 +729,8 @@ export default defineComponent({
         // and chart must be timeseries chart
         if (
           props.data.extras?.panelId == hoveredSeriesState?.value?.panelId &&
-          props?.data?.extras?.isTimeSeries === true
+          props?.data?.extras?.isTimeSeries === true &&
+          !props.data.extras?.heatmapTimeAxis
         ) {
           const seriesIndex = params?.batch?.[0]?.seriesIndex;
           const dataIndex = Math.max(params?.batch?.[0]?.dataIndex, 0);
@@ -506,15 +749,46 @@ export default defineComponent({
 
       //on dataZoom emit an event of start x and end x
       chart?.on("dataZoom", function (params: any) {
+        const zoomIds = params?.batch
+          ? params.batch.map((item: any) => item?.dataZoomId)
+          : [params?.dataZoomId];
+        // Scrolling rows moves the y axis only; it must never become a dashboard time range.
+        if (isRowScrollZoom(zoomIds)) {
+          noteRowWindow(rowWindowFromEvent(props.data?.options, params?.batch?.[0] ?? params));
+          return;
+        }
         //if batch then emit dataZoom event
         if (params?.batch) {
-          emit("updated:dataZoom", {
-            start: params?.batch[0]?.startValue || 0,
-            end: params?.batch[0]?.endValue || 0,
-            start1: params?.batch[1]?.startValue || 0,
-            end1: params?.batch[1]?.endValue || 0,
-          });
+          // A heatmap zooms by category index, which only its columns can turn into times.
+          const heatmapRange = heatmapZoomRange(
+            props.data?.extras?.heatmapTimeAxis,
+            params.batch[0]?.startValue,
+            params.batch[0]?.endValue,
+          );
+          emit(
+            "updated:dataZoom",
+            heatmapRange ?? {
+              start: params?.batch[0]?.startValue || 0,
+              end: params?.batch[0]?.endValue || 0,
+              start1: params?.batch[1]?.startValue || 0,
+              end1: params?.batch[1]?.endValue || 0,
+            },
+          );
+          const rows = lastRowWindow;
           restoreChart();
+          // Restore also rewinds the rows, so the scrolled window is put back.
+          if (rows && props.data?.extras?.rowScroll) {
+            chart?.dispatchAction({
+              type: "dataZoom",
+              batch: STATE_TIMELINE_ROW_ZOOM_IDS.filter((id) =>
+                props.data.options?.dataZoom?.some((zoom: any) => zoom?.id === id),
+              ).map((dataZoomId: string) => ({
+                dataZoomId,
+                startValue: rows.start,
+                endValue: rows.end,
+              })),
+            });
+          }
         }
         //else if daatazoom then emit dataZoom event
         else if (chart?.getOption()?.dataZoom) {
@@ -525,11 +799,30 @@ export default defineComponent({
         }
       });
       chart?.on("click", function (params: any) {
+        if (isLineStrokeEvent(params)) return;
         emit("click", params);
       });
 
       chart?.on("mouseover", function (params: any) {
+        if (isLineStrokeEvent(params)) return;
         emit("mouseover", params);
+        const heatmapTime = heatmapHoverTime(props.data?.extras?.heatmapTimeAxis, params);
+        if (
+          heatmapTime !== undefined &&
+          props.data.extras?.panelId === hoveredSeriesState?.value?.panelId
+        ) {
+          // The column, so a panel on the same time grid finds the instant at that index directly.
+          throttledSetHoveredSeriesIndex(
+            Number(params.value[0]),
+            params.seriesIndex,
+            props.data.extras.panelId || -1,
+            heatmapTime,
+          );
+        }
+      });
+
+      chart?.on("finished", () => {
+        emit("finished");
       });
 
       window.removeEventListener("resize", windowResizeEventCallback);
@@ -541,6 +834,8 @@ export default defineComponent({
         key: "dataZoomSelect",
         dataZoomSelectActive: true,
       });
+
+      applySvgPrintViewBox();
     };
 
     // dispatch tooltip action for all charts
@@ -554,30 +849,44 @@ export default defineComponent({
         // if hovered series is not same as currently hovered series
         // and hovered series is not -1
         // and chart is time series
-        if (
+        const followsHoveredPanel =
           isChartVisible &&
           props?.data?.extras?.panelId &&
           props?.data?.extras?.panelId != hoveredSeriesState?.value?.panelId &&
           hoveredSeriesState?.value?.panelId != -1 &&
-          props?.data?.extras?.isTimeSeries === true
-        ) {
+          props?.data?.extras?.isTimeSeries === true;
+        if (followsHoveredPanel && props.data.extras.heatmapTimeAxis) {
+          chart?.dispatchAction(
+            heatmapSyncPointer(
+              props.data.extras.heatmapTimeAxis,
+              hoveredSeriesState.value?.hoveredTime,
+              (column) => chart?.convertToPixel({ gridIndex: 0 }, [column, 0]),
+            ),
+          );
+        } else if (followsHoveredPanel) {
           // need to check index should not be greater than series length
           const hoveredSeriesIndex =
-            chart?.getOption()?.series.length > hoveredSeriesState?.value?.seriesIndex
+            props.data.extras?.crosshairSeriesIndex ??
+            (chart?.getOption()?.series.length > hoveredSeriesState?.value?.seriesIndex
               ? hoveredSeriesState?.value?.seriesIndex
-              : 0;
+              : 0);
           let hoveredSeriesDataIndex = hoveredSeriesState?.value?.dataIndex;
+          // Panels publish a Date or, in UTC, a zone-less string; a crosshair series compares them as one instant.
+          const hoveredTime =
+            props.data.extras?.crosshairSeriesIndex != null
+              ? new Date(hoveredSeriesState.value?.hoveredTime)
+              : hoveredSeriesState.value?.hoveredTime;
 
           // if hovered series dataindex is not there
           // or check hovered time is not at the same index in the current chart (ie if at same index then not need to find nearest index)
           if (
             !chart?.getOption()?.series[hoveredSeriesIndex]?.data[hoveredSeriesDataIndex] ||
             chart?.getOption()?.series[hoveredSeriesIndex]?.data[hoveredSeriesDataIndex][0] !=
-              hoveredSeriesState.value?.hoveredTime
+              hoveredTime
           ) {
             hoveredSeriesDataIndex = findNearestIndex(
               chart?.getOption()?.series[hoveredSeriesIndex]?.data ?? [],
-              hoveredSeriesState?.value?.hoveredTime,
+              hoveredTime,
             );
           }
 
@@ -595,7 +904,15 @@ export default defineComponent({
           hoveredSeriesState.value?.panelId == -1 &&
           hoveredSeriesState.value?.hoveredTime == null
         ) {
-          restoreChart();
+          // A restore would also reset the scrolled rows, so only the crosshair is cleared.
+          if (props.data.extras?.crosshairSeriesIndex != null) {
+            chart?.dispatchAction({ type: "updateAxisPointer", currTrigger: "leave" });
+          } else {
+            restoreChart();
+            if (props.data?.extras?.heatmapTimeAxis) {
+              chart?.dispatchAction({ type: "updateAxisPointer", currTrigger: "leave" });
+            }
+          }
         }
       },
     );
@@ -619,6 +936,7 @@ export default defineComponent({
           renderer: props.renderType,
           devicePixelRatio: window.devicePixelRatio || 1,
         });
+        trackPointer();
         const options = props.data.options || {};
 
         // change color and background color of tooltip
@@ -635,7 +953,7 @@ export default defineComponent({
           // Use notMerge flag from data prop if available, otherwise default to true
           const notMerge = props.data?.notMerge !== undefined ? props.data.notMerge : true;
           const lazyUpdate = props.data?.lazyUpdate !== undefined ? props.data.lazyUpdate : true;
-          chart?.setOption(withChartFont(options), { lazyUpdate, notMerge });
+          chart?.setOption(chartOptions(options), { lazyUpdate, notMerge });
           chart?.setOption({ animation: true }, { lazyUpdate: true });
         } catch (e: any) {
           emit("error", {
@@ -671,7 +989,8 @@ export default defineComponent({
           chart = echarts.init(chartRef.value, theme, {
             renderer: props.renderType,
           });
-          chart?.setOption(withChartFont(props?.data?.options || {}), {
+          trackPointer();
+          chart?.setOption(chartOptions(props?.data?.options || {}), {
             lazyUpdate: true,
             notMerge: true,
           });
@@ -679,6 +998,35 @@ export default defineComponent({
         }
       });
       zeroSizeReinitObserver.observe(chartRef.value);
+    };
+
+    // < lg the window resize listener misses container-only size changes (rails collapsing, stacked panes).
+    let containerResizeObserver: ResizeObserver | null = null;
+    let containerResizeRaf = 0;
+    const { lgUp } = useBreakpoint();
+    let lastObservedSize = { w: 0, h: 0 };
+    const resizeToContainer = () => {
+      containerResizeRaf = 0;
+      if (!chartRef.value) return;
+      const w = chartRef.value.clientWidth;
+      const h = chartRef.value.clientHeight;
+      if (w > 0 && h > 0 && (w !== lastObservedSize.w || h !== lastObservedSize.h)) {
+        lastObservedSize = { w, h };
+        chart?.resize();
+      }
+    };
+    const observeContainerResize = () => {
+      if (!chartRef.value || containerResizeObserver) return;
+      lastObservedSize = {
+        w: chartRef.value.clientWidth,
+        h: chartRef.value.clientHeight,
+      };
+      // Coalesced to one resize per frame: drawer and splitter animations notify every frame.
+      containerResizeObserver = new ResizeObserver(() => {
+        if (lgUp.value) return;
+        if (!containerResizeRaf) containerResizeRaf = requestAnimationFrame(resizeToContainer);
+      });
+      containerResizeObserver.observe(chartRef.value);
     };
 
     onMounted(async () => {
@@ -696,11 +1044,13 @@ export default defineComponent({
           chart = echarts.init(chartRef.value, theme, {
             renderer: props.renderType,
           });
+          trackPointer();
           if (chartRef.value.clientWidth === 0 || chartRef.value.clientHeight === 0) {
             reinitWhenSized();
           }
+          observeContainerResize();
         }
-        chart?.setOption(withChartFont(props?.data?.options || {}), {
+        chart?.setOption(chartOptions(props?.data?.options || {}), {
           lazyUpdate: true,
           notMerge: true,
         });
@@ -720,20 +1070,19 @@ export default defineComponent({
       zeroSizeReinitObserver?.disconnect();
       zeroSizeReinitObserver = null;
 
+      containerResizeObserver?.disconnect();
+      containerResizeObserver = null;
+      cancelAnimationFrame(containerResizeRaf);
+      containerResizeRaf = 0;
+
       // Cancel throttled functions
       throttledSetHoveredSeriesName.cancel();
       throttledSetHoveredSeriesIndex.cancel();
 
       // Clean up chart instance
+      chart?.getZr().off("mousemove", reportPointerTime);
       chart?.dispose();
       chart = null;
-
-      // Clean up intersection observer
-      if (chartRef.value && isChartVisibleObserver) {
-        isChartVisibleObserver.unobserve(chartRef.value);
-        isChartVisibleObserver.disconnect();
-        isChartVisibleObserver = null;
-      }
 
       // Clear chart reference
       if (chartRef.value) {
@@ -768,11 +1117,9 @@ export default defineComponent({
     });
 
     onUnmounted(() => {
-      if (chartRef.value) {
-        // unobserve chart
-        isChartVisibleObserver?.unobserve(chartRef.value);
-        isChartVisibleObserver?.disconnect();
-      }
+      // Never guard on chartRef: Vue nulls template refs before unmounted hooks run.
+      isChartVisibleObserver?.disconnect();
+      isChartVisibleObserver = null;
 
       cleanupChart();
     });
@@ -793,8 +1140,9 @@ export default defineComponent({
           chart = echarts.init(chartRef.value, theme, {
             renderer: props.renderType,
           });
+          trackPointer();
         }
-        chart?.setOption(withChartFont(props?.data?.options || {}), {
+        chart?.setOption(chartOptions(props?.data?.options || {}), {
           lazyUpdate: true,
           notMerge: true,
         });
@@ -821,11 +1169,26 @@ export default defineComponent({
     });
 
     watch(
+      () => props.findLineOnContextMenu,
+      (on) => {
+        try {
+          // Merge only the switch, so zoom and other interactive state survive the flip.
+          chart?.setOption(lineStrokeEventsPatch(chart.getOption()?.series, on), {
+            lazyUpdate: true,
+          });
+        } catch (error) {
+          console.error("Error during setOption", error);
+        }
+      },
+    );
+
+    watch(
       () => props.height,
       async () => {
         try {
           await nextTick();
           chart?.resize();
+          applySvgPrintViewBox();
         } catch (e) {
           console.error("Error while resizing", e);
         }
@@ -839,7 +1202,7 @@ export default defineComponent({
           await nextTick();
           chart?.resize();
           try {
-            chart?.setOption(withChartFont(props?.data?.options || {}), {
+            chart?.setOption(chartOptions(props?.data?.options || {}), {
               lazyUpdate: true,
               notMerge: true,
             });
@@ -868,8 +1231,11 @@ export default defineComponent({
     );
     return {
       chartRef,
+      chartId,
       hoveredSeriesState,
       handleNativeContextMenu,
+      onChartMouseLeave,
+      reportPointerTime,
       get chart() {
         return chart;
       },

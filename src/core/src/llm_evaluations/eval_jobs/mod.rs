@@ -44,7 +44,7 @@ pub enum EvalJobError {
     #[error("Job not found")]
     NotFound,
 
-    #[error("Invalid status '{0}'. Must be one of: draft, active, paused, degraded, archived")]
+    #[error("Invalid status '{0}'. Must be one of: draft, active, paused, archived")]
     InvalidStatus(String),
 
     #[error("Invalid status transition from '{from}' to '{to}'")]
@@ -149,8 +149,52 @@ async fn validate_source_stream(
     ensure_source_stream_exists(&job.stream, !schema.fields().is_empty())
 }
 
+fn ensure_scorer_is_online_compatible(scorer: &table::scorers::Scorer) -> Result<(), EvalJobError> {
+    use o2_enterprise::enterprise::llm_evaluations::scorers::{
+        ScorerReferenceRequirement, reference_requirement,
+    };
+
+    if reference_requirement(scorer) == ScorerReferenceRequirement::ExpectedOutput {
+        return Err(EvalJobError::InvalidJob(format!(
+            "Scorer '{}' references expected_output and cannot be attached to an Online Eval Job; use an Experiment target instead",
+            scorer.name
+        )));
+    }
+    Ok(())
+}
+
+async fn validate_online_scorers(
+    org_id: &str,
+    scorer_refs: &[config::meta::pipeline::components::ScorerRef],
+) -> Result<(), EvalJobError> {
+    for scorer_ref in scorer_refs {
+        let scorer = match scorer_ref.version {
+            Some(version) => {
+                table::scorers::get_by_entity_id_and_version(org_id, &scorer_ref.id, version)
+                    .await?
+            }
+            None => table::scorers::get_by_entity_id(org_id, &scorer_ref.id).await?,
+        }
+        .ok_or_else(|| {
+            EvalJobError::InvalidJob(format!("Scorer '{}' was not found", scorer_ref.id))
+        })?;
+        ensure_scorer_is_online_compatible(&scorer)?;
+    }
+    Ok(())
+}
+
 #[tracing::instrument(skip(job))]
 pub async fn create_job(
+    org_id: &str,
+    job: table::online_eval_jobs::OnlineEvalJob,
+) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
+    let job = prepare_new_job(org_id, job).await?;
+    insert_job(org_id, job).await
+}
+
+/// Runs every check [`create_job`] makes, so a caller can refuse the job before it is stored.
+#[tracing::instrument(skip(job))]
+pub async fn prepare_new_job(
     org_id: &str,
     mut job: table::online_eval_jobs::OnlineEvalJob,
 ) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
@@ -169,8 +213,17 @@ pub async fn create_job(
         .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
     job.validate()
         .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
+    validate_online_scorers(org_id, &job.scorers).await?;
     validate_source_stream(org_id, &job).await?;
+    Ok(job)
+}
 
+/// Stores a job [`prepare_new_job`] accepted.
+#[tracing::instrument(skip(job))]
+pub async fn insert_job(
+    org_id: &str,
+    mut job: table::online_eval_jobs::OnlineEvalJob,
+) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
     let now = Utc::now().timestamp_millis();
     job.created_at = now;
     job.updated_at = now;
@@ -183,6 +236,17 @@ pub async fn create_job(
 
 #[tracing::instrument(skip(job))]
 pub async fn update_job(
+    org_id: &str,
+    job_id: &str,
+    job: table::online_eval_jobs::OnlineEvalJob,
+) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
+    let job = prepare_job_update(org_id, job_id, job).await?;
+    store_job_update(job).await
+}
+
+/// Runs every check [`update_job`] makes, so a caller can refuse the edit before it is stored.
+#[tracing::instrument(skip(job))]
+pub async fn prepare_job_update(
     org_id: &str,
     job_id: &str,
     mut job: table::online_eval_jobs::OnlineEvalJob,
@@ -198,6 +262,7 @@ pub async fn update_job(
         .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
     job.validate()
         .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
+    validate_online_scorers(org_id, &job.scorers).await?;
     validate_source_stream(org_id, &job).await?;
     if existing.status == "active" {
         job.validate_for_activation()
@@ -212,11 +277,18 @@ pub async fn update_job(
     job.created_at = existing.created_at;
     job.version = existing.version + 1;
     job.updated_at = Utc::now().timestamp_millis();
+    Ok(job)
+}
 
-    // If the job is currently bound to a pipeline (active/paused/degraded),
+/// Stores an edit [`prepare_job_update`] accepted.
+#[tracing::instrument(skip(job))]
+pub async fn store_job_update(
+    mut job: table::online_eval_jobs::OnlineEvalJob,
+) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
+    // If the job is currently bound to a pipeline (active/paused),
     // re-reconcile so span pipelines pick up changes, or are torn down when
     // switching to trace/session scope.
-    if matches!(job.status.as_str(), "active" | "paused" | "degraded") {
+    if matches!(job.status.as_str(), "active" | "paused") {
         job.pipeline_id = reconciler::reconcile(&job)
             .await
             .map_err(|e| EvalJobError::ReconcilerError(e.to_string()))?;
@@ -272,6 +344,10 @@ pub async fn delete_job(org_id: &str, job_id: &str) -> Result<(), EvalJobError> 
         .map_err(|e| EvalJobError::ReconcilerError(e.to_string()))?;
 
     table::online_eval_jobs::delete(job_id).await?;
+    // A leftover health row is never listed, so its cleanup must not fail the delete.
+    if let Err(e) = table::eval_job_states::delete_by_job(job_id).await {
+        log::warn!("[EvalJobHealth] failed to delete health state for job {job_id}: {e}");
+    }
     remove_ownership(org_id, "eval_jobs", Authz::new(job_id)).await;
     publish_eval_job_delete(org_id, job_id).await;
     Ok(())
@@ -286,26 +362,7 @@ pub async fn transition_status(
     new_status: &str,
 ) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
     let job = get_job(org_id, job_id).await?;
-
-    if !table::online_eval_jobs::is_valid_transition(&job.status, new_status) {
-        return Err(EvalJobError::InvalidStatusTransition {
-            from: job.status,
-            to: new_status.to_string(),
-        });
-    }
-
-    // Build the target job snapshot (status updated) and let the reconciler
-    // produce/update/delete the eval pipeline before we persist the new
-    // status. This way: if reconciliation fails, we don't end up with a job
-    // claiming `active` while its pipeline isn't enabled.
-    let mut target = job.clone();
-    target.status = new_status.to_string();
-    if new_status == "active" {
-        target
-            .validate_for_activation()
-            .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
-        validate_source_stream(org_id, &target).await?;
-    }
+    let target = check_transition(org_id, &job, new_status).await?;
     let pipeline_id = reconciler::reconcile(&target)
         .await
         .map_err(|e| EvalJobError::ReconcilerError(e.to_string()))?;
@@ -322,6 +379,47 @@ pub async fn transition_status(
     Ok(updated)
 }
 
+/// The checks [`transition_status`] makes before reconciling; returns the job as it would become.
+pub async fn check_transition(
+    org_id: &str,
+    job: &table::online_eval_jobs::OnlineEvalJob,
+    new_status: &str,
+) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
+    if !table::online_eval_jobs::is_valid_transition(&job.status, new_status) {
+        return Err(EvalJobError::InvalidStatusTransition {
+            from: job.status.clone(),
+            to: new_status.to_string(),
+        });
+    }
+
+    // Build the target job snapshot (status updated) and let the reconciler
+    // produce/update/delete the eval pipeline before we persist the new
+    // status. This way: if reconciliation fails, we don't end up with a job
+    // claiming `active` while its pipeline isn't enabled.
+    let mut target = job.clone();
+    target.status = new_status.to_string();
+    if new_status == "active" {
+        target
+            .validate_for_activation()
+            .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
+        validate_source_stream(org_id, &target).await?;
+        validate_online_scorers(org_id, &target.scorers).await?;
+    }
+    Ok(target)
+}
+
+/// The checks [`manual_evaluate`] makes before it runs, so a caller can answer them first.
+#[cfg(feature = "enterprise")]
+pub async fn check_manual_evaluate(
+    org_id: &str,
+    job: &table::online_eval_jobs::OnlineEvalJob,
+    body: &ManualEvalJobRequestBody,
+) -> Result<(), EvalJobError> {
+    check_manual_job(org_id, job).await?;
+    normalize_manual_target_id(&body.target_id)?;
+    validate_manual_query_window(body.start_time, body.end_time)
+}
+
 #[cfg(feature = "enterprise")]
 #[tracing::instrument(skip(body))]
 pub async fn manual_evaluate(
@@ -331,14 +429,7 @@ pub async fn manual_evaluate(
     author: Option<String>,
 ) -> Result<ManualEvalJobResponseBody, EvalJobError> {
     let job = get_job(org_id, job_id).await?;
-    if job.status == "archived" {
-        return Err(EvalJobError::InvalidJob(
-            "Archived eval jobs cannot be manually evaluated".to_string(),
-        ));
-    }
-    job.validate()
-        .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
-    validate_source_stream(org_id, &job).await?;
+    check_manual_job(org_id, &job).await?;
 
     let target_id = normalize_manual_target_id(&body.target_id)?;
     validate_manual_query_window(body.start_time, body.end_time)?;
@@ -401,6 +492,22 @@ pub async fn manual_evaluate(
     Err(EvalJobError::InvalidJob(
         "Manual evaluation requires enterprise features".to_string(),
     ))
+}
+
+#[cfg(feature = "enterprise")]
+async fn check_manual_job(
+    org_id: &str,
+    job: &table::online_eval_jobs::OnlineEvalJob,
+) -> Result<(), EvalJobError> {
+    if job.status == "archived" {
+        return Err(EvalJobError::InvalidJob(
+            "Archived eval jobs cannot be manually evaluated".to_string(),
+        ));
+    }
+    job.validate()
+        .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
+    validate_online_scorers(org_id, &job.scorers).await?;
+    validate_source_stream(org_id, job).await
 }
 
 #[cfg(feature = "enterprise")]
@@ -538,6 +645,34 @@ mod tests {
                 .unwrap_err()
                 .to_string(),
             "Invalid eval job: endTime must be greater than startTime"
+        );
+    }
+
+    #[test]
+    fn reference_based_scorers_are_rejected_for_online_jobs() {
+        let scorer = table::scorers::Scorer {
+            id: "version-1".to_string(),
+            entity_id: "scorer-1".to_string(),
+            org_id: "org-1".to_string(),
+            name: "reference judge".to_string(),
+            version: 1,
+            scorer_type: table::scorers::ScorerType::LlmJudge,
+            description: None,
+            produces_score_config_id: None,
+            produces_score_config_version: None,
+            template: "Compare {{ output }} with {{ expected_output }}".to_string(),
+            output_schema: None,
+            params: serde_json::json!({}),
+            is_active: true,
+            created_at: 1,
+            updated_at: 1,
+        };
+
+        let error = ensure_scorer_is_online_compatible(&scorer).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("use an Experiment target instead")
         );
     }
 }

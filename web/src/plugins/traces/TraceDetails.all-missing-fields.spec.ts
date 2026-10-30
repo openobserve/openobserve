@@ -123,6 +123,10 @@ describe("TraceDetails - All Missing Fields (Real Data)", () => {
 
     // Mock API to return problematic data
     globalThis.server.use(
+      http.get(
+        `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/:stream/traces/:traceId/details`,
+        () => HttpResponse.json(mockSpansWithManyMissingFields),
+      ),
       http.post(
         `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
         async ({ request }) => {

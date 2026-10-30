@@ -57,8 +57,10 @@
 </template>
 
 <script setup lang="ts">
+import { evalJobsQuery } from "@/services/online-evals.service.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import onlineEvalsService, {
   type EvalJob,
   type EvalTargetScope,
@@ -92,7 +94,7 @@ const emit = defineEmits<{
   (event: "submitted", result: ManualEvalJobResult): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const formId = "manual-evaluation-form";
 const loadedJobs = ref<EvalJob[]>([]);
 const loadingJobs = ref(false);
@@ -100,7 +102,7 @@ const loadError = ref("");
 const compatibleJobs = computed(() => loadedJobs.value.filter(isCompatibleJob));
 const jobOptions = computed(() =>
   compatibleJobs.value.map((job) => ({
-    label: job.name,
+    label: raw(job.name),
     value: job.id,
   })),
 );
@@ -137,7 +139,7 @@ async function loadJobs(): Promise<void> {
   loadedJobs.value = [];
   form.reset({ jobId: "" });
   try {
-    loadedJobs.value = await onlineEvalsService.jobs.list(props.orgId);
+    loadedJobs.value = await queryClient.fetchQuery(evalJobsQuery(props.orgId));
     if (compatibleJobs.value.length === 1) {
       form.setFieldValue("jobId", compatibleJobs.value[0].id);
     }

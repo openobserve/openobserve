@@ -25,6 +25,9 @@ import {
   messagesFromOutput,
   looksLikeAgentInjection,
   buildTraceGroup,
+  buildTurnDetail,
+  spanTimeBounds,
+  maxOf,
 } from "./threadView.utils";
 
 // ===========================================================================
@@ -361,6 +364,78 @@ describe("extractContent", () => {
   // Unknown object shape → empty string (don't dump JSON into the chat).
   it("returns empty string for unrecognised object shapes", () => {
     expect(extractContent({ random: "field" })).toBe("");
+  });
+
+  // OTel GenAI semconv v5 part types (issue #14127) — a "thinking then call
+  // a tool" turn must survive instead of vanishing entirely.
+  it("renders a reasoning part", () => {
+    expect(extractContent([{ type: "reasoning", content: "let me check" }])).toBe("let me check");
+  });
+
+  it("renders a tool_call part instead of dropping the turn", () => {
+    const result = extractContent([
+      { type: "reasoning", content: "checking the weather" },
+      { type: "tool_call", name: "get_weather", arguments: { city: "Boston" } },
+    ]);
+    expect(result).toContain("checking the weather");
+    expect(result).toContain("get_weather");
+  });
+
+  it("renders a tool_call_response part", () => {
+    expect(extractContent([{ type: "tool_call_response", response: "rainy, 57F" }])).toBe(
+      "rainy, 57F",
+    );
+  });
+
+  // blob/file/uri stay suppressed — they have first-class rendering
+  // elsewhere and would just dump binary/reference JSON into the chat.
+  it("still drops blob/file/uri parts", () => {
+    expect(extractContent([{ type: "blob", modality: "image", content: "aGVsbG8=" }])).toBe("");
+  });
+
+  // A part type the spec hasn't been taught about yet must not make the
+  // whole turn disappear — show a generic marker instead of "".
+  it("renders a generic marker for an unrecognised future part type", () => {
+    expect(extractContent([{ type: "some_new_part_type", data: 1 }])).toBe("[some_new_part_type]");
+  });
+
+  // The same marker applies to a *recognised* type with nothing to render
+  // (empty content) — not just genuinely unrecognised ones.
+  it("renders a generic marker for a recognised type that yields no text", () => {
+    expect(extractContent([{ type: "text" }])).toBe("[text]");
+  });
+
+  // Real-world SDK field-name aliases (verified against actual instrumentation
+  // source, not the spec doc) — same coverage as genAiParts.spec.ts, exercised
+  // through the Thread tab's actual entry point so a regression is caught here too.
+  it("renders a `thinking`-typed part", () => {
+    expect(extractContent([{ type: "thinking", content: "let me check" }])).toBe("let me check");
+  });
+
+  it("renders a tool_call_response part via its `result` field", () => {
+    expect(extractContent([{ type: "tool_call_response", result: "rainy, 57F" }])).toBe(
+      "rainy, 57F",
+    );
+  });
+
+  // The exact shape ingested by repro_14127.py's turn 3 (issue-14127-repro/):
+  // a real tool-calling turn, end to end through extractContent.
+  it("renders a full tool-calling turn (thinking + tool_call)", () => {
+    const result = extractContent([
+      { type: "thinking", content: "I should call get_weather for Boston." },
+      { type: "tool_call", id: "call_1", name: "get_weather", arguments: { city: "Boston" } },
+    ]);
+    expect(result).toContain("I should call get_weather for Boston.");
+    expect(result).toContain("Called get_weather");
+    expect(result).toContain("Boston");
+  });
+
+  it("renders the tool response side of that turn (tool_call_response with `result`)", () => {
+    expect(
+      extractContent([
+        { type: "tool_call_response", id: "call_1", name: "get_weather", result: "rainy, 57F" },
+      ]),
+    ).toBe("rainy, 57F");
   });
 });
 
@@ -983,5 +1058,160 @@ describe("buildTraceGroup", () => {
     ];
     const g = buildTraceGroup(spans)!;
     expect(g.userQuery).toBe("EXPLICIT QUESTION");
+  });
+});
+
+// ===========================================================================
+// buildTurnDetail
+// ===========================================================================
+
+describe("buildTurnDetail", () => {
+  // Real capture: one agent turn where the `chat` span WRAPS the tool call it
+  // makes, so the `execute_tool` span is the newest span by start_time.
+  // ns timestamps are kept as strings — they exceed Number precision, and
+  // `buildTurnDetail` coerces with Number() anyway.
+  const chatSpan = {
+    span_id: "9c7e26618777ec86",
+    trace_id: "01a013ea454b703bbda018c5c5a0175f",
+    gen_ai_operation_name: "chat",
+    gen_ai_request_model: "deepseek-v4-pro",
+    gen_ai_response_model: "deepseek-v4-pro",
+    start_time: "1787040515717940269",
+    gen_ai_input_messages: JSON.stringify([
+      { role: "user", content: "how many streams are there" },
+    ]),
+    gen_ai_output_messages: JSON.stringify([
+      { role: "assistant", content: "There are **3,647 streams** in the `default` organization." },
+    ]),
+  };
+  const toolSpan = {
+    span_id: "dc20fb56909bd06c",
+    trace_id: "01a013ea454b703bbda018c5c5a0175f",
+    gen_ai_operation_name: "execute_tool",
+    gen_ai_tool_name: "o2_StreamList",
+    start_time: "1787040518081711486",
+    gen_ai_input_messages: JSON.stringify({ org_id: "default", limit: 10, offset: 0 }),
+    gen_ai_output_messages: JSON.stringify({
+      total: 3647,
+      items: [{ name: "_agent_signals", stream_type: "logs" }],
+    }),
+  };
+  const wrapperSpan = {
+    span_id: "a491937f8c278d4e",
+    trace_id: "01a013ea454b703bbda018c5c5a0175f",
+    gen_ai_operation_name: "span",
+    start_time: "1787040515717926621",
+  };
+
+  it("uses the chat span's reply, not the tool result, when the tool span is newest", () => {
+    const d = buildTurnDetail("t1", [chatSpan, toolSpan, wrapperSpan]);
+    expect(d.assistantMessage?.content).toBe(
+      "There are **3,647 streams** in the `default` organization.",
+    );
+    expect(d.assistantMessage?.content).not.toContain("_agent_signals");
+  });
+
+  it("does not mistake tool arguments for the user question", () => {
+    // Tool span sorted FIRST — the forward walk must still skip it.
+    const d = buildTurnDetail("t1", [{ ...toolSpan, start_time: 1 }, chatSpan]);
+    expect(d.userMessage?.content).toBe("how many streams are there");
+  });
+
+  it("still counts tool and LLM spans it excludes from messages", () => {
+    const d = buildTurnDetail("t1", [chatSpan, toolSpan, wrapperSpan]);
+    expect(d.llmCalls).toBe(1);
+    expect(d.toolCalls).toBe(1);
+    expect(d.otherCalls).toBe(1);
+    expect(d.otherOps).toEqual(["span"]);
+    expect(d.model).toBe("deepseek-v4-pro");
+    expect(d.traceId).toBe("t1");
+  });
+
+  it("takes the LAST assistant reply across a multi-call turn", () => {
+    const planning = {
+      ...chatSpan,
+      span_id: "plan",
+      start_time: 100,
+      gen_ai_output_messages: JSON.stringify([
+        { role: "assistant", content: "I should call o2_StreamList." },
+      ]),
+    };
+    const answer = { ...chatSpan, span_id: "answer", start_time: 300 };
+    const tool = { ...toolSpan, start_time: 200 };
+    const d = buildTurnDetail("t1", [planning, tool, answer]);
+    expect(d.assistantMessage?.content).toBe(
+      "There are **3,647 streams** in the `default` organization.",
+    );
+  });
+
+  it("returns null messages for a trace with no chat spans", () => {
+    const d = buildTurnDetail("t1", [toolSpan]);
+    expect(d.userMessage).toBeNull();
+    expect(d.assistantMessage).toBeNull();
+    expect(d.toolCalls).toBe(1);
+  });
+
+  it("handles an empty span list", () => {
+    const d = buildTurnDetail("t1", []);
+    expect(d).toEqual({
+      traceId: "t1",
+      userMessage: null,
+      assistantMessage: null,
+      model: null,
+      llmCalls: 0,
+      toolCalls: 0,
+      otherCalls: 0,
+      otherOps: [],
+    });
+  });
+});
+
+describe("spanTimeBounds / maxOf", () => {
+  it("returns the earliest start and latest end, skipping missing or invalid times", () => {
+    expect(
+      spanTimeBounds([
+        { start_time: 30, end_time: 90 },
+        { start_time: "10", end_time: 50 },
+        { start_time: undefined, end_time: 120 },
+        { start_time: Number.NaN, end_time: "x" },
+      ]),
+    ).toEqual({ startNs: 10, endNs: 120 });
+  });
+
+  it("returns null when no span carries a start or an end", () => {
+    expect(spanTimeBounds([])).toBeNull();
+    expect(spanTimeBounds([{ start_time: 5 }])).toBeNull();
+    expect(spanTimeBounds([{ end_time: 5 }])).toBeNull();
+  });
+
+  it("maxOf matches Math.max for small inputs", () => {
+    expect(maxOf([3, 9, 2])).toBe(9);
+    expect(maxOf([])).toBe(-Infinity);
+    expect(maxOf([], 0)).toBe(0);
+    expect(maxOf([-4], 0)).toBe(0);
+  });
+
+  it("handles 200,000 spans without a RangeError", () => {
+    const spans = Array.from({ length: 200_000 }, (_, i) => ({
+      start_time: 1_000 + i,
+      end_time: 2_000 + i * 2,
+      depth: i % 7,
+    }));
+    expect(spanTimeBounds(spans)).toEqual({ startNs: 1_000, endNs: 2_000 + 199_999 * 2 });
+    expect(maxOf(spans.map((s) => s.depth))).toBe(6);
+  });
+
+  it("buildTraceGroup computes the total duration over 200,000 spans", () => {
+    const spans: any[] = Array.from({ length: 200_000 }, (_, i) =>
+      makeSpan({ span_id: `s${i}`, start_time: 1_000 + i, end_time: 1_500 + i }),
+    );
+    spans[0] = makeSpan({
+      span_id: "turn-1",
+      gen_ai_operation_name: "chat",
+      gen_ai_input_messages: JSON.stringify([{ role: "user", content: "x" }]),
+      start_time: 1_000,
+      end_time: 1_500,
+    });
+    expect(buildTraceGroup(spans)!.totalDurationNs).toBe(1_500 + 199_999 - 1_000);
   });
 });

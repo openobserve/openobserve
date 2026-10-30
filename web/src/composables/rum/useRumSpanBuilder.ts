@@ -14,30 +14,57 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { type Ref } from "vue";
+import type { TranslateFn } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import searchService from "@/services/search";
-import { rumField, hasRumField, rumFieldEqualsSql } from "@/utils/rum/fields";
+import {
+  rumField,
+  hasRumField,
+  rumFieldEqualsAnySql,
+  normalizeTraceId,
+  traceIdLookupVariants,
+} from "@/utils/rum/fields";
 import { SPAN_KIND_CLIENT, SPAN_KIND_UNSPECIFIED } from "@/utils/traces/constants";
+import { spanWindowUs } from "@/utils/rum/traceWindow";
+import { collapseViewDocuments } from "@/utils/rum/viewDocuments";
+import { sqlIn } from "@/utils/query/sqlFilterBuilder";
 
 const ACTION_PROXIMITY_MS = 10_000; // ±10s — actions beyond this are collapsed
+// A browser request starts before the trace but is stamped on completion, so the tail is longer.
+const BROWSER_REQUEST_LEAD_US = 60_000_000;
+const BROWSER_REQUEST_LAG_US = 300_000_000;
+// A page view outlives any trace started from it, so its rows are found around the request.
+const PAGE_VIEW_WINDOW_US = 3_600_000_000;
 
-export default function useRumSpanBuilder(logStreams: Ref<string[]>, searchObj: any) {
+// Only a browser request can own a parent id that no span in the trace owns.
+export const hasDanglingParent = (spans: any[]): boolean => {
+  const ownedIds = new Set<string>();
+  for (const span of spans) {
+    if (span?.span_id) ownedIds.add(String(span.span_id));
+  }
+  for (const span of spans) {
+    const parentId = span?.reference_parent_span_id;
+    if (parentId && !ownedIds.has(String(parentId))) return true;
+  }
+  return false;
+};
+
+export default function useRumSpanBuilder(
+  logStreams: Ref<string[]>,
+  searchObj: any,
+  t: TranslateFn,
+) {
   const store = useStore();
   const router = useRouter();
-  const { getStream } = useStreams();
+  const { getStream } = useStreams(t);
 
   const sanitizeTraceId = (id: string): string => String(id).replace(/['"\\]/g, "");
 
   const getOrgId = () =>
     (router.currentRoute.value.query?.org_identifier as string) ||
     store.state.selectedOrganization.identifier;
-
-  // ±60s buffer around the trace time window for all RUM event queries,
-  // ensuring we capture RUM events that may have been ingested slightly
-  // before or after the backend trace spans.
-  const RUM_TIME_BUFFER_US = 60_000_000;
 
   /**
    * Fetch view events (type = 'view') for the given view IDs.
@@ -54,13 +81,14 @@ export default function useRumSpanBuilder(logStreams: Ref<string[]>, searchObj: 
           org_identifier: orgId,
           query: {
             query: {
-              sql: `SELECT * FROM "_rumdata" WHERE view_id IN ('${viewIds.join("','")}') AND type = 'view' ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
-              // +/- 60s around trace window to capture RUM events that may have
-              // been ingested slightly before or after the backend trace spans
-              start_time: startTime - RUM_TIME_BUFFER_US,
-              end_time: endTime + RUM_TIME_BUFFER_US,
+              // Newest first: a view is re-sent on every update and only the last
+              // document carries its final time spent, so an ascending page of 10
+              // dropped it for any view open longer than a few keep-alives.
+              sql: `SELECT * FROM "_rumdata" WHERE ${sqlIn("view_id", viewIds)} AND type = 'view' ORDER BY ${store.state.zoConfig.timestamp_column} DESC`,
+              start_time: startTime,
+              end_time: endTime,
               from: 0,
-              size: 10,
+              size: 50,
             },
           },
           page_type: "logs",
@@ -90,10 +118,8 @@ export default function useRumSpanBuilder(logStreams: Ref<string[]>, searchObj: 
           query: {
             query: {
               sql: `SELECT * FROM "_rumdata" WHERE action_id IN (${actionId.map((id) => `'${sanitizeTraceId(id)}'`).join(",")}) and type='action' ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
-              // +/- 60s around trace window to capture RUM action events that may
-              // have been ingested slightly before or after the backend trace spans
-              start_time: startTime - RUM_TIME_BUFFER_US,
-              end_time: endTime + RUM_TIME_BUFFER_US,
+              start_time: startTime,
+              end_time: endTime,
               from: 0,
               size: 250,
             },
@@ -124,12 +150,9 @@ export default function useRumSpanBuilder(logStreams: Ref<string[]>, searchObj: 
           org_identifier: orgId,
           query: {
             query: {
-              sql: `SELECT * FROM "_rumdata" WHERE view_id IN ('${viewIds.join("','")}') AND (type = 'error' OR type = 'resource' OR type = 'long_task' OR type = 'action') ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
-              // +/- 60s around trace window to capture RUM leaf events (resource,
-              // error, long_task) that may have been ingested slightly before or
-              // after the backend trace spans
-              start_time: startTime - RUM_TIME_BUFFER_US,
-              end_time: endTime + RUM_TIME_BUFFER_US,
+              sql: `SELECT * FROM "_rumdata" WHERE ${sqlIn("view_id", viewIds)} AND (type = 'error' OR type = 'resource' OR type = 'long_task' OR type = 'action') ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
+              start_time: startTime,
+              end_time: endTime,
               from: 0,
               size: 250,
             },
@@ -145,11 +168,21 @@ export default function useRumSpanBuilder(logStreams: Ref<string[]>, searchObj: 
     }
   };
 
-  /**
-   * Fetch RUM events that have the matching trace_id, plus the full view context.
-   * Returns structured data for building the Session→View→Action→Resource hierarchy.
-   */
-  const fetchRumEventsForTrace = async (traceId: string, startTime: number, endTime: number) => {
+  const parseActionIds = (actionId: unknown): string[] => {
+    if (typeof actionId !== "string" || !actionId) return [];
+    try {
+      const parsed = JSON.parse(actionId);
+      return Array.isArray(parsed) ? parsed.map(String) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  // The RUM Session Replay page only lists sessions whose events carry this flag.
+  const hasReplay = (event: any): boolean => event?.session_has_replay === true;
+
+  /** Fetches the browser request and its page view for a trace with a dangling parent, searching only around the window its spans span. */
+  const fetchRumEventsForTrace = async (traceId: string, spans: any[]) => {
     const empty = {
       tracedResources: [] as any[],
       viewEvents: [] as any[],
@@ -161,15 +194,22 @@ export default function useRumSpanBuilder(logStreams: Ref<string[]>, searchObj: 
       if (!logStreams.value.includes("_rumdata") || !traceId) {
         return empty;
       }
+      if (!hasDanglingParent(spans)) return empty;
+      const traceWindow = spanWindowUs(spans);
+      if (!traceWindow) return empty;
 
       const rumStream = await getStream("_rumdata", "logs", true);
       // Match the trace id under whichever spellings this stream actually carries.
       // Naming a column the stream lacks fails the entire query, so the predicate is
-      // built from the schema rather than assuming one namespace.
-      const traceIdPredicate = rumFieldEqualsSql(
+      // built from the schema rather than assuming one namespace. The id is matched
+      // in both its padded canonical form and the zero-stripped form SDK 0.4.x
+      // stored; non-hex ids fall back to an exact match.
+      const sanitized = sanitizeTraceId(traceId);
+      const idVariants = traceIdLookupVariants(sanitized);
+      const traceIdPredicate = rumFieldEqualsAnySql(
         rumStream?.schema,
         "trace_id",
-        sanitizeTraceId(traceId),
+        idVariants.length ? idVariants : [sanitized],
       );
       if (!traceIdPredicate) return empty;
 
@@ -182,10 +222,8 @@ export default function useRumSpanBuilder(logStreams: Ref<string[]>, searchObj: 
           query: {
             query: {
               sql: `SELECT * FROM "_rumdata" WHERE ${traceIdPredicate} ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
-              // +/- 60s around trace window to capture the RUM resource that bridges
-              // the trace to the RUM session (view/action hierarchy)
-              start_time: startTime - RUM_TIME_BUFFER_US,
-              end_time: endTime + RUM_TIME_BUFFER_US,
+              start_time: traceWindow.start - BROWSER_REQUEST_LEAD_US,
+              end_time: traceWindow.end + BROWSER_REQUEST_LAG_US,
               from: 0,
               size: 10,
             },
@@ -200,22 +238,17 @@ export default function useRumSpanBuilder(logStreams: Ref<string[]>, searchObj: 
 
       const viewIds = [...new Set(tracedResources.map((r: any) => r.view_id).filter(Boolean))];
 
-      // Parse action_id from traced resource (stringified JSON array)
-      let parsedActionIds: string[] = [];
-      try {
-        parsedActionIds = JSON.parse(tracedResources[0]?.action_id || "[]");
-      } catch {
-        parsedActionIds = [];
-      }
-      const primaryActionId = parsedActionIds || "";
+      // RUM `date` is milliseconds; without it the trace end is the nearest known instant.
+      const dateMs = Number(tracedResources[0]?.date);
+      const anchorUs = dateMs > 0 ? dateMs * 1000 : traceWindow.end;
+      const viewStart = anchorUs - PAGE_VIEW_WINDOW_US;
+      const viewEnd = anchorUs + PAGE_VIEW_WINDOW_US;
+      const actionIds = parseActionIds(tracedResources[0]?.action_id);
 
-      // Run all 3 queries in parallel
       const [viewEvents, actionEvents, allViewEvents] = await Promise.all([
-        fetchViewEvents(viewIds, startTime, endTime),
-        primaryActionId
-          ? fetchActionEvents(primaryActionId, startTime, endTime)
-          : Promise.resolve([]),
-        fetchAllViewEvents(viewIds, startTime, endTime),
+        fetchViewEvents(viewIds, viewStart, viewEnd),
+        actionIds.length ? fetchActionEvents(actionIds, viewStart, viewEnd) : Promise.resolve([]),
+        fetchAllViewEvents(viewIds, viewStart, viewEnd),
       ]);
 
       return { tracedResources, viewEvents, actionEvents, allViewEvents };
@@ -257,13 +290,17 @@ export default function useRumSpanBuilder(logStreams: Ref<string[]>, searchObj: 
       event.resource_duration / 1000000 || event[`${event.type}_duration`] / 1000000 || 0;
     const isTraced = hasRumField(event, "trace_id");
 
-    let operationName = "Unknown RUM Event";
+    let operationName: string = t("rum.unknownRumEvent");
     if (event.type === "resource") {
-      operationName = `${event.resource_method || "GET"} ${event.resource_url || "Unknown URL"}`;
+      operationName = `${event.resource_method || "GET"} ${event.resource_url || t("rum.unknownUrl")}`;
     } else if (event.type === "error") {
-      operationName = `Error: ${event.error_message || event.error_type || "Unknown Error"}`;
+      operationName = t("common.errorPrefix", {
+        message: event.error_message || event.error_type || t("rum.unknownErrorTitle"),
+      });
     } else if (event.type === "long_task") {
-      operationName = `Long Task: ${event.long_task_duration / 1000 || duration}ms`;
+      operationName = t("rum.longTaskOperation", {
+        duration: event.long_task_duration / 1000 || duration,
+      });
     }
 
     return {
@@ -275,7 +312,8 @@ export default function useRumSpanBuilder(logStreams: Ref<string[]>, searchObj: 
         ? String(rumField(event, "span_id"))
         : `rum_${event.type}_${event[`${event.type}_id`] || event.date}`,
       reference_parent_span_id: parentSpanId,
-      trace_id: rumField(event, "trace_id") || undefined,
+      trace_id:
+        normalizeTraceId(rumField(event, "trace_id")) || rumField(event, "trace_id") || undefined,
       operation_name: operationName,
       service_name: event.service || "Frontend",
       span_status:
@@ -285,6 +323,7 @@ export default function useRumSpanBuilder(logStreams: Ref<string[]>, searchObj: 
       span_kind: event.type === "resource" ? SPAN_KIND_CLIENT : SPAN_KIND_UNSPECIFIED,
       rum_event_type: event.type,
       rum_session_id: event.session_id,
+      rum_session_has_replay: hasReplay(event),
       _is_trace_bridge: isTraced,
     };
   };
@@ -317,15 +356,8 @@ export default function useRumSpanBuilder(logStreams: Ref<string[]>, searchObj: 
   };
 
   const buildViewSpans = (viewEvents: any[], traceId: string): any[] => {
-    const dedupedViews = new Map<string, any>();
-    for (const view of viewEvents) {
-      const existing = dedupedViews.get(view.view_id);
-      if (!existing || (view.view_time_spent > 0 && !existing.view_time_spent)) {
-        dedupedViews.set(view.view_id, view);
-      }
-    }
-
-    return [...dedupedViews.values()].map((view) => {
+    // A view's documents share its start `date`, so only the version says which is final.
+    return collapseViewDocuments(viewEvents).map((view: any) => {
       const viewDuration = view.view_time_spent || view.view_loading_time;
       return {
         [tsCol()]: view.date,
@@ -335,12 +367,15 @@ export default function useRumSpanBuilder(logStreams: Ref<string[]>, searchObj: 
         span_id: `rum_view_${view.view_id}`,
         reference_parent_span_id: "",
         trace_id: traceId || undefined,
-        operation_name: `View: ${view.view_url || view.view_name || "Unknown Page"}`,
+        operation_name: t("rum.viewOperation", {
+          page: view.view_url || view.view_name || t("rum.unknownPage"),
+        }),
         service_name: view.service || "Frontend",
         span_status: "OK",
         span_kind: SPAN_KIND_UNSPECIFIED,
         rum_event_type: "view",
         rum_session_id: view.session_id,
+        rum_session_has_replay: hasReplay(view),
       };
     });
   };
@@ -382,19 +417,23 @@ export default function useRumSpanBuilder(logStreams: Ref<string[]>, searchObj: 
         span_id: `rum_action_${action.action_id}`,
         reference_parent_span_id: action.view_id ? `rum_view_${action.view_id}` : "",
         trace_id: traceId || undefined,
-        operation_name: `Action: ${action.action_type || "Unknown"} on ${action.action_target_name || "Unknown"}`,
+        operation_name: t("rum.actionOperation", {
+          type: action.action_type || t("rum.unknown"),
+          target: action.action_target_name || t("rum.unknown"),
+        }),
         service_name: action.service || "Frontend",
         span_status: "OK",
         span_kind: SPAN_KIND_UNSPECIFIED,
         rum_event_type: "action",
         rum_session_id: action.session_id,
+        rum_session_has_replay: hasReplay(action),
       });
     }
 
     if (actionsToCollapse.length > 0) {
       spans.push(
         makeCollapsedSpan(
-          `[${actionsToCollapse.length} other actions]`,
+          t("rum.collapsedOtherActions", { count: actionsToCollapse.length }),
           actionsToCollapse,
           firstTracedResource?.view_id,
           firstTracedResource?.session_id,
@@ -402,6 +441,7 @@ export default function useRumSpanBuilder(logStreams: Ref<string[]>, searchObj: 
           {
             rum_event_type: "collapsed_actions",
             rum_session_id: firstTracedResource?.session_id,
+            rum_session_has_replay: hasReplay(firstTracedResource),
           },
         ),
       );
@@ -436,8 +476,47 @@ export default function useRumSpanBuilder(logStreams: Ref<string[]>, searchObj: 
     return { staticAssets, apiCalls, errors, longTasks };
   };
 
+  const traceIdOf = (event: any): string => {
+    const raw = rumField<string>(event, "trace_id") || "";
+    return normalizeTraceId(raw) || raw;
+  };
+
+  // The view's other requests belong to other traces; listing each buries the one opened here.
+  const splitRequestsByTrace = (apiCalls: any[], tracedResources: any[], traceId: string) => {
+    if (!traceId) return { ownRequests: apiCalls, otherRequests: [] as any[] };
+    const ownRequests = apiCalls.filter((event) => traceIdOf(event) === traceId);
+    const otherRequests = apiCalls.filter((event) => traceIdOf(event) !== traceId);
+    // A busy view can fill the leaf page before the traced request is reached.
+    if (!ownRequests.length) {
+      ownRequests.push(...tracedResources.filter((event) => event?.type === "resource"));
+    }
+    return { ownRequests, otherRequests };
+  };
+
   const buildResourceSpans = (apiCalls: any[], actionEvents: any[]): any[] =>
     apiCalls.map((event) => createLeafSpan(event, resolveParentSpanId(event, actionEvents)));
+
+  const buildOtherRequestSpans = (
+    otherRequests: any[],
+    firstTracedResource: any,
+    traceId: string,
+  ): any[] => {
+    if (!otherRequests.length) return [];
+    return [
+      makeCollapsedSpan(
+        t("rum.collapsedOtherRequests", { count: otherRequests.length }),
+        otherRequests,
+        firstTracedResource?.view_id,
+        firstTracedResource?.session_id,
+        traceId,
+        {
+          rum_event_type: "collapsed_requests",
+          rum_session_id: firstTracedResource?.session_id,
+          rum_session_has_replay: hasReplay(firstTracedResource),
+        },
+      ),
+    ];
+  };
 
   const buildErrorSpans = (
     errors: any[],
@@ -455,7 +534,7 @@ export default function useRumSpanBuilder(logStreams: Ref<string[]>, searchObj: 
     if (errors.length > 3) {
       spans.push(
         makeCollapsedSpan(
-          `[${errors.length - 3} more errors]`,
+          t("rum.collapsedMoreErrors", { count: errors.length - 3 }),
           errors.slice(3),
           firstTracedResource?.view_id,
           firstTracedResource?.session_id,
@@ -489,7 +568,7 @@ export default function useRumSpanBuilder(logStreams: Ref<string[]>, searchObj: 
     const remaining = staticAssets.length - 3;
     spans.push(
       makeCollapsedSpan(
-        `[${remaining} static assets]`,
+        t("rum.collapsedStaticAssets", { count: remaining }),
         staticAssets.slice(3),
         firstTracedResource?.view_id,
         firstTracedResource?.session_id,
@@ -515,7 +594,7 @@ export default function useRumSpanBuilder(logStreams: Ref<string[]>, searchObj: 
 
     return [
       makeCollapsedSpan(
-        `[${longTasks.length} long tasks]`,
+        t("rum.collapsedLongTasks", { count: longTasks.length }),
         longTasks,
         firstTracedResource?.view_id,
         firstTracedResource?.session_id,
@@ -539,6 +618,7 @@ export default function useRumSpanBuilder(logStreams: Ref<string[]>, searchObj: 
   /**
    * Format RUM events as trace spans with full parent-child hierarchy.
    * Builds Session → View → Action → Resource/Error/LongTask → Backend spans.
+   * Only the traced request is shown; the view's other requests collapse into one row.
    */
   const formatRumEventsAsSpans = (
     tracedResources: any[],
@@ -546,18 +626,22 @@ export default function useRumSpanBuilder(logStreams: Ref<string[]>, searchObj: 
     actionEvents: any[],
     allViewEvents: any[],
   ) => {
-    if (!allViewEvents.length) return [];
+    // An empty view page still shows the traced request, via the fallback in splitRequestsByTrace.
+    if (!allViewEvents.length && !tracedResources.length) return [];
 
     const firstTracedResource = tracedResources[0];
-    const traceId = rumField<string>(firstTracedResource, "trace_id") || "";
+    const rawTraceId = rumField<string>(firstTracedResource, "trace_id") || "";
+    const traceId = normalizeTraceId(rawTraceId) || rawTraceId;
     const tracedTimestamp = firstTracedResource?.date || 0;
 
     const { staticAssets, apiCalls, errors, longTasks } = classifyLeafEvents(allViewEvents);
+    const { ownRequests, otherRequests } = splitRequestsByTrace(apiCalls, tracedResources, traceId);
 
     const spans: any[] = [
       ...buildViewSpans(viewEvents, traceId),
       ...buildActionSpans(actionEvents, firstTracedResource, traceId, tracedTimestamp),
-      ...buildResourceSpans(apiCalls, actionEvents),
+      ...buildResourceSpans(ownRequests, actionEvents),
+      ...buildOtherRequestSpans(otherRequests, firstTracedResource, traceId),
       ...buildErrorSpans(errors, firstTracedResource, traceId, actionEvents),
       ...buildStaticAssetSpans(staticAssets, firstTracedResource, traceId),
       ...buildLongTaskSpans(longTasks, firstTracedResource, traceId),

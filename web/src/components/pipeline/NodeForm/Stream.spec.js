@@ -61,8 +61,9 @@ vi.mock("@/composables/usePipelines", () => ({
 }));
 
 vi.mock("@/utils/pipelines/constants", () => ({
-  defaultDestinationNodeWarningMessage:
-    "Removing the default destination node stops data from being ingested.",
+  // The module now exports an i18n KEY, not resolved text — the component
+  // resolves it with its own t().
+  defaultDestinationNodeWarningKey: "pipeline.defaultDestinationNodeWarning",
 }));
 
 // ---------------------------------------------------------------------------
@@ -618,7 +619,7 @@ describe("Stream Component", () => {
       await flushPromises();
       wrapper.vm.openCancelDialog();
       expect(wrapper.vm.dialog.show).toBe(true);
-      expect(wrapper.vm.dialog.title).toBe("Discard Changes");
+      expect(wrapper.vm.dialog.title).toBe("Discard changes");
       expect(wrapper.vm.dialog.message).toBe("Are you sure you want to cancel changes?");
     });
 

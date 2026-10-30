@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, fmt::Display, str::FromStr, sync::Arc};
+use std::{fmt::Display, ops::Range, str::FromStr, sync::Arc};
 
 use arrow::buffer::BooleanBuffer;
 use chrono::{DateTime, Duration, TimeZone, Utc};
@@ -107,10 +107,11 @@ impl PartialEq for DataField {
     }
 }
 
-pub const ALL_STREAM_TYPES: [StreamType; 8] = [
+pub const ALL_STREAM_TYPES: [StreamType; 9] = [
     StreamType::Logs,
     StreamType::Metrics,
     StreamType::Traces,
+    StreamType::Profiles,
     StreamType::ServiceGraph,
     StreamType::EnrichmentTables,
     StreamType::Filelist,
@@ -125,6 +126,7 @@ pub enum StreamType {
     Logs,
     Metrics,
     Traces,
+    Profiles,
     #[serde(rename = "service_graph")]
     ServiceGraph,
     #[serde(rename = "enrichment_tables")]
@@ -136,6 +138,14 @@ pub enum StreamType {
 }
 
 impl StreamType {
+    /// Types the compactor can merge across the hours of a closed day.
+    pub fn support_dynamic_merge(&self) -> bool {
+        matches!(
+            *self,
+            StreamType::Logs | StreamType::Metrics | StreamType::Traces
+        )
+    }
+
     pub fn support_index(&self) -> bool {
         matches!(
             *self,
@@ -155,6 +165,7 @@ impl StreamType {
             StreamType::Logs => "logs",
             StreamType::Metrics => "metrics",
             StreamType::Traces => "traces",
+            StreamType::Profiles => "profiles",
             StreamType::ServiceGraph => "service_graph",
             StreamType::EnrichmentTables => "enrichment_tables",
             StreamType::Filelist => "file_list",
@@ -170,6 +181,7 @@ impl From<&str> for StreamType {
             "logs" => StreamType::Logs,
             "metrics" => StreamType::Metrics,
             "traces" => StreamType::Traces,
+            "profiles" => StreamType::Profiles,
             "service_graph" => StreamType::ServiceGraph,
             "enrichment_tables" | "enrich" => StreamType::EnrichmentTables,
             "file_list" => StreamType::Filelist,
@@ -192,6 +204,7 @@ impl std::fmt::Display for StreamType {
             StreamType::Logs => write!(f, "logs"),
             StreamType::Metrics => write!(f, "metrics"),
             StreamType::Traces => write!(f, "traces"),
+            StreamType::Profiles => write!(f, "profiles"),
             StreamType::ServiceGraph => write!(f, "service_graph"),
             StreamType::EnrichmentTables => write!(f, "enrichment_tables"),
             StreamType::Filelist => write!(f, "file_list"),
@@ -278,7 +291,10 @@ pub enum FileSelection {
     /// Row ids matched by the tantivy index, as a per-row bitmap of length
     /// `num_rows` (one bit per parquet row).
     Rows(Arc<BooleanBuffer>),
-    /// Row group ids selected by row-group-level sampling.
+    /// Sorted, non-overlapping physical row ranges selected by a compact
+    /// secondary index. This avoids materializing one bitmap bit per row.
+    RowRanges(Arc<Vec<Range<usize>>>),
+    /// Sampled row group ids in `PARQUET_MAX_ROW_GROUP_SIZE`-row units, not physical row groups.
     RowGroups(Arc<Vec<u32>>),
 }
 
@@ -333,6 +349,8 @@ pub struct FileMeta {
     pub compressed_size: i64,
     pub index_size: i64,
     #[serde(default)]
+    pub mindex_size: i64,
+    #[serde(default)]
     pub bloom_ver: i64, // 0 = no .bf; otherwise = microsecond ts encoded in .bf filename
     pub flattened: bool,
 }
@@ -374,6 +392,7 @@ pub struct FileListDeleted {
     pub account: String,
     pub file: String,
     pub index_file: bool,
+    pub mindex_file: bool,
     pub flattened: bool,
 }
 
@@ -460,13 +479,18 @@ pub struct StreamStats {
     pub storage_size: f64,
     pub compressed_size: f64,
     pub index_size: f64,
+    #[serde(default)]
+    pub mindex_size: f64,
 }
 
 impl StreamStats {
-    /// Returns true iff [start, end] time range intersects with the stream's
-    /// time range.
+    /// Returns true iff [start, end] intersects the stream's time range, or the stream has no
+    /// stats yet.
     pub fn time_range_intersects(&self, start: i64, end: i64) -> bool {
-        assert!(start <= end);
+        // stats are built from persisted files only, so a stream with none is unknown, not empty
+        if self.doc_time_max == 0 {
+            return true;
+        }
         let (min, max) = self.time_range();
         // [min, max] does *not* intersect with [start, end] if either
         //
@@ -484,52 +508,16 @@ impl StreamStats {
 
     fn time_range(&self) -> (i64, i64) {
         assert!(self.doc_time_min <= self.doc_time_max);
-        let file_push_interval = Duration::try_seconds(get_config().limit.file_push_interval as _)
+        let cfg = get_config();
+        // stats lag ingestion by the WAL retention plus the stats job interval, not just the push
+        let slack_secs = cfg.limit.file_push_interval
+            + cfg.limit.max_file_retention_time
+            + cfg.limit.calculate_stats_interval;
+        let slack = Duration::try_seconds(slack_secs as _)
             .unwrap()
             .num_microseconds()
             .unwrap();
-        (self.doc_time_min, self.doc_time_max + file_push_interval)
-    }
-
-    pub fn add_file_meta(&mut self, meta: &FileMeta) {
-        self.file_num += 1;
-        self.doc_num = max(0, self.doc_num + meta.records);
-        self.doc_time_min = if self.doc_time_min == 0 {
-            meta.min_ts
-        } else if meta.min_ts == 0 {
-            self.doc_time_min
-        } else {
-            self.doc_time_min.min(meta.min_ts)
-        };
-        self.doc_time_max = self.doc_time_max.max(meta.max_ts);
-        self.storage_size += meta.original_size as f64;
-        self.compressed_size += meta.compressed_size as f64;
-        self.index_size += meta.index_size as f64;
-        if self.storage_size < 0.0 {
-            self.storage_size = 0.0;
-        }
-        if self.compressed_size < 0.0 {
-            self.compressed_size = 0.0;
-        }
-        if self.index_size < 0.0 {
-            self.index_size = 0.0;
-        }
-    }
-
-    pub fn format_by(&mut self, stats: &StreamStats) {
-        self.file_num = stats.file_num;
-        self.doc_num = stats.doc_num;
-        self.storage_size = stats.storage_size;
-        self.compressed_size = stats.compressed_size;
-        self.index_size = stats.index_size;
-        self.doc_time_min = if self.doc_time_min == 0 {
-            stats.doc_time_min
-        } else if stats.doc_time_min == 0 {
-            self.doc_time_min
-        } else {
-            self.doc_time_min.min(stats.doc_time_min)
-        };
-        self.doc_time_max = self.doc_time_max.max(stats.doc_time_max);
+        (self.doc_time_min, self.doc_time_max + slack)
     }
 
     pub fn merge(&mut self, other: &StreamStats) {
@@ -547,6 +535,7 @@ impl StreamStats {
         self.storage_size += other.storage_size;
         self.compressed_size += other.compressed_size;
         self.index_size += other.index_size;
+        self.mindex_size += other.mindex_size;
     }
 }
 
@@ -579,6 +568,7 @@ impl From<Stats> for StreamStats {
             storage_size: meta.original_size,
             compressed_size: meta.compressed_size.unwrap_or_default(),
             index_size: meta.index_size.unwrap_or_default(),
+            mindex_size: meta.mindex_size.unwrap_or_default(),
         }
     }
 }
@@ -602,6 +592,7 @@ impl std::ops::Sub<&StreamStats> for &StreamStats {
             storage_size: self.storage_size - rhs.storage_size,
             compressed_size: self.compressed_size - rhs.compressed_size,
             index_size: self.index_size - rhs.index_size,
+            mindex_size: self.mindex_size - rhs.mindex_size,
         }
     }
 }
@@ -625,6 +616,7 @@ impl std::ops::Add<&StreamStats> for &StreamStats {
             storage_size: self.storage_size + rhs.storage_size,
             compressed_size: self.compressed_size + rhs.compressed_size,
             index_size: self.index_size + rhs.index_size,
+            mindex_size: self.mindex_size + rhs.mindex_size,
         }
     }
 }
@@ -644,6 +636,7 @@ impl From<&FileMeta> for cluster_rpc::FileMeta {
             original_size: req.original_size,
             compressed_size: req.compressed_size,
             index_size: req.index_size,
+            mindex_size: req.mindex_size,
         }
     }
 }
@@ -658,6 +651,7 @@ impl From<&cluster_rpc::FileMeta> for FileMeta {
             compressed_size: req.compressed_size,
             flattened: false,
             index_size: req.index_size,
+            mindex_size: req.mindex_size,
             bloom_ver: 0,
         }
     }
@@ -781,6 +775,8 @@ pub struct UpdateStreamSettings {
     pub store_original_data: Option<bool>,
     #[serde(default)]
     pub approx_partition: Option<bool>,
+    #[serde(default)]
+    pub dynamic_merge: Option<bool>,
     #[serde(default)]
     pub extended_retention_days: UpdateSettingsWrapper<TimeRange>,
     #[serde(default)]
@@ -963,6 +959,9 @@ pub struct StreamSettings {
     pub store_original_data: bool,
     #[serde(default)]
     pub approx_partition: bool,
+    /// Per-stream override of `ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES`; unset follows the type.
+    #[serde(default)]
+    pub dynamic_merge: Option<bool>,
     #[serde(default)]
     pub index_original_data: bool,
     #[serde(default)]
@@ -996,6 +995,7 @@ impl Default for StreamSettings {
             max_query_range: 0,
             store_original_data: false,
             approx_partition: false,
+            dynamic_merge: None,
             distinct_value_fields: Vec::new(),
             index_updated_at: 0,
             index_fields_updated_at: Default::default(),
@@ -1052,6 +1052,10 @@ impl Serialize for StreamSettings {
         state.serialize_field("max_query_range", &self.max_query_range)?;
         state.serialize_field("store_original_data", &self.store_original_data)?;
         state.serialize_field("approx_partition", &self.approx_partition)?;
+        match self.dynamic_merge {
+            Some(dynamic_merge) => state.serialize_field("dynamic_merge", &dynamic_merge)?,
+            None => state.skip_field("dynamic_merge")?,
+        }
         state.serialize_field("index_updated_at", &self.index_updated_at)?;
         if !self.index_fields_updated_at.is_empty() {
             state.serialize_field("index_fields_updated_at", &self.index_fields_updated_at)?;
@@ -1184,6 +1188,8 @@ impl From<&str> for StreamSettings {
                     .use_stream_settings_for_partitions_enabled,
             );
 
+        let dynamic_merge = settings.get("dynamic_merge").and_then(Value::as_bool);
+
         let mut distinct_value_fields = Vec::new();
         let fields = settings.get("distinct_value_fields");
         if let Some(value) = fields {
@@ -1270,6 +1276,7 @@ impl From<&str> for StreamSettings {
             defined_schema_fields,
             store_original_data,
             approx_partition,
+            dynamic_merge,
             distinct_value_fields,
             index_updated_at,
             index_fields_updated_at,
@@ -1325,14 +1332,6 @@ impl StreamPartition {
         Self {
             field: field.to_string(),
             types: StreamPartitionType::Hash(std::cmp::max(16, buckets)),
-            disabled: false,
-        }
-    }
-
-    pub fn new_prefix(field: &str) -> Self {
-        Self {
-            field: field.to_string(),
-            types: StreamPartitionType::Prefix,
             disabled: false,
         }
     }
@@ -1491,53 +1490,13 @@ mod tests {
             compressed_size: 1,
             flattened: false,
             index_size: 0,
+            mindex_size: 0,
             bloom_ver: 0,
         };
 
         let rpc_meta = cluster_rpc::FileMeta::from(&file_meta);
         let resp = FileMeta::from(&rpc_meta);
         assert_eq!(file_meta, resp);
-    }
-
-    #[test]
-    fn test_stream_stats_add_file_meta() {
-        let mut stats = StreamStats::default();
-        let meta = FileMeta {
-            min_ts: 1000,
-            max_ts: 2000,
-            records: 100,
-            original_size: 1000,
-            compressed_size: 500,
-            index_size: 50,
-            flattened: false,
-            bloom_ver: 0,
-        };
-
-        stats.add_file_meta(&meta);
-        assert_eq!(stats.file_num, 1);
-        assert_eq!(stats.doc_num, 100);
-        assert_eq!(stats.doc_time_min, 1000);
-        assert_eq!(stats.doc_time_max, 2000);
-        assert_eq!(stats.storage_size, 1000.0);
-        assert_eq!(stats.compressed_size, 500.0);
-
-        // Test with negative values (should be clamped to 0)
-        let negative_meta = FileMeta {
-            original_size: -100,
-            compressed_size: -50,
-            index_size: -10,
-            ..meta
-        };
-        let mut negative_stats = StreamStats {
-            storage_size: 50.0,
-            compressed_size: 25.0,
-            index_size: 5.0,
-            ..Default::default()
-        };
-        negative_stats.add_file_meta(&negative_meta);
-        assert_eq!(negative_stats.storage_size, 0.0);
-        assert_eq!(negative_stats.compressed_size, 0.0);
-        assert_eq!(negative_stats.index_size, 0.0);
     }
 
     #[test]
@@ -1579,13 +1538,6 @@ mod tests {
 
     #[test]
     fn test_stream_partition_types() {
-        // Test prefix partition
-        let prefix_part = StreamPartition::new_prefix("field");
-        assert_eq!(prefix_part.types, StreamPartitionType::Prefix);
-        assert_eq!(prefix_part.get_partition_value("Hello"), "h");
-        assert_eq!(prefix_part.get_partition_value(""), "_");
-        assert_eq!(prefix_part.get_partition_value("123"), "1");
-
         // Test value partition
         let value_part = StreamPartition::new("field");
         assert_eq!(value_part.get_partition_value("test_value"), "test_value");
@@ -1764,6 +1716,7 @@ mod tests {
         assert!(StreamType::Logs.support_index());
         assert!(StreamType::Metrics.support_index());
         assert!(StreamType::Traces.support_index());
+        assert!(!StreamType::Profiles.support_index());
         assert!(StreamType::Metadata.support_index());
         assert!(!StreamType::EnrichmentTables.support_index());
         assert!(!StreamType::Filelist.support_index());
@@ -1777,6 +1730,7 @@ mod tests {
         assert!(StreamType::Metrics.support_uds());
         assert!(StreamType::Traces.support_uds());
         assert!(!StreamType::EnrichmentTables.support_uds());
+        assert!(!StreamType::Profiles.support_uds());
         assert!(!StreamType::Filelist.support_uds());
         assert!(!StreamType::Metadata.support_uds());
         assert!(!StreamType::Index.support_uds());
@@ -1788,6 +1742,7 @@ mod tests {
         assert_eq!(StreamType::Logs.as_str(), "logs");
         assert_eq!(StreamType::Metrics.as_str(), "metrics");
         assert_eq!(StreamType::Traces.as_str(), "traces");
+        assert_eq!(StreamType::Profiles.as_str(), "profiles");
         assert_eq!(StreamType::ServiceGraph.as_str(), "service_graph");
         assert_eq!(StreamType::EnrichmentTables.as_str(), "enrichment_tables");
         assert_eq!(StreamType::Filelist.as_str(), "file_list");
@@ -1902,7 +1857,7 @@ mod tests {
 
     #[test]
     fn test_stream_stats_time_range_intersects() {
-        // Use large timestamps so file_push_interval (10s = 10_000_000 µs) doesn't confuse results
+        // Use large timestamps so the stats slack (~20 min in µs) doesn't confuse results
         let base: i64 = 1_700_000_000_000_000; // ~2023-11-14 in µs
         let stats = StreamStats {
             doc_time_min: base,
@@ -1919,8 +1874,21 @@ mod tests {
         assert!(stats.time_range_intersects(base - 1_000_000, base + 5_000_000));
         // query ends exactly at stream min — no intersection (min < end: base < base is false)
         assert!(!stats.time_range_intersects(base - 1_000_000, base));
-        // query starts well after effective max (doc_time_max + file_push_interval ~10s)
-        assert!(!stats.time_range_intersects(base + 20_000_000, base + 30_000_000));
+        // the WAL and the stats job can hold data back for a while, so the upper bound is slack
+        let cfg = get_config();
+        let slack = ((cfg.limit.file_push_interval
+            + cfg.limit.max_file_retention_time
+            + cfg.limit.calculate_stats_interval)
+            * 1_000_000) as i64;
+        // query starts exactly at effective max (doc_time_max + slack) — still intersects
+        assert!(stats.time_range_intersects(base + slack, base + slack + 1_000_000));
+        // query starts after effective max
+        assert!(!stats.time_range_intersects(base + slack + 2_000_000, base + slack + 3_000_000));
+        // a stream with no persisted files has no stats and must not be filtered out
+        let no_stats = StreamStats::default();
+        assert!(no_stats.time_range_intersects(base, base + 1_000_000));
+        // an inverted range does not panic
+        assert!(!stats.time_range_intersects(base + 1_000_000, base));
     }
 
     // ── PartitionTimeLevel ────────────────────────────────────────────────────
@@ -1997,6 +1965,7 @@ mod tests {
             original_size: 1024,
             compressed_size: 512,
             index_size: 0,
+            mindex_size: 0,
             flattened: false,
             bloom_ver: 0,
         };
@@ -2028,6 +1997,15 @@ mod tests {
     }
 
     #[test]
+    fn test_file_key_with_row_range_selection() {
+        let mut key = FileKey::from_file_name("files/k.parquet");
+        let selection = FileSelection::RowRanges(Arc::new(vec![1..4, 8..12]));
+        key.with_selection(selection.clone(), Some(1024));
+        assert_eq!(key.selection, Some(selection));
+        assert_eq!(key.row_group_size, Some(1024));
+    }
+
+    #[test]
     fn test_stream_params_is_valid() {
         let valid = StreamParams::new("org", "stream", StreamType::Logs);
         assert!(valid.is_valid());
@@ -2040,33 +2018,6 @@ mod tests {
     }
 
     #[test]
-    fn test_stream_stats_format_by() {
-        let mut stats = StreamStats {
-            doc_time_min: 500,
-            doc_time_max: 1000,
-            ..Default::default()
-        };
-        let src = StreamStats {
-            file_num: 5,
-            doc_num: 100,
-            storage_size: 2048.0,
-            compressed_size: 1024.0,
-            index_size: 10.0,
-            doc_time_min: 200,
-            doc_time_max: 800,
-            ..Default::default()
-        };
-        stats.format_by(&src);
-        assert_eq!(stats.file_num, 5);
-        assert_eq!(stats.doc_num, 100);
-        assert_eq!(stats.storage_size, 2048.0);
-        // doc_time_min: min(500, 200) = 200
-        assert_eq!(stats.doc_time_min, 200);
-        // doc_time_max: max(1000, 800) = 1000
-        assert_eq!(stats.doc_time_max, 1000);
-    }
-
-    #[test]
     fn test_stream_stats_merge() {
         let mut a = StreamStats {
             file_num: 3,
@@ -2074,6 +2025,7 @@ mod tests {
             storage_size: 300.0,
             compressed_size: 150.0,
             index_size: 5.0,
+            mindex_size: 0.0,
             doc_time_min: 1000,
             doc_time_max: 2000,
             created_at: 100,
@@ -2084,6 +2036,7 @@ mod tests {
             storage_size: 200.0,
             compressed_size: 100.0,
             index_size: 3.0,
+            mindex_size: 0.0,
             doc_time_min: 500,
             doc_time_max: 3000,
             created_at: 50,
@@ -2121,36 +2074,6 @@ mod tests {
         assert!(!v.is_empty());
         let s: String = stats.into();
         assert!(s.contains("42"));
-    }
-
-    #[test]
-    fn test_stream_stats_format_by_self_zero_doc_time_min() {
-        // self.doc_time_min == 0 → take stats.doc_time_min
-        let mut stats = StreamStats {
-            doc_time_min: 0,
-            ..Default::default()
-        };
-        let src = StreamStats {
-            doc_time_min: 300,
-            ..Default::default()
-        };
-        stats.format_by(&src);
-        assert_eq!(stats.doc_time_min, 300);
-    }
-
-    #[test]
-    fn test_stream_stats_format_by_src_zero_doc_time_min() {
-        // stats.doc_time_min == 0 → keep self.doc_time_min
-        let mut stats = StreamStats {
-            doc_time_min: 400,
-            ..Default::default()
-        };
-        let src = StreamStats {
-            doc_time_min: 0,
-            ..Default::default()
-        };
-        stats.format_by(&src);
-        assert_eq!(stats.doc_time_min, 400);
     }
 
     #[test]
@@ -2233,6 +2156,7 @@ mod tests {
             max_ts: 200,
             compressed_size: None,
             index_size: None,
+            mindex_size: None,
         };
         let stream_stats = StreamStats::from(usage);
         assert_eq!(stream_stats.doc_num, 50);
@@ -2254,6 +2178,7 @@ mod tests {
             max_ts: 5000,
             compressed_size: Some(1024.0),
             index_size: Some(50.0),
+            mindex_size: Some(0.0),
         };
         let stream_stats = StreamStats::from(usage);
         assert_eq!(stream_stats.doc_num, 100);
@@ -2355,13 +2280,6 @@ mod tests {
     }
 
     #[test]
-    fn test_time_range_contains_strict_subset() {
-        let outer = TimeRange::new(0, 100);
-        let inner = TimeRange::new(20, 80);
-        assert!(outer.contains(&inner));
-    }
-
-    #[test]
     fn test_time_range_contains_not_contained() {
         let outer = TimeRange::new(0, 50);
         let inner = TimeRange::new(40, 100);
@@ -2385,13 +2303,6 @@ mod tests {
         assert!(!a.intersects(&b));
     }
 
-    #[test]
-    fn test_time_range_intersects_disjoint() {
-        let a = TimeRange::new(0, 30);
-        let b = TimeRange::new(50, 100);
-        assert!(!a.intersects(&b));
-    }
-
     // ── bloom_ver coverage on FileMeta ─────────────────────────────────────────
 
     #[test]
@@ -2409,6 +2320,7 @@ mod tests {
             original_size: 4,
             compressed_size: 5,
             index_size: 6,
+            mindex_size: 0,
             flattened: true,
             bloom_ver: 42,
         };
@@ -2428,6 +2340,7 @@ mod tests {
             "original_size": 4,
             "compressed_size": 5,
             "index_size": 6,
+            "mindex_size": 0,
             "flattened": false
         }"#;
         let parsed: FileMeta = serde_json::from_str(legacy).unwrap();
@@ -2458,5 +2371,75 @@ mod tests {
         assert_eq!(m.min_ts, 10);
         assert_eq!(m.max_ts, 20);
         assert_eq!(m.bloom_ver, 0);
+    }
+    #[test]
+    fn mindex_size_is_independent_in_stats_json_and_rpc() {
+        let meta = FileMeta {
+            records: 2,
+            index_size: 7,
+            mindex_size: 13,
+            ..Default::default()
+        };
+        let rpc = cluster_rpc::FileMeta::from(&meta);
+        assert_eq!(FileMeta::from(&rpc), meta);
+        let mut json = serde_json::to_value(&meta).unwrap();
+        json.as_object_mut().unwrap().remove("mindex_size");
+        assert_eq!(
+            serde_json::from_value::<FileMeta>(json)
+                .unwrap()
+                .mindex_size,
+            0
+        );
+        let mut a = StreamStats {
+            index_size: 7.0,
+            mindex_size: 13.0,
+            ..Default::default()
+        };
+        let b = StreamStats {
+            mindex_size: 5.0,
+            index_size: 12.0,
+            ..Default::default()
+        };
+        assert_eq!((&a + &b).mindex_size, 18.0);
+        assert_eq!((&a - &b).mindex_size, 8.0);
+        a.merge(&b);
+        assert_eq!((a.mindex_size, a.index_size), (18.0, 19.0));
+        let mut json = serde_json::to_value(&a).unwrap();
+        json.as_object_mut().unwrap().remove("mindex_size");
+        assert_eq!(
+            serde_json::from_value::<StreamStats>(json)
+                .unwrap()
+                .mindex_size,
+            0.0
+        );
+    }
+
+    #[test]
+    fn test_stream_settings_dynamic_merge_round_trip() {
+        // unset is not written, so old readers see no unknown key
+        let unset = json::to_string(&StreamSettings::default()).unwrap();
+        assert!(!unset.contains("dynamic_merge"));
+        assert_eq!(StreamSettings::from(unset.as_str()).dynamic_merge, None);
+        for value in [true, false] {
+            let settings = StreamSettings {
+                dynamic_merge: Some(value),
+                ..Default::default()
+            };
+            let text = json::to_string(&settings).unwrap();
+            assert_eq!(
+                StreamSettings::from(text.as_str()).dynamic_merge,
+                Some(value)
+            );
+        }
+    }
+
+    #[test]
+    fn test_update_stream_settings_dynamic_merge_null_is_unchanged() {
+        let missing: UpdateStreamSettings = json::from_str("{}").unwrap();
+        assert_eq!(missing.dynamic_merge, None);
+        let null: UpdateStreamSettings = json::from_str(r#"{"dynamic_merge": null}"#).unwrap();
+        assert_eq!(null.dynamic_merge, None);
+        let set: UpdateStreamSettings = json::from_str(r#"{"dynamic_merge": false}"#).unwrap();
+        assert_eq!(set.dynamic_merge, Some(false));
     }
 }

@@ -223,9 +223,17 @@ static GEN_AI_SCHEMA_FIELDS: std::sync::LazyLock<Vec<Field>> = std::sync::LazyLo
         Field::new("gen_ai_input_messages", DataType::Utf8, true),
         Field::new("gen_ai_output_messages", DataType::Utf8, true),
         Field::new("gen_ai_system_instructions", DataType::Utf8, true),
+        // Session span SQL always selects this, so a chat with no tool call still has the column.
+        Field::new("gen_ai_tool_name", DataType::Utf8, true),
         Field::new("user_id", DataType::Utf8, true),
         Field::new("gen_ai_conversation_id", DataType::Utf8, true),
+        Field::new("gen_ai_request_model", DataType::Utf8, true),
+        // Prompt Management attribution (`gen_ai.prompt.*`); label is only
+        // written for label-resolved calls, so it must be provisioned up front.
+        Field::new("gen_ai_prompt_name", DataType::Utf8, true),
+        Field::new("gen_ai_prompt_label", DataType::Utf8, true),
         // Integer fields
+        Field::new("gen_ai_prompt_version", DataType::Int64, true),
         Field::new("gen_ai_usage_input_tokens", DataType::Int64, true),
         Field::new("gen_ai_usage_output_tokens", DataType::Int64, true),
         Field::new("gen_ai_usage_total_tokens", DataType::Int64, true),
@@ -274,6 +282,93 @@ static GEN_AI_SCHEMA_FIELDS: std::sync::LazyLock<Vec<Field>> = std::sync::LazyLo
             true,
         ),
     ]
+});
+
+/// Ensure the eleven DBM identity columns (`o2_db_*`, written by trace-ingest
+/// enrichment) exist in the stream's Arrow schema, and — for streams with
+/// User-Defined Schema enabled — appear in `defined_schema_fields` (design §4,
+/// D1 condition 2 belt-and-braces). Called per ingest request only for streams
+/// that carried db spans, so non-DB workloads never grow these columns;
+/// idempotent and cheap once the fields exist (schema-cache contains check).
+pub async fn ensure_db_fields_in_schema(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+) -> Result<(), anyhow::Error> {
+    let schema_cache = infra::schema::get_cache(org_id, stream_name, stream_type).await?;
+    let missing_fields: Vec<Field> = DB_SCHEMA_FIELDS
+        .iter()
+        .filter(|f| !schema_cache.contains_field(f.name()))
+        .cloned()
+        .collect();
+    if !missing_fields.is_empty() {
+        let db_schema = Schema::new(missing_fields);
+        // Adding fields never needs a new version, so Some(now) only stamps a create.
+        let now = chrono::Utc::now().timestamp_micros();
+        merge(org_id, stream_name, stream_type, &db_schema, Some(now)).await?;
+    }
+
+    let mut settings = infra::schema::get_settings(org_id, stream_name, stream_type)
+        .await
+        .map(|s| (*s).clone())
+        .unwrap_or_default();
+    if append_db_fields_to_defined_schema_fields(&mut settings.defined_schema_fields) {
+        let mut metadata = std::collections::HashMap::with_capacity(1);
+        metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
+        update_setting(org_id, stream_name, stream_type, metadata).await?;
+    }
+    Ok(())
+}
+
+/// Append the `o2_db_*` columns to an already-enabled UDS field list so the
+/// UDS refactor keeps them (mirror of `append_gen_ai_fields_to_defined_schema_fields`).
+/// No-op (returns false) when UDS is not enabled (empty list) or when every
+/// field is already present.
+fn append_db_fields_to_defined_schema_fields(defined_schema_fields: &mut Vec<String>) -> bool {
+    if defined_schema_fields.is_empty() {
+        return false;
+    }
+
+    let mut updated = false;
+    for field in DB_SCHEMA_FIELDS.iter() {
+        if !defined_schema_fields
+            .iter()
+            .any(|name| name == field.name())
+        {
+            defined_schema_fields.push(field.name().to_string());
+            updated = true;
+        }
+    }
+    if updated {
+        defined_schema_fields.sort();
+    }
+    updated
+}
+
+/// Arrow schema fields provisioned on trace streams that carry db spans
+/// (design §3.1 table / §4): ten Utf8 columns plus the one Int64 exception,
+/// `o2_db_batch_multiplier`. Must stay in sync with
+/// `db_monitoring::ALL_DB_FIELDS` in openobserve-core.
+static DB_SCHEMA_FIELDS: std::sync::LazyLock<Vec<Field>> = std::sync::LazyLock::new(|| {
+    let mut fields: Vec<Field> = [
+        "o2_db_fingerprint",
+        "o2_db_query_norm",
+        "o2_db_system",
+        "o2_db_namespace",
+        "o2_db_instance",
+        "o2_db_operation",
+        "o2_db_status_code",
+        "o2_db_user",
+        "o2_db_env",
+        "o2_db_stmt_class",
+    ]
+    .iter()
+    .map(|name| Field::new(*name, DataType::Utf8, true))
+    .collect();
+    // The one non-Utf8 exception (design §4): written only when the normalizer
+    // collapsed N>1 repeated statement blocks in a batch.
+    fields.push(Field::new("o2_db_batch_multiplier", DataType::Int64, true));
+    fields
 });
 
 pub async fn delete_fields(
@@ -397,6 +492,18 @@ async fn list_stream_schemas(
         .collect()
 }
 
+/// Splits a listed key into `lead` segments plus its version; a missing one is 0.
+fn split_start_dt(key: &str, lead: usize) -> Option<(Vec<&str>, i64)> {
+    let mut columns: Vec<&str> = key.splitn(lead + 1, '/').collect();
+    let start_dt = if columns.len() > lead {
+        columns.pop()?.parse().ok()?
+    } else {
+        0
+    };
+    (columns.len() == lead && !columns.iter().any(|column| column.is_empty()))
+        .then_some((columns, start_dt))
+}
+
 pub async fn list(
     org_id: &str,
     stream_type: Option<StreamType>,
@@ -418,21 +525,15 @@ pub async fn list(
         HashMap::with_capacity(items.len());
     for (key, val) in items {
         let key = key.strip_prefix(&db_key).unwrap();
-        let (stream_type, stream_name, start_dt) = match stream_type {
-            Some(stream_type) => {
-                let columns = key.split('/').take(2).collect::<Vec<_>>();
-                assert_eq!(columns.len(), 2, "BUG");
-                (stream_type, columns[0].into(), columns[1].parse().unwrap())
-            }
-            None => {
-                let columns = key.split('/').take(3).collect::<Vec<_>>();
-                assert_eq!(columns.len(), 3, "BUG");
-                (
-                    columns[0].into(),
-                    columns[1].into(),
-                    columns[2].parse().unwrap(),
-                )
-            }
+        let parsed = match stream_type {
+            Some(stream_type) => split_start_dt(key, 1)
+                .map(|(columns, start_dt)| (stream_type, columns[0].into(), start_dt)),
+            None => split_start_dt(key, 2)
+                .map(|(columns, start_dt)| (columns[0].into(), columns[1].into(), start_dt)),
+        };
+        let Some((stream_type, stream_name, start_dt)) = parsed else {
+            log::error!("[SCHEMA] skipping malformed schema key: {key}");
+            continue;
         };
         let entry = schemas
             .entry((stream_name, stream_type))
@@ -479,10 +580,14 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     log::info!("Cache schema got {items_num} items");
     for (i, (key, val)) in items.into_iter().enumerate() {
         let key = key.strip_prefix(db_key).unwrap();
-        let columns = key.split('/').take(4).collect::<Vec<_>>();
-        assert_eq!(columns.len(), 4, "BUG");
+        let Some((columns, start_dt)) = split_start_dt(key, 3) else {
+            log::error!("[SCHEMA] skipping malformed schema key: {key}");
+            continue;
+        };
+        if start_dt == 0 {
+            log::warn!("[SCHEMA] key carries no start_dt, reading it as version 0: {key}");
+        }
         let item_key = format!("{}/{}/{}", columns[0], columns[1], columns[2]);
-        let start_dt: i64 = columns[3].parse().unwrap();
         let entry = schemas.entry(item_key).or_insert(Vec::new());
         entry.push((start_dt, val));
         if i.is_multiple_of(1000) {
@@ -527,7 +632,8 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         }
         settings_batch.push((item_key.to_string(), Arc::new(settings)));
         let mut w = STREAM_SCHEMAS_LATEST.write().await;
-        w.insert(
+        infra::schema::insert_latest(
+            &mut w,
             item_key.to_string(),
             SchemaCache::new(latest_schema.clone()),
         );
@@ -559,26 +665,6 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     infra::schema::put_stream_settings_batch(settings_batch).await;
     log::info!("Stream schemas Cached {keys_num} streams");
     Ok(())
-}
-
-pub fn filter_schema_version_id(schemas: &[Schema], _start_dt: i64, end_dt: i64) -> Option<usize> {
-    let versions = schemas.len();
-    for (i, schema) in schemas.iter().enumerate() {
-        let metadata = schema.metadata();
-        let schema_end_dt: i64 = metadata
-            .get("end_dt")
-            .unwrap_or(&"0".to_string())
-            .parse()
-            .unwrap();
-        if end_dt < schema_end_dt {
-            return Some(i);
-        }
-    }
-    if versions > 0 {
-        Some(versions - 1)
-    } else {
-        None
-    }
 }
 
 pub async fn list_organizations_from_cache() -> Vec<String> {
@@ -687,21 +773,7 @@ pub async fn list_streams_from_cache(org_id: &str, stream_type: StreamType) -> V
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
-    use arrow_schema::Schema;
-
     use super::*;
-
-    fn schema_with_end_dt(end_dt: i64) -> Schema {
-        let mut meta = HashMap::new();
-        meta.insert("end_dt".to_string(), end_dt.to_string());
-        Schema::new_with_metadata(vec![] as Vec<arrow_schema::Field>, meta)
-    }
-
-    fn schema_without_end_dt() -> Schema {
-        Schema::new_with_metadata(vec![] as Vec<arrow_schema::Field>, HashMap::new())
-    }
 
     #[tokio::test]
     async fn test_list_all_streams_grouped() {
@@ -739,78 +811,6 @@ mod tests {
         }
     }
 
-    // ── filter_schema_version_id ──────────────────────────────────────────────
-
-    #[test]
-    fn test_filter_schema_version_id_empty_schemas() {
-        assert_eq!(filter_schema_version_id(&[], 0, 1000), None);
-    }
-
-    #[test]
-    fn test_filter_schema_version_id_single_schema_matches() {
-        // end_dt=5000, query end_dt=3000 → 3000 < 5000 → returns index 0
-        let schemas = vec![schema_with_end_dt(5000)];
-        assert_eq!(filter_schema_version_id(&schemas, 0, 3000), Some(0));
-    }
-
-    #[test]
-    fn test_filter_schema_version_id_single_schema_no_match_returns_last() {
-        // end_dt=1000, query end_dt=2000 → 2000 is NOT < 1000 → fallback to last (index 0)
-        let schemas = vec![schema_with_end_dt(1000)];
-        assert_eq!(filter_schema_version_id(&schemas, 0, 2000), Some(0));
-    }
-
-    #[test]
-    fn test_filter_schema_version_id_multiple_schemas_finds_first_match() {
-        // Three versions with end_dt: 1000, 5000, 9000
-        // Query end_dt = 3000 → 3000 < 5000 at index 1 → returns 1
-        let schemas = vec![
-            schema_with_end_dt(1000),
-            schema_with_end_dt(5000),
-            schema_with_end_dt(9000),
-        ];
-        assert_eq!(filter_schema_version_id(&schemas, 0, 3000), Some(1));
-    }
-
-    #[test]
-    fn test_filter_schema_version_id_query_before_all_versions() {
-        // end_dt values: 1000, 2000, 3000; query end_dt = 500 → 500 < 1000 → index 0
-        let schemas = vec![
-            schema_with_end_dt(1000),
-            schema_with_end_dt(2000),
-            schema_with_end_dt(3000),
-        ];
-        assert_eq!(filter_schema_version_id(&schemas, 0, 500), Some(0));
-    }
-
-    #[test]
-    fn test_filter_schema_version_id_query_after_all_versions() {
-        // end_dt values: 1000, 2000, 3000; query end_dt = 5000 → no match → last index (2)
-        let schemas = vec![
-            schema_with_end_dt(1000),
-            schema_with_end_dt(2000),
-            schema_with_end_dt(3000),
-        ];
-        assert_eq!(filter_schema_version_id(&schemas, 0, 5000), Some(2));
-    }
-
-    #[test]
-    fn test_filter_schema_version_id_schema_missing_end_dt_metadata() {
-        // Schema without end_dt → parses as 0 → any end_dt ≥ 0 never satisfies end_dt < 0
-        // so falls through to last-index fallback
-        let schemas = vec![schema_without_end_dt()];
-        // query end_dt = 100 → 100 is NOT < 0 → fallback last index (0)
-        assert_eq!(filter_schema_version_id(&schemas, 0, 100), Some(0));
-    }
-
-    #[test]
-    fn test_filter_schema_version_id_boundary_equal_end_dt() {
-        // Condition is strict <, so end_dt == schema end_dt should NOT match
-        let schemas = vec![schema_with_end_dt(5000), schema_with_end_dt(9000)];
-        // query end_dt = 5000 → 5000 is NOT < 5000 → check next: 5000 < 9000 → returns 1
-        assert_eq!(filter_schema_version_id(&schemas, 0, 5000), Some(1));
-    }
-
     #[test]
     fn test_append_gen_ai_fields_to_defined_schema_fields_skips_non_uds_streams() {
         let mut fields = Vec::new();
@@ -837,6 +837,7 @@ mod tests {
         assert!(fields.contains(&"gen_ai_usage_cost_net_cache_impact".to_string()));
         assert!(fields.contains(&"gen_ai_agent_env".to_string()));
         assert!(fields.contains(&"gen_ai_agent_version".to_string()));
+        assert!(fields.contains(&"gen_ai_tool_name".to_string()));
         assert!(fields.contains(&O2_INGEST_TS_COL_NAME.to_string()));
     }
 
@@ -849,5 +850,109 @@ mod tests {
 
         assert!(!append_gen_ai_fields_to_defined_schema_fields(&mut fields));
         assert_eq!(fields.len(), len_after_first_append);
+    }
+
+    // ── DB Monitoring schema fields (design §4) ──────────────────────────────
+
+    #[test]
+    fn test_db_schema_fields_are_ten_utf8_plus_int64_batch_multiplier() {
+        // Eleven columns total: ten Utf8 + the one Int64 exception.
+        assert_eq!(DB_SCHEMA_FIELDS.len(), 11);
+        for field in DB_SCHEMA_FIELDS.iter() {
+            assert!(
+                field.name().starts_with("o2_db_"),
+                "bad name {}",
+                field.name()
+            );
+            assert!(field.is_nullable());
+            if field.name() == "o2_db_batch_multiplier" {
+                assert_eq!(field.data_type(), &DataType::Int64);
+            } else {
+                assert_eq!(field.data_type(), &DataType::Utf8, "{}", field.name());
+            }
+        }
+        assert!(
+            DB_SCHEMA_FIELDS
+                .iter()
+                .any(|f| f.name() == "o2_db_batch_multiplier")
+        );
+    }
+
+    #[test]
+    fn test_append_db_fields_noop_without_uds() {
+        // Empty defined_schema_fields means UDS is not enabled — nothing to
+        // maintain and no settings write.
+        let mut fields: Vec<String> = vec![];
+        assert!(!append_db_fields_to_defined_schema_fields(&mut fields));
+        assert!(fields.is_empty());
+    }
+
+    #[test]
+    fn test_append_db_fields_appends_all_and_sorts() {
+        let mut fields = vec!["service_name".to_string(), "duration".to_string()];
+        assert!(append_db_fields_to_defined_schema_fields(&mut fields));
+        for f in DB_SCHEMA_FIELDS.iter() {
+            assert!(fields.iter().any(|n| n == f.name()), "missing {}", f.name());
+        }
+        let mut sorted = fields.clone();
+        sorted.sort();
+        assert_eq!(fields, sorted);
+    }
+
+    #[test]
+    fn test_append_db_fields_idempotent() {
+        let mut fields = vec!["service_name".to_string()];
+        assert!(append_db_fields_to_defined_schema_fields(&mut fields));
+        let after_first = fields.clone();
+        assert!(!append_db_fields_to_defined_schema_fields(&mut fields));
+        assert_eq!(fields, after_first);
+    }
+
+    #[test]
+    fn test_split_start_dt_reads_the_version() {
+        assert_eq!(
+            split_start_dt("default/logs/slo_slices/1790056698540533", 3),
+            Some((vec!["default", "logs", "slo_slices"], 1790056698540533))
+        );
+        assert_eq!(
+            split_start_dt("logs/app/1790056698540533", 2),
+            Some((vec!["logs", "app"], 1790056698540533))
+        );
+        assert_eq!(
+            split_start_dt("app/1790056698540533", 1),
+            Some((vec!["app"], 1790056698540533))
+        );
+        assert_eq!(
+            split_start_dt("default/logs/slo_slices/-5", 3),
+            Some((vec!["default", "logs", "slo_slices"], -5)),
+            "back-dated versions sort before zero and are still valid keys"
+        );
+    }
+
+    #[test]
+    fn test_split_start_dt_reads_a_missing_version_as_zero() {
+        assert_eq!(
+            split_start_dt("default/logs/slo_slices", 3),
+            Some((vec!["default", "logs", "slo_slices"], 0)),
+            "build_key drops a zero start_dt"
+        );
+        assert_eq!(
+            split_start_dt("logs/app", 2),
+            Some((vec!["logs", "app"], 0))
+        );
+        assert_eq!(split_start_dt("app", 1), Some((vec!["app"], 0)));
+    }
+
+    #[test]
+    fn test_split_start_dt_rejects_malformed_keys() {
+        // a non-numeric version, rather than a panic on parse
+        assert_eq!(split_start_dt("default/logs/slo_slices/soon", 3), None);
+        // a stream name carrying a slash lands in the version's place
+        assert_eq!(split_start_dt("default/logs/a/b/123", 3), None);
+        // too few segments
+        assert_eq!(split_start_dt("default/logs", 3), None);
+        assert_eq!(split_start_dt("", 1), None);
+        // an empty segment is not a stream
+        assert_eq!(split_start_dt("default//slo_slices", 3), None);
     }
 }

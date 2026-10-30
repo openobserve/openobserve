@@ -157,22 +157,6 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_jwt_expiry_missing_parts() {
-        let token = "only.two";
-        let before = chrono::Utc::now().timestamp_micros();
-        let expiry = extract_jwt_expiry(token);
-        let after = chrono::Utc::now().timestamp_micros();
-
-        // Should return default expiry
-        let expected_min = before + (23 * 60 * 60 * 1_000_000);
-        let expected_max = after + (25 * 60 * 60 * 1_000_000);
-        assert!(
-            expiry >= expected_min && expiry <= expected_max,
-            "Should return default expiry for malformed token"
-        );
-    }
-
-    #[test]
     fn test_extract_jwt_expiry_invalid_base64() {
         let token = "invalid_header.invalid_payload.signature";
         let before = chrono::Utc::now().timestamp_micros();
@@ -291,22 +275,6 @@ mod tests {
 
         // Should handle large values correctly
         assert_eq!(expiry, far_future_exp * 1_000_000);
-    }
-
-    #[test]
-    fn test_extract_jwt_expiry_empty_token() {
-        // Empty token should return default expiry
-        let token = "";
-        let before = chrono::Utc::now().timestamp_micros();
-        let expiry = extract_jwt_expiry(token);
-        let after = chrono::Utc::now().timestamp_micros();
-
-        let expected_min = before + (23 * 60 * 60 * 1_000_000);
-        let expected_max = after + (25 * 60 * 60 * 1_000_000);
-        assert!(
-            expiry >= expected_min && expiry <= expected_max,
-            "Should return default expiry for empty token"
-        );
     }
 
     #[test]

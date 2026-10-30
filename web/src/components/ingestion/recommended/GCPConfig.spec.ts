@@ -21,6 +21,7 @@ import { ref } from "vue";
 import GCPConfig from "./GCPConfig.vue";
 import gcpCard from "@/components/ingestion/setupCard/content/gcp";
 import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
+import { gt } from "@/types/i18n";
 
 const mockEndpoint = ref({
   url: "https://test.openobserve.ai",
@@ -60,21 +61,21 @@ const SUBS = {
 
 describe("gcpCard builder", () => {
   it("builds the GCP card metadata and step flow", () => {
-    const card = gcpCard(SUBS);
+    const card = gcpCard(SUBS, gt);
     expect(card.provider.name).toBe("Google Cloud");
     expect(card.provider.metaBadges).toEqual(["Logs"]);
     expect(card.steps.map((s) => s.id)).toEqual(["sink", "subscription", "verify"]);
   });
 
   it("builds the Pub/Sub push endpoint with org and key", () => {
-    const sub = gcpCard(SUBS).steps.find((s) => s.id === "subscription")!;
+    const sub = gcpCard(SUBS, gt).steps.find((s) => s.id === "subscription")!;
     expect(sub.code!.raw).toBe(`${SUBS.url}/gcp/${SUBS.org}/{stream}/_sub?API-Key=${SUBS.token}`);
     // The key is masked on screen and only revealed/copied deliberately.
     expect(sub.code!.masked).not.toContain(SUBS.token);
   });
 
   it("keeps the stream name in lockstep between URL and detection", () => {
-    const card = gcpCard(SUBS);
+    const card = gcpCard(SUBS, gt);
     // {stream} survives build-time substitution so the renderer fills it from
     // the stream-name field, which also drives what detection watches.
     expect(card.streamInput?.default).toBe("default");
@@ -86,14 +87,14 @@ describe("gcpCard builder", () => {
   it("uses a filter that is valid SQL", () => {
     // useStreamDetect interpolates this into `WHERE (<filter>)`, so an empty
     // filter would be a syntax error and detection could never succeed.
-    expect(gcpCard(SUBS).detect.filter.trim()).not.toBe("");
+    expect(gcpCard(SUBS, gt).detect.filter.trim()).not.toBe("");
   });
 
   it("keeps BOTH doc links the old page linked, as real anchors", () => {
     // The pre-migration page listed two clickable links: Pub/Sub Logs and
     // Google Workspace. Google Workspace briefly regressed into unclickable
     // prose inside a collapsed accordion — it must stay a footer link.
-    const card = gcpCard(SUBS);
+    const card = gcpCard(SUBS, gt);
     expect(card.docUrl).toContain("send-gcp-logs-to-openobserve");
     expect(card.docLinks).toEqual([
       {
@@ -112,7 +113,7 @@ describe("GCPConfig.vue", () => {
   });
 
   it("renders the shared setup card for the gcp slug", () => {
-    expect(getDataSourceCard("gcp", SUBS)?.provider.name).toBe("Google Cloud");
+    expect(getDataSourceCard("gcp", SUBS, gt)?.provider.name).toBe("Google Cloud");
     wrapper = mount(GCPConfig, { global: { plugins: [mockStore, mockI18n] } });
     const stub = wrapper.findComponent({ name: "SetupCardRenderer" });
     expect(stub.exists()).toBe(true);

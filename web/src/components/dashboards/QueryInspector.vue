@@ -53,6 +53,63 @@
 
         <!-- Query Content -->
         <div class="space-y-4 p-3">
+          <div
+            v-if="statsFor(index).length"
+            class="text-text-secondary flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs"
+            :data-test="`query-inspector-stats-${index}`"
+          >
+            <template v-for="(stat, statIndex) in statsFor(index)" :key="stat.key">
+              <span v-if="statIndex > 0" class="text-text-muted" aria-hidden="true">{{
+                statSeparator
+              }}</span>
+              <span :data-test="`query-inspector-stat-${stat.key}-${index}`">{{ stat.text }}</span>
+            </template>
+          </div>
+          <OBanner
+            v-if="index === 0 && seriesLimit"
+            variant="warning"
+            icon="stacked-line-chart"
+            dense
+            :data-test="`query-inspector-notice-series-cap-${index}`"
+          >
+            {{ seriesLimitBody }}
+          </OBanner>
+          <OBanner
+            v-if="diagnosticsFor(index)?.serverPartial"
+            variant="warning"
+            icon="sync-problem"
+            dense
+            preserve-whitespace
+            :data-test="`query-inspector-notice-partial-${index}`"
+          >
+            <div>{{ t("dashboard.panelErrorButtons.partialBody") }}</div>
+            <div
+              v-for="reason in diagnosticsFor(index)?.partialReasons ?? []"
+              :key="reason"
+              class="font-mono text-xs"
+            >
+              {{ reason }}
+            </div>
+          </OBanner>
+          <OBanner
+            v-if="diagnosticsFor(index)?.functionErrors?.length"
+            variant="error-soft"
+            icon="error-outline"
+            dense
+            preserve-whitespace
+            :data-test="`query-inspector-notice-function-error-${index}`"
+          >
+            <div class="font-semibold">
+              {{ t("dashboard.panelErrorButtons.functionErrorTitle") }}
+            </div>
+            <div
+              v-for="message in diagnosticsFor(index)?.functionErrors ?? []"
+              :key="message"
+              class="font-mono text-xs"
+            >
+              {{ message }}
+            </div>
+          </OBanner>
           <!-- Original Query -->
           <div v-if="query.originalQuery">
             <div class="flex items-center justify-between">
@@ -70,7 +127,7 @@
             </div>
             <div class="group relative mt-1">
               <div
-                class="rounded-default bg-theme-body-bg-primary border-card-glass-border inspector-query-editor max-h-40 overflow-y-auto border p-2 font-mono text-sm break-all whitespace-pre-wrap [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] [scrollbar-width:thin]"
+                class="rounded-default bg-theme-body-bg-primary border-card-glass-border inspector-query-editor max-h-40 [scrollbar-width:thin] [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] overflow-y-auto border p-2 font-mono text-sm break-all whitespace-pre-wrap"
                 :data-test="`query-inspector-original-query-${index}`"
                 v-html="
                   highlightSearch(
@@ -99,7 +156,7 @@
             </div>
             <div class="group relative mt-1">
               <div
-                class="rounded-default bg-theme-body-bg-primary border-card-glass-border inspector-query-editor max-h-40 overflow-y-auto border p-2 font-mono text-sm break-all whitespace-pre-wrap [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] [scrollbar-width:thin]"
+                class="rounded-default bg-theme-body-bg-primary border-card-glass-border inspector-query-editor max-h-40 [scrollbar-width:thin] [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] overflow-y-auto border p-2 font-mono text-sm break-all whitespace-pre-wrap"
                 :data-test="`query-inspector-executed-query-${index}`"
                 v-html="
                   highlightSearch(
@@ -205,8 +262,8 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref, watch, onMounted, type PropType } from "vue";
-import { useI18n } from "vue-i18n";
+import { computed, defineComponent, ref, watch, type PropType } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
@@ -214,8 +271,22 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import DOMPurify from "dompurify";
 import { copyToClipboard } from "@/utils/clipboard";
+import {
+  addCommasToNumber,
+  formatDuration,
+  formatLargeNumber,
+  formatSizeFromMB,
+} from "@/utils/formatters";
+import type {
+  PanelDiagnostics,
+  QueryDiagnostics,
+  SeriesLimitInfo,
+} from "@/utils/dashboard/panelDiagnostics";
+import type { I18nText } from "@/types/i18n";
+import { describeSeriesLimit, seriesTotalBoundOf } from "@/utils/dashboard/panelNotices";
 
 interface QueryInspectorQuery {
   originalQuery: string;
@@ -230,7 +301,7 @@ interface QueryInspectorQuery {
 export default defineComponent({
   name: "QueryInspector",
   emits: ["update:open"],
-  components: { OButton, ODialog, OSearchInput, OIcon },
+  components: { OBanner, OButton, ODialog, OSearchInput, OIcon },
   props: {
     open: {
       type: Boolean,
@@ -238,15 +309,27 @@ export default defineComponent({
     },
     metaData: {
       type: Object as PropType<Record<string, any> | null>,
-      required: true,
+      required: false,
+      default: null,
     },
     data: {
       type: Object,
       required: true,
     },
+    /** Server stats and notices per query, index-aligned with `metaData.queries`. */
+    diagnostics: {
+      type: Object as PropType<PanelDiagnostics | null>,
+      required: false,
+      default: null,
+    },
+    seriesLimit: {
+      type: Object as PropType<SeriesLimitInfo | null>,
+      required: false,
+      default: null,
+    },
   },
   setup(props: any) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const queryData = computed<QueryInspectorQuery[]>(() => props.metaData?.queries || []);
     const searchQuery = ref("");
@@ -311,16 +394,81 @@ export default defineComponent({
     };
 
     const getQueryTypeDisplay = (queryType: string | undefined) => {
-      if (!queryType) return "SQL";
+      if (!queryType) return raw("SQL");
       const type = queryType.toLowerCase();
-      if (type === "sql") return "SQL";
-      if (type === "promql" || type === "metrics") return "PromQL";
-      return queryType.toUpperCase();
+      if (type === "sql") return raw("SQL");
+      if (type === "promql" || type === "metrics") return raw("PromQL");
+      return raw(queryType.toUpperCase());
+    };
+
+    const seriesLimitBody = computed(() =>
+      props.seriesLimit?.displayCapMessage
+        ? raw(props.seriesLimit.displayCapMessage)
+        : props.seriesLimit
+          ? describeSeriesLimit(props.seriesLimit, seriesTotalBoundOf(props.diagnostics), t).body
+          : raw(""),
+    );
+
+    const diagnosticsFor = (index: number): QueryDiagnostics | undefined =>
+      props.diagnostics?.queries?.[index];
+
+    // A value the server did not report is left out, never shown as zero.
+    const statsFor = (index: number): { key: string; text: I18nText }[] => {
+      const d = diagnosticsFor(index);
+      if (!d) return [];
+      const stats: { key: string; text: I18nText }[] = [];
+      if (d.took !== undefined) {
+        stats.push({
+          key: "took",
+          text: t("dashboard.queryInspector.statTook", { duration: formatDuration(d.took) }),
+        });
+      }
+      if (d.scanSizeMb !== undefined) {
+        stats.push({
+          key: "scanned",
+          text: t("dashboard.queryInspector.statScanned", { size: formatSizeFromMB(d.scanSizeMb) }),
+        });
+      }
+      if (d.scanRecords !== undefined) {
+        stats.push({
+          key: "rows-scanned",
+          text: t(
+            "dashboard.queryInspector.statRowsScanned",
+            { count: formatLargeNumber(d.scanRecords) },
+            d.scanRecords,
+          ),
+        });
+      }
+      if (d.rowsReturned !== undefined) {
+        stats.push({
+          key: "rows-returned",
+          text: t(
+            "dashboard.queryInspector.statRowsReturned",
+            { count: addCommasToNumber(d.rowsReturned) },
+            d.rowsReturned,
+          ),
+        });
+      }
+      if (d.seriesReturned !== undefined) {
+        stats.push({
+          key: "series-returned",
+          text: t("dashboard.queryInspector.statSeriesReturned", {
+            count: addCommasToNumber(d.seriesReturned),
+          }),
+        });
+      }
+      if (d.cacheRatio) {
+        stats.push({
+          key: "cache",
+          text: t("dashboard.queryInspector.statFromCache", { percent: d.cacheRatio }),
+        });
+      }
+      return stats;
     };
 
     const copyText = (text: string | undefined) => {
       if (!text) return;
-      copyToClipboard(text, { silent: true });
+      copyToClipboard(text, t);
     };
 
     watch(() => props.metaData, updateColorizedQueries, {
@@ -341,6 +489,10 @@ export default defineComponent({
       getQueryTypeDisplay,
       highlightSearch,
       copyText,
+      diagnosticsFor,
+      statsFor,
+      seriesLimitBody,
+      statSeparator: raw("·"),
     };
   },
 });
@@ -348,7 +500,7 @@ export default defineComponent({
 
 <style scoped>
 /* keep(scrollbar): custom webkit scrollbar for the query preview, plus :deep
-   overrides for the highlight <mark> and Monaco token spans injected via v-html. */
+   override for the highlight <mark> injected via v-html. */
 .inspector-query-editor::-webkit-scrollbar {
   width: 0.375rem;
   height: 0.375rem;
@@ -373,10 +525,5 @@ export default defineComponent({
   color: var(--color-table-highlight-text);
   border-radius: 0.125rem;
   padding: 0;
-}
-
-/* Ensure Monaco colorized content looks good */
-.inspector-query-editor :deep(.mtk1) {
-  color: inherit;
 }
 </style>

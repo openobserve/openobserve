@@ -35,7 +35,10 @@ const mockAddNode = vi.fn();
 const mockDeletePipelineNode = vi.fn();
 
 vi.mock("@/plugins/pipelines/useDnD", () => ({ default: vi.fn() }));
-vi.mock("@/services/search", () => ({ default: { search: vi.fn() } }));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), { default: { search: vi.fn() } });
+});
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStream: vi.fn().mockResolvedValue({
@@ -212,7 +215,7 @@ describe("Condition.vue (drawer chrome)", () => {
     builderGroup.value = { filterType: "group", conditions: [{ column: "changed" }] };
     await wrapper.find('[data-test="cancel-btn"]').trigger("click");
     expect(wrapper.vm.dialog.show).toBe(true);
-    expect(wrapper.vm.dialog.title).toBe("Discard Changes");
+    expect(wrapper.vm.dialog.title).toBe("Discard changes");
   });
 
   it("clears the selected/clicked node when closing", () => {

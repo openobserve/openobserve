@@ -21,6 +21,7 @@ use config::{
         search::{
             Query, Request as SearchRequest, RequestEncoding, SearchEventType, default_use_cache,
         },
+        self_reporting::usage::USAGE_STREAM,
         stream::StreamType,
     },
     utils::json,
@@ -42,6 +43,11 @@ pub async fn get_usage(
         (vec![], vec![])
     };
 
+    // return empty if usage stream is not there
+    if !infra::schema::exists(META_ORG_ID, StreamType::Logs, USAGE_STREAM).await {
+        return Ok(vec![]);
+    }
+
     let req = SearchRequest {
         query: Query {
             sql,
@@ -50,9 +56,7 @@ pub async fn get_usage(
             start_time,
             end_time,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
-            action_id: None,
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
@@ -99,7 +103,7 @@ pub async fn get_usage(
 pub async fn get_license_usage_data_from_node(node_id: String) -> Result<GetLicenseUsageResponse> {
     let node = get_node_by_uuid(&node_id)
         .await
-        .ok_or(anyhow::anyhow!("node {node_id} not found"))?;
+        .ok_or_else(|| anyhow::anyhow!("node {node_id} not found"))?;
     let node = std::sync::Arc::new(node) as std::sync::Arc<dyn NodeInfo>;
 
     let task = tokio::task::spawn(async move {

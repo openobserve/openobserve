@@ -317,15 +317,11 @@ pub async fn unsubscribe(
         ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
-pub async fn list_invoices(
-    Path(org_id): Path<String>,
-    Headers(user_email): Headers<UserEmail>,
-) -> Response {
-    let email = user_email.user_id.as_str();
+pub async fn list_invoices(Path(org_id): Path<String>) -> Response {
     if organization::get_org(&org_id).await.is_none() {
         return o2_cloud_billings::BillingError::OrgNotFound.into_http_response();
     }
-    match o2_cloud_billings::list_invoice(&org_id, email).await {
+    match o2_cloud_billings::list_invoice(&org_id).await {
         Ok(invoices) => {
             let body = ListInvoicesResponseBody {
                 invoices: invoices.unwrap_or_default(),
@@ -400,10 +396,17 @@ pub async fn list_subscription(
 )]
 pub async fn create_billing_portal_session(
     Path(org_id): Path<String>,
-    Query(query): Query<HashMap<String, String>>,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Response {
-    let Some(customer_id) = query.get("customer_id") else {
-        return o2_cloud_billings::BillingError::CustomerIdMissing.into_http_response();
+    let customer_id = match o2_cloud_billings::get_subscription(&user_email.user_id, &org_id).await
+    {
+        Ok(cb) => match billing_portal_customer_id(cb) {
+            Some(id) => id,
+            None => {
+                return o2_cloud_billings::BillingError::SubscriptionNotFound.into_http_response();
+            }
+        },
+        Err(e) => return e.into_http_response(),
     };
 
     let return_url = format!(
@@ -413,7 +416,7 @@ pub async fn create_billing_portal_session(
         org_id
     );
 
-    match o2_cloud_billings::create_customer_portal_session(customer_id, &return_url).await {
+    match o2_cloud_billings::create_customer_portal_session(&customer_id, &return_url).await {
         Err(err) => err.into_http_response(),
         Ok(billing_session) => MetaHttpResponse::json(billing_session),
     }
@@ -562,4 +565,35 @@ pub async fn handle_azure_event(headers: HeaderMap, payload: axum::body::Bytes) 
     //                 stream_name: None,
     //             })
     //             .await;
+}
+
+fn billing_portal_customer_id(cb: Option<o2_cloud_billings::CustomerBilling>) -> Option<String> {
+    cb.and_then(|cb| cb.customer_id)
+        .filter(|customer_id| !customer_id.is_empty())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn billing(customer_id: Option<&str>) -> o2_cloud_billings::CustomerBilling {
+        let mut cb = o2_cloud_billings::CustomerBilling::new("owner@example.com", "org1");
+        cb.customer_id = customer_id.map(str::to_string);
+        cb
+    }
+
+    #[test]
+    fn test_billing_portal_customer_id_comes_from_org_subscription() {
+        assert_eq!(
+            billing_portal_customer_id(Some(billing(Some("cus_org1")))),
+            Some("cus_org1".to_string())
+        );
+    }
+
+    #[test]
+    fn test_billing_portal_customer_id_missing_without_subscription() {
+        assert_eq!(billing_portal_customer_id(None), None);
+        assert_eq!(billing_portal_customer_id(Some(billing(None))), None);
+        assert_eq!(billing_portal_customer_id(Some(billing(Some("")))), None);
+    }
 }

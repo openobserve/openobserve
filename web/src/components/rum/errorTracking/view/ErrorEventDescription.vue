@@ -22,12 +22,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="bg-surface-subtle rounded-default p-2"
       >
 {
-  <span class="text-primary">from</span> : {{ column.view_referrer }},
-  <span class="text-primary">to</span> : {{ column.view_url }}
+  <span class="text-primary">{{ t('rum.from') }}</span> : {{ column.view_referrer }},
+  <span class="text-primary">{{ t('rum.to') }}</span> : {{ column.view_url }}
 }</pre>
     </template>
     <template v-else-if="column.type === 'resource' && column.resource_type === 'xhr'">
-      <span class="pr-2 text-xs font-bold">{{ column.resource_method }}</span>
+      <span class="pe-2 text-xs font-bold">{{ column.resource_method }}</span>
       <a
         :href="column.resource_url"
         target="_blank"
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="resource-url text-primary text-sm no-underline"
         >{{ column.resource_url }}</a
       >
-      <span class="pl-2">[ {{ column.resource_status_code }} ]</span>
+      <span class="ps-2">[ {{ column.resource_status_code }} ]</span>
     </template>
     <template v-else>
       <span data-test="error-event-description-default" class="text-sm">{{ getDescription }}</span>
@@ -46,6 +46,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { rumField } from "@/utils/rum/fields";
 import { computed } from "vue";
+import { useI18nTyped } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 const props = defineProps({
   column: {

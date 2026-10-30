@@ -19,16 +19,6 @@ use utoipa::ToSchema;
 
 type OrdF64 = ordered_float::OrderedFloat<f64>;
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct DashboardVersion {
-    #[serde(default = "default_version")]
-    pub version: i32,
-}
-
-fn default_version() -> i32 {
-    1
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, ToSchema, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Dashboard {
@@ -182,17 +172,6 @@ mod tests {
     use chrono::Utc;
 
     use super::*;
-
-    #[test]
-    fn test_default_version() {
-        assert_eq!(default_version(), 1);
-    }
-
-    #[test]
-    fn test_dashboard_version() {
-        let version = DashboardVersion { version: 2 };
-        assert_eq!(version.version, 2);
-    }
 
     #[test]
     fn test_dashboard_id_methods() {
@@ -513,18 +492,6 @@ mod tests {
         assert_eq!(deserialized.hash, "test_hash");
         assert_eq!(deserialized.updated_at, 1234567890);
         assert_eq!(deserialized.dashboard_id(), None);
-    }
-
-    #[test]
-    fn test_dashboard_version_serialization() {
-        let version = DashboardVersion { version: 3 };
-
-        let json = serde_json::to_string(&version).expect("Failed to serialize");
-        assert!(json.contains("3"));
-
-        let deserialized: DashboardVersion =
-            serde_json::from_str(&json).expect("Failed to deserialize");
-        assert_eq!(deserialized.version, 3);
     }
 
     #[test]

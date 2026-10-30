@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="context-menu bg-surface-overlay border-border-default rounded-default fixed z-9999 min-w-50 overflow-hidden border py-1 shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
+    class="context-menu bg-surface-overlay border-border-default rounded-default fixed z-9999 min-w-50 overflow-hidden border py-1 shadow-md"
     :style="{ top: `${y}px`, left: `${x}px` }"
     @click.stop
     data-test="alert-insights-context-menu"
@@ -30,39 +30,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="isAlertNameContext">
       <div class="menu-section px-0 py-1">
         <div
-          class="menu-item flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
-          @click="configureDedupForAlert"
-          data-test="context-menu-configure-dedup"
-        >
-          <OIcon name="tune" size="sm" class="mr-2" />
-          <span>Configure Dedup</span>
-        </div>
-        <div
-          class="menu-item flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
+          class="menu-item hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
           @click="editAlert"
           data-test="context-menu-edit-alert"
         >
-          <OIcon name="edit" size="sm" class="mr-2" />
-          <span>Edit Alert</span>
+          <OIcon name="edit" size="sm" class="me-2" />
+          <span>{{ t("alerts.insights.actions.editAlert") }}</span>
         </div>
         <div
-          class="menu-item flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
+          class="menu-item hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
           @click="viewAlertHistory"
           data-test="context-menu-view-history"
         >
-          <OIcon name="history" size="sm" class="mr-2" />
-          <span>View Alert History</span>
+          <OIcon name="history" size="sm" class="me-2" />
+          <span>{{ t("alerts.insights.actions.viewAlertHistory") }}</span>
         </div>
       </div>
       <OSeparator />
       <div class="menu-section px-0 py-1">
         <div
-          class="menu-item flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
+          class="menu-item hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
           @click="$emit('close')"
           data-test="context-menu-cancel"
         >
-          <OIcon name="close" size="sm" class="mr-2" />
-          <span>Cancel</span>
+          <OIcon name="close" size="sm" class="me-2" />
+          <span>{{ t("common.cancel") }}</span>
         </div>
       </div>
     </template>
@@ -71,8 +63,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   x: number;
@@ -93,7 +88,6 @@ const emit = defineEmits<{
     },
   ];
   "select-alert": [string];
-  "configure-dedup": [string];
   "edit-alert": [string];
   "view-history": [string];
 }>();
@@ -111,13 +105,6 @@ const isAlertNameContext = computed(() => {
 
   return typeof props.value === "string" && alertNamePanels.includes(props.panelId);
 });
-
-const configureDedupForAlert = () => {
-  if (typeof props.value === "string") {
-    emit("configure-dedup", props.value);
-    emit("close");
-  }
-};
 
 const editAlert = () => {
   if (typeof props.value === "string") {
@@ -153,15 +140,3 @@ onUnmounted(() => {
   document.removeEventListener("keydown", handleEscape);
 });
 </script>
-
-<style scoped>
-/* keep(complex-state): `.menu-item` hover/active are state pseudo-classes on this
-   component's own elements, with no utility equivalent. */
-.context-menu .menu-item:hover {
-  background-color: var(--color-dropdown-item-hover-bg);
-}
-
-.context-menu .menu-item:active {
-  background-color: var(--color-dropdown-item-active-bg);
-}
-</style>

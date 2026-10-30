@@ -2,8 +2,9 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { SwitchProps, SwitchEmits, SwitchSlots } from "./OSwitch.types";
-import { computed, ref, useAttrs, useId, useSlots, watch } from "vue";
+import { computed, onMounted, ref, useAttrs, useId, useSlots, watch } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { splitControlAttrs, warnIfUnlabelled } from "@/lib/forms/controlAttrs";
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -11,10 +12,9 @@ const parentDataTest = computed(() => $attrs["data-test"] as string | undefined)
 
 // Forward tabindex to the switch control; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
-const wrapperAttrs = computed(() => {
-  const { tabindex: _tabindex, ...rest } = $attrs;
-  return rest;
-});
+const split = computed(() => splitControlAttrs($attrs));
+const wrapperAttrs = computed(() => split.value.wrapperAttrs);
+const controlAttrs = computed(() => split.value.controlAttrs);
 
 const props = withDefaults(defineProps<SwitchProps>(), {
   size: "md",
@@ -59,28 +59,32 @@ function toggle() {
 // ── Track sizes ────────────────────────────────────────────────────────────
 // border-2 (2px each side) + p-0.5 (2px each side) = 4px eaten from each dimension
 // thumb = track_height - 4(border) - 4(padding), translate = track_width - 4 - 4 - thumb
-type TrackSize = { track: string; thumb: string; thumbTranslate: string };
+type TrackSize = {
+  track: string;
+  thumb: string;
+  thumbTranslate: string;
+};
 
 const trackSizes: Record<NonNullable<SwitchProps["size"]>, TrackSize> = {
   sm: {
     track: "w-6 h-3.5",
     thumb: "size-1.5",
-    thumbTranslate: "translate-x-2",
+    thumbTranslate: "translate-x-2 rtl:-translate-x-2",
   },
   md: {
     track: "w-7 h-4.5",
     thumb: "size-2.5",
-    thumbTranslate: "translate-x-2.5",
+    thumbTranslate: "translate-x-2.5 rtl:-translate-x-2.5",
   },
   lg: {
     track: "w-8 h-5",
     thumb: "size-3",
-    thumbTranslate: "translate-x-3",
+    thumbTranslate: "translate-x-3 rtl:-translate-x-3",
   },
   xl: {
     track: "w-11.5 h-6",
     thumb: "size-4.5",
-    thumbTranslate: "translate-x-5",
+    thumbTranslate: "translate-x-5 rtl:-translate-x-5",
   },
 };
 
@@ -92,6 +96,12 @@ const buttonId = computed(() => props.id ?? autoId);
 const labelId = computed(() => `${buttonId.value}-label`);
 const hasLabel = computed(
   () => Boolean(slots.label) || props.label !== undefined || Boolean(slots.tooltip),
+);
+onMounted(() =>
+  warnIfUnlabelled(
+    "OSwitch",
+    hasLabel.value || Boolean($attrs["aria-label"] || $attrs["aria-labelledby"]),
+  ),
 );
 </script>
 
@@ -117,6 +127,7 @@ const hasLabel = computed(
       :data-test="parentDataTest ? `${parentDataTest}-btn` : undefined"
       :disabled="disabled"
       :tabindex="inputTabindex"
+      v-bind="controlAttrs"
       :class="[
         'relative inline-flex shrink-0 rounded-full',
         'items-center border-2 p-0.5',
@@ -132,7 +143,7 @@ const hasLabel = computed(
             : 'border-switch-border-off bg-transparent',
         props.disabled ? 'cursor-not-allowed' : 'cursor-pointer',
         'outline-none',
-        'focus-visible:ring-accent/25 focus-visible:ring-4',
+        'focus-visible:ring-focus-ring-accent focus-visible:ring-4',
         'transition-[color,background-color,border-color,box-shadow] duration-200',
       ]"
     >

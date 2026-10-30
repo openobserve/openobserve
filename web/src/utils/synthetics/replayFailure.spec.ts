@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import { classifyPreflightFailure } from "./replayFailure";
+import { classifyPreflightFailure, classifyRestoreFailure } from "./replayFailure";
 
 describe("classifyPreflightFailure", () => {
   it("should recognise the extension's own incognito message", () => {
@@ -78,5 +78,62 @@ describe("classifyPreflightFailure", () => {
   it("should match case-insensitively", () => {
     expect(classifyPreflightFailure("INCOGNITO access denied")).toBe("incognito");
     expect(classifyPreflightFailure("A Replay Is Already In Progress")).toBe("in-progress");
+  });
+});
+
+/**
+ * A restore ends for three reasons, and only one of them is anybody's fault.
+ *
+ * The recorder window is the author's only way out of a restore they no longer
+ * want, so closing it is a CANCEL — reporting it as "step 9 failed" blames the
+ * journey for something the author did deliberately.
+ */
+describe("classifyRestoreFailure", () => {
+  it("should trust a reason the extension named itself", () => {
+    // Layer B: the extension knows whether the window went away, so its own word
+    // beats anything inferred from an exception.
+    expect(classifyRestoreFailure({ reason: "window-closed" })).toBe("window-closed");
+    expect(classifyRestoreFailure({ reason: "cancelled" })).toBe("cancelled");
+    expect(classifyRestoreFailure({ reason: "step-failed" })).toBe("step-failed");
+  });
+
+  it("should read a closed window from the error class on an older extension", () => {
+    expect(
+      classifyRestoreFailure({
+        error: "crxRecorder.runActions: Target page, context or browser has been closed",
+        structuredError: { message: "…", name: "TargetClosedError" },
+      }),
+    ).toBe("window-closed");
+  });
+
+  /**
+   * The bundler can rename classes, so `name` is not something to depend on
+   * alone. Matching the message text is the method this file already sanctions —
+   * the extension owns both ends of the string.
+   */
+  it("should read a closed window from the message when the class name is mangled", () => {
+    expect(
+      classifyRestoreFailure({
+        error: "crxRecorder.runActions: Target page, context or browser has been closed",
+      }),
+    ).toBe("window-closed");
+  });
+
+  it("should keep a genuine step failure a step failure", () => {
+    expect(
+      classifyRestoreFailure({
+        error: "locator.click: Timeout 30000ms exceeded",
+        structuredError: { message: "…", name: "TimeoutError" },
+      }),
+    ).toBe("step-failed");
+  });
+
+  /**
+   * "Target closed" with no window involved — a page the journey itself closed —
+   * must not read as the author walking away.
+   */
+  it("should not mistake an unrelated failure for a closed window", () => {
+    expect(classifyRestoreFailure({ error: "Internal error: page not found" })).toBe("step-failed");
+    expect(classifyRestoreFailure({})).toBe("step-failed");
   });
 });

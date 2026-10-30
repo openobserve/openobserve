@@ -4,8 +4,9 @@ const https = require('https');
 const { expect } = require('@playwright/test')
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const fetch = require('node-fetch');
-const { getAuthHeaders } = require('../../playwright-tests/utils/cloud-auth.js');
+const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 import { openNavFlyoutChild } from '../commonActions.js';
+import { ingestBase } from '../../playwright-tests/utils/ingest-url.js';
 
 const randomNodeName = `remote-node-${Math.floor(Math.random() * 1000)}`;
 
@@ -232,8 +233,8 @@ export class PipelinesPage {
         this.addEnrichmentTableButton = page.locator('[data-test="enrichment-tables-add-btn"]');
         // Enrichment tables list — OInput search field (auto-derived `-field` data-test)
         this.enrichmentSearchField = page.locator('[data-test="enrichment-tables-search-input-field"]');
-        // Add / Update Enrichment Table form root
-        this.addEnrichmentTablePage = page.locator('[data-test="add-enrichment-table-page"]');
+        // Add / Update Enrichment Table form dialog
+        this.addEnrichmentTablePage = page.locator('[data-test="add-enrichment-table-dialog"]');
         // Enrichment table tab locator (data-test prefix; the tab is rendered by
         // OToggleGroup under the Functions section).
         this.enrichmentTableTabLocator = page.locator('[data-test="pipeline-section-tab-enrichmentTables"]');
@@ -280,7 +281,7 @@ export class PipelinesPage {
         this.addConditionDeleteBtn = page.locator('[data-test="add-condition-drawer"] [data-test="o-drawer-neutral-btn"]');
         this.scheduledAlertTabs = page.locator('[data-test="scheduled-alert-tabs"]');
         this.nestedGroups = page.locator('.el-border');
-        this.operatorLabels = page.locator('span.tw\\:lowercase');
+        this.operatorLabels = page.locator('[data-test="alert-conditions-operator-label"]');
         this.firstConditionLabel = page.locator('[data-test="add-condition-section"]').getByText('if', { exact: true }).first();
         this.noteContainer = page.locator('[data-test="add-condition-note-container"]');
         this.noteHeading = page.locator('[data-test="add-condition-note-heading"]');
@@ -334,6 +335,10 @@ export class PipelinesPage {
         this.queryNode = page.locator('[data-test="pipeline-node-input-query-node"]');
         this.queryNodeDeleteBtn = page.locator('[data-test="pipeline-node-input-delete-btn"]');
         this.cancelPipelineBtn = page.locator('[data-test="add-pipeline-cancel-btn"]');
+        // Editor drafts: Cancel/leave with unsaved changes opens the shared leave dialog
+        this.draftLeaveDialog = page.locator('[data-test="editor-draft-leave-dialog"]');
+        this.draftLeaveDiscardBtn = this.draftLeaveDialog.locator('[data-test="o-dialog-neutral-btn"]');
+        this.draftLeaveCloseBtn = this.draftLeaveDialog.locator('[data-test="o-dialog-close-btn"]');
         this.dashboardsMenuLink = page.locator('[data-test="menu-link-\\/dashboards-item"]');
         // PipelineEditor emits a toast "Please connect all nodes before saving"
         // when the user clicks Save without joining nodes. OToast renders it via
@@ -360,7 +365,11 @@ export class PipelinesPage {
 
     // Methods from original PipelinesPage
     async gotoPipelinesPage() {
-        await openNavFlyoutChild(this.page, 'pipeline');
+        // The flyout child is a hover-reveal that can self-close mid-click, so retry the reveal+click until the pipeline route actually loads.
+        await expect(async () => {
+            await openNavFlyoutChild(this.page, 'pipeline');
+            await this.page.waitForURL(/pipeline/, { timeout: 5000 });
+        }).toPass({ timeout: 30000, intervals: [500, 1000, 2000] });
     }
 
     async pipelinesPageDefaultOrg() {
@@ -967,11 +976,7 @@ export class PipelinesPage {
         await this.sqlEditor.click();
     }
 
-    // Method to type the SQL query
-    async typeSqlQuery(query) {
-        await this.sqlQueryInput.click();
-        await this.sqlQueryInput.fill(query);
-    }
+
 
     // Method to select the frequency unit dropdown
     async selectFrequencyUnit() {
@@ -1091,8 +1096,8 @@ export class PipelinesPage {
         // click. The OButton in the AppPageHeader #actions slot can detach
         // mid-render while the list hydrates (documented add-btn detach race),
         // so re-resolve the locator and tolerate a transient detach. Short-circuit
-        // if a prior attempt already opened the form (the Add button is v-if'd
-        // out once the form mounts, so re-asserting its visibility would loop).
+        // if a prior attempt already opened the form (the dialog overlay blocks
+        // the Add button once it opens, so re-clicking it would loop).
         await listPage.waitFor({ state: 'visible', timeout: 20000 });
         await expect(async () => {
             if (await this.addEnrichmentTablePage.isVisible().catch(() => false)) return;
@@ -1174,6 +1179,22 @@ export class PipelinesPage {
     async navigateToEnrichmentTableTab() {
         await openNavFlyoutChild(this.page, 'pipeline');
         await this.page.locator(this.enrichmentTableTab).click();
+    }
+
+    /**
+     * Open Settings -> Pipeline Destinations and wait for the named row.
+     *
+     * Pipeline destinations live on their own tab — `destinationsQuery(org, "pipeline")` —
+     * so the alert destinations page never lists them and cannot reach this row. That
+     * list also has no search box, so the row is awaited directly rather than filtered.
+     */
+    async openPipelineDestinationsAt(name) {
+        await this.settingsMenu.click();
+        await this.pipelineDestinationsTab.click();
+        await expect(this.destinationListAddBtn).toBeVisible({ timeout: 30000 });
+        await this.page
+            .locator(`[data-test="alert-destination-list-${name}-delete-destination"]`)
+            .waitFor({ state: 'visible', timeout: 30000 });
     }
 
     async deleteDestination(randomNodeName) {
@@ -1402,7 +1423,7 @@ export class PipelinesPage {
         const headers = getAuthHeaders();
 
         const baseUrl = (process.env.INGESTION_URL || '').replace(/\/$/, '');
-        const url = `${baseUrl}/api/${orgId}/${streamName}/_json`;
+        const url = `${ingestBase(baseUrl)}/api/${orgId}/${streamName}/_json`;
         const fetchResponse = await fetch(url, {
             method: 'POST',
             headers: headers,
@@ -1414,11 +1435,39 @@ export class PipelinesPage {
         testLogger.info('Stream ingestion response', { streamName, status: fetchResponse.status });
         await this.page.waitForTimeout(2000);
 
-        // Navigate and explore
+        // Navigate to streams and try the streams-list Explore. A freshly-ingested stream
+        // (data ingested 200) can lag in the streams LIST on cloud (stream-stats latency), so
+        // the Explore action may never appear. Poll (reload + refresh-stats + re-search) for a
+        // bounded window; if it still doesn't surface, fall back to opening the logs explorer
+        // DIRECTLY by URL — which lands on the same page clickExplore reaches but does not depend
+        // on the stream showing in the streams-list. openTimestampMenu() below then runs the
+        // query on that logs explorer either way. This keeps the fast path for callers whose
+        // stream lists promptly (pipeline-core/pipelines) and only the lagging case takes the
+        // fallback, so it can't regress the tests that already pass here.
         await this.navigateToStreams();
-        await this.refreshStreamStats();
-        await this.searchStream(streamName);
-        await this.clickExplore();
+        let exploreReady = false;
+        try {
+            await expect.poll(async () => {
+                await this.page.reload().catch(() => {});
+                await this.page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
+                await this.refreshStreamStats().catch(() => {});
+                await this.searchStream(streamName).catch(() => {});
+                await this.page.waitForTimeout(1000);
+                return await this.exploreButton.first().isVisible({ timeout: 2000 }).catch(() => false);
+            }, { intervals: [3000, 5000, 10000, 15000], timeout: 60000 }).toBe(true);
+            exploreReady = true;
+        } catch (e) {
+            testLogger.warn('Explore not in streams list — falling back to direct logs URL', { streamName });
+        }
+
+        if (exploreReady) {
+            await this.clickExplore();
+        } else {
+            const org = getOrgIdentifier() || process.env.ORGNAME || 'default';
+            const base = (process.env.ZO_BASE_URL || '').replace(/\/+$/, '');
+            await this.page.goto(`${base}/web/logs?stream=${encodeURIComponent(streamName)}&stream_type=logs&org_identifier=${org}`);
+            await this.page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
+        }
         await this.openTimestampMenu();
         await this.navigateToPipeline();
     }
@@ -1597,6 +1646,30 @@ export class PipelinesPage {
         await this.page.waitForTimeout(300);
     }
 
+    async fillUnaryCondition(columnName, operator, index = 0) {
+        // Select the column (mirror fillCondition's column step) then the unary
+        // operator. Unary operators (is_null / is_not_null / is_empty /
+        // is_not_empty) render no value input, so never fill a value here.
+        const triggers = this.columnSelectTrigger;
+        const wrappers = this.columnSelect;
+        const trigCount = await triggers.count();
+        if (trigCount > 0) {
+            await triggers.nth(index).click();
+        } else {
+            await wrappers.nth(index).click();
+        }
+        await this.columnSelectPopover.first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        const searchCount = await this.columnSelectSearch.count();
+        if (searchCount > 0) {
+            await this.columnSelectSearch.first().fill(columnName);
+        }
+        await this.columnOptionByName(columnName).waitFor({ state: 'visible', timeout: 10000 });
+        await this.columnOptionByName(columnName).click();
+        await this.page.waitForTimeout(300);
+
+        await this.selectOperatorFromMenu(operator);
+    }
+
     async addNewCondition() {
         await this.addConditionButton.first().click();
         await this.page.waitForTimeout(500);
@@ -1742,7 +1815,37 @@ export class PipelinesPage {
     }
 
     async openPipelineForEdit(pipelineName) {
-        await this.page.locator(`[data-test="pipeline-list-${pipelineName}-update-pipeline"]`).click();
+        const editBtn = this.page.locator(`[data-test="pipeline-list-${pipelineName}-update-pipeline"]`);
+        // A naked click here 45s-timed-out on alpha1: after save the pipeline list can be long
+        // (shared org) or not-yet-refreshed, so the target row isn't clickable. Filter to the
+        // pipeline and wait for its edit button, polling with a reload if the list hasn't caught
+        // up. Mirrors the proven readiness path in createAndVerifyPipeline. Non-masking: if the
+        // pipeline never appears (i.e. save genuinely failed) the poll times out and we fail.
+        await this.searchPipeline(pipelineName).catch(() => {});
+        if (!(await editBtn.isVisible({ timeout: 15000 }).catch(() => false))) {
+            testLogger.info(`openPipelineForEdit: ${pipelineName} not in list yet — polling with reload`);
+            await expect.poll(async () => {
+                const reloadApi = this.page.waitForResponse(
+                    (resp) => /\/api\/[^/]+\/pipelines(\?|$)/.test(resp.url()) && resp.request().method() === 'GET' && resp.status() === 200,
+                    { timeout: 20000 }
+                ).catch(() => null);
+                await this.page.reload().catch(() => {});
+                await reloadApi;
+                const allTab = this.page.locator('[data-test="tab-all"]');
+                if (await allTab.isVisible({ timeout: 2000 }).catch(() => false)) {
+                    await allTab.click().catch(() => {});
+                }
+                await this.waitForPipelineListSettled(15000);
+                await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+                await this.pipelineSearchInputField.fill('').catch(() => {});
+                await this.searchPipeline(pipelineName).catch(() => {});
+                return await editBtn.isVisible({ timeout: 2000 }).catch(() => false);
+            }, {
+                intervals: [2000, 3000, 5000, 5000, 10000, 10000],
+                timeout: 120000,
+            }).toBe(true);
+        }
+        await editBtn.click();
         await this.page.waitForTimeout(2000);
     }
 
@@ -1837,6 +1940,14 @@ export class PipelinesPage {
         await this.valueInput.nth(index).locator('input').fill(value);
     }
 
+    /**
+     * Fill the first condition value input field (OInner `-field` native input).
+     * @param {string} value - The value to fill
+     */
+    async fillFirstConditionValue(value) {
+        await this.valueInputField.first().fill(value);
+    }
+
     async verifyDeleteButtonCount(expectedCount) {
         const count = await this.deleteConditionBtn.count();
         expect(count).toBe(expectedCount);
@@ -1853,6 +1964,44 @@ export class PipelinesPage {
         // The old `[role="alert"]` locator now matches Monaco's hidden a11y alert
         // (`class="monaco-alert" data-aria-hidden="true"`), so assert the real error.
         await this.conditionRequiredToast.first().waitFor({ state: 'visible', timeout: 10000 });
+    }
+
+    async verifyNoConditionError() {
+        // A successful save surfaces no inline schema error. Used to prove a
+        // unary condition (value-exempt) saved without the "fill all fields" error.
+        await expect(this.conditionRequiredToast).toHaveCount(0);
+    }
+
+    async verifyValueInputCount(expectedCount) {
+        // Count value inputs (v-if-removed for unary operators, present for binary).
+        await expect(this.valueInput).toHaveCount(expectedCount);
+    }
+
+    async verifyOperatorSelected(operator, index = 0) {
+        // The operator OFormSelect renders in reka-Select mode (non-listbox), so
+        // its trigger carries no `data-test-selected-value`; it shows the selected
+        // label as text. Unary operators map wire value -> display label.
+        const labelByOperator = {
+            is_null: 'Is Null',
+            is_not_null: 'Is Not Null',
+            is_empty: 'Is Empty',
+            is_not_empty: 'Is Not Empty',
+        };
+        const expectedLabel = labelByOperator[operator] ?? operator;
+        await expect(this.operatorSelectTrigger.nth(index)).toContainText(expectedLabel);
+    }
+
+    async verifyUnaryOperatorsOffered() {
+        // Open the operator menu and assert each unary option is offered by its
+        // snake_case `data-test-value` (the OSelect option value, not the label).
+        await this.operatorSelectTrigger.first().waitFor({ state: 'visible', timeout: 15000 });
+        await this.operatorSelectTrigger.first().click();
+        for (const operator of ["is_null", "is_not_null", "is_empty", "is_not_empty"]) {
+            const option = this.page.locator(
+                `[data-test="alert-conditions-operator-select-option"][data-test-value="${operator}"]`,
+            ).first();
+            await expect(option).toBeVisible();
+        }
     }
 
     async fillPartialCondition(columnName) {
@@ -2088,7 +2237,7 @@ export class PipelinesPage {
     async cancelAndDeletePipeline(pipelineName, searchPrefix = 'automatepi') {
         // Click the cancel/back button
         await this.page.locator('[data-test="add-pipeline-cancel-btn"]').click();
-        await this.confirmButton.click();
+        await this.discardDraftIfAsked();
         await this.page.waitForTimeout(2000);
 
         // Search for the pipeline
@@ -2117,7 +2266,7 @@ export class PipelinesPage {
         const baseUrl = (process.env.INGESTION_URL || '').replace(/\/$/, '');
 
         for (const streamName of streamNames) {
-            const url = `${baseUrl}/api/${orgId}/${streamName}/_json`;
+            const url = `${ingestBase(baseUrl)}/api/${orgId}/${streamName}/_json`;
             const fetchResponse = await fetchWithRetry(url, {
                 method: 'POST',
                 headers: headers,
@@ -2160,7 +2309,7 @@ export class PipelinesPage {
         }
 
         const baseUrl = (process.env.INGESTION_URL || '').replace(/\/$/, '');
-        const url = `${baseUrl}/api/${orgId}/ingest/metrics/_json`;
+        const url = `${ingestBase(baseUrl)}/api/${orgId}/ingest/metrics/_json`;
         const fetchResponse = await fetchWithRetry(url, {
             method: 'POST',
             headers: headers,
@@ -2175,6 +2324,10 @@ export class PipelinesPage {
         };
 
         testLogger.info('Metrics ingestion response', { streamName, status: response.status, data: response.data });
+        // Ingestion is only usable once the READ path lists the stream, so wait for that rather than for a fixed delay.
+        if (!(await this.waitForStreamListed(streamName, 'metrics'))) {
+            testLogger.warn('Metrics stream not listed by the streams API before the timeout', { streamName });
+        }
         return response;
     }
 
@@ -2273,7 +2426,7 @@ export class PipelinesPage {
         if (streamName) {
             requestHeaders["stream-name"] = streamName;
         }
-        const fetchResponse = await fetchWithRetry(`${baseUrl}/api/${orgId}/v1/traces`, {
+        const fetchResponse = await fetchWithRetry(`${ingestBase(baseUrl)}/api/${orgId}/v1/traces`, {
             method: 'POST',
             headers: requestHeaders,
             body: JSON.stringify(tracesData)
@@ -2287,7 +2440,32 @@ export class PipelinesPage {
         };
 
         testLogger.info('Traces ingestion response', { serviceName, streamName: streamName || 'default', status: response.status, data: response.data });
+        // Ingestion is only usable once the READ path lists the stream, so wait for that rather than for a fixed delay.
+        if (streamName && !(await this.waitForStreamListed(streamName, 'traces'))) {
+            testLogger.warn('Traces stream not listed by the streams API before the timeout', { streamName });
+        }
         return response;
+    }
+
+    /**
+     * Resolve once the streams API lists `streamName` for `streamType`.
+     * @returns {Promise<boolean>} whether the stream was listed before the timeout
+     */
+    async waitForStreamListed(streamName, streamType, { timeoutMs = 60000, pollMs = 1000 } = {}) {
+        // The node form reads its options from a cached query of this same list, so a stream the list has not got can never appear.
+        const orgId = process.env["ORGNAME"];
+        const baseUrl = (process.env.ZO_BASE_URL || '').replace(/\/$/, '');
+        const url = `${baseUrl}/api/${orgId}/streams?type=${streamType}`;
+        const deadline = Date.now() + timeoutMs;
+        for (;;) {
+            const listed = await fetchWithRetry(url, { method: 'GET', headers: getAuthHeaders() })
+                .then((res) => (res.ok ? res.json() : { list: [] }))
+                .then((body) => (body.list || []).some((stream) => stream.name === streamName))
+                .catch(() => false);
+            if (listed) return true;
+            if (Date.now() >= deadline) return false;
+            await this.page.waitForTimeout(pollMs);
+        }
     }
 
     /**
@@ -2665,18 +2843,26 @@ export class PipelinesPage {
         await this.queryNodeDeleteBtn.first().click();
     }
 
-    /**
-     * Click confirm button
-     */
-    async clickConfirmButton() {
-        await this.confirmButton.click();
-    }
+
 
     /**
      * Click cancel pipeline button
      */
     async clickCancelPipelineBtn() {
         await this.cancelPipelineBtn.click();
+        await this.discardDraftIfAsked();
+    }
+
+    /** Discards unsaved changes through the leave dialog when it opens, so no draft is left behind. */
+    async discardDraftIfAsked() {
+        const asked = await this.draftLeaveDialog
+            .waitFor({ state: 'visible', timeout: 2000 })
+            .then(() => true)
+            .catch(() => false);
+        if (asked) {
+            await this.draftLeaveDiscardBtn.click();
+            await this.draftLeaveDialog.waitFor({ state: 'hidden', timeout: 10000 });
+        }
     }
 
     /**
@@ -2684,6 +2870,12 @@ export class PipelinesPage {
      */
     async clickDashboardsMenu() {
         await this.dashboardsMenuLink.click();
+    }
+
+    async acceptUnsavedChangesPromptAndExpectDashboards() {
+        await expect(this.draftLeaveDialog, 'Leaving an unsaved pipeline must show the leave dialog').toBeVisible({ timeout: 10000 });
+        await this.draftLeaveDiscardBtn.click();
+        await expect(this.page).toHaveURL(/dashboards/, { timeout: 15000 });
     }
 
     /**
@@ -2895,6 +3087,35 @@ export class PipelinesPage {
     }
 
     /**
+     * Expand a field in the Associate Query sidebar and tick its first value.
+     * @param {string} fieldName
+     * @returns {Promise<string>} the value that was ticked
+     */
+    async addQueryFieldValueFilter(fieldName) {
+        const expandBtn = this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`);
+        await expandBtn.waitFor({ state: 'visible', timeout: 30000 });
+        await expandBtn.click();
+
+        const firstValue = this.page
+            .locator(`[data-test^="logs-search-subfield-add-${fieldName}-"]`)
+            .first();
+        // Field values arrive from their own request after the panel opens.
+        await firstValue.waitFor({ state: 'visible', timeout: 30000 });
+        const dataTest = await firstValue.getAttribute('data-test');
+        await firstValue.locator('button[role="checkbox"], input[type="checkbox"]').first().click();
+        await this.page.waitForTimeout(1000);
+        return (dataTest ?? '').replace(`logs-search-subfield-add-${fieldName}-`, '');
+    }
+
+    /** Untick every selected value for the open field, which removes its query condition. */
+    async clearQueryFieldValueFilter() {
+        const clearBtn = this.page.locator('[data-test="field-values-panel-clear-selection-btn"]');
+        await clearBtn.waitFor({ state: 'visible', timeout: 15000 });
+        await clearBtn.click();
+        await this.page.waitForTimeout(1000);
+    }
+
+    /**
      * Wait for watcher to process stream change
      * Deterministic wait that checks for query state to stabilize
      * Replaces: await page.waitForTimeout(2000) after stream change
@@ -3016,8 +3237,7 @@ export class PipelinesPage {
      */
     async cleanupPipelineCreation() {
         await this.cancelPipelineBtn.click().catch(() => {});
-        await this.page.waitForTimeout(500);
-        await this.confirmButton.click().catch(() => {});
+        await this.discardDraftIfAsked();
         testLogger.info('Pipeline creation cleanup completed');
     }
 
@@ -3177,6 +3397,52 @@ export class PipelinesPage {
      * @param {string} pipelineName - Pipeline name
      * @returns {import('@playwright/test').Locator} Pipeline row locator
      */
+    // ---- row View preview (#12647) and bulk export (#7030) ------------
+    // The preview bubble is OTooltip's own content node, not a pipeline-owned
+    // element, so it is matched by the library's data-test rather than by a
+    // loose class pattern.
+    getPipelineViewButton(pipelineName) {
+        return this.page.locator(`[data-test="pipeline-list-${pipelineName}-view-pipeline"]`);
+    }
+    getPipelinePreviewTooltip() {
+        return this.page.locator('[data-test="o-tooltip-content"]').first();
+    }
+    getPipelineEditButton(pipelineName) {
+        return this.page.locator(`[data-test="pipeline-list-${pipelineName}-update-pipeline"]`);
+    }
+    getBulkExportButton() {
+        return this.page.locator('[data-test="pipeline-list-export-pipelines-btn"]');
+    }
+    getSelectAllRowsCheckbox() {
+        return this.page.locator('[data-test="o2-table-select-all"]');
+    }
+
+    /** Hover the row's View action and return the preview bubble's box. */
+    async hoverViewAndGetPreviewBox(pipelineName) {
+        const btn = this.getPipelineViewButton(pipelineName);
+        await expect(btn, 'Row View action must be present').toBeVisible({ timeout: 20000 });
+        await btn.hover();
+        const tooltip = this.getPipelinePreviewTooltip();
+        await expect(tooltip, 'Hovering View must open the graph preview').toBeVisible({ timeout: 10000 });
+        return await tooltip.boundingBox();
+    }
+
+    async expectPipelineInList(pipelineName) {
+        await expect(this.getPipelineEditButton(pipelineName),
+            `Pipeline ${pipelineName} must be in the filtered list`).toBeVisible({ timeout: 20000 });
+    }
+
+    async expectBulkExportHidden() {
+        await expect(this.getBulkExportButton(),
+            'Bulk export must stay hidden while nothing is selected').toBeHidden();
+    }
+
+    async selectAllRowsAndExpectBulkExport() {
+        await this.getSelectAllRowsCheckbox().click();
+        await expect(this.getBulkExportButton(),
+            'Selecting pipelines must reveal a bulk export action').toBeVisible({ timeout: 10000 });
+    }
+
     getPipelineRowByName(pipelineName) {
         return this.page
             .locator(`[data-test="pipeline-list-${pipelineName}-update-pipeline"]`)
@@ -3274,6 +3540,7 @@ export class PipelinesPage {
      */
     async clickCancelPipelineBtnForce() {
         await this.cancelPipelineBtn.click({ force: true });
+        await this.discardDraftIfAsked();
         testLogger.info('Clicked cancel pipeline button (force)');
     }
 
@@ -3861,6 +4128,15 @@ export class PipelinesPage {
     }
 
     /**
+     * Wait for the history search-select OSelect popover to be hidden (e.g. after
+     * pressing Escape to dismiss the dropdown overlay). Best-effort.
+     */
+    async waitForHistorySearchSelectPopoverHidden() {
+        await this.page.locator('[data-test="pipeline-history-search-select-popover"]')
+            .waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+    }
+
+    /**
      * Select first option in dropdown
      */
     async selectFirstOption() {
@@ -3997,6 +4273,28 @@ export class PipelinesPage {
     }
 
     /**
+     * Click a top-left corner of the page body to dismiss an open dialog/dropdown
+     * or navigate away from an editor without saving.
+     */
+    async clickBodyCorner() {
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
+    }
+
+    /**
+     * Confirm the ResumePipelineDialog if it is open. When a paused pipeline is
+     * toggled back on, a dialog asks "from now" vs "from where paused"; clicking
+     * the primary button confirms the resume so it doesn't block later clicks.
+     */
+    async confirmResumePipelineDialog() {
+        const resumeDialog = this.page.locator('[data-test="resume-pipeline-dialog"]');
+        if (await resumeDialog.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await resumeDialog.locator('[data-test="o-dialog-primary-btn"]').click();
+            await this.page.waitForTimeout(500);
+            testLogger.info('Resume dialog confirmed');
+        }
+    }
+
+    /**
      * Add and configure a source stream node on the pipeline canvas.
      * Handles: drag stream → select type → enter name → select option → save → delete auto output.
      * @param {'traces'|'metrics'|'logs'} streamType - The stream type to select
@@ -4123,6 +4421,46 @@ export class PipelinesPage {
         await this.runQueryButton.waitFor({ state: 'visible', timeout: 5000 });
         await expect(this.runQueryButton).toBeEnabled({ timeout: 3000 });
         testLogger.info('✅ Run Query button is enabled as expected');
+    }
+
+    /** Open the delete dialog for an output node without confirming it. */
+    async openOutputStreamNodeDeleteDialog(index = 0) {
+        await this.pipelineNodeOutputStreamNode.nth(index).hover();
+        await this.pipelineNodeOutputDeleteBtn.nth(index).click();
+        await this.page.locator('[data-test="confirm-dialog"]').waitFor({ state: 'visible', timeout: 10000 });
+    }
+
+    /** The warning only fires for a destination that mirrors the source stream. */
+    getDefaultDestinationWarning() {
+        return this.page
+            .locator('[data-test="confirm-dialog"]')
+            .getByText(/default destination node/i);
+    }
+
+    async expectDefaultDestinationWarningVisible() {
+        await expect(this.getDefaultDestinationWarning()).toBeVisible({ timeout: 10000 });
+    }
+
+    async expectDefaultDestinationWarningAbsent() {
+        await expect(this.getDefaultDestinationWarning()).toHaveCount(0);
+    }
+
+    async cancelConfirmDialog() {
+        await this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-secondary-btn"]').click();
+        await this.page.locator('[data-test="confirm-dialog"]').waitFor({ state: 'hidden', timeout: 10000 });
+    }
+
+    async countOutputStreamNodes() {
+        return await this.pipelineNodeOutputStreamNode.count();
+    }
+
+    /**
+     * Saving the source node adds the mirroring destination asynchronously, so a
+     * plain count races the render -- it won on a fast machine and lost under CI load.
+     */
+    async expectOutputStreamNodePresent() {
+        await expect(this.pipelineNodeOutputStreamNode.first())
+            .toBeVisible({ timeout: 30000 });
     }
 
 }

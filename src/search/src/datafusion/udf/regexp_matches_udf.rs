@@ -150,7 +150,7 @@ pub fn regexp_matches<T: OffsetSizeTrait>(args: &[ArrayRef]) -> Result<ArrayRef>
     let is_scalar_pattern = regex.len() == 1;
 
     // Precompile the regex if it's scalar
-    let scalar_regex = if is_scalar_pattern {
+    let scalar_regex = if is_scalar_pattern && !regex.is_null(0) {
         Some(
             Regex::new(regex.value(0))
                 .map_err(|e| DataFusionError::Execution(format!("Invalid regex pattern: {e}")))?,
@@ -162,7 +162,7 @@ pub fn regexp_matches<T: OffsetSizeTrait>(args: &[ArrayRef]) -> Result<ArrayRef>
     let mut list_builder = ListBuilder::new(GenericStringBuilder::<T>::new());
 
     for i in 0..values.len() {
-        if values.is_null(i) || (!is_scalar_pattern && regex.is_null(i)) {
+        if values.is_null(i) || regex.is_null(if is_scalar_pattern { 0 } else { i }) {
             // Append NULL for this row
             list_builder.append(false);
             continue;
@@ -196,23 +196,24 @@ pub fn regexp_matches<T: OffsetSizeTrait>(args: &[ArrayRef]) -> Result<ArrayRef>
             // Group 3: hello              (innermost capture - what we want!)
 
             // Try innermost capture group first, then work outwards
-            let matched_value = (2..=cap.len())  // Start from 2 because: Group 0 is full match, Group 1 is first explicit group
-                .rev()  // Reverse the range to start from last group (innermost) to first group
-                .find_map(|i| cap.get(i))  // Try to get each group, returns None if group didn't match
-                .or_else(|| cap.get(1))    // If no inner groups matched, try the first explicit group
-                .or_else(|| cap.get(0))    // If no groups matched at all, use the entire match
+            let matched_value = (2..=cap.len()) // Start from 2 because: Group 0 is full match, Group 1 is first explicit group
+                .rev() // Reverse the range to start from last group (innermost) to first group
+                .find_map(|i| cap.get(i)) // Try to get each group, returns None if group didn't match
+                .or_else(|| cap.get(1)) // If no inner groups matched, try the first explicit group
+                .or_else(|| cap.get(0)) // If no groups matched at all, use the entire match
                 .map(|m| m.as_str()); // Convert the match to a string slice
 
             if let Some(matched) = matched_value {
                 // Clean up the matched value:
                 // If the value is wrapped in quotes (like "hello"), remove them
                 // If it's not (like 123), keep as is
-                let cleaned = if matched.starts_with('"') && matched.ends_with('"') {
-                    // Remove the surrounding quotes
-                    &matched[1..matched.len() - 1]
-                } else {
-                    matched
-                };
+                let cleaned =
+                    if matched.len() >= 2 && matched.starts_with('"') && matched.ends_with('"') {
+                        // Remove the surrounding quotes
+                        &matched[1..matched.len() - 1]
+                    } else {
+                        matched
+                    };
                 list_builder.values().append_value(cleaned);
                 has_match = true;
             }
@@ -247,6 +248,17 @@ mod tests {
     fn test_regexp_matches_direct_finds_matches() {
         let values = StringArray::from(vec!["abc123def456"]);
         let pattern = StringArray::from(vec!["(\\d+)"]);
+        let args: Vec<ArrayRef> = vec![Arc::new(values), Arc::new(pattern)];
+        let result = regexp_matches::<i32>(&args).unwrap();
+        use arrow::array::{Array, ListArray};
+        let list = result.as_any().downcast_ref::<ListArray>().unwrap();
+        assert!(!list.is_null(0));
+    }
+
+    #[test]
+    fn test_regexp_matches_lone_quote_does_not_panic() {
+        let values = StringArray::from(vec![r#"""#]);
+        let pattern = StringArray::from(vec![r#"(")"#]);
         let args: Vec<ArrayRef> = vec![Arc::new(values), Arc::new(pattern)];
         let result = regexp_matches::<i32>(&args).unwrap();
         use arrow::array::{Array, ListArray};
@@ -462,5 +474,42 @@ mod tests {
         ];
 
         assert_batches_eq!(expected, &results);
+    }
+
+    #[tokio::test]
+    async fn test_regexp_matches_null_scalar_pattern() {
+        let ctx = SessionContext::new();
+        ctx.register_udf(REGEX_MATCHES_UDF.clone());
+        let sql = "SELECT re_matches('gateway', CAST(NULL AS VARCHAR)) IS NULL AS missing";
+        let expected = [
+            "+---------+",
+            "| missing |",
+            "+---------+",
+            "| true    |",
+            "+---------+",
+        ];
+        let result = ctx.sql(sql).await.unwrap().collect().await.unwrap();
+        assert_batches_eq!(expected, &result);
+        // A one-row batch takes the scalar-pattern path, two rows take the array path.
+        for rows in [1, 2] {
+            let schema = Arc::new(Schema::new(vec![Field::new("job", DataType::Utf8, true)]));
+            let batch = RecordBatch::try_new(
+                schema.clone(),
+                vec![Arc::new(StringArray::from(vec!["gateway"; rows]))],
+            )
+            .unwrap();
+            ctx.register_table(
+                "t",
+                Arc::new(MemTable::try_new(schema, vec![vec![batch]]).unwrap()),
+            )
+            .unwrap();
+            let sql = "SELECT re_matches(job, CAST(NULL AS VARCHAR)) IS NULL AS missing FROM t";
+            let result = ctx.sql(sql).await.unwrap().collect().await.unwrap();
+            let mut expected = vec!["+---------+", "| missing |", "+---------+"];
+            expected.extend(std::iter::repeat_n("| true    |", rows));
+            expected.push("+---------+");
+            assert_batches_eq!(expected, &result);
+            ctx.deregister_table("t").unwrap();
+        }
     }
 }

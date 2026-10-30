@@ -16,7 +16,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, watch, computed, inject } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import useStreams from "@/composables/useStreams";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -44,12 +44,12 @@ export default defineComponent({
   components: { OSelect },
 
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
 
-    const { getStream } = useStreams();
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { getStream } = useStreams(t);
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     // Raw loaded groups: { label, streamRef, children: [{name, ...}] }
     const groups = ref<{ label: string; streamRef: any; children: any[] }[]>([]);
@@ -158,10 +158,9 @@ export default defineComponent({
       }
     }
 
-    // Re-fetch when streams list changes
-    watch(() => props.streams, fetchFieldsForStreams, {
+    // Callers pass a fresh array on every render, so only a change in content may refetch the schema.
+    watch(() => JSON.stringify(props.streams ?? []), fetchFieldsForStreams, {
       immediate: true,
-      deep: true,
     });
 
     return {

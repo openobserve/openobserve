@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OCollapsible
     :model-value="isExpanded"
     @update:model-value="handleToggle"
-    class="field-expansion-item rounded-default w-full overflow-hidden"
+    class="field-expansion-item rounded-default w-full overflow-clip [overflow-clip-margin:0.25rem]"
     trigger-class="px-0! py-0!"
   >
     <template #trigger>
@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`log-search-expand-${field.name}-field-btn`"
         :highlight="isFieldSelected"
       >
-        <span class="mr-1 flex w-[0.55rem] shrink-0 items-center justify-center">
+        <span class="me-1 flex w-[0.55rem] shrink-0 items-center justify-center">
           <OIcon
             class="text-text-muted inline-flex w-4 shrink-0 items-center justify-center"
             :name="isExpanded ? 'expand-more' : 'chevron-right'"
@@ -41,13 +41,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <OButton
           :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
-          v-if="showQuickMode"
+          v-if="showQuickMode && isInterestingCandidate"
           variant="ghost-neutral"
-          class="mr-1 gap-0!"
+          class="me-1 gap-0!"
           :title="
             field.isInterestingField
-              ? 'Remove from interesting fields'
-              : 'Add to interesting fields'
+              ? t('logStream.removeFromInterestingFields')
+              : t('logStream.addToInterestingFields')
           "
           size="icon"
           @click.stop="$emit('toggle-interesting', field, field.isInterestingField)"
@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #actions>
           <OButton
+            :aria-label="t('common.addFilter')"
             v-if="field.isSchemaField && showFilterIcon"
             :data-test="`log-search-index-list-filter-${field.name}-field-btn`"
             variant="ghost-neutral"
@@ -66,6 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="add" size="sm" />
           </OButton>
           <OButton
+            :aria-label="t('common.addFieldToTable')"
             :data-test="`log-search-index-list-add-${field.name}-field-btn`"
             v-if="showVisibilityToggle && !isFieldSelected"
             variant="ghost-neutral"
@@ -76,6 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="visibility" size="sm" />
           </OButton>
           <OButton
+            :aria-label="t('common.removeFieldFromTable')"
             :data-test="`log-search-index-list-remove-${field.name}-field-btn`"
             v-if="showVisibilityToggle && isFieldSelected"
             variant="ghost-neutral"
@@ -87,13 +90,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <OButton
             :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
-            v-if="showQuickMode"
+            v-if="showQuickMode && isInterestingCandidate"
             variant="ghost-neutral"
             class="gap-0!"
             :title="
               field.isInterestingField
-                ? 'Remove from interesting fields'
-                : 'Add to interesting fields'
+                ? t('logStream.removeFromInterestingFields')
+                : t('logStream.addToInterestingFields')
             "
             size="icon"
             @click.stop="$emit('toggle-interesting', field, field.isInterestingField)"
@@ -104,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OFieldRow>
     </template>
 
-    <div class="py-0 pr-2 pl-4">
+    <div class="py-0 ps-4 pe-2">
       <slot name="body">
         <FieldValuesPanel
           ref="fieldValuesPanelRef"
@@ -136,6 +139,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
 import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
+import { isSchemaBackedField } from "@/utils/logs/interestingFields";
+import { useI18nTyped } from "@/types/i18n";
 
 interface Props {
   field: any;
@@ -194,6 +199,9 @@ const emit = defineEmits<{
 const isExpanded = ref(props.expanded ?? false);
 const fieldValuesPanelRef = ref();
 
+// Mirrors FieldRow's gate rather than relying on it routing non-schema fields elsewhere.
+const isInterestingCandidate = computed(() => isSchemaBackedField(props.field));
+
 watch(
   () => props.expanded,
   (val) => {
@@ -239,6 +247,8 @@ const handleToggle = (val: boolean) => {
 };
 
 defineExpose({ reset: () => fieldValuesPanelRef.value?.reset() });
+
+const { t } = useI18nTyped();
 </script>
 
 <style scoped>

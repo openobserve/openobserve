@@ -30,6 +30,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :tabs-below="tabOrder.length > 1"
       bleed
     >
+      <template v-if="isMobile && activeHomeTab === 'ai'" #actions>
+        <OButton
+          variant="outline"
+          size="sm"
+          data-test="home-mobile-chats-toggle"
+          @click="mobileChatsOpen = true"
+        >
+          <template #icon-left><OIcon name="menu" size="sm" /></template>
+          {{ t("chatHistory.title") }}
+        </OButton>
+      </template>
       <!-- Top-level page header: module icon + "Home" title, with the home tabs
            rendered as a full-width strip below (tabsBelow). The header owns its
            own bottom divider when tabs are present; when only a single tab
@@ -51,23 +62,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`home-tab-${tab.id}`"
           >
             <span class="o-tab__label truncate">{{ tab.label }}</span>
-            <button
-              v-if="tab.id.startsWith('dash:')"
-              type="button"
-              class="rounded-default text-text-secondary hover:bg-surface-subtle-hover hover:text-text-body ml-1 inline-flex h-4 w-4 cursor-pointer items-center justify-center border-none bg-transparent text-sm leading-none opacity-60 transition-all duration-200 ease-[ease] hover:opacity-100"
-              :data-test="`home-tab-close-${tab.id}`"
-              :aria-label="t('home.removeHomeDashboard')"
-              @mousedown.stop.prevent
-              @pointerdown.stop.prevent
-              @click.stop.prevent="onCloseTab(tab.id)"
-            >
-              &times;
-            </button>
-            <OTooltip
-              v-if="tab.id.startsWith('dash:')"
-              side="bottom"
-              :content="t('home.removeHomeDashboard')"
-            />
+            <template v-if="tab.id.startsWith('dash:')" #trailing>
+              <button
+                type="button"
+                class="rounded-default text-text-secondary hover:bg-surface-subtle-hover hover:text-text-body inline-flex h-4 w-4 cursor-pointer items-center justify-center border-none bg-transparent text-sm leading-none opacity-60 transition-all duration-200 ease-[ease] hover:opacity-100 max-md:h-6 max-md:w-6"
+                :data-test="`home-tab-close-${tab.id}`"
+                :aria-label="t('home.removeHomeDashboard')"
+                @mousedown.stop.prevent
+                @pointerdown.stop.prevent
+                @click.stop.prevent="onCloseTab(tab.id)"
+              >
+                {{ "×" }}
+              </button>
+              <OTooltip side="bottom" :content="t('home.removeHomeDashboard')" />
+            </template>
           </OTab>
         </OTabs>
       </template>
@@ -80,45 +88,137 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex min-h-0 flex-1 flex-col"
         :class="activeHomeTab.startsWith('dash:') ? '' : 'px-2.5 pt-px pb-2.5'"
       >
+        <FirstDataNotice
+          v-if="firstDataNotice?.visible.value"
+          class="mt-2.5 mb-3"
+          :stream="firstDataNotice.stream.value"
+          :arrived-at="firstDataNotice.arrivedAt.value"
+          @open="firstDataNotice.open"
+          @dismiss="firstDataNotice.dismiss"
+        />
+        <FirstDataPanel
+          v-if="flagOn && isDataTab && arrived"
+          signal="any"
+          variant="compact"
+          :arrived="arrived"
+          class="mt-2.5 mb-3"
+          @dismiss="arrived = undefined"
+          @open="openArrived"
+        />
         <!-- O2 AI Assistant tab -->
         <div
           v-if="activeHomeTab === 'ai'"
-          class="home-ai-panel flex min-h-0 flex-1 flex-row overflow-hidden"
+          class="home-ai-panel flex min-h-0 flex-1 flex-row overflow-hidden max-md:flex-col"
         >
-          <HomeChatHistory @load-chat="onLoadChat" @new-chat="onNewChat" />
+          <HomeChatHistory class="max-md:hidden" @load-chat="onLoadChat" @new-chat="onNewChat" />
           <O2AIChat ref="homeChat" :is-open="true" :header-height="0" :centered-start="true" />
+          <ODrawer
+            v-if="isMobile"
+            v-model:open="mobileChatsOpen"
+            side="left"
+            size="sm"
+            bleed
+            seamless
+            anchor="header.app-page-header"
+            anchor-edge="bottom"
+            data-test="home-mobile-chats-drawer"
+          >
+            <HomeChatHistory
+              class="w-full!"
+              @load-chat="
+                (chat) => {
+                  onLoadChat(chat);
+                  mobileChatsOpen = false;
+                }
+              "
+              @new-chat="
+                () => {
+                  onNewChat();
+                  mobileChatsOpen = false;
+                }
+              "
+            />
+          </ODrawer>
         </div>
 
-        <!-- Overview tab (no inner card-container — the outer section panel
-             already provides the border; avoids a double-bordered card). -->
-        <div v-if="activeHomeTab === 'overview'" class="min-h-0 flex-1 overflow-hidden">
-          <OverviewTab />
-        </div>
+        <FirstDataPanel
+          v-if="flagOn && isDataTab"
+          v-slot="{ layout, statusLine }"
+          signal="any"
+          variant="compact"
+          :context="activeHomeTab === 'usage' ? 'usage' : 'overview'"
+          status-in-slot
+          @detected="(r) => (arrived = r)"
+        >
+          <HomeViewSkeleton v-if="layout === 'pending'" />
+          <div
+            v-else-if="layout !== 'none'"
+            class="min-h-0 flex-1 overflow-y-auto"
+            :class="{ 'pt-2.5': layout !== 'card' }"
+          >
+            <div
+              v-if="activeHomeTab === 'usage'"
+              class="flex shrink-0 flex-col not-empty:mb-3 empty:hidden"
+            >
+              <TrialPeriod current-page="usage" />
+            </div>
+            <OEmptyState
+              v-if="layout === 'forbidden'"
+              preset="no-access"
+              size="block"
+              data-test="home-no-access-empty-state"
+            />
+            <HomeNoDataState
+              v-else
+              :tab="activeHomeTab === 'usage' ? 'usage' : 'overview'"
+              :alternatives-only="layout === 'card'"
+            >
+              <template v-if="layout === 'status'" #status>
+                <component :is="statusLine" />
+              </template>
+            </HomeNoDataState>
+          </div>
+          <div v-else-if="activeHomeTab === 'overview'" class="min-h-0 flex-1 overflow-hidden">
+            <OverviewTab />
+          </div>
+          <div v-else class="-mx-2.5 min-h-0 flex-1 overflow-hidden">
+            <UsageTab />
+          </div>
+        </FirstDataPanel>
 
-        <!-- Usage tab -->
-        <div v-if="activeHomeTab === 'usage'" class="-mx-2.5 min-h-0 flex-1 overflow-hidden">
-          <UsageTab />
-        </div>
+        <template v-else>
+          <!-- Overview tab (no inner card-container — the outer section panel
+               already provides the border; avoids a double-bordered card). -->
+          <div v-if="activeHomeTab === 'overview'" class="min-h-0 flex-1 overflow-hidden">
+            <OverviewTab />
+          </div>
 
-        <!-- Pinned dashboard tab -->
-        <div v-else-if="activeHomeTab.startsWith('dash:')" class="min-h-0 flex-1 overflow-hidden">
-          <PinnedDashboardTab
-            :key="activeHomeTab"
-            :dashboard-id="parsePinnedTabId(activeHomeTab).dashboardId"
-            :folder-id="parsePinnedTabId(activeHomeTab).folderId"
-            @update-label="(l) => onPinnedLabel(parsePinnedTabId(activeHomeTab).dashboardId, l)"
-            @unavailable="onPinnedUnavailable"
-          />
-        </div>
+          <!-- Usage tab -->
+          <div v-if="activeHomeTab === 'usage'" class="-mx-2.5 min-h-0 flex-1 overflow-hidden">
+            <UsageTab />
+          </div>
+
+          <!-- Pinned dashboard tab -->
+          <div v-else-if="activeHomeTab.startsWith('dash:')" class="min-h-0 flex-1 overflow-hidden">
+            <PinnedDashboardTab
+              :key="activeHomeTab"
+              :dashboard-id="parsePinnedTabId(activeHomeTab).dashboardId"
+              :folder-id="parsePinnedTabId(activeHomeTab).folderId"
+              @update-label="(l) => onPinnedLabel(parsePinnedTabId(activeHomeTab).dashboardId, l)"
+              @unavailable="onPinnedUnavailable"
+            />
+          </div>
+        </template>
       </div>
     </OPageLayout>
   </div>
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref, watch, onMounted, onUnmounted } from "vue";
-import { useI18n } from "vue-i18n";
+import { computed, defineComponent, inject, ref, watch, onMounted, onUnmounted } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 import config from "../aws-exports";
 import OverviewTab from "@/views/OverviewTab.vue";
 import UsageTab from "@/views/UsageTab.vue";
@@ -128,31 +228,46 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import PinnedDashboardTab from "@/views/PinnedDashboardTab.vue";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
+import FirstDataNotice from "@/components/ingestion/FirstDataNotice.vue";
+import { FIRST_DATA_NOTICE } from "@/composables/firstEvent/useFirstDataNotice";
+import type { FirstEventResult } from "@/composables/firstEvent/useFirstEventWatch";
+import { rangeRoute } from "@/composables/firstEvent/confirmQuery";
+import HomeNoDataState from "@/views/HomeNoDataState.vue";
+import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
+import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 export default defineComponent({
   name: "PageHome",
 
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const router = useRouter();
+    const { t } = useI18nTyped();
+    const firstDataNotice = inject(FIRST_DATA_NOTICE, null);
     const LS_TAB_ORDER_KEY = "o2_home_tab_order";
     const LS_ACTIVE_TAB_KEY = "o2_home_active_tab";
 
     const isEnterpriseOrCloud = config.isEnterprise === "true" || config.isCloud === "true";
 
-    const { homeDashboard, clearHomeDashboard, updateLabel } = useHomeDashboard();
+    const { homeDashboard, clearHomeDashboard, updateLabel } = useHomeDashboard(t);
 
     const DEFAULT_TABS = computed(() => {
       const tabs: { id: string; label: string; closable?: boolean }[] = [];
       if (isEnterpriseOrCloud && store.state.zoConfig.ai_enabled) {
         tabs.push({ id: "ai", label: t("home.tabAiAssistant") });
       }
-      if (isEnterpriseOrCloud) {
-        tabs.push({ id: "overview", label: t("home.tabOverview") });
-      }
+      // Always reachable — Incidents/Services inside render locked (not
+      // hidden) in a build that doesn't unlock them (see OverviewTab.vue).
+      tabs.push({ id: "overview", label: t("home.tabOverview") });
       tabs.push({ id: "usage", label: t("home.tabUsage") });
       // Append the org home dashboard as a single tab (if set).
       if (homeDashboard.value) {
@@ -263,7 +378,7 @@ export default defineComponent({
     watch(activeHomeTab, (val) => {
       if (val.startsWith("dash:")) {
         const org = store.state.selectedOrganization?.identifier;
-        if (org) useHomeDashboard().load(org);
+        if (org) useHomeDashboard(t).load(org);
       }
     });
 
@@ -311,10 +426,33 @@ export default defineComponent({
     onMounted(() => window.addEventListener("o2:home-switch-tab", onSwitchTab));
     onUnmounted(() => window.removeEventListener("o2:home-switch-tab", onSwitchTab));
 
+    const { isMobile } = useBreakpoint();
+    const mobileChatsOpen = ref(false);
+
+    // the first-data takeover replaces Overview and Usage only behind the empty-data flag; flag off is BASE Home
+    const flagOn = computed(() => store.state.zoConfig?.restricted_routes_on_empty_data === true);
+    const isDataTab = computed(
+      () => activeHomeTab.value === "overview" || activeHomeTab.value === "usage",
+    );
+    const arrived = ref<FirstEventResult>();
+    const openArrived = () => {
+      const r = arrived.value;
+      if (!r) return;
+      const org = store.state.selectedOrganization?.identifier ?? "";
+      router
+        .push(
+          rangeRoute(org, r.streamType, r.streamName, { startUs: r.rangeStart, endUs: r.rangeEnd }),
+        )
+        .catch(() => {});
+    };
+
     return {
       t,
       store,
       config,
+      firstDataNotice,
+      isMobile,
+      mobileChatsOpen,
       activeHomeTab,
       tabOrder,
       onTabReorder,
@@ -326,6 +464,10 @@ export default defineComponent({
       onPinnedLabel,
       onPinnedUnavailable,
       onCloseTab,
+      flagOn,
+      isDataTab,
+      arrived,
+      openArrived,
     };
   },
   components: {
@@ -337,7 +479,16 @@ export default defineComponent({
     OTab,
     OTooltip,
     OPageLayout,
+    OButton,
+    OIcon,
+    ODrawer,
     PinnedDashboardTab,
+    FirstDataPanel,
+    FirstDataNotice,
+    HomeNoDataState,
+    HomeViewSkeleton,
+    TrialPeriod,
+    OEmptyState,
   },
 });
 </script>
@@ -400,18 +551,12 @@ export default defineComponent({
   background:
     linear-gradient(var(--color-ai-input-bg), var(--color-ai-input-bg)) padding-box,
     var(--color-gradient-brand-ribbon) border-box !important;
-  box-shadow:
-    0 0.125rem 0.25rem color-mix(in srgb, var(--color-black) 6%, transparent),
-    0 0.5rem 1.25rem -0.125rem color-mix(in srgb, var(--color-black) 12%, transparent),
-    0 1.125rem 2.75rem -0.625rem color-mix(in srgb, var(--color-ai-accent) 30%, transparent) !important;
+  box-shadow: var(--shadow-ai-composer) !important;
 }
 
 .dark .home-ai-panel :deep(.unified-input-box) {
+  /* Only the fill flips here — --shadow-ai-composer carries its own dark values. */
   --color-ai-input-bg: var(--color-surface-panel);
-  box-shadow:
-    0 0.125rem 0.25rem color-mix(in srgb, var(--color-black) 45%, transparent),
-    0 0.5rem 1.375rem -0.125rem color-mix(in srgb, var(--color-black) 55%, transparent),
-    0 1.25rem 3rem -0.625rem color-mix(in srgb, var(--color-ai-accent) 45%, transparent) !important;
 }
 
 /* Soft ambient glow behind the input */
@@ -429,17 +574,7 @@ export default defineComponent({
 
 /* Stronger glow + shadow on focus, no harsh ring */
 .home-ai-panel :deep(.unified-input-box:focus-within) {
-  box-shadow:
-    0 1px 0.125rem color-mix(in srgb, var(--color-black) 4%, transparent),
-    0 0.375rem 1rem -0.125rem color-mix(in srgb, var(--color-black) 10%, transparent),
-    0 1rem 2.5rem -0.5rem color-mix(in srgb, var(--color-ai-accent) 32%, transparent) !important;
-}
-
-.dark .home-ai-panel :deep(.unified-input-box:focus-within) {
-  box-shadow:
-    0 1px 0.125rem color-mix(in srgb, var(--color-black) 40%, transparent),
-    0 0.375rem 1.25rem -0.125rem color-mix(in srgb, var(--color-black) 55%, transparent),
-    0 1.125rem 2.75rem -0.5rem color-mix(in srgb, var(--color-ai-accent) 42%, transparent) !important;
+  box-shadow: var(--shadow-ai-focus) !important;
 }
 
 .home-ai-panel :deep(.unified-input-box:focus-within::before) {

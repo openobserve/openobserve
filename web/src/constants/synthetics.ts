@@ -15,22 +15,24 @@
 
 import type { AssertionKind, StepAction, SyntheticCheckType } from "@/types/synthetics";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import type { I18nKey, TranslateFn } from "@/types/i18n";
 
-// ── Action labels (capitalized) ──────────────────────────────────────────
-export const ACTION_LABELS: Record<StepAction, string> = {
-  navigate: "Navigate",
-  click: "Click",
-  type: "Type",
-  select: "Select",
-  press: "Press",
-  check: "Check",
-  uncheck: "Uncheck",
-  upload: "Upload",
-  hover: "Hover",
-  scroll: "Scroll",
-  wait: "Wait",
-  assert: "Assert",
-  screenshot: "Screenshot",
+// ── Action labels ────────────────────────────────────────────────────────
+export const ACTION_LABEL_KEYS: Record<StepAction, I18nKey> = {
+  navigate: "synthetics.journey.actionLabels.navigate",
+  click: "synthetics.journey.actionLabels.click",
+  type: "synthetics.journey.actionLabels.type",
+  select: "synthetics.journey.actionLabels.select",
+  press: "synthetics.journey.actionLabels.press",
+  check: "synthetics.journey.actionLabels.check",
+  uncheck: "synthetics.journey.actionLabels.uncheck",
+  upload: "synthetics.journey.actionLabels.upload",
+  hover: "synthetics.journey.actionLabels.hover",
+  scroll: "synthetics.journey.actionLabels.scroll",
+  wait: "synthetics.journey.actionLabels.wait",
+  assert: "synthetics.journey.actionLabels.assert",
+  screenshot: "synthetics.journey.actionLabels.screenshot",
+  subtest: "synthetics.journey.actionLabels.subtest",
 };
 
 // ── Action icons ─────────────────────────────────────────────────────────
@@ -48,6 +50,7 @@ export const ACTION_ICONS: Record<StepAction, IconName> = {
   wait: "hourglass-empty",
   assert: "fact-check",
   screenshot: "photo-camera",
+  subtest: "account-tree",
 };
 
 // ── Action groups ────────────────────────────────────────────────────────
@@ -95,6 +98,13 @@ export const VALUE_ACTIONS: readonly StepAction[] = [
   "wait",
 ];
 
+const NOT_SUBSTITUTED_ACTIONS: readonly StepAction[] = ["upload", "scroll", "wait"];
+
+// Only these values reach url/key/value, the three step fields the probe substitutes.
+export const SUBSTITUTED_VALUE_ACTIONS: readonly StepAction[] = VALUE_ACTIONS.filter(
+  (action) => !NOT_SUBSTITUTED_ACTIONS.includes(action),
+);
+
 /**
  * Actions retired from the authoring vocabulary (spec X-9).
  *
@@ -109,15 +119,40 @@ export const VALUE_ACTIONS: readonly StepAction[] = [
  * false green. `screenshot` is redundant with the per-run capture setting.
  * `wait` is the hard sleep this whole design exists to remove.
  *
- * Kept in ACTION_LABELS/ACTION_ICONS so existing monitors still RENDER; removed
+ * Kept in ACTION_LABEL_KEYS/ACTION_ICONS so existing monitors still RENDER; removed
  * from the picker so no new journey can contain one. Stored monitors keep
  * executing them until migrated (spec Q-10).
  */
-export const RETIRED_ACTIONS: readonly StepAction[] = ["hover", "scroll", "wait", "screenshot"];
+// `hover` left this list when Playwright 1.56 added a hover action to the
+// recorder model: it is captured by the action picker, stored in the v2
+// vocabulary and executed by both the probe and the extension player, so it is
+// a supported action rather than one that vanishes at save.
+export const RETIRED_ACTIONS: readonly StepAction[] = ["scroll", "wait", "screenshot"];
 
 export function isRetiredAction(action: StepAction): boolean {
   return RETIRED_ACTIONS.includes(action);
 }
+
+/** Actions expanded server-side before a browser sees them; mirrors `V2_COMPOSITION_ACTIONS`. */
+export const COMPOSITION_ACTIONS: readonly StepAction[] = ["subtest"];
+
+export function isCompositionAction(action: StepAction): boolean {
+  return COMPOSITION_ACTIONS.includes(action);
+}
+
+/** Row 0's id on every result record, so no authored step may carry it; mirrors `STEP_ID_RESERVED`. */
+export const START_LOAD_STEP_ID = "_start";
+
+/**
+ * Oldest recorder extension this build of the web app knows how to talk to.
+ *
+ * 0.2.0 is the first build that reports a version in its `getStatus` reply, so
+ * an absent version means "older than this" rather than "unknown". Chrome
+ * updates the extension independently of when O2 deploys, so without this the
+ * two can disagree about the wire with no way to say so — every future wire
+ * change would surface as confusing behaviour instead of a message.
+ */
+export const MIN_EXTENSION_VERSION = "0.2.0";
 
 // ── Assertion kinds (spec P5.1) ──────────────────────────────────────────
 /**
@@ -149,26 +184,95 @@ export function isPageLevelAssertion(kind: AssertionKind): boolean {
 }
 
 // ── Action dropdown options ──────────────────────────────────────────────
-export const actionOptions = (Object.keys(ACTION_LABELS) as StepAction[])
-  .filter((a) => !isRetiredAction(a))
-  .map((a) => ({
-    label: ACTION_LABELS[a],
-    value: a,
-  }));
+// Takes t so labels follow the active locale — call it inside a computed.
+export const actionOptions = (t: TranslateFn) =>
+  (Object.keys(ACTION_LABEL_KEYS) as StepAction[])
+    .filter((a) => !isRetiredAction(a))
+    .map((a) => ({
+      label: t(ACTION_LABEL_KEYS[a]),
+      value: a,
+    }));
 
 // The selector-type picker (CSS / XPath / Text / TestID / Role) is gone with the
 // v1 authoring path: a step names its element with a locator bundle, whose value
 // carries its own engine prefix.
 
+// ── Click type (which button, how many clicks) ───────────────────────────
+/**
+ * The click variants Playwright's action picker offers, as one choice.
+ *
+ * Storage keeps them as two fields — `button` and `click_count`, which is what
+ * `locator.click` takes — but an author thinks "double click", not "one click,
+ * count two". Datadog's browser tests present the same pair as a single click
+ * type for the same reason.
+ */
+export type ClickType = "left" | "right" | "middle" | "double";
+
+export const CLICK_TYPE_LABEL_KEYS: Record<ClickType, I18nKey> = {
+  left: "synthetics.journey.clickTypes.left",
+  right: "synthetics.journey.clickTypes.right",
+  middle: "synthetics.journey.clickTypes.middle",
+  double: "synthetics.journey.clickTypes.double",
+};
+
+/** What each type stores. Left/1 is the absent-field default, so it serialises away. */
+export const CLICK_TYPE_VALUES: Record<
+  ClickType,
+  { button: "left" | "middle" | "right"; clickCount: number }
+> = {
+  left: { button: "left", clickCount: 1 },
+  right: { button: "right", clickCount: 1 },
+  middle: { button: "middle", clickCount: 1 },
+  double: { button: "left", clickCount: 2 },
+};
+
+/**
+ * Which click type a stored pair reads as.
+ *
+ * `button` decides first: a contextmenu event is always one click, so the
+ * recorder cannot produce a right double click and a stored right+2 could only
+ * arrive through the API. Reading it as "Right click" is the closer of the two
+ * approximations — and nothing is rewritten unless the author picks a type.
+ */
+export function clickTypeOf(button?: string, clickCount?: number): ClickType {
+  if (button === "right") return "right";
+  if (button === "middle") return "middle";
+  return (clickCount ?? 1) >= 2 ? "double" : "left";
+}
+
+export const clickTypeOptions = (t: TranslateFn) =>
+  (Object.keys(CLICK_TYPE_LABEL_KEYS) as ClickType[]).map((c) => ({
+    label: t(CLICK_TYPE_LABEL_KEYS[c]),
+    value: c,
+  }));
+
+/**
+ * What a step's action reads as in a row, including which click it is.
+ *
+ * A right or double click is a `click` carrying two extra fields, so keying the
+ * label on the action alone rendered every one of them as a plain "Click": the
+ * fidelity reached storage and the replay, and stopped short of the only place
+ * an author looks.
+ */
+export function stepActionLabelKey(
+  action: StepAction,
+  button?: string,
+  clickCount?: number,
+): I18nKey {
+  if (action !== "click") return ACTION_LABEL_KEYS[action];
+  const type = clickTypeOf(button, clickCount);
+  return type === "left" ? ACTION_LABEL_KEYS.click : CLICK_TYPE_LABEL_KEYS[type];
+}
+
 // ── Value field labels (action-specific) ─────────────────────────────────
-export const VALUE_LABELS: Record<string, string> = {
-  navigate: "URL",
-  type: "Text to type",
-  select: "Option",
-  press: "Key",
-  upload: "File path",
-  scroll: "To (px or selector)",
-  wait: "Duration (ms)",
+export const VALUE_LABEL_KEYS: Record<string, I18nKey> = {
+  navigate: "synthetics.journey.valueLabels.navigate",
+  type: "synthetics.journey.valueLabels.type",
+  select: "synthetics.journey.valueLabels.select",
+  press: "synthetics.journey.valueLabels.press",
+  upload: "synthetics.journey.valueLabels.upload",
+  scroll: "synthetics.journey.valueLabels.scroll",
+  wait: "synthetics.journey.valueLabels.wait",
 };
 
 // ── Per-step timeout bounds ──────────────────────────────────────────────
@@ -191,6 +295,9 @@ export const DEFAULT_SETTLE_BUDGET_MS = 30000;
 export const MIN_SETTLE_BUDGET_MS = 100;
 export const MAX_SETTLE_BUDGET_MS = 60000;
 
+/** Mirrors the server's MAX_ENVIRONMENTS_PER_CHECK — job volume is envs × locations × devices. */
+export const MAX_CHECK_ENVIRONMENTS = 5;
+
 // ── Value field widths ───────────────────────────────────────────────────
 export const VALUE_WIDTH_MAP: Record<string, string> = {
   wait: "w-50!",
@@ -201,8 +308,8 @@ export const VALUE_WIDTH_MAP: Record<string, string> = {
 export interface CheckTypeCard {
   type: SyntheticCheckType;
   icon: IconName;
-  labelKey: string;
-  descKey: string;
+  labelKey: I18nKey;
+  descKey: I18nKey;
 }
 
 export const CHECK_TYPE_CARDS: CheckTypeCard[] = [
@@ -239,10 +346,41 @@ export const CHECK_TYPE_CARDS: CheckTypeCard[] = [
 ];
 
 // ── Value field tooltips ─────────────────────────────────────────────────
-export const VALUE_TOOLTIP_MAP: Record<string, string> = {
-  press: 'Press a keyboard key by its key name, e.g. "Enter", "Tab", "Escape", "ArrowDown".',
-  assert: 'Assertion expression, e.g. "text=Hello" or "visible" to check element visibility.',
+export const VALUE_TOOLTIP_KEYS: Record<string, I18nKey> = {
+  press: "synthetics.journey.valueTooltips.press",
+  assert: "synthetics.journey.valueTooltips.assert",
 };
+
+// ── Recorder extension ───────────────────────────────────────────────────────
+
+/**
+ * Chrome Web Store listing for the OpenObserve Recorder extension — fallback
+ * when the backend /config field `synthetics_recorder_extension_url`
+ * (`O2_SYNTHETICS_RECORDER_EXTENSION_URL`) is absent or empty.
+ */
+export const CHROME_WEB_STORE_URL =
+  "https://chromewebstore.google.com/detail/afhgiecgbpohkbobialnajlphbpcgomo";
+
+/**
+ * Query flag CreateBrowserTest writes when entering the extension-setup phase
+ * so a mid-setup reload (F5) returns there with the gate fields restored. The
+ * checklist's own "refresh this page" action strips it on purpose — after that
+ * reload the recorder is connected, so the gate's Record goes straight to
+ * recording instead of re-entering setup.
+ */
+export const SETUP_QUERY_PARAM = "setup";
+
+/**
+ * Chrome UI element names referenced by the recorder setup flow — interpolated
+ * into i18n strings as params so they stay in English across all locales,
+ * matching the actual Chrome browser interface.
+ */
+export const CHROME_UI_LABELS = {
+  allowIncognito: "Allow in Incognito",
+  extensionsMenu: "Extensions",
+  manageExtension: "Manage extension",
+  recorderName: "OpenObserve Recorder",
+} as const;
 
 // ── Recorder locator configuration ───────────────────────────────────────────
 
@@ -261,10 +399,3 @@ export const VALUE_TOOLTIP_MAP: Record<string, string> = {
  * all, and every step silently degraded to role/text/css.
  */
 export const DEFAULT_TEST_ID_ATTR = "data-test";
-
-/**
- * How many evidence events a step expansion shows before deferring to the
- * Evidence tab. A live bundle held 158 events across two steps — uncapped, one
- * expansion would run to 136 rows and break the step timeline's scroll.
- */
-export const INLINE_EVIDENCE_LIMIT = 5;

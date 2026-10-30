@@ -28,13 +28,15 @@ use common::meta::user::{InviteStatus, UserInvite, UserInviteList};
 #[cfg(feature = "enterprise")]
 use config::meta::ratelimit::CachedUserRoles;
 use config::{
-    DEFAULT_ORG, META_ORG_ID, get_config, ider,
+    DEFAULT_ORG, META_ORG_ID, ider,
     meta::user::{DBUser, User, UserOrg, UserRole},
     utils::rand::generate_random_string,
 };
 use db::{self, user::is_root_user};
 use hashbrown::HashMap;
 use infra::table::org_users::OrgUserRecord;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::password_policy;
 #[cfg(feature = "enterprise")]
 use o2_openfga::{
     authorizer::authz::delete_service_account_from_org, config::get_config as get_openfga_config,
@@ -49,14 +51,36 @@ use crate::{
             http::HttpResponse as MetaHttpResponse,
             organization::OrgRoleMapping,
             service_account::ServiceAccountCreateResponse,
-            user::{
-                UpdateUser, UserList, UserOrgRole, UserRequest, UserResponse, UserUpdateMode,
-                get_default_user_org,
-            },
+            user::{UpdateUser, UserList, UserOrgRole, UserRequest, UserResponse, UserUpdateMode},
         },
     },
     organization,
 };
+
+/// The account kind a removal endpoint acts on; any other membership answers as not found.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RemovalTarget {
+    User,
+    ServiceAccount,
+    Any,
+}
+
+impl RemovalTarget {
+    fn matches(self, role: &UserRole) -> bool {
+        match self {
+            Self::User => !role.is_service_account(),
+            Self::ServiceAccount => role.is_service_account(),
+            Self::Any => true,
+        }
+    }
+}
+
+/// True when `requested` is not the same set of custom roles as `current`.
+#[cfg(feature = "enterprise")]
+fn custom_roles_differ(requested: &[String], current: &[String]) -> bool {
+    let requested: std::collections::HashSet<&String> = requested.iter().collect();
+    requested != current.iter().collect()
+}
 
 fn redact_token(token: &str) -> String {
     if token.is_empty() {
@@ -79,7 +103,6 @@ pub async fn post_user(
     if !is_valid_email(&usr_req.email) {
         return Ok(MetaHttpResponse::bad_request("Invalid email"));
     }
-    let cfg = get_config();
     usr_req.email = usr_req.email.to_lowercase();
     if let Some(_custom_roles) = &usr_req.role.custom_role {
         #[cfg(not(feature = "enterprise"))]
@@ -163,7 +186,7 @@ pub async fn post_user(
             }
             let salt = ider::uuid();
             let password = get_hash(&usr_req.password, &salt);
-            let password_ext = get_hash(&usr_req.password, &cfg.auth.ext_auth_salt);
+            let password_ext = get_hash(&usr_req.password, &config::get_ext_auth_salt());
             let token = generate_random_string(16);
             let token_for_response = token.clone();
             let rum_token = format!("rum{}", generate_random_string(16));
@@ -307,268 +330,343 @@ pub async fn update_user(
 
     let mut old_role = None;
     let mut new_role = None;
-    let conf = get_config();
-    let password_ext_salt = conf.auth.ext_auth_salt.as_str();
-    if let Ok(existing_user) = existing_user {
-        let mut new_user;
-        let mut is_updated = false;
-        let mut is_org_updated = false;
-        let mut message = "";
-        #[cfg(feature = "enterprise")]
-        let mut custom_roles = vec![];
-        #[cfg(feature = "enterprise")]
-        let mut custom_roles_need_change = false;
-        match existing_user {
-            Some(local_user) => {
-                #[cfg(not(feature = "cloud"))]
-                if local_user.is_external {
-                    return Ok(MetaHttpResponse::bad_request(
-                        "Updates not allowed with external users, please update with source system",
-                    ));
-                }
-                if !update_mode.is_self_update() {
-                    if is_root_user(initiator_id) {
-                        allow_password_update = true
-                    } else {
-                        let initiating_user = match db::user::get(Some(org_id), initiator_id).await
-                        {
-                            Ok(Some(u)) => u,
-                            Ok(None) => {
-                                return Ok(MetaHttpResponse::unauthorized("Not Allowed"));
-                            }
-                            Err(e) => {
-                                log::error!("Error fetching initiating user {initiator_id}: {e}");
-                                return Ok(MetaHttpResponse::unauthorized("Not Allowed"));
-                            }
-                        };
-                        if (local_user.role.eq(&UserRole::Root)
-                            && initiating_user.role.eq(&UserRole::Root))
-                            || (!local_user.role.eq(&UserRole::Root)
-                                && (initiating_user.role.eq(&UserRole::Admin)
-                                    || initiating_user.role.eq(&UserRole::Root)))
-                        {
-                            allow_password_update = true
-                        }
-                    }
-                }
-                if local_user.role.eq(&UserRole::Root)
-                    && !update_mode.is_self_update()
-                    && !update_mode.is_cli_update()
-                {
-                    return Ok(MetaHttpResponse::bad_request(
-                        "Only root user can update its details",
-                    ));
-                }
-                new_user = local_user.clone();
-                if update_mode.is_self_update()
-                    && let Some(old_pass) = &user.old_password
-                    && let Some(new_pass) = &user.new_password
-                {
-                    if local_user
-                        .password
-                        .eq(&get_hash(old_pass, &local_user.salt))
-                    {
-                        new_user.password = get_hash(new_pass, &local_user.salt);
-                        new_user.password_ext = Some(get_hash(new_pass, password_ext_salt));
-                        log::info!("Password self updated for user: {email}");
-                        is_updated = true;
-                    } else {
-                        message = "Existing/old password mismatch, please provide valid existing password";
-                        return Ok(MetaHttpResponse::bad_request(message));
-                    }
-                } else if update_mode.is_self_update()
-                    && user.new_password.is_some()
-                    && user.old_password.is_none()
-                {
-                    message = "Please provide existing password";
-                } else if !update_mode.is_self_update()
-                    && allow_password_update
-                    && !local_user.is_external
-                    && let Some(new_pass) = user.new_password
-                {
-                    new_user.password = get_hash(&new_pass, &local_user.salt);
-                    new_user.password_ext = Some(get_hash(&new_pass, password_ext_salt));
-                    log::info!("Password by root updated for user: {email}");
+    let password_ext_salt = &config::get_ext_auth_salt();
 
-                    is_updated = true;
-                } else if user.new_password.is_some() {
-                    message = "You are not authorised to change the password";
+    let Ok(existing_user) = existing_user else {
+        return Ok(MetaHttpResponse::not_found("User not found"));
+    };
+
+    let mut new_user;
+    let mut is_updated = false;
+    let mut password_changed = false;
+    let mut is_org_updated = false;
+    let mut message = "";
+    #[cfg(feature = "enterprise")]
+    let mut custom_roles = vec![];
+    #[cfg(feature = "enterprise")]
+    let mut custom_roles_need_change = false;
+
+    let Some(local_user) = existing_user else {
+        return Ok(MetaHttpResponse::not_found("User not found"));
+    };
+
+    #[cfg(not(feature = "cloud"))]
+    if local_user.is_external {
+        return Ok(MetaHttpResponse::bad_request(
+            "Updates not allowed with external users, please update with source system",
+        ));
+    }
+    if !update_mode.is_self_update() {
+        if is_root_user(initiator_id) {
+            allow_password_update = true
+        } else {
+            let initiating_user = match db::user::get(Some(org_id), initiator_id).await {
+                Ok(Some(u)) => u,
+                Ok(None) => {
+                    return Ok(MetaHttpResponse::unauthorized("Not Allowed"));
                 }
-                if let Some(first_name) = user.first_name
-                    && !local_user.is_external
-                {
-                    new_user.first_name = first_name;
-                    is_updated = true;
+                Err(e) => {
+                    log::error!("Error fetching initiating user {initiator_id}: {e}");
+                    return Ok(MetaHttpResponse::unauthorized("Not Allowed"));
                 }
-                if let Some(last_name) = user.last_name
-                    && !local_user.is_external
-                {
-                    new_user.last_name = last_name;
-                    is_updated = true;
-                }
-                if let Some(role) = user.role
-                    && (!local_user.is_external || is_cloud)
-                    && (!update_mode.is_self_update()
-                        || (local_user.role.eq(&UserRole::Admin)
+            };
+            if (local_user.role.eq(&UserRole::Root) && initiating_user.role.eq(&UserRole::Root))
+                || (!local_user.role.eq(&UserRole::Root)
+                    && (initiating_user.role.eq(&UserRole::Admin)
+                        || initiating_user.role.eq(&UserRole::Root)))
+            {
+                allow_password_update = true
+            }
+        }
+    }
+
+    if local_user.role.eq(&UserRole::Root)
+        && !update_mode.is_self_update()
+        && !update_mode.is_cli_update()
+    {
+        return Ok(MetaHttpResponse::bad_request(
+            "Only root user can update its details",
+        ));
+    }
+
+    // Clearing a lockout hands the account back its remaining guesses, so it answers to the same
+    // gate as replacing the password outright: root, or an administrator of this org. Never the
+    // locked-out user themselves, which `allow_password_update` already excludes by staying false
+    // on a self-update.
+    #[cfg(feature = "enterprise")]
+    let remove_lockout = user.remove_lockout;
+    // The request field stays on the OSS wire so a mixed fleet agrees on the shape; without the
+    // lockout there is simply nothing to clear.
+    #[cfg(not(feature = "enterprise"))]
+    let remove_lockout = false;
+    if remove_lockout && !allow_password_update {
+        return Ok(MetaHttpResponse::unauthorized("Not Allowed"));
+    }
+
+    new_user = local_user.clone();
+    if update_mode.is_self_update()
+        && let Some(old_pass) = &user.old_password
+        && let Some(new_pass) = &user.new_password
+    {
+        if local_user
+            .password
+            .eq(&get_hash(old_pass, &local_user.salt))
+        {
+            // Validated here, not only at the HTTP layer: this is the single funnel
+            // every password change passes through, and clearing the reset flag below
+            // must never happen for a password the current policy would reject.
+            if let Err(msg) = db::password_policy::validate_password(new_pass).await {
+                return Ok(MetaHttpResponse::bad_request(msg));
+            }
+            let new_hash = get_hash(new_pass, &local_user.salt);
+            #[cfg(feature = "enterprise")]
+            if let Err(msg) = password_policy::history::check_reuse_and_record(
+                email,
+                &new_hash,
+                &local_user.password,
+                &db::password_policy::get_effective_policy().await,
+            )
+            .await
+            {
+                return Ok(MetaHttpResponse::bad_request(msg));
+            }
+            new_user.password = new_hash;
+            new_user.password_ext = Some(get_hash(new_pass, password_ext_salt));
+            log::info!("Password self updated for user: {email}");
+            is_updated = true;
+            password_changed = true;
+        } else {
+            message = "Existing/old password mismatch, please provide valid existing password";
+            return Ok(MetaHttpResponse::bad_request(message));
+        }
+    } else if update_mode.is_self_update()
+        && user.new_password.is_some()
+        && user.old_password.is_none()
+    {
+        message = "Please provide existing password";
+    } else if !update_mode.is_self_update()
+        && allow_password_update
+        && !local_user.is_external
+        && let Some(new_pass) = user.new_password
+    {
+        if let Err(msg) = db::password_policy::validate_password(&new_pass).await {
+            return Ok(MetaHttpResponse::bad_request(msg));
+        }
+        let new_hash = get_hash(&new_pass, &local_user.salt);
+        #[cfg(feature = "enterprise")]
+        if let Err(msg) = password_policy::history::check_reuse_and_record(
+            email,
+            &new_hash,
+            &local_user.password,
+            &db::password_policy::get_effective_policy().await,
+        )
+        .await
+        {
+            return Ok(MetaHttpResponse::bad_request(msg));
+        }
+        new_user.password = new_hash;
+        new_user.password_ext = Some(get_hash(&new_pass, password_ext_salt));
+        log::info!("Password by root updated for user: {email}");
+
+        is_updated = true;
+        password_changed = true;
+    } else if user.new_password.is_some() {
+        message = "You are not authorised to change the password";
+    }
+    if let Some(first_name) = user.first_name
+        && !local_user.is_external
+    {
+        new_user.first_name = first_name;
+        is_updated = true;
+    }
+    if let Some(last_name) = user.last_name
+        && !local_user.is_external
+    {
+        new_user.last_name = last_name;
+        is_updated = true;
+    }
+    if let Some(role) = user.role
+        && (!local_user.is_external || is_cloud)
+        && (!update_mode.is_self_update()
+            || (local_user.role.eq(&UserRole::Admin)
                             // Editor can update other's roles, but viewer can update only self
                             || local_user.role.eq(&UserRole::Editor)
                             || local_user.role.eq(&UserRole::Viewer)
                             || local_user.role.eq(&UserRole::Root)))
-                // if the User Role is Root, we do not change the Role
-                // Admins Role can still be mutable.
+    // if the User Role is Root, we do not change the Role
+    // Admins Role can still be mutable.
+    {
+        let new_org_role = UserOrgRole::from(&role);
+        old_role = Some(new_user.role);
+        new_user.role = new_org_role.base_role;
+        new_role = Some(new_user.role.clone());
+        if local_user.role.eq(&UserRole::Root) && new_user.role.ne(&UserRole::Root) {
+            message = "Root user role cannot be changed";
+        } else if update_mode.is_self_update() && local_user.role < new_user.role {
+            message = "Self role cannot be upgraded";
+        } else {
+            is_org_updated |= local_user.role.ne(&new_user.role);
+            #[cfg(feature = "enterprise")]
+            if let Some(cr) = new_org_role.custom_role {
+                // Only an admin grants custom roles; a self-update may resend its own unchanged.
+                if update_mode.is_self_update()
+                    && !matches!(local_user.role, UserRole::Admin | UserRole::Root)
+                    && custom_roles_differ(
+                        &cr,
+                        &o2_openfga::authorizer::roles::get_roles_for_org_user(org_id, email).await,
+                    )
                 {
-                    let new_org_role = UserOrgRole::from(&role);
-                    old_role = Some(new_user.role);
-                    new_user.role = new_org_role.base_role;
-                    new_role = Some(new_user.role.clone());
-                    if local_user.role.eq(&UserRole::Root) && new_user.role.ne(&UserRole::Root) {
-                        message = "Root user role cannot be changed";
-                    } else if update_mode.is_self_update() && local_user.role < new_user.role {
-                        message = "Self role cannot be upgraded";
-                    } else {
-                        is_org_updated |= local_user.role.ne(&new_user.role);
-                        #[cfg(feature = "enterprise")]
-                        if let Some(cr) = new_org_role.custom_role {
-                            custom_roles_need_change = true;
-                            custom_roles.extend(cr);
-                            is_org_updated = true;
-                        }
-                    }
-                }
-                // Token replacement is a privileged operation — only allow if the
-                // initiator is updating their own token OR has password-update rights
-                // (i.e. Root or Admin updating a non-root user).
-                if let Some(token) = user.token
-                    && (update_mode.is_self_update() || allow_password_update)
-                {
-                    new_user.token = token;
+                    message = "Self custom roles cannot be changed";
+                } else {
+                    custom_roles_need_change = true;
+                    custom_roles.extend(cr);
                     is_org_updated = true;
                 }
+            }
+        }
+    }
+    // Token replacement is a privileged operation — only allow if the
+    // initiator is updating their own token OR has password-update rights
+    // (i.e. Root or Admin updating a non-root user).
+    if let Some(token) = user.token
+        && (update_mode.is_self_update() || allow_password_update)
+    {
+        new_user.token = token;
+        is_org_updated = true;
+    }
 
-                if !message.is_empty() {
-                    return Ok(MetaHttpResponse::bad_request(message));
+    if !message.is_empty() {
+        return Ok(MetaHttpResponse::bad_request(message));
+    }
+
+    if !is_updated && !is_org_updated && !remove_lockout {
+        return Ok(MetaHttpResponse::bad_request("No changes to update"));
+    }
+
+    // Ahead of the record writes below: an unlock that the caller asked for must not be skipped
+    // because a later write failed, and it is safe to repeat if they retry the whole update.
+    if remove_lockout {
+        if let Err(e) = infra::table::user_auth_state::reset(email).await {
+            log::error!("Error clearing the lockout for {email}: {e}");
+            return Ok(MetaHttpResponse::internal_error(
+                "Failed to clear the lockout",
+            ));
+        }
+        log::info!("Lockout cleared for {email} by {initiator_id}");
+    }
+
+    // `password_changed` also clears whatever the user was flagged for and restarts
+    // their rotation clock, in the same statement as the new hash: the password has
+    // just been validated against the current policy, so there is nothing left to hold
+    // them to.
+    if is_updated
+        && db::user::update(
+            email,
+            &new_user.first_name,
+            &new_user.last_name,
+            &new_user.password,
+            new_user.password_ext,
+            password_changed,
+        )
+        .await
+        .is_err()
+    {
+        return Ok(MetaHttpResponse::internal_error("Failed to update user"));
+    }
+
+    // Update the organization membership
+    if is_org_updated {
+        if db::org_users::get(org_id, email).await.is_ok() {
+            if let Err(e) = db::org_users::update(
+                org_id,
+                email,
+                new_user.role,
+                &new_user.token,
+                new_user.rum_token,
+            )
+            .await
+            {
+                log::error!("Error updating org user relation: {e}");
+                return Ok(MetaHttpResponse::internal_error(
+                    "Failed to update organization membership for user",
+                ));
+            }
+        } else if let Err(e) = db::org_users::add(
+            org_id,
+            email,
+            new_user.role,
+            &new_user.token,
+            new_user.rum_token,
+        )
+        .await
+        {
+            log::error!("Error adding org user relation: {e}");
+            return Ok(MetaHttpResponse::internal_error(
+                "Failed to add organization membership for user",
+            ));
+        }
+
+        #[cfg(feature = "enterprise")]
+        {
+            use o2_openfga::authorizer::{
+                authz::{get_user_crole_tuple, update_tuples, update_user_role},
+                roles::{get_role_key, get_roles_for_org_user, get_user_crole_removal_tuples},
+            };
+
+            if get_openfga_config().enabled
+                && let Some(old) = old_role
+                && let Some(new) = new_role
+            {
+                if !old.eq(&new) {
+                    let mut old_str = old.to_string();
+                    let mut new_str = new.to_string();
+                    if old.eq(&UserRole::User) || old.is_service_account() {
+                        old_str = "allowed_user".to_string();
+                    }
+                    if new.eq(&UserRole::User) || new.is_service_account() {
+                        new_str = "allowed_user".to_string();
+                    }
+                    if old_str != new_str {
+                        log::debug!(
+                            "updating openfga role for {email} from {old_str} to {new_str}"
+                        );
+                        update_user_role(&old_str, &new_str, email, org_id).await;
+                    }
                 }
-
-                if !is_updated && !is_org_updated {
-                    return Ok(MetaHttpResponse::bad_request("No changes to update"));
-                }
-
-                if is_updated
-                    && db::user::update(
-                        email,
-                        &new_user.first_name,
-                        &new_user.last_name,
-                        &new_user.password,
-                        new_user.password_ext,
-                    )
-                    .await
-                    .is_err()
-                {
-                    return Ok(MetaHttpResponse::internal_error("Failed to update user"));
-                }
-
-                // Update the organization membership
-                if is_org_updated {
-                    if db::org_users::get(org_id, email).await.is_ok() {
-                        if let Err(e) = db::org_users::update(
-                            org_id,
-                            email,
-                            new_user.role,
-                            &new_user.token,
-                            new_user.rum_token,
-                        )
-                        .await
-                        {
-                            log::error!("Error updating org user relation: {e}");
-                            return Ok(MetaHttpResponse::internal_error(
-                                "Failed to update organization membership for user",
-                            ));
+                if custom_roles_need_change {
+                    let existing_roles = get_roles_for_org_user(org_id, email).await;
+                    let mut write_tuples = vec![];
+                    let mut delete_tuples = vec![];
+                    custom_roles.iter().for_each(|crole| {
+                        if !existing_roles.contains(crole) {
+                            write_tuples.push(get_user_crole_tuple(org_id, crole, email));
                         }
-                    } else if let Err(e) = db::org_users::add(
-                        org_id,
-                        email,
-                        new_user.role,
-                        &new_user.token,
-                        new_user.rum_token,
-                    )
-                    .await
-                    {
-                        log::error!("Error adding org user relation: {e}");
+                    });
+                    existing_roles.iter().for_each(|crole| {
+                        if !custom_roles.contains(crole) {
+                            get_user_crole_removal_tuples(
+                                email,
+                                &get_role_key(org_id, crole),
+                                &mut delete_tuples,
+                            );
+                        }
+                    });
+                    if let Err(e) = update_tuples(write_tuples, delete_tuples).await {
+                        log::error!(
+                            "Error updating custom roles for user {email} in {org_id} org : {e}"
+                        );
                         return Ok(MetaHttpResponse::internal_error(
-                            "Failed to add organization membership for user",
+                            "Failed to update custom roles for user",
                         ));
                     }
-
-                    #[cfg(feature = "enterprise")]
-                    {
-                        use o2_openfga::authorizer::{
-                            authz::{get_user_crole_tuple, update_tuples, update_user_role},
-                            roles::{
-                                get_role_key, get_roles_for_org_user, get_user_crole_removal_tuples,
-                            },
-                        };
-
-                        if get_openfga_config().enabled
-                            && let Some(old) = old_role
-                            && let Some(new) = new_role
-                        {
-                            if !old.eq(&new) {
-                                let mut old_str = old.to_string();
-                                let mut new_str = new.to_string();
-                                if old.eq(&UserRole::User) || old.is_service_account() {
-                                    old_str = "allowed_user".to_string();
-                                }
-                                if new.eq(&UserRole::User) || new.is_service_account() {
-                                    new_str = "allowed_user".to_string();
-                                }
-                                if old_str != new_str {
-                                    log::debug!(
-                                        "updating openfga role for {email} from {old_str} to {new_str}"
-                                    );
-                                    update_user_role(&old_str, &new_str, email, org_id).await;
-                                }
-                            }
-                            if custom_roles_need_change {
-                                let existing_roles = get_roles_for_org_user(org_id, email).await;
-                                let mut write_tuples = vec![];
-                                let mut delete_tuples = vec![];
-                                custom_roles.iter().for_each(|crole| {
-                                    if !existing_roles.contains(crole) {
-                                        write_tuples
-                                            .push(get_user_crole_tuple(org_id, crole, email));
-                                    }
-                                });
-                                existing_roles.iter().for_each(|crole| {
-                                    if !custom_roles.contains(crole) {
-                                        get_user_crole_removal_tuples(
-                                            email,
-                                            &get_role_key(org_id, crole),
-                                            &mut delete_tuples,
-                                        );
-                                    }
-                                });
-                                if let Err(e) = update_tuples(write_tuples, delete_tuples).await {
-                                    log::error!(
-                                        "Error updating custom roles for user {email} in {org_id} org : {e}"
-                                    );
-                                    return Ok(MetaHttpResponse::internal_error(
-                                        "Failed to update custom roles for user",
-                                    ));
-                                }
-                            }
-                        }
-                    }
                 }
-
-                #[cfg(not(feature = "enterprise"))]
-                log::debug!("Role changed from {old_role:?} to {new_role:?}");
-                Ok(MetaHttpResponse::ok("User updated successfully"))
             }
-            None => Ok(MetaHttpResponse::not_found("User not found")),
         }
-    } else {
-        Ok(MetaHttpResponse::not_found("User not found"))
     }
+
+    #[cfg(not(feature = "enterprise"))]
+    log::debug!("Role changed from {old_role:?} to {new_role:?}");
+    Ok(MetaHttpResponse::ok("User updated successfully"))
 }
 
 pub async fn add_admin_to_org(org_id: &str, user_email: &str) -> Result<(), anyhow::Error> {
@@ -634,7 +732,9 @@ pub async fn add_user_to_org(
         let initiating_user = if is_root_user(initiator_id) {
             let local_org = org_id.replace(' ', "_");
             // If the org does not exist, create it
-            let _ = organization::check_and_create_org(&local_org).await;
+            if let Err(error) = organization::check_and_create_org(&local_org).await {
+                log::warn!("Failed to auto-create organization '{local_org}': {error}");
+            }
             root_user.get("root").unwrap().clone()
         } else {
             match db::user::get(Some(org_id), initiator_id).await {
@@ -648,6 +748,21 @@ pub async fn add_user_to_org(
                 }
             }
         };
+        // Checked after the root branch above may have created a missing org.
+        match db::org_status::read_active(org_id).await {
+            Ok(true) => {}
+            Ok(false) => {
+                return Err(Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    "organization is not active",
+                ));
+            }
+            Err(e) => {
+                return Err(Error::other(format!(
+                    "cannot read the status of organization {org_id}: {e}"
+                )));
+            }
+        }
         let base_role = get_role(&role);
         let is_allowed =
             initiating_user.role.eq(&UserRole::Root) || initiating_user.role.eq(&UserRole::Admin);
@@ -728,6 +843,32 @@ pub async fn get_user(org_id: Option<&str>, name: &str) -> Option<User> {
         Some(loc_user) => Some(loc_user),
         None => db::user::get(Some(org_id), name).await.ok().flatten(),
     }
+}
+
+/// One member of `org_id`, shaped exactly as `list_users` reports them.
+///
+/// `None` means the account holds no membership in this organization. An account that exists
+/// elsewhere is not this organization's to describe, so it is absent rather than forbidden.
+pub async fn get_user_details(org_id: &str, email: &str) -> Option<UserResponse> {
+    let org_user = db::org_users::get(org_id, email).await.ok()?;
+    let user = get_user(Some(org_id), email).await?;
+    let token = user
+        .role
+        .is_service_account()
+        .then(|| redact_token(&org_user.token));
+    let is_system = organization::is_system_service_account(&user.email);
+    Some(UserResponse {
+        email: user.email,
+        role: user.role.to_string(),
+        first_name: user.first_name,
+        last_name: user.last_name,
+        is_external: user.is_external,
+        orgs: None,
+        created_at: org_user.created_at,
+        token,
+        is_system,
+        description: is_system.then(|| "Used by the AI SRE Agent.".to_string()),
+    })
 }
 
 pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
@@ -932,6 +1073,7 @@ pub async fn remove_user_from_org(
     org_id: &str,
     email_id: &str,
     initiator_id: &str,
+    target: RemovalTarget,
 ) -> Result<Response, Error> {
     let initiating_user = if is_root_user(initiator_id) {
         ROOT_USER.get("root").unwrap().to_owned()
@@ -957,146 +1099,112 @@ pub async fn remove_user_from_org(
     } else {
         is_allowed
     };
+    if !is_allowed {
+        return Ok(MetaHttpResponse::unauthorized("Not Allowed"));
+    }
 
-    if is_allowed {
-        let ret_user = db::user::get_db_user(email_id).await;
-        match ret_user {
-            Ok(mut user) => {
-                if is_root_user(user.email.as_str()) {
-                    return Ok(MetaHttpResponse::forbidden("Not Allowed"));
-                }
+    let not_found = || MetaHttpResponse::not_found("User for the organization not found");
+    let Ok(user) = db::user::get_db_user(email_id).await else {
+        return Ok(not_found());
+    };
+    let Some(membership) = user
+        .organizations
+        .iter()
+        .find(|o| o.name == org_id && target.matches(&o.role))
+        .cloned()
+    else {
+        #[cfg(feature = "cloud")]
+        if let Some(resp) = delete_cloud_invites(org_id, email_id).await {
+            return Ok(resp);
+        }
+        return Ok(not_found());
+    };
 
-                if initiating_user.email == email_id {
-                    return Ok(MetaHttpResponse::forbidden("Not Allowed"));
-                }
+    if is_root_user(user.email.as_str()) || initiating_user.email == email_id {
+        return Ok(MetaHttpResponse::forbidden("Not Allowed"));
+    }
+    // Resolved now: the users row may be gone by the time shares are revoked.
+    let user_id = match infra::table::users::get_id_by_email(email_id).await {
+        Ok(id) => id,
+        Err(e) => {
+            log::error!("error resolving the id of {email_id}: {e}");
+            None
+        }
+    };
 
-                if user
-                    .organizations
-                    .iter()
-                    .any(|o| o.role == UserRole::SreAgent)
-                    || crate::organization::is_system_service_account(&user.email)
-                {
-                    return Ok(MetaHttpResponse::forbidden(
-                        "System service accounts cannot be deleted",
-                    ));
-                }
+    if user
+        .organizations
+        .iter()
+        .any(|o| o.role == UserRole::SreAgent)
+        || crate::organization::is_system_service_account(&user.email)
+    {
+        return Ok(MetaHttpResponse::forbidden(
+            "System service accounts cannot be deleted",
+        ));
+    }
 
-                #[cfg(feature = "cloud")]
-                {
-                    use o2_enterprise::enterprise::cloud::org_invites;
+    #[cfg(feature = "cloud")]
+    if let Some(resp) = delete_cloud_invites(org_id, email_id).await {
+        return Ok(resp);
+    }
 
-                    if let Err(e) = org_invites::delete_invites_for_user(org_id, email_id).await {
-                        log::error!(
-                            "error deleting invites when deleting user {email_id} from org {org_id} : {e}"
-                        );
-                        return Ok(MetaHttpResponse::internal_error(
-                            "error deleting user invites",
-                        ));
-                    }
-                }
-
-                if !user.organizations.is_empty() {
-                    let orgs = &mut user.organizations;
-                    if orgs.len() == 1 {
-                        if orgs[0].role.eq(&UserRole::ServiceAccount) && user.is_external {
-                            return Ok(MetaHttpResponse::forbidden("Not Allowed"));
-                        }
-                        if let Err(e) = db::user::delete(email_id).await {
-                            log::error!("error deleting user from db : {e}");
-                            return Ok(MetaHttpResponse::internal_error(e.to_string()));
-                        }
-                        #[cfg(feature = "enterprise")]
-                        {
-                            use o2_openfga::authorizer::authz::delete_user_from_org;
-                            let user_role = &orgs[0].role;
-                            let user_fga_role = if user_role.eq(&UserRole::ServiceAccount)
-                                || user_role.eq(&UserRole::User)
-                            {
-                                "allowed_user".to_string()
-                            } else {
-                                user_role.to_string()
-                            };
-                            if get_openfga_config().enabled {
-                                log::debug!("delete user single org, role: {user_fga_role}");
-                                delete_user_from_org(org_id, email_id, &user_fga_role).await;
-                                if user_role.eq(&UserRole::ServiceAccount) {
-                                    delete_service_account_from_org(org_id, email_id).await;
-                                }
-                            }
-                        }
-                    } else {
-                        let mut _user_fga_role: Option<String> = None;
-                        #[cfg(feature = "enterprise")]
-                        let mut is_service_account = false;
-                        #[cfg(feature = "enterprise")]
-                        for org in orgs.iter() {
-                            if org.role.eq(&UserRole::ServiceAccount) && user.is_external {
-                                return Ok(MetaHttpResponse::forbidden("Not Allowed"));
-                            }
-                            if org.name.eq(org_id) {
-                                let user_role = &org.role;
-                                is_service_account = user_role.eq(&UserRole::ServiceAccount);
-                                _user_fga_role =
-                                    if is_service_account || user_role.eq(&UserRole::User) {
-                                        Some("allowed_user".to_string())
-                                    } else {
-                                        Some(user_role.to_string())
-                                    };
-                            }
-                        }
-                        orgs.retain(|x| !x.name.eq(org_id));
-                        let resp = db::org_users::remove(org_id, email_id).await;
-                        // special case as we cache flattened user struct
-                        match resp {
-                            Ok(_) => {
-                                #[cfg(feature = "enterprise")]
-                                {
-                                    use o2_openfga::authorizer::authz::delete_user_from_org;
-                                    log::debug!(
-                                        "user_fga_role, multi org: {}",
-                                        _user_fga_role.as_ref().unwrap()
-                                    );
-                                    if get_openfga_config().enabled
-                                        && let Some(_user_fga_role) = _user_fga_role
-                                    {
-                                        delete_user_from_org(
-                                            org_id,
-                                            email_id,
-                                            _user_fga_role.as_str(),
-                                        )
-                                        .await;
-                                        if is_service_account {
-                                            delete_service_account_from_org(org_id, email_id).await;
-                                        }
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                log::error!("error deleting user {email_id} from {org_id} : {e}");
-                                return Ok(MetaHttpResponse::internal_error(e.to_string()));
-                            }
-                        }
-                    }
-                    Ok(MetaHttpResponse::ok("User removed from organization"))
-                } else {
-                    Ok(MetaHttpResponse::not_found(
-                        "User for the organization not found",
-                    ))
+    let removal =
+        if user.organizations.len() == 1 && is_sole_membership(&membership, email_id).await {
+            remove_user_with_last_membership(&user, &membership).await
+        } else {
+            remove_one_membership(&user, &membership).await
+        };
+    if let Some(resp) = removal {
+        return Ok(resp);
+    }
+    // After the membership is gone: on-call rosters derive from it, so earlier is racy.
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::oncall::service as oncall_service;
+        match oncall_service::offboard_member(org_id, email_id, config::utils::time::now_micros())
+            .await
+        {
+            Ok(report) if report.needs_attention() => {
+                for warning in report.warnings() {
+                    log::warn!("[ONCALL] {email_id} left {org_id}: {warning}");
                 }
             }
-            Err(_) => Ok(MetaHttpResponse::not_found(
-                "User for the organization not found",
-            )),
+            Ok(_) => {}
+            Err(e) => log::error!(
+                "[ONCALL] {email_id} was removed from {org_id} but their on-call membership could not be cleaned up, so they may still be paged: {e}"
+            ),
         }
-    } else {
-        Ok(MetaHttpResponse::unauthorized("Not Allowed"))
     }
+    // After the membership is gone: their links ran with their stream access.
+    crate::public_dashboards::pause_departed_publisher_links(org_id, email_id).await;
+    if let Err(e) = infra::table::query_history::delete_by_user(org_id, email_id).await {
+        log::error!("error deleting query history of {email_id} in {org_id}: {e}");
+    }
+    revoke_ai_chat_shares(org_id, email_id, user_id.as_deref()).await;
+    Ok(MetaHttpResponse::ok("User removed from organization"))
 }
 
 pub async fn delete_user(email_id: &str) -> Result<Response, Error> {
+    if let Ok(Some(user_id)) = infra::table::users::get_id_by_email(email_id).await {
+        let now = config::utils::time::now_micros();
+        if let Err(e) = infra::table::ai_chat_shares::revoke_for_creator(None, &user_id, now).await
+        {
+            log::error!("error revoking AI chat shares of {email_id}: {e}");
+        }
+    }
+    #[cfg(feature = "enterprise")]
+    if let Ok(user) = db::user::get_db_user(email_id).await {
+        let orgs: Vec<String> = user.organizations.iter().map(|o| o.name.clone()).collect();
+        delete_ai_chats(&orgs, email_id).await;
+    }
     let result = db::user::delete(email_id).await;
     match result {
-        Ok(_) => Ok(MetaHttpResponse::ok("User deleted")),
+        Ok(_) => {
+            if let Err(e) = infra::table::query_history::delete_by_email(email_id).await {
+                log::error!("error deleting query history of {email_id}: {e}");
+            }
+            Ok(MetaHttpResponse::ok("User deleted"))
+        }
         Err(e) => Ok(MetaHttpResponse::not_found(e)),
     }
 }
@@ -1107,20 +1215,6 @@ pub async fn root_user_exists() -> bool {
         local_users.is_empty()
     } else {
         db::user::root_user_exists().await
-    }
-}
-
-pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
-    if orgs.is_empty() {
-        (false, get_default_user_org())
-    } else {
-        let mut local_orgs = orgs;
-        local_orgs.retain(|org| !org.name.eq(org_id));
-        if local_orgs.is_empty() {
-            (false, get_default_user_org())
-        } else {
-            (true, local_orgs.first().unwrap().clone())
-        }
     }
 }
 
@@ -1179,7 +1273,7 @@ pub async fn list_user_invites(user_id: &str, only_pending: bool) -> Result<Resp
                     org_name: db::organization::get_org(&invite.org_id)
                         .await
                         .map(|org| org.name)
-                        .unwrap_or("default".to_string()),
+                        .unwrap_or_else(|_| "default".to_string()),
                     role: invite.role,
                     org_id: invite.org_id,
                     token: invite.token,
@@ -1196,10 +1290,9 @@ pub async fn list_user_invites(user_id: &str, only_pending: bool) -> Result<Resp
 }
 
 pub async fn create_root_user(org_id: &str, user_req: UserRequest) -> Result<(), anyhow::Error> {
-    let cfg = get_config();
     let salt = ider::uuid();
     let password = get_hash(&user_req.password, &salt);
-    let password_ext = get_hash(&user_req.password, &cfg.auth.ext_auth_salt);
+    let password_ext = get_hash(&user_req.password, &config::get_ext_auth_salt());
     let token = user_req
         .token
         .clone()
@@ -1296,6 +1389,151 @@ async fn update_cache(user_email: &str, roles: Vec<String>) {
     );
 }
 
+/// A member who left an org no longer vouches for the chats they shared there.
+async fn revoke_ai_chat_shares(org_id: &str, email_id: &str, user_id: Option<&str>) {
+    let Some(user_id) = user_id else {
+        return;
+    };
+    let now = config::utils::time::now_micros();
+    match infra::table::ai_chat_shares::revoke_for_creator(Some(org_id), user_id, now).await {
+        Ok(0) => {}
+        Ok(n) => log::info!("revoked {n} AI chat shares of {email_id}, who left {org_id}"),
+        // Reads re-check membership, so a missed revoke never serves a leaver's share.
+        Err(e) => log::error!("error revoking AI chat shares of {email_id} in {org_id}: {e}"),
+    }
+}
+
+/// Re-reads the stored memberships, so a membership added since the first read is not deleted.
+async fn is_sole_membership(membership: &UserOrg, email_id: &str) -> bool {
+    match infra::table::org_users::list_org_ids_by_user_on_writer(email_id).await {
+        Ok(org_ids) => matches!(org_ids.as_slice(), [only] if *only == membership.name),
+        Err(e) => {
+            log::error!("error re-reading the memberships of {email_id}: {e}");
+            false
+        }
+    }
+}
+
+/// Deletes the user row together with its only membership; `Some` is the refusal or error.
+async fn remove_user_with_last_membership(user: &DBUser, membership: &UserOrg) -> Option<Response> {
+    if membership.role.eq(&UserRole::ServiceAccount) && user.is_external {
+        return Some(MetaHttpResponse::forbidden("Not Allowed"));
+    }
+    // The user row goes with the last org; their chats must not outlive it.
+    #[cfg(feature = "enterprise")]
+    delete_ai_chats(std::slice::from_ref(&membership.name), &user.email).await;
+    if let Err(e) = db::user::delete(&user.email).await {
+        log::error!("error deleting user from db : {e}");
+        return Some(MetaHttpResponse::internal_error(e.to_string()));
+    }
+    #[cfg(feature = "enterprise")]
+    if get_openfga_config().enabled {
+        let fga_role = fga_member_role(&membership.role);
+        log::debug!("delete user single org, role: {fga_role}");
+        if let Err(e) = o2_openfga::authorizer::authz::delete_user_from_org(
+            &membership.name,
+            &user.email,
+            &fga_role,
+        )
+        .await
+        {
+            log::error!(
+                "error deleting openfga tuples of {} in {} : {e}",
+                user.email,
+                membership.name
+            );
+        }
+        if membership.role.eq(&UserRole::ServiceAccount) {
+            delete_service_account_from_org(&membership.name, &user.email).await;
+        }
+    }
+    None
+}
+
+/// Removes one membership and keeps the user row; `Some` is the refusal or error.
+async fn remove_one_membership(user: &DBUser, membership: &UserOrg) -> Option<Response> {
+    #[cfg(feature = "enterprise")]
+    if user
+        .organizations
+        .iter()
+        .any(|org| org.role.eq(&UserRole::ServiceAccount) && user.is_external)
+    {
+        return Some(MetaHttpResponse::forbidden("Not Allowed"));
+    }
+    if let Err(e) = db::org_users::remove(&membership.name, &user.email).await {
+        log::error!(
+            "error deleting user {} from {} : {e}",
+            user.email,
+            membership.name
+        );
+        return Some(MetaHttpResponse::internal_error(e.to_string()));
+    }
+    #[cfg(feature = "enterprise")]
+    if get_openfga_config().enabled {
+        let fga_role = fga_member_role(&membership.role);
+        log::debug!("user_fga_role, multi org: {fga_role}");
+        if let Err(e) = o2_openfga::authorizer::authz::delete_user_from_org(
+            &membership.name,
+            &user.email,
+            &fga_role,
+        )
+        .await
+        {
+            log::error!(
+                "error deleting openfga tuples of {} in {} : {e}",
+                user.email,
+                membership.name
+            );
+        }
+        if membership.role.eq(&UserRole::ServiceAccount) {
+            delete_service_account_from_org(&membership.name, &user.email).await;
+        }
+    }
+    None
+}
+
+#[cfg(feature = "enterprise")]
+fn fga_member_role(role: &UserRole) -> String {
+    if role.eq(&UserRole::ServiceAccount) || role.eq(&UserRole::User) {
+        "allowed_user".to_string()
+    } else {
+        role.to_string()
+    }
+}
+
+#[cfg(feature = "cloud")]
+async fn delete_cloud_invites(org_id: &str, email_id: &str) -> Option<Response> {
+    use o2_enterprise::enterprise::cloud::org_invites;
+
+    let Err(e) = org_invites::delete_invites_for_user(org_id, email_id).await else {
+        return None;
+    };
+    log::error!("error deleting invites when deleting user {email_id} from org {org_id} : {e}");
+    Some(MetaHttpResponse::internal_error(
+        "error deleting user invites",
+    ))
+}
+
+/// Deletes the user's chats in `orgs` while their `users.id` still resolves (replicas: the sweep).
+#[cfg(feature = "enterprise")]
+async fn delete_ai_chats(orgs: &[String], email_id: &str) {
+    let user_id = match infra::table::users::get_id_by_email(email_id).await {
+        Ok(Some(id)) => id,
+        Ok(None) => return,
+        Err(e) => {
+            log::error!("error resolving {email_id} to delete their AI chats: {e}");
+            return;
+        }
+    };
+    for org_id in orgs {
+        match crate::ai_chat::delete_all_for_user(org_id, &user_id).await {
+            Ok(ids) if ids.is_empty() => {}
+            Ok(ids) => log::info!("deleted {} AI chats of {email_id} in {org_id}", ids.len()),
+            Err(e) => log::error!("error deleting AI chats of {email_id} in {org_id}: {e}"),
+        }
+    }
+}
+
 /// Creates a service account user record if it doesn't already exist
 /// This is used when creating organizations with a specified service account
 pub async fn create_service_account_if_not_exists(email: &str) -> Result<(), anyhow::Error> {
@@ -1311,8 +1549,7 @@ pub async fn create_service_account_if_not_exists(email: &str) -> Result<(), any
     let random_password = generate_random_string(32);
     let salt = ider::uuid();
     let password_hash = get_hash(&random_password, &salt);
-    let cfg = get_config();
-    let password_ext = get_hash(&random_password, &cfg.auth.ext_auth_salt);
+    let password_ext = get_hash(&random_password, &config::get_ext_auth_salt());
     let now = chrono::Utc::now().timestamp_micros();
     let user_record = infra::table::users::UserRecord {
         email: email.to_string(),
@@ -1325,9 +1562,17 @@ pub async fn create_service_account_if_not_exists(email: &str) -> Result<(), any
         user_type: config::meta::user::UserType::Internal,
         created_at: now,
         updated_at: now,
+        // Service accounts are excluded from the policy sweep and have no interactive password,
+        // so they are never flagged; the timestamp is set anyway to keep the column non-NULL.
+        must_reset_password: false,
+        password_reset_reason: None,
+        flagged_at: None,
+        password_updated_at: Some(now),
     };
 
-    infra::table::users::add(user_record).await?;
+    // Through the db layer, not the table: its cluster event caches the user for
+    // `get_cached_user_org`.
+    db::user::add_record(user_record).await?;
     log::info!("Service account user record created for '{}'", email);
 
     Ok(())
@@ -1335,12 +1580,14 @@ pub async fn create_service_account_if_not_exists(email: &str) -> Result<(), any
 
 #[cfg(test)]
 mod tests {
-    use common::{infra::config::USERS, meta::user::get_default_user_role};
+    use common::infra::config::USERS;
     use config::meta::user::{UserRole, UserType};
     use infra::{
-        db::{self as infra_db, ORM_CLIENT, connect_to_orm},
+        db::{self as infra_db, get_orm_client_rw},
         table as infra_table,
     };
+    #[cfg(feature = "enterprise")]
+    use o2_enterprise::enterprise::password_policy::meta::PasswordPolicy;
     use tokio::sync::Mutex;
 
     use super::*;
@@ -1348,10 +1595,18 @@ mod tests {
     // Mutex to ensure test setup is serialized to prevent race conditions
     static TEST_SETUP_LOCK: tokio::sync::OnceCell<Mutex<()>> = tokio::sync::OnceCell::const_new();
 
+    #[cfg(feature = "enterprise")]
     #[test]
-    fn test_redact_token_normal() {
-        // output is always 12 chars: first 4 visible, rest padded with '*'
-        assert_eq!(redact_token("abcd1234567890ef"), "abcd********");
+    fn a_self_update_may_resend_its_custom_roles_but_not_change_them() {
+        let current = ["a".to_string(), "b".to_string()];
+        assert!(!custom_roles_differ(&["b".into(), "a".into()], &current));
+        assert!(custom_roles_differ(
+            &["a".into(), "b".into(), "c".into()],
+            &current
+        ));
+        assert!(custom_roles_differ(&["a".into()], &current));
+        assert!(custom_roles_differ(&["c".into()], &[]));
+        assert!(!custom_roles_differ(&[], &[]));
     }
 
     #[test]
@@ -1368,54 +1623,16 @@ mod tests {
         assert_eq!(redact_token(""), "");
     }
 
-    #[test]
-    fn test_redact_token_five_chars() {
-        // still shows first 4, pads to 12 total
-        assert_eq!(redact_token("abcde"), "abcd********");
-    }
-
-    #[test]
-    fn test_is_user_from_org() {
-        let target_org = "org1".to_string();
-
-        let user_org = UserOrg {
-            name: "org2".to_string(),
-            org_name: "Organization 2".to_string(),
-            token: "token2".to_string(),
-            rum_token: Some("rum2".to_string()),
-            role: get_default_user_role(),
-        };
-
-        let matched_org = UserOrg {
-            name: target_org.clone(),
-            org_name: "Organization 1".to_string(),
-            token: "token1".to_string(),
-            rum_token: Some("rum1".to_string()),
-            role: get_default_user_role(),
-        };
-
-        let (found, org) = is_user_from_org(vec![], &target_org);
-        assert!(!found);
-        assert_eq!(org.name, "");
-
-        let (found, org) = is_user_from_org(vec![matched_org.clone()], &target_org);
-        assert!(!found);
-        assert_eq!(org.name, "");
-
-        let (found, org) =
-            is_user_from_org(vec![matched_org.clone(), user_org.clone()], &target_org);
-        assert!(found);
-        assert_eq!(org.name, "org2");
-    }
-
-    async fn set_up() {
-        // Acquire lock to serialize database setup across concurrent tests
+    /// Returned guard must be held for the whole test: `set_up` truncates the
+    /// shared user tables, so a concurrent test's setup would clear rows out
+    /// from under a test body that only serialized the setup itself.
+    async fn set_up() -> tokio::sync::MutexGuard<'static, ()> {
         let lock = TEST_SETUP_LOCK
             .get_or_init(|| async { Mutex::new(()) })
             .await;
-        let _guard = lock.lock().await;
+        let guard = lock.lock().await;
 
-        let _ = ORM_CLIENT.get_or_init(connect_to_orm).await;
+        let _ = get_orm_client_rw().await;
         // clear the table here as previous tests could have written to it
         let _ = infra::table::org_users::clear().await;
         let _ = infra::table::users::clear().await;
@@ -1444,6 +1661,10 @@ mod tests {
                 is_root: false,
                 created_at: 0,
                 updated_at: 0,
+                must_reset_password: false,
+                password_reset_reason: None,
+                flagged_at: None,
+                password_updated_at: None,
             },
         );
         ORG_USERS.insert(
@@ -1474,35 +1695,37 @@ mod tests {
                 password_ext: Some("root_password_ext_hash".to_string()),
             },
         );
+
+        guard
     }
 
     #[tokio::test]
     async fn test_list_users() {
-        set_up().await;
+        let _guard = set_up().await;
         assert!(list_users("", "dummy", None, None, false).await.is_ok())
     }
 
     #[tokio::test]
     async fn test_root_user_exists() {
-        set_up().await;
+        let _guard = set_up().await;
         assert!(!root_user_exists().await);
     }
 
     #[tokio::test]
     async fn test_get_user() {
-        set_up().await;
+        let _guard = set_up().await;
         assert!(get_user(Some("dummy"), "admin@zo.dev").await.is_some())
     }
 
     #[tokio::test]
     async fn test_post_user() {
-        set_up().await;
+        let _guard = set_up().await;
 
         let resp = post_user(
             "dummy",
             UserRequest {
                 email: "user@zo.dev".to_string(),
-                password: "pass#123".to_string(),
+                password: "Pass#1234567890".to_string(),
                 role: common::meta::user::UserOrgRole {
                     base_role: UserRole::Admin,
                     custom_role: None,
@@ -1520,7 +1743,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_user() {
-        set_up().await;
+        let _guard = set_up().await;
 
         let resp = update_user(
             "dummy",
@@ -1538,6 +1761,7 @@ mod tests {
                     custom: None,
                 }),
                 change_password: false,
+                remove_lockout: false,
             },
         )
         .await;
@@ -1560,6 +1784,7 @@ mod tests {
                     custom: None,
                 }),
                 change_password: false,
+                remove_lockout: false,
             },
         )
         .await;
@@ -1579,14 +1804,20 @@ mod tests {
 
         assert!(resp.is_ok());
 
-        let resp = remove_user_from_org("dummy", "user2@example.com", "admin@zo.dev").await;
+        let resp = remove_user_from_org(
+            "dummy",
+            "user2@example.com",
+            "admin@zo.dev",
+            RemovalTarget::User,
+        )
+        .await;
 
         assert!(resp.is_ok());
     }
 
     #[tokio::test]
     async fn test_create_new_user() {
-        set_up().await;
+        let _guard = set_up().await;
 
         let db_user = DBUser {
             email: "newuser@example.com".to_string(),
@@ -1635,7 +1866,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_user() {
-        set_up().await;
+        let _guard = set_up().await;
 
         let resp = delete_user("nonexistent@example.com").await;
         assert!(resp.is_ok());
@@ -1644,9 +1875,299 @@ mod tests {
         assert!(resp.is_ok());
     }
 
+    async fn create_query_history_table() {
+        infra_table::query_history::create_table_for_tests(get_orm_client_rw().await)
+            .await
+            .unwrap();
+    }
+
+    async fn create_user_with_history(email: &str) {
+        create_query_history_table().await;
+        let user = DBUser {
+            email: email.to_string(),
+            password: "".to_string(),
+            salt: "".to_string(),
+            first_name: "History".to_string(),
+            last_name: "User".to_string(),
+            password_ext: None,
+            is_external: false,
+            organizations: vec![UserOrg {
+                name: "dummy".to_string(),
+                org_name: "Dummy Org".to_string(),
+                token: "".to_string(),
+                rum_token: None,
+                role: UserRole::User,
+            }],
+        };
+        create_new_user(user).await.unwrap();
+        for org in ["dummy", "other"] {
+            infra_table::query_history::record(infra_table::query_history::NewRun {
+                org_id: org,
+                user_email: email,
+                source: "logs",
+                query: "up",
+                query_key: None,
+                streams: &[],
+                status: "ok",
+                context: serde_json::json!({}),
+                now_us: 1,
+            })
+            .await
+            .unwrap();
+        }
+    }
+
+    async fn history_count(org: &str, email: &str) -> usize {
+        infra_table::query_history::list(org, email, &Default::default(), 10, 0)
+            .await
+            .unwrap()
+            .len()
+    }
+
+    #[tokio::test]
+    async fn test_remove_user_from_org_deletes_their_query_history_in_that_org() {
+        let _guard = set_up().await;
+        let email = "history-leaver@example.com";
+        create_user_with_history(email).await;
+
+        let resp = remove_user_from_org("dummy", email, "admin@zo.dev", RemovalTarget::User)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        assert_eq!(history_count("dummy", email).await, 0);
+        assert_eq!(history_count("other", email).await, 1);
+    }
+
+    #[tokio::test]
+    async fn gate14_removing_a_publisher_pauses_their_public_links_after_the_membership_delete() {
+        use infra::table::{entity::public_dashboards::Model as Link, public_dashboards as links};
+
+        let _guard = set_up().await;
+        links::create_tables_for_tests(get_orm_client_rw().await)
+            .await
+            .unwrap();
+        // The test database outlives the run, so nothing here may collide with an earlier run.
+        let id = config::ider::uuid();
+        let email = format!("publisher-{id}@example.com");
+        let email = email.as_str();
+        create_user_with_history(email).await;
+        let link = Link {
+            id: id.clone(),
+            org_id: "dummy".to_string(),
+            folder_id: "default".to_string(),
+            dashboard_id: id.clone(),
+            slug: config::utils::rand::generate_random_string(22),
+            name: "Exec view".to_string(),
+            visibility: 1,
+            time_ranges: None,
+            default_range_key: None,
+            frozen_variables: None,
+            refresh_secs: 300,
+            dashboard_version: 8,
+            published_by: email.to_string(),
+            enabled: true,
+            expires_at: None,
+            created_by: email.to_string(),
+            updated_by: None,
+            created_at: 1,
+            updated_at: 1,
+            rev: 1,
+            deleted_at: None,
+            last_accessed_at: None,
+            access_count: 0,
+        };
+        let created = links::insert_capped(get_orm_client_rw().await, &link, u32::MAX, 1, false)
+            .await
+            .unwrap();
+        assert_eq!(created, links::CreateOutcome::Created);
+
+        let resp = remove_user_from_org("dummy", email, "admin@zo.dev", RemovalTarget::User)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        assert!(infra_table::org_users::get("dummy", email).await.is_err());
+        let row = links::get(get_orm_client_rw().await, &id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(!row.enabled, "the departed publisher's link is paused");
+        assert!(row.rev > link.rev, "the pause bumped the revision");
+    }
+
+    #[tokio::test]
+    async fn test_delete_user_deletes_their_query_history() {
+        let _guard = set_up().await;
+        let email = "history-deleted@example.com";
+        create_user_with_history(email).await;
+
+        let resp = delete_user(email).await.unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        assert_eq!(history_count("dummy", email).await, 0);
+        assert_eq!(history_count("other", email).await, 0);
+    }
+
+    async fn drop_query_history_table() {
+        use sea_orm::ConnectionTrait;
+        get_orm_client_rw()
+            .await
+            .execute_unprepared("DROP TABLE query_history")
+            .await
+            .unwrap();
+    }
+
+    // History cleanup is non-fatal like the on-call offboarding beside it: the removal still lands.
+    #[tokio::test]
+    async fn test_user_removal_succeeds_when_query_history_cleanup_fails() {
+        let _guard = set_up().await;
+        let email = "history-cleanup-fails@example.com";
+        create_user_with_history(email).await;
+        drop_query_history_table().await;
+        assert!(
+            infra_table::query_history::delete_by_email(email)
+                .await
+                .is_err()
+        );
+
+        let removed =
+            remove_user_from_org("dummy", email, "admin@zo.dev", RemovalTarget::User).await;
+        let deleted = delete_user(email).await;
+        create_query_history_table().await;
+
+        assert_eq!(removed.unwrap().status(), http::StatusCode::OK);
+        assert!(infra_table::org_users::get("dummy", email).await.is_err());
+        assert_eq!(deleted.unwrap().status(), http::StatusCode::OK);
+        assert!(infra_table::users::get(email).await.is_err());
+    }
+
+    async fn create_member(email: &str, memberships: &[(&str, UserRole)]) {
+        for (org, _) in memberships.iter().filter(|(org, _)| *org != "dummy") {
+            organization::check_and_create_org_without_ofga(org)
+                .await
+                .unwrap();
+        }
+        let user = DBUser {
+            email: email.to_string(),
+            password: "".to_string(),
+            salt: "".to_string(),
+            first_name: "Member".to_string(),
+            last_name: "User".to_string(),
+            password_ext: None,
+            is_external: false,
+            organizations: memberships
+                .iter()
+                .map(|(org, role)| UserOrg {
+                    name: org.to_string(),
+                    org_name: org.to_string(),
+                    token: "".to_string(),
+                    rum_token: None,
+                    role: role.clone(),
+                })
+                .collect(),
+        };
+        create_new_user(user).await.unwrap();
+    }
+
+    async fn membership_orgs(email: &str) -> Vec<String> {
+        let mut orgs: Vec<String> = db::user::get_db_user(email)
+            .await
+            .unwrap()
+            .organizations
+            .into_iter()
+            .map(|o| o.name)
+            .collect();
+        orgs.sort();
+        orgs
+    }
+
+    #[tokio::test]
+    async fn test_removal_from_an_org_the_user_is_not_in_keeps_the_user() {
+        let _guard = set_up().await;
+        let email = "member-of-other@example.com";
+        create_member(email, &[("other", UserRole::Admin)]).await;
+
+        let resp = remove_user_from_org("dummy", email, "admin@zo.dev", RemovalTarget::User)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::NOT_FOUND);
+        assert!(infra_table::users::get(email).await.is_ok());
+        assert_eq!(membership_orgs(email).await, vec!["other".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn test_removal_from_an_org_the_user_is_not_in_answers_not_found_for_any_org_count() {
+        let _guard = set_up().await;
+        let email = "member-of-two@example.com";
+        create_member(
+            email,
+            &[("other1", UserRole::Admin), ("other2", UserRole::User)],
+        )
+        .await;
+        // At debug level, the membership-only path must not need a path-org role to log.
+        let level = log::max_level();
+        log::set_max_level(log::LevelFilter::Debug);
+        let resp = remove_user_from_org("dummy", email, "admin@zo.dev", RemovalTarget::User).await;
+        log::set_max_level(level);
+
+        assert_eq!(resp.unwrap().status(), http::StatusCode::NOT_FOUND);
+        assert_eq!(
+            membership_orgs(email).await,
+            vec!["other1".to_string(), "other2".to_string()]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_each_removal_endpoint_acts_only_on_its_own_account_kind() {
+        let _guard = set_up().await;
+        let user = "kind-user@example.com";
+        let service_account = "kind-sa@example.com";
+        create_member(user, &[("dummy", UserRole::User)]).await;
+        create_member(service_account, &[("dummy", UserRole::ServiceAccount)]).await;
+
+        for (email, target) in [
+            (user, RemovalTarget::ServiceAccount),
+            (service_account, RemovalTarget::User),
+        ] {
+            let resp = remove_user_from_org("dummy", email, "admin@zo.dev", target)
+                .await
+                .unwrap();
+            assert_eq!(resp.status(), http::StatusCode::NOT_FOUND, "{email}");
+            assert_eq!(membership_orgs(email).await, vec!["dummy".to_string()]);
+        }
+        for (email, target) in [
+            (user, RemovalTarget::User),
+            (service_account, RemovalTarget::ServiceAccount),
+        ] {
+            let resp = remove_user_from_org("dummy", email, "admin@zo.dev", target)
+                .await
+                .unwrap();
+            assert_eq!(resp.status(), http::StatusCode::OK, "{email}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_a_membership_added_after_the_first_read_keeps_the_user_row() {
+        let _guard = set_up().await;
+        let email = "late-member@example.com";
+        create_member(email, &[("dummy", UserRole::User)]).await;
+        let membership = db::user::get_db_user(email)
+            .await
+            .unwrap()
+            .organizations
+            .remove(0);
+        assert!(is_sole_membership(&membership, email).await);
+
+        organization::check_and_create_org_without_ofga("late-other")
+            .await
+            .unwrap();
+        infra_table::org_users::add("late-other", email, UserRole::User, "", None)
+            .await
+            .unwrap();
+        assert!(!is_sole_membership(&membership, email).await);
+    }
+
     #[tokio::test]
     async fn test_root_user_exists_edge_cases() {
-        set_up().await;
+        let _guard = set_up().await;
 
         let exists = root_user_exists().await;
         assert!(!exists);
@@ -1674,7 +2195,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_root_user_if_not_exists() {
-        set_up().await;
+        let _guard = set_up().await;
 
         let user_req = UserRequest {
             email: "root@example.com".to_string(),
@@ -1718,7 +2239,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_post_user_validation() {
-        set_up().await;
+        let _guard = set_up().await;
 
         let invalid_email_req = UserRequest {
             email: "invalid-email".to_string(),
@@ -1777,7 +2298,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_user_validation() {
-        set_up().await;
+        let _guard = set_up().await;
 
         let resp = update_user(
             "dummy",
@@ -1792,6 +2313,7 @@ mod tests {
                 new_password: None,
                 role: None,
                 change_password: false,
+                remove_lockout: false,
             },
         )
         .await;
@@ -1812,6 +2334,7 @@ mod tests {
                 new_password: None,
                 role: None,
                 change_password: false,
+                remove_lockout: false,
             },
         )
         .await;
@@ -1820,9 +2343,297 @@ mod tests {
         assert_eq!(response.status(), 404);
     }
 
+    /// A password change must land the new hash and the columns describing it together: the flag
+    /// that blocks the user and the rotation clock that expires them.
+    #[tokio::test]
+    async fn test_password_change_clears_the_flag_and_restarts_the_rotation_clock() {
+        let _guard = set_up().await;
+
+        let email = "rotating@zo.dev";
+        let resp = post_user(
+            "dummy",
+            UserRequest {
+                email: email.to_string(),
+                password: "Pass#1234567890".to_string(),
+                role: common::meta::user::UserOrgRole {
+                    base_role: UserRole::Admin,
+                    custom_role: None,
+                },
+                first_name: "rot".to_owned(),
+                last_name: "".to_owned(),
+                is_external: false,
+                token: None,
+            },
+            "admin@zo.dev",
+        )
+        .await;
+        assert!(resp.is_ok());
+
+        infra_table::users::flag_all_for_password_reset("policy_tightened")
+            .await
+            .unwrap();
+        let before = infra_table::users::get(email).await.unwrap();
+        assert!(before.must_reset_password);
+
+        let resp = update_user(
+            "dummy",
+            email,
+            UserUpdateMode::SelfUpdate,
+            email,
+            UpdateUser {
+                token: None,
+                first_name: None,
+                last_name: None,
+                old_password: Some("Pass#1234567890".to_string()),
+                new_password: Some("Newpass#12345678".to_string()),
+                role: None,
+                change_password: true,
+                remove_lockout: false,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(resp.status(), 200);
+
+        let after = infra_table::users::get(email).await.unwrap();
+        assert!(!after.must_reset_password);
+        assert!(after.password_reset_reason.is_none());
+        assert!(after.flagged_at.is_none());
+        assert!(after.password_updated_at > before.password_updated_at);
+    }
+
+    /// The sweep skips root whatever the policy says. `apply_to_root` governs rotation and lockout,
+    /// which are recomputed per request; flagging root would instead store a block that only root
+    /// can clear, on the account that has to be able to repair a bad policy.
+    #[tokio::test]
+    async fn test_the_sweep_never_flags_root() {
+        let _guard = set_up().await;
+
+        let root_email = "sweep-root@zo.dev";
+        let ordinary = "sweep-user@zo.dev";
+        for (email, is_root) in [(root_email, true), (ordinary, false)] {
+            infra_table::users::add(infra_table::users::UserRecord {
+                email: email.to_string(),
+                first_name: "sweep".to_string(),
+                last_name: "".to_string(),
+                password: "hash".to_string(),
+                salt: "salt".to_string(),
+                is_root,
+                password_ext: None,
+                user_type: UserType::Internal,
+                created_at: 0,
+                updated_at: 0,
+                must_reset_password: false,
+                password_reset_reason: None,
+                flagged_at: None,
+                password_updated_at: Some(1),
+            })
+            .await
+            .unwrap();
+        }
+
+        infra_table::users::flag_all_for_password_reset("policy_tightened")
+            .await
+            .unwrap();
+
+        assert!(
+            !infra_table::users::get(root_email)
+                .await
+                .unwrap()
+                .must_reset_password,
+            "root is out of the sweep's scope"
+        );
+        assert!(
+            infra_table::users::get(ordinary)
+                .await
+                .unwrap()
+                .must_reset_password,
+            "everyone else is in it"
+        );
+    }
+
+    /// The reuse check belongs to `update_user`, not to the HTTP layer: the handlers validate
+    /// strength only, so a change routed through the CLI or any other caller would otherwise skip
+    /// it entirely.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_password_change_is_rejected_when_it_repeats_a_recent_password() {
+        let _guard = set_up().await;
+
+        let email = "reusing@zo.dev";
+        // `set_up` truncates the user tables but not the history a previous run left behind.
+        infra_table::user_password_history::delete_all_for_user(email)
+            .await
+            .unwrap();
+        let _ = infra_table::system_settings::create_table().await;
+        db::password_policy::set_policy(&PasswordPolicy {
+            history_count: 2,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+        let resp = post_user(
+            "dummy",
+            UserRequest {
+                email: email.to_string(),
+                password: "Pass#1234567890".to_string(),
+                role: common::meta::user::UserOrgRole {
+                    base_role: UserRole::Admin,
+                    custom_role: None,
+                },
+                first_name: "reuse".to_owned(),
+                last_name: "".to_owned(),
+                is_external: false,
+                token: None,
+            },
+            "admin@zo.dev",
+        )
+        .await;
+        assert!(resp.is_ok());
+
+        assert_eq!(
+            self_change_password(email, "Pass#1234567890", "Newpass#12345678")
+                .await
+                .status(),
+            200
+        );
+        assert_eq!(
+            self_change_password(email, "Newpass#12345678", "Pass#1234567890")
+                .await
+                .status(),
+            400
+        );
+        assert_eq!(
+            self_change_password(email, "Newpass#12345678", "Third#1234567890")
+                .await
+                .status(),
+            200
+        );
+
+        db::password_policy::set_policy(&PasswordPolicy::default())
+            .await
+            .unwrap();
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn self_change_password(email: &str, old: &str, new: &str) -> Response {
+        update_user(
+            "dummy",
+            email,
+            UserUpdateMode::SelfUpdate,
+            email,
+            UpdateUser {
+                token: None,
+                first_name: None,
+                last_name: None,
+                old_password: Some(old.to_string()),
+                new_password: Some(new.to_string()),
+                role: None,
+                change_password: true,
+                remove_lockout: false,
+            },
+        )
+        .await
+        .unwrap()
+    }
+
+    /// Clearing a lockout is the one administrative act that leaves no trace on the user record,
+    /// so it has to be gated on its own: nothing else in the request tells the caller apart.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_only_an_administrator_can_clear_a_lockout() {
+        let _guard = set_up().await;
+
+        let email = "locked@zo.dev";
+        let resp = post_user(
+            "dummy",
+            UserRequest {
+                email: email.to_string(),
+                password: "Pass#1234567890".to_string(),
+                role: common::meta::user::UserOrgRole {
+                    base_role: UserRole::Viewer,
+                    custom_role: None,
+                },
+                first_name: "locked".to_owned(),
+                last_name: "".to_owned(),
+                is_external: false,
+                token: None,
+            },
+            "admin@zo.dev",
+        )
+        .await;
+        assert!(resp.is_ok());
+
+        infra_table::user_auth_state::insert_first_failure(email, 1)
+            .await
+            .unwrap();
+
+        // The locked-out user is exactly who must not be able to lift their own lock.
+        assert_eq!(
+            clear_lockout(email, UserUpdateMode::SelfUpdate, email)
+                .await
+                .status(),
+            403
+        );
+        assert_eq!(
+            clear_lockout(email, UserUpdateMode::OtherUpdate, email)
+                .await
+                .status(),
+            403,
+            "a viewer administers nobody, itself included"
+        );
+        assert_eq!(
+            infra_table::user_auth_state::get(email)
+                .await
+                .unwrap()
+                .unwrap()
+                .failed_attempts,
+            1,
+            "a refused request must not have touched the counters"
+        );
+
+        assert_eq!(
+            clear_lockout(email, UserUpdateMode::OtherUpdate, "admin@zo.dev")
+                .await
+                .status(),
+            200
+        );
+        assert_eq!(
+            infra_table::user_auth_state::get(email)
+                .await
+                .unwrap()
+                .unwrap()
+                .failed_attempts,
+            0
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn clear_lockout(email: &str, mode: UserUpdateMode, initiator: &str) -> Response {
+        update_user(
+            "dummy",
+            email,
+            mode,
+            initiator,
+            UpdateUser {
+                token: None,
+                first_name: None,
+                last_name: None,
+                old_password: None,
+                new_password: None,
+                role: None,
+                change_password: false,
+                remove_lockout: true,
+            },
+        )
+        .await
+        .unwrap()
+    }
+
     #[tokio::test]
     async fn test_add_user_to_org_validation() {
-        set_up().await;
+        let _guard = set_up().await;
 
         let resp = add_user_to_org(
             "dummy",
@@ -1851,6 +2662,55 @@ mod tests {
         assert!(resp.is_ok());
         let response = resp.unwrap();
         assert_eq!(response.status(), 422);
+    }
+
+    #[tokio::test]
+    async fn test_add_user_to_org_refuses_blocked_org() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+
+        let _guard = set_up().await;
+        let org = "blockedaddorg";
+        organization::check_and_create_org_without_ofga(org)
+            .await
+            .unwrap();
+        create_new_user(DBUser {
+            email: "joiner@example.com".to_string(),
+            password: String::new(),
+            salt: String::new(),
+            first_name: "Joiner".to_string(),
+            last_name: String::new(),
+            password_ext: None,
+            is_external: false,
+            organizations: vec![UserOrg {
+                name: "dummy".to_string(),
+                org_name: "dummy".to_string(),
+                token: String::new(),
+                rum_token: None,
+                role: UserRole::User,
+            }],
+        })
+        .await
+        .unwrap();
+        let mut admin = ORG_USERS.get("dummy/admin@zo.dev").unwrap().clone();
+        admin.org_id = org.to_string();
+        ORG_USERS.insert(format!("{org}/admin@zo.dev"), admin);
+        let role = || UserOrgRole {
+            base_role: UserRole::User,
+            custom_role: None,
+        };
+
+        ORG_STATUS_CACHE.insert(org.to_string(), OrgStatus::Deleting);
+        let blocked = add_user_to_org(org, "joiner@example.com", role(), "admin@zo.dev").await;
+        ORG_STATUS_CACHE.remove(org);
+        assert_eq!(
+            blocked.map(|r| r.status()).unwrap_err().kind(),
+            std::io::ErrorKind::PermissionDenied,
+            "a deleting org must refuse new members as a client error"
+        );
+        let active = add_user_to_org(org, "joiner@example.com", role(), "admin@zo.dev")
+            .await
+            .unwrap();
+        assert_eq!(active.status(), 200);
     }
 
     #[cfg(feature = "enterprise")]

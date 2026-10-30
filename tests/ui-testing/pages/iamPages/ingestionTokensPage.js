@@ -17,7 +17,7 @@ export class IngestionTokensPage {
         // ============================================================
         this.titleHeading = page.locator('[data-test="ingestion-tokens-title-text"]');
         this.createTokenButton = page.locator('[data-test="add-ingestion-token"]');
-        this.searchInput = page.getByPlaceholder('Search...');
+        this.searchInput = page.locator('[data-test="ingestion-tokens-search-input-field"]');
 
         // ============================================================
         // Create Token dialog (ODialog — no custom data-test, uses ODialog built-ins)
@@ -25,6 +25,10 @@ export class IngestionTokensPage {
         this.dialogPrimaryBtn = page.locator('[data-test="o-dialog-primary-btn"]');
         this.dialogSecondaryBtn = page.locator('[data-test="o-dialog-secondary-btn"]');
         this.dialogCloseBtn = page.locator('[data-test="o-dialog-close-btn"]');
+        this.nameInputError = page.locator('[data-test="ingestion-token-name-input-error"]');
+
+        // "Manage Tokens" entry point (rendered on the Ingestion page)
+        this.manageTokensButton = page.getByRole('button', { name: /Manage Tokens/i });
 
         // ============================================================
         // Toast notifications (OToast)
@@ -62,6 +66,10 @@ export class IngestionTokensPage {
     async gotoIngestionTokensTab() {
         await this.ingestionTokensTab.click();
         await this.titleHeading.waitFor({ state: 'visible', timeout: 10000 });
+    }
+
+    async clickManageTokens() {
+        await this.manageTokensButton.click();
     }
 
     // ----- create token -----
@@ -115,7 +123,13 @@ export class IngestionTokensPage {
     // ----- toggle -----
 
     async toggleToken(name) {
-        await this.tokenToggleByName(name).click();
+        const toggle = this.tokenToggleByName(name);
+        // Token list loads async after reload and is client-paginated (20/page); re-apply the name filter until the row surfaces so a slow list load or search re-mount can't leave the toggle off-page.
+        await expect.poll(async () => {
+            await this.searchInput.fill(name);
+            return await toggle.isVisible().catch(() => false);
+        }, { timeout: 20000, intervals: [500, 1000, 1500, 2000, 3000] }).toBe(true);
+        await toggle.click();
     }
 
     // ----- assertions -----

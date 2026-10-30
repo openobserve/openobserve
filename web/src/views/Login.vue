@@ -15,18 +15,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <Login v-if="user.email == '' && !showInvitations" />
+  <Login v-if="user.email == '' && !showInvitations && !isDexCallback" />
+  <div
+    v-else-if="isDexCallback && !showInvitations"
+    data-test="dex-callback-loading"
+    class="bg-card-glass-bg flex h-[100vh] w-[100vw] flex-col items-center justify-center gap-4 max-md:h-dvh max-md:w-full"
+  >
+    <OSpinner size="lg" />
+    <div class="text-text-secondary text-base">
+      {{ t("login.signingIn") }}
+    </div>
+  </div>
   <div v-if="showInvitations && config.isCloud == 'true'">
     <div class="relative-position flex px-3 pt-2">
-      <img
-        class="h-10 max-h-10 w-auto max-w-50 cursor-pointer"
-        loading="lazy"
-        :src="
-          isDark
-            ? getImageURL('images/common/openobserve_latest_dark_2.svg')
-            : getImageURL('images/common/openobserve_latest_light_2.svg')
-        "
-      />
+      <a href="https://openobserve.ai/" target="_blank" rel="noopener noreferrer">
+        <img
+          class="h-10 max-h-10 w-auto max-w-50 cursor-pointer"
+          loading="lazy"
+          :alt="t('login.openObserveLogoAlt')"
+          :src="
+            isDark
+              ? getImageURL('images/common/openobserve_latest_dark_2.svg')
+              : getImageURL('images/common/openobserve_latest_light_2.svg')
+          "
+        />
+      </a>
     </div>
     <InvitationList
       v-if="showInvitations"
@@ -37,35 +50,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { configQuery } from "@/services/config.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, onBeforeMount, ref } from "vue";
 import { useRouter } from "vue-router";
 import Login from "@/components/login/Login.vue";
 import InvitationList from "@/components/iam/users/InvitationList.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import config from "@/aws-exports";
-import configService from "@/services/config";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { getUserInfo, getDecodedUserInfo, checkCallBackValues } from "@/utils/zincutils";
-import usersService from "@/services/users";
-import organizationsService from "@/services/organizations";
 import {
+  getUserInfo,
+  getDecodedUserInfo,
+  checkCallBackValues,
   useLocalCurrentUser,
   useLocalOrganization,
   invalidateLoginData,
-  useLocalUserInfo,
   getImageURL,
 } from "@/utils/zincutils";
+import usersService from "@/services/users";
+import organizationsService from "@/services/organizations";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useI18nTyped } from "@/types/i18n";
+import { expireSession } from "@/utils/sessionServices";
+import { isSameOriginRedirect } from "@/utils/safeUrl";
+import { withDisambiguatedOrgLabels } from "@/utils/organizationLabel";
+import { capturePrefill } from "@/components/login/firstSourceOptions";
 
 export default defineComponent({
   name: "LoginPage",
   components: {
     Login,
     InvitationList,
+    OSpinner,
   },
   setup() {
     const store = useStore();
+    const { t } = useI18nTyped();
     const { isDark } = useTheme();
     let orgOptions = ref([{ label: Number, value: String }]);
     const selectedOrg = ref({});
@@ -77,12 +100,30 @@ export default defineComponent({
       name: "",
     });
 
+    // The SSO round trip drops the signup link's query and referrer, so keep them for the Get started pick.
+    const pendingUtmContent = (): string | null => {
+      try {
+        const uri = window.sessionStorage.getItem("redirectURI");
+        return uri ? new URL(uri, window.location.origin).searchParams.get("utm_content") : null;
+      } catch {
+        return null;
+      }
+    };
+    capturePrefill(
+      router?.currentRoute.value.query?.utm_content ?? pendingUtmContent(),
+      document.referrer,
+    );
+
     onBeforeMount(async () => {
       if (!router?.currentRoute.value.hash) {
-        await configService
-          .get_config()
-          .then(async (res) => {
-            store.commit("setConfig", res.data);
+        await queryClient
+          .fetchQuery(configQuery())
+          .then(async (data: any) => {
+            // Never replace an already-loaded full config with the bootstrap
+            // subset (e.g. a logged-in user navigating to /login).
+            if (!store.state.zoConfig?.version) {
+              store.commit("setConfig", data);
+            }
           })
           .catch((err) => {
             console.error("Error while fetching config:", err);
@@ -111,8 +152,17 @@ export default defineComponent({
 
           store.dispatch("setOrganizations", res.data.data);
 
-          orgOptions.value = res.data.data.map(
-            (data: { id: any; name: any; type: any; identifier: any; UserObj: any }) => {
+          const labeledOrgs = withDisambiguatedOrgLabels(res.data.data);
+          orgOptions.value = labeledOrgs.map(
+            (data: {
+              id: any;
+              name: any;
+              type: any;
+              identifier: any;
+              UserObj: any;
+              label: string;
+            }) => {
+              // `label` is the real name here; the disambiguated string is applied only to the dropdown copy returned below.
               let optiondata: any = {
                 label: data.name,
                 id: data.id,
@@ -143,7 +193,7 @@ export default defineComponent({
                 tempDefaultOrg = optiondata;
               }
 
-              return optiondata;
+              return { ...optiondata, label: data.label };
             },
           );
 
@@ -153,9 +203,11 @@ export default defineComponent({
             store.dispatch("setSelectedOrganization", tempDefaultOrg);
           }
           //here check if the config.Iscloud is true and the redirectURI is there any new_user_login == true
+          // skip the onboarding prompt for invited users, who get new_user_login == true too on their first login
           if (
             config.isCloud == "true" &&
-            checkCallBackValues(router.currentRoute.value.hash, "new_user_login") == "true"
+            checkCallBackValues(router.currentRoute.value.hash, "new_user_login") == "true" &&
+            checkCallBackValues(router.currentRoute.value.hash, "pending_invites") != "true"
           ) {
             localStorage.setItem("isFirstTimeLogin", "true");
           }
@@ -188,19 +240,13 @@ export default defineComponent({
         });
     };
 
+    // The server refused this user's organizations, so the session ends as an expired one does: the drafts stay for the next login.
     const signout = () => {
       if (config?.isEnterprise == "true" || config?.isCloud == "true") {
         invalidateLoginData();
       }
-
-      store.dispatch("logout");
-      useLocalCurrentUser("", true);
-      useLocalUserInfo("", true);
-
-      router.push("/login");
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
+      // A reload here could re-run the login callback, so this goes to the login page instead.
+      expireSession(store, { toLogin: true });
     };
 
     /**
@@ -231,11 +277,14 @@ export default defineComponent({
 
       const redirectURI = window.sessionStorage.getItem("redirectURI");
       window.sessionStorage.removeItem("redirectURI");
-      if (redirectURI != null && redirectURI != "") {
-        if (redirectURI.includes("http")) {
-          window.location.href = redirectURI;
-        } else {
+      // Same-origin only: `redirectURI` originates from the `?short_url=`
+      // query param, so an off-origin value here is a post-auth open redirect
+      // (see utils/common.ts redirectUser for the twin of this check).
+      if (redirectURI != null && redirectURI != "" && isSameOriginRedirect(redirectURI)) {
+        if (redirectURI.startsWith("/")) {
           router.push({ path: redirectURI });
+        } else {
+          window.location.href = redirectURI;
         }
       } else {
         router.push({ path: "/" });
@@ -256,6 +305,7 @@ export default defineComponent({
 
     return {
       store,
+      t,
       isDark,
       config,
       router,
@@ -269,6 +319,10 @@ export default defineComponent({
   },
   data() {
     return {
+      // True while we're on the Dex (OIDC) redirect-back callback and still
+      // resolving the token in the URL hash. Shows a spinner instead of the
+      // login form so it doesn't flash before the user lands in the app.
+      isDexCallback: !!this.$route.hash,
       user: {
         email: "",
         cognito_sub: "",
@@ -293,10 +347,15 @@ export default defineComponent({
      */
 
     if (this.$route.hash) {
-      configService
-        .get_config()
-        .then(async (res) => {
-          this.store.commit("setZoConfig", res.data);
+      queryClient
+        .fetchQuery(configQuery())
+        .then(async (data: any) => {
+          // "setZoConfig" never existed as a mutation, so this fetch stored
+          // nothing; commit through the real mutation, with the same
+          // don't-clobber-the-full-config guard as everywhere else.
+          if (!this.store.state.zoConfig?.version) {
+            this.store.commit("setConfig", data);
+          }
           const token = getUserInfo(this.$route.hash);
 
           if (token !== null && token.email != null) {
@@ -325,6 +384,9 @@ export default defineComponent({
         })
         .catch((err) => {
           console.error("Error while fetching config:", err);
+          // Fall back to the login form instead of stranding the user on
+          // the spinner with no way to proceed.
+          this.isDexCallback = false;
         });
     }
   },
@@ -345,7 +407,7 @@ export default defineComponent({
           if (res.data.data.id == 0) {
             const dismiss = toast({
               variant: "loading",
-              message: "Please wait while creating new user...",
+              message: this.t("toastMessages.views.pleaseWaitWhileCreatingNewUser"),
               timeout: 0,
             });
 
@@ -372,7 +434,7 @@ export default defineComponent({
         .catch((error) => {
           toast({
             variant: "loading",
-            message: "Error while verifying user...",
+            message: this.t("toastMessages.views.errorWhileVerifyingUser"),
             timeout: 0,
           });
           if (error.status === 403) this.signout();

@@ -21,72 +21,290 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     title-data-test="add-destination-title"
     :back="{
       label: t('alert_destinations.header'),
-      onClick: () => emit('cancel:hideform'),
+      onClick: closeEditor,
     }"
     bleed
   >
     <div class="bg-card-glass-bg flex-1 overflow-x-hidden overflow-y-auto py-2">
-      <div>
-        <OForm :form="form" id="add-destination-form" class="mt-2 mb-1 flex flex-col gap-2 px-3">
-          <!-- Destination Type Selection for Alerts (only show in create mode, not edit) -->
-          <div v-if="isAlerts && !destination" class="w-full pb-3">
-            <div class="mb-2 text-sm font-medium">
-              {{ t("alert_destinations.destination_type") }}
-            </div>
-            <PrebuiltDestinationSelector
-              :model-value="dtVal"
-              @update:model-value="setDestinationType"
-              :search-query="destinationSearchQuery"
-              data-test="prebuilt-destination-selector"
-              @select="selectDestinationType"
-              @update:search-query="destinationSearchQuery = $event"
-            />
+      <div v-if="isSlackApp" class="mt-2 flex flex-col gap-4 px-3 pb-4">
+        <div v-if="!destination" class="w-full">
+          <div class="mb-2 text-sm font-medium">
+            {{ t("alert_destinations.destination_type") }}
           </div>
+          <PrebuiltDestinationSelector
+            :model-value="dtVal"
+            :slack-app="slackAppAvailable"
+            :unavailable-reason="slackAppUnavailableReason"
+            :can-manage-slack="canManageSlack"
+            data-test="prebuilt-destination-selector"
+            @update:model-value="setDestinationType"
+            @select="selectDestinationType"
+          />
+        </div>
+        <SlackAppDestinationForm
+          :key="slackAppFormKey"
+          :destination="slackAppDestination"
+          :templates="templates"
+          :confirmation="switchConfirmation"
+          @saved="onSlackAppSaved"
+          @cancel="closeEditor"
+        />
+      </div>
+      <template v-else>
+        <div>
+          <OForm :form="form" id="add-destination-form" class="mt-2 mb-1 flex flex-col gap-2 px-3">
+            <!-- Destination Type Selection for Alerts (only show in create mode, not edit) -->
+            <div v-if="isAlerts && !destination" class="w-full pb-3">
+              <div class="mb-2 text-sm font-medium">
+                {{ t("alert_destinations.destination_type") }}
+              </div>
+              <PrebuiltDestinationSelector
+                :model-value="dtVal"
+                :slack-app="slackAppAvailable"
+                :unavailable-reason="slackAppUnavailableReason"
+                :can-manage-slack="canManageSlack"
+                @update:model-value="setDestinationType"
+                :search-query="destinationSearchQuery"
+                data-test="prebuilt-destination-selector"
+                @select="selectDestinationType"
+                @update:search-query="destinationSearchQuery = $event"
+              />
+            </div>
 
-          <!-- Destination Type and Name Display for Edit Mode -->
-          <div v-if="isAlerts && destination && dtVal" class="w-full pb-3">
-            <div class="flex gap-3">
-              <!-- Destination Type (Read-only) -->
-              <div class="w-1/2">
-                <div class="mb-1 text-sm leading-tight font-medium">
-                  {{ t("alert_destinations.destination_type") }}
+            <!-- Destination Type and Name Display for Edit Mode -->
+            <div v-if="isAlerts && destination && dtVal" class="w-full pb-3">
+              <div class="flex gap-3">
+                <!-- Destination Type (Read-only) -->
+                <div class="w-1/2">
+                  <div class="mb-1 text-sm leading-tight font-medium">
+                    {{ t("alert_destinations.destination_type") }}
+                  </div>
+                  <div
+                    class="border-card-glass-border rounded-default flex items-center border p-2"
+                    data-test="destination-type-readonly"
+                  >
+                    <OIcon :name="getDestinationTypeIcon(dtVal)" size="md" class="me-2" />
+                    <span class="text-sm">{{ getDestinationTypeName(dtVal) }}</span>
+                    <OTag type="readonlyFlag" value="readonly" class="ms-2">{{
+                      t("alert_destinations.readonly")
+                    }}</OTag>
+                  </div>
                 </div>
-                <div
-                  class="border-card-glass-border rounded-default flex items-center border p-2"
-                  data-test="destination-type-readonly"
-                >
-                  <OIcon :name="getDestinationTypeIcon(dtVal)" size="md" class="mr-2" />
-                  <span class="text-sm">{{ getDestinationTypeName(dtVal) }}</span>
-                  <OTag type="readonlyFlag" value="readonly" class="ml-2">{{
-                    t("alert_destinations.readonly")
-                  }}</OTag>
+                <!-- Destination Name (Read-only) -->
+                <div class="w-1/2">
+                  <OFormInput
+                    data-test="add-destination-name-input"
+                    name="name"
+                    :label="t('alerts.name')"
+                    required
+                    readonly
+                    disabled
+                    tabindex="0"
+                  />
                 </div>
               </div>
-              <!-- Destination Name (Read-only) -->
-              <div class="w-1/2">
+            </div>
+
+            <!-- Prebuilt Destination Form (for alerts only) -->
+            <!-- Show for: create mode with destination_type selected OR edit mode for prebuilt destinations -->
+            <div
+              v-if="
+                isAlerts && (isPrebuiltDestination || (isUpdatingDestination && dtVal !== 'custom'))
+              "
+              class="w-full"
+            >
+              <SlackDestinationSetup
+                v-if="isNewSlackDestination"
+                :org-identifier="store.state.selectedOrganization.identifier"
+                :is-cloud="isCloudDeployment"
+                :is-enterprise="isEnterpriseDeployment"
+                @flow-change="handleSlackFlowChange"
+                @readiness-change="handleSlackReadinessChange"
+              />
+
+              <SlackAppSwitchBanner
+                v-if="destination && dtVal === 'slack'"
+                :destination="destination"
+                class="mb-3"
+                @switched="onSlackAppSaved"
+              />
+
+              <!-- Name Field for Create Mode -->
+              <div v-if="!destination && !isNewSlackDestination" class="w-1/2 pb-3">
                 <OFormInput
                   data-test="add-destination-name-input"
                   name="name"
                   :label="t('alerts.name')"
                   required
-                  readonly
-                  disabled
+                  tabindex="0"
+                />
+              </div>
+
+              <PrebuiltDestinationForm
+                v-if="dtVal && dtVal !== 'custom' && !isNewSlackDestination"
+                :destination-type="dtVal"
+                :hide-actions="true"
+                data-test="prebuilt-form"
+              />
+              <div v-else-if="isUpdatingDestination" class="p-3 text-center">
+                <OSpinner size="md" data-test="add-destination-loading-indicator" />
+                <div class="text-text-muted mt-2">{{ t("alert_destinations.loadingData") }}</div>
+              </div>
+
+              <!-- Template selector for prebuilt destinations -->
+              <div
+                v-if="dtVal && dtVal !== 'custom' && showPrebuiltAdvancedSettings"
+                class="w-1/2 py-1"
+              >
+                <OFormSelect
+                  data-test="add-destination-prebuilt-template-select"
+                  name="template"
+                  :label="t('alert_destinations.template')"
+                  :options="prebuiltTemplateOptions"
+                  labelKey="label"
+                  valueKey="value"
+                  tabindex="0"
+                />
+                <div class="text-text-secondary mt-1 text-xs">
+                  {{
+                    t("alert_destinations.templateHelp", {
+                      type: getDestinationTypeName(dtVal),
+                      name: defaultPrebuiltTemplateName,
+                    })
+                  }}
+                </div>
+              </div>
+
+              <!-- None of these settings apply to email destinations -->
+              <div
+                v-if="showPrebuiltAdvancedSettings && dtVal !== 'email'"
+                class="mt-3 w-full"
+                data-test="prebuilt-additional-settings"
+              >
+                <div class="py-1 font-bold">
+                  {{ t("alert_destinations.additional_settings") }}
+                </div>
+
+                <!-- Custom Headers -->
+                <div class="py-2">
+                  <div class="pb-1 text-sm font-medium">
+                    {{ t("alert_destinations.custom_headers") }}
+                  </div>
+                  <div v-for="(header, index) in apiHeaders" :key="index" class="flex gap-2 pb-2">
+                    <div class="ms-0 w-5/12">
+                      <OFormInput
+                        :data-test="`add-destination-header-${header['key']}-key-input`"
+                        :name="`apiHeaders[${index}].key`"
+                        :placeholder="t('alert_destinations.api_header')"
+                        tabindex="0"
+                      />
+                    </div>
+                    <div class="ms-0 w-5/12">
+                      <OFormInput
+                        :data-test="`add-destination-header-${header['key']}-value-input`"
+                        :name="`apiHeaders[${index}].value`"
+                        :placeholder="t('alert_destinations.api_header_value')"
+                        tabindex="0"
+                      />
+                    </div>
+                    <div class="ms-0 w-1/6">
+                      <OButton
+                        :data-test="`add-destination-header-${header['key']}-delete-btn`"
+                        class="ms-1"
+                        variant="ghost"
+                        size="icon-circle-sm"
+                        :title="t('alert_templates.edit')"
+                        @click="deleteApiHeader(index)"
+                      >
+                        <OIcon name="delete" size="sm" />
+                      </OButton>
+                      <OButton
+                        data-test="add-destination-add-header-btn"
+                        v-if="index === apiHeaders.length - 1"
+                        class="ms-1"
+                        variant="ghost"
+                        size="icon-circle-sm"
+                        :title="t('alert_templates.edit')"
+                        @click="addApiHeader()"
+                      >
+                        <OIcon name="add" size="sm" />
+                      </OButton>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Skip TLS Verify Toggle -->
+                <div class="py-2">
+                  <OFormSwitch
+                    data-test="add-destination-skip-tls-verify-toggle"
+                    name="skip_tls_verify"
+                    :label="t('alert_destinations.skip_tls_verify')"
+                  />
+                </div>
+              </div>
+
+              <!-- Test Result Display -->
+              <DestinationTestResult
+                v-if="lastTestResult"
+                :result="lastTestResult"
+                :is-loading="isTestInProgress"
+                :show-success-response-body="dtVal === 'slack'"
+                data-test="prebuilt-test-result"
+                @retry="handleTestDestination"
+              />
+            </div>
+
+            <!-- Tabs for non-alert destinations OR custom alert destinations -->
+            <div v-if="!isAlerts || (isAlerts && dtVal === 'custom')" class="w-full pb-3">
+              <div class="app-tabs-container me-2 h-9 w-fit">
+                <AppTabs
+                  data-test="add-destination-tabs"
+                  :tabs="tabs"
+                  class="tabs-selection-container"
+                  :active-tab="typeVal"
+                  @update:active-tab="setType"
+                />
+              </div>
+            </div>
+            <div
+              v-if="typeVal === 'email' && !getFormattedTemplates.length"
+              class="mb-3 flex w-full items-center"
+            >
+              <div class="me-2 text-sm font-medium">
+                {{ t("alert_destinations.noEmailTemplates") }}
+              </div>
+              <OButton
+                variant="outline"
+                size="sm"
+                data-test="add-destination-create-email-template-btn"
+                @click="createEmailTemplate"
+                >{{ t("alert_destinations.createEmailTemplate") }}</OButton
+              >
+            </div>
+            <!-- Name + Template row for custom alert destinations -->
+            <div v-if="isAlerts && dtVal === 'custom'" class="flex w-full gap-3">
+              <div class="w-1/2 py-1">
+                <OFormInput
+                  data-test="add-destination-name-input"
+                  name="name"
+                  :label="t('alerts.name')"
+                  required
+                  tabindex="0"
+                />
+              </div>
+              <div class="w-1/2 py-1">
+                <OFormSelect
+                  data-test="add-destination-template-select"
+                  name="template"
+                  :label="t('alert_destinations.template')"
+                  required
+                  :options="getFormattedTemplates"
                   tabindex="0"
                 />
               </div>
             </div>
-          </div>
-
-          <!-- Prebuilt Destination Form (for alerts only) -->
-          <!-- Show for: create mode with destination_type selected OR edit mode for prebuilt destinations -->
-          <div
-            v-if="
-              isAlerts && (isPrebuiltDestination || (isUpdatingDestination && dtVal !== 'custom'))
-            "
-            class="w-full"
-          >
-            <!-- Name Field for Create Mode -->
-            <div v-if="!destination" class="w-1/2 pb-3">
+            <!-- Name field for non-alert destinations (pipelines) -->
+            <div v-if="!isAlerts" class="w-full py-1">
               <OFormInput
                 data-test="add-destination-name-input"
                 name="name"
@@ -96,51 +314,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
 
-            <PrebuiltDestinationForm
-              v-if="dtVal && dtVal !== 'custom'"
-              :destination-type="dtVal"
-              :hide-actions="true"
-              data-test="prebuilt-form"
-            />
-            <div v-else-if="isUpdatingDestination" class="p-3 text-center">
-              <OSpinner size="md" data-test="add-destination-loading-indicator" />
-              <div class="text-text-muted mt-2">{{ t("alert_destinations.loadingData") }}</div>
-            </div>
-
-            <!-- Template selector for prebuilt destinations -->
-            <div v-if="dtVal && dtVal !== 'custom'" class="w-1/2 py-1">
-              <OFormSelect
-                data-test="add-destination-prebuilt-template-select"
-                name="template"
-                :label="t('alert_destinations.template')"
-                :options="prebuiltTemplateOptions"
-                labelKey="label"
-                valueKey="value"
-                tabindex="0"
-              />
-              <div class="text-text-secondary mt-1 text-xs">
-                {{
-                  t("alert_destinations.templateHelp", {
-                    type: getDestinationTypeName(dtVal),
-                    name: defaultPrebuiltTemplateName,
-                  })
-                }}
-              </div>
-            </div>
-
-            <!-- Additional Settings for Prebuilt Destinations -->
-            <div class="mt-3 w-full">
-              <div class="py-1 font-bold">
-                {{ t("alert_destinations.additional_settings") }}
-              </div>
-
-              <!-- Custom Headers (hidden for email destinations) -->
-              <div v-if="dtVal !== 'email'" class="py-2">
-                <div class="pb-1 text-sm font-medium">
-                  {{ t("alert_destinations.custom_headers") }}
+            <template
+              v-if="
+                (isAlerts && dtVal === 'custom' && typeVal === 'http') ||
+                (!isAlerts && typeVal === 'http')
+              "
+            >
+              <div class="flex w-full gap-3">
+                <div class="w-1/2 py-1">
+                  <OFormInput
+                    data-test="add-destination-url-input"
+                    name="url"
+                    :label="t('alert_destinations.url')"
+                    required
+                    tabindex="0"
+                  />
                 </div>
+                <div class="py-1" :class="{ 'w-1/4': !isAlerts, 'w-1/2': isAlerts }">
+                  <OFormSelect
+                    data-test="add-destination-method-select"
+                    name="method"
+                    :label="t('alert_destinations.method')"
+                    required
+                    :options="apiMethods"
+                    tabindex="0"
+                  />
+                </div>
+                <div v-if="!isAlerts" class="w-1/4 py-1">
+                  <OFormSelect
+                    data-test="add-destination-output-format-select"
+                    name="output_format"
+                    :label="t('alert_destinations.output_format')"
+                    required
+                    :options="outputFormats"
+                    tabindex="0"
+                  />
+                </div>
+              </div>
+              <div class="w-full py-2">
+                <div class="py-1 font-bold">{{ t("alert_destinations.headers") }}</div>
                 <div v-for="(header, index) in apiHeaders" :key="index" class="flex gap-2 pb-2">
-                  <div class="ml-0 w-5/12">
+                  <div class="ms-0 w-5/12">
                     <OFormInput
                       :data-test="`add-destination-header-${header['key']}-key-input`"
                       :name="`apiHeaders[${index}].key`"
@@ -148,7 +362,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       tabindex="0"
                     />
                   </div>
-                  <div class="ml-0 w-5/12">
+                  <div class="ms-0 w-5/12">
                     <OFormInput
                       :data-test="`add-destination-header-${header['key']}-value-input`"
                       :name="`apiHeaders[${index}].value`"
@@ -156,10 +370,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       tabindex="0"
                     />
                   </div>
-                  <div class="ml-0 w-1/6">
+                  <div class="ms-0 w-1/6">
                     <OButton
                       :data-test="`add-destination-header-${header['key']}-delete-btn`"
-                      class="ml-1"
+                      class="ms-1"
                       variant="ghost"
                       size="icon-circle-sm"
                       :title="t('alert_templates.edit')"
@@ -170,7 +384,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       data-test="add-destination-add-header-btn"
                       v-if="index === apiHeaders.length - 1"
-                      class="ml-1"
+                      class="ms-1"
                       variant="ghost"
                       size="icon-circle-sm"
                       :title="t('alert_templates.edit')"
@@ -181,267 +395,143 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
-
-              <!-- Skip TLS Verify Toggle -->
-              <div class="py-2">
+              <div class="w-full py-2">
                 <OFormSwitch
                   data-test="add-destination-skip-tls-verify-toggle"
                   name="skip_tls_verify"
                   :label="t('alert_destinations.skip_tls_verify')"
                 />
               </div>
-            </div>
 
-            <!-- Test Result Display -->
-            <DestinationTestResult
-              v-if="lastTestResult"
-              :result="lastTestResult"
-              :is-loading="isTestInProgress"
-              data-test="prebuilt-test-result"
-              @retry="handleTestDestination"
-            />
-          </div>
-
-          <!-- Tabs for non-alert destinations OR custom alert destinations -->
-          <div v-if="!isAlerts || (isAlerts && dtVal === 'custom')" class="w-full pb-3">
-            <div class="app-tabs-container mr-2 h-9 w-fit">
-              <AppTabs
-                data-test="add-destination-tabs"
-                :tabs="tabs"
-                class="tabs-selection-container"
-                :active-tab="typeVal"
-                @update:active-tab="setType"
+              <!-- Test Result Display -->
+              <DestinationTestResult
+                v-if="isCustomWebhook && lastTestResult"
+                :result="lastTestResult"
+                :is-loading="isTestInProgress"
+                data-test="custom-test-result"
+                @retry="handleTestDestination"
               />
-            </div>
-          </div>
-          <div
-            v-if="typeVal === 'email' && !getFormattedTemplates.length"
-            class="mb-3 flex w-full items-center"
-          >
-            <div class="mr-2 text-sm font-medium">
-              {{ t("alert_destinations.noEmailTemplates") }}
-            </div>
-            <OButton variant="outline" size="sm" @click="createEmailTemplate">{{
-              t("alert_destinations.createEmailTemplate")
-            }}</OButton>
-          </div>
-          <!-- Name + Template row for custom alert destinations -->
-          <div v-if="isAlerts && dtVal === 'custom'" class="flex w-full gap-3">
-            <div class="w-1/2 py-1">
-              <OFormInput
-                data-test="add-destination-name-input"
-                name="name"
-                :label="t('alerts.name')"
-                required
-                tabindex="0"
-              />
-            </div>
-            <div class="w-1/2 py-1">
+            </template>
+            <template v-if="typeVal === 'email' && (!isAlerts || dtVal === 'custom')">
+              <!-- Recipients are organization users, picked from the list rather
+                 than typed: a mistyped address in a free-text field failed
+                 silently at delivery time, with nothing in the UI to show for
+                 it. Someone who is not a user yet is created in place via the
+                 action below the options. -->
               <OFormSelect
-                data-test="add-destination-template-select"
-                name="template"
-                :label="t('alert_destinations.template')"
+                data-test="add-destination-emails-select"
+                name="emails"
+                :label="t('reports.recipients')"
                 required
-                :options="getFormattedTemplates"
-                tabindex="0"
-              />
-            </div>
-          </div>
-          <!-- Name field for non-alert destinations (pipelines) -->
-          <div v-if="!isAlerts" class="w-full py-1">
-            <OFormInput
-              data-test="add-destination-name-input"
-              name="name"
-              :label="t('alerts.name')"
-              required
-              tabindex="0"
-            />
-          </div>
-
-          <template
-            v-if="
-              (isAlerts && dtVal === 'custom' && typeVal === 'http') ||
-              (!isAlerts && typeVal === 'http')
-            "
-          >
-            <div class="flex w-full gap-3">
-              <div class="w-1/2 py-1">
-                <OFormInput
-                  data-test="add-destination-url-input"
-                  name="url"
-                  :label="t('alert_destinations.url')"
-                  required
-                  tabindex="0"
-                />
-              </div>
-              <div class="py-1" :class="{ 'w-1/4': !isAlerts, 'w-1/2': isAlerts }">
-                <OFormSelect
-                  data-test="add-destination-method-select"
-                  name="method"
-                  :label="t('alert_destinations.method')"
-                  required
-                  :options="apiMethods"
-                  tabindex="0"
-                />
-              </div>
-              <div v-if="!isAlerts" class="w-1/4 py-1">
-                <OFormSelect
-                  data-test="add-destination-output-format-select"
-                  name="output_format"
-                  :label="t('alert_destinations.output_format')"
-                  required
-                  :options="outputFormats"
-                  tabindex="0"
-                />
-              </div>
-            </div>
-            <div class="w-full py-2">
-              <div class="py-1 font-bold">{{ t("alert_destinations.headers") }}</div>
-              <div v-for="(header, index) in apiHeaders" :key="index" class="flex gap-2 pb-2">
-                <div class="ml-0 w-5/12">
-                  <OFormInput
-                    :data-test="`add-destination-header-${header['key']}-key-input`"
-                    :name="`apiHeaders[${index}].key`"
-                    :placeholder="t('alert_destinations.api_header')"
-                    tabindex="0"
-                  />
-                </div>
-                <div class="ml-0 w-5/12">
-                  <OFormInput
-                    :data-test="`add-destination-header-${header['key']}-value-input`"
-                    :name="`apiHeaders[${index}].value`"
-                    :placeholder="t('alert_destinations.api_header_value')"
-                    tabindex="0"
-                  />
-                </div>
-                <div class="ml-0 w-1/6">
-                  <OButton
-                    :data-test="`add-destination-header-${header['key']}-delete-btn`"
-                    class="ml-1"
-                    variant="ghost"
-                    size="icon-circle-sm"
-                    :title="t('alert_templates.edit')"
-                    @click="deleteApiHeader(index)"
-                  >
-                    <OIcon name="delete" size="sm" />
-                  </OButton>
-                  <OButton
-                    data-test="add-destination-add-header-btn"
-                    v-if="index === apiHeaders.length - 1"
-                    class="ml-1"
-                    variant="ghost"
-                    size="icon-circle-sm"
-                    :title="t('alert_templates.edit')"
-                    @click="addApiHeader()"
-                  >
-                    <OIcon name="add" size="sm" />
-                  </OButton>
-                </div>
-              </div>
-            </div>
-            <div class="w-full py-2">
-              <OFormSwitch
-                data-test="add-destination-skip-tls-verify-toggle"
-                name="skip_tls_verify"
-                :label="t('alert_destinations.skip_tls_verify')"
-              />
-            </div>
-          </template>
-          <template v-if="typeVal === 'email' && (!isAlerts || dtVal === 'custom')">
-            <OFormInput
-              name="emails"
-              :label="t('reports.recipients')"
-              required
-              tabindex="0"
-              :placeholder="t('user.inviteByEmail')"
-            />
-          </template>
-
-          <template v-if="typeVal === 'action' && (!isAlerts || dtVal === 'custom')">
-            <div class="action-select w-1/2 py-1">
-              <OFormSelect
-                data-test="add-destination-action-select"
-                name="action_id"
-                :label="t('alert_destinations.action')"
-                required
-                :options="actionOptions"
+                multiple
                 searchable
+                :options="orgUserOptions"
                 labelKey="label"
                 valueKey="value"
-                :loading="isLoadingActions"
+                :loading="isLoadingOrgUsers"
                 tabindex="0"
-              />
-            </div>
-          </template>
-        </OForm>
-      </div>
-      <div class="border-border-default flex w-full justify-between border-t px-4 py-4">
-        <!-- Left side: Test and Preview buttons (only for prebuilt destinations) -->
+              >
+                <template #after-options>
+                  <OButton
+                    variant="ghost-primary"
+                    size="sm"
+                    class="w-full justify-start"
+                    icon-left="person-add"
+                    data-test="add-destination-create-user-btn"
+                    @click="openCreateUser"
+                  >
+                    {{ t("user.add") }}
+                  </OButton>
+                </template>
+              </OFormSelect>
+            </template>
+          </OForm>
+        </div>
         <div
-          v-if="
-            isAlerts && (isPrebuiltDestination || (isUpdatingDestination && dtVal !== 'custom'))
-          "
-          class="flex items-center gap-2"
+          class="border-border-default flex w-full flex-col gap-3 border-t px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
         >
-          <OButton
-            data-test="destination-preview-button"
-            variant="outline"
-            size="sm"
-            @click="showPreview"
-            icon-left="preview"
+          <!-- Left side: Test and Preview buttons (prebuilt and custom Web Hook alert destinations) -->
+          <div
+            v-if="showPrebuiltFinalActions || isCustomWebhook"
+            class="flex flex-wrap items-center gap-2"
           >
-            {{ t("alert_destinations.preview") }}
-          </OButton>
-          <OButton
-            data-test="destination-test-button"
-            :loading="isTestInProgress"
-            variant="outline"
-            size="sm"
-            @click="handleTestDestination"
-            icon-left="send"
-          >
-            {{ t("alert_destinations.test") }}
-          </OButton>
-        </div>
-        <div v-else></div>
+            <OButton
+              data-test="destination-preview-button"
+              variant="outline"
+              size="sm"
+              @click="showPreview"
+              icon-left="preview"
+            >
+              {{ t("alert_destinations.preview") }}
+            </OButton>
+            <OButton
+              data-test="destination-test-button"
+              :loading="isTestInProgress"
+              variant="outline"
+              size="sm"
+              @click="handleTestDestination"
+              icon-left="send"
+            >
+              {{ t("alert_destinations.test") }}
+            </OButton>
+          </div>
+          <div v-else></div>
 
-        <!-- Right side: Cancel and Save buttons -->
-        <div class="flex items-center gap-2">
-          <OButton
-            data-test="add-destination-cancel-btn"
-            v-close-popup="true"
-            variant="outline"
-            size="sm-action"
-            @click="$emit('cancel:hideform')"
-            >{{ t("alerts.cancel") }}</OButton
-          >
-          <OButton
-            data-test="add-destination-submit-btn"
-            variant="primary"
-            size="sm-action"
-            type="submit"
-            form="add-destination-form"
-            @click="onSaveClick"
-            >{{ t("alerts.save") }}</OButton
-          >
+          <!-- Right side: Cancel and Save buttons -->
+          <div class="flex flex-wrap items-center justify-end gap-2">
+            <OButton
+              data-test="add-destination-cancel-btn"
+              v-close-popup="true"
+              variant="outline"
+              size="sm-action"
+              @click="closeEditor"
+              >{{ t("alerts.cancel") }}</OButton
+            >
+            <OButton
+              v-if="!isNewSlackDestination || showPrebuiltAdvancedSettings"
+              data-test="add-destination-submit-btn"
+              variant="primary"
+              size="sm-action"
+              type="submit"
+              form="add-destination-form"
+              @click="onSaveClick"
+              >{{ t("alerts.save") }}</OButton
+            >
+          </div>
         </div>
-      </div>
+      </template>
     </div>
+
+    <!-- Creating a recipient without leaving the destination form. Reuses the
+         IAM AddUser component in its drawer form (see its `container` prop) so
+         there is one user-creation form in the app, not two. -->
+    <AddUser
+      v-model:open="showCreateUser"
+      container="drawer"
+      :roles="createUserRoles"
+      :userRole="currentUserRole"
+      :isCloud="isCloudDeployment"
+      @updated="onUserCreated"
+    />
 
     <!-- Destination Preview Modal -->
     <DestinationPreview
       v-model="showPreviewModal"
       :type="dtVal"
       :template-content="previewContent"
+      :recipients="previewRecipients"
       data-test="destination-preview-modal"
     />
+    <EditorDraftDialogs :draft="destinationDraft" />
   </OPageLayout>
 </template>
 <script lang="ts" setup>
-import { ref, computed, onBeforeMount, onActivated, watch } from "vue";
+import { saveDestinationMutation } from "@/services/alert_destination.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
+import { ref, computed, nextTick, onBeforeMount, onActivated, onMounted, watch } from "vue";
 import type { PropType } from "vue";
-import { useI18n } from "vue-i18n";
-import destinationService from "@/services/alert_destination";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -455,23 +545,43 @@ import type { Template, Headers, DestinationPayload } from "@/ts/interfaces";
 import { useRouter } from "vue-router";
 import AppTabs from "@/components/common/AppTabs.vue";
 import config from "@/aws-exports";
-import useActions from "@/composables/useActions";
+import usersService from "@/services/users";
+import AddUser from "@/components/iam/users/AddUser.vue";
 import { useReo } from "@/services/reodotdev_analytics";
-import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
-import { isPrebuiltType, detectPrebuiltTypeFromUrl } from "@/utils/prebuilt-templates";
+import {
+  usePrebuiltDestinations,
+  type SlackSetupMetadata,
+} from "@/composables/usePrebuiltDestinations";
+import { detectPrebuiltType, getPrebuiltConfig } from "@/utils/prebuilt-templates";
+import { isValidSlackWebhookUrl } from "@/utils/prebuilt-templates/slack";
+import { DEFAULT_SLACK_APP_NAME } from "@/utils/slackManifest";
 import PrebuiltDestinationForm from "./PrebuiltDestinationForm.vue";
 import { prebuiltDestinationDefaults } from "./PrebuiltDestinationForm.schema";
 import PrebuiltDestinationSelector from "./PrebuiltDestinationSelector.vue";
 import DestinationTestResult from "./DestinationTestResult.vue";
 import DestinationPreview from "./DestinationPreview.vue";
+import SlackDestinationSetup from "./SlackDestinationSetup.vue";
+import SlackAppDestinationForm from "./SlackAppDestinationForm.vue";
+import SlackAppSwitchBanner from "./SlackAppSwitchBanner.vue";
+import { readSlackOrgConfig } from "@/utils/slackSettings";
+import { orgAdminFlag } from "@/components/ai-assistant/share/chatShare";
+import type { SlackDisabledReason } from "@/types/slack";
+import {
+  isSlackAppDestination,
+  switchToSlackApp,
+  type SlackAppDestination,
+} from "@/utils/slackAppDestination";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useOForm } from "@/lib/forms/Form/useOForm";
+import { useOForm, type FormFieldPath } from "@/lib/forms/Form/useOForm";
 import {
   makeAddDestinationSchema,
   addDestinationDefaults,
   type AddDestinationForm,
 } from "./AddDestination.schema";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+import { urlCarriesCredential } from "@/utils/drafts/urlCredentials";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 
 const props = defineProps({
   templates: {
@@ -488,17 +598,102 @@ const props = defineProps({
   },
 });
 const emit = defineEmits(["get:destinations", "cancel:hideform"]);
-const apiMethods = ["get", "post", "put"];
-const outputFormats = ["json", "ndjson"];
+const apiMethods = ["get", "post", "put"].map((m) => ({ label: raw(m.toUpperCase()), value: m }));
+const outputFormats = ["json", "ndjson"].map((f) => ({
+  label: raw(f.toUpperCase()),
+  value: f,
+}));
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
+
+// ── Email recipients ──────────────────────────────────────────────────────
+// Recipients are organization users, so the picker needs the org's user list.
+
+const orgUsers = ref<{ label: I18nText; value: string }[]>([]);
+const isLoadingOrgUsers = ref(false);
+const showCreateUser = ref(false);
+// Role choices for the create-user drawer, from the same endpoint the IAM
+// users page uses — the org decides what roles exist, not this form.
+const createUserRoles = ref<{ label: I18nText; value: string }[]>([]);
+const currentUserRole = ref("admin");
+
+const orgUserOptions = computed(() => orgUsers.value);
+const isCloudDeployment = computed(() => config.isCloud === "true");
+const isEnterpriseDeployment = computed(() => config.isEnterprise === "true");
+
+// OSS has neither the OAuth backend nor the enterprise manifest flow, so webhook is the only option.
+const defaultSlackSetupMethod = (): "oauth" | "manifest" | "webhook" => {
+  if (isCloudDeployment.value) return "oauth";
+  return isEnterpriseDeployment.value ? "manifest" : "webhook";
+};
+
+const fetchOrgUsers = async () => {
+  isLoadingOrgUsers.value = true;
+  try {
+    const res = await usersService.orgUsers(store.state.selectedOrganization.identifier);
+    const list = res.data?.data ?? res.data ?? [];
+
+    orgUsers.value = list
+      .filter((user: any) => user?.email)
+      .map((user: any) => ({ label: raw(user.email), value: user.email }));
+
+    // AddUser gates which roles the operator may grant on the CURRENT user's
+    // role; it comes off this same response, as it does on the IAM page.
+    const me = list.find(
+      (user: any) => user?.email?.toLowerCase() === store.state.userInfo?.email?.toLowerCase(),
+    );
+    if (me?.role) currentUserRole.value = String(me.role).toLowerCase();
+  } catch {
+    // A failed fetch leaves the picker empty rather than breaking the form. The
+    // required-field rule still stops an empty destination being saved.
+    orgUsers.value = [];
+  } finally {
+    isLoadingOrgUsers.value = false;
+  }
+};
+
+const fetchCreateUserRoles = async () => {
+  try {
+    const res = await usersService.getRoles(store.state.selectedOrganization.identifier);
+    createUserRoles.value = Array.isArray(res.data)
+      ? res.data.map((role: any) => ({ label: raw(role.label ?? role), value: role.value ?? role }))
+      : [];
+  } catch {
+    createUserRoles.value = [];
+  }
+};
+
+const openCreateUser = () => {
+  showCreateUser.value = true;
+};
+
+/**
+ * Refresh the list after a user is created and select the new address, so the
+ * round-trip ends where the user was going: a recipient chosen.
+ */
+const onUserCreated = async (created?: any) => {
+  showCreateUser.value = false;
+  const known = new Set(orgUsers.value.map((option) => option.value));
+
+  await fetchOrgUsers();
+
+  const added = created?.email ?? orgUsers.value.find((option) => !known.has(option.value))?.value;
+  if (!added) return;
+
+  const current = (form.state.values.emails ?? []) as string[];
+  if (!current.includes(added)) {
+    form.setFieldValue("emails", [...current, added]);
+  }
+};
+
 const { track } = useReo();
 
 // Single form for custom, pipeline and prebuilt destinations (credentials are
 // `credentials.*` fields); saveDestination dispatches by type.
+const addDestinationSchema = makeAddDestinationSchema(t, props.isAlerts);
 const form = useOForm({
   defaultValues: addDestinationDefaults(),
-  schema: makeAddDestinationSchema(t, props.isAlerts),
+  schema: addDestinationSchema,
   onSubmit: (value: AddDestinationForm) => saveDestination(value),
 });
 
@@ -506,6 +701,7 @@ const form = useOForm({
 // pipeline via saveCustomDestination. Returned so OForm awaits the real save (the
 // footer Save spinner spans it).
 function saveDestination(value: AddDestinationForm): Promise<void> | undefined {
+  if (blockOnPendingReentries()) return undefined;
   return isPrebuiltDestination.value ? handlePrebuiltSave(value) : saveCustomDestination(value);
 }
 
@@ -515,13 +711,36 @@ const typeVal = form.useStore((s: any) => s.values.type as string);
 const apiHeaders = form.useStore(
   (s: any) => (s.values.apiHeaders ?? []) as { key: string; value: string }[],
 );
+const urlVal = form.useStore((state: { values: AddDestinationForm }) => state.values.url);
+const methodVal = form.useStore((state: { values: AddDestinationForm }) => state.values.method);
+const templateVal = form.useStore((state: { values: AddDestinationForm }) => state.values.template);
+const skipTlsVerifyVal = form.useStore(
+  (state: { values: AddDestinationForm }) => state.values.skip_tls_verify,
+);
+const slackSetupMethod = form.useStore(
+  (state: { values: AddDestinationForm }) => state.values.slack_setup_method,
+);
+const slackTeamId = form.useStore(
+  (state: { values: AddDestinationForm }) => state.values.slack_team_id,
+);
+const slackTeamName = form.useStore(
+  (state: { values: AddDestinationForm }) => state.values.slack_team_name,
+);
+const slackChannelId = form.useStore(
+  (state: { values: AddDestinationForm }) => state.values.slack_channel_id,
+);
+const slackManifestReady = ref(false);
+const originalSlackWebhookUrl = ref("");
 
 const isUpdatingDestination = ref(false);
-const isLoadingActions = ref(false);
-const router = useRouter();
-const actionOptions = ref<{ value: string; label: string; type: string }[]>([]);
 
-const { getAllActions } = useActions();
+const orgId = useOrgId();
+// One mutation for both branches: the caller picks create vs update, the
+// declaration owns the cache consequence.
+const saveDestinationWrite = useMutation(() =>
+  saveDestinationMutation(orgId.value, () => isUpdatingDestination.value),
+);
+const router = useRouter();
 
 // Prebuilt destinations composable
 const {
@@ -530,9 +749,11 @@ const {
   createDestination,
   updateDestination,
   generatePreview,
+  renderTemplateBody,
+  testCustomDestination,
   isTestInProgress,
   lastTestResult,
-  detectPrebuiltType,
+  clearTestResult,
 } = usePrebuiltDestinations();
 
 // Prebuilt credentials sub-object (`credentials.*`), read reactively for the
@@ -543,6 +764,163 @@ const prebuiltCredentials = form.useStore(
 const destinationSearchQuery = ref("");
 const showPreviewModal = ref(false);
 const previewContent = ref("");
+const previewRecipients = computed(() =>
+  Array.isArray(prebuiltCredentials.value.recipients) ? prebuiltCredentials.value.recipients : [],
+);
+
+// A test result is stale once anything it was sent with changes; an in-flight
+// test is discarded too.
+watch(
+  [prebuiltCredentials, typeVal, urlVal, methodVal, templateVal, skipTlsVerifyVal, apiHeaders],
+  () => {
+    if (lastTestResult.value || isTestInProgress.value) clearTestResult();
+  },
+  { deep: true },
+);
+
+// The Slack app type has its own form: no URL, method or headers to fill.
+const isSlackApp = computed(
+  () =>
+    props.isAlerts &&
+    (!!switchDraft.value ||
+      (props.destination ? isSlackAppDestination(props.destination) : dtVal.value === "slack_app")),
+);
+const slackAppAvailable = computed(
+  () =>
+    props.isAlerts &&
+    (isEnterpriseDeployment.value || isCloudDeployment.value) &&
+    readSlackOrgConfig(store.state.zoConfig).enabled,
+);
+// An OSS build serves no reason of its own, so its edition is the reason.
+const slackAppUnavailableReason = computed<SlackDisabledReason>(() => {
+  if (!isEnterpriseDeployment.value && !isCloudDeployment.value) return "edition";
+  return readSlackOrgConfig(store.state.zoConfig).reason ?? "edition";
+});
+const canManageSlack = computed(() => orgAdminFlag(store.state) === true);
+const switchQuery = computed(() => router.currentRoute?.value.query ?? {});
+const switchDraft = computed(() => {
+  const q = switchQuery.value;
+  if (
+    !props.destination ||
+    q.name !== props.destination.name ||
+    typeof q.slack_app_installation !== "string"
+  )
+    return null;
+  const metadata = props.destination.metadata;
+  return switchToSlackApp(
+    {
+      ...props.destination,
+      metadata: typeof metadata === "string" ? metadata : JSON.stringify(metadata ?? {}),
+    },
+    q.slack_app_installation,
+  );
+});
+const switchConfirmation = computed(() => {
+  const q = switchQuery.value;
+  if (!switchDraft.value || typeof q.slack_app_refusal !== "string") return undefined;
+  return {
+    code: q.slack_app_refusal,
+    team: String(q.slack_app_team ?? ""),
+    destination: String(q.slack_app_room ?? ""),
+  };
+});
+const slackAppDestination = computed(
+  () =>
+    switchDraft.value ??
+    (props.destination && isSlackAppDestination(props.destination)
+      ? (props.destination as unknown as SlackAppDestination)
+      : null),
+);
+// The form seeds its values and confirm flags once, so a Review of another destination must remount it.
+const slackAppFormKey = computed(
+  () => `${slackAppDestination.value?.name ?? ""}:${switchConfirmation.value?.code ?? ""}`,
+);
+const onSlackAppSaved = (): void => {
+  emit("get:destinations");
+  emit("cancel:hideform");
+};
+
+const isNewSlackDestination = computed(
+  () => props.isAlerts && !props.destination && dtVal.value === "slack",
+);
+const isSlackOAuthFlow = computed(
+  () => isNewSlackDestination.value && slackSetupMethod.value === "oauth",
+);
+const isSlackManifestFlow = computed(
+  () => isNewSlackDestination.value && slackSetupMethod.value === "manifest",
+);
+const isSlackOAuthConnected = computed(() => {
+  const webhookUrl = prebuiltCredentials.value.webhookUrl;
+  const channel = prebuiltCredentials.value.channel;
+  return (
+    typeof webhookUrl === "string" &&
+    isValidSlackWebhookUrl(webhookUrl) &&
+    typeof channel === "string" &&
+    channel.trim().length > 0 &&
+    slackTeamId.value.trim().length > 0 &&
+    slackTeamName.value.trim().length > 0 &&
+    slackChannelId.value.trim().length > 0
+  );
+});
+const showPrebuiltAdvancedSettings = computed(() => {
+  if (isSlackOAuthFlow.value) return isSlackOAuthConnected.value;
+  if (isSlackManifestFlow.value) return slackManifestReady.value;
+  return true;
+});
+const showPrebuiltFinalActions = computed(
+  () =>
+    props.isAlerts &&
+    (isPrebuiltDestination.value || (isUpdatingDestination.value && dtVal.value !== "custom")) &&
+    showPrebuiltAdvancedSettings.value,
+);
+const isCustomWebhook = computed(
+  () => props.isAlerts && dtVal.value === "custom" && typeVal.value === "http",
+);
+const handleSlackFlowChange = (): void => {
+  clearTestResult();
+};
+const handleSlackReadinessChange = (ready: boolean): void => {
+  slackManifestReady.value = ready;
+};
+
+const issuePathToName = (path: readonly PropertyKey[]): string =>
+  path.reduce<string>(
+    (name, segment) =>
+      typeof segment === "number"
+        ? `${name}[${segment}]`
+        : name
+          ? `${name}.${String(segment)}`
+          : String(segment),
+    "",
+  );
+
+const formValues = form.useStore((state: { values: AddDestinationForm }) => state.values);
+watch(
+  formValues,
+  () => {
+    const result = addDestinationSchema.safeParse(form.state.values);
+    const invalidFields = new Set(
+      result.success ? [] : result.error.issues.map((issue) => issuePathToName(issue.path)),
+    );
+
+    for (const field of Object.keys(
+      form.state.fieldMeta ?? {},
+    ) as FormFieldPath<AddDestinationForm>[]) {
+      const meta = form.getFieldMeta(field);
+      if (meta && (meta.errors?.length ?? 0) > 0 && !invalidFields.has(field)) {
+        form.setFieldMeta(field, { ...meta, errorMap: {} });
+      }
+    }
+
+    if (result.success) {
+      const errorMap = (form.state.errorMap ?? {}) as Record<string, unknown>;
+      if (errorMap.onDynamic != null) {
+        form.setErrorMap({ onDynamic: undefined });
+      }
+    }
+  },
+  { deep: true },
+);
 
 // When no destination-type card is chosen yet, `destination_type` is empty so the
 // schema rejects on name/url — but those fields aren't mounted until a card is
@@ -572,8 +950,6 @@ const tabs = computed(() => {
       return [{ label: t("alerts.webhook"), value: "http", icon: "webhook" }];
     } else if (currentType === "email") {
       return [{ label: t("alerts.email"), value: "email", icon: "mail" }];
-    } else if (currentType === "action") {
-      return [{ label: t("alerts.action"), value: "action", icon: "bolt" }];
     }
   }
 
@@ -582,13 +958,6 @@ const tabs = computed(() => {
     { label: t("alerts.webhook"), value: "http", icon: "webhook" },
     { label: t("alerts.email"), value: "email", icon: "mail" },
   ];
-
-  if (
-    (config.isEnterprise == "true" || config.isCloud == "true") &&
-    store.state.zoConfig.actions_enabled
-  ) {
-    tabs.push({ label: t("alerts.action"), value: "action", icon: "bolt" });
-  }
 
   return tabs;
 });
@@ -621,7 +990,7 @@ const getDestinationTypeIcon = (typeId: string) => {
 onActivated(() => setupDestinationData());
 onBeforeMount(async () => {
   setupDestinationData();
-  await getActionOptions();
+  await Promise.all([fetchOrgUsers(), fetchCreateUserRoles()]);
 });
 
 // Watch for destination prop changes (important for edit mode dialog)
@@ -637,6 +1006,11 @@ watch(
 );
 
 const setupDestinationData = () => {
+  originalSlackWebhookUrl.value = "";
+  if (props.destination && isSlackAppDestination(props.destination)) {
+    isUpdatingDestination.value = true;
+    return;
+  }
   if (props.destination) {
     isUpdatingDestination.value = true;
     // Resolve the destination_type discriminator FIRST; setDestType only records
@@ -648,7 +1022,8 @@ const setupDestinationData = () => {
 
     const destHeaders: Record<string, any> = props.destination.headers || {};
 
-    // Set destination_type for prebuilt destinations in edit mode
+    setDestType(detectPrebuiltType(props.destination) ?? "custom");
+
     // Parse metadata if it's a string
     let parsedMetadata: any = null;
     if (props.destination.metadata) {
@@ -662,80 +1037,26 @@ const setupDestinationData = () => {
       }
     }
 
-    // Priority 1: Check metadata.prebuilt_type (most reliable for prebuilt destinations)
-    if (parsedMetadata?.prebuilt_type && isPrebuiltType(parsedMetadata.prebuilt_type)) {
-      setDestType(parsedMetadata.prebuilt_type);
-    }
-    // Priority 2: Check if template starts with 'system-prebuilt-' AND destination structure matches
-    // (Must have emails array for email, or specific prebuilt URL patterns for HTTP)
-    else if (props.destination.template?.startsWith("system-prebuilt-")) {
-      const templateType = props.destination.template.replace("system-prebuilt-", "");
-      // Only treat as prebuilt if structure matches the type
-      if (
-        templateType === "email" &&
-        props.destination.type === "email" &&
-        props.destination.emails
-      ) {
-        setDestType("email");
-      } else if (props.destination.type === "http" && props.destination.url) {
-        // Use URL-only detection here — detectPrebuiltType also checks the template
-        // name, which would always match since we're already inside the
-        // system-prebuilt-* branch. A custom destination can have any template,
-        // so the URL is the only reliable signal at this point.
-        const urlType = detectPrebuiltTypeFromUrl(props.destination.url);
-        if (urlType && isPrebuiltType(urlType)) {
-          setDestType(urlType);
-        } else {
-          // Has system template but URL doesn't match prebuilt patterns - it's custom
-          setDestType("custom");
-        }
-      } else {
-        setDestType("custom");
-      }
-    }
-    // Priority 3: Check if template starts with 'prebuilt_' (user templates)
-    // Also verify the URL matches the prebuilt type to avoid misclassifying custom
-    // destinations that happen to use a template with a prebuilt_ prefix.
-    else if (props.destination.template?.startsWith("prebuilt_")) {
-      const extractedType = props.destination.template.replace("prebuilt_", "");
-      if (isPrebuiltType(extractedType) && props.destination.url) {
-        const urlType = detectPrebuiltTypeFromUrl(props.destination.url);
-        setDestType(urlType === extractedType ? extractedType : "custom");
-      } else {
-        setDestType(isPrebuiltType(extractedType) ? extractedType : "custom");
-      }
-    }
-    // Priority 4: Check if template includes 'prebuilt' (legacy format)
-    // Also verify the URL matches the prebuilt type (same guard as Priority 3).
-    else if (props.destination.template?.includes("prebuilt")) {
-      const parts = props.destination.template.split("-");
-      const extractedType = parts[parts.length - 1];
-      if (isPrebuiltType(extractedType) && props.destination.url) {
-        const urlType = detectPrebuiltTypeFromUrl(props.destination.url);
-        setDestType(urlType === extractedType ? extractedType : "custom");
-      } else {
-        setDestType(isPrebuiltType(extractedType) ? extractedType : "custom");
-      }
-    }
-    // Priority 5: Fallback to URL-based detection (for destinations without metadata)
-    else if (props.destination.url) {
-      const detectedType = detectPrebuiltType(props.destination);
-      if (detectedType) {
-        setDestType(detectedType);
-      } else {
-        setDestType("custom");
-      }
-    }
-    // Priority 6: No indicators - this is a custom destination
-    else {
-      setDestType("custom");
-    }
-
     // Edit-prefill: seed via a single form.reset(record), not a per-field
     // setFieldValue loop — reset() also clears field meta, whereas a setFieldValue
     // loop leaves every prefilled field marked dirty/touched with stale errors, and
     // this runs again on every onActivated. Start from the defaults so every key is
     // present, then overlay the record.
+    const hasSavedSlackOAuthMetadata =
+      destType === "slack" &&
+      parsedMetadata?.setup_method === "oauth" &&
+      typeof parsedMetadata.slack_team_id === "string" &&
+      parsedMetadata.slack_team_id.trim().length > 0 &&
+      typeof parsedMetadata.slack_team_name === "string" &&
+      parsedMetadata.slack_team_name.trim().length > 0 &&
+      typeof parsedMetadata.slack_channel_id === "string" &&
+      parsedMetadata.slack_channel_id.trim().length > 0;
+    const hasSavedSlackManifestMetadata =
+      destType === "slack" &&
+      parsedMetadata?.setup_method === "manifest" &&
+      typeof parsedMetadata.slack_app_name === "string" &&
+      parsedMetadata.slack_app_name.trim().length > 0;
+
     const record: AddDestinationForm = {
       ...addDestinationDefaults(),
       destination_type: destType,
@@ -744,9 +1065,19 @@ const setupDestinationData = () => {
       method: props.destination.method ?? "post",
       skip_tls_verify: props.destination.skip_tls_verify ?? false,
       template: props.destination.template ?? "",
-      emails: (props.destination?.emails || []).join(", "),
+      emails: props.destination?.emails ?? [],
       type: props.destination.type || "http",
-      action_id: props.destination.action_id || "",
+      slack_setup_method: hasSavedSlackOAuthMetadata
+        ? "oauth"
+        : hasSavedSlackManifestMetadata
+          ? "manifest"
+          : "webhook",
+      slack_app_name: hasSavedSlackManifestMetadata
+        ? parsedMetadata.slack_app_name.trim()
+        : DEFAULT_SLACK_APP_NAME,
+      slack_team_id: hasSavedSlackOAuthMetadata ? parsedMetadata.slack_team_id : "",
+      slack_team_name: hasSavedSlackOAuthMetadata ? parsedMetadata.slack_team_name : "",
+      slack_channel_id: hasSavedSlackOAuthMetadata ? parsedMetadata.slack_channel_id : "",
       // Prebuilt credentials, typed to the active type's fields. Custom → {}.
       credentials:
         destType && destType !== "custom"
@@ -755,9 +1086,14 @@ const setupDestinationData = () => {
     };
 
     // Only CUSTOM headers reach the UI array; system/prebuilt ones stay implicit.
-    // When there are none, the default apiHeaders row is kept.
+    // When there are none, the default apiHeaders row is kept. Custom and
+    // pipeline destinations show every header: save rebuilds headers from the
+    // rows alone, so a hidden row would be deleted.
     if (Object.keys(destHeaders).length) {
-      const systemHeaders = ["Content-Type", "Authorization", "X-Routing-Key"];
+      const systemHeaders =
+        props.isAlerts && destType && destType !== "custom"
+          ? ["Content-Type", "Authorization", "X-Routing-Key"]
+          : [];
       const customHeadersOnly = Object.entries(destHeaders).filter(
         ([key]) => !systemHeaders.includes(key),
       );
@@ -772,6 +1108,10 @@ const setupDestinationData = () => {
     // Only override the default when the saved destination carries one.
     if (props.destination.output_format) {
       record.output_format = props.destination.output_format;
+    }
+
+    if (destType === "slack") {
+      originalSlackWebhookUrl.value = (props.destination.url ?? "").trim();
     }
 
     // Template name is stored/displayed as-is (e.g. "prebuilt_slack") — the
@@ -801,6 +1141,8 @@ const extractPrebuiltCredentials = (typeId: string): Record<string, any> => {
           // PagerDuty stores the integration key as the bare `routing_key`
           // metadata variable (substituted into the request body).
           credentials.integrationKey = value;
+        } else if (typeId === "pagerduty" && key === "severity") {
+          credentials.severity = value;
         }
       });
     } catch (e) {
@@ -817,11 +1159,11 @@ const extractPrebuiltCredentials = (typeId: string): Record<string, any> => {
   if (typeId === "servicenow" && props.destination.url) {
     credentials.instanceUrl = props.destination.url;
   }
-  // For email destinations, recipients are in the emails field.
+  // For email destinations, recipients are in the emails field. The picker holds
+  // a string[], so pass the array through untouched (a legacy string is split by
+  // the credential defaults).
   if (typeId === "email" && props.destination.emails) {
-    credentials.recipients = Array.isArray(props.destination.emails)
-      ? props.destination.emails.join(", ")
-      : props.destination.emails;
+    credentials.recipients = props.destination.emails;
   }
   // PagerDuty: integrationKey from routing_key metadata above; fall back to the
   // X-Routing-Key header for older destinations.
@@ -864,7 +1206,8 @@ const extractPrebuiltCredentials = (typeId: string): Record<string, any> => {
 const getFormattedTemplates = computed(() =>
   props.templates
     .filter((template) => {
-      if (typeVal.value === "email" && template.type === "email") return true;
+      if (typeVal.value === "email" && (template.type === "email" || template.kind === "content"))
+        return true;
       else if (typeVal.value !== "email") return true;
       return false;
     })
@@ -885,66 +1228,40 @@ const defaultPrebuiltTemplateName = computed(() => templateNameFor(dtVal.value))
 
 // Template choices for a prebuilt destination: the API-sourced prebuilt
 // template for this type as the first (default) option, followed by any
-// user-created custom templates of the matching kind (email vs http).
+// user-created templates that fit the channel (email or content for email).
 // Other prebuilt types are excluded to prevent cross-type mismatches.
 const prebuiltTemplateOptions = computed(() => {
   const isEmailType = dtVal.value === "email";
   const matching = props.templates.filter((template) => {
     if (template.isPrebuilt) return false;
-    if (isEmailType) return template.type === "email";
+    if (isEmailType) return template.type === "email" || template.kind === "content";
     return template.type !== "email";
   });
 
-  const options: { label: string; value: string }[] = [];
+  const options: { label: I18nText; value: string }[] = [];
 
   if (defaultPrebuiltTemplateName.value) {
     const defaultLabel = t("alert_destinations.templateDefaultOption", {
       name: defaultPrebuiltTemplateName.value,
     });
-    options.push({ label: defaultLabel, value: defaultPrebuiltTemplateName.value });
+    options.push({ label: raw(defaultLabel), value: defaultPrebuiltTemplateName.value });
   }
 
   matching.forEach((template) => {
-    options.push({ label: template.name, value: template.name });
+    options.push({ label: raw(template.name), value: template.name });
   });
 
   return options;
 });
-
-const updateActionOptions = () => {
-  actionOptions.value = [];
-  store.state.organizationData.actions.forEach((action: any) => {
-    if (action.execution_details_type === "service")
-      actionOptions.value.push({
-        value: action.id,
-        label: action.name,
-        type: action.execution_details_type,
-      });
-  });
-};
-
-const getActionOptions = async () => {
-  try {
-    isLoadingActions.value = true;
-    // Update action options with existing actions
-    updateActionOptions();
-
-    // Get all actions from the server and update the action options
-    await getAllActions();
-    isLoadingActions.value = false;
-    updateActionOptions();
-  } catch (err) {
-    console.error(err);
-  } finally {
-    isLoadingActions.value = false;
-  }
-};
 
 // Select destination type (prebuilt or custom) — bridges the card grid choice
 // into the form and swaps the discriminated branch WITHOUT carrying stale
 // inactive-branch values into the save.
 const selectDestinationType = (type: string) => {
   form.setFieldValue("destination_type", type);
+  clearTestResult();
+  if (type === "slack_app") return;
+  slackManifestReady.value = false;
 
   if (type === "custom") {
     // Switch to custom mode — clear any prebuilt credentials.
@@ -958,36 +1275,60 @@ const selectDestinationType = (type: string) => {
     form.setFieldValue("credentials", prebuiltDestinationDefaults(type, {}));
     form.setFieldValue("type", type === "email" ? "email" : "http");
     form.setFieldValue("template", templateNameFor(type));
+    if (type === "slack") {
+      form.setFieldValue("slack_setup_method", defaultSlackSetupMethod());
+      form.setFieldValue("slack_app_name", DEFAULT_SLACK_APP_NAME);
+      form.setFieldValue("slack_team_id", "");
+      form.setFieldValue("slack_team_name", "");
+      form.setFieldValue("slack_channel_id", "");
+    }
   }
 };
 
-// Handle prebuilt destination test
+// Handle prebuilt and custom Web Hook destination tests
 const handleTestDestination = async () => {
+  if (isCustomWebhook.value) {
+    // testCustomDestination reports every failure through lastTestResult.
+    await testCustomDestination({
+      url: urlVal.value,
+      method: methodVal.value,
+      headers: headersFromRows(apiHeaders.value),
+      skipTlsVerify: skipTlsVerifyVal.value,
+      template: templateVal.value,
+    });
+    return;
+  }
   if (!isPrebuiltDestination.value) return;
 
   try {
     await testDestination(dtVal.value, prebuiltCredentials.value);
-  } catch (error) {
-    console.error("Test failed:", error);
+  } catch {
+    // testDestination owns user-facing sanitized error state.
   }
 };
 
 // Show template preview
 const showPreview = async () => {
-  if (!isPrebuiltDestination.value) return;
+  const customTemplate = isCustomWebhook.value ? templateVal.value : undefined;
+  if (isCustomWebhook.value && !customTemplate) {
+    toast({ variant: "error", message: t("alerts.validation.templateRequired") });
+    return;
+  }
+  if (!isPrebuiltDestination.value && !customTemplate) return;
 
   try {
     // Clear previous content
     previewContent.value = "";
 
     // Fetch and generate preview
-    const preview = await generatePreview(dtVal.value, prebuiltCredentials.value);
+    const preview = customTemplate
+      ? await renderTemplateBody(customTemplate)
+      : await generatePreview(dtVal.value, prebuiltCredentials.value);
     previewContent.value = preview;
 
     // Only show modal after content is ready
     showPreviewModal.value = true;
-  } catch (error) {
-    console.error("Failed to generate preview:", error);
+  } catch {
     toast({
       variant: "error",
       message: t("alert_destinations.previewError"),
@@ -998,6 +1339,33 @@ const showPreview = async () => {
 // Save a prebuilt destination — invoked by saveDestination once the form's schema
 // passes. name/template/apiHeaders/skip_tls_verify and `credentials` all come from
 // the validated `value`.
+const slackSetupMetadataFor = (value: AddDestinationForm): SlackSetupMetadata | undefined => {
+  if (value.destination_type !== "slack") return undefined;
+  const webhookUrl = value.credentials.webhookUrl;
+  if (
+    isUpdatingDestination.value &&
+    typeof webhookUrl === "string" &&
+    webhookUrl.trim() !== originalSlackWebhookUrl.value
+  ) {
+    return { setup_method: "webhook" };
+  }
+  if (value.slack_setup_method === "oauth") {
+    return {
+      setup_method: "oauth",
+      slack_team_id: value.slack_team_id.trim(),
+      slack_team_name: value.slack_team_name.trim(),
+      slack_channel_id: value.slack_channel_id.trim(),
+    };
+  }
+  if (value.slack_setup_method === "manifest") {
+    return {
+      setup_method: "manifest",
+      slack_app_name: value.slack_app_name.trim(),
+    };
+  }
+  return { setup_method: "webhook" };
+};
+
 async function handlePrebuiltSave(value: AddDestinationForm) {
   try {
     // Scope credentials to the ACTIVE type's fields (dropping any keys left over
@@ -1007,12 +1375,14 @@ async function handlePrebuiltSave(value: AddDestinationForm) {
       (value.credentials ?? {}) as Record<string, unknown>,
     );
     // Build custom headers object from the api-headers array-field
-    const customHeaders: Headers = {};
-    (value.apiHeaders || []).forEach((header) => {
-      if (header.key && header.value) customHeaders[header.key] = header.value;
-    });
+    const customHeaders = headersFromRows(value.apiHeaders || []);
 
-    const templateOverride = (value.template || "").trim() || undefined;
+    const selectedTemplate = (value.template || "").trim();
+    const templateOverride = isUpdatingDestination.value
+      ? selectedTemplate || undefined
+      : selectedTemplate && selectedTemplate !== templateNameFor(value.destination_type)
+        ? selectedTemplate
+        : undefined;
 
     if (isUpdatingDestination.value) {
       // Update existing prebuilt destination
@@ -1024,6 +1394,7 @@ async function handlePrebuiltSave(value: AddDestinationForm) {
         customHeaders, // custom headers
         value.skip_tls_verify || false, // skipTlsVerify
         templateOverride,
+        slackSetupMetadataFor(value),
       );
     } else {
       // Create new prebuilt destination
@@ -1034,14 +1405,26 @@ async function handlePrebuiltSave(value: AddDestinationForm) {
         customHeaders, // custom headers
         value.skip_tls_verify || false, // skipTlsVerify
         templateOverride,
+        slackSetupMetadataFor(value),
       );
     }
 
-    emit("get:destinations");
-    emit("cancel:hideform");
-  } catch (error) {
-    console.error("Failed to save prebuilt destination:", error);
+    // `createDestination`/`updateDestination` above come from usePrebuiltDestinations,
+    // which invalidates the scope itself.
+    finishSave();
+  } catch {
+    // The composable presents a sanitized error toast and rethrows so submission
+    // state settles without exposing credential-bearing request details.
   }
+}
+
+// Header rows → request headers. A row without both a key and a value is skipped.
+function headersFromRows(rows: { key: string; value: string }[]): Headers {
+  const headers: Headers = {};
+  rows.forEach((header) => {
+    if (header.key && header.value) headers[header.key] = header.value;
+  });
+  return headers;
 }
 
 // The custom/pipeline save path (dispatched from saveDestination for non-prebuilt
@@ -1055,10 +1438,7 @@ function saveCustomDestination(value: AddDestinationForm) {
     message: t("common.pleaseWait"),
     timeout: 0,
   });
-  const headers: Headers = {};
-  (value.apiHeaders || []).forEach((header) => {
-    if (header.key && header.value) headers[header.key] = header.value;
-  });
+  const headers = headersFromRows(value.apiHeaders || []);
 
   const payload: Partial<DestinationPayload> = {
     url: value.url,
@@ -1075,12 +1455,7 @@ function saveCustomDestination(value: AddDestinationForm) {
 
   if (value.type === "email") {
     payload["type"] = "email";
-    payload["emails"] = (value.emails || "").split(/[;,]/).map((email: string) => email.trim());
-  }
-
-  if (value.type === "action") {
-    payload["type"] = "action";
-    payload["action_id"] = value.action_id;
+    payload["emails"] = value.emails ?? [];
   }
 
   if (isUpdatingDestination.value) {
@@ -1088,16 +1463,11 @@ function saveCustomDestination(value: AddDestinationForm) {
       button: "Update Destination",
       page: "Add Destination",
     });
-    return destinationService
-      .update({
-        org_identifier: store.state.selectedOrganization.identifier,
-        destination_name: value.name,
-        data: payload,
-      })
+    return saveDestinationWrite
+      .mutateAsync({ destination_name: value.name, data: payload })
       .then(() => {
         dismiss();
-        emit("get:destinations");
-        emit("cancel:hideform");
+        finishSave();
         toast({
           variant: "success",
           message: t("alert_destinations.saved"),
@@ -1118,16 +1488,11 @@ function saveCustomDestination(value: AddDestinationForm) {
       button: "Create Destination",
       page: "Add Destination",
     });
-    return destinationService
-      .create({
-        org_identifier: store.state.selectedOrganization.identifier,
-        destination_name: value.name,
-        data: payload,
-      })
+    return saveDestinationWrite
+      .mutateAsync({ destination_name: value.name, data: payload })
       .then(() => {
         dismiss();
-        emit("get:destinations");
-        emit("cancel:hideform");
+        finishSave();
         toast({
           variant: "success",
           message: t("alert_destinations.saved"),
@@ -1159,6 +1524,168 @@ const deleteApiHeader = (index: number) => {
   }[];
   // Always keep at least one (blank) row so the add button stays reachable.
   if (!rows.length) (form as any).pushFieldValue("apiHeaders", { key: "", value: "" });
+};
+
+// Drafts belong to the alert destinations page; the pipeline host keeps the plain editor.
+const draftsActive = props.isAlerts && router.currentRoute.value.name === "alertDestinations";
+// Set while the leave dialog's Save runs, so a successful save does not close the editor itself.
+let leaveSave: { saved: boolean } | null = null;
+
+// These types' URL is the webhook itself, so the URL is the credential.
+const SECRET_URL_TYPES = new Set(["slack", "discord", "msteams"]);
+const urlCarriesSecret = (url: string, destinationType: string): boolean =>
+  SECRET_URL_TYPES.has(destinationType) || urlCarriesCredential(url);
+
+// Header values carry auth, and a URL that can hold a token is one, so neither is drafted.
+const redactDestinationDraft = (data: AddDestinationForm) => {
+  const copy = JSON.parse(JSON.stringify(data)) as AddDestinationForm;
+  const paths: string[] = [];
+  const blank = (holder: Record<string, unknown>, key: string, path: string) => {
+    if (typeof holder[key] !== "string" || holder[key] === "") return;
+    holder[key] = "";
+    paths.push(path);
+  };
+  if (urlCarriesSecret(copy.url, copy.destination_type)) blank(copy, "url", "/url");
+  copy.apiHeaders.forEach((row, index) => blank(row, "value", `/apiHeaders/${index}/value`));
+  const credentials = copy.credentials as Record<string, unknown>;
+  (getPrebuiltConfig(copy.destination_type)?.credentialFields ?? [])
+    .filter((field) => field.type === "password" || field.key === "webhookUrl")
+    .forEach((field) => blank(credentials, field.key, `/credentials/${field.key}`));
+  return { data: copy, paths };
+};
+
+const describeRedactedDestination = (paths: string[], data: AddDestinationForm): I18nText[] => {
+  const credentialFields = getPrebuiltConfig(data.destination_type)?.credentialFields ?? [];
+  const fields = paths.flatMap((path): I18nText[] => {
+    if (path === "/url") return [t("alert_destinations.url")];
+    const header = /^\/apiHeaders\/(\d+)\/value$/.exec(path);
+    if (header) {
+      const name = data.apiHeaders[Number(header[1])]?.key;
+      return [
+        name ? t("common.editorDraft.headerField", { name }) : t("common.editorDraft.headersField"),
+      ];
+    }
+    const field = credentialFields.find((f) => path === `/credentials/${f.key}`);
+    return field ? [t(field.labelKey)] : [];
+  });
+  return [...new Set(fields)];
+};
+
+// A not-kept header is found again by its name, since rows may have moved since the draft was written.
+let notKeptHeaderKeys = new Map<string, string>();
+
+const fieldNameFor = (path: string): FormFieldPath<AddDestinationForm> | null => {
+  const key = notKeptHeaderKeys.get(path);
+  if (key !== undefined) {
+    const index = form.state.values.apiHeaders.findIndex((row) => row.key === key);
+    return index < 0 ? null : (`apiHeaders[${index}].value` as FormFieldPath<AddDestinationForm>);
+  }
+  return path.slice(1).split("/").join(".") as FormFieldPath<AddDestinationForm>;
+};
+
+const flagReentries = (paths: string[]) => {
+  for (const path of paths) {
+    const name = fieldNameFor(path);
+    const meta = name ? form.getFieldMeta(name) : undefined;
+    if (!name || !meta) continue;
+    form.setFieldMeta(name, {
+      ...meta,
+      errorMap: { ...meta.errorMap, onSubmit: t("common.editorDraft.reenterField") },
+    });
+  }
+};
+
+/** A changed secret the draft could not keep must be typed again before saving. */
+const blockOnPendingReentries = (): boolean => {
+  const pending = draftsActive ? destinationDraft.pendingReentries() : [];
+  if (!pending.length) return false;
+  flagReentries(pending);
+  toast({ variant: "error", message: t("common.editorDraft.reenterBeforeSave") });
+  return true;
+};
+
+const serverDestination = () => {
+  const saved = props.destination;
+  if (!saved) return null;
+  return {
+    name: saved.name,
+    type: saved.type,
+    url: saved.url ?? "",
+    method: saved.method ?? "",
+    skip_tls_verify: !!saved.skip_tls_verify,
+    template: saved.template ?? "",
+    headers: saved.headers ?? {},
+    emails: saved.emails ?? [],
+    output_format: saved.output_format ?? "",
+    metadata: saved.metadata ?? "",
+  };
+};
+
+const destinationDraft = useEditorDraft<AddDestinationForm>({
+  kind: "alert_destination",
+  entityLabel: () => t("common.editorDraft.entities.alert_destination"),
+  entityId: () => props.destination?.name ?? null,
+  snapshot: () => ({ ...formValues.value }),
+  apply: async (data, { notKeptPaths }) => {
+    form.reset({ ...data, name: props.destination ? form.state.values.name : data.name });
+    notKeptHeaderKeys = new Map(
+      notKeptPaths.flatMap((path) => {
+        const header = /^\/apiHeaders\/(\d+)\/value$/.exec(path);
+        const key = header ? data.apiHeaders[Number(header[1])]?.key : undefined;
+        return key === undefined ? [] : [[path, key] as const];
+      }),
+    );
+    // After the form's own error sweep, which runs on the reset values.
+    await nextTick();
+    flagReentries(notKeptPaths);
+  },
+  base: serverDestination,
+  // The Slack app type is edited by its own form, which keeps no draft.
+  hasChanges: () => !isSlackApp.value,
+  // The saved destination keeps headers as a map and has no form fields, so the form's redaction cannot run on it.
+  redactBase: (base) => {
+    const saved = base as NonNullable<ReturnType<typeof serverDestination>>;
+    return {
+      ...saved,
+      url: urlCarriesSecret(saved.url, "") ? "" : saved.url,
+      headers: Object.fromEntries(Object.keys(saved.headers).map((key) => [key, ""])),
+    };
+  },
+  save: async () => {
+    const run = { saved: false };
+    leaveSave = run;
+    try {
+      onSaveClick();
+      await form.handleSubmit();
+    } finally {
+      leaveSave = null;
+    }
+    return run.saved;
+  },
+  redact: redactDestinationDraft,
+  describeRedacted: describeRedactedDestination,
+  leaveOnRouteUpdate: (to, from) =>
+    to.path !== from.path ||
+    to.query.action !== from.query.action ||
+    to.query.name !== from.query.name,
+});
+
+onMounted(async () => {
+  if (draftsActive) await destinationDraft.start();
+});
+
+function finishSave() {
+  emit("get:destinations");
+  if (leaveSave) {
+    leaveSave.saved = true;
+    return;
+  }
+  destinationDraft.markSaved();
+  emit("cancel:hideform");
+}
+
+const closeEditor = async () => {
+  if (await destinationDraft.confirmLeave()) emit("cancel:hideform");
 };
 
 const createEmailTemplate = () => {

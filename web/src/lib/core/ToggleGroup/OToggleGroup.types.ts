@@ -2,6 +2,8 @@
  * OToggleGroup.types.ts — public types for OToggleGroup.
  */
 
+import type { I18nText } from "@/types/i18n";
+
 import type { AcceptableValue } from "reka-ui";
 import type { ComputedRef, InjectionKey } from "vue";
 
@@ -35,7 +37,7 @@ export interface ToggleGroupProps {
   /** Visual variant — use 'primary' when the toggle sits on a primary-colored bar */
   variant?: ToggleGroupVariant;
   /** Label text rendered next to the toggle bar. For richer content use the `label` slot. */
-  label?: string;
+  label?: I18nText;
   /** Position of the label relative to the toggle bar */
   labelPosition?: "left" | "right" | "top";
   /**
@@ -44,7 +46,19 @@ export interface ToggleGroupProps {
    * responsible for applying it. Default: false
    */
   reorderable?: boolean;
+  /** Below md, render as a dropdown showing the active item (single-select only). */
+  mobileDropdown?: boolean;
 }
+
+/** Tells an OToggleGroupItem it is being rendered as the dropdown trigger or as a menu row. */
+export interface ToggleGroupMenuContext {
+  mode: "trigger" | "menu";
+  isActive: (value: AcceptableValue | boolean) => boolean;
+  select: (value: AcceptableValue | boolean) => void;
+}
+
+export const ToggleGroupMenuKey: InjectionKey<ToggleGroupMenuContext> =
+  Symbol("o-toggle-group-menu");
 
 /**
  * Provided by OToggleGroup, injected by each OToggleGroupItem so the item knows to

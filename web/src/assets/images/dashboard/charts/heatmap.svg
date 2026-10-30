@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800">
+  <rect x="36" y="36" width="728" height="728" rx="10" fill="#202020"/>
+  <g>
+    <rect x="59.5" y="59.5" width="153" height="153" fill="#076AEA"/>
+    <rect x="235.5" y="59.5" width="153" height="153" fill="#076AEA"/>
+    <rect x="411.5" y="59.5" width="153" height="153" fill="#EEEEEE"/>
+    <rect x="587.5" y="59.5" width="153" height="153" fill="#FF3535"/>
+    <rect x="59.5" y="235.5" width="153" height="153" fill="#076AEA"/>
+    <rect x="235.5" y="235.5" width="153" height="153" fill="#EEEEEE"/>
+    <rect x="411.5" y="235.5" width="153" height="153" fill="#EEEEEE"/>
+    <rect x="587.5" y="235.5" width="153" height="153" fill="#FF3535"/>
+    <rect x="59.5" y="411.5" width="153" height="153" fill="#EEEEEE"/>
+    <rect x="235.5" y="411.5" width="153" height="153" fill="#EEEEEE"/>
+    <rect x="411.5" y="411.5" width="153" height="153" fill="#EEEEEE"/>
+    <rect x="587.5" y="411.5" width="153" height="153" fill="#FF3535"/>
+    <rect x="59.5" y="587.5" width="153" height="153" fill="#EEEEEE"/>
+    <rect x="235.5" y="587.5" width="153" height="153" fill="#EEEEEE"/>
+    <rect x="411.5" y="587.5" width="153" height="153" fill="#FF3535"/>
+    <rect x="587.5" y="587.5" width="153" height="153" fill="#FF3535"/>
+  </g>
+</svg>

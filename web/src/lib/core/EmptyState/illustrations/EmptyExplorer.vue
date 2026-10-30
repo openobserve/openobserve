@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
     role="img"
-    aria-label="No data found"
+    :aria-label="t('emptyState.illustrations.explorer.ariaLabel')"
   >
     <!-- backdrop blob (parallax drift + breathe); translate folds in the scale-about-centre
          compensation (centre 191.2,131): peak (5,-4) + centre·(1-1.02) = (1.18,-6.62) -->
@@ -314,5 +314,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { useI18nTyped } from "@/types/i18n";
+
 withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 300, animated: true });
+
+const { t } = useI18nTyped();
 </script>

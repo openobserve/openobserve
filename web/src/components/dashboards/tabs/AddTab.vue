@@ -47,12 +47,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { addTab, getDashboard } from "@/utils/commons";
 import { useRoute } from "vue-router";
 import { editTab } from "../../../utils/commons";
 import useNotifications from "@/composables/useNotifications";
+import { useDashboardSaveConflict } from "@/composables/dashboard/useDashboardSaveConflict";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -91,16 +92,13 @@ export default defineComponent({
   },
   emits: ["refresh", "update:open"],
   setup(props: any, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const route = useRoute();
     const store: any = useStore();
     const addTabForm: any = ref(null);
     const addTabSchema = makeAddTabSchema(t);
-    const {
-      showPositiveNotification,
-      showErrorNotification,
-      showConfictErrorNotificationWithRefreshBtn,
-    } = useNotifications();
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
+    const saveConflict = useDashboardSaveConflict();
 
     // The tab record being edited. This is EXTERNAL data fetched from the
     // store/API (it carries the non-form fields tabId/panels) — NOT a mirror of
@@ -110,11 +108,9 @@ export default defineComponent({
     // OForm reads `defaultValues` once at mount, and ODialog remounts the body on
     // open — so this computed seeds `name` each time the dialog opens (edit → the
     // tab's name, create → blank). No local model / no manual reset needed.
-    const addTabDefaults = computed(
-      (): AddTabForm => ({
-        name: props.editMode ? (editingTab.value?.name ?? "") : "",
-      }),
-    );
+    const addTabDefaults = computed((): AddTabForm => ({
+      name: props.editMode ? (editingTab.value?.name ?? "") : "",
+    }));
 
     // Edit data arrives ASYNC (getDashboard may hit the API) after the dialog has
     // mounted, so `:default-values` has already been read. Per the playbook
@@ -144,6 +140,7 @@ export default defineComponent({
     const onSubmit = async (value: AddTabForm) => {
       // The @submit payload is the source of truth for `name`; the loaded
       // `editingTab` carries the rest (panels/tabId) in edit mode.
+      const newTabData: any = { name: value.name, panels: [] };
       try {
         //if edit mode
         if (props.editMode) {
@@ -168,7 +165,7 @@ export default defineComponent({
             store,
             props.dashboardId,
             props.folderId ?? route.query.folder ?? "default",
-            { name: value.name, panels: [] },
+            newTabData,
           );
 
           // emit refresh to rerender
@@ -178,14 +175,21 @@ export default defineComponent({
           showPositiveNotification(t("dashboard.addTab.tabAddedSuccessfully"));
         }
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              (props.editMode
-                ? t("dashboard.addTab.failedToUpdateTab")
-                : t("dashboard.addTab.failedToAddTab")),
-          );
+        if (saveConflict.isConflict(error)) {
+          void saveConflict.openConflict({
+            dashboardId: props.dashboardId,
+            folderId: (props.folderId ?? route.query.folder ?? "default") as string,
+            change: props.editMode
+              ? t("dashboard.saveConflict.change.renamedTab", {
+                  from: editingTab.value?.name ?? "",
+                  to: value.name,
+                })
+              : t("dashboard.saveConflict.change.addedTab", { name: value.name }),
+            onResolved: () => emit("update:open", false),
+          });
+          // The tab is already in the working copy and on screen as unsaved; Save here again would add it twice.
+          emit("refresh", props.editMode ? { ...editingTab.value, name: value.name } : newTabData);
+          emit("update:open", false);
         } else {
           showErrorNotification(
             error?.message ??

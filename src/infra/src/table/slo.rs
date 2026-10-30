@@ -97,6 +97,9 @@ pub struct StatusWrite {
     /// the watermark and never moves it.
     pub watermark_end: Option<i64>,
     pub trailing_slices: Option<serde_json::Value>,
+    /// The precomputed burn-window aggregates, keyed by window seconds.
+    /// Rollup-row only, like the watermark and the trailing buffer.
+    pub burn_windows: Option<serde_json::Value>,
     pub computed_at: i64,
 }
 
@@ -237,12 +240,26 @@ pub async fn apply_status_in_txn<C: ConnectionTrait>(
             .await?;
     }
 
+    // The burn-window cache rides the same rollup-only rule. Written in this
+    // transaction with the watermark it was computed against, so a reader
+    // never sees windows from one pass beside a watermark from another.
+    if let Some(windows) = &write.burn_windows {
+        slo_status::Entity::update_many()
+            .col_expr(
+                slo_status::Column::BurnWindows,
+                Expr::value(windows.clone()),
+            )
+            .filter(row_of(&write.slo_id, slo_status::ROLLUP_GROUP_KEY))
+            .exec(txn)
+            .await?;
+    }
+
     Ok(WriteOutcome::Applied)
 }
 
 /// Read one status row. `group_key = ""` is the rollup.
-pub async fn load_status(
-    db: &DatabaseConnection,
+pub async fn load_status<C: ConnectionTrait>(
+    db: &C,
     slo_id: &str,
     group_key: &str,
 ) -> Result<Option<slo_status::Model>, errors::Error> {
@@ -251,6 +268,21 @@ pub async fn load_status(
             .one(db)
             .await?,
     )
+}
+
+/// The rollup row, locked until the transaction ends; SQLite has one writer connection instead.
+pub async fn load_rollup_for_update<C: ConnectionTrait>(
+    db: &C,
+    slo_id: &str,
+) -> Result<Option<slo_status::Model>, errors::Error> {
+    use sea_orm::QuerySelect;
+    Ok(slo_status::Entity::find_by_id((
+        slo_id.to_string(),
+        slo_status::ROLLUP_GROUP_KEY.to_string(),
+    ))
+    .lock_exclusive()
+    .one(db)
+    .await?)
 }
 
 /// Every status row for one SLO — the rollup plus each group.
@@ -320,13 +352,14 @@ pub async fn bump_generation(
 /// This is what makes at-least-once publication safe (D64): the running
 /// aggregate is a cache, and this rebuilds it from the slices that are the
 /// source of truth. It is therefore **load-bearing**, not hygiene.
-pub async fn reconcile_from_slices(
-    db: &DatabaseConnection,
+pub async fn reconcile_from_slices<C: ConnectionTrait>(
+    db: &C,
     slo_id: &str,
     group_key: &str,
     recomputed: (f64, f64, i32),
 ) -> Result<(), errors::Error> {
     let (good, total, covered) = recomputed;
+
     // Assignment, not increment: this is a rebuild from the source of truth,
     // and the watermark is deliberately untouched — reconciliation repairs the
     // aggregate, not the read clamp.
@@ -340,13 +373,58 @@ pub async fn reconcile_from_slices(
     Ok(())
 }
 
+/// Replaces the rollup's burn cache; false if its generation or watermark moved.
+pub async fn replace_burn_cache<C: ConnectionTrait>(
+    db: &C,
+    slo_id: &str,
+    definition_generation: i32,
+    watermark_end: i64,
+    trailing_slices: serde_json::Value,
+    burn_windows: serde_json::Value,
+) -> Result<bool, errors::Error> {
+    let res = slo_status::Entity::update_many()
+        .col_expr(
+            slo_status::Column::TrailingSlices,
+            Expr::value(trailing_slices),
+        )
+        .col_expr(slo_status::Column::BurnWindows, Expr::value(burn_windows))
+        .filter(row_of(slo_id, slo_status::ROLLUP_GROUP_KEY))
+        .filter(slo_status::Column::DefinitionGeneration.eq(definition_generation))
+        .filter(slo_status::Column::WatermarkEnd.eq(watermark_end))
+        .exec(db)
+        .await?;
+    Ok(res.rows_affected > 0)
+}
+
+/// Delete every status row belonging to an org's SLOs — the org-teardown path.
+///
+/// These rows carry no org of their own, so the ids come from `slos`. This
+/// therefore has to run BEFORE `slos::delete_by_org`, or there is nothing left
+/// to resolve through.
+pub async fn delete_by_org(db: &DatabaseConnection, org: &str) -> Result<(), errors::Error> {
+    let slo_ids = super::slos::ids_in_org(db, org).await?;
+    if slo_ids.is_empty() {
+        return Ok(());
+    }
+
+    slo_status::Entity::delete_many()
+        .filter(slo_status::Column::SloId.is_in(slo_ids))
+        .exec(db)
+        .await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use config::meta::slo::slice::Writer;
     use sea_orm::{Database, DatabaseConnection};
 
     use super::*;
-    use crate::table::migration::create_slo_tables_for_test;
+    // `slo_status` carries no org column, so the org lives one hop away in
+    // `slos` — the by-org tests need a real row there to resolve through.
+    use crate::table::{
+        migration::create_slo_tables_for_test, slos::insert_for_test as register_slo,
+    };
 
     const SLO: &str = "slo00000000000000000000000";
     const ROLLUP: &str = slo_status::ROLLUP_GROUP_KEY;
@@ -386,6 +464,9 @@ mod tests {
             ],
             watermark_end: Some(9_900),
             trailing_slices: Some(serde_json::json!({"9600": [10.0, 10.0]})),
+            burn_windows: Some(serde_json::json!({
+                "3600": { "good": 99.0, "total": 100.0, "covered": 12, "expected": 12 }
+            })),
             computed_at: 1_000,
         }
     }
@@ -646,6 +727,63 @@ mod tests {
         assert_eq!(status.coverage, None);
     }
 
+    /// Gap 1: the column had a reader, a migration and no writer, so every
+    /// burn-rate alert froze forever. This pins the write.
+    #[tokio::test]
+    async fn the_burn_windows_round_trip() {
+        let db = db().await;
+        init_generation(&db, SLO, 1).await.unwrap();
+        apply_status(&db, &write_of(1)).await.unwrap();
+
+        let status = load_status(&db, SLO, ROLLUP).await.unwrap().unwrap();
+        assert_eq!(
+            status.burn_windows,
+            Some(serde_json::json!({
+                "3600": { "good": 99.0, "total": 100.0, "covered": 12, "expected": 12 }
+            })),
+            "the alert evaluator reads this column; an unwritten one freezes \
+             every burn-rate alert on the SLO"
+        );
+    }
+
+    /// Rollup-only, like the watermark: a group row has no watermark to read
+    /// its windows against, so writing them there would be a value nothing
+    /// can interpret.
+    #[tokio::test]
+    async fn the_burn_windows_land_on_the_rollup_row_only() {
+        let db = db().await;
+        init_generation(&db, SLO, 1).await.unwrap();
+        apply_status(&db, &write_of(1)).await.unwrap();
+
+        let group = load_status(&db, SLO, "region:eu").await.unwrap().unwrap();
+        assert_eq!(group.burn_windows, None);
+        assert_eq!(group.trailing_slices, None);
+    }
+
+    /// Backfill fills history BEHIND the watermark, so the windows ending at
+    /// the watermark are not its to write — the same rule the watermark
+    /// itself follows.
+    #[tokio::test]
+    async fn backfill_does_not_write_burn_windows() {
+        let db = db().await;
+        init_generation(&db, SLO, 1).await.unwrap();
+        apply_status(
+            &db,
+            &StatusWrite {
+                writer: Writer::Backfill,
+                watermark_end: None,
+                trailing_slices: None,
+                burn_windows: None,
+                ..write_of(1)
+            },
+        )
+        .await
+        .unwrap();
+
+        let status = load_status(&db, SLO, ROLLUP).await.unwrap().unwrap();
+        assert_eq!(status.burn_windows, None);
+    }
+
     #[tokio::test]
     async fn the_trailing_buffer_round_trips() {
         let db = db().await;
@@ -658,6 +796,48 @@ mod tests {
             Some(serde_json::json!({"9600": [10.0, 10.0]})),
             "write-on-change compares against this; losing it would re-emit \
              every trailing slice on every pass"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_burn_cache_replace_at_the_stored_watermark_lands() {
+        let db = db().await;
+        init_generation(&db, SLO, 1).await.unwrap();
+        apply_status(&db, &write_of(1)).await.unwrap();
+
+        let windows = serde_json::json!({ "3600": { "good": 12.0, "total": 12.0 } });
+        let trailing = serde_json::json!({"9600": [0.0, 0.0]});
+        assert!(
+            replace_burn_cache(&db, SLO, 1, 9_900, trailing.clone(), windows.clone())
+                .await
+                .unwrap()
+        );
+        let status = load_status(&db, SLO, ROLLUP).await.unwrap().unwrap();
+        assert_eq!(status.burn_windows, Some(windows));
+        assert_eq!(status.trailing_slices, Some(trailing));
+    }
+
+    #[tokio::test]
+    async fn a_burn_cache_replace_after_the_watermark_moved_writes_nothing() {
+        let db = db().await;
+        init_generation(&db, SLO, 1).await.unwrap();
+        apply_status(&db, &write_of(1)).await.unwrap();
+        let before = load_status(&db, SLO, ROLLUP).await.unwrap().unwrap();
+
+        let empty = serde_json::json!({});
+        assert!(
+            !replace_burn_cache(&db, SLO, 1, 9_600, empty.clone(), empty.clone())
+                .await
+                .unwrap()
+        );
+        assert!(
+            !replace_burn_cache(&db, SLO, 2, 9_900, empty.clone(), empty)
+                .await
+                .unwrap()
+        );
+        assert_eq!(
+            load_status(&db, SLO, ROLLUP).await.unwrap().unwrap(),
+            before
         );
     }
 
@@ -700,5 +880,63 @@ mod tests {
             expected,
             "a write that reported success must not have been lost"
         );
+    }
+
+    // ===================== org teardown ====================================
+
+    const ORG: &str = "acme";
+    const OTHER_ORG: &str = "globex";
+    const OTHER_SLO: &str = "slo11111111111111111111111";
+
+    /// The rollup row AND every group row must go — a surviving group row is
+    /// an orphan no org will ever read again.
+    #[tokio::test]
+    async fn delete_by_org_removes_every_status_row_for_the_orgs_slos() {
+        let db = db().await;
+        register_slo(&db, ORG, SLO).await;
+        register_slo(&db, ORG, OTHER_SLO).await;
+        apply_status(&db, &write_of(1)).await.unwrap();
+        let mut second = write_of(1);
+        second.slo_id = OTHER_SLO.to_string();
+        apply_status(&db, &second).await.unwrap();
+        assert_eq!(load_all_groups(&db, SLO).await.unwrap().len(), 2);
+
+        delete_by_org(&db, ORG).await.unwrap();
+        assert!(load_all_groups(&db, SLO).await.unwrap().is_empty());
+        assert!(load_all_groups(&db, OTHER_SLO).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn delete_by_org_leaves_another_orgs_status_rows_alone() {
+        let db = db().await;
+        register_slo(&db, ORG, SLO).await;
+        register_slo(&db, OTHER_ORG, OTHER_SLO).await;
+        apply_status(&db, &write_of(1)).await.unwrap();
+        let mut theirs = write_of(1);
+        theirs.slo_id = OTHER_SLO.to_string();
+        apply_status(&db, &theirs).await.unwrap();
+
+        delete_by_org(&db, ORG).await.unwrap();
+        assert!(load_all_groups(&db, SLO).await.unwrap().is_empty());
+        assert_eq!(
+            load_all_groups(&db, OTHER_SLO).await.unwrap().len(),
+            2,
+            "another org's status rows were deleted"
+        );
+    }
+
+    /// Org cleanup retries steps, so a second pass must find nothing and
+    /// still succeed.
+    #[tokio::test]
+    async fn delete_by_org_on_an_org_with_no_slos_is_a_no_op() {
+        let db = db().await;
+        register_slo(&db, OTHER_ORG, OTHER_SLO).await;
+        let mut theirs = write_of(1);
+        theirs.slo_id = OTHER_SLO.to_string();
+        apply_status(&db, &theirs).await.unwrap();
+
+        delete_by_org(&db, ORG).await.unwrap();
+        delete_by_org(&db, ORG).await.unwrap();
+        assert_eq!(load_all_groups(&db, OTHER_SLO).await.unwrap().len(), 2);
     }
 }

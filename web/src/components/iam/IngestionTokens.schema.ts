@@ -16,6 +16,7 @@ export const makeCreateTokenSchema = (
       .min(1, t("common.nameRequired"))
       .max(256, t("common.nameMaxLength", { max: 256 })),
     description: z.string().optional(),
+    splunk_token: z.boolean().optional(),
   });
 
 export type CreateTokenForm = z.infer<ReturnType<typeof makeCreateTokenSchema>>;
@@ -24,4 +25,5 @@ export type CreateTokenForm = z.infer<ReturnType<typeof makeCreateTokenSchema>>;
 export const createTokenDefaults = (): CreateTokenForm => ({
   name: "",
   description: "",
+  splunk_token: false,
 });

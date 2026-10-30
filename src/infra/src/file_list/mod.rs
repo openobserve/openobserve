@@ -35,6 +35,13 @@ pub mod pending_delete;
 pub mod postgres;
 pub mod sqlite;
 
+const STREAM_SCAN_WINDOW_MICROS: i64 = 3600 * 1_000_000;
+const STREAMS_PER_QUERY: usize = 1000;
+/// Longest org id the PostgreSQL file_list and schema_history `org` columns hold.
+pub const ORG_ID_MAX_LEN: usize = 100;
+/// Longest `{org}/{stream_type}/{stream}` key the PostgreSQL file_list `stream` columns hold.
+pub const STREAM_KEY_MAX_LEN: usize = 256;
+
 static CLIENT: Lazy<Box<dyn FileList>> = Lazy::new(connect_default);
 pub static LOCAL_CACHE: Lazy<Box<dyn FileList>> = Lazy::new(connect_local_cache);
 
@@ -63,6 +70,42 @@ pub fn connect_local_cache() -> Box<dyn FileList> {
     Box::<sqlite::SqliteFileList>::default()
 }
 
+/// Why a stream's file_list key or its org cannot be stored, if it cannot.
+pub fn stream_key_violation(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+) -> Option<String> {
+    if !file_list_keys_bounded() {
+        return None;
+    }
+    stream_key_length_violation(org_id, stream_type, stream_name)
+}
+
+/// Why an org id cannot be stored in the file_list `org` columns, if it cannot.
+pub fn org_id_violation(org_id: &str) -> Option<String> {
+    if !file_list_keys_bounded() {
+        return None;
+    }
+    org_id_length_violation(org_id)
+}
+
+/// The two file tables an org deletion empties stream by stream.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StreamRowsTable {
+    FileList,
+    History,
+}
+
+impl StreamRowsTable {
+    fn name(self) -> &'static str {
+        match self {
+            Self::FileList => "file_list",
+            Self::History => "file_list_history",
+        }
+    }
+}
+
 #[async_trait]
 pub trait FileList: Sync + Send + 'static {
     async fn health_check(&self) -> Result<()>;
@@ -74,7 +117,12 @@ pub trait FileList: Sync + Send + 'static {
     async fn batch_add(&self, files: &[FileKey]) -> Result<()>;
     async fn batch_add_with_id(&self, files: &[FileKey]) -> Result<()>;
     async fn batch_add_history(&self, files: &[FileKey]) -> Result<()>;
-    async fn update_dump_records(&self, dump_file: &FileKey, dumped_ids: &[i64]) -> Result<()>;
+    /// `dumped_ids` pairs each file_list id with its `date` so partitioned backends can prune.
+    async fn update_dump_records(
+        &self,
+        dump_file: &FileKey,
+        dumped_ids: &[(i64, String)],
+    ) -> Result<()>;
     async fn batch_process(&self, files: &[FileKey]) -> Result<()>;
     async fn batch_add_deleted(
         &self,
@@ -83,6 +131,7 @@ pub trait FileList: Sync + Send + 'static {
         files: &[FileListDeleted],
     ) -> Result<()>;
     async fn batch_remove_deleted(&self, files: &[FileKey]) -> Result<()>;
+    async fn release_deleted(&self, ids: &[i64], created_at: i64) -> Result<()>;
     async fn get(&self, file: &str) -> Result<FileMeta>;
     async fn contains(&self, file: &str) -> Result<bool>;
     async fn update_flattened(&self, file: &str, flattened: bool) -> Result<()>;
@@ -113,12 +162,15 @@ pub trait FileList: Sync + Send + 'static {
         time_range: (i64, i64),
         flattened: Option<bool>,
     ) -> Result<Vec<FileKey>>;
+    /// Files of `date_range` with `original_size <= max_original_size`, the
+    /// compactor's merge candidates.
     async fn query_for_merge(
         &self,
         org_id: &str,
         stream_type: StreamType,
         stream_name: &str,
         date_range: (String, String),
+        max_original_size: i64,
     ) -> Result<Vec<FileKey>>;
     async fn query_for_dump(
         &self,
@@ -163,6 +215,9 @@ pub trait FileList: Sync + Send + 'static {
         limit: i64,
     ) -> Result<Vec<FileListDeleted>>;
     async fn list_deleted(&self) -> Result<Vec<FileListDeleted>>;
+    async fn has_deleted_by_org(&self, org_id: &str) -> Result<bool>;
+    /// Removes `ids` from `file_list_deleted` unless the org is deleting; false when it is.
+    async fn remove_deleted_unless_org_deleting(&self, org_id: &str, ids: &[i64]) -> Result<bool>;
     async fn get_min_date(
         &self,
         org_id: &str,
@@ -246,11 +301,79 @@ pub trait FileList: Sync + Send + 'static {
         date_range: (String, String),
     ) -> Result<StreamStats>;
     async fn org_stats_by_account(&self, org_id: &str, account: &str) -> Result<(i64, i64)>;
-    async fn delete_by_org(&self, org_id: &str) -> Result<()>;
+    async fn list_stats_streams_by_org(&self, org_id: &str) -> Result<Vec<String>>;
+    async fn list_streams_updated_between(
+        &self,
+        org_id: &str,
+        time_range: (i64, i64),
+    ) -> Result<Vec<String>>;
+    async fn list_org_streams_by_scan(&self, org_id: &str) -> Result<Vec<String>>;
+    async fn remove_stream_batch(
+        &self,
+        table: StreamRowsTable,
+        org_id: &str,
+        stream: &str,
+        limit: i64,
+        to_deleted: bool,
+    ) -> Result<u64>;
+    async fn delete_stream_stats_by_org(&self, org_id: &str) -> Result<()>;
+    async fn delete_jobs_by_streams(&self, org_id: &str, streams: &[String]) -> Result<()>;
 }
 
-pub async fn delete_by_org(org_id: &str) -> Result<()> {
-    CLIENT.delete_by_org(org_id).await
+/// The streams of the org's `stream_stats` rows, an indexed read.
+pub async fn list_stats_streams_by_org(org_id: &str) -> Result<Vec<String>> {
+    CLIENT.list_stats_streams_by_org(org_id).await
+}
+
+/// Streams of the org with a `file_list` or history row updated in `[since, until)`.
+pub async fn list_streams_updated_since(
+    org_id: &str,
+    since: i64,
+    until: i64,
+) -> Result<Vec<String>> {
+    let mut streams = std::collections::BTreeSet::new();
+    let mut start = since;
+    // Hour windows keep each read an index range on `updated_at`, however long ago `since` is.
+    while start < until {
+        let end = until.min(start.saturating_add(STREAM_SCAN_WINDOW_MICROS));
+        streams.extend(
+            CLIENT
+                .list_streams_updated_between(org_id, (start, end))
+                .await?,
+        );
+        start = end;
+    }
+    Ok(streams.into_iter().collect())
+}
+
+/// Every stream with a file, history or job row of the org; scans each table once (no org index).
+pub async fn list_org_streams_by_scan(org_id: &str) -> Result<Vec<String>> {
+    CLIENT.list_org_streams_by_scan(org_id).await
+}
+
+/// Removes up to `limit` of the stream's rows; `to_deleted` first queues their objects.
+pub async fn remove_stream_batch(
+    table: StreamRowsTable,
+    org_id: &str,
+    stream: &str,
+    limit: i64,
+    to_deleted: bool,
+) -> Result<u64> {
+    CLIENT
+        .remove_stream_batch(table, org_id, stream, limit.max(1), to_deleted)
+        .await
+}
+
+pub async fn delete_stream_stats_by_org(org_id: &str) -> Result<()> {
+    CLIENT.delete_stream_stats_by_org(org_id).await
+}
+
+/// Deletes the org's `file_list_jobs` rows of these streams, through the stream-led index.
+pub async fn delete_jobs_by_streams(org_id: &str, streams: &[String]) -> Result<()> {
+    for chunk in streams.chunks(STREAMS_PER_QUERY) {
+        CLIENT.delete_jobs_by_streams(org_id, chunk).await?;
+    }
+    Ok(())
 }
 
 pub async fn health_check() -> Result<()> {
@@ -296,7 +419,7 @@ pub async fn batch_process(files: &[FileKey]) -> Result<()> {
 }
 
 #[inline]
-pub async fn update_dump_records(dump_file: &FileKey, dumped_ids: &[i64]) -> Result<()> {
+pub async fn update_dump_records(dump_file: &FileKey, dumped_ids: &[(i64, String)]) -> Result<()> {
     CLIENT.update_dump_records(dump_file, dumped_ids).await
 }
 
@@ -312,6 +435,12 @@ pub async fn batch_add_deleted(
 #[inline]
 pub async fn batch_remove_deleted(files: &[FileKey]) -> Result<()> {
     CLIENT.batch_remove_deleted(files).await
+}
+
+/// Re-stamps claimed `file_list_deleted` rows, undoing the claim `query_deleted` stamped on them.
+#[inline]
+pub async fn release_deleted(ids: &[i64], created_at: i64) -> Result<()> {
+    CLIENT.release_deleted(ids, created_at).await
 }
 
 #[inline]
@@ -402,15 +531,29 @@ pub async fn query(
 }
 
 #[inline]
+/// Classic upper bound on `original_size` for merge candidates: files at or
+/// above ~95% of `ZO_COMPACT_MAX_FILE_SIZE` are already "big enough" and are
+/// not merged again.
+pub fn merge_max_original_size() -> i64 {
+    get_config().compact.max_file_size as i64 * 95 / 100
+}
+
 #[tracing::instrument(name = "infra:file_list:db:query_for_merge")]
 pub async fn query_for_merge(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     date_range: (String, String),
+    max_original_size: i64,
 ) -> Result<Vec<FileKey>> {
     CLIENT
-        .query_for_merge(org_id, stream_type, stream_name, date_range)
+        .query_for_merge(
+            org_id,
+            stream_type,
+            stream_name,
+            date_range,
+            max_original_size,
+        )
         .await
 }
 
@@ -502,6 +645,18 @@ pub async fn query_deleted(
 #[inline]
 pub async fn list_deleted() -> Result<Vec<FileListDeleted>> {
     CLIENT.list_deleted().await
+}
+
+/// Whether the org has any row in `file_list_deleted`.
+#[inline]
+pub async fn has_deleted_by_org(org_id: &str) -> Result<bool> {
+    CLIENT.has_deleted_by_org(org_id).await
+}
+
+/// Removes the rows unless the org is deleting; the caller's `OrgLifecycleGuard` keeps a flip out.
+#[inline]
+pub async fn remove_deleted_unless_org_deleting(org_id: &str, ids: &[i64]) -> Result<bool> {
+    CLIENT.remove_deleted_unless_org_deleting(org_id, ids).await
 }
 
 #[inline]
@@ -717,31 +872,73 @@ fn validate_time_range(time_range: (i64, i64)) -> Result<()> {
     Ok(())
 }
 
-pub fn calculate_max_ts_upper_bound(time_end: i64, stream_type: StreamType) -> i64 {
+fn file_list_keys_bounded() -> bool {
+    // only the PostgreSQL backend bounds these columns; Nats keeps file_list in SQLite
+    MetaStore::from(get_config().common.meta_store.as_str()) == MetaStore::PostgreSQL
+}
+
+// VARCHAR(n) counts characters, not bytes
+fn org_id_length_violation(org_id: &str) -> Option<String> {
+    let org_len = org_id.chars().count();
+    (org_len > ORG_ID_MAX_LEN).then(|| {
+        format!(
+            "Organization id too long: {org_id} is {org_len} characters, only {ORG_ID_MAX_LEN} accepted"
+        )
+    })
+}
+
+fn stream_key_length_violation(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+) -> Option<String> {
+    if let Some(violation) = org_id_length_violation(org_id) {
+        return Some(violation);
+    }
+    let len = org_id.chars().count() + stream_type.as_str().len() + stream_name.chars().count() + 2;
+    (len > STREAM_KEY_MAX_LEN).then(|| {
+        format!(
+            "Stream name too long: {org_id}/{stream_type}/{stream_name} is {len} characters, only {STREAM_KEY_MAX_LEN} accepted"
+        )
+    })
+}
+
+/// Daily when the stream is dynamically merged (its files can span a day), else the type's level.
+pub async fn max_ts_bound_level(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+) -> PartitionTimeLevel {
+    let level = query_retention_level(stream_type);
+    if level == PartitionTimeLevel::Daily || !stream_type.support_dynamic_merge() {
+        return level;
+    }
+    if crate::schema::get_dynamic_merge(org_id, stream_name, stream_type).await {
+        PartitionTimeLevel::Daily
+    } else {
+        level
+    }
+}
+
+/// `ZO_*_QUERY_RETENTION` of the type; `Filelist` is daily, a dump file can hold a merged day.
+pub fn query_retention_level(stream_type: StreamType) -> PartitionTimeLevel {
     let cfg = get_config();
     let level = match stream_type {
         StreamType::Logs => PartitionTimeLevel::from(cfg.limit.logs_query_retention.as_str()),
         StreamType::Traces => PartitionTimeLevel::from(cfg.limit.traces_query_retention.as_str()),
         StreamType::Metrics => PartitionTimeLevel::from(cfg.limit.metrics_query_retention.as_str()),
+        StreamType::Filelist => PartitionTimeLevel::Daily,
         _ => PartitionTimeLevel::Hourly,
     };
-    let ts = level.duration();
-    if ts > 0 {
-        time_end + second_micros(ts)
+    if level.duration() > 0 {
+        level
     } else {
-        time_end + second_micros(PartitionTimeLevel::Hourly.duration())
+        PartitionTimeLevel::Hourly
     }
 }
 
-pub fn parse_stream_key(key: &str) -> Option<(String, StreamType, String)> {
-    let parts = key.split('/').collect::<Vec<_>>();
-    if parts.len() != 3 {
-        return None;
-    }
-    let org_id = parts[0].to_string();
-    let stream_type = parts[1].into();
-    let stream_name = parts[2].to_string();
-    Some((org_id, stream_type, stream_name))
+pub fn calculate_max_ts_upper_bound(time_end: i64, level: PartitionTimeLevel) -> i64 {
+    time_end + second_micros(level.duration())
 }
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
@@ -770,6 +967,8 @@ pub struct FileRecord {
     pub compressed_size: i64,
     #[sqlx(default)]
     pub index_size: i64,
+    #[sqlx(default)]
+    pub mindex_size: i64,
     #[sqlx(default)]
     pub bloom_ver: i64,
     #[sqlx(default)]
@@ -801,6 +1000,7 @@ impl From<&FileRecord> for FileMeta {
             original_size: r.original_size,
             compressed_size: r.compressed_size,
             index_size: r.index_size,
+            mindex_size: r.mindex_size,
             bloom_ver: r.bloom_ver,
             flattened: r.flattened,
         }
@@ -818,6 +1018,7 @@ pub struct StatsRecord {
     pub original_size: i64,
     pub compressed_size: i64,
     pub index_size: i64,
+    pub mindex_size: i64,
 }
 
 impl From<&StatsRecord> for StreamStats {
@@ -831,6 +1032,7 @@ impl From<&StatsRecord> for StreamStats {
             storage_size: record.original_size as f64,
             compressed_size: record.compressed_size as f64,
             index_size: record.index_size as f64,
+            mindex_size: record.mindex_size as f64,
         }
     }
 }
@@ -851,6 +1053,7 @@ pub struct FileDeletedRecord {
     pub date: String,
     pub file: String,
     pub index_file: bool,
+    pub mindex_file: bool,
     pub flattened: bool,
 }
 
@@ -869,7 +1072,7 @@ pub struct MergeJobPendingRecord {
 }
 
 #[derive(Debug, Clone, sqlx::Type, PartialEq, Default)]
-#[repr(i64)]
+#[repr(i32)]
 pub enum FileListJobStatus {
     #[default]
     Pending,
@@ -877,8 +1080,8 @@ pub enum FileListJobStatus {
     Done,
 }
 
-impl From<i64> for FileListJobStatus {
-    fn from(status: i64) -> Self {
+impl From<i32> for FileListJobStatus {
+    fn from(status: i32) -> Self {
         match status {
             0 => Self::Pending,
             1 => Self::Running,
@@ -905,59 +1108,56 @@ pub struct FileIdWithFile {
 
 #[cfg(test)]
 mod tests {
-    use config::meta::stream::{StreamStats, StreamType};
+    use config::meta::stream::StreamStats;
 
     use super::*;
 
-    // ── parse_stream_key ──────────────────────────────────────────────────────
-
     #[test]
-    fn test_parse_stream_key_valid_logs() {
-        let result = parse_stream_key("myorg/logs/mystream");
-        assert!(result.is_some());
-        let (org, stype, stream) = result.unwrap();
-        assert_eq!(org, "myorg");
-        assert_eq!(stype, StreamType::Logs);
-        assert_eq!(stream, "mystream");
+    fn test_stream_key_length_boundary() {
+        // "org/metrics/" is 12 characters
+        let fits = "m".repeat(STREAM_KEY_MAX_LEN - 12);
+        assert!(stream_key_length_violation("org", StreamType::Metrics, &fits).is_none());
+        let over = format!("{fits}m");
+        let violation = stream_key_length_violation("org", StreamType::Metrics, &over).unwrap();
+        assert!(violation.starts_with("Stream name too long"), "{violation}");
+        assert!(violation.contains("is 257 characters"), "{violation}");
+        // a multi-byte name is measured in characters, as the VARCHAR column is
+        let wide = "é".repeat(STREAM_KEY_MAX_LEN - 12);
+        assert!(stream_key_length_violation("org", StreamType::Metrics, &wide).is_none());
     }
 
     #[test]
-    fn test_parse_stream_key_valid_metrics() {
-        let result = parse_stream_key("default/metrics/cpu_usage");
-        assert!(result.is_some());
-        let (org, stype, stream) = result.unwrap();
-        assert_eq!(org, "default");
-        assert_eq!(stype, StreamType::Metrics);
-        assert_eq!(stream, "cpu_usage");
+    fn test_stream_key_length_org_boundary() {
+        let org = "o".repeat(ORG_ID_MAX_LEN);
+        assert!(stream_key_length_violation(&org, StreamType::Logs, "s").is_none());
+        let org = format!("{org}o");
+        let violation = stream_key_length_violation(&org, StreamType::Logs, "s").unwrap();
+        assert!(
+            violation.starts_with("Organization id too long"),
+            "{violation}"
+        );
     }
 
+    /// CI runs this under both meta stores; only PostgreSQL bounds the file_list key.
     #[test]
-    fn test_parse_stream_key_valid_traces() {
-        let result = parse_stream_key("acme/traces/http_spans");
-        assert!(result.is_some());
-        let (org, stype, stream) = result.unwrap();
-        assert_eq!(org, "acme");
-        assert_eq!(stype, StreamType::Traces);
-        assert_eq!(stream, "http_spans");
+    fn test_stream_key_violation_follows_meta_store() {
+        let over = "s".repeat(STREAM_KEY_MAX_LEN);
+        let bounded =
+            MetaStore::from(get_config().common.meta_store.as_str()) == MetaStore::PostgreSQL;
+        assert_eq!(
+            stream_key_violation("org", StreamType::Logs, &over).is_some(),
+            bounded
+        );
+        assert!(stream_key_violation("org", StreamType::Logs, "s").is_none());
+        let long_org = "o".repeat(ORG_ID_MAX_LEN + 1);
+        assert_eq!(org_id_violation(&long_org).is_some(), bounded);
+        assert!(org_id_violation("org").is_none());
     }
 
-    #[test]
-    fn test_parse_stream_key_too_few_parts() {
-        assert!(parse_stream_key("myorg/logs").is_none());
-        assert!(parse_stream_key("myorg").is_none());
-        assert!(parse_stream_key("").is_none());
-    }
+    // ── FileListJobStatus::from(i32) ──────────────────────────────────────────
 
     #[test]
-    fn test_parse_stream_key_too_many_parts() {
-        // More than 3 segments → None
-        assert!(parse_stream_key("org/logs/stream/extra").is_none());
-    }
-
-    // ── FileListJobStatus::from(i64) ──────────────────────────────────────────
-
-    #[test]
-    fn test_file_list_job_status_from_i64() {
+    fn test_file_list_job_status_from_i32() {
         assert_eq!(FileListJobStatus::from(0), FileListJobStatus::Pending);
         assert_eq!(FileListJobStatus::from(1), FileListJobStatus::Running);
         assert_eq!(FileListJobStatus::from(2), FileListJobStatus::Done);
@@ -989,6 +1189,7 @@ mod tests {
             original_size: 102400,
             compressed_size: 51200,
             index_size: 1024,
+            mindex_size: 0,
             bloom_ver: 0,
             flattened: true,
             updated_at: 9999,
@@ -1022,6 +1223,7 @@ mod tests {
             original_size: 4096,
             compressed_size: 2048,
             index_size: 0,
+            mindex_size: 0,
             bloom_ver: 0,
             flattened: false,
             updated_at: 0,
@@ -1058,6 +1260,7 @@ mod tests {
             original_size: 4,
             compressed_size: 5,
             index_size: 6,
+            mindex_size: 0,
             bloom_ver: 1_715_000_000_000_000,
             flattened: false,
             updated_at: 0,
@@ -1083,6 +1286,7 @@ mod tests {
             original_size: 0,
             compressed_size: 0,
             index_size: 0,
+            mindex_size: 0,
             bloom_ver: 0,
             flattened: false,
             updated_at: 0,
@@ -1106,6 +1310,7 @@ mod tests {
             original_size: 1_048_576,
             compressed_size: 524_288,
             index_size: 8192,
+            mindex_size: 0,
         };
 
         let stats = StreamStats::from(&record);
@@ -1130,6 +1335,7 @@ mod tests {
             original_size: 256,
             compressed_size: 128,
             index_size: 0,
+            mindex_size: 0,
         };
 
         let stats = StreamStats::from(&record);
@@ -1148,6 +1354,7 @@ mod tests {
             original_size: 512,
             compressed_size: 256,
             index_size: 64,
+            mindex_size: 0,
         };
 
         // owned conversion should produce the same result as ref conversion
@@ -1179,6 +1386,7 @@ mod tests {
                 original_size,
                 compressed_size,
                 index_size,
+                mindex_size: 0,
                 flattened: false,
                 bloom_ver: 0,
             },
@@ -1262,5 +1470,100 @@ mod tests {
         assert_eq!(stats.original_size, 10000000000);
         assert_eq!(stats.compressed_size, 5000000000);
         assert_eq!(stats.idx_scan_size, 500000000);
+    }
+
+    #[test]
+    fn test_query_retention_level_defaults() {
+        // logs and traces hourly, metrics daily; a dump stream holds files that can span a day
+        assert_eq!(
+            query_retention_level(StreamType::Logs),
+            PartitionTimeLevel::Hourly
+        );
+        assert_eq!(
+            query_retention_level(StreamType::Traces),
+            PartitionTimeLevel::Hourly
+        );
+        assert_eq!(
+            query_retention_level(StreamType::Metrics),
+            PartitionTimeLevel::Daily
+        );
+        assert_eq!(
+            query_retention_level(StreamType::Filelist),
+            PartitionTimeLevel::Daily
+        );
+        assert_eq!(
+            query_retention_level(StreamType::EnrichmentTables),
+            PartitionTimeLevel::Hourly
+        );
+    }
+
+    #[test]
+    fn test_calculate_max_ts_upper_bound() {
+        let end = 1_700_000_000_000_000;
+        assert_eq!(
+            calculate_max_ts_upper_bound(end, PartitionTimeLevel::Hourly),
+            end + second_micros(3600)
+        );
+        assert_eq!(
+            calculate_max_ts_upper_bound(end, PartitionTimeLevel::Daily),
+            end + second_micros(86400)
+        );
+    }
+
+    #[tokio::test]
+    async fn test_lenient_removal_keeps_the_rows_of_a_deleting_org() {
+        use config::meta::organization::OrganizationType;
+
+        use crate::table::{organizations, testing};
+        if !testing::meta_store().await {
+            return;
+        }
+        let org = testing::unique("t_fld");
+        organizations::add(&org, &org, OrganizationType::Custom)
+            .await
+            .unwrap();
+        let file = |name: &str| FileListDeleted {
+            id: 0,
+            account: String::new(),
+            file: format!("files/{org}/logs/s/2024/01/01/00/{name}.parquet"),
+            index_file: false,
+            mindex_file: false,
+            flattened: false,
+        };
+        batch_add_deleted(&org, 1, &[file("a"), file("b")])
+            .await
+            .unwrap();
+        let ids_of_org = || async {
+            let rows = list_deleted().await.unwrap();
+            rows.into_iter()
+                .filter(|f| f.file.starts_with(&format!("files/{org}/")))
+                .map(|f| f.id)
+                .collect::<Vec<_>>()
+        };
+        let ids = ids_of_org().await;
+
+        organizations::set_status(&org, "deleting").await.unwrap();
+        let while_deleting = remove_deleted_unless_org_deleting(&org, &ids[..1])
+            .await
+            .unwrap();
+        let kept = ids_of_org().await;
+        organizations::set_status(&org, "active").await.unwrap();
+        let while_active = remove_deleted_unless_org_deleting(&org, &ids[..1])
+            .await
+            .unwrap();
+        let left = ids_of_org().await;
+        remove_deleted_unless_org_deleting(&org, &left)
+            .await
+            .unwrap();
+        organizations::remove(&org).await.unwrap();
+
+        assert_eq!(ids.len(), 2);
+        assert!(!while_deleting);
+        assert_eq!(
+            kept, ids,
+            "a lenient removal deleted rows of a deleting org"
+        );
+        assert!(while_active);
+        assert_eq!(left, ids[1..]);
     }
 }

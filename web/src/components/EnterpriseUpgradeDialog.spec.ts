@@ -30,11 +30,14 @@ vi.mock("@/aws-exports", () => ({
 
 // Mock license_server service.
 const mockGetLicense = vi.fn();
-vi.mock("@/services/license_server", () => ({
-  default: {
-    get_license: (...args: any[]) => mockGetLicense(...args),
-  },
-}));
+vi.mock("@/services/license_server", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_license: (...args: any[]) => mockGetLicense(...args),
+    },
+  });
+});
 
 // Mock the lazy chart renderer so the component does not try to load echarts.
 vi.mock("@/components/dashboards/panels/ChartRenderer.vue", () => ({
@@ -378,14 +381,14 @@ describe("EnterpriseUpgradeDialog", () => {
       expect(Array.isArray(vm.coreFeatures)).toBe(true);
       expect(vm.coreFeatures.length).toBe(11);
       expect(Array.isArray(vm.enterpriseFeatures)).toBe(true);
-      expect(vm.enterpriseFeatures.length).toBe(21);
+      expect(vm.enterpriseFeatures.length).toBe(17);
     });
 
     it("renders one feature-list-item per enterprise feature in Open Source layout", () => {
       const wrapper = createWrapper();
       const items = wrapper.findAll('[data-test="enterprise-upgrade-feature-item"]');
-      // Open Source variant renders only enterprise features (21).
-      expect(items.length).toBe(21);
+      // Open Source variant renders only enterprise features (17).
+      expect(items.length).toBe(17);
     });
 
     it("renders core + enterprise features for the Cloud layout", () => {
@@ -393,8 +396,8 @@ describe("EnterpriseUpgradeDialog", () => {
       (config as any).isEnterprise = "true";
       const wrapper = createWrapper();
       const items = wrapper.findAll('[data-test="enterprise-upgrade-feature-item"]');
-      // Cloud renders 11 core + 21 enterprise.
-      expect(items.length).toBe(32);
+      // Cloud renders 11 core + 17 enterprise.
+      expect(items.length).toBe(28);
     });
   });
 
@@ -448,9 +451,10 @@ describe("EnterpriseUpgradeDialog", () => {
       expect(openSpy).toHaveBeenCalledWith("https://o2.ws/contact_us", "_blank");
     });
 
-    it("openFeatureLink opens the provided URL in a new tab", () => {
+    it("clicking a feature item opens its doc link in a new tab", () => {
       const wrapper = createWrapper();
-      (wrapper.vm as any).openFeatureLink("https://o2.ws/sso");
+      const items = wrapper.findAll('[data-test="enterprise-upgrade-feature-item"]');
+      items[0].trigger("click");
       expect(openSpy).toHaveBeenCalledWith("https://o2.ws/sso", "_blank");
     });
 

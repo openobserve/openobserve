@@ -21,27 +21,40 @@
 // event rather than thrown. These tests mount the REAL <OForm> (only ODialog
 // is stubbed) so the conditional name schema actually gates the submit.
 
+import { queryClient } from "@/composables/query/queryClient";
 import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-vi.mock("@/services/service_accounts", () => ({
-  default: {
-    create: vi.fn(),
-    update: vi.fn(),
-  },
-}));
+vi.mock("@/services/service_accounts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create: vi.fn(),
+      update: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/iam", () => ({
-  getRoles: vi.fn().mockResolvedValue({ data: [] }),
-  getGroups: vi.fn().mockResolvedValue({ data: [] }),
-  updateRole: vi.fn(),
-  updateGroup: vi.fn(),
-  createRole: vi.fn(),
-  getResources: vi.fn().mockResolvedValue({ data: [] }),
-}));
+vi.mock("@/services/iam", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  const getRoles = vi.fn().mockResolvedValue({ data: [] });
+  const getGroups = vi.fn().mockResolvedValue({ data: [] });
+  const getResources = vi.fn().mockResolvedValue({ data: [] });
+  return overlayServiceMock(await importOriginal(), {
+    getRoles,
+    getGroups,
+    updateRole: vi.fn(),
+    updateGroup: vi.fn(),
+    createRole: vi.fn(),
+    getResources,
+  });
+});
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
 
 vi.mock("@/services/reodotdev_analytics", () => ({
   useReo: () => ({ track: vi.fn() }),
@@ -269,6 +282,25 @@ describe("AddServiceAccount", () => {
   });
 
   describe("creation behavior", () => {
+    it("tracks service_account_created once the account is created", async () => {
+      vi.mocked(service_accounts.create).mockResolvedValue({ data: {} } as any);
+      await getNameInput(wrapper).setValue("new-bot");
+      await submitForm(wrapper);
+
+      expect(analytics.track).toHaveBeenCalledWith("service_account_created");
+    });
+
+    it("does not track service_account_created when creation fails", async () => {
+      vi.mocked(service_accounts.create).mockRejectedValue({
+        response: { status: 500, data: { message: "Server error" } },
+      });
+      await getNameInput(wrapper).setValue("fail-bot");
+      await submitForm(wrapper);
+
+      expect(service_accounts.create).toHaveBeenCalled();
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
     it("emits updated (with an access promise resolving to empty buckets) + update:open(false) after a successful create", async () => {
       vi.mocked(service_accounts.create).mockResolvedValue({ data: {} } as any);
       await getNameInput(wrapper).setValue("new-bot");
@@ -394,6 +426,8 @@ describe("AddServiceAccount", () => {
           { key: "hidden", visible: false },
         ],
       } as any);
+      // Drop the cached read so this override is the one that runs.
+      queryClient.clear();
       vi.mocked(updateRole).mockResolvedValue({ data: {} } as any);
 
       await wrapper.vm.onRoleAdded({
@@ -419,6 +453,8 @@ describe("AddServiceAccount", () => {
 
     it("warns instead of claiming success when the seeding yields zero grants", async () => {
       vi.mocked(getResources).mockResolvedValue({ data: [] } as any);
+      // Drop the cached read so this override is the one that runs.
+      queryClient.clear();
 
       await wrapper.vm.onRoleAdded({
         role_name: "viewer_role",

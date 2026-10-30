@@ -28,19 +28,17 @@ use config::{
 };
 use infra::errors::{Error, ErrorCodes, Result};
 use itertools::Itertools;
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::actions::{
-    action_manager::trigger_action,
-    meta::{ActionTriggerResult, TriggerSource},
-};
 use proto::cluster_rpc::SearchQuery;
 use vector_enrichment::TableRegistry;
 
-use crate::{SearchResult, cluster::flight, sql::Sql, utils::is_default_query_limit_exceeded};
+use crate::{
+    QueryTracker, SearchResult, cluster::flight, sql::Sql, utils::is_default_query_limit_exceeded,
+};
 
 #[tracing::instrument(name = "service:search:cluster", skip_all)]
 pub async fn search(
     req: Request,
+    query_tracker: &QueryTracker,
     query: SearchQuery,
     _req_regions: Vec<String>,
     _req_clusters: Vec<String>,
@@ -48,7 +46,6 @@ pub async fn search(
 ) -> Result<search::Response> {
     let start = std::time::Instant::now();
     let trace_id = req.trace_id.clone();
-    let query_type = query.query_type.to_lowercase();
     let track_total_hits = query.track_total_hits;
 
     // handle request time range
@@ -60,11 +57,9 @@ pub async fn search(
     // execution
     let use_query_fn = query.uses_zo_fn;
     let query_fn = query.query_fn.clone();
-    #[cfg(feature = "enterprise")]
-    let action_id = query.action_id.clone();
-
     let ret = search_inner(
         req,
+        query_tracker,
         query,
         _req_regions,
         _req_clusters,
@@ -86,7 +81,6 @@ pub async fn search(
 
     // hits
     if !merge_batches.is_empty() {
-        let schema = merge_batches[0].schema();
         let batches_query_ref: Vec<&RecordBatch> = merge_batches.iter().collect();
         let mut json_rows = record_batches_to_json_rows(&batches_query_ref)
             .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
@@ -98,7 +92,7 @@ pub async fn search(
             json_rows.truncate(default_query_limit);
         }
 
-        let mut sources: Vec<json::Value> = if query_fn.is_empty() {
+        let sources: Vec<json::Value> = if query_fn.is_empty() {
             json_rows
                 .into_iter()
                 .filter(|v| !v.is_empty())
@@ -152,7 +146,7 @@ pub async fn search(
 
                         ret_val
                             .as_array()
-                            .ok_or(Error::Message("Expected array".to_string()))?
+                            .ok_or_else(|| Error::Message("Expected array".to_string()))?
                             .iter()
                             .filter_map(|v| {
                                 if !v.is_null() && v.is_object() {
@@ -204,50 +198,19 @@ pub async fn search(
             }
         };
 
-        #[cfg(feature = "enterprise")]
-        if !action_id.is_empty() {
-            let resp = trigger_action(
-                &trace_id,
-                &sql.org_id,
-                &action_id,
-                sources,
-                TriggerSource::Search,
-            )
-            .await
-            .map_err(|err| Error::Message(err.to_string()))?;
-            match resp.result {
-                ActionTriggerResult::Success(new_sources) => {
-                    sources = new_sources;
-                }
-                ActionTriggerResult::Failure(err_msg) => {
-                    log::error!(
-                        "[trace_id {trace_id}] search->action: action_id: {action_id}, err: {err_msg}"
-                    );
-                    return Err(Error::Message(err_msg));
-                }
-            }
-        }
-
-        // handle query type: json, metrics, table
-        if query_type == "table" {
-            (result.columns, sources) = super::handle_table_response(schema, sources);
-        } else if query_type == "metrics" {
-            sources = super::handle_metrics_response(sources);
-        }
-
         if use_query_fn {
             for source in sources {
                 if source.is_object() {
                     result.add_hit(
-                        &flatten::flatten(source).map_err(|e| Error::Message(e.to_string()))?,
+                        flatten::flatten(source).map_err(|e| Error::Message(e.to_string()))?,
                     );
                 } else {
-                    result.add_hit(&source);
+                    result.add_hit(source);
                 }
             }
         } else {
             for source in sources {
-                result.add_hit(&source);
+                result.add_hit(source);
             }
         }
     }
@@ -295,12 +258,6 @@ pub async fn search(
             .observe(cached_ratio);
     }
 
-    if query_type == "table" {
-        result.response_type = "table".to_string();
-    } else if query_type == "metrics" {
-        result.response_type = "matrix".to_string();
-    }
-
     // set order by
     if let Some(order_by) = sql.order_by.first() {
         result.set_order_by(Some(order_by.1));
@@ -321,16 +278,16 @@ pub async fn search(
 }
 
 // internal search function that return record batches
-// NOTE: careful use it, before enter it, should add trace_id to query_manager
+// NOTE: careful use it, before enter it, should register the query in the query_manager
 pub async fn search_inner(
     req: Request,
+    query_tracker: &QueryTracker,
     query: SearchQuery,
     _req_regions: Vec<String>,
     _req_clusters: Vec<String>,
     _need_super_cluster: bool,
     sql: Option<Arc<Sql>>,
 ) -> Result<SearchResult> {
-    let trace_id = req.trace_id.clone();
     let sql = match sql {
         Some(s) => s,
         None => {
@@ -353,7 +310,7 @@ pub async fn search_inner(
         && !local_cluster_search
     {
         super::super::super_cluster::leader::search(
-            &trace_id,
+            query_tracker,
             sql.clone(),
             req,
             query,
@@ -362,10 +319,10 @@ pub async fn search_inner(
         )
         .await
     } else {
-        flight::search(&trace_id, sql.clone(), req).await
+        flight::search(query_tracker, sql.clone(), req).await
     };
     #[cfg(not(feature = "enterprise"))]
-    let ret = flight::search(&trace_id, sql.clone(), req).await;
+    let ret = flight::search(query_tracker, sql.clone(), req).await;
 
     ret
 }

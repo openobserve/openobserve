@@ -14,6 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed } from "vue";
+import { generateLabelFromName } from "@/utils/dashboard/fieldLabel";
+import { STATE_TIMELINE_Y_FUNCTION } from "@/utils/dashboard/defaultFields";
+import { isRawValueChart, isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
+import {
+  HOSTMAP_MAX_GROUP_LEVELS,
+  HOSTMAP_NUMERIC_Y_FUNCTION,
+} from "@/utils/dashboard/convertHostmapData";
+import { isNumericYField } from "@/utils/dashboard/heatmapYAxis";
+import { TREEMAP_MAX_LEVELS } from "@/utils/dashboard/convertTreemapData";
+import { SUNBURST_MAX_LEVELS } from "@/utils/dashboard/convertSunburstData";
 
 const colors = [
   "#5960b2",
@@ -41,15 +51,6 @@ export const usePanelFields = ({
 }) => {
   const promqlMode = computed(() => dashboardPanelData.data.queryType == "promql");
 
-  const generateLabelFromName = (name: string) => {
-    return name
-      .replace(/[_\-\s.]/g, " ")
-      .split(" ")
-      .map((string) => string.charAt(0).toUpperCase() + string.slice(1))
-      .filter((it) => it)
-      .join(" ");
-  };
-
   const isPivotMode = computed(() => {
     if (dashboardPanelData.data.type !== "table") return false;
     const currentQuery =
@@ -61,12 +62,30 @@ export const usePanelFields = ({
     );
   });
 
+  // Every group field and the sub-group each add one nesting level.
+  const treemapLevels = computed(() => {
+    const fields =
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields;
+    return (fields?.x?.length ?? 0) + (fields?.breakdown?.length ?? 0);
+  });
+  // Every x field and the breakdown add one ring, so the cap counts both wells together.
+  const sunburstLevelCount = () => {
+    const fields =
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields;
+    return (fields?.x?.length ?? 0) + (fields?.breakdown?.length ?? 0);
+  };
+
   const isAddXAxisNotAllowed = computed(() => {
     switch (dashboardPanelData.data.type) {
       case "pie":
       case "donut":
       case "heatmap":
       case "gauge":
+      case "bar-gauge":
+      case "state-timeline":
+      case "funnel":
+      case "boxplot":
+      case "hostmap":
       case "area":
       case "bar":
       case "h-bar":
@@ -79,11 +98,20 @@ export const usePanelFields = ({
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x
             .length >= 1
         );
+      case "sunburst":
+        return sunburstLevelCount() >= SUNBURST_MAX_LEVELS;
       case "metric":
+      case "distribution":
+      case "node-graph":
+      case "alert-list":
+      case "flame-graph":
+      case "logs":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x
             .length >= 0
         );
+      case "treemap":
+        return treemapLevels.value >= TREEMAP_MAX_LEVELS;
       case "table":
         return false;
       default:
@@ -104,9 +132,33 @@ export const usePanelFields = ({
       case "area-stacked":
       case "stacked":
       case "h-stacked":
+      case "state-timeline":
+      case "distribution":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
             .breakdown?.length >= 1
+        );
+      case "treemap":
+        return (
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+            .breakdown?.length >= 1 || treemapLevels.value >= TREEMAP_MAX_LEVELS
+        );
+      case "sunburst":
+        return (
+          (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+            .breakdown?.length ?? 0) >= 1 || sunburstLevelCount() >= SUNBURST_MAX_LEVELS
+        );
+      case "funnel":
+      case "node-graph":
+      case "alert-list":
+      case "flame-graph":
+      case "boxplot":
+      case "logs":
+        return true;
+      case "hostmap":
+        return (
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+            .breakdown?.length >= HOSTMAP_MAX_GROUP_LEVELS
         );
       case "table":
         // Allow up to 3 breakdown fields for table charts
@@ -124,10 +176,20 @@ export const usePanelFields = ({
       case "pie":
       case "donut":
       case "gauge":
+      case "bar-gauge":
+      case "treemap":
+      case "sunburst":
+      case "funnel":
+      case "boxplot":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y
             .length >= 1
         );
+      case "node-graph":
+      case "alert-list":
+      case "flame-graph":
+      case "logs":
+        return true;
       case "metric":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y
@@ -135,6 +197,8 @@ export const usePanelFields = ({
         );
       case "area-stacked":
       case "heatmap":
+      case "state-timeline":
+      case "hostmap":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y
             .length >= 1
@@ -187,10 +251,7 @@ export const usePanelFields = ({
     const isDerived = checkIsDerivedField(row.name) ?? false;
 
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.push({
-      label: !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-        .customQuery
-        ? generateLabelFromName(row.name)
-        : row.name,
+      label: "",
       alias:
         !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery &&
         !isDerived
@@ -263,10 +324,7 @@ export const usePanelFields = ({
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields.breakdown.push({
-      label: !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-        .customQuery
-        ? generateLabelFromName(row.name)
-        : row.name,
+      label: "",
       alias:
         !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery &&
         !isDerived
@@ -316,6 +374,12 @@ export const usePanelFields = ({
     updateArrayAlias();
   };
 
+  const isNumericStreamField = (row: { name: string; streamAlias?: string }) =>
+    isNumericYField(
+      { args: [{ type: "field", value: { field: row.name, streamAlias: row.streamAlias } }] },
+      dashboardPanelData,
+    );
+
   const addYAxisItem = (row: { name: string; streamAlias?: string }) => {
     if (!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y) {
       dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y = [];
@@ -328,10 +392,7 @@ export const usePanelFields = ({
     const isDerived = checkIsDerivedField(row.name) ?? false;
 
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.push({
-      label: !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-        .customQuery
-        ? generateLabelFromName(row.name)
-        : row.name,
+      label: "",
       alias:
         !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery &&
         !isDerived
@@ -343,7 +404,17 @@ export const usePanelFields = ({
       // column: row.name,
       color: getNewColorValue(),
       type: "build",
-      functionName: dashboardPanelData.data.type == "heatmap" || isDerived ? null : "count",
+      functionName:
+        dashboardPanelData.data.type == "heatmap" ||
+        dashboardPanelData.data.type == "boxplot" ||
+        isRawValueChart(dashboardPanelData.data.type) ||
+        isDerived
+          ? null
+          : isRowTimeline(dashboardPanelData.data.type)
+            ? STATE_TIMELINE_Y_FUNCTION
+            : dashboardPanelData.data.type == "hostmap" && isNumericStreamField(row)
+              ? HOSTMAP_NUMERIC_Y_FUNCTION
+              : "count",
       args: [
         {
           type: "field",
@@ -376,10 +447,7 @@ export const usePanelFields = ({
     const isDerived = checkIsDerivedField(row.name) ?? false;
 
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z.push({
-      label: !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-        .customQuery
-        ? generateLabelFromName(row.name)
-        : row.name,
+      label: "",
       alias:
         !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery &&
         !isDerived

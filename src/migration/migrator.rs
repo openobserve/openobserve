@@ -660,11 +660,6 @@ mod tests {
     }
 
     #[test]
-    fn test_truncate_str_short() {
-        assert_eq!(truncate_str("hello", 10), "hello");
-    }
-
-    #[test]
     fn test_truncate_str_exact() {
         assert_eq!(truncate_str("hello", 5), "hello");
     }

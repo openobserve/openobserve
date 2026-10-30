@@ -62,18 +62,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex min-h-0 w-full flex-1 flex-col overflow-hidden pt-2.5">
       <!-- Summary Stats Card -->
       <div v-if="!loading" class="mx-2.5 mb-2.5 shrink-0">
-        <div class="grid gap-3" style="grid-template-columns: 1fr 1fr 1fr 1.6fr 0.9fr">
+        <div
+          class="grid gap-3 max-md:grid-cols-5 max-md:gap-1.5 md:[grid-template-columns:1fr_1fr_1fr_1.6fr_0.9fr]"
+        >
           <!-- Results Returned -->
           <div class="stat-tile">
             <div
-              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3"
+              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3 max-md:h-auto max-md:items-center max-md:gap-1 max-md:p-1.5"
             >
               <div class="flex items-start justify-between">
-                <div class="font-small text-text-label text-base">
+                <div class="font-small text-text-label text-base max-md:hidden">
                   {{ t("logs.searchJobInspector.results") }}
                 </div>
                 <div
-                  class="rounded-default flex h-10 w-10 items-center justify-center border"
+                  class="rounded-default flex h-10 w-10 items-center justify-center border max-md:h-7 max-md:w-7"
                   style="
                     background: rgba(57, 126, 246, 0.2);
                     border-color: rgba(57, 126, 246, 0.35);
@@ -86,11 +88,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
               </div>
-              <div class="flex flex-col gap-1">
-                <div class="text-text-body text-2xl font-bold">
-                  {{ hasNoData ? "NA" : (profileData?.data_records || 0).toLocaleString() }}
+              <div class="flex flex-col gap-1 max-md:max-w-full max-md:min-w-0 max-md:items-center">
+                <div
+                  class="text-text-body text-2xl font-bold max-md:max-w-full max-md:truncate max-md:text-sm"
+                >
+                  {{ hasNoData ? raw("NA") : (profileData?.data_records || 0).toLocaleString() }}
                 </div>
-                <div class="text-3xs text-text-secondary">
+                <div class="text-3xs text-text-secondary max-md:hidden">
                   {{ t("logs.searchJobInspector.returnedFromQuery") }}
                 </div>
               </div>
@@ -100,14 +104,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Events Scanned -->
           <div class="stat-tile">
             <div
-              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3"
+              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3 max-md:h-auto max-md:items-center max-md:gap-1 max-md:p-1.5"
             >
               <div class="flex items-start justify-between">
-                <div class="font-small text-text-label text-base">
+                <div class="font-small text-text-label text-base max-md:hidden">
                   {{ t("logs.searchJobInspector.scannedEvents") }}
                 </div>
                 <div
-                  class="rounded-default flex h-10 w-10 items-center justify-center border"
+                  class="rounded-default flex h-10 w-10 items-center justify-center border max-md:h-7 max-md:w-7"
                   style="
                     background: rgba(57, 126, 246, 0.2);
                     border-color: rgba(57, 126, 246, 0.35);
@@ -120,11 +124,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
               </div>
-              <div class="flex flex-col gap-1">
-                <div class="text-text-body text-2xl font-bold">
-                  {{ hasNoData ? "NA" : (profileData?.scan_records || 0).toLocaleString() }}
+              <div class="flex flex-col gap-1 max-md:max-w-full max-md:min-w-0 max-md:items-center">
+                <div
+                  class="text-text-body text-2xl font-bold max-md:max-w-full max-md:truncate max-md:text-sm"
+                >
+                  {{ hasNoData ? raw("NA") : (profileData?.scan_records || 0).toLocaleString() }}
                 </div>
-                <div class="text-3xs text-text-secondary">
+                <div class="text-3xs text-text-secondary max-md:hidden">
                   {{ t("logs.searchJobInspector.scannedEventsForQuery") }}
                 </div>
               </div>
@@ -134,14 +140,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Time Taken -->
           <div class="stat-tile">
             <div
-              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3"
+              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3 max-md:h-auto max-md:items-center max-md:gap-1 max-md:p-1.5"
             >
               <div class="flex items-start justify-between">
-                <div class="font-small text-text-label text-base">
+                <div class="font-small text-text-label text-base max-md:hidden">
                   {{ t("logs.searchJobInspector.timeTaken") }}
                 </div>
                 <div
-                  class="rounded-default flex h-10 w-10 items-center justify-center border"
+                  class="rounded-default flex h-10 w-10 items-center justify-center border max-md:h-7 max-md:w-7"
                   style="background: rgba(34, 197, 94, 0.2); border-color: rgba(34, 197, 94, 0.35)"
                 >
                   <svg
@@ -160,16 +166,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </svg>
                 </div>
               </div>
-              <div class="flex flex-col gap-1">
-                <div class="text-text-body text-2xl font-bold">
+              <div class="flex flex-col gap-1 max-md:max-w-full max-md:min-w-0 max-md:items-center">
+                <div
+                  class="text-text-body text-2xl font-bold max-md:max-w-full max-md:truncate max-md:text-sm"
+                >
                   {{
                     hasNoData
-                      ? "NA"
+                      ? raw("NA")
                       : formatDuration(profileData?.time_taken || profileData?.total_duration)
                   }}
                 </div>
                 <div
-                  class="text-3xs"
+                  class="text-3xs max-md:hidden"
                   :class="
                     hasNoData
                       ? 'text-text-secondary'
@@ -191,14 +199,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Trace ID -->
           <div class="stat-tile">
             <div
-              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3"
+              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3 max-md:h-auto max-md:items-center max-md:gap-1 max-md:p-1.5"
             >
               <div class="flex items-start justify-between">
-                <div class="font-small text-text-label text-base">
+                <div class="font-small text-text-label text-base max-md:hidden">
                   {{ t("logs.searchJobInspector.traceId") }}
                 </div>
                 <div
-                  class="rounded-default flex h-10 w-10 items-center justify-center border"
+                  class="rounded-default flex h-10 w-10 items-center justify-center border max-md:h-7 max-md:w-7"
                   style="
                     background: rgba(242, 220, 245, 0.25);
                     border-color: rgba(242, 220, 245, 0.45);
@@ -228,14 +236,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </svg>
                 </div>
               </div>
-              <div class="flex flex-col gap-1">
-                <div
-                  class="truncate overflow-hidden font-mono text-sm leading-tight font-semibold"
+              <div class="flex flex-col gap-1 max-md:max-w-full max-md:min-w-0 max-md:items-center">
+                <OTruncatedText
+                  as="div"
+                  class="font-mono text-sm leading-tight font-semibold max-md:max-w-full max-md:text-xs"
                   :class="hasNoData ? 'text-text-secondary' : 'text-text-link'"
                 >
-                  {{ hasNoData ? "NA" : traceId }}
-                  <OTooltip v-if="!hasNoData" :content="traceId" />
-                </div>
+                  {{ hasNoData ? raw("NA") : traceId }}
+                </OTruncatedText>
               </div>
             </div>
           </div>
@@ -243,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- View Query -->
           <div class="stat-tile">
             <div
-              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col items-center justify-center border p-3 transition-all"
+              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col items-center justify-center border p-3 transition-all max-md:h-full max-md:p-1.5"
               :class="
                 hasNoData
                   ? 'cursor-not-allowed opacity-50'
@@ -252,7 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="!hasNoData && (showSqlDialog = true)"
             >
               <div
-                class="rounded-default mb-2 flex h-12 w-12 items-center justify-center border"
+                class="rounded-default mb-2 flex h-12 w-12 items-center justify-center border max-md:mb-0 max-md:h-7 max-md:w-7"
                 style="
                   background: rgba(245, 235, 147, 0.25);
                   border-color: rgba(245, 235, 147, 0.45);
@@ -286,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="errorMessage"
         variant="error"
         icon="error"
-        :content="errorMessage"
+        :content="raw(errorMessage)"
         class="mb-2.5 shrink-0"
         data-test="inspector-error-banner"
       />
@@ -333,11 +341,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-component="{ row }">
-              <span :title="row.component">{{ row.component }}</span>
+              <span>{{ row.component }}</span>
             </template>
 
             <template #cell-desc="{ row }">
-              <span class="text-xs" :title="row.desc || '-'">{{ row.desc || "-" }}</span>
+              <span class="text-xs">{{ row.desc || "-" }}</span>
             </template>
 
             <template #empty>
@@ -377,12 +385,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OButton>
       </template>
+      <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
       <div class="rounded-default bg-surface-subtle max-h-[calc(100vh-150px)] overflow-auto p-4">
         <pre
           class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
           data-test="inspector-sql-query-content"
-          >{{ profileData?.sql || t("logs.searchJobInspector.noSqlAvailable") }}</pre
-        >
+          >{{ profileData?.sql || t("logs.searchJobInspector.noSqlAvailable") }}</pre>
       </div>
     </ODrawer>
 
@@ -399,8 +407,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ traceId }}
         </div>
-        <OButton variant="primary" size="sm-action" @click="copyTraceId"
-          ><OIcon name="content-copy" size="sm" class="mr-1"
+        <OButton
+          :aria-label="t('common.copyToClipboard')"
+          variant="primary"
+          size="sm-action"
+          @click="copyTraceId"
+          ><OIcon name="content-copy" size="sm" class="me-1"
         /></OButton>
       </div>
     </ODialog>
@@ -411,7 +423,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onMounted, computed, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import searchService from "@/services/search";
 import { chartColor } from "@/utils/chartTheme";
 import NoData from "@/components/shared/grid/NoData.vue";
@@ -423,6 +435,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -472,6 +485,7 @@ export default defineComponent({
     ODialog,
     OBanner,
     OTooltip,
+    OTruncatedText,
     OIcon,
     OTable,
   },
@@ -480,7 +494,7 @@ export default defineComponent({
     const route = useRoute();
     const store = useStore();
     const { isDark } = useTheme();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const loading = ref(false);
     const errorMessage = ref("");
@@ -503,7 +517,7 @@ export default defineComponent({
     const columns = computed<OTableColumnDef[]>(() => [
       {
         id: "index",
-        header: "#",
+        header: raw("#"),
         accessorKey: "index",
         meta: { align: "left" },
         size: indexColumnWidth.value,
@@ -741,7 +755,7 @@ export default defineComponent({
     };
 
     const copyTraceId = () => {
-      copyToClipboard(traceId.value, {
+      copyToClipboard(traceId.value, t, {
         errorMessage: t("logs.searchJobInspector.failedToCopyTraceId"),
       }).then((success) => {
         if (success) {
@@ -755,7 +769,7 @@ export default defineComponent({
 
     const copiedSql = ref(false);
     const copySql = () => {
-      copyToClipboard(profileData.value?.sql || "", {
+      copyToClipboard(profileData.value?.sql || "", t, {
         errorMessage: t("logs.searchJobInspector.failedToCopySql"),
       }).then((success) => {
         if (success) {
@@ -772,6 +786,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       loading,
       errorMessage,
       profileData,

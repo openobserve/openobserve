@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { PrebuiltConfig } from "./types";
+import { raw } from "@/types/i18n";
+
+import { PrebuiltConfig, PrebuiltType } from "./types";
 
 const isValidServiceNowIncidentUrl = (url: string): boolean => {
   try {
@@ -57,7 +59,7 @@ export const servicenowTemplate = {
   name: "prebuilt_servicenow",
   body: JSON.stringify(
     {
-      short_description: "OpenObserve Alert: {alert_name}",
+      short_description: "OpenObserve [{alert_status}]: {alert_name}",
       description:
         "Alert Details:\n\nStream: {stream_name}\nType: {stream_type}\nCount: {alert_count}\nThreshold: {alert_operator} {alert_threshold}\nTime: {alert_time}\n\nView in OpenObserve: {alert_url}",
       category: "Software",
@@ -85,14 +87,13 @@ export const servicenowConfig: PrebuiltConfig = {
     Accept: "application/json",
   },
   method: "post",
-  urlValidator: (url: string) => isValidServiceNowIncidentUrl(url),
   credentialFields: [
     {
       key: "instanceUrl",
       labelKey: "alerts.prebuiltDestinations.servicenowInstanceUrl",
       type: "text",
       required: true,
-      hint: "https://your-instance.service-now.com/api/now/table/incident",
+      hint: raw("https://your-instance.service-now.com/api/now/table/incident"),
       validator: (url: string) =>
         isValidServiceNowIncidentUrl(url) || {
           key: "alerts.prebuiltDestinations.servicenowInstanceUrlFormat",
@@ -103,7 +104,7 @@ export const servicenowConfig: PrebuiltConfig = {
       labelKey: "common.username",
       type: "text",
       required: true,
-      hint: "ServiceNow username with incident creation permissions",
+      hintKey: "alerts.prebuiltDestinations.servicenowUsernameHelp",
       validator: (value: string) =>
         value.trim().length > 0 || {
           key: "alerts.prebuiltDestinations.usernameRequired",
@@ -114,7 +115,7 @@ export const servicenowConfig: PrebuiltConfig = {
       labelKey: "common.password",
       type: "password",
       required: true,
-      hint: "ServiceNow password or API token",
+      hintKey: "alerts.prebuiltDestinations.servicenowPasswordHelp",
       validator: (value: string) =>
         value.trim().length > 0 || {
           key: "alerts.prebuiltDestinations.passwordRequired",
@@ -125,17 +126,26 @@ export const servicenowConfig: PrebuiltConfig = {
       labelKey: "alerts.prebuiltDestinations.servicenowAssignmentGroup",
       type: "text",
       required: false,
-      hint: "Group to assign incidents to (e.g., IT Operations)",
+      hintKey: "alerts.prebuiltDestinations.servicenowAssignmentGroupHelp",
+      persistInMetadata: true,
+    },
+    {
+      key: "resolutionCode",
+      labelKey: "alerts.prebuiltDestinations.servicenowResolutionCode",
+      type: "text",
+      required: false,
+      hintKey: "alerts.prebuiltDestinations.servicenowResolutionCodeHelp",
+      persistInMetadata: true,
     },
   ],
 };
 
 import servicenowLogo from "@/assets/images/alerts/destinations/servicenow.png";
 
-export const servicenowDestinationType = {
+export const servicenowDestinationType: PrebuiltType = {
   id: "servicenow",
-  name: "ServiceNow",
-  description: "Create incidents in ServiceNow",
+  name: raw("ServiceNow"),
+  descriptionKey: "alert_destinations.prebuilt.servicenowDescription",
   icon: "servicenow",
   image: servicenowLogo,
   popular: true,

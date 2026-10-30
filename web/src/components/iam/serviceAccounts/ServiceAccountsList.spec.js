@@ -13,19 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+import { describe, expect, it, beforeAll, beforeEach, vi, afterAll, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 
 // Mock service_accounts service
-vi.mock("@/services/service_accounts", () => ({
-  default: {
-    list: vi.fn(),
-    delete: vi.fn(),
-    bulkDelete: vi.fn(),
-    refresh_token: vi.fn(),
-  },
-}));
+vi.mock("@/services/service_accounts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+      delete: vi.fn(),
+      bulkDelete: vi.fn(),
+      refresh_token: vi.fn(),
+    },
+  });
+});
 
 // Mock usePermissions composable
 const mockServiceAccountsState = {
@@ -50,6 +53,7 @@ import ServiceAccountsList from "@/components/iam/serviceAccounts/ServiceAccount
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import service_accounts from "@/services/service_accounts";
+import config from "@/aws-exports";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -704,13 +708,15 @@ describe("ServiceAccountsList Component", () => {
     it("has correct column configuration", () => {
       // columns uses OTableColumnDef with 'id' (not 'name'). The row-index "#"
       // column is now auto-injected by OTable's show-index, so it is not part
-      // of the component's own column defs.
-      expect(wrapper.vm.columns).toHaveLength(5);
+      // of the component's own column defs. aws-exports is mocked with
+      // isEnterprise: "true", so the Roles column is included.
+      expect(wrapper.vm.columns).toHaveLength(6);
       expect(wrapper.vm.columns[0].id).toBe("email");
       expect(wrapper.vm.columns[1].id).toBe("first_name");
-      expect(wrapper.vm.columns[2].id).toBe("token");
-      expect(wrapper.vm.columns[3].id).toBe("created_at");
-      expect(wrapper.vm.columns[4].id).toBe("actions");
+      expect(wrapper.vm.columns[2].id).toBe("roles");
+      expect(wrapper.vm.columns[3].id).toBe("token");
+      expect(wrapper.vm.columns[4].id).toBe("created_at");
+      expect(wrapper.vm.columns[5].id).toBe("actions");
     });
 
     it("has correct per page options", () => {
@@ -860,6 +866,18 @@ describe("ServiceAccountsList Component", () => {
       expect(openDialogs.length).toBeGreaterThan(0);
     });
 
+    it("names the account and uses a destructive OK button", async () => {
+      wrapper.vm.confirmDeleteAction({ email: "service1@example.com", is_system: false });
+      await nextTick();
+      const deleteDialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((d) => d.props("modelValue") === true);
+      expect(deleteDialog.props("messageKeypath")).toBe("serviceAccounts.confirmDeleteMsg");
+      expect(deleteDialog.props("messageName")).toBe(wrapper.vm.deleteUserEmailIdentifier);
+      expect(deleteDialog.props("messageName")).toBeTruthy();
+      expect(deleteDialog.props("okVariant")).toBe("destructive");
+    });
+
     it("closes confirm delete dialog when ConfirmDialog emits update:cancel", async () => {
       wrapper.vm.confirmDelete = true;
       wrapper.vm.deleteUserEmailIdentifier = "service1@example.com";
@@ -924,6 +942,10 @@ describe("ServiceAccountsList Component", () => {
       wrapper.vm.openBulkDeleteDialog();
       await nextTick();
       expect(wrapper.vm.confirmBulkDelete).toBe(true);
+      const bulkDialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((d) => d.vm.$attrs["data-test"] === "service-accounts-list-bulk-delete-dialog");
+      expect(bulkDialog.props("okVariant")).toBe("destructive");
     });
 
     it("closes bulk delete dialog when ConfirmDialog emits update:cancel", async () => {
@@ -1145,6 +1167,21 @@ describe("ServiceAccountsList Component", () => {
       expect(curl).not.toContain("_search");
     });
 
+    it.each([
+      ["http://localhost:5080", "http://localhost:5080"],
+      ["/", window.location.origin],
+      ["https://o2.example.com/base", "https://o2.example.com/base"],
+    ])("cURL snippet targets the API endpoint the UI calls (%s)", (apiEndpoint, expectedHost) => {
+      const original = store.state.API_ENDPOINT;
+      store.state.API_ENDPOINT = apiEndpoint;
+      try {
+        wrapper.vm.revealToken("the-token", "svc@example.com");
+        expect(wrapper.vm.tokenCurlSnippet).toContain(`"${expectedHost}/api/test-org/streams"`);
+      } finally {
+        store.state.API_ENDPOINT = original;
+      }
+    });
+
     it("Header snippet is Authorization: Basic base64(identifier:token)", () => {
       wrapper.vm.revealToken("the-token", "svc@example.com");
       const header = wrapper.vm.tokenHeaderSnippet;
@@ -1177,6 +1214,63 @@ describe("ServiceAccountsList Component", () => {
       expect(tokenDialog).toBeDefined();
       // Copy button should still be present (data-test attribute)
       expect(tokenDialog.html()).toContain("service-accounts-list-token-copy-btn");
+    });
+
+    it("the copy hint does not use an em dash", () => {
+      const hint = wrapper.find('[data-test="service-accounts-token-copy-hint"]');
+      expect(hint.exists()).toBe(true);
+      expect(hint.text()).not.toContain("—");
+    });
+
+    it("the main Copy Token button always copies the raw token, even on the Header/Env tab", async () => {
+      wrapper.vm.revealToken("the-token", "svc@example.com");
+      wrapper.vm.tokenTab = "header";
+      await nextTick();
+
+      await wrapper.find('[data-test="service-accounts-list-token-copy-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("the-token");
+      expect(navigator.clipboard.writeText).not.toHaveBeenCalledWith(wrapper.vm.tokenHeaderSnippet);
+    });
+
+    it("renders the active tab's snippet in a dedicated OCodeBlock with its own copy action", async () => {
+      wrapper.vm.revealToken("the-token", "svc@example.com");
+      const tokenDialog = wrapper
+        .findAllComponents({ name: "ODialog" })
+        .find((d) => d.props("title") === "Copy your token");
+
+      for (const [tab, expectedCode] of [
+        ["curl", wrapper.vm.tokenCurlSnippet],
+        ["header", wrapper.vm.tokenHeaderSnippet],
+        ["env", wrapper.vm.tokenEnvSnippet],
+      ]) {
+        wrapper.vm.tokenTab = tab;
+        await nextTick();
+        const codeBlock = tokenDialog.findComponent({ name: "OCodeBlock" });
+        expect(codeBlock.exists()).toBe(true);
+        expect(codeBlock.props("code")).toBe(expectedCode);
+        // copyable defaults to true — the box owns its own copy button.
+        expect(codeBlock.props("copyable")).not.toBe(false);
+      }
+    });
+  });
+
+  // Regional Cloud orgs (e.g. us2) reject service-account Basic auth on the
+  // primary region's API host, so the snippet must use the region's own host.
+  describe("Token dialog — cURL host on Cloud", () => {
+    beforeAll(() => {
+      config.isCloud = "true";
+    });
+    afterAll(() => {
+      config.isCloud = false;
+    });
+
+    it("targets the API endpoint the UI calls, not a fixed global API host", () => {
+      wrapper.vm.revealToken("the-token", "svc@example.com");
+      const curl = wrapper.vm.tokenCurlSnippet;
+      expect(curl).toContain(`"${store.state.API_ENDPOINT}/api/test-org/streams"`);
+      expect(curl).not.toContain("api.openobserve.ai");
     });
   });
 
@@ -1219,7 +1313,9 @@ describe("ServiceAccountsList Component", () => {
       const groupLink = wrapper.find('[data-test="service-accounts-list-token-add-to-group"]');
       expect(roleLink.exists()).toBe(true);
       expect(groupLink.exists()).toBe(true);
-      expect(wrapper.vm.showGroupLink).toBe(true);
+      // `showGroupLink` was replaced by `rbacAccess` this session — the
+      // group link now always renders, just locked when `!rbacAccess.allowed`.
+      expect(wrapper.vm.rbacAccess.allowed).toBe(true);
 
       // Role must be the first option (appear before Group in the DOM).
       const html = wrapper.find('[data-test="service-accounts-token-step-1"]').html();
@@ -1252,7 +1348,9 @@ describe("ServiceAccountsList Component", () => {
       );
       const summary = wrapper.find('[data-test="service-accounts-token-access-summary"]');
       expect(summary.exists()).toBe(true);
-      expect(summary.text()).toContain("Roles assigned: editor");
+      // Label shown once, followed by a badge per role — not one sentence.
+      expect(summary.text()).toContain("Roles assigned");
+      expect(summary.text()).toContain("editor");
     });
 
     it("creation with grants lists the assigned roles/groups and hides the fallback links", async () => {
@@ -1264,14 +1362,31 @@ describe("ServiceAccountsList Component", () => {
 
       const summary = wrapper.find('[data-test="service-accounts-token-access-summary"]');
       expect(summary.exists()).toBe(true);
-      expect(summary.text()).toContain("Roles assigned: editor");
-      expect(summary.text()).toContain("Added to user groups: pipelines");
+      expect(summary.text()).toContain("Roles assigned");
+      expect(summary.text()).toContain("editor");
+      expect(summary.text()).toContain("Added to user groups");
+      expect(summary.text()).toContain("pipelines");
       expect(wrapper.find('[data-test="service-accounts-list-token-add-to-role"]').exists()).toBe(
         false,
       );
       expect(wrapper.find('[data-test="service-accounts-token-access-failed"]').exists()).toBe(
         false,
       );
+    });
+
+    it("shows the 'Roles assigned' label once even when multiple roles were granted", async () => {
+      wrapper.vm.revealToken("tok", "svc@example.com", {
+        assigned: { roles: ["editor", "viewer", "admin"], groups: [] },
+        failed: { roles: [], groups: [] },
+      });
+      await nextTick();
+
+      const summary = wrapper.find('[data-test="service-accounts-token-access-summary"]');
+      const labelOccurrences = summary.text().split("Roles assigned").length - 1;
+      expect(labelOccurrences).toBe(1);
+      ["editor", "viewer", "admin"].forEach((role) => {
+        expect(summary.text()).toContain(role);
+      });
     });
 
     it("creation with failed grants surfaces the failures and the retry hint", async () => {
@@ -1358,6 +1473,18 @@ describe("ServiceAccountsList Component", () => {
       expect(wrapper.vm.formatCreatedAt(0)).toBe("—");
       expect(wrapper.vm.formatCreatedAt(undefined)).toBe("—");
     });
+
+    it("includes a 'roles' column on enterprise/cloud (aws-exports mocked isEnterprise: true)", () => {
+      const rolesCol = wrapper.vm.columns.find((c) => c.id === "roles");
+      expect(rolesCol).toBeDefined();
+      expect(rolesCol.header).toBe("Roles");
+    });
+
+    it("serviceAccountRolesText joins assigned role names, else renders an em dash", () => {
+      wrapper.vm.serviceAccountRoles = { "svc@example.com": ["editor", "viewer"] };
+      expect(wrapper.vm.serviceAccountRolesText("svc@example.com")).toBe("editor, viewer");
+      expect(wrapper.vm.serviceAccountRolesText("unknown@example.com")).toBe("—");
+    });
   });
 
   describe("Actions — rotate verb label", () => {
@@ -1405,7 +1532,8 @@ describe("ServiceAccountsList Component", () => {
       vi.mocked(service_accounts.list).mockResolvedValueOnce({
         data: { data: [] },
       });
-      await wrapper.vm.getServiceAccountsUsers();
+      // Forced: a plain reload would be served from the cache the mount warmed.
+      await wrapper.vm.getServiceAccountsUsers(true);
       await flushPromises();
 
       // The service accounts list should be empty

@@ -3,13 +3,13 @@
     data-test="dashboard-group"
     :style="`--group-index: ${groupNestedIndex};`"
     class="rounded-default flex bg-[color-mix(in_srgb,var(--color-brand-indigo)_calc(5%*var(--group-index)),transparent)] p-0"
-    :class="groupNestedIndex > 0 ? 'pl-1.25' : 'pl-0'"
+    :class="groupNestedIndex > 0 ? 'ps-1.25' : 'ps-0'"
   >
     <div class="flex flex-row flex-wrap items-center" data-test="dashboard-group-conditions">
       <div
         v-for="(condition, index) in group.conditions"
         :key="index"
-        class="mr-2.5 inline-flex min-h-8.75 items-center gap-2"
+        class="me-2.5 inline-flex min-h-8.75 items-center gap-2"
         data-test="dashboard-group-condition-group"
       >
         <Group
@@ -41,6 +41,7 @@
       <ODropdown v-model:open="showAddMenu">
         <template #trigger>
           <OButton
+            :aria-label="t('common.addCondition')"
             variant="outline"
             size="icon-chip"
             data-test="dashboard-add-condition-add"
@@ -57,9 +58,10 @@
     </div>
     <div
       v-if="groupNestedIndex !== 0"
-      class="border-border-default ms-2 flex items-center justify-between border-l ps-1.5"
+      class="border-border-default ms-2 flex items-center justify-between border-s ps-1.5"
     >
       <OButton
+        :aria-label="t('common.remove')"
         variant="ghost"
         size="icon-chip"
         class="!w-4"
@@ -78,7 +80,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import AddCondition from "./AddCondition.vue";
 
 export default defineComponent({
@@ -118,7 +120,7 @@ export default defineComponent({
   },
   emits: ["add-condition", "add-group", "remove-group", "logical-operator-change"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const showAddMenu = ref(false);
 
     // Same reference as props.group; mutation targets its nested fields only.

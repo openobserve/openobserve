@@ -66,12 +66,10 @@ const SEARCH_REMOVED_FIELD_PATHS: &[&str] = &[
     "/properties/request_body/properties/search_event_context",
     // Query object (Query struct) — internal performance / streaming fields
     "/properties/request_body/properties/query/properties/quick_mode",
-    "/properties/request_body/properties/query/properties/action_id",
     "/properties/request_body/properties/query/properties/histogram_interval",
     "/properties/request_body/properties/query/properties/streaming_id",
     "/properties/request_body/properties/query/properties/streaming_output",
     "/properties/request_body/properties/query/properties/track_total_hits",
-    "/properties/request_body/properties/query/properties/query_type",
     "/properties/request_body/properties/query/properties/skip_wal",
     "/properties/request_body/properties/query/properties/sampling_config",
     "/properties/request_body/properties/query/properties/sampling_ratio",
@@ -502,7 +500,6 @@ mod tests {
                                 "skip_wal": {"type": "boolean"},
                                 "streaming_id": {"type": "string"},
                                 "streaming_output": {"type": "boolean"},
-                                "query_type": {"type": "string"},
                                 "quick_mode": {"type": "boolean"},
                                 "sampling_config": {"type": "object"},
                                 "sampling_ratio": {"type": "number"}
@@ -549,7 +546,6 @@ mod tests {
             "skip_wal",
             "streaming_id",
             "streaming_output",
-            "query_type",
             "quick_mode",
             "sampling_config",
             "sampling_ratio",

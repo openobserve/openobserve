@@ -659,6 +659,196 @@ describe("SelectFunction", () => {
     });
   });
 
+  describe("Cast Suggestion", () => {
+    // A factory, not a shared object: tests mutate the arg they are given, and a
+    // shared literal leaks that mutation into every test that follows.
+    const textField = () => ({ type: "field", value: { field: "usage_amount" } });
+
+    beforeEach(() => {
+      (mockDashboardPanelData as any).meta = {
+        streamFields: {
+          groupedFields: [
+            {
+              name: "aws_cost_cur",
+              stream_alias: null,
+              schema: [
+                { name: "usage_amount", type: "Utf8" },
+                { name: "blended_cost", type: "Float64" },
+              ],
+            },
+          ],
+        },
+      };
+    });
+
+    afterEach(() => {
+      delete (mockDashboardPanelData as any).meta;
+    });
+
+    const suggestion = (w: any) =>
+      w.find('[data-test="dashboard-function-dropdown-arg-cast-suggestion-0"]');
+
+    it("should suggest a cast when a numeric aggregation targets a text field", () => {
+      wrapper = createWrapper({ modelValue: { functionName: "sum", args: [textField()] } });
+      expect(suggestion(wrapper).exists()).toBe(true);
+    });
+
+    it("should stay silent for min and max, which accept text", () => {
+      wrapper = createWrapper({ modelValue: { functionName: "max", args: [textField()] } });
+      expect(suggestion(wrapper).exists()).toBe(false);
+    });
+
+    it("should stay silent for a numeric field", () => {
+      wrapper = createWrapper({
+        modelValue: {
+          functionName: "sum",
+          args: [{ type: "field", value: { field: "blended_cost" } }],
+        },
+      });
+      expect(suggestion(wrapper).exists()).toBe(false);
+    });
+
+    it("should stay silent for count", () => {
+      wrapper = createWrapper({ modelValue: { functionName: "count", args: [textField()] } });
+      expect(suggestion(wrapper).exists()).toBe(false);
+    });
+
+    it("should wrap the argument in a safe cast when applied", async () => {
+      wrapper = createWrapper({ modelValue: { functionName: "sum", args: [textField()] } });
+      await wrapper
+        .find('[data-test="dashboard-function-dropdown-arg-cast-apply-0"]')
+        .trigger("click");
+
+      expect(wrapper.vm.fields.args[0]).toEqual({
+        type: "function",
+        value: {
+          functionName: "try_cast",
+          args: [
+            { type: "field", value: { field: "usage_amount" } },
+            { type: "castType", value: "DOUBLE" },
+          ],
+        },
+      });
+      expect(suggestion(wrapper).exists()).toBe(false);
+    });
+
+    it("should emit the cast to the parent, so the query actually changes", async () => {
+      wrapper = createWrapper({ modelValue: { functionName: "sum", args: [textField()] } });
+      await wrapper
+        .find('[data-test="dashboard-function-dropdown-arg-cast-apply-0"]')
+        .trigger("click");
+
+      const emitted = wrapper.emitted("update:modelValue");
+      expect(emitted).toBeTruthy();
+      expect(emitted[emitted.length - 1][0].args[0].value.functionName).toBe("try_cast");
+    });
+
+    it("should suggest DOUBLE, never BIGINT — a decimal string casts to NULL", async () => {
+      wrapper = createWrapper({ modelValue: { functionName: "sum", args: [textField()] } });
+      expect(
+        wrapper.find('[data-test="dashboard-function-dropdown-arg-cast-apply-0-BIGINT"]').exists(),
+      ).toBe(false);
+
+      await wrapper
+        .find('[data-test="dashboard-function-dropdown-arg-cast-apply-0"]')
+        .trigger("click");
+
+      expect(wrapper.vm.fields.args[0].value.args[1].value).toBe("DOUBLE");
+    });
+
+    it("should hide the suggestion once dismissed", async () => {
+      wrapper = createWrapper({ modelValue: { functionName: "sum", args: [textField()] } });
+      await wrapper
+        .find('[data-test="dashboard-function-dropdown-arg-cast-dismiss-0"]')
+        .trigger("click");
+
+      expect(suggestion(wrapper).exists()).toBe(false);
+      expect(wrapper.vm.fields.args[0]).toEqual(textField());
+    });
+
+    it("should re-offer the suggestion when the field changes", async () => {
+      wrapper = createWrapper({ modelValue: { functionName: "sum", args: [textField()] } });
+      await wrapper
+        .find('[data-test="dashboard-function-dropdown-arg-cast-dismiss-0"]')
+        .trigger("click");
+
+      wrapper.vm.fields.args[0].value = { field: "other_amount" };
+      (mockDashboardPanelData as any).meta.streamFields.groupedFields[0].schema.push({
+        name: "other_amount",
+        type: "Utf8",
+      });
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.castSuggestions[0]).toBeDefined();
+    });
+
+    it("should keep the cast when the aggregation is changed", async () => {
+      wrapper = createWrapper({ modelValue: { functionName: "sum", args: [textField()] } });
+      await wrapper
+        .find('[data-test="dashboard-function-dropdown-arg-cast-apply-0"]')
+        .trigger("click");
+
+      wrapper.vm.fields.functionName = "avg";
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.fields.args[0].type).toBe("function");
+      expect(wrapper.vm.fields.args[0].value.functionName).toBe("try_cast");
+      expect(wrapper.vm.fields.args[0].value.args[0].value).toEqual({ field: "usage_amount" });
+    });
+
+    it("should keep the target type when switching between the two cast functions", async () => {
+      wrapper = createWrapper({
+        modelValue: {
+          functionName: "try_cast",
+          args: [textField(), { type: "castType", value: "BIGINT" }],
+        },
+      });
+
+      wrapper.vm.fields.functionName = "cast";
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.fields.args[1]).toEqual({ type: "castType", value: "BIGINT" });
+    });
+
+    it("should still drop an argument the new function cannot accept", async () => {
+      wrapper = createWrapper({
+        modelValue: {
+          functionName: "try_cast",
+          args: [textField(), { type: "castType", value: "DOUBLE" }],
+        },
+      });
+
+      wrapper.vm.fields.functionName = "sum";
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.fields.args).toHaveLength(1);
+      expect(wrapper.vm.fields.args[0]).toEqual(textField());
+    });
+
+    it("should render a target type selector for a cast function", () => {
+      wrapper = createWrapper({
+        modelValue: {
+          functionName: "try_cast",
+          args: [textField(), { type: "castType", value: "DOUBLE" }],
+        },
+      });
+      expect(
+        wrapper.find('[data-test="dashboard-function-dropdown-arg-cast-type-select-1"]').exists(),
+      ).toBe(true);
+    });
+
+    it("should not offer a type switcher for an argument with a single allowed type", () => {
+      wrapper = createWrapper({
+        modelValue: {
+          functionName: "try_cast",
+          args: [textField(), { type: "castType", value: "DOUBLE" }],
+        },
+      });
+      expect(wrapper.vm.hasArgTypeChoice("try_cast", 0)).toBe(true);
+      expect(wrapper.vm.hasArgTypeChoice("try_cast", 1)).toBe(false);
+    });
+  });
+
   describe("Missing Args Handling", () => {
     it("should add missing args to model value", () => {
       const modelValue = {

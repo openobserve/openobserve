@@ -15,6 +15,7 @@ let measureTextCtx: CanvasRenderingContext2D | null | undefined;
  * @param {string} fontSize - The font size of the text.
  * @return {number} The width of the text in pixels.
  */
+// eslint-disable-next-line local/no-hardcoded-px -- measures text ECharts paints, and ECharts fontSize is a plain number = literal CSS px that never scales with the root; the measurement must use that same fixed px or it mis-reserves space
 export const calculateWidthText = (text: string, fontSize: string = "12px"): number => {
   if (!text) return 0;
 
@@ -29,6 +30,7 @@ export const calculateWidthText = (text: string, fontSize: string = "12px"): num
   if (measureTextCtx) {
     // Must match the family ECharts renders axis labels with (set globally by
     // registerO2EChartsTheme), otherwise nameGap/width come out wrong.
+    // eslint-disable-next-line local/no-hardcoded-px -- mirrors the caller's ECharts fontSize, which is literal CSS px (see the fallback on the signature above)
     measureTextCtx.font = canvasFont(fontSize || "12px", "sans");
     return Math.ceil(measureTextCtx.measureText(String(text)).width);
   }
@@ -48,12 +50,14 @@ export const calculateWidthText = (text: string, fontSize: string = "12px"): num
  * @param lo - axis extent minimum
  * @param hi - axis extent maximum
  * @param splitNumber - desired number of intervals (ECharts default: 5)
+ * @param minInterval - the axis minInterval; the interval never goes below it
  * @return {number[]} the tick values, lowest first
  */
 export const calculateNiceTickValues = (
   lo: number,
   hi: number,
   splitNumber: number = 5,
+  minInterval: number = 0,
 ): number[] => {
   const span = hi - lo;
   if (!(span > 0) || !Number.isFinite(span)) return [lo];
@@ -62,7 +66,8 @@ export const calculateNiceTickValues = (
   const exp10 = 10 ** Math.floor(Math.log10(step));
   const f = step / exp10;
   const nf = f < 1.5 ? 1 : f < 2.5 ? 2 : f < 4 ? 3 : f < 7 ? 5 : 10;
-  const interval = nf * exp10;
+  // ECharts raises its nice interval to the axis minInterval, so the prediction must too.
+  const interval = Math.max(nf * exp10, minInterval > 0 ? minInterval : 0);
 
   const ticks: number[] = [];
   for (let k = Math.floor(lo / interval); k <= Math.ceil(hi / interval); k++) {
@@ -146,7 +151,7 @@ export const applyMeasuredYAxisLeftInset = (options: any): void => {
   }
 
   if (widest > 0) {
-    options.grid.left = widest;
+    options.grid.left = widest + 12;
     if (grid.containLabel === true && typeof grid.bottom === "number") {
       grid.bottom += X_AXIS_TICK_LABEL_BAND;
     }

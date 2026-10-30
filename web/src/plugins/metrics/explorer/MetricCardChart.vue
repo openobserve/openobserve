@@ -32,7 +32,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :selected-time-obj="selectedTimeObj"
       :variables-data="variablesData"
       :injected-promql-data="injectedPromqlData"
+      :injected-exemplars="injectedExemplars"
       :allow-alert-creation="allowAlertCreation"
+      alert-source="explorer"
       :allow-annotations-add="false"
       :allow-annotations-a-p-i="false"
       @error="onPanelError"
@@ -44,6 +46,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { computed, defineComponent, type PropType } from "vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
+import type { InjectedExemplars } from "@/ts/interfaces/exemplars";
+import { adaptiveDecimals } from "@/utils/metrics/breakdownStats";
+import { withBareMetricNames } from "@/utils/metrics/metricsHandoff";
+
+/** `gapMs` is in ms although dashboards store it as `timeRangeGap.seconds`. */
+export interface ShiftedResult {
+  result: any;
+  gapMs: number;
+  periodAsStr: string;
+  parentIndex: number;
+}
+
+export interface ChartForecast {
+  until: number;
+  label: string;
+  entries: Array<{ result: any; parentIndex: number }>;
+}
 
 export default defineComponent({
   name: "MetricCardChart",
@@ -51,12 +70,20 @@ export default defineComponent({
   props: {
     /** One PromQL query_range response per query in the effective variant. */
     results: { type: Array as PropType<any[]>, required: true },
+    /** `{expr, legendTemplate?, stream?}`; `stream` is what a right-click alert reads. */
     queries: { type: Array as PropType<any[]>, required: true },
     chartType: { type: String, default: "line" },
     unit: { type: String, default: null },
     unitCustom: { type: String, default: null },
     bucketUnit: { type: String, default: null },
     bucketUnitCustom: { type: String, default: null },
+    /** A heatmap's colour range, when it must match other heatmaps drawn beside it. */
+    visualMapRange: {
+      type: Object as PropType<{ min: number; max: number } | null>,
+      default: null,
+    },
+    /** Overrides the precision read off `results`, so heatmaps drawn together label buckets alike. */
+    decimals: { type: Number, default: null },
     color: { type: String, required: true },
     height: { type: String, default: "100%" },
     /**
@@ -76,6 +103,17 @@ export default defineComponent({
      * place to author an alert.
      */
     allowAlertCreation: { type: Boolean, default: false },
+    legend: { type: Boolean, default: false },
+    shifted: { type: Array as PropType<ShiftedResult[]>, default: () => [] },
+    /** The queries' step, so shifted samples snap onto the primaries' grid. */
+    stepSeconds: { type: Number, default: 0 },
+    /** `until` (µs) widens the pinned x-axis past the range end, where the forecast lies. */
+    forecast: { type: Object as PropType<ChartForecast | null>, default: null },
+    /** The card's exemplar state; the explorer grid owns the fetch. */
+    injectedExemplars: {
+      type: Object as PropType<InjectedExemplars | undefined>,
+      default: undefined,
+    },
   },
   /**
    * `zoom` carries the panel's `updated:data-zoom` payload (a drag-select on the
@@ -85,32 +123,6 @@ export default defineComponent({
    */
   emits: ["error", "zoom"],
   setup(props, { emit }) {
-    /**
-     * Decimal places that keep the axis readable at the data's magnitude.
-     *
-     * The shared formatter applies no magnitude scaling to `numbers`/`custom`
-     * units, so a rate of 0.004 c/s renders as a column of identical "0.00"
-     * ticks at the default 2 decimals. Scaling the precision to the series keeps
-     * the axis readable.
-     */
-    const adaptiveDecimals = () => {
-      let max = 0;
-      for (const response of props.results ?? []) {
-        for (const series of response?.result ?? []) {
-          for (const [, raw] of series?.values ?? []) {
-            const v = Math.abs(parseFloat(raw));
-            if (Number.isFinite(v) && v > max) max = v;
-          }
-        }
-      }
-      if (max === 0) return 2;
-      if (max < 0.001) return 6;
-      if (max < 0.01) return 5;
-      if (max < 0.1) return 4;
-      if (max < 1) return 3;
-      return 2;
-    };
-
     /** How many series the chart will actually draw, across every query. */
     const seriesCount = () => {
       let n = 0;
@@ -128,10 +140,10 @@ export default defineComponent({
      * Hashing the series NAME into the palette also keeps p50 the same colour on
      * every re-render and between the tile and the card it applies to.
      */
-    const colorConfig = () =>
-      seriesCount() > 1
-        ? { mode: "palette-classic-by-series" }
-        : { mode: "fixed", fixedColor: [props.color] };
+    const colorConfig = () => {
+      if (seriesCount() <= 1) return { mode: "fixed", fixedColor: [props.color] };
+      return { mode: props.legend ? "palette-classic" : "palette-classic-by-series" };
+    };
 
     /**
      * The panel schema. The same shape the drill-in hands the editor, which is
@@ -144,16 +156,17 @@ export default defineComponent({
       type: props.chartType,
       queryType: "promql",
       queries: (props.queries ?? []).map((q: any) => ({
-        query: q.expr,
+        // The data is injected, so the query text only seeds a right-click alert, which should read naturally.
+        query: withBareMetricNames(q.expr),
         customQuery: true,
-        fields: { stream_type: "metrics" },
+        fields: { ...(q.stream ? { stream: q.stream } : {}), stream_type: "metrics" },
         config: { promql_legend: q.legendTemplate ?? "" },
       })),
       config: {
         unit: props.unit,
         unit_custom: props.unitCustom,
-        decimals: adaptiveDecimals(),
-        show_legends: false,
+        decimals: props.decimals ?? adaptiveDecimals(props.results),
+        show_legends: props.legend,
         // Gridlines make a small chart readable — without them a sparkline is
         // just a shape. The heatmap is solid colour, so they'd only add noise.
         show_gridlines: props.chartType !== "heatmap",
@@ -165,6 +178,7 @@ export default defineComponent({
         // Injected data is never "loading", so the converter would auto-range
         // the x-axis; pin it to the queried window instead. See `timeRange`.
         pin_x_axis_to_range: true,
+        explorer_overlays: true,
         // Activates the classic-histogram transform (le-sort + de-accumulate)
         // and the card-sized heatmap look (small colour bar, thinned bucket
         // labels, no top gap). Without them a cumulative-bucket heatmap renders
@@ -175,6 +189,7 @@ export default defineComponent({
               compact_preview: true,
               bucket_unit: props.bucketUnit,
               bucket_unit_custom: props.bucketUnitCustom,
+              ...(props.visualMapRange ? { visual_map_range: props.visualMapRange } : {}),
             }
           : {}),
       },
@@ -200,16 +215,33 @@ export default defineComponent({
     const injectedPromqlData = computed(() => {
       if (!props.results?.length) return undefined;
       const range = props.timeRange;
+      const primary = { startTime: range?.start_time, endTime: range?.end_time };
+      const shifted = props.shifted.map((entry) => ({
+        startTime: range?.start_time - entry.gapMs * 1000,
+        endTime: range?.end_time - entry.gapMs * 1000,
+        timeRangeGap: { seconds: entry.gapMs, periodAsStr: entry.periodAsStr },
+        panelQueryIndex: entry.parentIndex,
+      }));
+      const ahead = props.forecast;
+      const forecast = (ahead?.entries ?? []).map((entry) => ({
+        ...primary,
+        seriesRole: "forecast",
+        timeRangeGap: { seconds: 0, periodAsStr: ahead?.label ?? "" },
+        panelQueryIndex: entry.parentIndex,
+      }));
+      const queries = [...props.results.map(() => ({ ...primary })), ...shifted, ...forecast];
+      // The x-axis pin and the gap fill read the first entry's window only.
+      if (ahead) queries[0] = { ...queries[0], endTime: ahead.until };
       return {
-        data: props.results,
-        metadata: {
-          queries: [
-            {
-              startTime: range?.start_time,
-              endTime: range?.end_time,
-            },
-          ],
-        },
+        data: [
+          ...props.results,
+          ...props.shifted.map((entry) => entry.result),
+          ...(ahead?.entries ?? []).map((entry) => entry.result),
+        ],
+        metadata: { queries },
+        ...(props.stepSeconds > 0
+          ? { resultMetaData: queries.map(() => [{ step: props.stepSeconds * 1e6 }]) }
+          : {}),
       };
     });
 

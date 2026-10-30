@@ -1,0 +1,697 @@
+[
+  {
+    "id": "cap-mongo-s01-py-stmt-legacy",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system": "mongodb",
+        "db.name": "dbm",
+        "db.statement": "find {'_id': 3}",
+        "db.mongodb.collection": "dbm_items",
+        "net.peer.name": "mongo",
+        "net.peer.port": 27017
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "find {'_id': \"?\"}",
+      "operation": "find",
+      "stmt_class": "query",
+      "system": "mongodb",
+      "namespace": "dbm",
+      "instance": "mongo",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mongodb-S01-py",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/python-mongo-stmt-legacy.json",
+    "dialect": "mongodb"
+  },
+  {
+    "id": "cap-mongo-s01-py-stmt-dup",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system": "mongodb",
+        "db.system.name": "mongodb",
+        "db.name": "dbm",
+        "db.namespace": "dbm",
+        "db.statement": "find {'_id': 3}",
+        "db.query.text": "find {'_id': 3}",
+        "db.mongodb.collection": "dbm_items",
+        "db.collection.name": "dbm_items",
+        "net.peer.name": "mongo",
+        "server.address": "mongo",
+        "net.peer.port": 27017,
+        "server.port": 27017
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "find {'_id': \"?\"}",
+      "operation": "find",
+      "stmt_class": "query",
+      "system": "mongodb",
+      "namespace": "dbm",
+      "instance": "mongo",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mongodb-S01-py",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/python-mongo-stmt-dup.json",
+    "dialect": "mongodb"
+  },
+  {
+    "id": "cap-mongo-s01-py-stmt-new",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system.name": "mongodb",
+        "db.namespace": "dbm",
+        "db.query.text": "find {'_id': 3}",
+        "db.collection.name": "dbm_items",
+        "server.address": "mongo",
+        "server.port": 27017
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "find {'_id': \"?\"}",
+      "operation": "find",
+      "stmt_class": "query",
+      "system": "mongodb",
+      "namespace": "dbm",
+      "instance": "mongo",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mongodb-S01-py",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/python-mongo-stmt-new.json",
+    "dialect": "mongodb"
+  },
+  {
+    "id": "cap-mongo-s02-py-stmt-legacy",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system": "mongodb",
+        "db.name": "dbm",
+        "db.statement": "find {'price': {'$gt': 25}, 'category': 'b'}",
+        "db.mongodb.collection": "dbm_items",
+        "net.peer.name": "mongo",
+        "net.peer.port": 27017
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "find {'price': {'$gt': \"?\"}, 'category': \"?\"}",
+      "operation": "find",
+      "stmt_class": "query",
+      "system": "mongodb",
+      "namespace": "dbm",
+      "instance": "mongo",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mongodb-S02-py",
+    "literals": [
+      "25",
+      "'b'"
+    ],
+    "source": "tests/dbm-capture/fixtures/python-mongo-stmt-legacy.json",
+    "dialect": "mongodb"
+  },
+  {
+    "id": "cap-mongo-s03-py-arity3",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system": "mongodb",
+        "db.name": "dbm",
+        "db.statement": "find {'_id': {'$in': [1, 2, 3]}}",
+        "db.mongodb.collection": "dbm_items",
+        "net.peer.name": "mongo",
+        "net.peer.port": 27017
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "find {'_id': {'$in': [\"?\"]}}",
+      "operation": "find",
+      "stmt_class": "query",
+      "system": "mongodb",
+      "namespace": "dbm",
+      "instance": "mongo",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mongodb-S03-inlist-py",
+    "literals": [
+      "[1, 2, 3]"
+    ],
+    "source": "tests/dbm-capture/fixtures/python-mongo-stmt-legacy.json",
+    "dialect": "mongodb"
+  },
+  {
+    "id": "cap-mongo-s05-py-arity20",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system.name": "mongodb",
+        "db.namespace": "dbm",
+        "db.query.text": "find {'_id': {'$in': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]}}",
+        "db.collection.name": "dbm_items",
+        "server.address": "mongo",
+        "server.port": 27017
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "find {'_id': {'$in': [\"?\"]}}",
+      "operation": "find",
+      "stmt_class": "query",
+      "system": "mongodb",
+      "namespace": "dbm",
+      "instance": "mongo",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mongodb-S03-inlist-py",
+    "literals": [
+      "19, 20"
+    ],
+    "source": "tests/dbm-capture/fixtures/python-mongo-stmt-new.json",
+    "dialect": "mongodb"
+  },
+  {
+    "id": "cap-mongo-s06-py-insert-one",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system": "mongodb",
+        "db.name": "dbm",
+        "db.statement": "insert [{'_id': 101, 'name': 'ins-1', 'price': 11, 'category': 'x'}]",
+        "db.mongodb.collection": "dbm_items",
+        "net.peer.name": "mongo",
+        "net.peer.port": 27017
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "insert [{'_id': \"?\", 'name': \"?\", 'price': \"?\", 'category': \"?\"}]",
+      "operation": "insert",
+      "stmt_class": "query",
+      "system": "mongodb",
+      "namespace": "dbm",
+      "instance": "mongo",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mongodb-S06-insert-py",
+    "literals": [
+      "101",
+      "'ins-1'"
+    ],
+    "source": "tests/dbm-capture/fixtures/python-mongo-stmt-legacy.json",
+    "dialect": "mongodb"
+  },
+  {
+    "id": "cap-mongo-s08-py-insert-many10",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system.name": "mongodb",
+        "db.namespace": "dbm",
+        "db.query.text": "insert [{'_id': 121, 'name': 'many-1', 'price': 10, 'category': 'z'}, {'_id': 122, 'name': 'many-2', 'price': 20, 'category': 'z'}, {'_id': 123, 'name': 'many-3', 'price': 30, 'category': 'z'}, {'_id': 124, 'name': 'many-4', 'price': 40, 'category': 'z'}, {'_id': 125, 'name': 'many-5', 'price': 50, 'category': 'z'}, {'_id': 126, 'name': 'many-6', 'price': 60, 'category': 'z'}, {'_id': 127, 'name': 'many-7', 'price': 70, 'category': 'z'}, {'_id': 128, 'name': 'many-8', 'price': 80, 'category': 'z'}, {'_id': 129, 'name': 'many-9', 'price': 90, 'category': 'z'}, {'_id': 130, 'name': 'many-10', 'price': 100, 'category': 'z'}]",
+        "db.collection.name": "dbm_items",
+        "server.address": "mongo",
+        "server.port": 27017
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "insert [{'_id': \"?\", 'name': \"?\", 'price': \"?\", 'category': \"?\"}]",
+      "operation": "insert",
+      "stmt_class": "query",
+      "system": "mongodb",
+      "namespace": "dbm",
+      "instance": "mongo",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mongodb-S06-insert-py",
+    "literals": [
+      "121",
+      "'many-1'"
+    ],
+    "source": "tests/dbm-capture/fixtures/python-mongo-stmt-new.json",
+    "dialect": "mongodb"
+  },
+  {
+    "id": "cap-mongo-s09-py-update1",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system": "mongodb",
+        "db.system.name": "mongodb",
+        "db.name": "dbm",
+        "db.namespace": "dbm",
+        "db.statement": "update [{'q': {'_id': 1}, 'u': {'$inc': {'price': 1}}, 'multi': False, 'upsert': False}]",
+        "db.query.text": "update [{'q': {'_id': 1}, 'u': {'$inc': {'price': 1}}, 'multi': False, 'upsert': False}]",
+        "db.mongodb.collection": "dbm_items",
+        "db.collection.name": "dbm_items",
+        "net.peer.name": "mongo",
+        "server.address": "mongo",
+        "net.peer.port": 27017,
+        "server.port": 27017
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "update [{'q': {'_id': \"?\"}, 'u': {'$inc': {'price': \"?\"}}, 'multi': \"?\", 'upsert': \"?\"}]",
+      "operation": "update",
+      "stmt_class": "query",
+      "system": "mongodb",
+      "namespace": "dbm",
+      "instance": "mongo",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mongodb-S09-update-py",
+    "literals": [
+      "False"
+    ],
+    "source": "tests/dbm-capture/fixtures/python-mongo-stmt-dup.json",
+    "dialect": "mongodb"
+  },
+  {
+    "id": "cap-mongo-s09-py-update100",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system": "mongodb",
+        "db.system.name": "mongodb",
+        "db.name": "dbm",
+        "db.namespace": "dbm",
+        "db.statement": "update [{'q': {'_id': 2}, 'u': {'$inc': {'price': 100}}, 'multi': False, 'upsert': False}]",
+        "db.query.text": "update [{'q': {'_id': 2}, 'u': {'$inc': {'price': 100}}, 'multi': False, 'upsert': False}]",
+        "db.mongodb.collection": "dbm_items",
+        "db.collection.name": "dbm_items",
+        "net.peer.name": "mongo",
+        "server.address": "mongo",
+        "net.peer.port": 27017,
+        "server.port": 27017
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "update [{'q': {'_id': \"?\"}, 'u': {'$inc': {'price': \"?\"}}, 'multi': \"?\", 'upsert': \"?\"}]",
+      "operation": "update",
+      "stmt_class": "query",
+      "system": "mongodb",
+      "namespace": "dbm",
+      "instance": "mongo",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mongodb-S09-update-py",
+    "literals": [
+      "100",
+      "False"
+    ],
+    "source": "tests/dbm-capture/fixtures/python-mongo-stmt-dup.json",
+    "dialect": "mongodb"
+  },
+  {
+    "id": "cap-mongo-s10-py-ping",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system": "mongodb",
+        "db.name": "admin",
+        "db.statement": "ping",
+        "net.peer.name": "mongo",
+        "net.peer.port": 27017
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "ping",
+      "operation": "ping",
+      "stmt_class": "ping",
+      "system": "mongodb",
+      "namespace": "admin",
+      "instance": "mongo",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "probe-ping-command",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/python-mongo-stmt-legacy.json",
+    "dialect": "mongodb"
+  },
+  {
+    "id": "cap-mongo-s11-py-badoperator",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system.name": "mongodb",
+        "db.namespace": "dbm",
+        "db.query.text": "find {'price': {'$badOperator': 1}}",
+        "db.collection.name": "dbm_items",
+        "server.address": "mongo",
+        "server.port": 27017,
+        "error.type": "BadValue"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "find {'price': {'$badOperator': \"?\"}}",
+      "operation": "find",
+      "stmt_class": "query",
+      "system": "mongodb",
+      "namespace": "dbm",
+      "instance": "mongo",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mongodb-S11-error-py",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/python-mongo-stmt-new.json",
+    "dialect": "mongodb"
+  },
+  {
+    "id": "cap-mongo-s01-opcoll-legacy",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system": "mongodb",
+        "db.name": "dbm",
+        "db.statement": "find",
+        "db.mongodb.collection": "dbm_items",
+        "net.peer.name": "mongo",
+        "net.peer.port": 27017
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "find",
+      "operation": "find",
+      "stmt_class": "query",
+      "system": "mongodb",
+      "namespace": "dbm",
+      "instance": "mongo",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mongodb-S01-opcoll",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/python-mongo-legacy.json",
+    "dialect": "mongodb"
+  },
+  {
+    "id": "cap-mongo-s01-opcoll-new",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system.name": "mongodb",
+        "db.namespace": "dbm",
+        "db.query.text": "find",
+        "db.collection.name": "dbm_items",
+        "server.address": "mongo",
+        "server.port": 27017
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "find",
+      "operation": "find",
+      "stmt_class": "query",
+      "system": "mongodb",
+      "namespace": "dbm",
+      "instance": "mongo",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mongodb-S01-opcoll",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/python-mongo-new.json",
+    "dialect": "mongodb"
+  },
+  {
+    "id": "cap-mongo-s01-node-cur",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system.name": "mongodb",
+        "db.namespace": "dbm",
+        "db.operation.name": "find",
+        "db.collection.name": "dbm_items",
+        "server.address": "172.21.0.4",
+        "server.port": 27017,
+        "db.query.text": "{\"find\":\"?\",\"filter\":{\"_id\":\"?\"}}"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "{\"find\":\"?\",\"filter\":{\"_id\":\"?\"}}",
+      "operation": "find",
+      "stmt_class": "query",
+      "system": "mongodb",
+      "namespace": "dbm",
+      "instance": "172.21.0.4",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mongodb-S01-node",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/node-mongo-cur-legacy.json",
+    "dialect": "mongodb"
+  },
+  {
+    "id": "cap-mongo-s01-node-era-legacy",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system": "mongodb",
+        "db.name": "dbm",
+        "db.mongodb.collection": "dbm_items",
+        "db.operation": "find",
+        "db.connection_string": "mongodb://172.21.0.4:27017/dbm",
+        "net.peer.name": "172.21.0.4",
+        "net.peer.port": 27017,
+        "db.statement": "{\"find\":\"?\",\"filter\":{\"_id\":\"?\"}}"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "{\"find\":\"?\",\"filter\":{\"_id\":\"?\"}}",
+      "operation": "find",
+      "stmt_class": "query",
+      "system": "mongodb",
+      "namespace": "dbm",
+      "instance": "172.21.0.4",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mongodb-S01-node",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/node-mongo-era-legacy.json",
+    "dialect": "mongodb"
+  },
+  {
+    "id": "cap-mongo-s03-node-cur-arity3",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system.name": "mongodb",
+        "db.namespace": "dbm",
+        "db.operation.name": "find",
+        "db.collection.name": "dbm_items",
+        "server.address": "172.21.0.4",
+        "server.port": 27017,
+        "db.query.text": "{\"find\":\"?\",\"filter\":{\"_id\":{\"$in\":[\"?\",\"?\",\"?\"]}}}"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "{\"find\":\"?\",\"filter\":{\"_id\":{\"$in\":[\"?\"]}}}",
+      "operation": "find",
+      "stmt_class": "query",
+      "system": "mongodb",
+      "namespace": "dbm",
+      "instance": "172.21.0.4",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mongodb-S03-inlist-node",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/node-mongo-cur-legacy.json",
+    "dialect": "mongodb"
+  },
+  {
+    "id": "cap-mongo-s06-node-cur-bare-doc",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system.name": "mongodb",
+        "db.namespace": "dbm",
+        "db.operation.name": "insert",
+        "db.collection.name": "dbm_items",
+        "server.address": "172.21.0.4",
+        "server.port": 27017,
+        "db.query.text": "{\"_id\":\"?\",\"name\":\"?\",\"price\":\"?\",\"category\":\"?\"}"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "{\"_id\":\"?\",\"name\":\"?\",\"price\":\"?\",\"category\":\"?\"}",
+      "operation": "insert",
+      "stmt_class": "query",
+      "system": "mongodb",
+      "namespace": "dbm",
+      "instance": "172.21.0.4",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mongodb-S06-insert-node",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/node-mongo-cur-legacy.json"
+  },
+  {
+    "id": "cap-mongo-s09-node-cur-update",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system.name": "mongodb",
+        "db.namespace": "dbm",
+        "db.operation.name": "update",
+        "db.collection.name": "dbm_items",
+        "server.address": "172.21.0.4",
+        "server.port": 27017,
+        "db.query.text": "{\"update\":\"?\",\"updates\":[{\"q\":{\"_id\":\"?\"},\"u\":{\"$inc\":{\"price\":\"?\"}}}],\"ordered\":\"?\"}"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "{\"update\":\"?\",\"updates\":[{\"q\":{\"_id\":\"?\"},\"u\":{\"$inc\":{\"price\":\"?\"}}}],\"ordered\":\"?\"}",
+      "operation": "update",
+      "stmt_class": "query",
+      "system": "mongodb",
+      "namespace": "dbm",
+      "instance": "172.21.0.4",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mongodb-S09-update-node",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/node-mongo-cur-legacy.json",
+    "dialect": "mongodb"
+  },
+  {
+    "id": "cap-mongo-s10-node-cur-ping",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system.name": "mongodb",
+        "db.namespace": "admin",
+        "db.operation.name": "ping",
+        "db.collection.name": "$cmd",
+        "server.address": "172.21.0.4",
+        "server.port": 27017,
+        "db.query.text": "{\"ping\":\"?\"}"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "{\"ping\":\"?\"}",
+      "operation": "ping",
+      "stmt_class": "ping",
+      "system": "mongodb",
+      "namespace": "admin",
+      "instance": "172.21.0.4",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mongodb-S10-ping-node",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/node-mongo-cur-legacy.json",
+    "dialect": "mongodb"
+  },
+  {
+    "id": "cap-mongo-s11-node-era-legacy",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system": "mongodb",
+        "db.name": "dbm",
+        "db.mongodb.collection": "dbm_items",
+        "db.operation": "find",
+        "db.connection_string": "mongodb://172.21.0.4:27017/dbm",
+        "net.peer.name": "172.21.0.4",
+        "net.peer.port": 27017,
+        "db.statement": "{\"find\":\"?\",\"filter\":{\"price\":{\"$badOperator\":\"?\"}}}"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "{\"find\":\"?\",\"filter\":{\"price\":{\"$badOperator\":\"?\"}}}",
+      "operation": "find",
+      "stmt_class": "query",
+      "system": "mongodb",
+      "namespace": "dbm",
+      "instance": "172.21.0.4",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mongodb-S11-error-node",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/node-mongo-era-legacy.json",
+    "dialect": "mongodb"
+  }
+]

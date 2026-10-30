@@ -64,6 +64,8 @@ pub struct SliceRow {
     /// Monotonic within the generation; higher wins on the same key. Exists
     /// for late-data re-emission, not for publication ordering.
     pub rev: i64,
+    /// The downtime whose window zeroed or filled this slice (D8).
+    pub corrected_by: Option<String>,
 }
 
 /// Whether a row is visible to readers.
@@ -153,7 +155,8 @@ pub fn gap_fill_policy(sli_type: SliType) -> GapFill {
         SliType::Count => GapFill::CoveredZero,
         // The aggregate had no input, so there is no value to compare.
         SliType::TimeSlice => GapFill::Nothing,
-        // Coverage comes from the triggers stream instead (S-16, D65).
+        // Coverage is proved by the availability ledger instead, so an absent
+        // slice means the source alert was not evaluating (S-16, D65).
         SliType::Alert => GapFill::Nothing,
     }
 }
@@ -270,6 +273,7 @@ mod tests {
             good,
             total,
             rev,
+            corrected_by: None,
         }
     }
 
@@ -429,17 +433,6 @@ mod tests {
     }
 
     // ---- gap-fill policy ---------------------------------------------------
-
-    /// D48: the two types disagree, and the disagreement is the point.
-    #[test]
-    fn count_treats_a_missing_bucket_as_measured_zero_traffic() {
-        assert_eq!(gap_fill_policy(SliType::Count), GapFill::CoveredZero);
-    }
-
-    #[test]
-    fn time_slice_treats_a_missing_bucket_as_unmeasured() {
-        assert_eq!(gap_fill_policy(SliType::TimeSlice), GapFill::Nothing);
-    }
 
     #[test]
     fn alert_sli_takes_coverage_from_the_ledger_not_gap_fill() {

@@ -13,10 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import config from "@/aws-exports";
 import { b64EncodeUnicode, useLocalLogFilterField } from "@/utils/zincutils";
 import { canvasFont } from "@/utils/fonts";
 
@@ -28,10 +26,30 @@ import {
 } from "@/composables/useLogs/logsVisualization";
 
 import { searchState } from "@/composables/useLogs/searchState";
+import { encodeFtScan } from "@/utils/logs/freeTextScan";
 import { Parser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import { TimestampRange, ParsedSQLResult, TimePeriodUnit } from "@/ts/interfaces";
 import { TIME_MULTIPLIERS } from "@/utils/logs/constants";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import type { TranslateFn } from "@/types/i18n";
+import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
+import { stripCommentLines } from "@/utils/query/sqlComments";
+import type { PersistSurface } from "@/composables/useLogs/useAutoRun";
+import {
+  DEFAULT_ROWS_PER_PAGE,
+  VIEW_STATE_PARAMS,
+  bindLogsUrlRouter,
+  encodeColumns,
+  shownEntryFor,
+  shownSearch,
+  urlWriteMode,
+  writeLogsUrl,
+  type LogsUrlMode,
+  type ShownEntry,
+  type ShownInputs,
+} from "@/composables/useLogs/useLogsUrl";
+import { activePermalink, columnsFromUrl } from "@/composables/useLogs/useLogPermalink";
+import { resolveCalendarPeriod } from "@/utils/dashboard/calendarPeriods";
 
 interface SQLColumn {
   expr?: {
@@ -98,6 +116,7 @@ export const logsUtils = () => {
   const { searchObj } = searchState();
   let parser: Parser | null = new Parser();
   const router = useRouter();
+  bindLogsUrlRouter(router);
   const store = useStore();
   const timestampColumnName = store.state.zoConfig.timestamp_column;
 
@@ -129,10 +148,11 @@ export const logsUtils = () => {
   const fnParsedSQL = (queryString: string = ""): ExtendedParsedSQLResult => {
     try {
       const finalQueryString: string = queryString || searchObj.data.query;
-      const filteredQuery: string = finalQueryString
-        .split("\n")
-        .filter((line: string) => !line.trim().startsWith("--"))
-        .join("\n");
+      const filteredQuery: string = stripCommentLines(finalQueryString);
+
+      if (maxParenDepth(filteredQuery) > SQL_PARSE_MAX_DEPTH) {
+        return DEFAULT_PARSED_RESULT;
+      }
 
       const parsedQuery: ExtendedParsedSQLResult | null = parser?.astify(
         filteredQuery,
@@ -182,6 +202,9 @@ export const logsUtils = () => {
       console.error("Invalid period: must be a non-empty string");
       return undefined;
     }
+
+    const calendar = resolveCalendarPeriod(period);
+    if (calendar) return { from: calendar.startTime / 1000, to: calendar.endTime / 1000 };
 
     const currentTime = new Date();
     const toTimestamp = currentTime.getTime();
@@ -329,29 +352,14 @@ export const logsUtils = () => {
   };
 
   const shouldAddFunctionToSearch = () => {
-    if (!isActionsEnabled.value)
-      return searchObj.data.tempFunctionContent != "" && searchObj.meta.showTransformEditor;
-
-    return searchObj.data.transformType === "function" && searchObj.data.tempFunctionContent != "";
+    return searchObj.data.tempFunctionContent != "" && searchObj.meta.showTransformEditor;
   };
 
   const addTransformToQuery = (queryReq: any) => {
     if (shouldAddFunctionToSearch()) {
       queryReq.query["query_fn"] = b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
     }
-
-    // Add action ID if it exists
-    if (searchObj.data.transformType === "action" && searchObj.data.selectedTransform?.id) {
-      queryReq.query["action_id"] = searchObj.data.selectedTransform.id;
-    }
   };
-
-  const isActionsEnabled = computed(() => {
-    return (
-      (config.isEnterprise == "true" || config.isCloud == "true") &&
-      store.state.zoConfig.actions_enabled
-    );
-  });
 
   /**
    * Helper function to calculate width of the column based on its content(from first 5 rows)
@@ -361,12 +369,17 @@ export const logsUtils = () => {
    */
   const getColumnWidth = (context: any, field: string) => {
     // Font of table header — must match what actually renders, or the measured
-    // width is wrong and cells truncate/overflow.
-    context.font = canvasFont("14px", "sans", "bold");
+    // width is wrong and cells truncate/overflow. Rem, not px: this text is
+    // painted by the DOM (SearchResult.vue sets log cells to var(--text-xs) /
+    // var(--font-mono)), so it scales with the root font-size and the
+    // measurement has to scale with it. The px exemptions on the dashboard's
+    // canvas measurements are the opposite case — those measure text ECharts
+    // paints at a fixed numeric fontSize.
+    context.font = canvasFont("0.875rem", "sans", "bold");
     let max = context.measureText(field).width + 16;
 
     // Font of the table content
-    context.font = canvasFont("12px", "mono");
+    context.font = canvasFont("0.75rem", "mono");
     let width = 0;
     try {
       for (let i = 0; i < 5; i++) {
@@ -389,11 +402,90 @@ export const logsUtils = () => {
     return max;
   };
 
-  const showCancelSearchNotification = () => {
+  const showCancelSearchNotification = (t: TranslateFn) => {
     toast({
       variant: "info",
-      message: "Running query cancelled successfully",
+      message: t("toastMessages.useLogs.runningQueryCancelledSuccessfully"),
     });
+  };
+
+  const activeUrlSurface = (): PersistSurface => {
+    const mode = searchObj.meta.logsVisualizeToggle;
+    return mode === "patterns" || mode === "visualize" || mode === "build" ? mode : "logs";
+  };
+
+  const liveSelectedStreams = (): string[] => {
+    const selectedStream = searchObj.data.stream.selectedStream as unknown;
+    if (Array.isArray(selectedStream)) return selectedStream.map(String);
+    if (selectedStream && typeof selectedStream === "object" && "value" in selectedStream) {
+      return [String((selectedStream as { value: string }).value)];
+    }
+    return typeof selectedStream === "string" && selectedStream ? [selectedStream] : [];
+  };
+
+  const liveFunctionContent = (): string | null =>
+    searchObj.data.transformType === "function" && searchObj.data.tempFunctionContent !== ""
+      ? searchObj.data.tempFunctionContent.trim()
+      : null;
+
+  const liveInputs = (): ShownInputs => ({
+    streams: liveSelectedStreams(),
+    streamType: searchObj.data.stream.streamType,
+    query: String(searchObj.data.query ?? "").trim(),
+    sqlMode: !!searchObj.meta.sqlMode,
+    functionContent: liveFunctionContent(),
+    quickMode: !!searchObj.meta.quickMode,
+    regions: [...(searchObj.meta?.regions ?? [])],
+    clusters: [...(searchObj.meta?.clusters ?? [])],
+    definedSchemas: searchObj.meta.useUserDefinedSchemas,
+    freeTextScan: searchObj.meta.freeTextScan,
+  });
+
+  const writeShownTime = (query: any, shown: ShownEntry | null, isShareLink: boolean) => {
+    const date = searchObj.data.datetime;
+    if (!shown) {
+      if (date.type === "relative" && !isShareLink) query["period"] = date.relativeTimePeriod;
+      else if (date.type === "relative" || date.type === "absolute") {
+        query["from"] = date.startTime;
+        query["to"] = date.endTime;
+      }
+      return;
+    }
+    if (isShareLink && shown.bounds) {
+      query["from"] = shown.bounds.start_time;
+      query["to"] = shown.bounds.end_time;
+    } else if (shown.period.type === "relative" && !isShareLink) {
+      query["period"] = shown.period.period;
+    } else if (shown.period.type === "absolute") {
+      query["from"] = shown.period.startUs;
+      query["to"] = shown.period.endUs;
+    } else {
+      query["from"] = date.startTime;
+      query["to"] = date.endTime;
+    }
+  };
+
+  const writeGridViewState = (query: any, inputs: ShownInputs) => {
+    const timestampColumn = store.state.zoConfig?.timestamp_column || "_timestamp";
+    if (!inputs.sqlMode && !searchObj.meta.isFtsDefaultColumn) {
+      const fields = (searchObj.data.stream.selectedFields ?? []).filter(
+        (field: string) => field !== timestampColumn,
+      );
+      query["columns"] = encodeColumns(fields);
+    }
+    const rows = shownSearch.logs?.rows ?? Number(searchObj.meta.resultGrid?.rowsPerPage);
+    if (rows && rows !== DEFAULT_ROWS_PER_PAGE) query["rows"] = rows;
+    const page = shownSearch.logs?.page ?? 1;
+    if (page > 1 && Number(searchObj.meta.refreshInterval ?? 0) === 0) query["page"] = page;
+  };
+
+  const writeLineLinkState = (query: any) => {
+    const active = activePermalink.value;
+    if (!active) return;
+    query["log_stream"] = active.link.stream;
+    query["log_ts"] = String(active.link.ts);
+    if (active.link.id !== undefined) query["log_id"] = active.link.id;
+    else if (active.link.fp !== undefined) query["log_fp"] = active.link.fp;
   };
 
   const generateURLQuery = (
@@ -401,54 +493,32 @@ export const logsUtils = () => {
     dashboardPanelData: any = null,
     buildPanelData: any = null,
   ) => {
-    const date = searchObj.data.datetime;
-
     const query: any = {};
+    const shown = shownEntryFor(activeUrlSurface());
+    const inputs = shown?.inputs ?? liveInputs();
 
-    if (searchObj.data.stream.streamType) {
-      query["stream_type"] = searchObj.data.stream.streamType;
+    if (inputs.streamType) {
+      query["stream_type"] = inputs.streamType;
     }
+    query["stream"] = inputs.streams.join(",");
 
-    // selectedStream is string[] in state; branches below defensively handle
-    // legacy string / { value } shapes that may still reach this code path
-    const selectedStream: string[] = searchObj.data.stream.selectedStream;
-    if (selectedStream.length > 0 && typeof selectedStream != "object") {
-      // Dead defensive branch for a legacy non-array shape (TS narrows the
-      // array type to never here); cast keeps it compiling, runtime unchanged.
-      query["stream"] = (selectedStream as string[]).join(",");
-    } else if (
-      typeof selectedStream === "object" &&
-      Object.prototype.hasOwnProperty.call(selectedStream, "value")
-    ) {
-      query["stream"] = (selectedStream as unknown as { value: string }).value;
-    } else {
-      query["stream"] = searchObj.data.stream.selectedStream.join(",");
-    }
-
-    if (date.type == "relative") {
-      if (isShareLink) {
-        query["from"] = date.startTime;
-        query["to"] = date.endTime;
-      } else {
-        query["period"] = date.relativeTimePeriod;
-      }
-    } else if (date.type == "absolute") {
-      query["from"] = date.startTime;
-      query["to"] = date.endTime;
-    }
+    writeShownTime(query, shown, isShareLink);
 
     query["refresh"] = searchObj.meta.refreshInterval;
 
-    if (searchObj.data.query) {
-      query["sql_mode"] = searchObj.meta.sqlMode;
-      query["query"] = b64EncodeUnicode(searchObj.data.query.trim());
+    if (inputs.query) {
+      query["sql_mode"] = inputs.sqlMode;
+      query["query"] = b64EncodeUnicode(inputs.query);
+      const ftScan = encodeFtScan(inputs.freeTextScan);
+      if (ftScan) query["ft_scan"] = ftScan;
     }
 
-    //add the function editor toggle is true or false
-    //it will help to retain the function editor state when we refresh the page
-    query["fn_editor"] = searchObj.meta.showTransformEditor;
-    if (searchObj.data.transformType === "function" && searchObj.data.tempFunctionContent != "") {
-      query["functionContent"] = b64EncodeUnicode(searchObj.data.tempFunctionContent.trim());
+    query["fn_editor"] = shown
+      ? !!shown.inputs.functionContent
+      : searchObj.meta.showTransformEditor;
+    const functionContent = shown ? shown.inputs.functionContent : liveFunctionContent();
+    if (functionContent) {
+      query["functionContent"] = b64EncodeUnicode(functionContent);
     }
 
     // TODO : Add type in query params for all types
@@ -456,17 +526,17 @@ export const logsUtils = () => {
       query["type"] = searchObj.meta.pageType;
     }
 
-    query["defined_schemas"] = searchObj.meta.useUserDefinedSchemas;
+    query["defined_schemas"] = inputs.definedSchemas;
     query["org_identifier"] = store.state.selectedOrganization.identifier;
-    query["quick_mode"] = searchObj.meta.quickMode;
+    query["quick_mode"] = inputs.quickMode;
     query["show_histogram"] = searchObj.meta.showHistogram;
 
-    if (store.state.zoConfig?.super_cluster_enabled && searchObj.meta?.regions?.length) {
-      query["regions"] = searchObj.meta.regions.join(",");
+    if (store.state.zoConfig?.super_cluster_enabled && inputs.regions.length) {
+      query["regions"] = inputs.regions.join(",");
     }
 
-    if (store.state.zoConfig?.super_cluster_enabled && searchObj.meta?.clusters?.length) {
-      query["clusters"] = searchObj.meta.clusters.join(",");
+    if (store.state.zoConfig?.super_cluster_enabled && inputs.clusters.length) {
+      query["clusters"] = inputs.clusters.join(",");
     }
 
     if (searchObj.meta.logsVisualizeToggle) {
@@ -486,8 +556,7 @@ export const logsUtils = () => {
     } else {
       // else preserve existing visualization data from the current URL
       const existingEncodedConfig = router.currentRoute.value?.query?.visualization_data as
-        | string
-        | undefined;
+        string | undefined;
       if (existingEncodedConfig) {
         query["visualization_data"] = existingEncodedConfig;
       }
@@ -506,25 +575,52 @@ export const logsUtils = () => {
     } else {
       // else preserve existing build data from the current URL
       const existingEncodedBuildConfig = router.currentRoute.value?.query?.build_data as
-        | string
-        | undefined;
+        string | undefined;
       if (existingEncodedBuildConfig) {
         query["build_data"] = existingEncodedBuildConfig;
       }
     }
 
+    writeGridViewState(query, inputs);
+    if (!isShareLink) writeLineLinkState(query);
+
     return query;
   };
 
-  const updateUrlQueryParams = (dashboardPanelData: any = null, buildPanelData: any = null) => {
-    const query = generateURLQuery(false, dashboardPanelData, buildPanelData);
+  const isLogsRoute = () => router?.currentRoute.value?.name === "logs";
+
+  const dropTransientType = (query: any) => {
     if (
-      (Object.hasOwn(query, "type") && query.type == "search_history_re_apply") ||
-      query.type == "search_scheduler"
+      query.type === "search_history_re_apply" ||
+      query.type === "search_scheduler" ||
+      query.type === "rca_evidence_query"
     ) {
       delete query.type;
     }
-    router.push({ query });
+  };
+
+  const updateUrlQueryParams = (
+    dashboardPanelData: any = null,
+    buildPanelData: any = null,
+    mode: LogsUrlMode | "auto" = "auto",
+  ) => {
+    if (!isLogsRoute()) return;
+    const query = generateURLQuery(false, dashboardPanelData, buildPanelData);
+    dropTransientType(query);
+    const writeMode = mode === "auto" ? urlWriteMode(router.currentRoute.value.query, query) : mode;
+    return writeLogsUrl(writeMode, query);
+  };
+
+  const patchUrlViewState = (dashboardPanelData: any = null, buildPanelData: any = null) => {
+    if (!isLogsRoute()) return;
+    const next = generateURLQuery(false, dashboardPanelData, buildPanelData);
+    const query: any = { ...router.currentRoute.value.query };
+    dropTransientType(query);
+    for (const key of VIEW_STATE_PARAMS) {
+      if (key in next) query[key] = next[key];
+      else delete query[key];
+    }
+    return writeLogsUrl("replace", query);
   };
 
   const isNonAggregatedSQLMode = (searchObj: any, parsedSQL: any) => {
@@ -546,6 +642,7 @@ export const logsUtils = () => {
     if (searchObj.meta?.isFtsDefaultColumn) {
       return;
     }
+    if (columnsFromUrl.value) return;
     const identifier: string = searchObj.organizationIdentifier || "default";
     const selectedFields: any =
       useLocalLogFilterField()?.value != null ? useLocalLogFilterField()?.value : {};
@@ -569,34 +666,27 @@ export const logsUtils = () => {
     return false;
   }
 
-  // validate if timestamp column alias is used for any field
+  // Reject a query that aliases a column as the reserved timestamp column.
+  // A regex over the `AS <ts>` forms is enough and, unlike astify(), stays cheap
+  // on large nested queries (parsing per visible panel froze the dashboard).
   const checkTimestampAlias = (query: string): boolean => {
     const tsCol = timestampColumnName ?? store.state.zoConfig.timestamp_column ?? "_timestamp";
-    const parsedSQL = fnParsedSQL(query);
 
-    const columns = parsedSQL?.columns;
-    if (Array.isArray(columns)) {
-      const invalid = columns.some((field: any) => field.as === tsCol);
-      if (invalid) {
-        return false;
-      }
+    // A query that never mentions the timestamp column cannot alias it.
+    if (!query || !query.toLowerCase().includes(tsCol.toLowerCase())) {
+      return true;
     }
 
-    // Escape special regex characters in timestamp column name
     const escapedTimestamp = tsCol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-    // Patterns for alias check
-    const patterns = [
+    const aliasPatterns = [
       new RegExp(`\\bas\\s*'${escapedTimestamp}'`, "i"), // AS '_timestamp'
       new RegExp(`\\bas\\s*"${escapedTimestamp}"`, "i"), // AS "_timestamp"
+      new RegExp(`\\bas\\s*\`${escapedTimestamp}\``, "i"), // AS `_timestamp`
       new RegExp(`\\bas\\s+${escapedTimestamp}\\b`, "i"), // AS _timestamp (unquoted)
     ];
 
-    if (patterns.some((p) => p.test(query))) {
-      return false;
-    }
-
-    return true;
+    return !aliasPatterns.some((p) => p.test(query));
   };
 
   return {
@@ -611,11 +701,11 @@ export const logsUtils = () => {
     removeTraceId,
     shouldAddFunctionToSearch,
     addTransformToQuery,
-    isActionsEnabled,
     getColumnWidth,
     showCancelSearchNotification,
     generateURLQuery,
     updateUrlQueryParams,
+    patchUrlViewState,
     isNonAggregatedSQLMode,
     updatedLocalLogFilterField,
     isTimestampASC,

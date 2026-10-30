@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { format } from "date-fns";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
@@ -82,7 +82,7 @@ const props = defineProps<{
   loading?: boolean;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 const hasData = computed(() =>
@@ -114,8 +114,8 @@ const chartOptions = computed(() => {
   // Read the theme so token colors are re-resolved when it flips —
   // getComputedStyle alone is not reactive.
   void store.state.theme;
-  const errorColor = resolveToken("--color-severity-error-color", "#EF5350");
-  const warningColor = resolveToken("--color-severity-warning-color", "#FB8C00");
+  const errorColor = resolveToken("--color-severity-error-color", "#ea1a17");
+  const warningColor = resolveToken("--color-severity-warning-color", "#b16300");
   const labels = props.buckets.map((bucket) =>
     format(new Date(Math.floor(bucket.ts / 1000)), labelFormat.value),
   );

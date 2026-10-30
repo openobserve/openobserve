@@ -19,30 +19,32 @@ use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 pub async fn run() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     {
-        // Only alert_manager nodes run the service graph job.
+        // Only scheduler nodes run the service graph job.
         // (Ingester/querier/compactor/router nodes exit here.)
-        if !LOCAL_NODE.is_alert_manager() {
+        if !LOCAL_NODE.is_scheduler() {
             log::info!(
-                "[SERVICE_GRAPH::JOB] Service graph processor disabled on non-alert-manager node (role: {:?})",
+                "[SERVICE_GRAPH::JOB] Service graph rollup disabled on non-scheduler node (role: {:?})",
                 LOCAL_NODE.role
             );
             return Ok(());
         }
 
-        log::info!("[SERVICE_GRAPH::JOB] Service graph processor is enabled");
+        if !get_o2_config().service_graph.enabled {
+            log::info!(
+                "[SERVICE_GRAPH::JOB] Service graph rollup disabled by O2_SERVICE_GRAPH_ENABLED"
+            );
+            return Ok(());
+        }
+
+        log::info!("[SERVICE_GRAPH::JOB] Service graph rollup is enabled");
 
         spawn_pausable_job!(
-            "service_graph_processor",
-            get_o2_config().service_graph.processing_interval_secs,
+            "service_graph_v4",
+            get_o2_config().service_graph.interval_secs,
             {
-                log::debug!("[SERVICE_GRAPH::JOB] Running service graph processing");
-                if let Err(e) =
-                    openobserve_core::traces::service_graph::process_service_graph().await
-                {
-                    log::error!("[SERVICE_GRAPH::JOB] Processing failed: {e}");
-                }
-            },
-            sleep_after
+                use openobserve_core::traces::service_graph::v4;
+                v4::run_tick(v4::Settings::from_config()).await;
+            }
         );
     }
 

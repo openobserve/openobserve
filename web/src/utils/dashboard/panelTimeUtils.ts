@@ -14,6 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { LocationQuery } from "vue-router";
+import { getConsumableRelativeTime } from "@/utils/date";
+import { parseCalendarToken } from "@/utils/dashboard/calendarPeriods";
+import { timestampToTimezoneDate } from "@/utils/timezone";
+
+const RELATIVE_PERIOD_PATTERN = /^[1-9]\d*[smhdwM]$/;
 
 /**
  * Panel time range types for picker format
@@ -201,4 +206,142 @@ export const resolvePanelTimeValue = (
   }
 
   return null;
+};
+
+const pickerValueType = (value: any): string | undefined => value?.valueType || value?.type;
+
+/** Whether two picker values name the same range; a relative range is its period, not its moving window. */
+export const arePickerValuesEqual = (first: any, second: any): boolean => {
+  if (!first || !second) return first === second;
+
+  const type = pickerValueType(first);
+  if (type !== pickerValueType(second)) return false;
+  if (type === "relative") {
+    if (first.relativeTimePeriod !== second.relativeTimePeriod) return false;
+    // A calendar period's start moves with the timezone, so the same token can name another window.
+    const bothResolved =
+      Number.isFinite(Number(first.startTime ?? NaN)) &&
+      Number.isFinite(Number(second.startTime ?? NaN));
+    return (
+      !bothResolved ||
+      parseCalendarToken(first.relativeTimePeriod) === null ||
+      Number(first.startTime) === Number(second.startTime)
+    );
+  }
+
+  return (
+    Number(first.startTime) === Number(second.startTime) &&
+    Number(first.endTime) === Number(second.endTime)
+  );
+};
+
+/** Whether a picker value can be queried: a relative period, or a start that is before its end. */
+export const isUsablePickerValue = (value: any): boolean => {
+  if (!value) return false;
+  if (pickerValueType(value) === "relative") {
+    const period = String(value.relativeTimePeriod ?? "");
+    return RELATIVE_PERIOD_PATTERN.test(period) || parseCalendarToken(period) !== null;
+  }
+
+  const start = Number(value.startTime);
+  const end = Number(value.endTime);
+  return Number.isFinite(start) && Number.isFinite(end) && start < end;
+};
+
+/** Resolves a picker value to the time object panels load with; a relative range resolves from now. */
+export const pickerValueToTimeObj = (
+  value: any,
+): { start_time: Date; end_time: Date; relativeTimePeriod?: string | null } | null => {
+  if (!value) return null;
+
+  if (pickerValueType(value) === "relative") {
+    const window = value.relativeTimePeriod
+      ? getConsumableRelativeTime(value.relativeTimePeriod)
+      : undefined;
+    return window
+      ? {
+          start_time: new Date(window.startTime),
+          end_time: new Date(window.endTime),
+          // Kept alongside the resolved window so a cache-restore check can tell a calendar period apart from a rolling one without re-deriving it.
+          relativeTimePeriod: value.relativeTimePeriod,
+        }
+      : null;
+  }
+
+  return {
+    start_time: new Date(Number(value.startTime)),
+    end_time: new Date(Number(value.endTime)),
+  };
+};
+
+/** The payload DateTime's `setSavedDate` takes for a picker value, absolute times as wall clock in `timezone`. */
+export const toPickerSavedDate = (value: any, timezone: string) => {
+  if (pickerValueType(value) === "relative") {
+    return { type: "relative", relativeTimePeriod: value.relativeTimePeriod };
+  }
+
+  // Wall-clock strings, because setSavedDate's timestamp path formats in the browser's zone, not the dashboard's.
+  const inTimezone = (micros: any, pattern: string) =>
+    timestampToTimezoneDate(Number(micros), timezone, pattern);
+  return {
+    type: "absolute",
+    selectedDate: {
+      from: inTimezone(value.startTime, "yyyy/MM/dd"),
+      to: inTimezone(value.endTime, "yyyy/MM/dd"),
+    },
+    selectedTime: {
+      startTime: inTimezone(value.startTime, "HH:mm:ss"),
+      endTime: inTimezone(value.endTime, "HH:mm:ss"),
+    },
+  };
+};
+
+/** Whether a dashboard panel runs on a relative range: URL pt-* time, then saved range, then global. */
+export const isEffectivePanelTimeRelative = (
+  panel: any,
+  query: LocationQuery | undefined,
+  globalTime: { valueType?: string } | null | undefined,
+): boolean => {
+  // A panel's own time counts only while panel time is on, as in ViewDashboard's computeAllPanelTimes.
+  const ownTime = hasPanelTime(panel)
+    ? (getPanelTimeFromURL(panel.id, query) ??
+      convertPanelTimeRangeToPicker(panel.config?.panel_time_range))
+    : null;
+  return (ownTime?.valueType ?? globalTime?.valueType) === "relative";
+};
+
+/** The fields of a panel that decide which time range it loads with. */
+export interface PanelTimeSource {
+  id?: string;
+  config?: { panel_time_enabled?: boolean; panel_time_range?: PanelTimeRange | null };
+}
+
+/** Whether the range a panel loads with is a calendar period, by the same precedence as isEffectivePanelTimeRelative. */
+export const isEffectivePanelTimeCalendar = (
+  panel: PanelTimeSource | null | undefined,
+  query: LocationQuery | undefined,
+  globalTime: { valueType?: string; relativeTimePeriod?: string } | null | undefined,
+): boolean => {
+  const ownTime =
+    panel && hasPanelTime(panel)
+      ? (getPanelTimeFromURL(panel.id ?? "", query) ??
+        convertPanelTimeRangeToPicker(panel.config?.panel_time_range))
+      : null;
+  const time = ownTime ?? globalTime;
+  return time?.valueType === "relative" && parseCalendarToken(time.relativeTimePeriod) !== null;
+};
+
+/** Whether a dashboard URL change can move any panel's time; var-, pt- and cell_ params cannot. */
+export const queryChangeAffectsPanelTimes = (
+  newQuery: Record<string, any>,
+  oldQuery: Record<string, any> | undefined,
+): boolean => {
+  const changedKeys = [...Object.keys(newQuery), ...Object.keys(oldQuery ?? {})].filter(
+    (key) => newQuery[key] !== oldQuery?.[key],
+  );
+  if (changedKeys.length === 0) return true;
+  if (changedKeys.some((key) => key === "period" || key === "from" || key === "to")) return true;
+  return !changedKeys.every(
+    (key) => key.startsWith("pt-") || key.startsWith("cell_") || key.startsWith("var-"),
+  );
 };

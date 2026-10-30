@@ -18,7 +18,10 @@ import { getDefaultOrganization, redirectUser, logsErrorMessage } from "@/utils/
 import organizationsService from "@/services/organizations";
 import * as zincutils from "@/utils/zincutils";
 
-vi.mock("@/services/organizations");
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { automockService } = await import("@/test/unit/helpers/mockService");
+  return automockService(await importOriginal());
+});
 vi.mock("@/utils/zincutils");
 vi.mock("vuex", () => ({
   useStore: () => ({
@@ -38,6 +41,9 @@ describe("Common Utils", () => {
     Object.defineProperty(window, "location", {
       value: {
         href: "",
+        // `origin` is what the same-origin redirect check compares against;
+        // a real window.location always has it.
+        origin: "http://localhost:3000",
         replace: vi.fn(),
       },
       writable: true,
@@ -175,12 +181,26 @@ describe("Common Utils", () => {
       mockZincutils.getPath = vi.fn().mockReturnValue("/default-path");
     });
 
-    it("should redirect to external URL when redirectURI contains http", () => {
-      const externalUrl = "https://external-site.com/redirect";
+    // SECURITY: `redirectURI` comes from the attacker-controllable
+    // `?short_url=` query param. It previously only had to CONTAIN "http",
+    // so an off-origin URL sent the user to a phishing site right after they
+    // authenticated. Off-origin must now fall back to the home path.
+    it("refuses an off-origin redirect and goes to the default path instead", () => {
+      const replaceSpy = vi.spyOn(window.location, "replace");
 
-      redirectUser(externalUrl);
+      redirectUser("https://external-site.com/redirect");
 
-      expect(window.location.href).toBe(externalUrl);
+      expect(replaceSpy).toHaveBeenCalledWith("/default-path");
+      expect(window.location.href).not.toContain("external-site.com");
+    });
+
+    it("refuses protocol-relative and backslash off-origin tricks", () => {
+      for (const hostile of ["//evil.com/", "/\\evil.com", "https://localhost.evil.com/"]) {
+        const replaceSpy = vi.spyOn(window.location, "replace");
+        redirectUser(hostile);
+        expect(replaceSpy, `accepted: ${hostile}`).toHaveBeenCalledWith("/default-path");
+        replaceSpy.mockRestore();
+      }
     });
 
     it("should use replace for internal redirects", () => {
@@ -209,20 +229,12 @@ describe("Common Utils", () => {
       expect(replaceSpy).toHaveBeenCalledWith("/default-path");
     });
 
-    it("should handle https URLs", () => {
-      const httpsUrl = "https://secure.example.com/auth";
+    it("still allows an absolute URL on the SAME origin", () => {
+      const sameOrigin = "http://localhost:3000/auth/callback";
 
-      redirectUser(httpsUrl);
+      redirectUser(sameOrigin);
 
-      expect(window.location.href).toBe(httpsUrl);
-    });
-
-    it("should handle http URLs", () => {
-      const httpUrl = "http://example.com/redirect";
-
-      redirectUser(httpUrl);
-
-      expect(window.location.href).toBe(httpUrl);
+      expect(window.location.href).toBe(sameOrigin);
     });
 
     it("should handle relative paths", () => {

@@ -17,8 +17,19 @@ import store from "../stores";
 import type { AxiosInstance } from "axios";
 import axios from "axios";
 import config from "../aws-exports";
-import { useLocalUserInfo, useLocalCurrentUser } from "@/utils/zincutils";
+import { expireSession } from "@/utils/sessionServices";
 import { addUnauthorizedError } from "@/composables/useUnauthorizedErrorGrouper";
+import { usePasswordReset } from "@/composables/usePasswordReset";
+import { isPasswordResetError } from "@/utils/passwordResetErrors";
+
+declare module "axios" {
+  interface AxiosRequestConfig {
+    /** The caller renders a 403 itself, so it is left out of the grouped "Access Required" toast. */
+    skipAccessToast?: boolean;
+    /** Skip the global Unauthorized toast on a 403; the caller handles the refusal itself. */
+    silentForbidden?: boolean;
+  }
+}
 
 // Shared refresh state — ensures only one dex_refresh request is in-flight
 // at a time across all axios instances and streaming fetch requests. All
@@ -38,11 +49,7 @@ export const attemptTokenRefresh = (requestUrl: string = ""): Promise<void> => {
   }
 
   if (config.isCloud == "true") {
-    store.dispatch("logout");
-    useLocalCurrentUser("", true);
-    useLocalUserInfo("", true);
-    sessionStorage.clear();
-    window.location.reload();
+    expireSession(store);
     return Promise.reject(new Error("Cloud environment: direct logout"));
   }
 
@@ -63,13 +70,7 @@ export const attemptTokenRefresh = (requestUrl: string = ""): Promise<void> => {
         .catch(() => {
           return refreshInstance
             .get("/config/logout")
-            .finally(() => {
-              store.dispatch("logout");
-              useLocalCurrentUser("", true);
-              useLocalUserInfo("", true);
-              sessionStorage.clear();
-              window.location.reload();
-            })
+            .finally(() => expireSession(store))
             .then(() => Promise.reject(new Error("Refresh failed")));
         })
         .finally(() => {
@@ -80,11 +81,7 @@ export const attemptTokenRefresh = (requestUrl: string = ""): Promise<void> => {
   }
 
   // Not enterprise SSO — standard logout
-  store.dispatch("logout");
-  useLocalCurrentUser("", true);
-  useLocalUserInfo("", true);
-  sessionStorage.clear();
-  window.location.reload();
+  expireSession(store);
   return Promise.reject(new Error("Not SSO: cannot refresh"));
 };
 
@@ -107,17 +104,19 @@ const http = ({ headers } = {} as any) => {
       return response;
     },
     function (error) {
+      // Ahead of the status switch: a reset-required 403 is a policy state, not an authorization failure.
+      if (isPasswordResetError(error)) {
+        usePasswordReset().open(error.response.data.reason);
+        // A blocked page fires many requests behind an undismissable dialog; one toast per rejection would stack.
+        return new Promise(() => {});
+      }
       if (error && error.response && error.response.status) {
         switch (error.response.status) {
           case 400:
             break;
           case 401:
             if (config.isCloud == "true" && !error.request.responseURL.includes("/auth/login")) {
-              store.dispatch("logout");
-              useLocalCurrentUser("", true);
-              useLocalUserInfo("", true);
-              sessionStorage.clear();
-              window.location.reload();
+              expireSession(store);
             }
             // Delegate to the shared refresh helper — it owns the URL exclusion
             // checks and the logout-on-failure path. Retry the original request
@@ -127,17 +126,15 @@ const http = ({ headers } = {} as any) => {
                 .then(() => instance.request(error.config))
                 .catch(() => Promise.reject(error));
             } else {
-              if (!error.request.responseURL.includes("/login")) {
-                store.dispatch("logout");
-                useLocalCurrentUser("", true);
-                useLocalUserInfo("", true);
-                sessionStorage.clear();
-                window.location.reload();
-              }
+              if (!error.request.responseURL.includes("/login")) expireSession(store);
             }
             break;
           case 403:
-            if (config.isEnterprise == "true" || config.isCloud == "true") {
+            if (
+              (config.isEnterprise == "true" || config.isCloud == "true") &&
+              !error.config?.skipAccessToast &&
+              !error.config?.silentForbidden
+            ) {
               const responseUrl = error.request?.responseURL || error.config?.url || "";
               addUnauthorizedError(responseUrl);
             }

@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="feature-card mb-3"
     v-if="showDeprecationWarning"
     role="region"
-    aria-label="MySQL deprecation warning"
+    :aria-label="t('components.databaseDeprecationBanner.ariaLabel')"
     data-test="database-deprecation-banner-message"
   >
     <div class="flex items-center">
@@ -28,18 +28,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-text-heading text-base leading-6 font-semibold"
           data-test="database-deprecation-banner-title"
         >
-          ⚠️ MySQL support is DEPRECATED and will be removed in future.
+          {{ t("components.databaseDeprecationBanner.title") }}
         </span>
         <br />
         <span
           class="text-text-secondary text-sm leading-5 font-normal"
           data-test="database-deprecation-banner-subtitle"
         >
-          Please migrate to PostgreSQL to ensure continued support.
+          {{ t("components.databaseDeprecationBanner.description") }}
         </span>
       </div>
-      <div class="col-auto ml-2">
-        <OButton variant="ghost" size="icon-sm" icon-left="close" @click="dismissWarning" />
+      <div class="col-auto ms-2">
+        <OButton
+          :aria-label="t('common.close')"
+          variant="ghost"
+          size="icon-sm"
+          icon-left="close"
+          @click="dismissWarning"
+        />
       </div>
     </div>
   </div>
@@ -47,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, onMounted } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 
@@ -57,6 +64,7 @@ export default defineComponent({
   name: "DatabaseDeprecationBanner",
   components: { OButton },
   setup() {
+    const { t } = useI18nTyped();
     const store = useStore();
     const showDeprecationWarning = ref(false);
 
@@ -104,6 +112,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       store,
       showDeprecationWarning,
       dismissWarning,

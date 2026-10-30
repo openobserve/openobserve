@@ -12,23 +12,23 @@
   <!--
     OpenObserve RUM + Logs async loader stub. This SAME block must appear in the
     <head> of every page so the SDK initializes on each navigation. It installs
-    the OO_RUM / OO_LOGS queues synchronously, then loads the bundles async.
+    the O2_RUM / O2_LOGS queues synchronously, then loads the bundles async.
   -->
   <script>
     (function (h, o, u, n, g) {
       h[g] = h[g] || { q: [], onReady: function (c) { this.q.push(c); } };
       var s = o.createElement(u); s.async = 1; s.src = n;
       var f = o.getElementsByTagName(u)[0]; f.parentNode.insertBefore(s, f);
-    })(window, document, 'script', 'https://browsersdk.openobserve.ai/0.3.4/openobserve-logs.js', 'OO_LOGS');
+    })(window, document, 'script', 'https://browsersdk.openobserve.ai/0.4.3/openobserve-logs.js', 'O2_LOGS');
     (function (h, o, u, n, g) {
       h[g] = h[g] || { q: [], onReady: function (c) { this.q.push(c); } };
       var s = o.createElement(u); s.async = 1; s.src = n;
       var f = o.getElementsByTagName(u)[0]; f.parentNode.insertBefore(s, f);
-    })(window, document, 'script', 'https://browsersdk.openobserve.ai/0.3.4/openobserve-rum.js', 'OO_RUM');
+    })(window, document, 'script', 'https://browsersdk.openobserve.ai/0.4.3/openobserve-rum.js', 'O2_RUM');
   </script>
 
   <!-- Shared SDK config + init -->
-  <script src="./oo-rum.js"></script>
+  <script src="./o2-rum.js"></script>
   <!-- Shared styles -->
   <link rel="stylesheet" href="./styles.css" />
 </head>

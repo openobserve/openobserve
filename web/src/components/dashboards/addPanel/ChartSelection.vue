@@ -16,14 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="h-full">
-    <div class="w-25 p-0">
-      <ul class="m-0 flex list-none flex-wrap p-0">
+    <div class="w-25 p-0 max-md:w-full">
+      <ul class="m-0 flex list-none flex-wrap p-0 max-md:flex-nowrap max-md:overflow-x-auto">
         <li
-          class="w-12.5"
+          class="w-12.5 max-md:shrink-0"
           v-for="(item, index) in ChartsArray"
           :key="index"
           :class="[
-            'border-card-glass-border border-r border-b',
+            'border-card-glass-border border-e border-b',
             'hover:bg-surface-subtle transition-colors duration-150 ease-in-out',
             selectedChartType === item.id ? 'bg-label-chip-url-bg' : '',
             isChartDisabled(item) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
@@ -40,7 +40,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <img
               :src="item.image.replace('img:', '')"
               :alt="item.title"
-              class="mx-auto my-2 h-6 w-6"
+              class="mx-auto my-2 scheme-light dark:scheme-dark"
+              :class="item.id === 'maps' ? 'h-6 w-8' : 'h-6 w-6'"
               data-test="dashboard-addpanel-chart-selection-icon"
             />
             <OTooltip class="text-center" :content="item.title" />
@@ -56,7 +57,7 @@ import { defineComponent, inject, ref } from "vue";
 import { getImageURL } from "../../../utils/zincutils";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 export default defineComponent({
@@ -66,91 +67,146 @@ export default defineComponent({
 
   setup(props) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     // array of charts
     const chartsArray = ref([
       {
-        image: "img:" + getImageURL("images/dashboard/charts/area.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/area.svg"),
         title: t("dashboard.areaLabel"),
         id: "area",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/area-graph.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/area-graph.svg"),
         title: t("dashboard.areaStackedLabel"),
         id: "area-stacked",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/bar-chart.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/bar-chart.svg"),
         title: t("dashboard.barLabel"),
         id: "bar",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/bar-graph.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/bar-graph.svg"),
         title: t("dashboard.horizontalLabel"),
         id: "h-bar",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/line-chart.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/line-chart.svg"),
         title: t("dashboard.lineLabel"),
         id: "line",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/scatter-graph.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/scatter-graph.svg"),
         title: t("dashboard.scatterLabel"),
         id: "scatter",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/stacked.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/stacked.svg"),
         title: t("dashboard.stackedLabel"),
         id: "stacked",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/h-stacked.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/h-stacked.svg"),
         title: t("dashboard.hstackedLabel"),
         id: "h-stacked",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/geomap.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/geomap.svg"),
         title: t("dashboard.geomapLabel"),
         id: "geomap",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/world-map.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/world-map.svg"),
         title: t("dashboard.worldmapLabel"),
         id: "maps",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/pie-chart.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/pie-chart.svg"),
         title: t("dashboard.pieLabel"),
         id: "pie",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/donut-chart.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/donut-chart.svg"),
         title: t("dashboard.donutLabel"),
         id: "donut",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/heatmap.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/treemap.svg"),
+        title: t("dashboard.chartSelection.treemap"),
+        id: "treemap",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/sunburst.svg"),
+        title: t("dashboard.chartSelection.sunburst"),
+        id: "sunburst",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/heatmap.svg"),
         title: t("dashboard.heatmapLabel"),
         id: "heatmap",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/table.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/boxplot.svg"),
+        title: t("dashboard.chartSelection.boxplot"),
+        id: "boxplot",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/distribution.svg"),
+        title: t("dashboard.chartSelection.distribution"),
+        id: "distribution",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/state-timeline.svg"),
+        title: t("dashboard.stateTimelineLabel"),
+        id: "state-timeline",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/hostmap.svg"),
+        title: t("dashboard.hostmapLabel"),
+        id: "hostmap",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/table.svg"),
         title: t("dashboard.tableLabel"),
         id: "table",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/123.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/123.svg"),
         title: t("dashboard.metricTextLabel"),
         id: "metric",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/Gauge.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/Gauge.svg"),
         title: t("dashboard.chartSelection.gauge"),
         id: "gauge",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/HTML.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/logs.svg"),
+        title: t("dashboard.chartSelection.logs"),
+        id: "logs",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/bar-gauge.svg"),
+        title: t("dashboard.chartSelection.barGauge"),
+        id: "bar-gauge",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/funnel.svg"),
+        title: t("dashboard.chartSelection.funnel"),
+        id: "funnel",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/alert-list.svg"),
+        title: t("dashboard.chartSelection.alertList"),
+        id: "alert-list",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/flame-graph.svg"),
+        title: t("dashboard.chartSelection.flameGraph"),
+        id: "flame-graph",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/HTML.svg"),
         title: t("dashboard.chartSelection.html"),
         id: "html",
       },
@@ -165,14 +221,19 @@ export default defineComponent({
         id: "sankey",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/chart.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/node-graph.svg"),
+        title: t("dashboard.chartSelection.nodeGraph"),
+        id: "node-graph",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/chart.svg"),
         title: t("dashboard.chartSelection.customChart"),
         id: "custom_chart",
       },
     ]);
 
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { promqlMode, dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { promqlMode, dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const promqlAllowedCharts = new Set([
       "line",
@@ -182,10 +243,13 @@ export default defineComponent({
       "area-stacked",
       "metric",
       "gauge",
+      "bar-gauge",
       "pie",
       "donut",
       "table",
       "heatmap",
+      "state-timeline",
+      "hostmap",
       "h-bar",
       "stacked",
       "h-stacked",

@@ -39,7 +39,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OTab name="services" :label="t('settings.correlation.discoveredServicesTab')" />
         <OTab name="discovery" :label="t('settings.correlation.serviceDiscoveryTab')" />
-        <OTab name="alert-correlation" :label="t('settings.correlation.alertCorrelationTab')" />
         <OTab
           name="field-aliases"
           data-test="correlation-settings-field-aliases-tab"
@@ -60,15 +59,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :semantic-groups="semanticGroups"
           @navigate-to-aliases="onNavigateToAliases"
           @navigate-to-services="onTabChange('services')"
-          @update-service-fields="onUpdateServiceFields"
-        />
-      </div>
-
-      <div v-show="activeTab === 'alert-correlation'" class="px-page-edge h-full overflow-y-auto">
-        <OrganizationDeduplicationSettings
-          :org-id="store.state.selectedOrganization.identifier"
-          :config="store.state.organizationSettings?.deduplication_config"
-          @saved="onCorrelationSettingsSaved"
         />
       </div>
 
@@ -101,22 +91,23 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import { defineComponent, ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter, useRoute, onBeforeRouteLeave } from "vue-router";
-import OrganizationDeduplicationSettings from "@/components/alerts/OrganizationDeduplicationSettings.vue";
 import DiscoveredServices from "@/components/settings/DiscoveredServices.vue";
 import ServiceIdentitySetup from "@/components/settings/ServiceIdentitySetup.vue";
 import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsConfig.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import serviceStreamsService from "@/services/service_streams";
+import { serviceStreamKeys } from "@/services/service_streams.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { confirmForcedSignOutDiscard, draftSignOutForced } from "@/utils/drafts/draftSession";
 
 export default defineComponent({
   name: "CorrelationSettings",
   components: {
-    OrganizationDeduplicationSettings,
     DiscoveredServices,
     ServiceIdentitySetup,
     SemanticFieldGroupsConfig,
@@ -128,7 +119,7 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const { confirm } = useConfirmDialog();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const route = useRoute();
 
@@ -136,13 +127,11 @@ export default defineComponent({
     const slugToTab: Record<string, string> = {
       "service-discovery": "discovery",
       services: "services",
-      "alert-correlation": "alert-correlation",
       "field-aliases": "field-aliases",
     };
     const tabToSlug: Record<string, string> = {
       discovery: "service-discovery",
       services: "services",
-      "alert-correlation": "alert-correlation",
       "field-aliases": "field-aliases",
     };
 
@@ -234,11 +223,6 @@ export default defineComponent({
         icon: "manage-search",
       },
       {
-        label: t("settings.correlation.alertCorrelationTab"),
-        value: "alert-correlation",
-        icon: "notifications",
-      },
-      {
         label: t("settings.correlation.fieldAliasesTab"),
         value: "field-aliases",
         icon: "link",
@@ -292,6 +276,8 @@ export default defineComponent({
         const orgId = store.state.selectedOrganization.identifier;
         const groups = draftSemanticGroups.value;
         await serviceStreamsService.updateSemanticGroups(orgId, groups);
+        // The groups are cached, and dimension analytics is computed from them.
+        void queryClient.invalidateQueries({ queryKey: serviceStreamKeys.all(orgId) });
         semanticGroups.value = groups;
         draftSemanticGroups.value = cloneGroups(groups);
         toast({ variant: "success", message: t("settings.correlation.fieldAliasesSaved") });
@@ -308,27 +294,9 @@ export default defineComponent({
       fieldAliasesEditorKey.value += 1;
     };
 
-    const onUpdateServiceFields = async (fields: string[]) => {
-      try {
-        const orgId = store.state.selectedOrganization.identifier;
-        const updated = semanticGroups.value.map((g: any) =>
-          g.id === "service" ? { ...g, fields } : g,
-        );
-        await serviceStreamsService.updateSemanticGroups(orgId, updated);
-        semanticGroups.value = updated;
-        toast({ variant: "success", message: t("settings.correlation.fieldAliasesSaved") });
-      } catch (_) {
-        toast({ variant: "error", message: t("settings.correlation.fieldAliasesSaveError") });
-      }
-    };
-
-    const onCorrelationSettingsSaved = () => {
-      // Child components handle their own notifications and data refresh
-      // No global store update needed as settings are managed via settings v2 API
-    };
-
     onBeforeRouteLeave(async () => {
       if (!isFieldAliasesDirty.value) return true;
+      if (draftSignOutForced.value) return confirmForcedSignOutDiscard(confirm, t);
       return await confirmDiscardUnsaved();
     });
 
@@ -338,9 +306,7 @@ export default defineComponent({
       aliasScrollToGroup,
       tabs,
       onTabChange,
-      onCorrelationSettingsSaved,
       onNavigateToAliases,
-      onUpdateServiceFields,
       onDraftSemanticGroupsChange,
       saveSemanticGroups,
       discardSemanticGroups,

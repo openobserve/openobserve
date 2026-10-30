@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-wrap items-center">
     <div
-      class="mr-4 mb-2 flex flex-nowrap items-center gap-x-1"
+      class="me-4 mb-2 flex flex-nowrap items-center gap-x-1"
       v-for="(item, index) in adhocVariables"
       :key="index"
     >
@@ -28,20 +28,21 @@
         @update:model-value="emitValue()"
       />
       <OButton
+        :aria-label="t('common.remove')"
         variant="ghost"
         size="icon"
-        class="ml-1"
+        class="ms-1"
         @click="removeField(index)"
         :data-test="`dashboard-variable-adhoc-close-${index}`"
         icon-left="close"
       >
       </OButton>
-      <!-- <div v-if="index != adhocVariables.length - 1" class="ml-2 and-border" class="bg-surface-subtle-hover">AND</div> -->
+      <!-- <div v-if="index != adhocVariables.length - 1" class="ms-2 and-border" class="bg-surface-subtle-hover">AND</div> -->
     </div>
     <OButton
       variant="ghost"
       size="sm"
-      class="hideOnPrintMode mb-2 ml-1"
+      class="hideOnPrintMode ms-1 mb-2"
       @click="addFields"
       data-test="dashboard-variable-adhoc-add-selector"
     >
@@ -52,10 +53,10 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, toRef, watch, type Ref, toRefs } from "vue";
+import { defineComponent, toRef, watch, type Ref, toRefs } from "vue";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import DynamicFilterIcon from "../../icons/DynamicFilterIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -77,10 +78,10 @@ export default defineComponent({
 
   setup(props: any, { emit }) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const operatorOptions = [
-      { label: "=", value: "=" },
-      { label: "!=", value: "!=" },
+      { label: raw("="), value: "=" },
+      { label: raw("!="), value: "!=" },
     ];
     const options = toRef(props.variableItem, "options");
     const { modelValue: adhocVariables } = toRefs(props) as {
@@ -121,6 +122,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       fieldsFilterFn,
       fieldsFilteredOptions,
       addFields,

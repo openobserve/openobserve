@@ -18,8 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="source-maps-container bg-card-glass-bg flex h-full flex-col overflow-hidden">
     <!-- Filters Section -->
     <div class="px-page-edge bg-surface-base py-3">
-      <div class="flex items-end justify-between">
-        <div class="flex items-end gap-4">
+      <!-- Below lg the filters and actions share one wrapping row (filters two-up on phones) instead of running off the edge. -->
+      <div class="flex items-end justify-between max-lg:flex-wrap max-lg:gap-2">
+        <div class="flex items-end gap-4 max-lg:contents">
           <!-- Version Filter -->
           <OSelect
             v-model="filters.version"
@@ -28,8 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             clearable
             searchable
             creatable
-            style="width: 200px"
-            class="o2-custom-select-dashboard"
+            style="width: 12.5rem"
+            class="o2-custom-select-dashboard max-md:basis-[calc(50%-0.25rem)]"
           />
 
           <!-- Service Filter -->
@@ -40,8 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             clearable
             searchable
             creatable
-            style="width: 200px"
-            class="o2-custom-select-dashboard"
+            style="width: 12.5rem"
+            class="o2-custom-select-dashboard max-md:basis-[calc(50%-0.25rem)]"
           />
 
           <!-- Environment Filter -->
@@ -52,8 +53,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             clearable
             searchable
             creatable
-            style="width: 200px"
-            class="o2-custom-select-dashboard"
+            style="width: 12.5rem"
+            class="o2-custom-select-dashboard max-md:basis-[calc(50%-0.25rem)]"
           />
 
           <!-- Apply Button -->
@@ -63,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Columns + Refresh + Upload Buttons -->
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 max-lg:ms-auto">
           <OTableColumnToggle
             :columns="columns"
             :column-visibility="columnVisibility"
@@ -96,29 +97,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="source-maps-list min-h-0 flex-1">
       <!-- Source Maps Table (OTable handles loading skeleton) -->
       <OTable
+        ref="oTableRef"
         :data="groupedSourceMaps"
         :columns="columns"
         :column-visibility="columnVisibility"
         row-key="id"
         :loading="isLoading"
+        :forbidden="forbidden"
         pagination="client"
         :page-size="selectedPerPage"
         :page-size-options="perPageOptionsList"
+        :current-page="currentPage"
+        @update:current-page="currentPage = $event"
+        @update:page-size="selectedPerPage = $event"
+        :sort-by="sortBy"
+        :sort-order="sortOrder"
+        @update:sort-by="sortBy = $event"
+        @update:sort-order="sortOrder = $event"
         :show-global-filter="false"
-        :footer-title="t('rum.sourceMaps')"
         expansion="single"
         expand-on-row-click
         v-model:expanded-ids="expandedIds"
         class="w-full"
       >
         <template #expansion="{ row }">
-          <div
-            class="bg-surface-base border-t border-(--color-border-default,var(--color-border-default)) p-3"
-          >
-            <div class="mb-2 text-sm font-medium">Source Map Files ({{ row.files.length }})</div>
+          <div class="bg-surface-base border-border-default border-t p-3">
+            <div class="mb-2 text-sm font-medium">
+              {{ t("rum.sourceMapFilesCount", { count: row.files.length }) }}
+            </div>
             <ul
               class="divide-border rounded-default flex flex-col divide-y overflow-y-auto border"
-              style="max-height: 400px"
+              style="max-height: 25rem"
             >
               <li
                 v-for="(file, index) in row.files"
@@ -127,11 +136,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex items-center gap-2 px-3 py-2"
               >
                 <div class="flex min-w-0 flex-1 flex-col">
-                  <span class="text-muted-foreground block text-xs">Source File</span>
+                  <span class="text-muted-foreground block text-xs">{{ t("rum.sourceFile") }}</span>
                   <span class="font-mono text-sm break-all">{{ file.source_file_name }}</span>
                 </div>
                 <div class="flex min-w-0 flex-1 flex-col">
-                  <span class="text-muted-foreground block text-xs">Source Map File</span>
+                  <span class="text-muted-foreground block text-xs">{{
+                    t("rum.sourceMapFile")
+                  }}</span>
                   <span class="font-mono text-sm break-all">{{ file.source_map_file_name }}</span>
                 </div>
               </li>
@@ -172,17 +183,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODialog
       v-model:open="deleteDialog.show"
       size="xs"
-      :title="deleteDialog.title"
+      :title="raw(deleteDialog.title)"
       data-test="delete-source-maps-dialog"
       :secondary-button-label="t('common.cancel')"
       :primary-button-label="t('common.ok')"
+      primary-button-variant="destructive"
       @click:secondary="deleteDialog.show = false"
       @click:primary="
         deleteSourceMap();
         deleteDialog.show = false;
       "
     >
-      <p class="para">{{ deleteDialog.message }}</p>
+      <i18n-t
+        v-if="deleteDialog.data"
+        keypath="rum.deleteSourceMapsConfirm"
+        :plural="deleteDialog.data.fileCount"
+        tag="p"
+        class="para"
+      >
+        <template #service>
+          <span
+            data-test="delete-source-maps-dialog-name"
+            class="text-text-heading font-semibold break-all"
+            >{{ deleteDialog.data.service }}</span
+          >
+        </template>
+        <template #version>
+          <span class="text-text-heading font-semibold break-all">{{
+            deleteDialog.data.version
+          }}</span>
+        </template>
+        <template #env>
+          <span class="text-text-heading font-semibold break-all">{{ deleteDialog.data.env }}</span>
+        </template>
+        <template #count>{{ deleteDialog.data.fileCount }}</template>
+      </i18n-t>
     </ODialog>
   </div>
 </template>
@@ -193,8 +228,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // would silently drop it from the cache and bring back the refetch-on-return.
 defineOptions({ name: "SourceMaps" });
 
-import { ref, onMounted, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { ref, onMounted, computed, watch } from "vue";
+import { useListViewState } from "@/composables/useListViewState";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import sourcemapsService from "@/services/sourcemaps";
@@ -213,7 +249,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 
@@ -221,7 +257,6 @@ const router = useRouter();
 const deleteDialog = ref({
   show: false,
   title: "",
-  message: "",
   data: null as any,
 });
 
@@ -236,11 +271,15 @@ const filteredServiceOptions = ref<string[]>([]);
 const filteredEnvironmentOptions = ref<string[]>([]);
 
 // Filters
-const filters = ref<{
-  version?: string;
-  service?: string;
-  environment?: string;
-}>({});
+type SourceMapFilters = { version?: string; service?: string; environment?: string };
+const viewState = useListViewState("rumSourceMaps", {
+  filters: {} as SourceMapFilters,
+  pageSize: 20,
+  currentPage: 1,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+});
+const filters = ref<SourceMapFilters>({ ...viewState.filters });
 
 // Fetch filter values from API
 const fetchFilterValues = async () => {
@@ -272,6 +311,7 @@ const fetchFilterValues = async () => {
 
 // State
 const isLoading = ref(false);
+const forbidden = ref(false);
 const sourceMaps = ref<any[]>([]);
 const groupedSourceMaps = ref<any[]>([]);
 const expandedIds = ref<string[]>([]);
@@ -334,13 +374,29 @@ const columns = computed<OTableColumnDef[]>(() => [
 ]);
 
 // Pagination
-const selectedPerPage = ref<number>(20);
+const selectedPerPage = ref<number>(viewState.pageSize);
+const currentPage = ref(viewState.currentPage);
+const sortBy = ref(viewState.sortBy);
+const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
+const oTableRef = ref<any>(null);
+watch([filters, selectedPerPage, currentPage, sortBy, sortOrder], () => {
+  Object.assign(viewState, {
+    filters: { ...filters.value },
+    pageSize: selectedPerPage.value,
+    currentPage: currentPage.value,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+  });
+});
+watch(filters, () => (currentPage.value = 1), { deep: true });
+let pageRestored = false;
 
 const perPageOptionsList = [20, 50, 100, 250];
 
 // Fetch source maps
 const fetchSourceMaps = async () => {
   isLoading.value = true;
+  forbidden.value = false;
 
   try {
     const params: any = {};
@@ -358,12 +414,18 @@ const fetchSourceMaps = async () => {
 
     // Group source maps by service, version, and environment
     groupSourceMaps();
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error fetching source maps:", error);
+    forbidden.value = error?.response?.status === 403;
     sourceMaps.value = [];
     groupedSourceMaps.value = [];
   } finally {
     isLoading.value = false;
+    if (!pageRestored) {
+      pageRestored = true;
+      // Macrotask so the restored page wins over the table's own reset on data change.
+      setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
+    }
   }
 };
 
@@ -420,8 +482,7 @@ const formatTimestamp = (timestamp: number) => {
 const confirmDeleteSourceMap = (sourceMap: any) => {
   deleteDialog.value = {
     show: true,
-    title: "Delete Source Maps",
-    message: `Are you sure you want to delete all source maps for ${sourceMap.service} (${sourceMap.version}) in ${sourceMap.env} environment? This will delete ${sourceMap.fileCount} file(s).`,
+    title: t("rum.deleteSourceMapsTitle"),
     data: sourceMap,
   };
 };
@@ -440,7 +501,11 @@ const deleteSourceMap = async () => {
 
     toast({
       variant: "success",
-      message: `Source maps deleted successfully for ${sourceMap.service} (${sourceMap.version}) in ${sourceMap.env}`,
+      message: t("toastMessages.RUM.sourceMapsDeletedSuccessfullyForIn", {
+        service: sourceMap.service,
+        version: sourceMap.version,
+        environment: sourceMap.env,
+      }),
     });
 
     // Remove from local list
@@ -449,7 +514,8 @@ const deleteSourceMap = async () => {
     console.error("Error deleting source maps:", error);
     toast({
       variant: "error",
-      message: error?.response?.data?.message || error?.message || "Failed to delete source maps",
+      message:
+        error?.response?.data?.message || error?.message || t("rum.failedToDeleteSourceMaps"),
     });
   }
 };

@@ -21,4 +21,19 @@
 use common;
 use openobserve_core as service;
 
+/// **T39 / F6 — the `cloud` feature must reach `openobserve-synthetics`.**
+///
+/// `#[cfg(feature = "cloud")]` in a crate that does not DEFINE `cloud` compiles
+/// to nothing, silently taking the synthetics billing emit with it — revenue
+/// loss no runtime test can catch. Do not remove or silence this assert: it must
+/// fire during this crate's `--features cloud` compile, and the fix is
+/// `openobserve-synthetics/cloud` in this crate's `cloud` feature (item 1.3).
+#[cfg(feature = "cloud")]
+const _: () = assert!(
+    openobserve_synthetics::BUILT_WITH_CLOUD,
+    "this crate was built with `cloud` but openobserve-synthetics was not: its `cfg(feature = \
+     \"cloud\")` blocks — including the synthetics billing emit — compiled to NOTHING. Add \
+     `openobserve-synthetics/cloud` to this crate's `cloud` feature (spec item 1.3 / F6)."
+);
+
 pub mod job;

@@ -648,7 +648,7 @@ impl TreeNodeRewriter for StreamingAggsRewriter {
 
 fn is_single_node_aggregate(node: &Arc<dyn ExecutionPlan>) -> bool {
     config::get_config()
-        .common
+        .search
         .feature_single_node_optimize_enabled
         && config::cluster::LOCAL_NODE.is_single_node()
         && node

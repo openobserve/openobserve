@@ -50,6 +50,8 @@ pub struct QueueConfig {
     pub max_age: Option<std::time::Duration>,
     pub retention_policy: RetentionPolicy,
     pub storage_type: StorageType,
+    /// Messages published with a repeated id inside this window are dropped by the server.
+    pub duplicate_window: Option<std::time::Duration>,
 }
 
 pub struct QueueConfigBuilder {
@@ -63,6 +65,7 @@ impl QueueConfigBuilder {
                 max_age: None,
                 retention_policy: RetentionPolicy::Limits,
                 storage_type: StorageType::File,
+                duplicate_window: None,
             },
         }
     }
@@ -79,6 +82,11 @@ impl QueueConfigBuilder {
 
     pub fn storage_type(mut self, storage_type: StorageType) -> Self {
         self.config.storage_type = storage_type;
+        self
+    }
+
+    pub fn duplicate_window(mut self, window: std::time::Duration) -> Self {
+        self.config.duplicate_window = Some(window);
         self
     }
 
@@ -105,7 +113,11 @@ pub async fn get_super_cluster() -> &'static Box<dyn Queue> {
 }
 
 pub async fn init() -> Result<()> {
-    nats::init().await
+    match QueueStore::try_from(config::get_config().common.queue_store.as_str()) {
+        Ok(QueueStore::Nats) => nats::init().await,
+        Ok(QueueStore::Memory) => memory::init().await,
+        Err(e) => Err(Error::Message(e)),
+    }
 }
 
 async fn default() -> Box<dyn Queue> {
@@ -137,6 +149,13 @@ pub trait Queue: Sync + Send + 'static {
     async fn create(&self, topic: &str) -> Result<()>;
     async fn create_with_config(&self, topic: &str, config: QueueConfig) -> Result<()>;
     async fn publish(&self, topic: &str, value: Bytes) -> Result<()>;
+    /// Publish a logical task with a stable identity. Durable backends use the
+    /// identity for broker-side duplicate suppression; other backends retain
+    /// at-least-once delivery and rely on consumer idempotency.
+    async fn publish_with_id(&self, topic: &str, value: Bytes, message_id: &str) -> Result<()> {
+        let _ = message_id;
+        self.publish(topic, value).await
+    }
     async fn consume(
         &self,
         topic: &str,
@@ -350,6 +369,15 @@ mod tests {
             .storage_type(StorageType::Memory)
             .build();
         assert!(matches!(cfg.storage_type, StorageType::Memory));
+    }
+
+    #[test]
+    fn test_builder_duplicate_window_is_unset_until_asked() {
+        assert_eq!(QueueConfigBuilder::new().build().duplicate_window, None);
+        let cfg = QueueConfigBuilder::new()
+            .duplicate_window(Duration::from_secs(3600))
+            .build();
+        assert_eq!(cfg.duplicate_window, Some(Duration::from_secs(3600)));
     }
 
     #[test]

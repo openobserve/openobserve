@@ -13,81 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
-use datafusion::error::Result;
-use hashbrown::HashMap;
-use promql_parser::parser::LabelModifier;
+use crate::aggregations::{AggFunc, extrema::ExtremaAccumulator};
 
-use crate::aggregations::{Accumulate, AggFunc};
-
-/// Aggregates Matrix input for range queries
-pub fn min(param: &Option<LabelModifier>, data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    let start = std::time::Instant::now();
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] min() started",
-        eval_ctx.trace_id
-    );
-
-    let result = super::eval_aggregate(param, data, Min, eval_ctx);
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] min() execution took: {:?}",
-        eval_ctx.trace_id,
-        start.elapsed()
-    );
-    result
-}
-
+#[derive(Clone, Copy)]
 pub struct Min;
 
 impl AggFunc for Min {
+    type Accumulator = ExtremaAccumulator<false>;
+
     fn name(&self) -> &'static str {
         "min"
     }
 
-    fn build(&self) -> Box<dyn super::Accumulate> {
-        Box::new(MinAccumulate::new())
-    }
-}
-
-pub struct MinAccumulate {
-    min: HashMap<i64, f64>,
-}
-
-impl MinAccumulate {
-    fn new() -> Self {
-        MinAccumulate {
-            min: HashMap::new(),
-        }
-    }
-}
-
-impl Accumulate for MinAccumulate {
-    fn accumulate(&mut self, sample: &Sample) {
-        let entry = self.min.entry(sample.timestamp).or_insert(f64::INFINITY);
-        if sample.value < *entry {
-            *entry = sample.value;
-        }
-    }
-
-    fn merge(&mut self, other: Box<dyn Accumulate>) {
-        let other = other.into_any().downcast::<Self>().expect("same type");
-        for (timestamp, value) in other.min {
-            let entry = self.min.entry(timestamp).or_insert(f64::INFINITY);
-            if value < *entry {
-                *entry = value;
-            }
-        }
-    }
-
-    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
-        self
-    }
-
-    fn evaluate(self: Box<Self>) -> Vec<Sample> {
-        self.min
-            .into_iter()
-            .map(|(timestamp, value)| Sample::new(timestamp, value))
-            .collect()
+    fn build(&self, slots: usize) -> Self::Accumulator {
+        ExtremaAccumulator::new(slots)
     }
 }
 
@@ -95,33 +34,10 @@ impl Accumulate for MinAccumulate {
 mod tests {
     use std::sync::Arc;
 
-    use config::meta::promql::value::{Label, RangeValue, Sample, Value};
+    use config::meta::promql::value::{EvalContext, Label, RangeValue, Sample, Value};
 
     use super::*;
-
-    #[test]
-    fn test_min_value_none_input() {
-        let timestamp = 1640995200;
-        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = min(&None, Value::None, &eval_ctx).unwrap();
-        assert!(matches!(result, Value::None));
-    }
-
-    #[test]
-    fn test_min_invalid_input_returns_err() {
-        let timestamp = 1640995200;
-        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = min(&None, Value::Float(1.0), &eval_ctx);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_min_empty_matrix_returns_none() {
-        let timestamp = 1640995200;
-        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = min(&None, Value::Matrix(vec![]), &eval_ctx).unwrap();
-        assert!(matches!(result, Value::None));
-    }
+    use crate::aggregations::eval_aggregate;
 
     #[test]
     fn test_min_range_function() {
@@ -162,7 +78,7 @@ mod tests {
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test min without label grouping - should return the minimum value
-        let result = min(&None, data.clone(), &eval_ctx).unwrap();
+        let result = eval_aggregate(&None, data.clone(), Min, &eval_ctx).unwrap();
 
         match result {
             Value::Matrix(matrix) => {

@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OTooltip
               :content="t('aiObservability.agentGraph.versionAgnosticHint')"
-              max-width="300px"
+              max-width="18.75rem"
             />
           </OIcon>
         </template>
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              localStorage keys), so the two surfaces don't share a type. Same
              control shape as the Traces SearchBar toolbar for consistency. -->
         <template #trailing>
-          <div class="ml-auto flex shrink-0 items-center gap-2">
+          <div class="ms-auto flex shrink-0 items-center gap-2">
             <OToggleGroup
               :model-value="vizType"
               type="single"
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :options="layoutOptions"
               :searchable="false"
               data-test="agent-graph-layout-type"
-              class="h-8! min-h-8! w-[7.5rem]"
+              class="h-8! min-h-8! w-30"
               :disabled="vizType === 'graph'"
               @update:model-value="onLayoutTypeChange"
             />
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { defineAsyncComponent, ref, computed, onMounted } from "vue";
 import type { AcceptableValue } from "reka-ui";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import AiPageShell from "@/enterprise/components/AIObservability/AiPageShell.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -177,11 +177,10 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import useTraces from "@/composables/useTraces";
 import { getConsumableRelativeTime } from "@/utils/date";
-import genAiAgentMappingService, {
-  type GenAiAgentListItem,
-} from "@/services/gen-ai-agent-mapping.service";
+import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
+import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { agentOptionKey } from "@/plugins/traces/llmAgentFilter";
 import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
 import { useAiDateController } from "@/enterprise/composables/useAiDateController";
@@ -190,9 +189,8 @@ import { useAgentScope } from "@/enterprise/composables/useAgentScope";
 
 defineOptions({ name: "AIAgentGraphPage" });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
-const { searchObj } = useTraces();
 
 // Shared AI-module date range — the same singleton LLM Insights / Sessions /
 // Agent Behavior use, so picking a time on any AI tab lands on all of them.
@@ -362,7 +360,7 @@ async function loadAgents() {
   try {
     const org = store.state.selectedOrganization.identifier;
     const { startTime, endTime } = effectiveWindow();
-    const res = await genAiAgentMappingService.listAgents(org, startTime, endTime);
+    const res = await queryClient.fetchQuery(genAiAgentsQuery(org, startTime, endTime));
     agents.value = res.agents ?? [];
     // Reconcile the selection against the fresh list. Reloading (e.g. after a
     // time-range change) can return a different or empty set, which would

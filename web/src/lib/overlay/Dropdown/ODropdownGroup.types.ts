@@ -2,9 +2,11 @@
  * ODropdownGroup.types.ts — public types for ODropdownGroup.
  */
 
+import type { I18nText } from "@/types/i18n";
+
 export interface DropdownGroupProps {
   /** Optional visible group label */
-  label?: string;
+  label?: I18nText;
 }
 
 export interface DropdownGroupSlots {

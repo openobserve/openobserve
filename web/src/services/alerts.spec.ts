@@ -14,8 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
-import alerts from "@/services/alerts";
+import alerts, { alertActionErrorOf } from "@/services/alerts";
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // Mock the http service
 vi.mock("@/services/http", () => ({
@@ -526,6 +529,81 @@ describe("alerts service", () => {
     });
   });
 
+  describe("composite alert contracts", () => {
+    it("validates a draft through the advisory composite endpoint", async () => {
+      const body = {
+        composite_condition: {
+          expression: "{id-a} && {id-b}",
+          warning_counts_as_firing: true,
+          stale_child_policy: "use_last_state" as const,
+        },
+        composite_id: "composite-1",
+        folder_id: "payments",
+      };
+      mockHttpInstance.post.mockResolvedValue({ data: { valid: true } });
+
+      await alerts.validateComposite("org123", body);
+
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(
+        "/api/v2/org123/alerts/composites/validate",
+        body,
+      );
+    });
+
+    it("loads references for the chip, drawer, and delete-conflict flow", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: { references: [] } });
+
+      await alerts.getCompositeReferences("org123", "child/id");
+
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(
+        "/api/v2/org123/alerts/child%2Fid/composite-references",
+      );
+    });
+
+    it("preserves the child-referenced 409 response for the caller to render", async () => {
+      const conflict = {
+        response: {
+          status: 409,
+          data: {
+            code: "child_referenced",
+            references: [{ alert_id: "parent-1", name: "Checkout degraded" }],
+            hidden_reference_count: 2,
+          },
+        },
+      };
+      mockHttpInstance.delete.mockRejectedValue(conflict);
+
+      await expect(alerts.delete_by_alert_id("org123", "child-1")).rejects.toEqual(conflict);
+    });
+  });
+
+  describe("list_by_slo", () => {
+    it("should filter to SLO alerts, not just to the slo_id", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: { list: [] } });
+
+      await alerts.list_by_slo("org123", "slo-123");
+
+      // `alert_type=slo` is load-bearing, not belt-and-braces. Absent, the
+      // param defaults to `all`, and on enterprise builds the handler then
+      // APPENDS every anomaly-detection config in the org to the response —
+      // those rows never went through the SQL `slo_id` predicate, so they come
+      // back regardless of which SLO was asked for. Callers count this list to
+      // tell a user how many alerts an SLO delete destroys.
+      const url = mockHttpInstance.get.mock.calls[0][0] as string;
+      expect(url).toContain("/api/v2/org123/alerts");
+      expect(url).toContain("slo_id=slo-123");
+      expect(url).toContain("alert_type=slo");
+    });
+
+    it("should encode the slo id", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: { list: [] } });
+
+      await alerts.list_by_slo("org123", "a b&c");
+
+      expect(mockHttpInstance.get.mock.calls[0][0]).toContain("slo_id=a%20b%26c");
+    });
+  });
+
   describe("move_to_another_folder", () => {
     it("should make PATCH request with folder_id when provided", async () => {
       const params = {
@@ -558,6 +636,96 @@ describe("alerts service", () => {
         `/api/v2/${params.org_identifier}/alerts/move`,
         params.data,
       );
+    });
+  });
+
+  describe("ack and mute", () => {
+    const BASE = "/api/v2/acme/alerts/a%2F1";
+
+    it("acks a group of the firing the caller saw", async () => {
+      mockHttpInstance.post.mockResolvedValue({ data: { changed: true, acks: [] } });
+      const body = { group_key: "k1", firing_started_at: 1_790_000_000_000_000 };
+      await alerts.ackAlert("acme", "a/1", body);
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(`${BASE}/ack`, body, {});
+    });
+
+    it("acks every firing group and takes over, with the folder for the permission check", async () => {
+      mockHttpInstance.post.mockResolvedValue({ data: { changed: true, acks: [] } });
+      await alerts.ackAlert("acme", "a/1", { all_groups: true, take_over: true }, "payments");
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(
+        `${BASE}/ack`,
+        { all_groups: true, take_over: true },
+        { params: { folder: "payments" } },
+      );
+    });
+
+    it("unacks one group", async () => {
+      mockHttpInstance.post.mockResolvedValue({ data: { changed: true } });
+      await alerts.unackAlert("acme", "a/1", { group_key: "" });
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(`${BASE}/unack`, { group_key: "" }, {});
+    });
+
+    it("lists the acks in force", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: { acks: [] } });
+      await alerts.listAlertAcks("acme", "a/1");
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`${BASE}/acks`, {});
+    });
+
+    it("mutes through the alert route", async () => {
+      mockHttpInstance.post.mockResolvedValue({ data: { downtime_id: "d1" } });
+      const body = { until_clear: true, group_keys: ["k1"] };
+      await alerts.muteAlert("acme", "a/1", body);
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(`${BASE}/mute`, body, {});
+    });
+
+    it("extends a quick mute with the version the caller saw", async () => {
+      mockHttpInstance.post.mockResolvedValue({ data: { version: 3 } });
+      await alerts.extendAlertMute("acme", "a/1", "d 1", { version: 2, minutes: 60 });
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(
+        `${BASE}/mute/d%201/extend`,
+        { version: 2, minutes: 60 },
+        {},
+      );
+    });
+
+    it("cancels a quick mute", async () => {
+      mockHttpInstance.post.mockResolvedValue({ data: {} });
+      await alerts.cancelAlertMute("acme", "a/1", "d1", "payments");
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(`${BASE}/mute/d1/cancel`, undefined, {
+        params: { folder: "payments" },
+      });
+    });
+  });
+
+  describe("alertActionErrorOf", () => {
+    const failure = (status: number, data: unknown) => ({ response: { status, data } });
+
+    it("reads a refusal with who is on call and who can act", () => {
+      const data = {
+        code: "ack_refused",
+        message: "Ack needs Admin or Editor",
+        rule: "role",
+        on_call: [{ email: "dana@acme.io", team: "Payments" }],
+        can_act: [{ email: "lee@acme.io", name: "Lee" }],
+      };
+      expect(alertActionErrorOf(failure(403, data))).toEqual(data);
+    });
+
+    it("reads the 409 codes", () => {
+      expect(alertActionErrorOf(failure(409, { code: "not_firing" }))).toEqual({
+        code: "not_firing",
+      });
+      expect(
+        alertActionErrorOf(failure(409, { code: "firing_changed", firing_started_at: 7 })),
+      ).toEqual({ code: "firing_changed", firing_started_at: 7 });
+    });
+
+    it("ignores an error that carries no known code", () => {
+      expect(alertActionErrorOf(failure(403, { message: "Unauthorized Access" }))).toBeNull();
+      expect(alertActionErrorOf(failure(409, { code: "something_else" }))).toBeNull();
+      expect(alertActionErrorOf(failure(500, { code: "not_firing" }))).toBeNull();
+      expect(alertActionErrorOf(new Error("network"))).toBeNull();
+      expect(alertActionErrorOf(undefined)).toBeNull();
     });
   });
 
@@ -595,5 +763,160 @@ describe("alerts service", () => {
 
       await expect(alerts.delete("org123", "logs", "test", "logs")).rejects.toThrow("Forbidden");
     });
+  });
+
+  describe("product analytics", () => {
+    it("tracks alert_created once the request resolves and returns the response", async () => {
+      const response = { data: { code: 200 } };
+      mockHttpInstance.post.mockResolvedValue(response);
+
+      await expect(alerts.create("org123", "logs", "logs", { name: "a" })).resolves.toBe(response);
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("alert_created");
+    });
+
+    it("does not track alert_created when the request rejects", async () => {
+      mockHttpInstance.post.mockRejectedValue(new Error("boom"));
+
+      await expect(alerts.create("org123", "logs", "logs", { name: "a" })).rejects.toThrow("boom");
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it("tracks alert_created from create_by_alert_id once the request resolves and returns the response", async () => {
+      const response = { data: { code: 200 } };
+      mockHttpInstance.post.mockResolvedValue(response);
+
+      await expect(alerts.create_by_alert_id("org123", { name: "a" }, "f1")).resolves.toBe(
+        response,
+      );
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("alert_created");
+    });
+
+    it("does not track alert_created from create_by_alert_id when the request rejects", async () => {
+      mockHttpInstance.post.mockRejectedValue(new Error("boom"));
+
+      await expect(alerts.create_by_alert_id("org123", { name: "a" }, "f1")).rejects.toThrow(
+        "boom",
+      );
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it("tracks alert_created from clone_by_id once the request resolves and returns the response", async () => {
+      const response = { data: { code: 200 } };
+      mockHttpInstance.post.mockResolvedValue(response);
+
+      await expect(alerts.clone_by_id("org123", "a1", { name: "copy" }, "f1")).resolves.toBe(
+        response,
+      );
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("alert_created");
+    });
+
+    it("does not track alert_created from clone_by_id when the request rejects", async () => {
+      mockHttpInstance.post.mockRejectedValue(new Error("boom"));
+
+      await expect(alerts.clone_by_id("org123", "a1", { name: "copy" }, "f1")).rejects.toThrow(
+        "boom",
+      );
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("product analytics: alert lifecycle", () => {
+    const cases: Array<[string, string, () => Promise<unknown>, unknown[]]> = [
+      [
+        "update_by_alert_id",
+        "put",
+        () => alerts.update_by_alert_id("org1", { id: "a1" }),
+        ["alert_updated"],
+      ],
+      [
+        "update_by_alert_id composite",
+        "put",
+        () => alerts.update_by_alert_id("org1", { id: "a1", alert_type: "composite" }),
+        ["alert_updated"],
+      ],
+      [
+        "delete_by_alert_id",
+        "delete",
+        () => alerts.delete_by_alert_id("org1", "a1"),
+        ["alert_deleted", { count: 1 }],
+      ],
+      [
+        "bulkDelete",
+        "delete",
+        () => alerts.bulkDelete("org1", { ids: ["a", "b"] }),
+        ["alert_deleted", { count: 2 }],
+      ],
+      [
+        "toggle_state_by_alert_id enable",
+        "patch",
+        () => alerts.toggle_state_by_alert_id("org1", "a1", true),
+        ["alert_enabled", { count: 1 }],
+      ],
+      [
+        "toggle_state_by_alert_id disable",
+        "patch",
+        () => alerts.toggle_state_by_alert_id("org1", "a1", false),
+        ["alert_disabled", { count: 1 }],
+      ],
+      [
+        "bulkToggleState",
+        "post",
+        () => alerts.bulkToggleState("org1", false, { ids: ["a", "b"] }),
+        ["alert_disabled", { count: 2 }],
+      ],
+      [
+        "trigger_alert",
+        "patch",
+        () => alerts.trigger_alert("org1", "a1"),
+        ["alert_manually_triggered"],
+      ],
+      [
+        "retrain_by_id",
+        "patch",
+        () => alerts.retrain_by_id("org1", "a1"),
+        ["anomaly_detection_training_started"],
+      ],
+    ];
+
+    it.each(cases)("%s tracks once the request resolves", async (_label, verb, call, args) => {
+      const response = { data: { successful: ["a", "b"], unsuccessful: [], success: true } };
+      mockHttpInstance[verb].mockResolvedValue(response);
+
+      await expect(call()).resolves.toBe(response);
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith(...args);
+    });
+
+    it.each(cases)("%s does not track when the request rejects", async (_label, verb, call) => {
+      mockHttpInstance[verb].mockRejectedValue(new Error("boom"));
+
+      await expect(call()).rejects.toThrow("boom");
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["bulkDelete", "delete", () => alerts.bulkDelete("org1", { ids: ["a"] })],
+      ["bulkToggleState", "post", () => alerts.bulkToggleState("org1", true, { ids: ["a"] })],
+    ] as Array<[string, string, () => Promise<unknown>]>)(
+      "%s does not track when nothing was affected",
+      async (_label, verb, call) => {
+        mockHttpInstance[verb].mockResolvedValue({ data: { successful: [], unsuccessful: ["a"] } });
+
+        await call();
+
+        expect(analytics.track).not.toHaveBeenCalled();
+      },
+    );
   });
 });

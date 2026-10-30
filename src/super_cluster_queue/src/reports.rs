@@ -15,17 +15,13 @@
 
 use std::str::FromStr;
 
-use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
-    errors::Result,
-    table,
-};
+use infra::{db::get_orm_client_rw, errors::Result, table};
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType, ReportMessage};
 use svix_ksuid::Ksuid;
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
     match msg.message_type {
-        MessageType::ReportsTable => {
+        MessageType::ReportsTable | MessageType::ReportsLastRun => {
             let msg = msg.try_into()?;
             process_msg(msg).await?;
         }
@@ -41,7 +37,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
 }
 
 pub(crate) async fn process_msg(msg: ReportMessage) -> Result<()> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_rw().await;
     match msg {
         ReportMessage::Create {
             org_id,
@@ -92,6 +88,18 @@ pub(crate) async fn process_msg(msg: ReportMessage) -> Result<()> {
                     .await
                     .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
             }
+        }
+        ReportMessage::LastRun {
+            org_id,
+            report_id,
+            at,
+            status,
+            error,
+        } => {
+            // The table op, not the core recorder, so the apply is not published again.
+            table::reports::set_last_run(&org_id, &report_id, at, &status, error.as_deref())
+                .await
+                .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
         }
         ReportMessage::Reset => {
             table::reports::delete_all(conn)

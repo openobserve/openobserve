@@ -1,7 +1,7 @@
 <template>
   <div v-if="visible" class="confirmation-overlay mb-2 w-full">
     <div
-      class="confirmation-dialog rounded-default bg-surface-base border-border-default flex w-full flex-col gap-3.5 border-2 px-4 pt-4 pb-3.5 shadow-[0_2px_8px_rgba(0,0,0,0.1)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
+      class="confirmation-dialog rounded-default bg-surface-base border-border-default flex w-full flex-col gap-3.5 border-2 px-4 pt-4 pb-3.5 shadow-sm dark:shadow-sm"
       @keydown="handleDialogKeydown"
       @click="handleDialogClick"
     >
@@ -11,7 +11,21 @@
           size="md"
           class="confirmation-icon text-icon-color mt-0.5 shrink-0"
         />
+        <i18n-t
+          v-if="deleteTarget?.name"
+          keypath="aiAssistant.aiChat.confirmDeleteNamedEntity"
+          tag="span"
+          class="confirmation-title text-text-heading flex-1 text-sm leading-normal font-medium"
+        >
+          <template #name>
+            <span data-test="o2-ai-confirm-dialog-name" class="font-semibold break-all">{{
+              deleteTarget.name
+            }}</span>
+          </template>
+          <template #entity>{{ deleteTarget.entity }}</template>
+        </i18n-t>
         <span
+          v-else
           class="confirmation-title text-text-heading flex-1 text-sm leading-normal font-medium"
           >{{ formattedMessage }}</span
         >
@@ -36,7 +50,7 @@
             @click="handleConfirm"
             @focus="handleYesFocus"
             @blur="handleYesBlur"
-            >Allow</OButton
+            >{{ t("aiAssistant.confirmDialog.allow") }}</OButton
           >
           <OButton
             ref="alwaysButtonRef"
@@ -52,7 +66,7 @@
             @click="handleAlwaysConfirm"
             @focus="handleAlwaysFocus"
             @blur="handleAlwaysBlur"
-            >Always Allow</OButton
+            >{{ t("aiAssistant.confirmDialog.alwaysAllow") }}</OButton
           >
           <OButton
             ref="noButtonRef"
@@ -68,13 +82,28 @@
             @click="handleCancel"
             @focus="handleNoFocus"
             @blur="handleNoBlur"
-            >No</OButton
+            >{{ t("aiAssistant.confirmDialog.no") }}</OButton
           >
         </template>
 
         <!-- For other actions, show 2 buttons -->
         <template v-else>
           <OButton
+            v-if="isDeleteAction"
+            ref="yesButtonRef"
+            variant="destructive"
+            :block="true"
+            data-test="o2-ai-confirm-dialog-confirm"
+            class="confirmation-btn rounded-default w-full text-sm font-semibold tracking-normal normal-case"
+            :class="isFocusedYes ? 'ring-status-negative/40 ring-3' : ''"
+            tabindex="0"
+            @click="handleConfirm"
+            @focus="handleYesFocus"
+            @blur="handleYesBlur"
+            >{{ resolvedConfirmLabel }}</OButton
+          >
+          <OButton
+            v-else
             ref="yesButtonRef"
             variant="outline"
             :block="true"
@@ -88,7 +117,7 @@
             @click="handleConfirm"
             @focus="handleYesFocus"
             @blur="handleYesBlur"
-            >{{ confirmLabel }}</OButton
+            >{{ resolvedConfirmLabel }}</OButton
           >
           <OButton
             ref="noButtonRef"
@@ -104,7 +133,7 @@
             @click="handleCancel"
             @focus="handleNoFocus"
             @blur="handleNoBlur"
-            >{{ cancelLabel }}</OButton
+            >{{ resolvedCancelLabel }}</OButton
           >
         </template>
       </div>
@@ -114,27 +143,46 @@
 
 <script setup lang="ts">
 import { ref, watch, nextTick, computed, onMounted, onUnmounted } from "vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 interface ConfirmationData {
   tool?: string;
   args?: Record<string, any>;
-  message?: string;
+  message?: I18nText;
 }
 
 interface Props {
   visible: boolean;
   confirmation: ConfirmationData | null;
-  confirmLabel?: string;
-  cancelLabel?: string;
+  confirmLabel?: I18nText;
+  cancelLabel?: I18nText;
 }
 
+const { t } = useI18nTyped();
+
+/** Keep in sync with `aiAssistant.aiChat.entity.*`; anything absent renders raw English. */
+const DELETABLE_ENTITIES = new Set([
+  "alert",
+  "dashboard",
+  "pipeline",
+  "report",
+  "function",
+  "stream",
+  "folder",
+  "panel",
+  "user",
+  "action",
+]);
+
 const props = withDefaults(defineProps<Props>(), {
-  confirmLabel: "Yes",
-  cancelLabel: "No",
   confirmation: null,
 });
+
+// Render-time defaults — a withDefaults literal would freeze the English text.
+const resolvedConfirmLabel = computed(() => props.confirmLabel ?? t("common.yes"));
+const resolvedCancelLabel = computed(() => props.cancelLabel ?? t("common.no"));
 
 const emit = defineEmits<{
   confirm: [];
@@ -145,6 +193,31 @@ const emit = defineEmits<{
 // Check if this is a navigation action
 const isNavigationAction = computed(() => props.confirmation?.tool === "navigation_action");
 
+const isDeleteAction = computed(() => !!props.confirmation?.tool?.startsWith("Delete"));
+
+/** Ids only as a last resort: a raw id names nothing the user recognises. */
+const ID_ARGS = ["alert_id", "dashboard_id", "pipeline_id", "id"];
+
+function readableName(args: Record<string, any>): string {
+  const named = ["name", "title", ...Object.keys(args).filter((k) => k.endsWith("_name"))];
+  for (const key of [...named, ...ID_ARGS]) {
+    const value = args[key];
+    if (typeof value === "string" && value) return value;
+    if (typeof value === "number") return String(value);
+  }
+  return "";
+}
+
+const deleteTarget = computed(() => {
+  if (!isDeleteAction.value || !props.confirmation?.tool) return null;
+  // Gated on a list, not te(): te() ignores the fallback locale, so it misses for non-English users.
+  const lowerEntity = props.confirmation.tool.replace("Delete", "").toLowerCase();
+  const entity = DELETABLE_ENTITIES.has(lowerEntity)
+    ? t(`aiAssistant.aiChat.entity.${lowerEntity}`)
+    : raw(lowerEntity);
+  return { name: readableName(props.confirmation.args || {}), entity };
+});
+
 // Format message based on confirmation data
 const formattedMessage = computed(() => {
   if (!props.confirmation) return "";
@@ -154,35 +227,20 @@ const formattedMessage = computed(() => {
     // Use the label/message from the navigation action
     const message = props.confirmation.message;
     if (message) {
-      return `Allow O2 Assistant to ${message}?`;
+      return t("aiAssistant.aiChat.allowAssistantTo", { action: message });
     }
 
     // Fallback: format based on target
     const target = props.confirmation.args;
     if (target?.name) {
-      return `Allow O2 Assistant to navigate to ${target.name}?`;
+      return t("aiAssistant.aiChat.allowAssistantNavigateTo", { name: target.name });
     }
 
-    return "Allow O2 Assistant to navigate?";
+    return t("aiAssistant.aiChat.navigateConfirmQuestion");
   }
 
-  // Handle Delete* operations generically (DeleteAlert, DeleteDashboard, DeletePipeline, etc.)
-  if (props.confirmation.tool && props.confirmation.tool.startsWith("Delete")) {
-    // Extract entity type (e.g., "Alert" from "DeleteAlert")
-    const entityType = props.confirmation.tool.replace("Delete", "");
-    const entityTypeLower = entityType.toLowerCase();
-    const args = props.confirmation.args || {};
-
-    // Try to find a name or title for the entity
-    const name =
-      args.name || args.title || args.alert_id || args.dashboard_id || args.pipeline_id || args.id;
-
-    if (name) {
-      return `Do you really want to delete the "${name}" ${entityTypeLower}?`;
-    }
-
-    // Fallback if no identifier found
-    return `Do you really want to delete this ${entityTypeLower}?`;
+  if (deleteTarget.value) {
+    return t("aiAssistant.aiChat.confirmDeleteEntity", { entity: deleteTarget.value.entity });
   }
 
   // Fallback to message property

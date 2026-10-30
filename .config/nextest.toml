@@ -1,0 +1,8 @@
+experimental = ["wrapper-scripts"]
+
+[scripts.wrapper.slot-isolation]
+command = { command-line = ".config/slot-isolation.sh", relative-to = "workspace-root" }
+
+[[profile.default.scripts]]
+filter = "all()"
+run-wrapper = "slot-isolation"

@@ -1,5 +1,6 @@
 <template>
   <OPageLayout
+    overflow-first
     data-test="gen-ai-agent-mapping-settings"
     :subtitle="t('settings.genAiAgentMapping.description')"
     icon="smart-toy"
@@ -12,7 +13,7 @@
     </template>
     <!-- Content helpers (populate / clear the fields) live in the header,
            separate from the primary Save action at the bottom. -->
-    <template #actions>
+    <template #actions-overflow>
       <OButton
         data-test="gen-ai-agent-mapping-apply-defaults-btn"
         variant="outline"
@@ -30,6 +31,8 @@
       >
         {{ t("settings.genAiAgentMapping.resetToEmpty") }}
       </OButton>
+    </template>
+    <template #actions>
       <OButton
         data-test="gen-ai-agent-registry-clear-btn"
         variant="outline-destructive"
@@ -55,7 +58,7 @@
               v-model="agentNameText"
               :label="t('settings.genAiAgentMapping.agentNameFields')"
               :help-text="t('settings.genAiAgentMapping.agentNameHelp')"
-              :placeholder="t('settings.genAiAgentMapping.agentNamePlaceholder')"
+              :placeholder="raw('my.custom.agent_name\nteam.agent.label')"
               :rows="8"
               spellcheck="false"
               data-test="gen-ai-agent-name-fields-input"
@@ -74,7 +77,7 @@
               v-model="agentIdText"
               :label="t('settings.genAiAgentMapping.agentIdFields')"
               :help-text="t('settings.genAiAgentMapping.agentIdHelp')"
-              :placeholder="t('settings.genAiAgentMapping.agentIdPlaceholder')"
+              :placeholder="raw('my.custom.agent_id\nteam.agent.uid')"
               :rows="8"
               spellcheck="false"
               data-test="gen-ai-agent-id-fields-input"
@@ -93,7 +96,7 @@
               v-model="envFieldsText"
               :label="t('settings.genAiAgentMapping.envFields')"
               :help-text="t('settings.genAiAgentMapping.envHelp')"
-              :placeholder="t('settings.genAiAgentMapping.envPlaceholder')"
+              :placeholder="raw('my.custom.env\ntier')"
               :rows="8"
               spellcheck="false"
               data-test="gen-ai-env-fields-input"
@@ -109,7 +112,7 @@
               v-model="versionFieldsText"
               :label="t('settings.genAiAgentMapping.versionFields')"
               :help-text="t('settings.genAiAgentMapping.versionHelp')"
-              :placeholder="t('settings.genAiAgentMapping.versionPlaceholder')"
+              :placeholder="raw('my.custom.version\nrelease.tag')"
               :rows="8"
               spellcheck="false"
               data-test="gen-ai-version-fields-input"
@@ -164,7 +167,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeMount, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -178,8 +181,13 @@ import genAiAgentMappingService, {
   fetchDefaultGenAiAgentMapping,
   type GenAiAgentMappingConfig,
 } from "@/services/gen-ai-agent-mapping.service";
+import {
+  clearGenAiAgentRegistryMutation,
+  saveGenAiAgentMappingMutation,
+} from "@/services/gen-ai-agent-mapping.queries";
+import { useMutation } from "@tanstack/vue-query";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 // The standard-tier attribute the resolver ALWAYS checks first for each
@@ -206,6 +214,10 @@ const envFieldsText = ref("");
 const versionFieldsText = ref("");
 
 const orgId = computed(() => store.state.selectedOrganization?.identifier);
+
+// Both writes drop the agent scope; the mutations declare it beside the endpoint.
+const saveMapping = useMutation(() => saveGenAiAgentMappingMutation(orgId.value));
+const clearRegistry = useMutation(() => clearGenAiAgentRegistryMutation(orgId.value));
 
 const fieldsToText = (fields: string[]) => fields.join("\n");
 const textToFields = (text: string) =>
@@ -296,7 +308,7 @@ const clearAgentRegistry = async () => {
 
   clearingRegistry.value = true;
   try {
-    const result = await genAiAgentMappingService.clearRegistry(orgId.value);
+    const result = await clearRegistry.mutateAsync();
     clearRegistryDialogOpen.value = false;
     toast({
       variant: "success",
@@ -324,7 +336,7 @@ const saveConfig = async () => {
 
   saving.value = true;
   try {
-    const saved = await genAiAgentMappingService.save(orgId.value, draftConfig());
+    const saved = await saveMapping.mutateAsync(draftConfig());
     setDraft(saved);
     toast({
       variant: "success",

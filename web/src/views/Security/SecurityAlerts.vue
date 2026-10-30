@@ -8,7 +8,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
      it, and hands off to the evidence (Events) and the rule (Detections). -->
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -72,7 +72,7 @@ import { bestMatch } from "@/utils/security/classify";
 import { normalizeEvents } from "@/utils/security/normalize";
 import { b64EncodeUnicode, formatEventCount } from "@/utils/formatters";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
@@ -923,7 +923,7 @@ onUnmounted(() => {
       <!-- Firings by severity (facets) and when they happened -->
       <div class="border-border-default px-page-edge flex shrink-0 flex-col gap-2 border-b py-3">
         <OStatStrip
-          compact
+          compact-values
           :items="stats"
           :loading="statsLoading"
           selectable
@@ -1170,7 +1170,7 @@ onUnmounted(() => {
           <h3 class="text-text-secondary text-xs font-semibold tracking-wide uppercase">
             {{ t("siem.alerts.falsePositives") }}
           </h3>
-          <ul class="text-text-heading flex list-disc flex-col gap-1 pl-5 text-sm">
+          <ul class="text-text-heading flex list-disc flex-col gap-1 ps-5 text-sm">
             <li v-for="fp in sigma.falsepositives" :key="fp">{{ fp }}</li>
           </ul>
         </section>

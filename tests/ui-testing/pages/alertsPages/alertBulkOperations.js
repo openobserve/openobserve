@@ -132,116 +132,83 @@ export class AlertBulkOperations {
     /**
      * Move all alerts in current folder to another folder
      * @param {string} targetFolderName - Target folder name
+     * @param {object} [options]
+     * @param {string} [options.expectAlertName] - Name of an alert expected in the SOURCE folder.
+     *   When provided, we wait for THAT row to render before selecting — this proves the source
+     *   folder's own data has loaded (see race note below) and that we are not looking at a stale
+     *   table left over from the previous folder.
      */
-    async moveAllAlertsToFolder(targetFolderName) {
-        // Select all alerts using the header checkbox
+    async moveAllAlertsToFolder(targetFolderName, options = {}) {
+        const { expectAlertName } = options;
         const headerCheckbox = this.page.locator(this.locators.headerCheckbox).first();
-        await headerCheckbox.waitFor({ state: 'visible', timeout: 10000 });
-        await headerCheckbox.click();
-        testLogger.info('Clicked select all checkbox');
-
-        // Verify pagination text is visible with fallback — the text may be delayed
-        // when checking the current folder before the move operation completes.
-        // Use a soft check with retry: wait up to 5 s for the pagination summary,
-        // but don't block forever if the UI renders it slightly later.
-        try {
-            await expect(this.page.getByText(/Showing \d+ - \d+ of/)).toBeVisible({ timeout: 5000 });
-        } catch (e) {
-            testLogger.warn('Pagination text not immediately visible, continuing — header checkbox was checked');
-        }
-
-        // Wait for Vue reactivity to propagate the selection
-        await this.page.waitForTimeout(500);
-
-        // Click move across folders button with retry — header checkbox may not
-        // always propagate `selectedAlerts` on first attempt due to Vue reactivity timing.
         const moveBtn = this.page.locator(this.locators.moveAcrossFoldersButton);
-        for (let attempt = 1; attempt <= 3; attempt++) {
-            if (await moveBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-                break;
-            }
-            testLogger.warn('Move button not visible after header checkbox, re-clicking select-all', { attempt });
-            const headerCheckbox = this.page.locator(this.locators.headerCheckbox).first();
-            if (!(await headerCheckbox.isChecked())) {
-                await headerCheckbox.click({ force: true });
-            }
-            await this.page.waitForTimeout(1000);
-        }
-        await moveBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await headerCheckbox.waitFor({ state: 'visible', timeout: 10000 });
 
-        // Dismiss any visible toasts before clicking the move button.
-        // Toasts (e.g. "Please select stream type" error from clone validation, or "Folder
-        // added successfully" from ensureFolderExists) render in the Notifications region and
-        // intercept pointer events at the button's position. Error toasts linger 30s by default
-        // (and their timers are paused in headless mode). Loop until all are gone.
+        // ROOT CAUSE (alerts-e2e-flow:160 "Move drawer failed to open"):
+        // AlertList.vue's getAlertsFn() runs `selectedAlerts.value = []` at the START of every
+        // folder fetch. Switching to a freshly-created (uncached) folder kicks off that async
+        // fetch, but navigateToFolder returns as soon as the tab is active + a table is on screen
+        // — so clicking select-all can fire BEFORE the fetch resolves, and when it resolves it
+        // WIPES the selection. The move-across-folders button is `v-if="selectedAlerts.length > 0"`
+        // so it vanishes ("Move button disappeared before click attempt"). A CACHED folder serves
+        // synchronously with no wipe — which is exactly why this historically failed attempt 1 and
+        // passed attempt 2 (retry warmed the cache), and became permanent under parallel load
+        // (slow listByFolderId => the wipe always lands after select-all). networkidle does not
+        // catch it because streaming/websocket keeps connections open.
+        // Fix: wait until the source folder's OWN data has settled (loading gone + the expected row
+        // rendered) so the wipe has already happened, THEN select and confirm the selection sticks.
+
+        // 1) Let the folder's load finish (getAlertsFn resolved) — best-effort, non-blocking.
+        await this.page.locator('[data-test="alert-list-loading-alert"]')
+            .waitFor({ state: 'hidden', timeout: 20000 }).catch(() => {});
+
+        // 2) Wait for the source folder's own rows to render. Prefer the specific expected alert
+        //    (proves right folder + settled data); fall back to any row when no name is given.
+        if (expectAlertName) {
+            await this.page.locator('[data-test^="o2-table-row-"]')
+                .filter({ hasText: expectAlertName }).first()
+                .waitFor({ state: 'visible', timeout: 20000 });
+        } else {
+            await this.page.locator('[data-test^="o2-table-row-"]').first()
+                .waitFor({ state: 'visible', timeout: 20000 });
+        }
+
         const toastDismissBtn = this.page.locator('button[aria-label="Dismiss notification"]');
-        let toastCount = await toastDismissBtn.count().catch(() => 0);
-        if (toastCount > 0) {
-            testLogger.warn('Dismissing visible toast(s) before move operation', { count: toastCount });
-            while (toastCount > 0) {
-                await toastDismissBtn.first().click({ force: true }).catch(() => {});
-                await this.page.waitForTimeout(150);
-                toastCount = await toastDismissBtn.count().catch(() => 0);
-            }
-            await this.page.waitForTimeout(500);
-        }
-
         const moveDrawer = this.page.locator('[data-test="dashboard-move-to-another-folder-dialog"]');
         const scopedFolderDropdown = moveDrawer.locator(this.locators.folderDropdown);
 
-        // Retry opening the drawer and wait for an interactive child control.
-        // Uses force:true on all attempts to bypass any residual toast overlay.
-        // Re-selects alerts before each attempt because Vue may clear selectedAlerts
-        // during the previous attempt's timeout period (v-if hides the button when empty).
-        let drawerReady = false;
-        let lastOpenError;
-
-        for (let attempt = 1; attempt <= 3; attempt++) {
-            try {
-                // Ensure move button is still visible — selectedAlerts may have been cleared.
-                const isMoveVisible = await moveBtn.isVisible({ timeout: 2000 }).catch(() => false);
-                if (!isMoveVisible) {
-                    testLogger.warn('Move button disappeared before click attempt — re-selecting alerts', { attempt });
-                    const hdrChk = this.page.locator(this.locators.headerCheckbox).first();
-                    await hdrChk.waitFor({ state: 'visible', timeout: 5000 });
-                    if (!(await hdrChk.isChecked().catch(() => false))) {
-                        await hdrChk.click({ force: true });
-                    }
-                    await moveBtn.waitFor({ state: 'visible', timeout: 10000 });
-                }
-
-                await moveBtn.click({ force: true, timeout: 5000 });
-
-                await moveDrawer.waitFor({ state: 'visible', timeout: 7000 });
-                await scopedFolderDropdown.waitFor({ state: 'visible', timeout: 7000 });
-                drawerReady = true;
-                break;
-            } catch (e) {
-                lastOpenError = e;
-                testLogger.warn('Move drawer did not become ready, retrying move action', {
-                    attempt,
-                    error: e.message,
-                });
-                // Only press Escape if the drawer actually opened — pressing it when
-                // the drawer is not visible would disrupt other UI state.
-                const isDrawerOpen = await moveDrawer.isVisible({ timeout: 300 }).catch(() => false);
-                if (isDrawerOpen) {
-                    await this.page.keyboard.press('Escape').catch(() => {});
-                }
-                // Dismiss any toasts that may have appeared during this attempt.
-                let dc = await toastDismissBtn.count().catch(() => 0);
-                while (dc > 0) {
-                    await toastDismissBtn.first().click({ force: true }).catch(() => {});
-                    await this.page.waitForTimeout(150);
-                    dc = await toastDismissBtn.count().catch(() => 0);
-                }
-                await this.page.waitForTimeout(800);
+        // 3) ATOMIC open: (re)select-all → click move → confirm the drawer opened — as ONE retried
+        //    block. A late getAlertsFn resolve can still wipe selectedAlerts AFTER select-all
+        //    (hiding the move button, which is v-if="selectedAlerts.length > 0"), so a fixed
+        //    stability window is not enough. Instead we retry the WHOLE open until the drawer is
+        //    up: the drawer is driven by its own `showMoveAlertDialog` ref and captures the
+        //    selection at click time, so once it opens a later wipe cannot close it. Each
+        //    iteration re-selects if the button vanished, so the operation only needs ONE click
+        //    to land while the selection is valid — which it eventually does once the folder is
+        //    cached and no further fetch fires. Also dismisses toasts that intercept the click.
+        await expect(async () => {
+            // Already open (from a prior iteration whose success check hadn't settled)? Done.
+            if (await moveDrawer.isVisible().catch(() => false)
+                && await scopedFolderDropdown.isVisible().catch(() => false)) {
+                return;
             }
-        }
-
-        if (!drawerReady) {
-            throw new Error(`Move drawer failed to open after retries: ${lastOpenError?.message || 'unknown error'}`);
-        }
+            // Toasts (folder-added, clone-validation errors) render over the button and eat clicks.
+            let dc = await toastDismissBtn.count().catch(() => 0);
+            while (dc > 0) {
+                await toastDismissBtn.first().click({ force: true }).catch(() => {});
+                await this.page.waitForTimeout(150);
+                dc = await toastDismissBtn.count().catch(() => 0);
+            }
+            // Ensure the selection is present (re-tick if a fetch wiped it).
+            if (!(await headerCheckbox.isChecked().catch(() => false))) {
+                await headerCheckbox.click({ force: true });
+            }
+            await expect(moveBtn).toBeVisible({ timeout: 3000 });
+            await moveBtn.click({ force: true, timeout: 5000 });
+            await expect(moveDrawer).toBeVisible({ timeout: 5000 });
+            await expect(scopedFolderDropdown).toBeVisible({ timeout: 5000 });
+        }).toPass({ timeout: 60000 });
+        testLogger.info('Move drawer opened with a valid selection');
 
         await scopedFolderDropdown.click();
         await this.page.waitForTimeout(2000);

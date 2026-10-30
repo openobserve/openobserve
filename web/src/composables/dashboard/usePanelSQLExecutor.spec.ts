@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { ref } from "vue";
 import { usePanelSQLExecutor } from "./usePanelSQLExecutor";
+import { usePanelSearchHandlers } from "./usePanelSearchHandlers";
 
 // ─── module mocks ─────────────────────────────────────────────────────────────
 
@@ -86,6 +87,7 @@ const makeCtx = (overrides: Partial<any> = {}) => {
   const handleSearchClose = vi.fn();
   const handleSearchError = vi.fn();
   const handleSearchReset = vi.fn();
+  const clearHitsBuffer = vi.fn();
   const processApiError = vi.fn();
   const saveCurrentStateToCache = vi.fn(async () => {});
   const addTraceId = vi.fn();
@@ -117,6 +119,7 @@ const makeCtx = (overrides: Partial<any> = {}) => {
     handleSearchClose,
     handleSearchError,
     handleSearchReset,
+    clearHitsBuffer,
     processApiError,
     saveCurrentStateToCache,
     addTraceId,
@@ -187,13 +190,80 @@ describe("usePanelSQLExecutor", () => {
       expect(addTraceId).toHaveBeenCalled();
     });
 
-    it("single query uses standard handleSearchResponse handler", async () => {
+    it("single query forwards stream events to the standard handlers", async () => {
       const { ctx, fetchQueryDataWithHttpStream, handleSearchResponse } = makeCtx();
       const { executeSQL } = usePanelSQLExecutor(ctx);
       await executeSQL(0, 300_000_000, null);
 
       const [, handlers] = fetchQueryDataWithHttpStream.mock.calls[0];
-      expect(handlers.data).toBe(handleSearchResponse);
+      const payload = { traceId: "mock-trace-sql" };
+      const response = { type: "end" };
+      handlers.data(payload, response);
+      expect(handleSearchResponse).toHaveBeenCalledWith(payload, response);
+    });
+
+    it("ignores events from a previous run's stream once a new run has started", async () => {
+      const {
+        ctx,
+        fetchQueryDataWithHttpStream,
+        handleSearchResponse,
+        handleSearchClose,
+        handleSearchError,
+        handleSearchReset,
+        removeTraceId,
+      } = makeCtx();
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+      await executeSQL(0, 300_000_000, null);
+
+      const [[stalePayload, stale], [, current]] = fetchQueryDataWithHttpStream.mock.calls;
+      stale.data(stalePayload, { type: "search_response_hits" });
+      stale.error(stalePayload, { content: { message: "x" } });
+      stale.reset(stalePayload, {});
+      stale.complete(stalePayload, { type: "end" });
+      expect(handleSearchResponse).not.toHaveBeenCalled();
+      expect(handleSearchError).not.toHaveBeenCalled();
+      expect(handleSearchReset).not.toHaveBeenCalled();
+      expect(handleSearchClose).not.toHaveBeenCalled();
+      expect(removeTraceId).toHaveBeenCalledWith(stalePayload.traceId);
+
+      current.data(stalePayload, { type: "search_response_hits" });
+      expect(handleSearchResponse).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not duplicate categories when a re-run overlaps the previous run's stream", async () => {
+      const { ctx, state, fetchQueryDataWithHttpStream } = makeCtx();
+      const handlers = usePanelSearchHandlers({
+        state,
+        processApiError: vi.fn(),
+        saveCurrentStateToCache: vi.fn(),
+        loadData: vi.fn(),
+        removeTraceId: vi.fn(),
+      });
+      Object.assign(ctx, {
+        handleSearchResponse: handlers.handleSearchResponse,
+        handleSearchClose: handlers.handleSearchClose,
+        handleSearchError: handlers.handleSearchError,
+        handleSearchReset: handlers.handleSearchReset,
+      });
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+      await executeSQL(0, 300_000_000, null);
+
+      const hits = [{ value: "OK" }, { value: "ERROR" }];
+      for (const [payload, streamHandlers] of fetchQueryDataWithHttpStream.mock.calls) {
+        streamHandlers.data(payload, {
+          type: "search_response_metadata",
+          content: { results: { streaming_aggs: false } },
+        });
+        streamHandlers.data(payload, {
+          type: "search_response_hits",
+          content: { results: { hits } },
+        });
+        streamHandlers.data(payload, { type: "end" });
+      }
+
+      expect(state.data[0].map((h: any) => h.value)).toEqual(["OK", "ERROR"]);
     });
 
     it("includes panel metadata in payload.meta", async () => {
@@ -371,6 +441,32 @@ describe("usePanelSQLExecutor", () => {
       expect(payload.queryReq.query.sql).toHaveLength(2);
     });
 
+    it("shows the time-shift stream's progress and clears partial data on completion", async () => {
+      const panelSchema = makePanelSchema([
+        {
+          query: "SELECT * FROM logs",
+          vrlFunctionQuery: "",
+          fields: { stream: "logs", stream_type: "logs", x: [{ alias: "ts" }] },
+          config: { time_shift: [{ offSet: "1d" }] },
+        },
+      ]);
+
+      const { ctx, state, fetchQueryDataWithHttpStream } = makeCtx({ panelSchema });
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      const [[payload, stream]] = fetchQueryDataWithHttpStream.mock.calls;
+      stream.data(payload, { type: "event_progress", content: { percent: 60 } });
+
+      expect(state.loadingProgressPercentage).toBe(60);
+      expect(state.isPartialData).toBe(true);
+
+      await stream.complete(payload, {});
+
+      expect(state.loading).toBe(false);
+      expect(state.isPartialData).toBe(false);
+    });
+
     it("propagates errors from applyDynamicVariables", async () => {
       const { ctx } = makeCtx();
       ctx.applyDynamicVariables = vi.fn(async () => {
@@ -412,6 +508,38 @@ describe("usePanelSQLExecutor", () => {
       expect(payload.queryReq.query.sql[0].sql).toBe("SELECT * FROM logs");
       expect(payload.queryReq.query.sql[1].sql).toBe("SELECT * FROM metrics");
       expect(payload.queryReq.query.per_query_response).toBe(true);
+    });
+
+    it("shows the multi-query stream's averaged progress on the panel", async () => {
+      const panelSchema = makePanelSchema([
+        {
+          query: "SELECT * FROM logs",
+          vrlFunctionQuery: "",
+          fields: { stream: "logs", stream_type: "logs", x: [{ alias: "ts" }] },
+          config: { time_shift: [] },
+        },
+        {
+          query: "SELECT * FROM metrics",
+          vrlFunctionQuery: "",
+          fields: { stream: "metrics", stream_type: "logs", x: [{ alias: "ts" }] },
+          config: { time_shift: [] },
+        },
+      ]);
+
+      const { ctx, state, fetchQueryDataWithHttpStream } = makeCtx({ panelSchema });
+      const { executeMultiSQL } = usePanelSQLExecutor(ctx);
+      await executeMultiSQL(0, 300_000_000, null, "logs");
+
+      const [[payload, stream]] = fetchQueryDataWithHttpStream.mock.calls;
+      stream.data(payload, { type: "event_progress", content: { percent: 35 } });
+
+      expect(state.loadingProgressPercentage).toBe(35);
+      expect(state.isPartialData).toBe(true);
+
+      await stream.complete(payload, {});
+
+      expect(state.loading).toBe(false);
+      expect(state.isPartialData).toBe(false);
     });
 
     it("initializes state arrays for all queries before fetch", async () => {
@@ -531,6 +659,180 @@ describe("usePanelSQLExecutor", () => {
       expect(state.metadata.queries[0].panelQueryIndex).toBe(0);
       expect(state.metadata.queries[1].panelQueryIndex).toBe(0);
       expect(state.metadata.queries[2].panelQueryIndex).toBe(0);
+    });
+  });
+
+  describe("superseded runs on the time-shift and multi-query paths", () => {
+    const query = (sql: string, time_shift: any[] = []) => ({
+      query: sql,
+      vrlFunctionQuery: "",
+      fields: { stream: "logs", stream_type: "logs", x: [{ alias: "ts" }] },
+      config: { time_shift },
+    });
+    const hits = [{ value: "OK" }, { value: "ERROR" }];
+    const streamHits = (payload: any, handlers: any) => {
+      handlers.data(payload, {
+        type: "search_response_metadata",
+        content: { results: { query_index: 0, streaming_aggs: false } },
+      });
+      handlers.data(payload, {
+        type: "search_response_hits",
+        content: { results: { query_index: 0, hits } },
+      });
+    };
+    const cases = [
+      {
+        name: "time-shift",
+        queries: [query("SELECT * FROM logs", [{ offSet: "1d" }])],
+        run: (ex: any) => ex.executeSQL(0, 300_000_000, null),
+      },
+      {
+        name: "multi-query",
+        queries: [query("SELECT * FROM logs"), query("SELECT * FROM metrics")],
+        run: (ex: any) => ex.executeMultiSQL(0, 300_000_000, null, "logs"),
+      },
+    ];
+
+    it.each(cases)("$name: a superseded run's stream cannot write", async ({ queries, run }) => {
+      const {
+        ctx,
+        state,
+        fetchQueryDataWithHttpStream,
+        handleSearchError,
+        handleSearchReset,
+        removeTraceId,
+      } = makeCtx({ panelSchema: makePanelSchema(queries) });
+      const executor = usePanelSQLExecutor(ctx);
+      await run(executor);
+      await run(executor);
+
+      const [[stalePayload, stale], [currentPayload, current]] =
+        fetchQueryDataWithHttpStream.mock.calls;
+      streamHits(currentPayload, current);
+      streamHits(stalePayload, stale);
+      stale.data(stalePayload, { type: "end" });
+      await stale.complete(stalePayload, { type: "end" });
+      stale.error(stalePayload, { content: { message: "x" } });
+      stale.reset(stalePayload, {});
+
+      expect(state.data[0].map((h: any) => h.value)).toEqual(["OK", "ERROR"]);
+      expect(state.loading).toBe(true);
+      expect(handleSearchError).not.toHaveBeenCalled();
+      expect(handleSearchReset).not.toHaveBeenCalled();
+      expect(removeTraceId).toHaveBeenCalledWith(stalePayload.traceId);
+    });
+
+    it.each([
+      { name: "single query", queries: [query("SELECT * FROM logs")], multi: false },
+      {
+        name: "time-shift",
+        queries: [query("SELECT * FROM logs", [{ offSet: "1d" }])],
+        multi: false,
+      },
+      { name: "multi-query", queries: cases[1].queries, multi: true },
+    ])(
+      "$name: a run superseded while awaiting variables fires and writes nothing",
+      async ({ queries, multi }) => {
+        const { ctx, state, fetchQueryDataWithHttpStream } = makeCtx({
+          panelSchema: makePanelSchema(queries),
+        });
+        let resumeA!: () => void;
+        const gate = new Promise<void>((resolve) => (resumeA = resolve));
+        let calls = 0;
+        ctx.applyDynamicVariables = vi.fn(async (q: string) => {
+          if (calls++ === 0) await gate;
+          return { query: q, metadata: [] };
+        });
+        const executor = usePanelSQLExecutor(ctx);
+        const run = () =>
+          multi
+            ? executor.executeMultiSQL(0, 300_000_000, null, "logs")
+            : executor.executeSQL(0, 300_000_000, null);
+
+        const runA = run();
+        await run();
+        const afterB = JSON.stringify([state.data, state.metadata, state.resultMetaData]);
+        resumeA();
+        await runA;
+
+        expect(fetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
+        expect(JSON.stringify([state.data, state.metadata, state.resultMetaData])).toBe(afterB);
+      },
+    );
+
+    it("a re-run discards progress the previous run's stream buffered but had not flushed", async () => {
+      const { ctx, state, fetchQueryDataWithHttpStream } = makeCtx();
+      const handlers = usePanelSearchHandlers({
+        state,
+        processApiError: vi.fn(),
+        saveCurrentStateToCache: vi.fn(),
+        loadData: vi.fn(),
+        removeTraceId: vi.fn(),
+      });
+      Object.assign(ctx, {
+        handleSearchResponse: handlers.handleSearchResponse,
+        clearHitsBuffer: handlers.clearHitsBuffer,
+      });
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      const [[payloadA, streamA]] = fetchQueryDataWithHttpStream.mock.calls;
+      streamA.data(payloadA, { type: "event_progress", content: { percent: 42 } });
+      const runB = executeSQL(0, 300_000_000, null);
+      await runB;
+
+      expect(state.loadingProgressPercentage).toBe(0);
+      expect(state.isPartialData).toBe(false);
+    });
+
+    it.each([
+      { name: "single query", queries: [query("SELECT * FROM logs")], multi: false },
+      { name: "multi-query", queries: cases[1].queries, multi: true },
+    ])(
+      "$name: a prefetched run superseded while awaiting annotations does not complete",
+      async ({ queries, multi }) => {
+        let resolveAnnotations!: (v: any) => void;
+        const { ctx, state } = makeCtx({
+          panelSchema: makePanelSchema(queries),
+          shouldFetchAnnotations: vi.fn(() => true),
+          refreshAnnotations: vi
+            .fn()
+            .mockImplementationOnce(() => new Promise((r) => (resolveAnnotations = r)))
+            .mockResolvedValue([]),
+        });
+        const executor = usePanelSQLExecutor(ctx);
+        const run = () =>
+          multi
+            ? executor.executeMultiSQL(0, 300_000_000, null, "logs")
+            : executor.executeSQL(0, 300_000_000, null);
+        ctx.searchResponse.value = { hits: [{ value: "prefetched" }] };
+        const runA = run();
+        await vi.waitFor(() => expect(ctx.refreshAnnotations).toHaveBeenCalled());
+        ctx.searchResponse.value = null;
+        await run();
+        state.loading = true;
+
+        resolveAnnotations([{ id: "stale-annotation" }]);
+        await runA;
+
+        expect(state.loading).toBe(true);
+        expect(state.annotations).toEqual([]);
+      },
+    );
+
+    it("multi-query: the searchResponse early return still supersedes an in-flight stream", async () => {
+      const { ctx, state, fetchQueryDataWithHttpStream } = makeCtx({
+        panelSchema: makePanelSchema(cases[1].queries),
+      });
+      const { executeMultiSQL } = usePanelSQLExecutor(ctx);
+      await executeMultiSQL(0, 300_000_000, null, "logs");
+      ctx.searchResponse.value = { hits: [{ value: "cached" }] };
+      await executeMultiSQL(0, 300_000_000, null, "logs");
+
+      const [[stalePayload, stale]] = fetchQueryDataWithHttpStream.mock.calls;
+      streamHits(stalePayload, stale);
+
+      expect(state.data.flat().map((h: any) => h.value)).toEqual(["cached"]);
     });
   });
 
@@ -674,6 +976,246 @@ describe("usePanelSQLExecutor", () => {
 
       const [payload] = fetchQueryDataWithHttpStream.mock.calls[0];
       expect(payload.meta.fallback_order_by_col).toBeNull();
+    });
+  });
+
+  // ─── metric sparkline (isolated 2nd is_ui_histogram fetch) ────────────────────
+
+  describe("metric sparkline histogram fetch", () => {
+    const metricQuery = {
+      query: "SELECT count(_timestamp) as y_axis_1 FROM logs",
+      vrlFunctionQuery: "",
+      fields: { stream: "logs", stream_type: "logs", x: [{ alias: "ts" }] },
+      config: { time_shift: [] },
+    };
+    const makeMetricCtx = (sparklineEnabled: boolean) =>
+      makeCtx({
+        panelSchema: ref({
+          id: "panel-metric-1",
+          title: "Metric Panel",
+          type: "metric",
+          queryType: "sql",
+          config: sparklineEnabled ? { sparkline: { enabled: true } } : {},
+          queries: [metricQuery],
+        }),
+      });
+
+    it("fires a 2nd is_ui_histogram request when sparkline is enabled", async () => {
+      const { ctx, fetchQueryDataWithHttpStream } = makeMetricCtx(true);
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      const histCall = fetchQueryDataWithHttpStream.mock.calls.find(
+        ([p]: any) => p?.meta?.is_ui_histogram === true,
+      );
+      expect(histCall).toBeTruthy();
+    });
+
+    it("does NOT fire the 2nd fetch when sparkline is disabled", async () => {
+      const { ctx, fetchQueryDataWithHttpStream } = makeMetricCtx(false);
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      const histCall = fetchQueryDataWithHttpStream.mock.calls.find(
+        ([p]: any) => p?.meta?.is_ui_histogram === true,
+      );
+      expect(histCall).toBeUndefined();
+    });
+
+    it("captures hits from the stream response (2nd handler arg), not the request payload", async () => {
+      const { ctx, state, fetchQueryDataWithHttpStream } = makeMetricCtx(true);
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      const histCall = fetchQueryDataWithHttpStream.mock.calls.find(
+        ([p]: any) => p?.meta?.is_ui_histogram === true,
+      );
+      const [payload, handlers] = histCall;
+      // 1st arg is our OWN request payload (type "histogram"); 2nd is the stream
+      // response. A handler that reads the request's `type` would capture nothing.
+      expect(payload.type).toBe("histogram");
+      const hits = [
+        { zo_sql_key: "2026-01-01T00:00:00", zo_sql_num: 5 },
+        { zo_sql_key: "2026-01-01T00:01:00", zo_sql_num: 7 },
+      ];
+      handlers.data(payload, {
+        type: "search_response_hits",
+        content: { results: { hits } },
+      });
+      handlers.complete();
+
+      expect(state.sparklineData[0]).toEqual(hits);
+    });
+
+    it("streams hits: sparklineData updates on each chunk, not only on complete", async () => {
+      const { ctx, state, fetchQueryDataWithHttpStream } = makeMetricCtx(true);
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      const [payload, handlers] = fetchQueryDataWithHttpStream.mock.calls.find(
+        ([p]: any) => p?.meta?.is_ui_histogram === true,
+      );
+
+      const chunk1 = [{ zo_sql_key: 1, zo_sql_num: 5 }];
+      handlers.data(payload, {
+        type: "search_response_hits",
+        content: { results: { hits: chunk1 } },
+      });
+      // Committed on the chunk, before complete() runs.
+      expect(state.sparklineData[0]).toEqual(chunk1);
+
+      const chunk2 = [{ zo_sql_key: 2, zo_sql_num: 7 }];
+      handlers.data(payload, {
+        type: "search_response_hits",
+        content: { results: { hits: chunk2 } },
+      });
+      expect(state.sparklineData[0]).toEqual([...chunk1, ...chunk2]);
+
+      handlers.complete();
+      expect(state.sparklineData[0]).toEqual([...chunk1, ...chunk2]);
+    });
+
+    it("drops a stale sparkline stream that completes after a newer run reset the state", async () => {
+      const { ctx, state, fetchQueryDataWithHttpStream } = makeMetricCtx(true);
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+
+      // Run 1 fires the sparkline stream, but it hasn't completed yet.
+      await executeSQL(0, 300_000_000, null);
+      const [stalePayload, staleHandlers] = fetchQueryDataWithHttpStream.mock.calls.find(
+        ([p]: any) => p?.meta?.is_ui_histogram === true,
+      );
+
+      // Run 2 (e.g. a new time range) resets state and bumps the run token.
+      await executeSQL(0, 600_000_000, null);
+
+      // The OLD stream now completes with stale hits — must be ignored.
+      staleHandlers.data(stalePayload, {
+        type: "search_response_hits",
+        content: { results: { hits: [{ zo_sql_key: "old", zo_sql_num: 1 }] } },
+      });
+      staleHandlers.complete();
+      expect(state.sparklineData[0]).toBeUndefined();
+
+      // The current run's stream still writes normally.
+      const histCalls = fetchQueryDataWithHttpStream.mock.calls.filter(
+        ([p]: any) => p?.meta?.is_ui_histogram === true,
+      );
+      const [freshPayload, freshHandlers] = histCalls[histCalls.length - 1];
+      const freshHits = [{ zo_sql_key: "new", zo_sql_num: 9 }];
+      freshHandlers.data(freshPayload, {
+        type: "search_response_hits",
+        content: { results: { hits: freshHits } },
+      });
+      freshHandlers.complete();
+      expect(state.sparklineData[0]).toEqual(freshHits);
+    });
+
+    it("fires a per-query is_ui_histogram fetch for a multi-query metric grid", async () => {
+      const panelSchema = ref({
+        id: "panel-metric-multi",
+        title: "Multi Metric",
+        type: "metric",
+        queryType: "sql",
+        config: { sparkline: { enabled: true } },
+        queries: [
+          {
+            query: "SELECT count(*) as y FROM a",
+            vrlFunctionQuery: "",
+            fields: { stream: "a", stream_type: "logs", x: [{ alias: "ts" }] },
+            config: { time_shift: [] },
+          },
+          {
+            query: "SELECT count(*) as y FROM b",
+            vrlFunctionQuery: "",
+            fields: { stream: "b", stream_type: "logs", x: [{ alias: "ts" }] },
+            config: { time_shift: [] },
+          },
+        ],
+      });
+      const { ctx, state, fetchQueryDataWithHttpStream } = makeCtx({ panelSchema });
+      const { executeMultiSQL } = usePanelSQLExecutor(ctx);
+      await executeMultiSQL(0, 300_000_000, null, "logs");
+
+      // One isolated histogram fetch per query, each targeting its own grid cell.
+      const histCalls = fetchQueryDataWithHttpStream.mock.calls.filter(
+        ([p]: any) => p?.meta?.is_ui_histogram === true,
+      );
+      expect(histCalls).toHaveLength(2);
+      expect(histCalls[0][0].meta.currentQueryIndex).toBe(0);
+      expect(histCalls[1][0].meta.currentQueryIndex).toBe(1);
+
+      // Completing each stream writes to the matching sparklineData slot.
+      const hitsA = [
+        { zo_sql_key: "1", zo_sql_num: 1 },
+        { zo_sql_key: "2", zo_sql_num: 2 },
+      ];
+      const hitsB = [
+        { zo_sql_key: "1", zo_sql_num: 3 },
+        { zo_sql_key: "2", zo_sql_num: 4 },
+      ];
+      histCalls[0][1].data(histCalls[0][0], {
+        type: "search_response_hits",
+        content: { results: { hits: hitsA } },
+      });
+      histCalls[0][1].complete();
+      histCalls[1][1].data(histCalls[1][0], {
+        type: "search_response_hits",
+        content: { results: { hits: hitsB } },
+      });
+      histCalls[1][1].complete();
+
+      expect(state.sparklineData[0]).toEqual(hitsA);
+      expect(state.sparklineData[1]).toEqual(hitsB);
+    });
+
+    const HISTOGRAM_UNAVAILABLE = {
+      code: 20013,
+      message: "Search histogram not available",
+      error_detail: "Histogram unavailable for CTEs, DISTINCT, UNION, JOIN and LIMIT queries.",
+    };
+
+    it("sets sparklineWarning when the histogram-unavailable error (20013) arrives via the data event", async () => {
+      const { ctx, state, fetchQueryDataWithHttpStream } = makeMetricCtx(true);
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      const histCall = fetchQueryDataWithHttpStream.mock.calls.find(
+        ([p]: any) => p?.meta?.is_ui_histogram === true,
+      );
+      const [payload, handlers] = histCall;
+      // The API delivers this as a data event of type "error" (see handleSearchResponse),
+      // not the error callback — the handler must catch it there.
+      handlers.data(payload, { type: "error", content: HISTOGRAM_UNAVAILABLE });
+
+      expect(state.sparklineWarning).toBe(HISTOGRAM_UNAVAILABLE.error_detail);
+    });
+
+    it("also sets sparklineWarning when 20013 arrives via the error callback", async () => {
+      const { ctx, state, fetchQueryDataWithHttpStream } = makeMetricCtx(true);
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      const histCall = fetchQueryDataWithHttpStream.mock.calls.find(
+        ([p]: any) => p?.meta?.is_ui_histogram === true,
+      );
+      const [payload, handlers] = histCall;
+      handlers.error(payload, { type: "error", content: HISTOGRAM_UNAVAILABLE });
+
+      expect(state.sparklineWarning).toBe(HISTOGRAM_UNAVAILABLE.error_detail);
+    });
+
+    it("stays silent for other (transient) histogram errors", async () => {
+      const { ctx, state, fetchQueryDataWithHttpStream } = makeMetricCtx(true);
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      const histCall = fetchQueryDataWithHttpStream.mock.calls.find(
+        ([p]: any) => p?.meta?.is_ui_histogram === true,
+      );
+      const [payload, handlers] = histCall;
+      handlers.error(payload, { type: "error", content: { code: 500, message: "boom" } });
+
+      expect(state.sparklineWarning).toBe("");
     });
   });
 });

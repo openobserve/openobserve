@@ -61,6 +61,31 @@ export const decodeMetricsConfig = (raw: string | null | undefined): MetricsBlob
   }
 };
 
+// A blob query filled out to the full panel schema. The blob comes from a URL
+// anyone can hand-write or truncate, and the panel reads `fields.x.length` and
+// `fields.filter.conditions.length` without guarding, so a query missing either
+// throws mid-render and blanks the whole metrics page.
+const normaliseBlobQuery = (q: any): any => {
+  const slot = defaultMetricsQuery();
+  const fields = { ...slot.fields, ...(q?.fields ?? {}) };
+  fields.filter = { ...slot.fields?.filter, ...(q?.fields?.filter ?? {}) };
+  fields.stream_type = "metrics";
+  return { ...slot, ...(q ?? {}), fields, config: { ...slot.config, ...(q?.config ?? {}) } };
+};
+
+// Blob panel data made safe to lay over a panel, mutated in place. Every route
+// that seeds a panel from a URL blob must go through this, not just the codec —
+// the explorer's Visualize pane seeds from the decoded object directly.
+export const normaliseMetricsBlobData = (data: Record<string, any>): Record<string, any> => {
+  // An empty array would leave the panel with no query at all, so it keeps the default.
+  if (Array.isArray(data.queries) && data.queries.length) {
+    data.queries = data.queries.map(normaliseBlobQuery);
+  } else {
+    delete data.queries;
+  }
+  return data;
+};
+
 // apply a decoded blob onto the live panel IN PLACE (never reassign .data); returns true if applied
 export const applyMetricsBlob = (
   raw: string | null | undefined,
@@ -69,14 +94,7 @@ export const applyMetricsBlob = (
   const blob = decodeMetricsConfig(raw);
   if (!blob) return false;
 
-  const data = blob.data ?? {};
-  if (Array.isArray(data.queries)) {
-    for (const q of data.queries) {
-      if (q && q.fields) q.fields.stream_type = "metrics";
-    }
-  }
-
-  Object.assign(dashboardPanelData.data, data);
+  Object.assign(dashboardPanelData.data, normaliseMetricsBlobData(blob.data ?? {}));
   if (dashboardPanelData.layout) dashboardPanelData.layout.currentQueryIndex = 0;
   return true;
 };

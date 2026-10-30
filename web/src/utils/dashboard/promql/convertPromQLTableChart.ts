@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { gt } from "@/types/i18n";
+
 import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
@@ -53,8 +55,7 @@ export class TableConverter implements PromQLChartConverter {
 
   /**
    * Apply custom column ordering based on config
-   * Note: Sticky columns remain in their ordered position (they don't move to front)
-   * Sticky is just a CSS property for horizontal scrolling
+   * Note: the table pins sticky columns to the left edge, ahead of the ordered columns
    */
   private applyColumnOrdering(labelKeys: string[], config: any): string[] {
     const columnOrder: string[] = config.column_order || [];
@@ -90,6 +91,11 @@ export class TableConverter implements PromQLChartConverter {
     // Value text-replacement mappings.
     const mappings = panelSchema.config?.mappings || [];
     const valueMappingCache = buildValueMappingCache(mappings);
+    const missingValue = String(config.no_value_replacement ?? "");
+    // An empty replacement keeps today's text for missing values.
+    const isReplaced = (val: any) =>
+      missingValue !== "" &&
+      (val === null || val === undefined || val === "" || String(val) === "NaN");
 
     // ── Shared column factories (one definition per column kind) ──────────────
     const baseColumn = (name: string, label: string, defaultAlign: string): any => {
@@ -100,12 +106,14 @@ export class TableConverter implements PromQLChartConverter {
 
     const textFormat = (val: any) => {
       const mapped = lookupValueMapping(val, valueMappingCache);
-      return mapped != null ? mapped : val;
+      if (mapped != null) return mapped;
+      return isReplaced(val) ? missingValue : val;
     };
 
     const valueFormat = (colNameLower: string) => (val: any) => {
       const mapped = lookupValueMapping(val, valueMappingCache);
       if (mapped != null) return mapped;
+      if (isReplaced(val)) return missingValue;
       const unitToUse = unitConfigMap[colNameLower]?.unit || config?.unit;
       const customUnitToUse = unitConfigMap[colNameLower]?.customUnit || config?.unit_custom;
       return formatUnitValue(getUnitValue(val, unitToUse, customUnitToUse, config?.decimals));
@@ -116,16 +124,14 @@ export class TableConverter implements PromQLChartConverter {
     // cells in logs and traces, so digits line up column-to-column. Label
     // columns hold free text and stay in the sans face.
     const makeTimestampColumn = (sticky = false): any => ({
-      ...baseColumn("timestamp", "Timestamp", "left"),
+      ...baseColumn("timestamp", gt("dashboard.utils.promqlTableTimestampColumn"), "left"),
       mono: true,
-      ...(sticky ? { sticky, headerClasses: "sticky-column", classes: "sticky-column" } : {}),
+      ...(sticky ? { pinned: "left" } : {}),
     });
 
     const makeLabelColumn = (key: string, sticky = false): any => ({
       ...baseColumn(key, key, "left"),
-      sticky,
-      headerClasses: sticky ? "sticky-column" : undefined,
-      classes: sticky ? "sticky-column" : undefined,
+      ...(sticky ? { pinned: "left" } : {}),
       format: textFormat,
     });
 
@@ -150,7 +156,7 @@ export class TableConverter implements PromQLChartConverter {
 
     // In "single" (Timestamp) mode, show timestamp + value columns
     if (tableMode === "single") {
-      return [makeTimestampColumn(), makeValueColumn("value", "Value")];
+      return [makeTimestampColumn(), makeValueColumn("value", gt("common.value"))];
     }
 
     // In "expanded_timeseries" mode, show timestamp + all metric labels + value
@@ -176,7 +182,7 @@ export class TableConverter implements PromQLChartConverter {
         columns.push(makeLabelColumn(key, stickyColumns.includes(key)));
       });
 
-      columns.push(makeValueColumn("value", "Value"));
+      columns.push(makeValueColumn("value", gt("common.value")));
 
       return columns;
     }
@@ -200,7 +206,10 @@ export class TableConverter implements PromQLChartConverter {
 
     aggregations.forEach((agg: string) => {
       const columnName = aggregations.length === 1 ? "value" : `value_${agg}`;
-      const columnLabel = aggregations.length === 1 ? "Value" : `Value (${agg})`;
+      const columnLabel =
+        aggregations.length === 1
+          ? gt("common.value")
+          : gt("dashboard.utils.promqlTableValueColumn", { aggregation: agg });
       columns.push(makeValueColumn(columnName, columnLabel));
     });
 

@@ -142,11 +142,11 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
     testLogger.info('Metrics option found in stream type dropdown');
 
     // Close dialog by clicking outside
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    await pageManager.pipelinesPage.clickBodyCorner();
     await page.waitForTimeout(500);
 
     // Navigate back to pipelines list
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    await pageManager.pipelinesPage.clickBodyCorner();
 
     testLogger.info('Test completed: Metrics stream type visibility check');
   });
@@ -399,9 +399,9 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
 
     // The scheduled pipeline has a nested dialog overlay that intercepts clicks
     // Dismiss dialogs by clicking outside and use force click for the cancel button
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    await pageManager.pipelinesPage.clickBodyCorner();
     await page.waitForTimeout(500);
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    await pageManager.pipelinesPage.clickBodyCorner();
     await page.waitForTimeout(500);
 
     // Use force click to bypass the dialog overlay
@@ -462,9 +462,9 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
     }
 
     // Clean up - dismiss dialogs by clicking outside
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    await pageManager.pipelinesPage.clickBodyCorner();
     await page.waitForTimeout(500);
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    await pageManager.pipelinesPage.clickBodyCorner();
     await page.waitForTimeout(500);
     await pageManager.pipelinesPage.clickCancelPipelineBtnForce();
 
@@ -529,7 +529,7 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
     }
 
     // Cancel and close
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    await pageManager.pipelinesPage.clickBodyCorner();
 
     testLogger.info('Test completed: After flattening toggle check');
   });
@@ -609,13 +609,7 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
     // this, the dialog stays open and blocks subsequent UI clicks (cleanup).
     toggleSwitch = await pageManager.pipelinesPage.openPipelineRowMenuAndGetToggle(pipelineName);
     await toggleSwitch.click();
-    const resumeDialog = page.locator('[data-test="resume-pipeline-dialog"]');
-    if (await resumeDialog.isVisible({ timeout: 3000 }).catch(() => false)) {
-      const resumePrimaryBtn = resumeDialog.locator('[data-test="o-dialog-primary-btn"]');
-      await resumePrimaryBtn.click();
-      await page.waitForTimeout(500);
-      testLogger.info('Resume dialog confirmed');
-    }
+    await pageManager.pipelinesPage.confirmResumePipelineDialog();
     testLogger.info('Pipeline toggled back');
 
     // Cleanup using helper

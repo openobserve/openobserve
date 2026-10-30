@@ -4,6 +4,7 @@ import fs from 'fs';
 import { AlertDestinationsPage } from './alertDestinationsPage.js';
 import { openNavFlyoutChild } from '../commonActions.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { authedRequest } = require('../../playwright-tests/utils/cloud-auth.js');
 
 export class AlertTemplatesPage {
     constructor(page) {
@@ -58,6 +59,9 @@ export class AlertTemplatesPage {
         this.headerCheckbox = '[data-test="o2-table-select-all"]';
         this.addTemplateTitle = '[data-test="add-template-title"]';
         this.templateCancelBtn = '[data-test="add-template-cancel-btn"]';
+        // Editor drafts: Cancel with unsaved changes opens the shared leave dialog
+        this.draftLeaveDialog = '[data-test="editor-draft-leave-dialog"]';
+        this.draftLeaveDiscardBtn = '[data-test="editor-draft-leave-dialog"] [data-test="o-dialog-neutral-btn"]';
         this.templateCloneBtnPattern = '[data-test="alert-template-list-{templateName}-clone-template"]';
 
         // Inline locators moved from methods
@@ -142,6 +146,50 @@ export class AlertTemplatesPage {
      */
     async waitForTemplateListReady() {
         await this.page.locator(this.addTemplateButton).waitFor({ state: 'visible', timeout: 30000 });
+    }
+
+    /**
+     * Deep-link straight to the templates list with a given `page` query param,
+     * exercising TemplateList's URL-restored `currentPage` on a cold mount.
+     * @param {number} page
+     */
+    async gotoTemplatesWithPageParam(page) {
+        const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
+        const orgIdentifier = process.env.ORGNAME || 'default';
+        await this.page.goto(
+            `${baseUrl}/web/alert-templates?org_identifier=${orgIdentifier}&page=${page}`,
+            { waitUntil: 'domcontentloaded' }
+        );
+        await this.waitForTemplateListReady();
+    }
+
+    // ==================== LIST PAGINATION (OTable pagination bar) ====================
+
+    async clickNextPage() {
+        const nextPageBtn = this.page.locator('[data-test="o2-table-next-page-btn"]');
+        await nextPageBtn.waitFor({ state: 'visible', timeout: 15000 });
+        await nextPageBtn.click();
+    }
+
+    async getPaginationInfoText() {
+        const text = await this.page.locator('[data-test="o2-table-pagination-info"]').textContent().catch(() => null);
+        return (text || '').replace(/\s+/g, ' ').trim();
+    }
+
+    async expectPaginationInfoToMatch(pattern) {
+        await expect
+            .poll(async () => await this.getPaginationInfoText(), { timeout: 20000 })
+            .toMatch(pattern);
+    }
+
+    async expectUrlHasPageParam(pageValue) {
+        await expect.poll(() => this.page.url(), { timeout: 15000 }).toContain(`page=${pageValue}`);
+    }
+
+    async expectAtLeastOneListRow() {
+        await expect(
+            this.page.locator('[data-test^="o2-table-row-"]').first(),
+        ).toBeVisible({ timeout: 20000 });
     }
 
     /**
@@ -371,8 +419,10 @@ export class AlertTemplatesPage {
         }
 
         try {
-            // Use page.request to bypass the RUM SDK's window.fetch wrapper which causes "TypeError: Failed to fetch"
-            const response = await this.page.request.post(createUrl, {
+            // Use authedRequest (page.request under the hood, bypassing the RUM SDK fetch wrapper)
+            // so a rotated-passcode 401 self-heals + retries instead of failing template creation
+            // and cascading into navigateToTemplates failures (alpha1 flake).
+            const response = await authedRequest(this.page, 'post', createUrl, {
                 data: {
                     name: templateName,
                     body: templateBody
@@ -406,8 +456,8 @@ export class AlertTemplatesPage {
         const templateBody = `[{"alert_name": "{alert_name}", "alert_type": "validation", "org_name": "{org_name}", "stream_name": "{stream_name}"}]`;
 
         try {
-            // Use page.request to bypass the RUM SDK's window.fetch wrapper
-            const response = await this.page.request.post(createUrl, {
+            // authedRequest self-heals a rotated-passcode 401 (see createTemplateViaApi).
+            const response = await authedRequest(this.page, 'post', createUrl, {
                 data: {
                     name: templateName,
                     body: templateBody
@@ -1171,6 +1221,15 @@ export class AlertTemplatesPage {
 
     async clickTemplateCancelBtn() {
         await this.page.locator(this.templateCancelBtn).click();
+        // Unsaved changes are discarded through the leave dialog so no draft is left behind.
+        const asked = await this.page.locator(this.draftLeaveDialog)
+            .waitFor({ state: 'visible', timeout: 2000 })
+            .then(() => true)
+            .catch(() => false);
+        if (asked) {
+            await this.page.locator(this.draftLeaveDiscardBtn).click();
+            await this.page.locator(this.draftLeaveDialog).waitFor({ state: 'hidden', timeout: 10000 });
+        }
         await this.page.waitForTimeout(1000);
     }
 

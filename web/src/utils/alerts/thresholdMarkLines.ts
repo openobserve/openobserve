@@ -32,6 +32,21 @@ export interface ThresholdMarkLine {
   show_label: false;
 }
 
+/** Axis bounds a chart should honour so its threshold lines stay on screen. */
+export interface ThresholdAxisBounds {
+  y_axis_min?: number;
+  y_axis_max?: number;
+}
+
+/**
+ * Headroom above/below the outermost threshold, so a line that defines the
+ * axis edge is not drawn ON the edge (where it reads as a border, not a
+ * threshold). Proportional to the threshold's own magnitude, with an absolute
+ * floor for thresholds at or near zero.
+ */
+const PAD_RATIO = 0.1;
+const MIN_PAD = 1;
+
 const has = (v: unknown): v is string | number => v !== undefined && v !== null && v !== "";
 
 export function buildThresholdMarkLines(critical: unknown, warning: unknown): ThresholdMarkLine[] {
@@ -55,4 +70,35 @@ export function buildThresholdMarkLines(critical: unknown, warning: unknown): Th
     });
   }
   return lines;
+}
+
+/**
+ * Y-axis bounds that keep every threshold line visible.
+ *
+ * A chart auto-scales to its DATA, so a threshold outside that range is drawn
+ * outside the plot area and simply never appears — the common case being an
+ * alert that has not fired, where every value sits below the threshold and the
+ * line the user came to see is the one thing missing.
+ *
+ * The returned values are advisory: both chart pipelines feed them through
+ * `getFinalAxisValue`, which takes `max(config, dataMax)` and
+ * `min(config, dataMin)`. So these only ever WIDEN the axis — data that already
+ * exceeds a threshold still scales normally and nothing is clipped.
+ */
+export function thresholdAxisBounds(markLines: ThresholdMarkLine[]): ThresholdAxisBounds {
+  const values = markLines
+    .filter((line) => line.type === "yAxis")
+    .map((line) => Number(line.value))
+    .filter((value) => Number.isFinite(value));
+
+  if (!values.length) return {};
+
+  const highest = Math.max(...values);
+  const lowest = Math.min(...values);
+  const pad = (value: number) => Math.max(Math.abs(value) * PAD_RATIO, MIN_PAD);
+
+  return {
+    y_axis_min: lowest - pad(lowest),
+    y_axis_max: highest + pad(highest),
+  };
 }

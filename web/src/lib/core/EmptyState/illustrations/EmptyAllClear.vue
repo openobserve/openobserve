@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
     role="img"
-    aria-label="You're all caught up"
+    :aria-label="t('emptyState.allCaughtUp')"
   >
     <!-- glow + slow rays (upper right) -->
     <circle cx="262" cy="92" r="58" fill="var(--color-warning-300)" opacity="0.12" />
@@ -277,5 +277,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { useI18nTyped } from "@/types/i18n";
+
 withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 300, animated: true });
+
+const { t } = useI18nTyped();
 </script>

@@ -23,8 +23,9 @@ use std::{
 use ::stream::get_stream;
 use arrow_schema::{DataType, Field};
 use bulk::SCHEMA_CONFORMANCE_FAILED;
+use chrono::Utc;
 use config::{
-    DISTINCT_FIELDS, META_ORG_ID, SIZE_IN_MB, get_config,
+    META_ORG_ID, SIZE_IN_MB, TIMESTAMP_COL_NAME, get_config,
     meta::{
         alerts::alert::Alert,
         self_reporting::usage::{RequestStats, UsageType},
@@ -34,8 +35,7 @@ use config::{
     utils::{
         json::{Map, Value, estimate_json_bytes, get_string_value},
         schema_ext::SchemaExt,
-        time::now_micros,
-        util::DISTINCT_STREAM_PREFIX,
+        time::{now_micros, parse_timestamp_micro_from_value},
     },
 };
 use db;
@@ -44,16 +44,19 @@ use infra::{
     schema::{SchemaCache, get_partition_time_level},
 };
 use ingestion_common::IngestionStatus;
-use schema::{check_for_schema, stream_schema_exists};
+use schema::{get_future_discard_error, get_upto_discard_error, stream_schema_exists};
 
 use crate::{
     alerts::alert::AlertExt,
     common::meta::stream::SchemaRecords,
-    ingestion::{TriggerAlertData, evaluate_trigger, get_write_partition_key, write_file},
-    metadata::{MetadataItem, MetadataType, distinct_values::DvItem, write},
+    ingestion::{
+        PartitionMemo, TriggerAlertData, evaluate_trigger, resolve_batch_schema,
+        schema_records_to_entries, write_entries, write_entries_synced,
+    },
 };
 
 pub mod bulk;
+pub mod columnar;
 pub mod hec;
 pub mod ingest;
 pub mod loki;
@@ -61,7 +64,63 @@ pub mod otlp;
 
 static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
 
-pub type O2IngestJsonData = (Vec<(i64, Map<String, Value>)>, Option<usize>);
+pub type IngestJsonData = (Vec<(i64, Map<String, Value>)>, Option<usize>);
+
+/// No association names `_all_values`, so the scan leaves its stale pre-redaction text.
+#[cfg(feature = "vectorscan")]
+pub fn snapshot_derived_sources(records: &[(i64, Map<String, Value>)]) -> Vec<String> {
+    let max_len = get_config().limit.index_all_max_value_length;
+    records
+        .iter()
+        .map(|(_, record)| {
+            if record.contains_key(config::ALL_VALUES_COL_NAME) {
+                all_values_of(record, max_len)
+            } else {
+                String::new()
+            }
+        })
+        .collect()
+}
+
+/// `_original` is redacted in place by the engine; only `_all_values` needs rebuilding here.
+#[cfg(feature = "vectorscan")]
+pub fn refresh_derived_columns(before: &[String], records: &mut [(i64, Map<String, Value>)]) {
+    let max_len = get_config().limit.index_all_max_value_length;
+    for (stale, (_, record)) in before.iter().zip(records.iter_mut()) {
+        if !record.contains_key(config::ALL_VALUES_COL_NAME) {
+            continue;
+        }
+        let values = all_values_of(record, max_len);
+        if &values == stale {
+            continue;
+        }
+        record.insert(
+            config::ALL_VALUES_COL_NAME.to_string(),
+            Value::String(values),
+        );
+    }
+}
+
+/// The `_all_values` concatenation: every field but the derived ones, space-joined.
+#[cfg(feature = "vectorscan")]
+fn all_values_of(record: &Map<String, Value>, max_len: usize) -> String {
+    let mut values = Vec::with_capacity(record.len());
+    for (k, value) in record.iter() {
+        if [
+            TIMESTAMP_COL_NAME,
+            config::ID_COL_NAME,
+            config::ORIGINAL_DATA_COL_NAME,
+            config::ALL_VALUES_COL_NAME,
+        ]
+        .contains(&k.as_str())
+            || (max_len != 0 && value.as_str().is_some_and(|s| s.len() > max_len))
+        {
+            continue;
+        }
+        values.push(value.to_string());
+    }
+    values.join(" ")
+}
 
 fn parse_bulk_index(v: &Value) -> Option<(&str, &str, Option<&str>)> {
     let local_val = v.as_object()?;
@@ -96,7 +155,7 @@ pub fn cast_to_type(
             continue;
         }
         match field.data_type() {
-            DataType::Utf8 | DataType::LargeUtf8 => {
+            DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => {
                 if val.is_string() {
                     continue;
                 }
@@ -187,6 +246,11 @@ fn set_parsing_error(parse_error: &mut String, field: &Field) {
     ));
 }
 
+/// Write each stream's prepared records, returning whether any stream was
+/// skipped because it started deleting after admission.
+///
+/// A skip loses those records silently, so the flag is the only way a caller
+/// that must not acknowledge lost data can tell it from a clean write.
 #[allow(clippy::too_many_arguments)]
 async fn write_logs_by_stream(
     thread_id: usize,
@@ -195,45 +259,59 @@ async fn write_logs_by_stream(
     time_stats: (i64, &Instant), // started_at
     usage_type: UsageType,
     status: &mut IngestionStatus,
-    json_data_by_stream: HashMap<String, O2IngestJsonData>,
+    json_data_by_stream: HashMap<String, IngestJsonData>,
     byte_size_by_stream: HashMap<String, usize>,
     derived_streams: HashSet<String>,
-) -> Result<()> {
+    mut columnar: Option<columnar::JsonColumnar>,
+) -> Result<bool> {
+    let mut stream_skipped = false;
     for (stream_name, (json_data, fn_num)) in json_data_by_stream {
         // check if we are allowed to ingest
         if db::compact::retention::is_deleting_stream(org_id, StreamType::Logs, &stream_name, None)
         {
-            log::warn!("stream [{stream_name}] is being deleted");
+            log::warn!("stream [{org_id}/{stream_name}] is being deleted");
+            stream_skipped = true;
             continue; // skip
         }
+        // before the new-stream hooks, so a stream that cannot be stored is never announced
+        if let Err(e) = schema::check_stream_key_len(org_id, StreamType::Logs, &stream_name) {
+            let columnar = columnar.take_if(|c| c.stream_name() == stream_name);
+            reject_stream_rows(&stream_name, &json_data, columnar, status, &e.to_string());
+            continue;
+        }
 
-        // for cloud, we want to sent event when user creates a new stream
-        #[cfg(feature = "cloud")]
-        if get_stream(org_id, &stream_name, StreamType::Logs)
-            .await
-            .is_none()
+        if crate::ingestion::checks_for_new_stream(org_id)
+            && !infra::schema::exists(org_id, StreamType::Logs, &stream_name).await
         {
-            let org = match super::organization::get_org(org_id).await {
-                None => {
-                    return Err(Error::Message(format!(
-                        "org with id {org_id} not found in db"
-                    )));
-                }
-                Some(org) => org,
-            };
+            // for cloud, we want to sent event when user creates a new stream
+            #[cfg(feature = "cloud")]
+            if get_stream(org_id, &stream_name, StreamType::Logs)
+                .await
+                .is_none()
+            {
+                let org = match super::organization::get_org(org_id).await {
+                    None => {
+                        return Err(Error::Message(format!(
+                            "org with id {org_id} not found in db"
+                        )));
+                    }
+                    Some(org) => org,
+                };
 
-            super::self_reporting::cloud_events::enqueue_cloud_event(
-                super::self_reporting::cloud_events::CloudEvent {
-                    org_id: org.identifier.clone(),
-                    org_name: org.name.clone(),
-                    org_type: org.org_type.clone(),
-                    user: Some(user_email.to_string()),
-                    event: super::self_reporting::cloud_events::EventType::StreamCreated,
-                    subscription_type: None,
-                    stream_name: Some(stream_name.clone()),
-                },
-            )
-            .await;
+                super::self_reporting::cloud_events::enqueue_cloud_event(
+                    super::self_reporting::cloud_events::CloudEvent {
+                        org_id: org.identifier.clone(),
+                        org_name: org.name.clone(),
+                        org_type: org.org_type.clone(),
+                        user: Some(user_email.to_string()),
+                        event: super::self_reporting::cloud_events::EventType::StreamCreated,
+                        subscription_type: None,
+                        stream_name: Some(stream_name.clone()),
+                    },
+                )
+                .await;
+            }
+            super::onboarding::on_user_stream_created(org_id, StreamType::Logs, &stream_name);
         }
 
         // write json data by stream
@@ -243,6 +321,7 @@ async fn write_logs_by_stream(
             &stream_name,
             status,
             json_data,
+            columnar.take_if(|c| c.stream_name() == stream_name),
             derived_streams.contains(&stream_name),
         )
         .await?;
@@ -294,7 +373,42 @@ async fn write_logs_by_stream(
             .await;
         }
     }
-    Ok(())
+    Ok(stream_skipped)
+}
+
+/// Fails every row of a stream the write refuses, in the shape the caller's response reports.
+fn reject_stream_rows(
+    stream_name: &str,
+    json_data: &[(i64, Map<String, Value>)],
+    columnar: Option<columnar::JsonColumnar>,
+    status: &mut IngestionStatus,
+    reason: &str,
+) {
+    match status {
+        IngestionStatus::Record(status) => {
+            let rows = json_data.len() + columnar.map_or(0, |c| c.rows());
+            status.failed += rows as u32;
+            status.error = reason.to_string();
+        }
+        IngestionStatus::Bulk(bulk_res) => {
+            let doc_ids = json_data
+                .iter()
+                .map(|(_, record)| record.get("_id").and_then(Value::as_str).map(String::from))
+                .chain(columnar.into_iter().flat_map(|mut c| c.take_bulk_ids()));
+            for doc_id in doc_ids {
+                bulk_res.errors = true;
+                bulk::add_record_status(
+                    stream_name.to_string(),
+                    doc_id,
+                    String::new(),
+                    None,
+                    bulk_res,
+                    Some(bulk::STREAM_NAME_TOO_LONG.to_string()),
+                    Some(reason.to_string()),
+                );
+            }
+        }
+    }
 }
 
 async fn write_logs(
@@ -303,6 +417,7 @@ async fn write_logs(
     stream_name: &str,
     status: &mut IngestionStatus,
     json_data: Vec<(i64, Map<String, Value>)>,
+    columnar: Option<columnar::JsonColumnar>,
     is_derived: bool,
 ) -> Result<RequestStats> {
     let cfg = get_config();
@@ -326,6 +441,7 @@ async fn write_logs(
         }
     };
     let stream_settings = infra::schema::unwrap_stream_settings(&schema).unwrap_or_default();
+    let has_uds = !stream_settings.defined_schema_fields.is_empty();
 
     let mut partition_keys: Vec<StreamPartition> = vec![];
     let partition_time_level = get_partition_time_level(StreamType::Logs);
@@ -333,17 +449,31 @@ async fn write_logs(
         partition_keys = stream_settings.partition_keys;
     }
 
+    if config::get_config().db_monitoring.enabled
+        && crate::db_monitoring::server_vantage::is_dbm_server_stream(stream_name)
+        && crate::db_monitoring::server_vantage::batch_has_dbm_records(
+            json_data.iter().map(|(_, record)| record),
+        )
+    {
+        crate::db_monitoring::server_vantage::ensure_server_stream_index_field(org_id, stream_name)
+            .await;
+    }
+
     // Start get stream alerts
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
-    crate::ingestion::get_stream_alerts(
-        &[StreamParams {
-            org_id: org_id.to_owned().into(),
-            stream_name: stream_name.to_owned().into(),
-            stream_type: StreamType::Logs,
-        }],
-        &mut stream_alerts_map,
-    )
-    .await;
+    // Chat history never reaches a realtime alert, even one stored before alerts there were
+    // refused.
+    if !config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(stream_name) {
+        crate::ingestion::get_stream_alerts(
+            &[StreamParams {
+                org_id: org_id.to_owned().into(),
+                stream_name: stream_name.to_owned().into(),
+                stream_type: StreamType::Logs,
+            }],
+            &mut stream_alerts_map,
+        )
+        .await;
+    }
     let cur_stream_alerts =
         stream_alerts_map.get(&format!("{}/{}/{}", org_id, StreamType::Logs, stream_name));
     let mut triggers: TriggerAlertData =
@@ -352,15 +482,14 @@ async fn write_logs(
     // End get stream alert
 
     // start check for schema
-    let min_timestamp = json_data.iter().map(|(ts, _)| ts).min().unwrap();
-    let (schema_evolution, infer_schema) = check_for_schema(
+    let (schema_evolution, infer_schema) = resolve_batch_schema(
         org_id,
         stream_name,
         StreamType::Logs,
         &mut stream_schema_map,
-        json_data.iter().map(|(_, v)| v).collect(),
-        *min_timestamp,
-        is_derived, // is_derived is true if the stream is derived
+        &json_data,
+        is_derived,
+        has_uds,
     )
     .await?;
 
@@ -381,9 +510,8 @@ async fn write_logs(
         None => Arc::new(latest_schema),
     };
 
-    let mut distinct_values = Vec::with_capacity(16);
-
     let mut write_buf: HashMap<String, SchemaRecords> = HashMap::new();
+    let mut partition_memo = PartitionMemo::new(&partition_keys, partition_time_level);
 
     for (timestamp, mut record_val) in json_data {
         let doc_id = record_val
@@ -483,56 +611,27 @@ async fn write_logs(
                         // the data doesn't satisfy the alert condition
                     }
                     Err(e) => {
-                        log::error!("[LOGS] Error while evaluating realtime alert: {e}");
+                        log::error!(
+                            "[LOGS] Error while evaluating realtime alert: org_id: {org_id}, error: {e}"
+                        );
                     }
                 }
             }
         }
         // end check for alert triggers
 
-        // get distinct_value items
-        if stream_settings.enable_distinct_fields {
-            let mut map = Map::new();
-            for field in DISTINCT_FIELDS.iter().chain(
-                stream_settings
-                    .distinct_value_fields
-                    .iter()
-                    .map(|f| &f.name),
-            ) {
-                if let Some(val) = record_val.get(field) {
-                    map.insert(field.clone(), val.clone());
+        let hour_buf =
+            partition_memo.buffer(timestamp, &record_val, &schema_key, &mut write_buf, || {
+                SchemaRecords {
+                    schema_key: schema_key.clone(),
+                    schema: rec_schema.clone(),
+                    records: vec![],
+                    records_size: 0,
                 }
-            }
-
-            if !map.is_empty() {
-                // add distinct values
-                distinct_values.push(MetadataItem::DistinctValues(DvItem {
-                    stream_type: StreamType::Logs,
-                    stream_name: stream_name.to_string(),
-                    value: map,
-                }));
-            }
-        }
-
-        // get hour key
-        let hour_key = get_write_partition_key(
-            timestamp,
-            &partition_keys,
-            partition_time_level,
-            &record_val,
-            Some(&schema_key),
-        );
-
-        let hour_buf = write_buf.entry(hour_key).or_insert_with(|| SchemaRecords {
-            schema_key: schema_key.clone(),
-            schema: rec_schema.clone(),
-            records: vec![],
-            records_size: 0,
-        });
+            });
         let record_val = Value::Object(record_val);
-        let record_size = estimate_json_bytes(&record_val);
+        hour_buf.records_size += estimate_json_bytes(&record_val);
         hour_buf.records.push(Arc::new(record_val));
-        hour_buf.records_size += record_size;
 
         // update status(success)
         match status {
@@ -540,46 +639,58 @@ async fn write_logs(
                 status.successful += 1;
             }
             IngestionStatus::Bulk(bulk_res) => {
-                bulk::add_record_status(
-                    stream_name.to_string(),
-                    doc_id,
-                    "".to_string(),
-                    None,
-                    bulk_res,
-                    None,
-                    None,
-                );
+                if !cfg.common.bulk_api_response_errors_only {
+                    bulk_res.items.push(bulk::success_item(
+                        "index".to_string(),
+                        stream_name,
+                        doc_id.unwrap_or_default(),
+                    ));
+                }
             }
         }
     }
 
-    // write data to wal
+    let mut entries = schema_records_to_entries(org_id, stream_name, write_buf);
+    if let Some(columnar) = columnar {
+        entries.extend(columnar_entries(org_id, status, columnar)?);
+    }
     let writer =
         ingester::get_writer(thread_id, org_id, StreamType::Logs.as_str(), stream_name).await;
-    let req_stats = write_file(
-        &writer,
-        org_id,
-        stream_name,
-        write_buf,
-        !cfg.common.wal_fsync_disabled,
-    )
-    .await?;
-
-    // send distinct_values
-    if !distinct_values.is_empty()
-        && !stream_name.starts_with(DISTINCT_STREAM_PREFIX)
-        && stream_settings.enable_distinct_fields
-        && let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await
-    {
-        log::error!("Error while writing distinct values: {e}");
-    }
+    // A chat-events ack lets the writer advance its watermark in the DB, so those bytes must
+    // reach the OS before the ack: a kill after it must not lose them.
+    let req_stats = if stream_name == config::meta::self_reporting::ai_chat::AI_CHAT_EVENTS_STREAM {
+        write_entries_synced(&writer, stream_name, entries).await?
+    } else {
+        write_entries(
+            &writer,
+            stream_name,
+            entries,
+            !cfg.common.wal_fsync_disabled,
+        )
+        .await?
+    };
 
     // only one trigger per request
     if !triggers.is_empty() {
-        tokio::spawn(async move { evaluate_trigger(triggers).await });
+        tokio::spawn(evaluate_trigger(triggers));
     }
 
     Ok(req_stats)
+}
+
+fn columnar_entries(
+    org_id: &str,
+    status: &mut IngestionStatus,
+    mut columnar: columnar::JsonColumnar,
+) -> Result<Vec<ingester::Entry>> {
+    match status {
+        IngestionStatus::Record(status) => status.successful += columnar.rows() as u32,
+        IngestionStatus::Bulk(bulk_res) => {
+            let doc_ids = columnar.take_bulk_ids();
+            bulk::add_success_items(columnar.stream_name(), doc_ids, bulk_res);
+        }
+    }
+    columnar.into_entries(org_id)
 }
 
 async fn ingestion_log_enabled() -> bool {
@@ -587,9 +698,68 @@ async fn ingestion_log_enabled() -> bool {
         return false;
     }
     // the logging will be enabled through meta only
-    db::organization::get_org_setting_toggle_ingestion_logs(META_ORG_ID)
+    db::organization::read_org_setting(META_ORG_ID, |s| s.toggle_ingestion_logs)
         .await
         .unwrap_or(false)
+}
+
+pub fn handle_timestamp_for_value(
+    value: &mut Value,
+    min_ts: i64,
+    max_ts: i64,
+) -> Result<i64, anyhow::Error> {
+    let local_val = value
+        .as_object_mut()
+        .ok_or_else(|| anyhow::Error::msg("Value is not an object"))?;
+    handle_timestamp_for_map(local_val, min_ts, max_ts)
+}
+
+fn handle_timestamp_for_map(
+    val: &mut Map<String, Value>,
+    min_ts: i64,
+    max_ts: i64,
+) -> Result<i64, anyhow::Error> {
+    let parsed = val
+        .get(TIMESTAMP_COL_NAME)
+        .filter(|v| !v.is_null())
+        .map(parse_timestamp_micro_from_value);
+    let (timestamp, rewrite) = resolve_timestamp(parsed, min_ts, max_ts)?;
+    if rewrite {
+        val.insert(
+            TIMESTAMP_COL_NAME.to_string(),
+            Value::Number(timestamp.into()),
+        );
+    }
+    Ok(timestamp)
+}
+
+/// A record's timestamp from its parsed non-null `_timestamp`, and whether it must be rewritten.
+fn resolve_timestamp(
+    parsed: Option<Result<(i64, bool), anyhow::Error>>,
+    min_ts: i64,
+    max_ts: i64,
+) -> Result<(i64, bool), anyhow::Error> {
+    let (timestamp, has_valid_timestamp) = match parsed {
+        Some(Ok(t)) => t,
+        Some(Err(_)) => return Err(anyhow::Error::msg("Can't parse timestamp")),
+        None => (0, false),
+    };
+    // check ingestion time
+    if timestamp > 0 && timestamp < min_ts {
+        return Err(get_upto_discard_error());
+    }
+    if timestamp > max_ts {
+        return Err(get_future_discard_error());
+    }
+    if has_valid_timestamp {
+        return Ok((timestamp, false));
+    }
+    let timestamp = if timestamp > 0 {
+        timestamp
+    } else {
+        Utc::now().timestamp_micros()
+    };
+    Ok((timestamp, true))
 }
 
 fn log_failed_record<T: std::fmt::Debug>(enabled: bool, record: &T, error: &str) {
@@ -601,7 +771,45 @@ fn log_failed_record<T: std::fmt::Debug>(enabled: bool, record: &T, error: &str)
 
 #[cfg(test)]
 mod tests {
+    use config::utils::json::json;
+
     use super::*;
+
+    #[test]
+    fn test_reject_stream_rows_fails_every_row() {
+        let rows: Vec<(i64, Map<String, Value>)> = vec![
+            (0, json!({"_id": "a"}).as_object().unwrap().clone()),
+            (0, json!({"message": "b"}).as_object().unwrap().clone()),
+        ];
+
+        let mut record = IngestionStatus::Record(ingestion_common::RecordStatus::default());
+        reject_stream_rows("s", &rows, None, &mut record, "too long");
+        let IngestionStatus::Record(status) = record else {
+            unreachable!()
+        };
+        assert_eq!((status.successful, status.failed), (0, 2));
+        assert_eq!(status.error, "too long");
+
+        let mut bulk = IngestionStatus::Bulk(ingestion_common::BulkResponse {
+            took: 0,
+            errors: false,
+            items: vec![],
+        });
+        reject_stream_rows("s", &rows, None, &mut bulk, "too long");
+        let IngestionStatus::Bulk(bulk) = bulk else {
+            unreachable!()
+        };
+        assert!(bulk.errors);
+        let ids: Vec<&str> = bulk
+            .items
+            .iter()
+            .map(|item| item["index"]._id.as_str())
+            .collect();
+        assert_eq!(ids, ["a", ""]);
+        let error = bulk.items[0]["index"].error.as_ref().unwrap();
+        assert_eq!(error.err_type, bulk::STREAM_NAME_TOO_LONG);
+        assert_eq!(error.reason, "too long");
+    }
 
     #[test]
     fn test_set_parsing_error() {
@@ -620,8 +828,17 @@ mod tests {
     }
 
     #[test]
+    fn test_cast_to_type_utf8view_casts_to_string() {
+        let mut local_val = Map::new();
+        local_val.insert("test".to_string(), Value::from(42));
+        let delta = vec![Field::new("test", DataType::Utf8View, true)];
+        assert!(cast_to_type(&mut local_val, delta).is_ok());
+        assert_eq!(local_val.get("test"), Some(&Value::from("42")));
+    }
+
+    #[test]
     fn test_parse_bulk_index_index_action() {
-        let v = serde_json::json!({"index": {"_index": "my-stream", "_id": "doc1"}});
+        let v = json!({"index": {"_index": "my-stream", "_id": "doc1"}});
         let result = parse_bulk_index(&v);
         assert!(result.is_some());
         let (action, index, doc_id) = result.unwrap();
@@ -632,7 +849,7 @@ mod tests {
 
     #[test]
     fn test_parse_bulk_index_create_action_no_doc_id() {
-        let v = serde_json::json!({"create": {"_index": "my-stream"}});
+        let v = json!({"create": {"_index": "my-stream"}});
         let result = parse_bulk_index(&v);
         assert!(result.is_some());
         let (action, index, doc_id) = result.unwrap();
@@ -643,15 +860,132 @@ mod tests {
 
     #[test]
     fn test_parse_bulk_index_no_known_action_returns_none() {
-        let v = serde_json::json!({"delete": {"_index": "my-stream"}});
+        let v = json!({"delete": {"_index": "my-stream"}});
         let result = parse_bulk_index(&v);
         assert!(result.is_none());
     }
 
     #[test]
     fn test_parse_bulk_index_missing_index_skips_action() {
-        let v = serde_json::json!({"index": {"_id": "doc1"}});
+        let v = json!({"index": {"_id": "doc1"}});
         let result = parse_bulk_index(&v);
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_handle_timestamp_for_value_valid_in_range() {
+        // 2024-01-15 in microseconds
+        let ts = 1_705_276_800_000_000i64;
+        let mut val = json!({TIMESTAMP_COL_NAME: ts});
+        let result = handle_timestamp_for_value(&mut val, 0, i64::MAX);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ts);
+    }
+
+    #[test]
+    fn test_handle_timestamp_for_value_too_old() {
+        let min_ts = 1_705_276_800_000_000i64;
+        let old_ts = 1_000_000_000_000_000i64;
+        let mut val = json!({TIMESTAMP_COL_NAME: old_ts});
+        let result = handle_timestamp_for_value(&mut val, min_ts, i64::MAX);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_handle_timestamp_for_value_too_future() {
+        let max_ts = 1_705_276_800_000_000i64;
+        let future_ts = 2_000_000_000_000_000i64;
+        let mut val = json!({TIMESTAMP_COL_NAME: future_ts});
+        let result = handle_timestamp_for_value(&mut val, 0, max_ts);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_handle_timestamp_for_value_not_object() {
+        let mut val = json!("not an object");
+        let result = handle_timestamp_for_value(&mut val, 0, i64::MAX);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_handle_timestamp_for_value_null_timestamp_uses_now() {
+        let mut val = json!({TIMESTAMP_COL_NAME: null});
+        let before = chrono::Utc::now().timestamp_micros();
+        let result = handle_timestamp_for_value(&mut val, 0, i64::MAX);
+        let after = chrono::Utc::now().timestamp_micros();
+        assert!(result.is_ok());
+        let ts = result.unwrap();
+        assert!(ts >= before && ts <= after);
+    }
+
+    #[test]
+    fn test_handle_timestamp_for_value_missing_field_uses_now() {
+        let mut val = json!({"message": "hello"});
+        let before = chrono::Utc::now().timestamp_micros();
+        let result = handle_timestamp_for_value(&mut val, 0, i64::MAX);
+        let after = chrono::Utc::now().timestamp_micros();
+        assert!(result.is_ok());
+        let ts = result.unwrap();
+        assert!(ts >= before && ts <= after);
+        // field should be inserted
+        assert!(val.get(TIMESTAMP_COL_NAME).is_some());
+    }
+
+    #[cfg(feature = "vectorscan")]
+    fn record_with(pairs: &[(&str, &str)]) -> (i64, Map<String, Value>) {
+        let mut record = Map::new();
+        for (k, v) in pairs {
+            record.insert(k.to_string(), Value::from(*v));
+        }
+        (1, record)
+    }
+
+    #[test]
+    #[cfg(feature = "vectorscan")]
+    fn refresh_rebuilds_all_values_from_the_redacted_fields() {
+        let mut records = vec![record_with(&[
+            ("email", "bob@x.com"),
+            (config::ALL_VALUES_COL_NAME, "\"bob@x.com\""),
+        ])];
+        let before = snapshot_derived_sources(&records);
+        records[0]
+            .1
+            .insert("email".to_string(), Value::from("[REDACTED]"));
+        refresh_derived_columns(&before, &mut records);
+
+        let rebuilt = records[0].1[config::ALL_VALUES_COL_NAME].as_str().unwrap();
+        assert!(rebuilt.contains("[REDACTED]"));
+        assert!(!rebuilt.contains("bob@x.com"));
+    }
+
+    #[test]
+    #[cfg(feature = "vectorscan")]
+    fn refresh_keeps_original_the_engine_already_redacted() {
+        let mut records = vec![record_with(&[
+            ("email", "[REDACTED]"),
+            (config::ORIGINAL_DATA_COL_NAME, "{\"email\":\"[REDACTED]\"}"),
+            (config::ALL_VALUES_COL_NAME, "\"bob@x.com\""),
+        ])];
+        let before = vec!["stale".to_string()];
+        refresh_derived_columns(&before, &mut records);
+
+        assert_eq!(
+            records[0].1[config::ORIGINAL_DATA_COL_NAME].as_str(),
+            Some("{\"email\":\"[REDACTED]\"}")
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "vectorscan")]
+    fn a_record_without_all_values_is_left_alone() {
+        let mut records = vec![record_with(&[
+            ("email", "[REDACTED]"),
+            (config::ORIGINAL_DATA_COL_NAME, "{\"email\":\"[REDACTED]\"}"),
+        ])];
+        let before = snapshot_derived_sources(&records);
+        assert_eq!(before, vec![String::new()]);
+
+        refresh_derived_columns(&before, &mut records);
+        assert_eq!(records[0].1.len(), 2);
     }
 }

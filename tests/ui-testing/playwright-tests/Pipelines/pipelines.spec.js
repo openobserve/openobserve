@@ -429,11 +429,10 @@ test.describe("Pipeline testcases", { tag: ['@all', '@pipelines'] }, () => {
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
 
-    // Click the dashboards menu — onBeforeRouteLeave fires and shows a Vue
-    // ConfirmDialog instead of window.confirm (native dialog). Accept it.
+    // Leaving with unsaved changes opens the shared leave dialog; Discard completes the navigation.
     await pipelinePage.clickDashboardsMenu();
-    await pipelinePage.discardChangesOkBtn.waitFor({ state: 'visible', timeout: 10000 });
-    await pipelinePage.discardChangesOkBtn.click();
+    await pipelinePage.draftLeaveDiscardBtn.waitFor({ state: 'visible', timeout: 10000 });
+    await pipelinePage.draftLeaveDiscardBtn.click();
 
     // Assert the page navigates to the desired URL containing "dashboards"
     await page.waitForURL(/dashboards/);
@@ -458,11 +457,10 @@ test.describe("Pipeline testcases", { tag: ['@all', '@pipelines'] }, () => {
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
 
-    // Click the dashboards menu — onBeforeRouteLeave fires and shows a Vue
-    // ConfirmDialog instead of window.confirm (native dialog). Dismiss it.
+    // Closing the leave dialog keeps the user on the editor.
     await pipelinePage.clickDashboardsMenu();
-    await pipelinePage.discardChangesCancelBtn.waitFor({ state: 'visible', timeout: 10000 });
-    await pipelinePage.discardChangesCancelBtn.click();
+    await pipelinePage.draftLeaveCloseBtn.waitFor({ state: 'visible', timeout: 10000 });
+    await pipelinePage.draftLeaveCloseBtn.click();
 
     // Assert page url to have pipeline
     await expect(page).toHaveURL(/pipeline/);
@@ -532,13 +530,7 @@ test.describe("Pipeline testcases", { tag: ['@all', '@pipelines'] }, () => {
       // Second toggle: resumes the pipeline → ResumePipelineDialog opens
       toggleSwitch = await pipelinePage.openPipelineRowMenuAndGetToggle(pipelineName);
       await toggleSwitch.click();
-      const resumeDialog = page.locator('[data-test="resume-pipeline-dialog"]');
-      if (await resumeDialog.isVisible({ timeout: 3000 }).catch(() => false)) {
-        const resumePrimaryBtn = resumeDialog.locator('[data-test="o-dialog-primary-btn"]');
-        await resumePrimaryBtn.click();
-        await page.waitForTimeout(500);
-        testLogger.info('Resume dialog confirmed');
-      }
+      await pipelinePage.confirmResumePipelineDialog();
       testLogger.info('Pipeline toggle functionality verified');
     } catch (e) {
       testLogger.info('Toggle control not reachable via more-options menu', { error: e?.message });

@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed, ref } from "vue";
-import { useStore } from "vuex";
+import type { TranslateFn } from "@/types/i18n";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import {
   aggregateStepStats,
@@ -35,6 +35,7 @@ import {
   buildRunDetailSql,
   buildProtocolRunDetailSql,
   mapHistogram,
+  mapHistogramSplit,
   deriveKpiFromHistogram,
   mapProtocolRunDetail,
   mapRun,
@@ -80,13 +81,14 @@ const EMPTY_KPI: SyntheticKpi = {
  * Orchestration layer for KPI cards and Response Time chart.
  * Runs data is fetched separately via the REST /runs endpoint.
  */
-export function useSyntheticResults() {
-  const store = useStore();
-  const { getStream } = useStreams();
+export function useSyntheticResults(t: TranslateFn) {
+  const { getStream } = useStreams(t);
   const { executeQuery, cancelAll } = useLLMStreamQuery();
 
   const kpi = ref<SyntheticKpi>({ ...EMPTY_KPI });
   const buckets = ref<SyntheticBucket[]>([]);
+  /** Per-env bucket series — populated only on an env-split fetch. */
+  const bucketsByEnv = ref<Map<string, SyntheticBucket[]>>(new Map());
   const runs = ref<SyntheticRun[]>([]);
   const runDetail = ref<SyntheticRunDetail | null>(null);
   const protocolRunDetail = ref<ProtocolRunDetail | null>(null);
@@ -236,7 +238,9 @@ export function useSyntheticResults() {
     monitorId: string,
     startTime: number,
     endTime: number,
+    environment?: string,
   ): Promise<StepStatsResult | null> {
+    let hasStepEnvField = false;
     try {
       const stream: any = await getStream(SYNTHETIC_STEP_RESULTS_STREAM, "logs", true);
       const schema: { name: string }[] = stream?.schema ?? [];
@@ -245,21 +249,33 @@ export function useSyntheticResults() {
       // absent column is rejected outright by the search API — so a weaker check
       // would turn a partially-created stream into four failed queries.
       if (!schema.some((f) => f.name === "step_id")) return null;
+      hasStepEnvField = schema.some((f) => f.name === "environment");
     } catch {
       return null;
     }
+    if (environment && !hasStepEnvField) return null;
 
     try {
+      const stepEnv = environment || undefined;
       const [aggHits, dimHits, sparkHits, defHits] = await Promise.all([
-        executeQuery(buildStepAggregateSql(monitorId), startTime, endTime, "logs") as Promise<
-          Record<string, unknown>[]
-        >,
-        executeQuery(buildStepDimensionSql(monitorId), startTime, endTime, "logs") as Promise<
-          Record<string, unknown>[]
-        >,
-        executeQuery(buildStepSparklineSql(monitorId), startTime, endTime, "logs") as Promise<
-          Record<string, unknown>[]
-        >,
+        executeQuery(
+          buildStepAggregateSql(monitorId, stepEnv),
+          startTime,
+          endTime,
+          "logs",
+        ) as Promise<Record<string, unknown>[]>,
+        executeQuery(
+          buildStepDimensionSql(monitorId, stepEnv),
+          startTime,
+          endTime,
+          "logs",
+        ) as Promise<Record<string, unknown>[]>,
+        executeQuery(
+          buildStepSparklineSql(monitorId, 2000, stepEnv),
+          startTime,
+          endTime,
+          "logs",
+        ) as Promise<Record<string, unknown>[]>,
         // Step names and selectors still live on the execution record's
         // `recorded_steps` — the step stream carries ids, not the journey
         // definition, because a definition repeated on every step row would be
@@ -282,23 +298,27 @@ export function useSyntheticResults() {
     monitorId: string,
     startTime: number,
     endTime: number,
+    environment?: string,
   ): Promise<StepStatsResult> {
     try {
-      const fromStream = await fetchStepStreamStats(monitorId, startTime, endTime);
+      const fromStream = await fetchStepStreamStats(monitorId, startTime, endTime, environment);
       if (fromStream) return fromStream;
 
       let hasRetryHistory = false;
       let hasRetryAttribution = false;
       let hasStatusReason = false;
+      let hasEnvField = false;
       try {
         const stream: any = await getStream(SYNTHETIC_RESULTS_STREAM, "logs", true);
         const schema: { name: string }[] = stream?.schema ?? [];
         hasRetryHistory = schema.some((f) => f.name === "retry_history");
         hasRetryAttribution = schema.some((f) => f.name === "retry_step_ids");
         hasStatusReason = schema.some((f) => f.name === "status_reason");
+        hasEnvField = schema.some((f) => f.name === "environment");
       } catch {
         // Schema not available — omit retry_history, which is safe.
       }
+      if (environment && !hasEnvField) return emptyStepStats();
       // C7 — once the probe writes `retry_step_ids`, the flaky column is
       // answered by three scalars on the rows that actually retried, so the
       // ~1 KB-per-attempt `retry_history` blob stops being fetched across all
@@ -317,7 +337,7 @@ export function useSyntheticResults() {
       const STEP_DEFS_LIMIT = 100;
       const [hits, defHits, retryHits] = await Promise.all([
         executeQuery(
-          buildRunsWithStepsSql(monitorId, STEP_RUNS_LIMIT, selectRetryHistory),
+          buildRunsWithStepsSql(monitorId, STEP_RUNS_LIMIT, selectRetryHistory, environment),
           startTime,
           endTime,
           "logs",
@@ -330,7 +350,7 @@ export function useSyntheticResults() {
         ) as Promise<Record<string, unknown>[]>,
         useAttribution
           ? (executeQuery(
-              buildRetryAttributionSql(monitorId, STEP_RUNS_LIMIT, hasStatusReason),
+              buildRetryAttributionSql(monitorId, STEP_RUNS_LIMIT, hasStatusReason, environment),
               startTime,
               endTime,
               "logs",
@@ -383,7 +403,15 @@ export function useSyntheticResults() {
    * while the Steps tab is the one the fewest visits ever open. Callers drive it
    * separately through `fetchSteps` when the tab is actually in view.
    */
-  async function fetchAll(monitorId: string, startTime: number, endTime: number): Promise<void> {
+  async function fetchAll(
+    monitorId: string,
+    startTime: number,
+    endTime: number,
+    /** Environment NAME to scope every overview query to; undefined = all. */
+    environment?: string,
+    /** Request per-env chart series (multi-env check in All mode). */
+    splitEnvironments = false,
+  ): Promise<void> {
     if (!monitorId || !startTime || !endTime) return;
     loading.value = true;
     kpiLoading.value = true;
@@ -403,6 +431,19 @@ export function useSyntheticResults() {
       const schemaFields = await fetchSchemaFields();
       const hasAttemptsField = schemaFields.has("attempts");
       const hasStatusReasonField = schemaFields.has("status_reason");
+      if (environment && !schemaFields.has("environment")) {
+        kpi.value = { ...EMPTY_KPI };
+        buckets.value = [];
+        bucketsByEnv.value = new Map();
+        runs.value = [];
+        kpiLoading.value = false;
+        histogramLoading.value = false;
+        runsLoading.value = false;
+        kpiHasLoadedOnce.value = true;
+        histogramHasLoadedOnce.value = true;
+        runsHasLoadedOnce.value = true;
+        return;
+      }
 
       // The histogram now feeds BOTH the charts and the KPI tiles.
       //
@@ -412,8 +453,16 @@ export function useSyntheticResults() {
       // cached histogram beside it. Every count tile is a plain sum over the
       // buckets, so this is exact rather than an approximation — only p95 needs
       // its own (small) query, because percentiles do not sum.
+      const split = splitEnvironments && !environment && schemaFields.has("environment");
       const histogramRowsP = executeQuery(
-        buildHistogramSql(monitorId, interval, hasAttemptsField, hasStatusReasonField),
+        buildHistogramSql(
+          monitorId,
+          interval,
+          hasAttemptsField,
+          hasStatusReasonField,
+          environment,
+          split,
+        ),
         startTime,
         endTime,
         "logs",
@@ -421,8 +470,8 @@ export function useSyntheticResults() {
 
       const kpiPromise = Promise.all([
         histogramRowsP,
-        executeQuery(buildP95Sql(monitorId), startTime, endTime, "logs"),
-        executeQuery(buildLastRunSql(monitorId), startTime, endTime, "logs"),
+        executeQuery(buildP95Sql(monitorId, environment), startTime, endTime, "logs"),
+        executeQuery(buildLastRunSql(monitorId, environment), startTime, endTime, "logs"),
       ])
         .then(([histogramRows, p95Rows, lastRunRows]) => {
           kpi.value = deriveKpiFromHistogram(
@@ -433,7 +482,8 @@ export function useSyntheticResults() {
         })
         .catch((e: unknown) => {
           kpi.value = { ...EMPTY_KPI };
-          kpiError.value = e instanceof Error ? e.message : String(e ?? "KPI query failed");
+          kpiError.value =
+            e instanceof Error ? e.message : String(e ?? t("synthetics.kpiQueryFailed"));
         })
         .finally(() => {
           kpiLoading.value = false;
@@ -443,12 +493,20 @@ export function useSyntheticResults() {
       // Group 2: the same histogram rows feed the response-time and errors charts.
       const histogramPromise = histogramRowsP
         .then((histogramRows) => {
-          buckets.value = mapHistogram(histogramRows, startTime, endTime);
+          if (split) {
+            const folded = mapHistogramSplit(histogramRows, startTime, endTime);
+            buckets.value = folded.blended;
+            bucketsByEnv.value = folded.byEnv;
+          } else {
+            buckets.value = mapHistogram(histogramRows, startTime, endTime);
+            bucketsByEnv.value = new Map();
+          }
         })
         .catch((e: unknown) => {
           buckets.value = [];
+          bucketsByEnv.value = new Map();
           histogramError.value =
-            e instanceof Error ? e.message : String(e ?? "Histogram query failed");
+            e instanceof Error ? e.message : String(e ?? t("synthetics.histogramQueryFailed"));
         })
         .finally(() => {
           histogramLoading.value = false;
@@ -458,7 +516,7 @@ export function useSyntheticResults() {
       // Group 3: Runs list — feeds timeline, breakdown cards, table,
       // steps tab, and errors tab. Typically the slowest query.
       const runsPromise = executeQuery(
-        buildRunsSql(monitorId, RUNS_QUERY_LIMIT, schemaFields),
+        buildRunsSql(monitorId, RUNS_QUERY_LIMIT, schemaFields, environment),
         startTime,
         endTime,
         "logs",
@@ -468,7 +526,8 @@ export function useSyntheticResults() {
         })
         .catch((e: unknown) => {
           runs.value = [];
-          runsError.value = e instanceof Error ? e.message : String(e ?? "Runs query failed");
+          runsError.value =
+            e instanceof Error ? e.message : String(e ?? t("synthetics.runsQueryFailed"));
         })
         .finally(() => {
           runsLoading.value = false;
@@ -479,7 +538,7 @@ export function useSyntheticResults() {
       // get a meaningful completion signal.
       await Promise.all([kpiPromise, histogramPromise, runsPromise]);
     } catch (e: unknown) {
-      error.value = e instanceof Error ? e.message : "Failed to load results";
+      error.value = e instanceof Error ? e.message : t("synthetics.failedToLoadResults");
       kpi.value = { ...EMPTY_KPI };
       buckets.value = [];
     } finally {
@@ -510,7 +569,7 @@ export function useSyntheticResults() {
         runDetail.value = mapRunDetail(rows[0]);
       }
     } catch (e: unknown) {
-      error.value = e instanceof Error ? e.message : "Failed to load run";
+      error.value = e instanceof Error ? e.message : t("synthetics.failedToLoadRun");
       runDetail.value = null;
     } finally {
       loading.value = false;
@@ -541,7 +600,7 @@ export function useSyntheticResults() {
         protocolRunDetail.value = mapProtocolRunDetail(rows[0]);
       }
     } catch (e: unknown) {
-      error.value = e instanceof Error ? e.message : "Failed to load run";
+      error.value = e instanceof Error ? e.message : t("synthetics.failedToLoadRun");
       protocolRunDetail.value = null;
     } finally {
       loading.value = false;
@@ -556,15 +615,21 @@ export function useSyntheticResults() {
    * Called on its own rather than from `fetchAll`, so the Steps tab pays for
    * this only when it is opened or its window changes underneath it.
    */
-  async function fetchSteps(monitorId: string, startTime: number, endTime: number): Promise<void> {
+  async function fetchSteps(
+    monitorId: string,
+    startTime: number,
+    endTime: number,
+    environment?: string,
+  ): Promise<void> {
     if (!monitorId || !startTime || !endTime) return;
     stepsLoading.value = true;
     stepsError.value = null;
     try {
-      stepStats.value = await fetchAndAggregateSteps(monitorId, startTime, endTime);
+      stepStats.value = await fetchAndAggregateSteps(monitorId, startTime, endTime, environment);
     } catch (e: unknown) {
       stepStats.value = emptyStepStats();
-      stepsError.value = e instanceof Error ? e.message : String(e ?? "Steps query failed");
+      stepsError.value =
+        e instanceof Error ? e.message : String(e ?? t("synthetics.stepsQueryFailed"));
     } finally {
       stepsLoading.value = false;
       stepsHasLoadedOnce.value = true;
@@ -574,6 +639,7 @@ export function useSyntheticResults() {
   return {
     kpi,
     buckets,
+    bucketsByEnv,
     runs,
     runsTruncated,
     runDetail,

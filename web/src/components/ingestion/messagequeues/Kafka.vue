@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import CopyContent from "@/components/CopyContent.vue";
+import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
 import useIngestion from "@/composables/useIngestion";
@@ -27,7 +27,7 @@ const docURL = messageQueuesDocURLs[name];
 
 <template>
   <IngestionContent>
-    <CopyContent :content="content" />
+    <CredentialCodeBlock slug="kafka" :content="content" />
     <IngestionDocLink :href="docURL" />
   </IngestionContent>
 </template>

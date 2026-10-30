@@ -2,15 +2,29 @@
 
 <script setup lang="ts">
 import type { Cell, Row } from "@tanstack/vue-table";
-import { computed, inject, ref, useSlots } from "vue";
+import type { VNode } from "vue";
+import type { TooltipSide } from "@/lib/overlay/Tooltip/OTooltip.types";
+import {
+  Comment,
+  Fragment,
+  Text,
+  computed,
+  inject,
+  nextTick,
+  onBeforeUnmount,
+  ref,
+  useSlots,
+  watch,
+} from "vue";
 import { FlexRender } from "@tanstack/vue-table";
 import { useSanitizedHtml } from "../composables/useSanitizedHtml";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { OTableTreeContextKey } from "../composables/useTableTree";
-import { OTableCellActionsKey } from "../OTable.types";
+import { OTableCellActionsKey, OTableOverflowTooltipKey } from "../OTable.types";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
 import { copyToClipboard } from "@/utils/clipboard";
+import { useI18nTyped } from "@/types/i18n";
 
 const slots = useSlots();
 
@@ -24,7 +38,7 @@ async function handleCopy(event: MouseEvent) {
   // Copy what the user sees: the formatted display value (dashboard format fns
   // handle units, timestamps and no_value_replacement), not the raw cell value.
   const value = String(displayValue.value ?? "");
-  const success = await copyToClipboard(value, { silent: true });
+  const success = await copyToClipboard(value, t, { silent: true });
   if (success) {
     copied.value = true;
     if (copyTimer) clearTimeout(copyTimer);
@@ -43,6 +57,7 @@ const props = defineProps<{
   getHighlightedHtml?: (columnId: string, cellValue: any) => string | null;
   wrap?: boolean;
   dense?: boolean;
+  compact?: boolean;
   bordered?: boolean;
   enableCellCopy?: boolean;
   getCellStyle?: (params: { columnId: string; row: any; value: any }) => Record<string, any>;
@@ -80,10 +95,11 @@ const slotAlignClass = computed(() => {
   return "flex items-center w-full min-w-0";
 });
 
-// Slotted content truncates to one line unless `wrap` is on, mirroring the
-// default (non-slot) behaviour.
+// Truncates like `truncate`, but clip with a margin lets a focused control's outline in the slot still paint.
 const slotContentClass = computed(() =>
-  props.wrap ? "min-w-0 flex-1 wrap-anywhere whitespace-normal" : "truncate min-w-0 flex-1",
+  props.wrap
+    ? "min-w-0 flex-1 wrap-anywhere whitespace-normal"
+    : "min-w-0 flex-1 overflow-clip text-ellipsis whitespace-nowrap [overflow-clip-margin:0.25rem]",
 );
 
 const isPinned = computed(() => props.cell.column.getIsPinned?.() ?? false);
@@ -148,7 +164,7 @@ const pivotTotalStyle = computed<Record<string, any>>(() => {
     maxWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     backgroundColor: "var(--color-table-cell-bg)",
     // Same left-edge separator as the header, so it runs down the whole column.
-    boxShadow: "-2px 0 4px -2px var(--color-border-default)",
+    boxShadow: "var(--shadow-sticky-right)",
   };
 });
 
@@ -210,13 +226,13 @@ const cellStyle = computed(() => {
     base.position = "sticky";
     base.left = `${pinOffset.value}px`;
     base.zIndex = 1;
-    base.boxShadow = "2px 0 4px -2px var(--color-border-default)";
+    base.boxShadow = "var(--shadow-sticky-left)";
   }
   if (isPinned.value === "right") {
     base.position = "sticky";
     base.right = `${pinOffset.value}px`;
     base.zIndex = 1;
-    base.boxShadow = "-2px 0 4px -2px var(--color-border-default)";
+    base.boxShadow = "var(--shadow-sticky-right)";
   }
   const extra = props.getCellStyle?.({
     columnId: props.cell.column.id,
@@ -272,6 +288,8 @@ function handleClick() {
   });
 }
 
+const { t } = useI18nTyped();
+
 // Right-click. Emitted as plain values (not the TanStack cell) so a consumer's
 // context menu keeps rendering correctly even after the virtualizer recycles
 // the row underneath it. The event is NOT prevented — the consumer decides
@@ -290,16 +308,141 @@ function handleContextMenu() {
 const hasCellActions = computed(() => !!slots["cell-hover-actions"]);
 const cellActionsCtx = inject(OTableCellActionsKey, null);
 const isCellActionActive = computed(() => cellActionsCtx?.activeCellKey.value === props.cell.id);
-function onCellActionsEnter() {
-  if (hasCellActions.value) cellActionsCtx?.setActiveCell(props.cell.id);
+
+// Anchored to the cell's top edge (not the pointer) with an arrow pointing back at
+// the row, so the toolbar can't be read as belonging to the row it is drawn over.
+// The cell is one row tall and clips overflow, hence <body> teleport + inline coords.
+const cellEl = ref<HTMLElement | null>(null);
+const cellActionsEl = ref<HTMLElement | null>(null);
+const cellActionsX = ref(0);
+const cellActionsY = ref(0);
+const cellActionsBelow = ref(false);
+const cellActionsPointerX = ref(0);
+const cellActionsArrowX = ref(0);
+
+const cellActionsStyle = computed(() => ({
+  // px because these are viewport coordinates read off getBoundingClientRect.
+  left: `${cellActionsX.value}px`,
+  top: `${cellActionsY.value}px`,
+  transform: cellActionsBelow.value ? "translate(-50%, 0)" : "translate(-50%, -100%)",
+}));
+
+// Clip the rotated square to the half outside the bar plus a ~1.5px sliver that hides
+// the bar's border; the full square would notch any filled control (the AI chip) 3px in.
+const cellActionsArrowClass = computed(() =>
+  cellActionsBelow.value
+    ? "-top-1 border-t border-s [clip-path:polygon(0_0,100%_0,100%_26%,26%_100%,0_100%)]"
+    : "-bottom-1 border-e border-b [clip-path:polygon(0_100%,100%_100%,100%_0,74%_0,0_74%)]",
+);
+
+// Arrow centre within the bar (`-ms-1` offsets its box), so it stays under the pointer
+// after the bar is clamped to the window.
+const cellActionsArrowStyle = computed(() => ({ left: `${cellActionsArrowX.value}px` }));
+
+function onCellActionsEnter(event: MouseEvent) {
+  if (!hasCellActions.value) return;
+  cellActionsPointerX.value = event.clientX ?? 0;
+  cellActionsX.value = cellActionsPointerX.value;
+  // Pre-placed so the toolbar doesn't flash at the window origin before measurement.
+  cellActionsY.value = cellEl.value?.getBoundingClientRect().top ?? event.clientY ?? 0;
+  cellActionsBelow.value = false;
+  cellActionsCtx?.setActiveCell(props.cell.id);
 }
 function onCellActionsLeave() {
   if (hasCellActions.value) cellActionsCtx?.setActiveCell(null);
 }
+
+const overflowTooltipCtx = inject(OTableOverflowTooltipKey, null);
+function onCellEnter(event: MouseEvent) {
+  if (!isAction.value && meta.value?.cellOverflowTooltip !== false && cellEl.value) {
+    overflowTooltipCtx?.enter(cellEl.value, cellActionsSide);
+  }
+  onCellActionsEnter(event);
+}
+function onCellLeave() {
+  overflowTooltipCtx?.leave();
+  onCellActionsLeave();
+}
+// The toolbar lives outside the <td>, so the cell's mouseleave has already fired by
+// the time the pointer reaches it — re-assert the active cell to cancel the clear.
+function onCellActionsHoverEnter() {
+  cellActionsCtx?.setActiveCell(props.cell.id);
+}
+
+// Consumers typically render actions for only some columns, so the slot is empty on
+// most cells. The toolbar now has a visible surface, and an empty one would read as a
+// stray box floating next to the pointer — so only show it once the slot yields
+// something. `v-if` inside the slot leaves comment placeholders, hence the walk.
+function hasRenderedContent(nodes: VNode[] | undefined): boolean {
+  return !!nodes?.some((node) => {
+    if (node.type === Comment) return false;
+    if (node.type === Fragment) return hasRenderedContent(node.children as VNode[]);
+    if (node.type === Text) return String(node.children ?? "").trim().length > 0;
+    return true;
+  });
+}
+
+// Short-circuit on the inactive cells: building throwaway vnodes for every cell of
+// every render would cost far more than the one hovered cell it answers for.
+const hasCellActionsContent = computed(() => {
+  if (!isCellActionActive.value) return false;
+  return hasRenderedContent(
+    slots["cell-hover-actions"]?.({
+      row: props.row.original,
+      column: props.cell.column.columnDef,
+      value: rawValue.value,
+      active: true,
+    }),
+  );
+});
+
+// Read when the table's cut-off tooltip opens, so it can take the side this toolbar leaves free.
+function cellActionsSide(): TooltipSide | null {
+  if (!hasCellActions.value || !isCellActionActive.value || !hasCellActionsContent.value) {
+    return null;
+  }
+  return cellActionsBelow.value ? "bottom" : "top";
+}
+
+// Fixed coordinates don't follow a scrolling row, so drop the toolbar instead of
+// letting it hang over unrelated content.
+function onScrollDismiss() {
+  cellActionsCtx?.setActiveCell(null);
+}
+
+watch(isCellActionActive, async (active) => {
+  if (!active) {
+    window.removeEventListener("scroll", onScrollDismiss, true);
+    return;
+  }
+  window.addEventListener("scroll", onScrollDismiss, { capture: true, passive: true });
+  await nextTick();
+  const bar = cellActionsEl.value?.getBoundingClientRect();
+  const cellRect = cellEl.value?.getBoundingClientRect();
+  if (!bar || !cellRect) return;
+  // The sticky header, not the window edge, is the ceiling: flip below rather than cover it.
+  const headerBottom =
+    cellEl.value?.closest("table")?.querySelector("thead")?.getBoundingClientRect().bottom ?? 0;
+  cellActionsBelow.value = cellRect.top - bar.height < Math.max(headerBottom, 0);
+  cellActionsY.value = cellActionsBelow.value ? cellRect.bottom : cellRect.top;
+  const half = bar.width / 2;
+  cellActionsX.value = Math.min(
+    Math.max(cellActionsPointerX.value, half),
+    window.innerWidth - half,
+  );
+  // Keep the arrow clear of the bar's corner radius once the bar has been clamped.
+  cellActionsArrowX.value = Math.min(
+    Math.max(cellActionsPointerX.value - (cellActionsX.value - half), 10),
+    Math.max(bar.width - 10, 10),
+  );
+});
+
+onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true));
 </script>
 
 <template>
   <td
+    ref="cellEl"
     :data-test="`o2-table-cell-${cell.column.id}`"
     :class="[
       // Base text color for the whole cell so custom `#cell-*` slots (which skip
@@ -307,7 +450,7 @@ function onCellActionsLeave() {
       // instead of falling back to a grey inherited value in dark mode. Inner
       // links/badges override this with their own color.
       'text-text-body',
-      meta?.spacer
+      meta?.spacer || compact
         ? 'px-0 align-middle'
         : meta?.compactPadding
           ? 'px-1 align-middle'
@@ -317,8 +460,8 @@ function onCellActionsLeave() {
       isAction ? 'w-0 whitespace-nowrap' : '',
       isPinned
         ? rowSelected
-          ? 'bg-table-row-selected-bg group-hover/row:bg-table-row-hover-bg transition-colors duration-150'
-          : 'bg-table-cell-bg group-hover/row:bg-table-row-hover-bg transition-colors duration-150'
+          ? 'bg-table-row-selected-bg transition-colors duration-(--duration-hover-out)'
+          : 'bg-table-cell-bg group-hover/row:bg-table-row-hover-bg transition-colors duration-(--duration-hover-out) group-hover/row:duration-(--duration-hover-in)'
         : '',
       wrap
         ? 'wrap-anywhere whitespace-normal'
@@ -327,10 +470,10 @@ function onCellActionsLeave() {
             ? 'overflow-hidden text-ellipsis whitespace-nowrap'
             : 'whitespace-nowrap'
           : isAction
-            ? 'overflow-hidden whitespace-nowrap'
+            ? 'overflow-clip whitespace-nowrap [overflow-clip-margin:0.25rem] has-[:focus-visible]:z-2!'
             : 'overflow-hidden text-ellipsis whitespace-nowrap',
       meta?.cellClass ?? '',
-      isTreeColumn || hasCellActions ? 'relative' : '',
+      isTreeColumn ? 'relative' : '',
       enableCellCopy ? 'group/cell' : '',
       isTreeColumn && treeMeta?.isParent && treeMeta?.isExpanded ? 'o2-tree-parent-expanded' : '',
       isTreeColumn && treeMeta && treeMeta.parentId !== null ? 'o2-tree-child' : '',
@@ -350,8 +493,8 @@ function onCellActionsLeave() {
     ]"
     @click="handleClick"
     @contextmenu="handleContextMenu"
-    @mouseenter="onCellActionsEnter"
-    @mouseleave="onCellActionsLeave"
+    @mouseenter="onCellEnter"
+    @mouseleave="onCellLeave"
   >
     <!-- Tree-mode wrapper: indent + chevron + cell content -->
     <div
@@ -381,7 +524,7 @@ function onCellActionsLeave() {
       </span>
       <div class="min-w-0 flex-1">
         <div v-if="$slots.default" :class="slotAlignClass">
-          <div v-if="!isAction" :class="slotContentClass"><slot /></div>
+          <div v-if="!isAction" :class="slotContentClass" data-o2-cell-clip><slot /></div>
           <slot v-else />
         </div>
         <FlexRender
@@ -400,7 +543,7 @@ function onCellActionsLeave() {
     <template v-else-if="!pivotMerge?.hideContent">
       <div v-if="$slots.default" :class="slotAlignClass">
         <!-- Non-action slot content truncates with an ellipsis by default. -->
-        <div v-if="!isAction" :class="slotContentClass"><slot /></div>
+        <div v-if="!isAction" :class="slotContentClass" data-o2-cell-clip><slot /></div>
         <slot v-else />
       </div>
       <!-- Copy-enabled cell: value and copy button share a flex row, so the
@@ -418,9 +561,10 @@ function onCellActionsLeave() {
         <span
           v-else-if="highlightedHtml"
           :class="[defaultTextClass, copyValueClass]"
+          data-o2-cell-clip
           v-html="highlightedHtml"
         />
-        <span v-else :class="[defaultTextClass, copyValueClass]">
+        <span v-else :class="[defaultTextClass, copyValueClass]" data-o2-cell-clip>
           {{ displayValue }}
         </span>
         <OButton
@@ -428,13 +572,20 @@ function onCellActionsLeave() {
           size="icon-xs-sq"
           :data-test="`o2-table-cell-copy-${cell.column.id}`"
           :data-copied="copied ? 'true' : undefined"
-          class="h-4! min-h-0! w-4! shrink-0 opacity-0 transition-opacity group-hover/cell:opacity-100"
-          :class="align === 'right' ? 'order-first mr-1' : 'ml-1'"
-          :title="copied ? 'Copied!' : 'Copy'"
+          class="h-4! min-h-0! w-4! shrink-0 opacity-0 transition-opacity group-hover/cell:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
+          :class="align === 'right' ? 'order-first me-1' : 'ms-1'"
+          :title="copied ? t('common.copiedExclaim') : t('common.copy')"
           @click="handleCopy"
         >
           <OIcon :name="copied ? 'check' : 'content-copy'" size="sm" />
         </OButton>
+        <!-- Inline actions right of the copy button -->
+        <slot
+          name="copy-actions"
+          :column-id="cell.column.id"
+          :row="row.original"
+          :value="rawValue"
+        />
       </div>
       <!-- Custom cell render via TanStack FlexRender -->
       <FlexRender
@@ -450,21 +601,47 @@ function onCellActionsLeave() {
       </span>
     </template>
 
-    <!-- Per-cell hover-action overlay. Spans the cell's right edge full-height
-         so it anchors both flow content and self-positioned content. -->
-    <div
-      v-if="hasCellActions"
-      class="o2-table-cell-hover-actions absolute inset-y-0 right-0 z-2 flex items-center"
-      :data-test="`o2-table-cell-hover-actions-${cell.column.id}`"
-    >
-      <slot
-        name="cell-hover-actions"
-        :row="row.original"
-        :column="cell.column.columnDef"
-        :value="rawValue"
-        :active="isCellActionActive"
-      />
-    </div>
+    <!-- Hover-action toolbar, floated clear of the hovered row and teleported out of
+         the cell, which is one row tall and clips overflow. The wrapper's padding is
+         the gap the user sees AND the hover bridge from the row up to the buttons —
+         without it the pointer would cross bare table on the way and activate the
+         row above. -->
+    <Teleport v-if="hasCellActions && isCellActionActive && hasCellActionsContent" to="body">
+      <div
+        ref="cellActionsEl"
+        class="o2-table-cell-hover-actions fixed z-1000"
+        :class="cellActionsBelow ? 'pt-1.5' : 'pb-1.5'"
+        :style="cellActionsStyle"
+        :data-test="`o2-table-cell-hover-actions-${cell.column.id}`"
+        @mouseenter="onCellActionsHoverEnter"
+        @mouseleave="onCellActionsLeave"
+      >
+        <div class="relative">
+          <!-- empty:hidden covers what the vnode walk can't see: slot content that IS a
+               component but renders nothing, e.g. the AI button on a non-AI build. -->
+          <div
+            class="peer bg-surface-overlay rounded-default shadow-overlay flex items-center gap-1 border border-solid border-transparent px-1 py-0.5 empty:hidden"
+          >
+            <slot
+              name="cell-hover-actions"
+              :row="row.original"
+              :column="cell.column.columnDef"
+              :value="rawValue"
+              :active="isCellActionActive"
+            />
+          </div>
+          <!-- The bar sits clear of the hovered row, so this arrow is the only thing
+               tying it to the row it acts on. -->
+          <span
+            class="bg-surface-overlay border-border-default absolute -ms-1 size-2 rotate-45 border-solid peer-empty:hidden"
+            :class="cellActionsArrowClass"
+            :style="cellActionsArrowStyle"
+            :data-test="`o2-table-cell-hover-arrow-${cell.column.id}`"
+            aria-hidden="true"
+          />
+        </div>
+      </div>
+    </Teleport>
   </td>
 </template>
 

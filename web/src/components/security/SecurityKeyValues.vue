@@ -4,7 +4,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 <!-- Label/value rows for a record drawer; every value copies, and pivots when `pivotable`. -->
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -32,7 +32,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{ pivot: [field: string, value: string, op: "=" | "!="] }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const search = ref("");
 const copied = ref<string | null>(null);
 

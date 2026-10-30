@@ -15,9 +15,11 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+import { nextTick } from "vue";
 import SearchResult from "@/plugins/logs/SearchResult.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import { resetLogsAutoRunForTests } from "@/composables/useLogs/logsAutoRun";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -36,10 +38,47 @@ const oDrawerStub = {
   emits: ["update:open", "close"],
 };
 
+// Named stub so props and the presence of a `loading-banner` slot are observable.
+vi.mock("@/lib/core/Table/OTable.vue", () => ({
+  // defineAsyncComponent unwraps `.default` only for a module-shaped result.
+  __esModule: true,
+  default: {
+    name: "OTable",
+    props: [
+      "columns",
+      "data",
+      "loading",
+      "streaming",
+      "wrap",
+      "rowKey",
+      "virtualScroll",
+      "rowClass",
+      "getRowStatusColor",
+    ],
+    template:
+      '<div data-test="otable-stub">' +
+      '<div v-if="$slots[\'loading-banner\']" data-test="otable-stub-has-loading-banner-slot" />' +
+      '<div v-for="(r, i) in (data || [])" :key="i" data-test="otable-stub-row" :class="rowClass ? rowClass(r) : \'\'" :data-row-status-color="getRowStatusColor ? getRowStatusColor(r) : \'\'">' +
+      '<div v-for="c in (columns || [])" :key="c.id" :data-test="\'otable-stub-cell-\' + c.id"><slot :name="\'cell-\' + c.id" :row="r" :value="r[c.id]" /></div>' +
+      "</div>" +
+      "</div>",
+  },
+}));
+
+// Named stub so both progress bars on the page can be told apart by their props.
+vi.mock("@/components/common/LoadingProgress.vue", () => ({
+  default: {
+    name: "LoadingProgress",
+    props: ["loading", "loadingProgressPercentage"],
+    template: '<div data-test="loading-progress-stub" />',
+  },
+}));
+
 describe("SearchResult Component", () => {
   let wrapper: any;
 
   beforeEach(async () => {
+    resetLogsAutoRunForTests();
     // jsdom does not implement HTMLElement.scrollTo
     HTMLElement.prototype.scrollTo = vi.fn();
 
@@ -81,11 +120,9 @@ describe("SearchResult Component", () => {
           DetailTable: true,
           ChartRenderer: true,
           SanitizedHtmlRenderer: true,
-          OTable: true,
           CellActions: true,
           O2AIContextAddBtn: true,
           PatternDetailsDialog: true,
-          TracesAnalysisDashboard: true,
           ODrawer: oDrawerStub,
         },
       },
@@ -102,6 +139,41 @@ describe("SearchResult Component", () => {
       wrapper.unmount();
     }
     vi.clearAllMocks();
+  });
+
+  describe("Quick mode hint in the expanded row (issue 16022)", () => {
+    const setQuickModeState = (quickMode: boolean) => {
+      const { meta, data } = wrapper.vm.searchObj;
+      meta.quickMode = quickMode;
+      meta.sqlMode = false;
+      data.stream.selectedStream = ["app"];
+      data.stream.interestingFieldList = ["level"];
+      data.stream.selectedStreamFields = [
+        { name: "_timestamp", isSchemaField: true },
+        { name: "level", isSchemaField: true },
+        { name: "message", isSchemaField: true },
+      ];
+    };
+
+    it("reports hidden fields for a quick-mode row", () => {
+      setQuickModeState(true);
+      expect(wrapper.vm.quickModeHiddenFields({ _timestamp: 1, level: "info" })).toEqual({
+        shown: 2,
+        total: 3,
+      });
+    });
+
+    it("reports nothing when quick mode is off", () => {
+      setQuickModeState(false);
+      expect(wrapper.vm.quickModeHiddenFields({ _timestamp: 1, level: "info" })).toBeNull();
+    });
+
+    it("turns off quick mode and runs the query again", () => {
+      setQuickModeState(true);
+      wrapper.vm.turnOffQuickMode();
+      expect(wrapper.vm.searchObj.meta.quickMode).toBe(false);
+      expect(wrapper.emitted("run-query")).toHaveLength(1);
+    });
   });
 
   describe("Table Functionality", () => {
@@ -126,6 +198,20 @@ describe("SearchResult Component", () => {
     it("should handle missing scrollContainerRef in scrollTableToTop", () => {
       wrapper.vm.scrollContainerRef = null;
       expect(() => wrapper.vm.scrollTableToTop(0)).not.toThrow();
+    });
+
+    // Regression: the skeleton clamped the shared scroller mid-list, so a fresh patterns result mounted half-way down instead of at the top
+    it("should scroll the shared container to the top when a patterns extraction starts", async () => {
+      const scrollToSpy = vi.fn();
+      wrapper.vm.scrollContainerRef = { scrollTo: scrollToSpy };
+      wrapper.vm.patternsState = { ...wrapper.vm.patternsState, loading: false };
+      await flushPromises();
+      scrollToSpy.mockClear();
+
+      wrapper.vm.patternsState = { ...wrapper.vm.patternsState, loading: true };
+      await flushPromises();
+
+      expect(scrollToSpy).toHaveBeenCalledWith({ top: 0 });
     });
   });
 
@@ -189,6 +275,30 @@ describe("SearchResult Component", () => {
       expect(wrapper.emitted()["expandlog"]).toEqual([[3]]);
     });
 
+    it("filters the (empty) breakdown row by NULL only for a numeric field", () => {
+      wrapper.vm.pinnedTooltip = { ...wrapper.vm.pinnedTooltip, field: "status" };
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+        { name: "status", dataType: "Int64" },
+      ];
+
+      wrapper.vm.applyPinnedFilter("", "include");
+
+      expect(wrapper.vm.searchObj.data.stream.addToFilterMode).toBe("append");
+      expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe("status is null");
+    });
+
+    it("filters the (empty) breakdown row by NULL and '' for a string field", () => {
+      wrapper.vm.pinnedTooltip = { ...wrapper.vm.pinnedTooltip, field: "level" };
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [{ name: "level", dataType: "Utf8" }];
+
+      wrapper.vm.applyPinnedFilter("", "exclude");
+
+      expect(wrapper.vm.searchObj.data.stream.addToFilterMode).toBe("append");
+      expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe(
+        "(level is not null AND level != '')",
+      );
+    });
+
     it("should toggle error details", async () => {
       wrapper.vm.disableMoreErrorDetails = false;
 
@@ -203,6 +313,164 @@ describe("SearchResult Component", () => {
       await wrapper.vm.sendToAiChat(testValue);
 
       expect(wrapper.emitted()["sendToAiChat"]).toEqual([[testValue, true]]); // includes append parameter
+    });
+  });
+
+  describe("pinned breakdown tooltip and theme changes", () => {
+    const ts = 1640995200000;
+    const accents = new Map<Element, string>();
+    let styleSpy: ReturnType<typeof vi.spyOn>;
+    let originalTheme: string;
+    let originalShowHistogram: boolean;
+    let originalHistogram: any;
+    let chartMock: any;
+
+    const pinAt = () =>
+      wrapper.vm.onHistogramAreaClick({
+        currentTarget: { getBoundingClientRect: () => ({ left: 0, top: 0 }) },
+        clientX: 10,
+        clientY: 10,
+      });
+    const emptyRowColor = () =>
+      wrapper.vm.pinnedTooltip.rows.find((r: any) => r.rawValue === "").color;
+
+    beforeEach(async () => {
+      originalTheme = store.state.theme;
+      originalShowHistogram = wrapper.vm.searchObj.meta.showHistogram;
+      originalHistogram = wrapper.vm.searchObj.data.histogram;
+      store.state.theme = "light";
+      await flushPromises();
+      document.documentElement.classList.remove("dark");
+      accents.set(document.documentElement, "rgba(91, 76, 240, 1)");
+      accents.set(document.body, "rgba(139, 141, 240, 1)");
+      styleSpy = vi.spyOn(window, "getComputedStyle").mockImplementation(
+        (el: Element) =>
+          ({
+            getPropertyValue: (prop: string) =>
+              prop === "--color-theme-accent" ? (accents.get(el) ?? "") : "",
+          }) as unknown as CSSStyleDeclaration,
+      );
+      // Hidden chart, so re-renders cannot replace the mocked ECharts instance.
+      wrapper.vm.searchObj.meta.showHistogram = false;
+      wrapper.vm.searchObj.data.histogram = {
+        xData: [ts],
+        yData: [5],
+        breakdownField: "level",
+        breakdownSeries: new Map([
+          ["error", [2]],
+          ["", [3]],
+        ]),
+        chartParams: { title: "", timezone: "UTC" },
+      };
+      wrapper.vm.reDrawChart();
+      await flushPromises();
+      chartMock = {
+        containPixel: vi.fn(() => true),
+        convertFromPixel: vi.fn(() => [ts, 0]),
+        dispatchAction: vi.fn(),
+        setOption: vi.fn(),
+      };
+      wrapper.vm.histogramChart = { chart: chartMock };
+    });
+
+    afterEach(async () => {
+      styleSpy.mockRestore();
+      accents.clear();
+      vi.useRealTimers();
+      localStorage.removeItem("appliedLightThemeName");
+      document.documentElement.classList.remove("dark");
+      wrapper.vm.searchObj.meta.showHistogram = originalShowHistogram;
+      wrapper.vm.searchObj.data.histogram = originalHistogram;
+      store.state.theme = originalTheme;
+      await flushPromises();
+    });
+
+    it("pins the (empty) row with the current accent and keeps populated colors", () => {
+      pinAt();
+
+      expect(wrapper.vm.pinnedTooltip.visible).toBe(true);
+      expect(emptyRowColor()).toBe("rgba(91, 76, 240, 1)");
+      expect(wrapper.vm.pinnedTooltip.rows.find((r: any) => r.rawValue === "error").color).toBe(
+        "#EF5350",
+      );
+    });
+
+    it("closes the pin on a custom accent change and repins with the new accent", async () => {
+      vi.useFakeTimers();
+      localStorage.setItem("appliedLightThemeName", "__custom__");
+      pinAt();
+
+      accents.set(document.documentElement, "rgba(16, 185, 129, 1)");
+      window.dispatchEvent(new CustomEvent("themeColorChanged"));
+      await nextTick();
+
+      expect(wrapper.vm.pinnedTooltip.visible).toBe(false);
+      expect(chartMock.setOption).toHaveBeenCalledWith(
+        { tooltip: { triggerOn: "mousemove|click" } },
+        false,
+      );
+
+      vi.advanceTimersByTime(300);
+      pinAt();
+      expect(emptyRowColor()).toBe("rgba(16, 185, 129, 1)");
+    });
+
+    it("closes the pin on a light/dark mode change and repins with the dark accent", async () => {
+      pinAt();
+
+      store.state.theme = "dark";
+      await flushPromises();
+
+      expect(wrapper.vm.pinnedTooltip.visible).toBe(false);
+      pinAt();
+      expect(emptyRowColor()).toBe("rgba(139, 141, 240, 1)");
+    });
+
+    it("closes a pin opened during the accent debounce once the redraw runs", async () => {
+      vi.useFakeTimers();
+      localStorage.setItem("appliedLightThemeName", "__custom__");
+      pinAt();
+
+      accents.set(document.documentElement, "rgba(16, 185, 129, 1)");
+      window.dispatchEvent(new CustomEvent("themeColorChanged"));
+      await nextTick();
+      pinAt();
+      expect(wrapper.vm.pinnedTooltip.visible).toBe(true);
+
+      vi.advanceTimersByTime(300);
+      expect(wrapper.vm.pinnedTooltip.visible).toBe(false);
+      pinAt();
+      expect(emptyRowColor()).toBe("rgba(16, 185, 129, 1)");
+    });
+
+    it("gives the empty group and a literal (empty) value their own series colors", async () => {
+      wrapper.vm.searchObj.data.histogram = {
+        ...wrapper.vm.searchObj.data.histogram,
+        breakdownSeries: new Map([
+          ["", [3]],
+          ["(empty)", [1]],
+          ["error", [2]],
+        ]),
+      };
+      wrapper.vm.reDrawChart();
+      await flushPromises();
+      const seriesColors = wrapper.vm.plotChart.options.series.map((s: any) => s.itemStyle.color);
+
+      pinAt();
+      const rowColors = wrapper.vm.pinnedTooltip.rows.map((r: any) => r.color);
+
+      expect(seriesColors[0]).toBe("rgba(91, 76, 240, 1)");
+      expect(seriesColors[1]).not.toBe(seriesColors[0]);
+      expect(rowColors).toEqual(seriesColors);
+    });
+
+    it("keeps the pin open across a streaming redraw", async () => {
+      pinAt();
+
+      wrapper.vm.reDrawChart();
+      await flushPromises();
+
+      expect(wrapper.vm.pinnedTooltip.visible).toBe(true);
     });
   });
 
@@ -221,6 +489,34 @@ describe("SearchResult Component", () => {
       await wrapper.vm.copyLogToClipboard(mockLog, false);
 
       expect(typeof wrapper.vm.copyLogToClipboard).toBe("function");
+    });
+  });
+
+  describe("showLogCellActions", () => {
+    // The default grid (no fields selected) is timestamp + one `source` column
+    // holding the whole row as JSON, and `source` is not closable.
+    it("shows actions on the source column even though it is not closable", () => {
+      expect(
+        wrapper.vm.showLogCellActions({ id: "source", meta: { closable: false } }, { a: 1 }),
+      ).toBe(true);
+    });
+
+    it("shows actions on a closable field column that has a value", () => {
+      expect(
+        wrapper.vm.showLogCellActions({ id: "level", meta: { closable: true } }, { level: "info" }),
+      ).toBe(true);
+    });
+
+    it("hides actions on a closable field column with no value in this row", () => {
+      expect(
+        wrapper.vm.showLogCellActions({ id: "level", meta: { closable: true } }, { level: null }),
+      ).toBe(false);
+    });
+
+    it("hides actions on other non-closable columns", () => {
+      expect(
+        wrapper.vm.showLogCellActions({ id: "index", meta: { closable: false } }, { a: 1 }),
+      ).toBe(false);
     });
   });
 
@@ -421,6 +717,71 @@ describe("SearchResult Component", () => {
       // and is marked as a system pick so it is never persisted.
       expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual(["message"]);
       expect(wrapper.vm.searchObj.meta.isFtsDefaultColumn).toBe(true);
+    });
+
+    it("resolves the FTS default once the fields land after the search finished", async () => {
+      // A search finishing inside the window where extractFields() has emptied the list leaves the table on _source for good.
+      wrapper.vm.searchObj.data.stream.selectedFields = [];
+      wrapper.vm.searchObj.meta.isFtsDefaultColumn = false;
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [];
+      wrapper.vm.searchObj.data.queryResults = {
+        hits: [{ message: "hello", kubernetes_pod_id: "pod-1" }],
+      };
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.meta.searchApplied = true;
+
+      wrapper.vm.searchObj.loading = true;
+      await wrapper.vm.$nextTick();
+      wrapper.vm.searchObj.loading = false;
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([]);
+      expect(wrapper.vm.searchObj.meta.isFtsDefaultColumn).toBe(false);
+
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+        { name: "message", ftsKey: true },
+        { name: "kubernetes_pod_id", ftsKey: false },
+      ];
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual(["message"]);
+      expect(wrapper.vm.searchObj.meta.isFtsDefaultColumn).toBe(true);
+    });
+
+    it("does not resolve on late fields when the user chose the columns", async () => {
+      wrapper.vm.searchObj.data.stream.selectedFields = ["kubernetes_pod_id"];
+      wrapper.vm.searchObj.meta.isFtsDefaultColumn = false;
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [];
+      wrapper.vm.searchObj.data.queryResults = { hits: [{ message: "hello" }] };
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.meta.searchApplied = true;
+      wrapper.vm.searchObj.loading = false;
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+        { name: "message", ftsKey: true },
+        { name: "kubernetes_pod_id", ftsKey: false },
+      ];
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual(["kubernetes_pod_id"]);
+      expect(wrapper.vm.searchObj.meta.isFtsDefaultColumn).toBe(false);
+    });
+
+    it("does not resolve on late fields in SQL mode", async () => {
+      wrapper.vm.searchObj.data.stream.selectedFields = [];
+      wrapper.vm.searchObj.meta.isFtsDefaultColumn = false;
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [];
+      wrapper.vm.searchObj.data.queryResults = { hits: [{ message: "hello" }] };
+      wrapper.vm.searchObj.meta.sqlMode = true;
+      wrapper.vm.searchObj.meta.searchApplied = true;
+      wrapper.vm.searchObj.loading = false;
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [{ name: "message", ftsKey: true }];
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([]);
     });
 
     it("loading watcher leaves columns alone in SQL mode (custom queries are authoritative)", async () => {
@@ -694,25 +1055,22 @@ describe("SearchResult Component", () => {
     });
   });
 
-  describe("Volume Analysis Dashboard", () => {
-    it("should open volume analysis dashboard", () => {
-      wrapper.vm.showVolumeAnalysisDashboard = false;
-      wrapper.vm.openVolumeAnalysisDashboard();
-      expect(wrapper.vm.showVolumeAnalysisDashboard).toBe(true);
+  describe("Drill down (formerly the Insights drawer)", () => {
+    it("no longer renders an Insights button in the results toolbar", async () => {
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.data.queryResults.hits = [{ _timestamp: 1, message: "a" }];
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="logs-analyze-dimensions-button"]').exists()).toBe(false);
     });
 
-    it("should close volume analysis dashboard", () => {
-      wrapper.vm.showVolumeAnalysisDashboard = true;
-      wrapper.vm.closeVolumeAnalysisDashboard();
-      expect(wrapper.vm.showVolumeAnalysisDashboard).toBe(false);
-    });
-
-    it("openVolumeAnalysisDashboard is a function", () => {
-      expect(typeof wrapper.vm.openVolumeAnalysisDashboard).toBe("function");
-    });
-
-    it("closeVolumeAnalysisDashboard is a function", () => {
-      expect(typeof wrapper.vm.closeVolumeAnalysisDashboard).toBe("function");
+    it("keeps exposing the histogram brush state the Drill down page reads", () => {
+      expect(wrapper.vm.hasHistogramSelection).toBe(false);
+      expect(wrapper.vm.originalTimeRangeBeforeSelection).toBeNull();
+      expect(wrapper.vm.volumeAnalysisTimeRange).toEqual({
+        startTime: wrapper.vm.searchObj.data.datetime.startTime,
+        endTime: wrapper.vm.searchObj.data.datetime.endTime,
+      });
     });
   });
 
@@ -874,6 +1232,236 @@ describe("SearchResult Component", () => {
       await flushPromises();
 
       expect(wrapper.vm.searchObj.meta.showDetailTab).toBe(false);
+    });
+  });
+  describe("streaming results grid (#14303)", () => {
+    const hits = (n: number) =>
+      Array.from({ length: n }, (_, i) => ({ _timestamp: i, log: `line-${i}` }));
+
+    const setState = async (loading: boolean, rows: any[]) => {
+      wrapper.vm.searchObj.loading = loading;
+      wrapper.vm.searchObj.data.queryResults = { hits: rows };
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+    };
+
+    const table = () => wrapper.findComponent({ name: "OTable" });
+
+    it("shows the skeleton on first paint: loading with no rows", async () => {
+      await setState(true, []);
+      expect(table().props("loading")).toBe(true);
+      expect(table().props("streaming")).toBe(false);
+    });
+
+    it("switches to streaming once rows exist while still loading", async () => {
+      await setState(true, hits(3));
+      expect(table().props("loading")).toBe(false);
+      expect(table().props("streaming")).toBe(true);
+    });
+
+    it("is neither loading nor streaming once the search settles with rows", async () => {
+      await setState(false, hits(3));
+      expect(table().props("loading")).toBe(false);
+      expect(table().props("streaming")).toBe(false);
+    });
+
+    it("is neither loading nor streaming when the search settles with no rows", async () => {
+      await setState(false, []);
+      expect(table().props("loading")).toBe(false);
+      expect(table().props("streaming")).toBe(false);
+    });
+
+    it("tracks the latest hits array across successive replacements", async () => {
+      await setState(true, hits(2));
+      expect(table().props("data").length).toBe(2);
+      await setState(true, hits(5));
+      expect(table().props("data").length).toBe(5);
+      await setState(true, hits(9));
+      expect(table().props("data").length).toBe(9);
+    });
+
+    it("never remounts the grid across successive replacements", async () => {
+      await setState(true, hits(2));
+      const uid = table().vm.$.uid;
+      await setState(true, hits(5));
+      expect(table().vm.$.uid).toBe(uid);
+      await setState(true, hits(9));
+      expect(table().vm.$.uid).toBe(uid);
+      await setState(false, hits(9));
+      expect(table().vm.$.uid).toBe(uid);
+    });
+
+    it("returns streaming to false when the hits are emptied mid-search", async () => {
+      await setState(true, hits(3));
+      expect(table().props("streaming")).toBe(true);
+      await setState(true, []);
+      expect(table().props("streaming")).toBe(false);
+    });
+
+    it("passes a loading-banner slot so OTable suppresses its default banner", async () => {
+      await setState(true, hits(3));
+      expect(wrapper.find('[data-test="otable-stub-has-loading-banner-slot"]').exists()).toBe(true);
+    });
+  });
+  describe("severity spine, row class and timestamp sr text (A7)", () => {
+    const render = async (rows: any[]) => {
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.meta.quickMode = false;
+      wrapper.vm.searchObj.data.resultGrid.columns = [
+        { id: "_timestamp", header: "_timestamp" },
+        { id: "message", header: "message" },
+      ];
+      wrapper.vm.searchObj.data.queryResults = { hits: rows };
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+      return wrapper.findAll('[data-test="otable-stub-row"]');
+    };
+
+    it("AC-A1.1: an inferred row gets the message classes, the solid field spine and inferred sr text", async () => {
+      const [row] = await render([
+        { _timestamp: "2026-10-06 12:00:01", message: "2026-10-06 12:00:01 ERROR payment failed" },
+      ]);
+      expect(row.classes()).toEqual(
+        expect.arrayContaining(["o2-log-level-error", "o2-log-level-src-message"]),
+      );
+      expect(row.attributes("data-row-status-color")).toBe(
+        "var(--color-log-severity-error-indicator)",
+      );
+      const cell = row.find('[data-test="otable-stub-cell-_timestamp"]');
+      expect(cell.find('[data-test="log-row-timestamp-value"]').text()).toBe("2026-10-06 12:00:01");
+      const sr = cell.find('[data-test="log-row-severity-sr"]');
+      expect(sr.text()).toBe("Severity error, inferred");
+      expect(sr.classes()).toEqual(expect.arrayContaining(["sr-only", "select-none"]));
+    });
+
+    it("AC-A1.2: a row with no evidence is unknown with a transparent spine", async () => {
+      const [row] = await render([{ _timestamp: "t", message: "user logged in" }]);
+      expect(row.classes()).toEqual(
+        expect.arrayContaining(["o2-log-level-unknown", "o2-log-level-src-none"]),
+      );
+      expect(row.attributes("data-row-status-color")).toBe("transparent");
+      expect(row.find('[data-test="log-row-severity-sr"]').text()).toBe("Severity unknown");
+    });
+
+    it("J-A2: HTTP rows resolve from status with a solid token spine", async () => {
+      const rows = await render([
+        { _timestamp: "a", status: 503 },
+        { _timestamp: "b", status: 404 },
+        { _timestamp: "c", status: 200 },
+      ]);
+      const levels = rows.map((r: any) =>
+        r.classes().find((c: string) => /^o2-log-level-(?!src)/.test(c)),
+      );
+      expect(levels).toEqual(["o2-log-level-error", "o2-log-level-warning", "o2-log-level-ok"]);
+      rows.forEach((r: any) => expect(r.classes()).toContain("o2-log-level-src-http"));
+      expect(rows[0].attributes("data-row-status-color")).toBe(
+        "var(--color-log-severity-error-indicator)",
+      );
+      expect(rows[0].find('[data-test="log-row-severity-sr"]').text()).toBe("Severity error");
+    });
+
+    it("renders the sr text in the timestamp column only", async () => {
+      const [row] = await render([{ _timestamp: "t", message: "[WARN] x" }]);
+      expect(row.findAll('[data-test="log-row-severity-sr"]')).toHaveLength(1);
+      const message = row.find('[data-test="otable-stub-cell-message"]');
+      expect(message.find('[data-test="log-row-severity-sr"]').exists()).toBe(false);
+      expect(message.find('[data-test="log-row-timestamp-value"]').exists()).toBe(false);
+    });
+  });
+
+  describe("results progress line (#14303)", () => {
+    const line = () => wrapper.find('[data-test="logs-results-progress"] [role="progressbar"]');
+
+    const startQuery = async (percentage: number | undefined) => {
+      wrapper.vm.searchObj.loading = false;
+      await nextTick();
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      wrapper.vm.searchObj.loadingHistogram = false;
+      wrapper.vm.searchObj.loadingHistogramProgressPercentage = 0;
+      wrapper.vm.searchObj.loadingProgressPercentage = percentage;
+      wrapper.vm.searchObj.loading = true;
+      await nextTick();
+    };
+
+    const passDelay = async () => {
+      vi.advanceTimersByTime(300);
+      await nextTick();
+    };
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("waits 300ms so a fast query never flashes the line", async () => {
+      await startQuery(42);
+      vi.advanceTimersByTime(299);
+      await nextTick();
+      expect(line().exists()).toBe(false);
+      vi.advanceTimersByTime(1);
+      await nextTick();
+      expect(line().exists()).toBe(true);
+    });
+
+    it("binds the streaming results percentage to the line", async () => {
+      await startQuery(42);
+      await passDelay();
+      expect(line().attributes("style")).toContain("width: 42%");
+      expect(line().attributes("aria-valuenow")).toBe("42");
+    });
+
+    it("keeps a 5% floor when no progress has been reported yet", async () => {
+      await startQuery(undefined);
+      await passDelay();
+      expect(line().attributes("style")).toContain("width: 5%");
+    });
+
+    it("removes the line at once when the query settles", async () => {
+      await startQuery(42);
+      await passDelay();
+      wrapper.vm.searchObj.loading = false;
+      await nextTick();
+      expect(line().exists()).toBe(false);
+      expect(wrapper.find('[data-test="logs-results-progress"]').classes()).toContain("opacity-0");
+    });
+
+    it("does not let the histogram progress drive the results line", async () => {
+      await startQuery(42);
+      wrapper.vm.searchObj.loadingHistogram = true;
+      wrapper.vm.searchObj.loadingHistogramProgressPercentage = 90;
+      await passDelay();
+      expect(line().attributes("style")).toContain("width: 42%");
+    });
+
+    it("shows the size a fresh run has scanned so far, in place of the scan chip", async () => {
+      wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
+      wrapper.vm.searchObj.data.histogram.chartParams.titleParts = {
+        start: 1,
+        end: 10,
+        total: "10",
+        took: 5,
+        scanLabel: "Scan Size",
+        scanSize: "300.00 MB",
+      };
+      await startQuery(10);
+      wrapper.vm.searchObj.data.queryResults = { hits: [], scan_size: 1536 };
+      await passDelay();
+      expect(wrapper.find('[data-test="logs-result-scan-progress"]').text()).toBe(
+        "Scanned 1.50 GB",
+      );
+      expect(wrapper.find('[data-test="logs-result-scan-chip"]').exists()).toBe(false);
+      wrapper.vm.searchObj.loading = false;
+      await nextTick();
+      expect(wrapper.find('[data-test="logs-result-scan-progress"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="logs-result-scan-chip"]').exists()).toBe(true);
+    });
+  });
+
+  describe("results bar layout", () => {
+    it("lets the header bar grow when its chips wrap instead of clipping them", () => {
+      const bar = wrapper.find('[data-test="logs-search-field-list-collapse-btn"]').element
+        .parentElement as HTMLElement;
+      expect(bar.classList.contains("min-h-9")).toBe(true);
+      expect(bar.classList.contains("h-9")).toBe(false);
     });
   });
 });

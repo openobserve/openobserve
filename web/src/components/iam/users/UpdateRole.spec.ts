@@ -26,11 +26,14 @@ import UpdateRole from "@/components/iam/users/UpdateRole.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-vi.mock("@/services/organizations", () => ({
-  default: {
-    update_member_role: vi.fn(),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      update_member_role: vi.fn(),
+    },
+  });
+});
 
 const { mockToast } = vi.hoisted(() => ({
   mockToast: vi.fn(),

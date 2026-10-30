@@ -13,9 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
+import { createMemoryHistory, createRouter, type RouteRecordRaw } from "vue-router";
 import useRoutes from "./router";
+import Login from "@/views/Login.vue";
+import store from "@/stores";
+import { routeGuard } from "@/utils/zincutils";
+import { isPaywalledDestination, shouldPaywallRoute } from "@/utils/auth";
+import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import config from "@/aws-exports";
+import enLocale from "@/locales/languages/en-US.json";
+
+// Routes store an i18n KEY in `meta.titleKey` (src/router/index.ts translates it
+// per navigation), so assert the English copy the key still resolves to — a typo'd
+// or removed key resolves to undefined and fails.
+const enTitle = (titleKey: string) =>
+  titleKey.split(".").reduce<any>((node, part) => node?.[part], enLocale);
 
 // ---------------------------------------------------------------------------
 // Config mock — mutable so individual tests can change isCloud / isEnterprise
@@ -30,11 +43,20 @@ vi.mock("@/aws-exports", () => ({
 // ---------------------------------------------------------------------------
 // Utility mocks
 // ---------------------------------------------------------------------------
+// `router.ts` imports the store singleton (the Database Monitoring gate reads
+// `zoConfig` outside a component, where `useStore()` cannot reach), and
+// `stores/index.ts` calls these at module scope to seed its initial state. A
+// mock missing them throws on import and takes the whole suite down with it,
+// so every export the store touches is stubbed here.
 vi.mock("@/utils/zincutils", () => ({
   routeGuard: vi.fn((to: any, from: any, next: any) => next()),
   useLocalUserInfo: vi.fn(),
   useLocalCurrentUser: vi.fn(),
+  // The three `stores/index.ts` calls at module scope to seed its state.
+  useLocalOrganization: vi.fn(),
+  useLocalTimezone: vi.fn(),
   invalidateLoginData: vi.fn(),
+  getPath: vi.fn(() => "/"),
 }));
 
 // ---------------------------------------------------------------------------
@@ -80,6 +102,29 @@ vi.mock("@/views/RUM/ErrorViewer.vue", () => ({ default: { name: "ErrorViewer" }
 vi.mock("@/views/RUM/AppPerformance.vue", () => ({ default: { name: "AppPerformance" } }));
 vi.mock("@/views/RUM/AppErrors.vue", () => ({ default: { name: "AppErrors" } }));
 vi.mock("@/views/RUM/AppSessions.vue", () => ({ default: { name: "AppSessions" } }));
+vi.mock("@/views/RUM/AppAnalytics.vue", () => ({ default: { name: "AppAnalytics" } }));
+vi.mock("@/views/RUM/NamedEventEditor.vue", () => ({ default: { name: "NamedEventEditor" } }));
+vi.mock("@/components/rum/productAnalytics/AnalyticsOverview.vue", () => ({
+  default: { name: "AnalyticsOverview" },
+}));
+vi.mock("@/components/rum/productAnalytics/AnalyticsFunnels.vue", () => ({
+  default: { name: "AnalyticsFunnels" },
+}));
+vi.mock("@/components/rum/productAnalytics/SavedFunnelsPage.vue", async () => ({
+  default: {
+    name: "SavedFunnelsPage",
+    beforeRouteEnter: (await import("@/utils/rum/funnelLinks")).forwardFunnelLink,
+  },
+}));
+vi.mock("@/components/rum/productAnalytics/AnalyticsPaths.vue", () => ({
+  default: { name: "AnalyticsPaths" },
+}));
+vi.mock("@/components/rum/productAnalytics/AnalyticsRetention.vue", () => ({
+  default: { name: "AnalyticsRetention" },
+}));
+vi.mock("@/components/rum/productAnalytics/NamedEventsListPage.vue", () => ({
+  default: { name: "NamedEventsListPage" },
+}));
 vi.mock("@/components/reports/ReportList.vue", () => ({ default: { name: "ReportList" } }));
 vi.mock("@/components/reports/CreateReport.vue", () => ({ default: { name: "CreateReport" } }));
 vi.mock("@/components/rum/performance/PerformanceSummary.vue", () => ({
@@ -118,15 +163,21 @@ vi.mock("@/components/pipelines/BackfillJobsList.vue", () => ({
 // Sub-composable mocks — return empty arrays so counts are deterministic
 // ---------------------------------------------------------------------------
 vi.mock("./useIngestionRoutes", () => ({
-  default: vi.fn(() => [{ path: "ingestion", name: "ingestion", component: {} }]),
+  default: vi.fn(() => [
+    { path: "ingestion", name: "ingestion", component: () => Promise.resolve({}) },
+  ]),
 }));
 
 vi.mock("./useEnterpriseRoutes", () => ({
-  default: vi.fn(() => [{ path: "iam", name: "iam", component: {}, children: [] }]),
+  default: vi.fn(() => [
+    { path: "iam", name: "iam", component: () => Promise.resolve({}), children: [] },
+  ]),
 }));
 
 vi.mock("./useManagementRoutes", () => ({
-  default: vi.fn(() => [{ path: "settings", name: "settings", component: {}, children: [] }]),
+  default: vi.fn(() => [
+    { path: "settings", name: "settings", component: () => Promise.resolve({}), children: [] },
+  ]),
 }));
 
 // ---------------------------------------------------------------------------
@@ -223,7 +274,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have correct meta title for /login", () => {
       const { parentRoutes } = useRoutes();
       const loginRoute = parentRoutes.find((r: any) => r.path === "/login");
-      expect(loginRoute.meta.title).toBe("Login");
+      expect(enTitle(loginRoute.meta.titleKey)).toBe("Login");
     });
   });
 
@@ -257,6 +308,29 @@ describe("useRoutes (router.ts)", () => {
 
       logoutRoute.beforeEnter({}, {}, vi.fn());
       expect(invalidateLoginData).toHaveBeenCalledTimes(1);
+
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        writable: true,
+        value: originalLocation,
+      });
+    });
+
+    it("W-S12 forgets a kept Slack link request in /logout beforeEnter", async () => {
+      const { rememberLinkRequest, recallLinkRequest } = await import("@/utils/slackLink");
+      rememberLinkRequest("req-1.sig", null);
+      const { parentRoutes } = useRoutes();
+      const logoutRoute = parentRoutes.find((r: any) => r.path === "/logout");
+
+      const originalLocation = window.location;
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        writable: true,
+        value: { href: "" },
+      });
+
+      logoutRoute.beforeEnter({}, {}, vi.fn());
+      expect(recallLinkRequest()).toBeNull();
 
       Object.defineProperty(window, "location", {
         configurable: true,
@@ -309,6 +383,55 @@ describe("useRoutes (router.ts)", () => {
       });
     });
 
+    it("ends the session but keeps the drafts, since only the menu's sign-out confirms discarding them", async () => {
+      const { readEditorDraft, writeEditorDraft } = await import("@/utils/drafts/editorDraftStore");
+      const { resumeDraftSession } = await import("@/utils/drafts/draftSession");
+      const draftScope = {
+        kind: "function" as const,
+        org: "o",
+        entityId: "f",
+        userEmail: "me@x.io",
+      };
+      store.commit("setUserInfo", { email: "me@x.io" });
+      writeEditorDraft(draftScope, { data: {} });
+      const dispatch = vi.spyOn(store, "dispatch");
+      const aborted = vi.fn();
+      const prompt = vi.fn();
+      window.addEventListener("o2:abort-ai-streams", aborted);
+      window.addEventListener("beforeunload", prompt);
+      const originalLocation = window.location;
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        writable: true,
+        value: { href: "" },
+      });
+
+      const { parentRoutes } = useRoutes();
+      const logout = (parentRoutes as RouteRecordRaw[]).find((r) => r.path === "/logout");
+      const enter = logout?.beforeEnter;
+      if (typeof enter !== "function") throw new Error("/logout has no beforeEnter guard");
+      enter.call(undefined, {} as never, {} as never, vi.fn());
+      window.dispatchEvent(new Event("beforeunload", { cancelable: true }));
+
+      expect(dispatch).toHaveBeenCalledWith("logout");
+      expect(dispatch).not.toHaveBeenCalledWith("logout", expect.anything());
+      expect(readEditorDraft(draftScope)).not.toBeNull();
+      expect(aborted).toHaveBeenCalledTimes(1);
+      expect(prompt).not.toHaveBeenCalled();
+      expect(window.location.href).toBe("/login");
+
+      window.removeEventListener("o2:abort-ai-streams", aborted);
+      window.removeEventListener("beforeunload", prompt);
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        writable: true,
+        value: originalLocation,
+      });
+      dispatch.mockRestore();
+      resumeDraftSession();
+      localStorage.clear();
+    });
+
     it("should redirect window.location.href to /login in /logout beforeEnter", () => {
       const { parentRoutes } = useRoutes();
       const logoutRoute = parentRoutes.find((r: any) => r.path === "/logout");
@@ -322,6 +445,26 @@ describe("useRoutes (router.ts)", () => {
 
       logoutRoute.beforeEnter({}, {}, vi.fn());
       expect(mockLocation.href).toBe("/login");
+    });
+  });
+
+  describe("parentRoutes — /signup", () => {
+    it("redirects to /login with mode=signup", () => {
+      const { parentRoutes } = useRoutes();
+      const signupRoute = parentRoutes.find((r: any) => r.path === "/signup");
+      expect(signupRoute.redirect({ query: {} })).toEqual({
+        path: "/login",
+        query: { mode: "signup" },
+      });
+    });
+
+    it("keeps the other query params it was opened with", () => {
+      const { parentRoutes } = useRoutes();
+      const signupRoute = parentRoutes.find((r: any) => r.path === "/signup");
+      expect(signupRoute.redirect({ query: { utm_source: "blog", mode: "x" } })).toEqual({
+        path: "/login",
+        query: { utm_source: "blog", mode: "signup" },
+      });
     });
   });
 
@@ -350,7 +493,40 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title 'Login Callback' for /cb route", () => {
       const { parentRoutes } = useRoutes();
       const cbRoute = parentRoutes.find((r: any) => r.path === "/cb");
-      expect(cbRoute.meta.title).toBe("Login Callback");
+      expect(enTitle(cbRoute.meta.titleKey)).toBe("Login Callback");
+    });
+  });
+
+  describe("parentRoutes — Slack OAuth callback", () => {
+    it("exposes the public Slack callback view with localized metadata", () => {
+      const { parentRoutes } = useRoutes();
+      const callbackRoute = parentRoutes.find(
+        (route: any) => route.path === "/slack/oauth/callback",
+      );
+
+      expect(callbackRoute).toBeDefined();
+      expect(callbackRoute.name).toBe("slackOAuthCallback");
+      expect(callbackRoute.component).toBeDefined();
+      expect(enTitle(callbackRoute.meta.titleKey)).toBe("Connecting Slack");
+    });
+  });
+
+  describe("parentRoutes — Slack link pages", () => {
+    it.each([
+      ["/slack/link", "slackLink", "Link Slack account"],
+      ["/slack/link/callback", "slackLinkCallback", "Linking Slack account"],
+      ["/slack/connect/callback", "slackConnectCallback", "Signing in with Slack"],
+    ])("AC-9.6 %s is a titled route that needs a session", async (path, name, title) => {
+      const { parentRoutes } = useRoutes();
+      const route = parentRoutes.find((r: any) => r.path === path);
+
+      expect(route).toBeDefined();
+      expect(route.name).toBe(name);
+      expect(enTitle(route.meta.titleKey)).toBe(title);
+      expect(route.meta.public).toBeUndefined();
+      expect(route.beforeEnter).toBeUndefined();
+      const view = await route.component();
+      expect(view.default).toBeDefined();
     });
   });
 
@@ -379,7 +555,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title 'Home' for home route", () => {
       const { homeChildRoutes } = useRoutes();
       const homeRoute = findRoute(homeChildRoutes, "home");
-      expect(homeRoute.meta.title).toBe("Home");
+      expect(enTitle(homeRoute.meta.titleKey)).toBe("Home");
     });
 
     it("should have component defined for home route", () => {
@@ -408,7 +584,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title 'Logs' for logs route", () => {
       const { homeChildRoutes } = useRoutes();
       const logsRoute = findRoute(homeChildRoutes, "logs");
-      expect(logsRoute.meta.title).toBe("Logs");
+      expect(enTitle(logsRoute.meta.titleKey)).toBe("Logs");
     });
 
     it("should have keepAlive true for logs route", () => {
@@ -468,7 +644,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title 'Metrics' for metrics route", () => {
       const { homeChildRoutes } = useRoutes();
       const metricsRoute = findRoute(homeChildRoutes, "metrics");
-      expect(metricsRoute.meta.title).toBe("Metrics");
+      expect(enTitle(metricsRoute.meta.titleKey)).toBe("Metrics");
     });
 
     it("should have beforeEnter guard that calls routeGuard for metrics route", async () => {
@@ -585,7 +761,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title 'Traces' for traces route", () => {
       const { homeChildRoutes } = useRoutes();
       const tracesRoute = findRoute(homeChildRoutes, "traces");
-      expect(tracesRoute.meta.title).toBe("Traces");
+      expect(enTitle(tracesRoute.meta.titleKey)).toBe("Traces");
     });
 
     it("should have beforeEnter guard for traces route", () => {
@@ -606,11 +782,185 @@ describe("useRoutes (router.ts)", () => {
       expect(route.path).toBe("traces/trace-details");
     });
 
-    it("should include service-graph redirect route", () => {
+    it("redirects the standalone Service Graph path to the canonical query tab", () => {
+      config.isEnterprise = "true";
       const { homeChildRoutes } = useRoutes();
-      const route = homeChildRoutes.find((r: any) => r.path === "service-graph");
-      expect(route).toBeDefined();
-      expect(route.redirect).toBe("/traces");
+      const route = homeChildRoutes.find((candidate) => candidate.path === "traces/service-graph");
+      if (!route || typeof route.redirect !== "function") {
+        throw new Error("Missing Service Graph legacy redirect");
+      }
+
+      expect(
+        route.redirect({
+          query: { org_identifier: "default", period: "7d", search_mode: "spans" },
+        }),
+      ).toEqual({
+        name: "traces",
+        query: { org_identifier: "default", period: "7d", tab: "service-graph" },
+      });
+    });
+
+    it("redirects the standalone Service Graph path to Traces in OSS", () => {
+      const { homeChildRoutes } = useRoutes();
+      const route = homeChildRoutes.find((candidate) => candidate.path === "traces/service-graph");
+      if (!route || typeof route.redirect !== "function") {
+        throw new Error("Missing Service Graph legacy redirect");
+      }
+
+      expect(route.redirect({ query: { org_identifier: "default", stream: "traces" } })).toEqual({
+        name: "traces",
+        query: { org_identifier: "default", stream: "traces", tab: "spans" },
+      });
+    });
+
+    it("redirects the standalone Service Catalog path to the canonical query tab", () => {
+      const { homeChildRoutes } = useRoutes();
+      const route = homeChildRoutes.find((candidate) => candidate.path === "traces/services");
+      if (!route || typeof route.redirect !== "function") {
+        throw new Error("Missing Service Catalog legacy redirect");
+      }
+
+      expect(route.redirect({ query: { org_identifier: "default", from: "1", to: "2" } })).toEqual({
+        name: "traces",
+        query: {
+          org_identifier: "default",
+          from: "1",
+          to: "2",
+          tab: "services-catalog",
+        },
+      });
+    });
+
+    it("keeps the oldest Service Graph path as a query-preserving redirect", () => {
+      config.isEnterprise = "true";
+      const { homeChildRoutes } = useRoutes();
+      const route = homeChildRoutes.find((candidate) => candidate.path === "service-graph");
+      if (!route || typeof route.redirect !== "function") {
+        throw new Error("Missing oldest Service Graph redirect");
+      }
+
+      expect(route.redirect({ query: { org_identifier: "default" } })).toEqual({
+        name: "traces",
+        query: { org_identifier: "default", tab: "service-graph" },
+      });
+    });
+
+    it("normalizes an unsupported Service Graph tab before entering Traces in OSS", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "traces");
+      const next = vi.fn();
+
+      route.beforeEnter(
+        {
+          query: { org_identifier: "default", stream: "traces", tab: "service-graph" },
+          hash: "",
+        },
+        {},
+        next,
+      );
+
+      expect(next).toHaveBeenCalledWith({
+        name: "traces",
+        query: { org_identifier: "default", stream: "traces", tab: "spans" },
+        hash: "",
+        replace: true,
+      });
+      expect(routeGuard).not.toHaveBeenCalled();
+    });
+
+    it("removes legacy search_mode from an otherwise valid Traces URL", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "traces");
+      const next = vi.fn();
+
+      route.beforeEnter(
+        {
+          query: {
+            org_identifier: "default",
+            stream: "traces",
+            tab: "spans",
+            search_mode: "traces",
+          },
+          hash: "#results",
+        },
+        {},
+        next,
+      );
+
+      expect(next).toHaveBeenCalledWith({
+        name: "traces",
+        query: { org_identifier: "default", stream: "traces", tab: "spans" },
+        hash: "#results",
+        replace: true,
+      });
+      expect(routeGuard).not.toHaveBeenCalled();
+    });
+
+    it("does not expose standalone Service Graph or Service Catalog route names", () => {
+      const { homeChildRoutes } = useRoutes();
+      expect(findRoute(homeChildRoutes, "serviceGraph")).toBeUndefined();
+      expect(findRoute(homeChildRoutes, "servicesCatalog")).toBeUndefined();
+    });
+  });
+
+  // =========================================================================
+  // 8b. Database Monitoring — the enterprise-only tabs
+  // =========================================================================
+  /**
+   * Deadlocks, Blocked queries and Table health read endpoints the OSS backend
+   * answers 403 on. Disabling the tabs cannot stop a PASTED URL, so each of the
+   * three routes carries its own guard. It lands on the DBM overview — the
+   * section the reader is already inside — rather than a page that renders
+   * empty because every fetch was refused.
+   */
+  describe("homeChildRoutes — Database Monitoring enterprise gate", () => {
+    const GATED = ["dbmDeadlocks", "dbmBlocking", "dbmTableHealth"] as const;
+    const OPEN = ["dbmDatabases", "dbmQueries", "dbmSamples", "dbmActivity"] as const;
+
+    it.each(GATED)("redirects %s to the DBM overview on an OSS build", (name) => {
+      config.isEnterprise = "false";
+      const { homeChildRoutes } = useRoutes();
+      const next = vi.fn();
+      findRoute(homeChildRoutes, name).beforeEnter({ query: { range: "360" } }, {}, next);
+      expect(next).toHaveBeenCalledWith({ name: "dbmDatabases", query: { range: "360" } });
+    });
+
+    it.each(GATED)("lets %s through on an enterprise build", async (name) => {
+      config.isEnterprise = "true";
+      const { routeGuard } = await import("@/utils/zincutils");
+      const { homeChildRoutes } = useRoutes();
+      const to = { query: {} };
+      const next = vi.fn();
+      findRoute(homeChildRoutes, name).beforeEnter(to, {}, next);
+      expect(routeGuard).toHaveBeenCalledWith(to, {}, next);
+    });
+
+    /** Only the literal string unlocks — a truthy-string check would fail open. */
+    it.each(["", "TRUE", "1", "yes"])("treats isEnterprise=%p as OSS", (value) => {
+      config.isEnterprise = value;
+      const { homeChildRoutes } = useRoutes();
+      const next = vi.fn();
+      findRoute(homeChildRoutes, "dbmDeadlocks").beforeEnter({ query: {} }, {}, next);
+      expect(next).toHaveBeenCalledWith({ name: "dbmDatabases", query: {} });
+    });
+
+    /** The four OSS tabs must stay reachable — the gate is three routes, not the section. */
+    it.each(OPEN)("leaves %s reachable on an OSS build", (name) => {
+      config.isEnterprise = "false";
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, name);
+      // No child guard of its own: the parent's Database Monitoring guard is
+      // the only thing standing between an OSS reader and these four pages.
+      expect(route.beforeEnter).toBeUndefined();
+    });
+
+    /** Routes stay REGISTERED on OSS — an unregistered route is a 404, not a redirect. */
+    it.each(GATED)("keeps %s registered on an OSS build", (name) => {
+      config.isEnterprise = "false";
+      const { homeChildRoutes } = useRoutes();
+      expect(findRoute(homeChildRoutes, name)).toBeDefined();
     });
   });
 
@@ -633,7 +983,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title 'Dashboards' for dashboards route", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "dashboards");
-      expect(route.meta.title).toBe("Dashboards");
+      expect(enTitle(route.meta.titleKey)).toBe("Dashboards");
     });
 
     it("should include viewDashboard route", () => {
@@ -698,7 +1048,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title 'Streams' for logstreams route", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "logstreams");
-      expect(route.meta.title).toBe("Streams");
+      expect(enTitle(route.meta.titleKey)).toBe("Streams");
     });
 
     it("should include streamExplorer route", () => {
@@ -739,7 +1089,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title 'About' for about route", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "about");
-      expect(route.meta.title).toBe("About");
+      expect(enTitle(route.meta.titleKey)).toBe("About");
     });
 
     it("should have keepAlive true for about route", () => {
@@ -768,7 +1118,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title 'Pipeline' for pipeline route", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "pipeline");
-      expect(route.meta.title).toBe("Pipeline");
+      expect(enTitle(route.meta.titleKey)).toBe("Pipeline");
     });
 
     it("should have beforeEnter guard for pipeline route", () => {
@@ -876,7 +1226,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title 'Pipeline History' for pipelineHistory route", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "pipelineHistory");
-      expect(route.meta.title).toBe("Pipeline History");
+      expect(enTitle(route.meta.titleKey)).toBe("Pipeline History");
     });
 
     it("should include pipelineBackfill route", () => {
@@ -894,7 +1244,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title 'Pipeline Backfill Jobs' for pipelineBackfill route", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "pipelineBackfill");
-      expect(route.meta.title).toBe("Pipeline Backfill Jobs");
+      expect(enTitle(route.meta.titleKey)).toBe("Pipeline Backfill Jobs");
     });
 
     it("should call routeGuard in pipeline route beforeEnter", async () => {
@@ -927,7 +1277,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title 'Alerts' for alertList route", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "alertList");
-      expect(route.meta.title).toBe("Alerts");
+      expect(enTitle(route.meta.titleKey)).toBe("Alerts");
     });
 
     it("should include addAlert route", () => {
@@ -1169,7 +1519,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title 'Real User Monitoring' for RUM route", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "RUM");
-      expect(route.meta.title).toBe("Real User Monitoring");
+      expect(enTitle(route.meta.titleKey)).toBe("Real User Monitoring");
     });
 
     it("should have beforeEnter guard for RUM route", () => {
@@ -1311,6 +1661,126 @@ describe("useRoutes (router.ts)", () => {
     });
   });
 
+  describe("homeChildRoutes — Product Analytics", () => {
+    const shell = () => findRoute(useRoutes().homeChildRoutes, PA_ROUTES.shell);
+
+    const realRouter = () => {
+      const { homeChildRoutes } = useRoutes();
+      const catchAll = homeChildRoutes.find((r: any) => r.path === "/:catchAll(.*)*");
+      return createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          {
+            path: "/",
+            component: { name: "Layout" },
+            children: homeChildRoutes.filter((r: any) => r !== catchAll),
+          },
+          catchAll,
+        ],
+      });
+    };
+
+    it("is its own top-level route, not a RUM child", () => {
+      const { homeChildRoutes } = useRoutes();
+      expect(homeChildRoutes.find((r: any) => r.name === PA_ROUTES.shell)?.path).toBe(
+        "product-analytics",
+      );
+      const rum = findRoute(homeChildRoutes, "RUM");
+      expect(rum.children.map((c: any) => c.path)).not.toContain("analytics");
+      expect(findRoute(homeChildRoutes, "RumAnalytics")).toBeUndefined();
+    });
+
+    it("renders the six sub-tab routes inside the shell, each lazy and guarded", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      const route = shell();
+      expect(typeof route.component).toBe("function");
+      expect(route.meta.titleKey).toBe("menu.productAnalytics");
+      expect(route.children.map((c: any) => [c.path, c.name])).toEqual([
+        ["overview", PA_ROUTES.overview],
+        ["funnels", PA_ROUTES.funnels],
+        ["funnels/build", PA_ROUTES.funnelBuilder],
+        ["paths", PA_ROUTES.paths],
+        ["retention", PA_ROUTES.retention],
+        ["events", PA_ROUTES.events],
+      ]);
+      for (const child of [route, ...route.children]) {
+        expect(typeof child.component).toBe("function");
+        const next = vi.fn();
+        child.beforeEnter({}, {}, next);
+        expect(routeGuard).toHaveBeenCalledWith({}, {}, next);
+      }
+    });
+
+    it("registers the named event editors as siblings of the shell, outside its tab strip", () => {
+      const { homeChildRoutes } = useRoutes();
+      const top = (name: string) => homeChildRoutes.find((r: any) => r.name === name);
+      expect(top(PA_ROUTES.eventNew)?.path).toBe("product-analytics/events/new");
+      expect(top(PA_ROUTES.eventEdit)?.path).toBe("product-analytics/events/:id/edit");
+      expect(top(PA_ROUTES.eventEdit)?.props).toBe(true);
+      const router = realRouter();
+      for (const [path, name] of [
+        ["/product-analytics/events/new", PA_ROUTES.eventNew],
+        ["/product-analytics/events/abc/edit", PA_ROUTES.eventEdit],
+      ]) {
+        const resolved = router.resolve(path);
+        expect(resolved.name).toBe(name);
+        expect(resolved.matched.map((m) => m.name)).not.toContain(PA_ROUTES.shell);
+      }
+      expect(router.resolve("/product-analytics/events").matched.map((m) => m.name)).toEqual([
+        undefined,
+        PA_ROUTES.shell,
+        PA_ROUTES.events,
+      ]);
+      expect(router.resolve("/product-analytics/funnels/build").name).toBe(PA_ROUTES.funnelBuilder);
+    });
+
+    it.each([
+      ["/product-analytics/funnels?app=web&sf=Alpha000000000000000000001", "sf"],
+      ["/product-analytics/funnels?app=web&funnel=abc", "funnel"],
+    ])("forwards %s, a link naming a funnel, to the builder with its query", async (path, key) => {
+      const router = realRouter();
+      await router.push(path);
+      expect(router.currentRoute.value.name).toBe(PA_ROUTES.funnelBuilder);
+      expect(router.currentRoute.value.path).toBe("/product-analytics/funnels/build");
+      expect(router.currentRoute.value.query).toMatchObject({ app: "web" });
+      expect(router.currentRoute.value.query[key]).toBeDefined();
+    });
+
+    it("leaves the remaining RUM tabs where they were", async () => {
+      const router = realRouter();
+      await router.push("/rum/sessions?period=15m");
+      expect(router.currentRoute.value.name).toBe("Sessions");
+    });
+  });
+
+  describe("public dashboard route", () => {
+    it("serves the anonymous viewer outside the layout and marks it public", () => {
+      const { parentRoutes, homeChildRoutes } = useRoutes();
+      const route = findRoute(parentRoutes, "publicDashboard");
+      expect(route.path).toBe("/public/dashboards/:slug");
+      expect(route.meta.public).toBe(true);
+      expect(homeChildRoutes.some((r: any) => r.name === "publicDashboard")).toBe(false);
+    });
+  });
+
+  describe("AI shared chat routes", () => {
+    it("serves org shares inside the main layout with the token as a prop", () => {
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "sharedChat");
+      expect(route.path).toBe("ai/shared/:token");
+      expect(route.props({ params: { token: "t1" } })).toEqual({ token: "t1" });
+      expect(route.meta?.public).toBeUndefined();
+    });
+
+    it("serves public links outside the layout and marks them public", () => {
+      const { parentRoutes } = useRoutes();
+      const route = findRoute(parentRoutes, "publicSharedChat");
+      expect(route.path).toBe("/ai/public/:token");
+      expect(route.meta.public).toBe(true);
+      expect(route.props({ params: { token: "t2" } })).toEqual({ token: "t2", isPublic: true });
+    });
+  });
+
   // =========================================================================
   // 16. homeChildRoutes — shortUrl route
   // =========================================================================
@@ -1359,7 +1829,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title 'Member Subscription' for member_subscription route", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "member_subscription");
-      expect(route.meta.title).toBe("Member Subscription");
+      expect(enTitle(route.meta.titleKey)).toBe("Member Subscription");
     });
   });
 
@@ -1385,7 +1855,7 @@ describe("useRoutes (router.ts)", () => {
       config.isCloud = "false";
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "reports");
-      expect(route.meta.title).toBe("Reports");
+      expect(enTitle(route.meta.titleKey)).toBe("Reports");
     });
 
     it("should have props true for reports route", () => {
@@ -1413,7 +1883,7 @@ describe("useRoutes (router.ts)", () => {
       config.isCloud = "false";
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "createReport");
-      expect(route.meta.title).toBe("Create Report");
+      expect(enTitle(route.meta.titleKey)).toBe("Create Report");
     });
 
     it("should splice reports routes at index 13", () => {
@@ -1423,11 +1893,28 @@ describe("useRoutes (router.ts)", () => {
       expect(reportsRoute.name).toBe("reports");
     });
 
-    it("should splice createReport route at index 14", () => {
+    it("should splice createReport route at index 15", () => {
       config.isCloud = "false";
       const { homeChildRoutes } = useRoutes();
-      const createReportRoute = homeChildRoutes[14];
+      const createReportRoute = homeChildRoutes[15];
       expect(createReportRoute.name).toBe("createReport");
+    });
+
+    it("registers the guarded report detail route between list and create", () => {
+      config.isCloud = "false";
+      const { homeChildRoutes } = useRoutes();
+      const route = homeChildRoutes[14];
+      expect(route.name).toBe("reportDetail");
+      expect(route.path).toBe("/reports/detail/:report_id");
+      expect(route.props).toBe(true);
+      expect(route.meta.titleKey).toBe("routeTitles.reportDetail");
+      expect(enTitle(route.meta.titleKey)).toBe("Report");
+      expect(typeof route.component).toBe("function");
+      const to = {};
+      const from = {};
+      const next = vi.fn();
+      route.beforeEnter(to, from, next);
+      expect(routeGuard).toHaveBeenCalledWith(to, from, next);
     });
 
     it("should have beforeEnter guard for reports route", () => {
@@ -1459,6 +1946,97 @@ describe("useRoutes (router.ts)", () => {
   });
 
   // =========================================================================
+  // 18b. homeChildRoutes — Infrastructure routes (Hosts / Kubernetes)
+  // =========================================================================
+  // Always registered, no feature gate — detection changes page state, never route existence (4.7/§6).
+  describe("homeChildRoutes — infra workload routes", () => {
+    it.each([
+      ["infraHosts", "infra/hosts"],
+      ["infraKubernetes", "infra/kubernetes"],
+      ["infraKubernetes2", "infra/kubernetes-2"],
+    ])("registers %s at path %s", (name, path) => {
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, name as string);
+      expect(route).toBeDefined();
+      expect(route.path).toBe(path);
+    });
+
+    it.each(["infraHosts", "infraKubernetes", "infraKubernetes2"])(
+      "%s beforeEnter calls routeGuard",
+      async (name) => {
+        const { routeGuard } = await import("@/utils/zincutils");
+        vi.mocked(routeGuard as any).mockClear();
+        const { homeChildRoutes } = useRoutes();
+        const route = findRoute(homeChildRoutes, name);
+        const mockTo = {};
+        const mockFrom = {};
+        const mockNext = vi.fn();
+        route.beforeEnter(mockTo, mockFrom, mockNext);
+        expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
+      },
+    );
+
+    // A menu entry whose workload has no registered pack can only render a dead
+    // end, so the route must not come back while `curatedPacks` lacks an AWS pack.
+    it("registers NO aws route, by name or by path", () => {
+      const { homeChildRoutes } = useRoutes();
+      expect(homeChildRoutes.find((r: any) => r.name === "infraAws")).toBeUndefined();
+      expect(homeChildRoutes.find((r: any) => r.path === "infra/aws")).toBeUndefined();
+    });
+
+    it("serves Kubernetes from the redesigned page and keeps the curated page on the hidden kubernetes-2 route", () => {
+      const { homeChildRoutes } = useRoutes();
+      const current = findRoute(homeChildRoutes, "infraKubernetes") as any;
+      expect(current.meta?.titleKey).toBe("menu.kubernetes");
+      expect(current.props).toBeUndefined();
+      expect(String(current.component)).toMatch(/kubernetes2\/KubernetesPage\.vue/);
+      const hidden = findRoute(homeChildRoutes, "infraKubernetes2") as any;
+      expect(hidden.props).toEqual({ workload: "kubernetes" });
+      expect(String(hidden.component)).toMatch(/curated\/CuratedPageView\.vue/);
+    });
+
+    // The curated-page migration (design §8.1) swaps only the `component` on these
+    // two rows. Which chunk they load is an implementation detail and deliberately
+    // NOT asserted; what must survive is the deep-link contract below.
+    it.each(["infraKubernetes", "infraKubernetes2"])(
+      "%s keeps its titleKey and a lazily-imported component across the component swap",
+      (name) => {
+        const { homeChildRoutes } = useRoutes();
+        const route = findRoute(homeChildRoutes, name);
+        expect(typeof route.component).toBe("function");
+        expect(route.meta?.titleKey).toBeTruthy();
+      },
+    );
+
+    it.each(["infraKubernetes2"])(
+      "%s resolves to the curated view, NOT WorkloadStubPage (§8.1 step 2)",
+      (name) => {
+        // The chunk NAME stays unasserted; which MODULE the loader targets is what
+        // changes, and it is the only thing separating the two across the swap.
+        // Asserted off the loader's source rather than by importing either module:
+        // WorkloadStubPage.vue is DELETED by §8.1, so importing it fails the whole
+        // file, and awaiting the real CuratedPageView pulls RenderDashboardCharts →
+        // logs/constants → useLocalWrapContent, which this spec's closed zincutils
+        // mock does not export. The loader source needs neither.
+        const { homeChildRoutes } = useRoutes();
+        const loader = String((findRoute(homeChildRoutes, name) as any).component);
+        expect(loader).not.toMatch(/WorkloadStubPage\.vue/);
+        expect(loader).toMatch(/Infrastructure\/curated\/CuratedPageView\.vue/);
+      },
+    );
+
+    it("keeps the non-cloud reports route at splice index 13 after the insertion", () => {
+      // The infra routes must land past the splice(13) hazard (design 4.7).
+      config.isCloud = "false";
+      const { homeChildRoutes } = useRoutes();
+      expect(homeChildRoutes[13].name).toBe("reports");
+      expect(homeChildRoutes[14].name).toBe("reportDetail");
+      expect(homeChildRoutes[15].name).toBe("createReport");
+      expect(findRoute(homeChildRoutes, "infraHosts")).toBeDefined();
+    });
+  });
+
+  // =========================================================================
   // 19. homeChildRoutes — reports routes absent when cloud
   // =========================================================================
   describe("homeChildRoutes — reports routes absent when cloud", () => {
@@ -1474,6 +2052,12 @@ describe("useRoutes (router.ts)", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "createReport");
       expect(route).toBeUndefined();
+    });
+
+    it("should NOT include reportDetail route when isCloud is 'true'", () => {
+      config.isCloud = "true";
+      const { homeChildRoutes } = useRoutes();
+      expect(findRoute(homeChildRoutes, "reportDetail")).toBeUndefined();
     });
   });
 
@@ -1519,7 +2103,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title '404 - Not Found' for catch-all route", () => {
       const { homeChildRoutes } = useRoutes();
       const lastRoute = homeChildRoutes[homeChildRoutes.length - 1];
-      expect(lastRoute.meta.title).toBe("404 - Not Found");
+      expect(enTitle(lastRoute.meta.titleKey)).toBe("404 - Not Found");
     });
 
     it("should have keepAlive true for catch-all route", () => {
@@ -1568,7 +2152,7 @@ describe("useRoutes (router.ts)", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "traces");
 
-      const mockTo = {};
+      const mockTo = { query: { tab: "traces" } };
       const mockFrom = {};
       const mockNext = vi.fn();
       route.beforeEnter(mockTo, mockFrom, mockNext);
@@ -1621,6 +2205,48 @@ describe("useRoutes (router.ts)", () => {
       const mockNext = vi.fn();
       route.beforeEnter(mockTo, mockFrom, mockNext);
       expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
+    });
+
+    it("sends a playlist link on the dashboard view to the TV player", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      vi.mocked(routeGuard).mockClear();
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "viewDashboard");
+      const next = vi.fn();
+
+      route.beforeEnter(
+        { query: { org_identifier: "acme", playlist: "d1:f1,d2", interval: "2m", slide: "2" } },
+        {},
+        next,
+      );
+
+      expect(next).toHaveBeenCalledWith({
+        path: "/dashboards/tv",
+        query: { org_identifier: "acme", playlist: "d1:f1,d2:default", interval: "2m", slide: "2" },
+        replace: true,
+      });
+      expect(routeGuard).not.toHaveBeenCalled();
+    });
+
+    it("keeps the TV player's own page fallback on the dashboard view", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "viewDashboard");
+      const to = { query: { dashboard: "d1", playlist: "d1,d2", tvpage: "1", kiosk: "true" } };
+      const next = vi.fn();
+      route.beforeEnter(to, {}, next);
+      expect(routeGuard).toHaveBeenCalledWith(to, {}, next);
+    });
+
+    it("registers the TV playlist route behind the route guard", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "dashboardTvPlaylist");
+      expect(route.path).toBe("/dashboards/tv");
+      expect(route.meta.titleKey).toBe("routeTitles.dashboardTvPlaylist");
+      const next = vi.fn();
+      route.beforeEnter({}, {}, next);
+      expect(routeGuard).toHaveBeenCalledWith({}, {}, next);
     });
 
     it("should call routeGuard for functionList route beforeEnter", async () => {
@@ -1736,9 +2362,20 @@ describe("useRoutes (router.ts)", () => {
   // 23. Edge cases
   // =========================================================================
   describe("Edge Cases", () => {
-    it("should have exactly 3 parentRoutes", () => {
+    it("should have exactly these 10 parentRoutes, the anonymous public pages included", () => {
       const { parentRoutes } = useRoutes();
-      expect(parentRoutes).toHaveLength(3);
+      expect(parentRoutes.map((r: any) => r.path)).toEqual([
+        "/login",
+        "/signup",
+        "/logout",
+        "/cb",
+        "/ai/public/:token",
+        "/slack/oauth/callback",
+        "/slack/link",
+        "/slack/link/callback",
+        "/slack/connect/callback",
+        "/public/dashboards/:slug",
+      ]);
     });
 
     it("should have unique paths in parentRoutes", () => {
@@ -1748,12 +2385,13 @@ describe("useRoutes (router.ts)", () => {
       expect(paths).toHaveLength(uniquePaths.length);
     });
 
-    it("should have component or beforeEnter defined for every parentRoute", () => {
+    it("should have a component, beforeEnter or redirect defined for every parentRoute", () => {
       const { parentRoutes } = useRoutes();
       parentRoutes.forEach((route: any) => {
         const hasComponent = route.component !== undefined;
         const hasBeforeEnter = typeof route.beforeEnter === "function";
-        expect(hasComponent || hasBeforeEnter).toBe(true);
+        const hasRedirect = route.redirect !== undefined;
+        expect(hasComponent || hasBeforeEnter || hasRedirect).toBe(true);
       });
     });
 
@@ -1764,16 +2402,43 @@ describe("useRoutes (router.ts)", () => {
       config.isCloud = "true";
       const { homeChildRoutes: cloudRoutes } = useRoutes();
 
-      expect(nonCloudRoutes.length).toBe(cloudRoutes.length + 2);
+      expect(nonCloudRoutes.length).toBe(cloudRoutes.length + 3);
     });
 
-    it("should have component defined for every top-level homeChildRoute that is not a redirect", () => {
+    /**
+     * A top-level route must RESOLVE to something: either it renders a component,
+     * it redirects, or it is a grouping parent whose children render.
+     *
+     * The third case is deliberate and load-bearing. `traces/databases` is a
+     * componentless parent: it exists to own the path prefix and to apply the
+     * Database Monitoring guard ONCE for every sub-view, while each child page
+     * renders its own OPageLayout. Giving the parent a shell component instead
+     * would nest two page layouts and push the child's header down — the bug
+     * documented at Functions.vue:18-22. So the invariant is "resolves to
+     * something", not "has a component".
+     */
+    it("should resolve every top-level homeChildRoute to a component, a redirect, or children", () => {
       const { homeChildRoutes } = useRoutes();
       homeChildRoutes.forEach((route: any) => {
-        if (!route.redirect) {
-          expect(route.component).toBeDefined();
-        }
+        const resolves =
+          route.component !== undefined ||
+          route.redirect !== undefined ||
+          (Array.isArray(route.children) && route.children.length > 0);
+        expect(resolves, `route ${route.path} renders nothing`).toBe(true);
       });
+    });
+
+    /** ...and a componentless parent's children must themselves render. */
+    it("should have a component on every child of a componentless parent route", () => {
+      const { homeChildRoutes } = useRoutes();
+      homeChildRoutes
+        .filter((route: any) => !route.component && !route.redirect)
+        .forEach((parent: any) => {
+          expect(parent.children?.length).toBeGreaterThan(0);
+          parent.children.forEach((child: any) => {
+            expect(child.component, `${parent.path}/${child.path} renders nothing`).toBeDefined();
+          });
+        });
     });
 
     it("should have string path for every top-level homeChildRoute", () => {
@@ -1791,5 +2456,205 @@ describe("useRoutes (router.ts)", () => {
       const uniqueNames = [...new Set(names)];
       expect(names).toHaveLength(uniqueNames.length);
     });
+  });
+
+  // Route meta is untyped (`parentRoutes: any`), so a typo in a titleKey cannot be
+  // caught by the compiler — this is the gate instead. An unresolvable key would
+  // put the raw key in the browser tab.
+  describe("meta.titleKey", () => {
+    it("should only use i18n keys that exist in en-US.json", () => {
+      const collect = (routes: any[]): string[] =>
+        routes.flatMap((route) => [
+          ...(route?.meta?.titleKey ? [route.meta.titleKey] : []),
+          ...collect(route?.children ?? []),
+        ]);
+
+      const { parentRoutes, homeChildRoutes } = useRoutes();
+      const titleKeys = collect([...parentRoutes, ...homeChildRoutes]);
+      expect(titleKeys.length).toBeGreaterThan(0);
+
+      for (const titleKey of titleKeys) {
+        expect(enTitle(titleKey), `no en-US message for "${titleKey}"`).toBeTypeOf("string");
+      }
+    });
+  });
+
+  // custom_hide_menus removes a tile, never a route.
+  describe("hidden menus never block routes (AC-28)", () => {
+    const buildRouter = () => {
+      const { parentRoutes, homeChildRoutes } = useRoutes();
+      const catchAll = homeChildRoutes.find((r: any) => r.path === "/:catchAll(.*)*");
+      return createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          ...parentRoutes,
+          {
+            path: "/",
+            component: { name: "Layout" },
+            children: homeChildRoutes.filter((r: any) => r !== catchAll),
+          },
+          catchAll,
+        ],
+      });
+    };
+
+    it("resolves and enters /streams with custom_hide_menus=streams", async () => {
+      const previous = store.state.zoConfig?.custom_hide_menus;
+      store.state.zoConfig = { ...(store.state.zoConfig ?? {}), custom_hide_menus: "streams" };
+      try {
+        const router = buildRouter();
+        expect(router.resolve("/streams").name).toBe("logstreams");
+        await router.push("/streams");
+        expect(router.currentRoute.value.name).toBe("logstreams");
+      } finally {
+        store.state.zoConfig = { ...store.state.zoConfig, custom_hide_menus: previous };
+      }
+    });
+  });
+
+  describe("profiles route guard", () => {
+    const enter = (zoConfig: Record<string, unknown>) => {
+      const previous = store.state.zoConfig;
+      store.state.zoConfig = zoConfig;
+      try {
+        const route: any = useRoutes().homeChildRoutes.find((r: any) => r.name === "profiles");
+        const next = vi.fn();
+        route.beforeEnter({ query: { org_identifier: "acme" } }, {}, next);
+        return next;
+      } finally {
+        store.state.zoConfig = previous;
+      }
+    };
+
+    it("sends a typed /profiles URL home when profiling is off", () => {
+      expect(enter({ build_type: "enterprise", profiling_enabled: false })).toHaveBeenCalledWith({
+        name: "home",
+        query: { org_identifier: "acme" },
+      });
+    });
+
+    it("opens the page when profiling is on, or while /config is still loading", () => {
+      expect(enter({ profiling_enabled: true })).toHaveBeenCalledWith();
+      expect(enter({})).toHaveBeenCalledWith();
+    });
+  });
+
+  // the paywall predicate treats a matched beforeEnter as proof that routeGuard runs there.
+  describe("paywall guard proxy (A-27)", () => {
+    const EXPIRED_MICROS = (Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000;
+
+    const flatten = (routes: any[], prefix = ""): any[] =>
+      routes.flatMap((r) => {
+        const path = r.path.startsWith("/") ? r.path : `${prefix}/${r.path}`.replace(/\/+/g, "/");
+        return [{ ...r, fullPath: path }, ...(r.children ? flatten(r.children, path) : [])];
+      });
+
+    // Runs the chain the way vue-router does on entering from outside: every record's beforeEnter, parent first.
+    const chainReachesRouteGuard = (resolved: any): boolean => {
+      vi.mocked(routeGuard).mockClear();
+      let to = resolved;
+      for (let hop = 0; hop < 3; hop++) {
+        let redirect: any = null;
+        for (const record of to.matched) {
+          if (typeof record.beforeEnter !== "function") continue;
+          record.beforeEnter(to, {}, (arg?: any) => {
+            if (arg && typeof arg === "object" && arg.name) redirect = arg;
+          });
+          if (redirect) break;
+        }
+        if (vi.mocked(routeGuard).mock.calls.length) return true;
+        // Only a self-redirect (traces canonicalising its tab query) is followed; a different route is a feature gate.
+        if (!redirect || redirect.name !== to.name) return false;
+        to = { ...to, query: redirect.query ?? to.query };
+      }
+      return false;
+    };
+
+    let previousZoConfig: any;
+
+    beforeEach(() => {
+      config.isEnterprise = "true";
+      config.isCloud = "true";
+      previousZoConfig = store.state.zoConfig;
+      store.state.zoConfig = {
+        ...(store.state.zoConfig ?? {}),
+        database_monitoring_enabled: true,
+        public_dashboards_enabled: true,
+      };
+    });
+
+    afterEach(() => {
+      store.state.zoConfig = previousZoConfig;
+    });
+
+    it("mutes a home child route exactly when its guard chain reaches routeGuard and the paywall applies", () => {
+      const { parentRoutes, homeChildRoutes } = useRoutes();
+      const catchAll = homeChildRoutes.find((r: any) => r.path === "/:catchAll(.*)*");
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          ...parentRoutes,
+          {
+            path: "/",
+            component: { name: "Layout" },
+            children: homeChildRoutes.filter((r: any) => r !== catchAll),
+          },
+          catchAll,
+        ],
+      });
+      const candidates = flatten(homeChildRoutes).filter(
+        (r) => r.name && r !== catchAll && !r.fullPath.includes(":"),
+      );
+      expect(candidates.length).toBeGreaterThan(30);
+
+      const mismatches = candidates
+        .map((r) => {
+          const resolved = router.resolve({
+            path: r.fullPath,
+            query: { org_identifier: "default" },
+          });
+          const muted = isPaywalledDestination(EXPIRED_MICROS, resolved);
+          const blocked =
+            chainReachesRouteGuard(resolved) && shouldPaywallRoute(EXPIRED_MICROS, resolved.name);
+          return muted === blocked
+            ? null
+            : `${String(resolved.name)}: muted=${muted} blocked=${blocked}`;
+        })
+        .filter((line): line is string => line !== null);
+      expect(mismatches).toEqual([]);
+    });
+  });
+
+  describe("allowOnEmptyData", () => {
+    it.each(["home", "logs", "metrics", "traces", "dashboards"])(
+      "opens %s on an empty org",
+      (name) => {
+        const { homeChildRoutes } = useRoutes();
+        expect(findRoute(homeChildRoutes, name).meta.allowOnEmptyData).toBe(true);
+      },
+    );
+
+    it.each(["metricsEditor", "viewDashboard", "searchJobInspector", "promqlBuilder"])(
+      "keeps the empty-data guard on %s",
+      (name) => {
+        const { homeChildRoutes } = useRoutes();
+        expect(findRoute(homeChildRoutes, name).meta?.allowOnEmptyData).toBeUndefined();
+      },
+    );
+  });
+});
+
+describe("useRoutes lazy loading", () => {
+  // An eager route component lands in the entry bundle the login page downloads.
+  it("lazy-loads every route component except Login", () => {
+    const { parentRoutes, homeChildRoutes } = useRoutes();
+    const walk = (routes: any[]): void =>
+      routes.forEach((route) => {
+        if (route.component && route.component !== Login) {
+          expect(typeof route.component, route.path).toBe("function");
+        }
+        if (route.children) walk(route.children);
+      });
+    walk([...parentRoutes, ...homeChildRoutes]);
   });
 });

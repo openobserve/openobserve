@@ -27,7 +27,10 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
-vi.mock("@/utils/zincutils", () => ({
+// Partial: the overlaid synthetics service loads `@/stores`, which pulls other
+// zincutils exports — a wholesale mock leaves them undefined at import time.
+vi.mock("@/utils/zincutils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/zincutils")>()),
   getImageURL: vi.fn((path) => path),
 }));
 
@@ -35,12 +38,15 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(),
 }));
 
-vi.mock("@/services/synthetics", () => ({
-  default: {
-    createLocation: vi.fn(),
-    updateLocation: vi.fn(),
-  },
-}));
+vi.mock("@/services/synthetics", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      createLocation: vi.fn(),
+      updateLocation: vi.fn(),
+    },
+  });
+});
 
 import syntheticsService from "@/services/synthetics";
 
@@ -189,19 +195,19 @@ describe("SyntheticsLocationForm", () => {
     wrapper = createWrapper({
       isEdit: true,
       data: {
-        id: "datadog-us-west-1",
-        provider: "datadog",
+        id: "acme-us-west-1",
+        provider: "acme",
         region: "us-west-1",
-        label: "Datadog US West",
+        label: "Acme US West",
         enabled: true,
       },
     });
 
     expect(wrapper.vm.locationFormDefaults).toEqual({
       provider: "custom",
-      customProvider: "datadog",
+      customProvider: "acme",
       region: "us-west-1",
-      label: "Datadog US West",
+      label: "Acme US West",
       enabled: true,
     });
   });
@@ -224,7 +230,7 @@ describe("SyntheticsLocationForm", () => {
     // providerValue to "custom", which conditionally renders the input.
     wrapper = createWrapper({
       isEdit: true,
-      data: { provider: "datadog", region: "us-east-1", label: "Test" },
+      data: { provider: "acme", region: "us-east-1", label: "Test" },
     });
 
     // providerValue is initialized from locationFormDefaults.provider = "custom"
@@ -322,17 +328,17 @@ describe("SyntheticsLocationForm", () => {
 
     await wrapper.vm.saveLocation({
       provider: "custom",
-      customProvider: "datadog",
+      customProvider: "acme",
       region: "us-west-1",
-      label: "Datadog US West",
+      label: "Acme US West",
       enabled: true,
     });
 
     expect(createLocMock).toHaveBeenCalledWith(
       "default",
       expect.objectContaining({
-        provider: "datadog",
-        id: "datadog-us-west-1",
+        provider: "acme",
+        id: "acme-us-west-1",
       }),
     );
   });

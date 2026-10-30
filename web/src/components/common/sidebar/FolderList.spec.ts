@@ -46,7 +46,13 @@ const ConfirmDialogStub = {
   props: {
     modelValue: { type: Boolean, default: false },
     title: { type: String, default: "" },
-    message: { type: String, default: "" },
+    message: { type: String },
+    messageKeypath: { type: String },
+    messageName: { type: String },
+    confirmText: { type: String },
+    okLabel: { type: String },
+    okVariant: { type: String },
+    focusCancel: { type: Boolean, default: false },
   },
   emits: ["update:ok", "update:cancel", "update:modelValue"],
   template: `
@@ -68,10 +74,14 @@ const ConfirmDialogStub = {
 
 // Mock the external dependencies
 vi.mock("vue-router");
-vi.mock("@/services/dashboards");
+vi.mock("@/services/dashboards", async (importOriginal) => {
+  const { automockService } = await import("@/test/unit/helpers/mockService");
+  return automockService(await importOriginal());
+});
 vi.mock("@/utils/commons", () => ({
-  getFoldersListByType: vi.fn(),
-  deleteFolderByIdByType: vi.fn(),
+  // Both are `async` in the real module, so the doubles must be thenable too.
+  getFoldersListByType: vi.fn(() => Promise.resolve([])),
+  deleteFolderByIdByType: vi.fn(() => Promise.resolve()),
 }));
 // Create persistent mocks that can be accessed across tests
 const showPositiveNotificationMock = vi.fn();
@@ -157,6 +167,38 @@ describe("FolderList.vue", () => {
 
   afterEach(() => {
     wrapper?.unmount();
+  });
+
+  // The rail reserves a fixed slot for the icon so every folder name starts at
+  // the same x-position. A folder with no icon still fills it, rather than
+  // leaving a hole that makes the list look ragged.
+  describe("Folder icon slot", () => {
+    it("should render an icon slot for every folder, icon set or not", () => {
+      const slots = wrapper.findAll('[data-test^="dashboard-folder-icon-"]');
+      const rows = wrapper.findAll('[data-test^="dashboard-folder-name-"]');
+      expect(rows.length).toBeGreaterThan(0);
+      expect(slots).toHaveLength(rows.length);
+    });
+
+    it("should fall back to the folder glyph when a folder has no icon", () => {
+      // No icons are stored in this suite, so every slot shows the fallback.
+      const slot = wrapper.find('[data-test^="dashboard-folder-icon-"]');
+      expect(slot.exists()).toBe(true);
+      expect(slot.find("svg").exists()).toBe(true);
+      expect(slot.find('[data-test="glyph-emoji"]').exists()).toBe(false);
+    });
+
+    it("should give the icon slot a fixed size so names stay aligned", () => {
+      const classes = wrapper.find('[data-test^="dashboard-folder-icon-"]').classes();
+      expect(classes).toContain("size-4");
+      expect(classes).toContain("shrink-0");
+    });
+
+    it("should let the folder name take the remaining row width", () => {
+      const name = wrapper.find('[data-test^="dashboard-folder-name-"]');
+      expect(name.classes()).toContain("flex-1");
+      expect(name.classes()).toContain("truncate");
+    });
   });
 
   describe("Component Initialization", () => {
@@ -723,7 +765,8 @@ describe("FolderList.vue", () => {
           props: { type: "alerts" },
         });
 
-        await nextTick();
+        // The folder fetch on mount is awaited, so the selection lands a microtask later.
+        await flushPromises();
         expect(newWrapper.vm.activeFolderId).toBe("folder1");
 
         newWrapper.unmount();
@@ -756,7 +799,8 @@ describe("FolderList.vue", () => {
           props: { type: "alerts" },
         });
 
-        await nextTick();
+        // The folder fetch on mount is awaited, so the selection lands a microtask later.
+        await flushPromises();
         expect(newWrapper.vm.activeFolderId).toBe("default");
 
         newWrapper.unmount();
@@ -765,6 +809,93 @@ describe("FolderList.vue", () => {
   });
 
   describe("Template Rendering", () => {
+    it("reads Folders in the rail header and Add Folder on the add button by default", () => {
+      expect(wrapper.text()).toContain("Folders");
+      expect(wrapper.find('[data-test="dashboard-new-folder-btn"]').attributes("title")).toBe(
+        "Add Folder",
+      );
+    });
+
+    it("reads Fleets and New fleet for the fleets type", () => {
+      const fleets = mount(FolderList, {
+        global: {
+          plugins: [i18n],
+          stubs: { AddFolder: AddFolderStub, ConfirmDialog: ConfirmDialogStub },
+          mocks: { $store: mockStore },
+          provide: { store: mockStore },
+        },
+        props: { type: "fleets" },
+      });
+      expect(fleets.text()).toContain("Fleets");
+      expect(fleets.text()).not.toContain("Folders");
+      expect(fleets.find('[data-test="dashboard-new-folder-btn"]').attributes("title")).toBe(
+        "New fleet",
+      );
+      fleets.unmount();
+    });
+
+    it("asks for a fleet's name before deleting it, but not for other folder types", async () => {
+      const fleetStore = {
+        ...mockStore,
+        state: {
+          ...mockStore.state,
+          organizationData: {
+            ...mockStore.state.organizationData,
+            foldersByType: { fleets: [{ folderId: "f9", name: "test1" }] },
+          },
+        },
+      };
+      const fleets = mount(FolderList, {
+        global: {
+          plugins: [i18n],
+          stubs: { AddFolder: AddFolderStub, ConfirmDialog: ConfirmDialogStub },
+          mocks: { $store: fleetStore },
+          provide: { store: fleetStore },
+        },
+        props: { type: "fleets" },
+      });
+      (fleets.vm as any).showDeleteFolderDialogFn("f9");
+      await fleets.vm.$nextTick();
+      expect(fleets.findComponent(ConfirmDialogStub).props()).toMatchObject({
+        confirmText: "test1",
+        okLabel: "Delete",
+        okVariant: "destructive",
+        focusCancel: true,
+      });
+      fleets.unmount();
+      (wrapper.vm as any).showDeleteFolderDialogFn("folder1");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.findComponent(ConfirmDialogStub).props()).toMatchObject({
+        confirmText: undefined,
+        okLabel: undefined,
+        okVariant: "destructive",
+        focusCancel: false,
+      });
+    });
+
+    it("falls back to the fleet's id when its name is not known", async () => {
+      const fleetStore = {
+        ...mockStore,
+        state: {
+          ...mockStore.state,
+          organizationData: { ...mockStore.state.organizationData, foldersByType: { fleets: [] } },
+        },
+      };
+      const fleets = mount(FolderList, {
+        global: {
+          plugins: [i18n],
+          stubs: { AddFolder: AddFolderStub, ConfirmDialog: ConfirmDialogStub },
+          mocks: { $store: fleetStore },
+          provide: { store: fleetStore },
+        },
+        props: { type: "fleets" },
+      });
+      (fleets.vm as any).showDeleteFolderDialogFn("f9");
+      await fleets.vm.$nextTick();
+      expect(fleets.findComponent(ConfirmDialogStub).props("confirmText")).toBe("f9");
+      fleets.unmount();
+    });
+
     it("should render folder search input", () => {
       const searchInput = wrapper.find('[data-test="folder-search"]');
       expect(searchInput.exists()).toBe(true);
@@ -1138,6 +1269,61 @@ describe("FolderList.vue", () => {
       await wrapper.vm.updateFolderList([]);
       expect(wrapper.vm.showAddFolderDialog).toBe(false);
       expect(wrapper.vm.isFolderEditMode).toBe(false);
+    });
+  });
+
+  describe("delete dialog names the folder", () => {
+    it("passes the folder name and the named keypath to the dialog", async () => {
+      wrapper.vm.showDeleteFolderDialogFn("folder1", "Test Folder 1");
+      await nextTick();
+      expect(wrapper.findComponent(ConfirmDialogStub).props()).toMatchObject({
+        messageKeypath: "dashboard.deleteFolderMessage",
+        messageName: "Test Folder 1",
+        message: undefined,
+        okVariant: "destructive",
+      });
+    });
+
+    it("keeps the fleet message without a keypath", async () => {
+      const fleets = mount(FolderList, {
+        global: {
+          plugins: [i18n],
+          stubs: { AddFolder: AddFolderStub, ConfirmDialog: ConfirmDialogStub },
+          mocks: { $store: mockStore },
+          provide: { store: mockStore },
+        },
+        props: { type: "fleets" },
+      });
+      (fleets.vm as any).showDeleteFolderDialogFn("f9", "test1");
+      await nextTick();
+      const props = fleets.findComponent(ConfirmDialogStub).props();
+      expect(props.messageKeypath).toBeUndefined();
+      expect(props.message).toBeTruthy();
+      fleets.unmount();
+    });
+
+    it("renders the name in bold inside the real ConfirmDialog", async () => {
+      const real = mount(FolderList, {
+        global: {
+          plugins: [i18n],
+          stubs: {
+            AddFolder: AddFolderStub,
+            ODialog: { template: '<div data-test="o-dialog-stub"><slot /></div>' },
+          },
+          mocks: { $store: mockStore },
+          provide: { store: mockStore },
+        },
+        props: { type: "alerts" },
+      });
+      (real.vm as any).showDeleteFolderDialogFn("folder1", "Test Folder 1");
+      await nextTick();
+      const name = real.find('[data-test="confirm-dialog-name"]');
+      expect(name.text()).toBe("Test Folder 1");
+      expect(name.classes()).toContain("font-semibold");
+      expect(real.find('[data-test="dialog-box"]').text()).toContain(
+        "Are you sure you want to delete the Test Folder 1 folder?",
+      );
+      real.unmount();
     });
   });
 });

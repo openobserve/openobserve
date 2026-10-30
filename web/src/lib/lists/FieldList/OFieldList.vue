@@ -16,7 +16,7 @@
       <OInput
         :model-value="searchModel"
         data-test="o-field-list-search"
-        :placeholder="searchPlaceholder"
+        :placeholder="searchPlaceholder ?? t('common.searchFields')"
         clearable
         @update:model-value="onSearchChange"
       >
@@ -63,11 +63,19 @@
           <div
             v-else
             class="o-field-list__row group px-page-edge rounded-default relative mt-1 flex min-h-6 w-full cursor-pointer items-center text-xs leading-[0.8rem]"
-            :class="{ 'o-field-list__row--draggable': draggable }"
+            :class="{
+              'o-field-list__row--draggable': draggable,
+              'focus-visible:ring-focus-ring-accent outline-none focus-visible:ring-2 focus-visible:ring-inset':
+                keyboard,
+            }"
+            :tabindex="keyboard ? 0 : undefined"
+            :role="keyboard ? 'button' : undefined"
             :data-test="`o-field-list-row-${row.name}`"
             :draggable="draggable && isDragEnabled(row, row._index ?? 0) && isDragArmed()"
             @click="(e: MouseEvent) => onRowClick(row, e)"
             @dblclick="(e: MouseEvent) => onRowDblClick(row, e)"
+            @keydown.enter.space="(e: KeyboardEvent) => onRowKey(row, e)"
+            @keydown.up.down="onRowArrow"
             @dragstart="(e: DragEvent) => onDragStart(row, e)"
             @dragend="(e: DragEvent) => onDragEnd(row, e)"
             @dragover.prevent
@@ -101,7 +109,7 @@
             </div>
             <div
               v-if="$slots['field-actions']"
-              class="o-field-list__actions border-field-list-actions-border rounded-default bg-field-list-actions-bg invisible absolute top-1/2 right-1 flex shrink-0 -translate-y-1/2 items-stretch overflow-hidden border opacity-0 transition-[opacity,visibility] duration-[120ms] ease-[ease] group-hover:visible group-hover:opacity-100"
+              class="o-field-list__actions border-field-list-actions-border rounded-default bg-field-list-actions-bg invisible absolute top-1/2 right-1 flex shrink-0 -translate-y-1/2 items-stretch overflow-hidden border opacity-0 transition-[opacity,visibility] duration-[120ms] ease-[ease] group-hover:visible group-hover:opacity-100 max-md:visible max-md:opacity-100"
             >
               <slot name="field-actions" :row="row" :index="row._index" />
             </div>
@@ -126,6 +134,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { computed, ref, watch } from "vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -138,7 +147,7 @@ const props = withDefaults(
   defineProps<{
     fields: FieldItem[];
     search?: string;
-    searchPlaceholder?: string;
+    searchPlaceholder?: I18nText;
     /** Extra classes for the search block — see the template note on gutters. */
     searchClass?: string;
     loading?: boolean;
@@ -152,10 +161,13 @@ const props = withDefaults(
     draggable?: boolean;
     dragEnabledFn?: (row: FieldItem, index: number) => boolean;
     sortFn?: (a: FieldItem, b: FieldItem) => number;
+    /** Rows take focus and Enter or Space picks them, for a list that is a picker. */
+    keyboard?: boolean;
   }>(),
   {
     search: "",
-    searchPlaceholder: "Search fields",
+    // No default here — a withDefaults default is evaluated at module scope, which
+    // would freeze the locale. The template falls back to t() at render time.
     searchClass: "",
     loading: false,
     currentPage: 1,
@@ -168,6 +180,7 @@ const props = withDefaults(
     draggable: false,
     dragEnabledFn: undefined,
     sortFn: undefined,
+    keyboard: false,
   },
 );
 
@@ -175,12 +188,14 @@ const emit = defineEmits<{
   "update:search": [value: string];
   "update:currentPage": [page: number];
   "update:expandedIds": [ids: string[]];
-  "row-click": [row: FieldItem, event: MouseEvent];
+  "row-click": [row: FieldItem, event: MouseEvent | KeyboardEvent];
   "row-dblclick": [row: FieldItem, event: MouseEvent];
   "scroll-end": [scrollInfo: any];
   "drag-start": [row: FieldItem, event: DragEvent];
   "drag-end": [row: FieldItem, event: DragEvent];
 }>();
+
+const { t } = useI18nTyped();
 
 const scrollContainerRef = ref<HTMLElement | null>(null);
 const searchModel = ref(props.search);
@@ -355,6 +370,24 @@ function onRowClick(row: FieldItem, event: MouseEvent) {
   emit("row-click", row, event);
 }
 
+function onRowKey(row: FieldItem, event: KeyboardEvent) {
+  if (!props.keyboard || row.isGroup || event.target !== event.currentTarget) return;
+  event.preventDefault();
+  emit("row-click", row, event);
+}
+
+function onRowArrow(event: KeyboardEvent) {
+  if (!props.keyboard) return;
+  const rows = [
+    ...(scrollContainerRef.value?.querySelectorAll<HTMLElement>(".o-field-list__row") ?? []),
+  ];
+  const next =
+    rows[rows.indexOf(event.currentTarget as HTMLElement) + (event.key === "ArrowDown" ? 1 : -1)];
+  if (!next) return;
+  event.preventDefault();
+  next.focus();
+}
+
 function onRowDblClick(row: FieldItem, event: MouseEvent) {
   if (row.isGroup) return;
   emit("row-dblclick", row, event);
@@ -418,6 +451,7 @@ defineExpose({ scrollToTop });
   background-color: transparent !important;
 }
 .o-field-list__actions > :deep(*:not(:first-child)) {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the 1-device-pixel chip separator must not scale with text or it smears at fractional zoom */
   border-left: 1px solid var(--color-field-list-actions-border) !important;
 }
 </style>

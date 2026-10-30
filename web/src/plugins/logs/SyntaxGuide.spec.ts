@@ -141,6 +141,7 @@ describe("SyntaxGuide.vue", () => {
     const dropdown = wrapper.findComponent({ name: "ODropdown" });
     expect(dropdown.exists()).toBe(true);
     // The theme class is bound on the content wrapper div inside the dropdown.
+    // eslint-disable-next-line no-restricted-syntax -- test assertion deriving the expected class from the mock store; routing it through useTheme() would test the helper instead of the component.
     const expectedClass = store.state.theme === "dark" ? "theme-dark" : "theme-light";
     expect(expectedClass).toBe("theme-dark");
   });
@@ -151,6 +152,7 @@ describe("SyntaxGuide.vue", () => {
     wrapper = createWrapper();
     const dropdown = wrapper.findComponent({ name: "ODropdown" });
     expect(dropdown.exists()).toBe(true);
+    // eslint-disable-next-line no-restricted-syntax -- test assertion deriving the expected class from the mock store; routing it through useTheme() would test the helper instead of the component.
     const expectedClass = store.state.theme === "dark" ? "theme-dark" : "theme-light";
     expect(expectedClass).toBe("theme-light");
   });
@@ -328,7 +330,7 @@ describe("SyntaxGuide.vue", () => {
     const button = wrapper.findComponent({ name: "OButton" });
     // noBorder now toggles Tailwind utility classes instead of a scoped class
     expect(button.classes()).toContain("border-0!");
-    expect(button.classes()).not.toContain("ml-1");
+    expect(button.classes()).not.toContain("ms-1");
   });
 
   // Test 32: noBorder false keeps standard spacing classes
@@ -337,7 +339,7 @@ describe("SyntaxGuide.vue", () => {
     const button = wrapper.findComponent({ name: "OButton" });
     // noBorder false keeps the standard inline margin utility
     expect(button.classes()).not.toContain("border-0!");
-    expect(button.classes()).toContain("ml-1");
+    expect(button.classes()).toContain("ms-1");
   });
 
   // Test 33: label prop renders on button when noBorder is false
@@ -402,5 +404,22 @@ describe("SyntaxGuide.vue", () => {
   it("should have label default value as empty string", () => {
     wrapper = createWrapper();
     expect(wrapper.props().label).toBe("");
+  });
+
+  // Test 41: toolbar variant matches the 34px logs toolbar row
+  it("should give the toolbar variant the 34px toolbar height and keep xs text", () => {
+    wrapper = createWrapper({ toolbar: true, label: "Syntax Guide" });
+    const button = wrapper.findComponent({ name: "OButton" });
+    expect(button.props("variant")).toBe("outline");
+    expect(button.classes()).toContain("h-[2.125rem]!");
+    expect(button.classes()).toContain("text-xs");
+  });
+
+  // Test 42: non-toolbar variants keep their own height
+  it("should not apply the toolbar height to the default or menu-item variants", () => {
+    wrapper = createWrapper();
+    expect(wrapper.findComponent({ name: "OButton" }).classes()).not.toContain("h-[2.125rem]!");
+    wrapper = createWrapper({ menuItem: true });
+    expect(wrapper.findComponent({ name: "OButton" }).classes()).not.toContain("h-[2.125rem]!");
   });
 });

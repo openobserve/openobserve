@@ -27,9 +27,7 @@
 
 use serde::{Deserialize, Serialize};
 
-/// The reserved stream name. Registered in
-/// [`crate::meta::self_reporting::usage::RESERVED_INTERNAL_STREAMS`], which is
-/// what stops a user creating, ingesting into, or deleting it.
+/// The stream the SLO job writes its slices to.
 pub const SLO_SLICES_STREAM: &str = "slo_slices";
 
 /// One measured slice.
@@ -64,6 +62,9 @@ pub struct SloSliceRow {
     /// This is for **dedupe**, not publication ordering — there is no
     /// publication protocol to order (D64).
     pub rev: i64,
+    /// Id of the downtime that corrected this slice, or `""` when measured as is.
+    #[serde(default)]
+    pub corrected_by: String,
 }
 
 impl SloSliceRow {
@@ -86,6 +87,7 @@ impl SloSliceRow {
             good: 1.0,
             total: 1.0,
             rev: 1,
+            corrected_by: "downtime".to_string(),
         }
     }
 }
@@ -100,7 +102,7 @@ mod tests {
         // type and then conflict with the first real write.
         let v = serde_json::to_value(SloSliceRow::init_for_reflection()).unwrap();
         let obj = v.as_object().unwrap();
-        assert_eq!(obj.len(), 10, "a field was added without a sample value");
+        assert_eq!(obj.len(), 11, "a field was added without a sample value");
         for (k, val) in obj {
             assert!(!val.is_null(), "{k} is null in the reflection sample");
             if let Some(s) = val.as_str() {
@@ -132,6 +134,7 @@ mod tests {
             good: 98.0,
             total: 100.0,
             rev: 2,
+            corrected_by: String::new(),
         };
         let json = serde_json::to_string(&row).unwrap();
         assert_eq!(serde_json::from_str::<SloSliceRow>(&json).unwrap(), row);
@@ -153,6 +156,7 @@ mod tests {
             "good",
             "total",
             "rev",
+            "corrected_by",
         ] {
             assert!(v.get(field).is_some(), "field `{field}` was renamed");
         }

@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`pipeline-section-tab-${s.key}`"
     >
       <OIcon :name="s.icon" size="sm" class="shrink-0" />
-      <span>{{ s.label }}</span>
+      <span :class="s.key === activeSectionKey ? '' : 'max-md:hidden'">{{ s.label }}</span>
       <span
         v-if="s.count != null"
         class="text-2xs rounded-full px-1.5 py-1 leading-none font-bold"
@@ -55,14 +55,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, type RouteLocationRaw } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 
@@ -78,6 +78,7 @@ const routeToSection: Record<string, string> = {
   pipelineHistory: "streamPipelines",
   pipelineBackfill: "streamPipelines",
   functionList: "functions",
+  importFunction: "functions",
   enrichmentTables: "enrichmentTables",
 };
 
@@ -88,7 +89,7 @@ const activeSectionKey = computed(() => {
 
 interface Section {
   key: string;
-  label: string;
+  label: I18nText;
   icon: string;
   to: RouteLocationRaw;
   visible: boolean;

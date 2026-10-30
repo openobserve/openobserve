@@ -27,6 +27,7 @@ pub static BASE_TIME: Lazy<DateTime<Utc>> =
 
 pub static DAY_MICRO_SECS: i64 = 24 * 3600 * 1_000_000;
 pub static HOUR_MICRO_SECS: i64 = 3600 * 1_000_000;
+pub static SECOND_MICRO_SECS: i64 = 1_000_000;
 
 pub enum HourFormat {
     Zero,
@@ -72,6 +73,14 @@ pub fn second_micros(n: i64) -> i64 {
         .unwrap()
 }
 
+/// The `YYYYMM` of a microsecond timestamp, UTC. One encoding, or a period compares against
+/// something that was written with another.
+#[inline(always)]
+pub fn month_of(micros: i64) -> i32 {
+    let at = DateTime::from_timestamp_micros(micros).unwrap_or_default();
+    at.year() * 100 + at.month() as i32
+}
+
 #[inline(always)]
 pub fn get_ymdh_from_micros(n: i64, hour_format: HourFormat) -> String {
     let n = if n > 0 {
@@ -88,24 +97,29 @@ pub fn get_ymdh_from_micros(n: i64, hour_format: HourFormat) -> String {
 
 #[inline(always)]
 pub fn parse_i64_to_timestamp_micros(v: i64) -> i64 {
+    // Only seconds far below the epoch overflow; they saturate rather than wrap.
+    try_parse_i64_to_timestamp_micros(v).unwrap_or(i64::MIN)
+}
+
+/// [`parse_i64_to_timestamp_micros`], or `None` when scaling to microseconds overflows.
+#[inline(always)]
+pub fn try_parse_i64_to_timestamp_micros(v: i64) -> Option<i64> {
     if v == 0 {
-        return Utc::now().timestamp_micros();
+        return Some(Utc::now().timestamp_micros());
     }
-    let mut duration = v;
-    if duration > BASE_TIME.timestamp_nanos_opt().unwrap_or_default() {
+    if v > BASE_TIME.timestamp_nanos_opt().unwrap_or_default() {
         // nanoseconds
-        duration /= 1000;
-    } else if duration > BASE_TIME.timestamp_micros() {
+        Some(v / 1000)
+    } else if v > BASE_TIME.timestamp_micros() {
         // microseconds
-        // noop
-    } else if duration > BASE_TIME.timestamp_millis() {
+        Some(v)
+    } else if v > BASE_TIME.timestamp_millis() {
         // milliseconds
-        duration *= 1000;
+        v.checked_mul(1000)
     } else {
         // seconds
-        duration *= 1_000_000;
+        v.checked_mul(1_000_000)
     }
-    duration
 }
 
 #[inline(always)]
@@ -136,11 +150,14 @@ pub fn parse_str_to_time(s: &str) -> Result<DateTime<Utc>, anyhow::Error> {
             NaiveDateTime::parse_from_str(s, fmt)?.and_utc()
         } else if s.contains('.') {
             // Handle formats with decimal seconds: "2025-05-14T01:15:25.047"
+            let fraction = s.split('.').next_back().unwrap_or("");
+            // the zone is part of this text, so "12Z" and "12345Z" are as long as 3 and 6 digits
+            let zone_less = fraction.bytes().all(|b| b.is_ascii_digit());
             // First check if it has milliseconds (3 decimal places)
-            if s.split('.').next_back().unwrap_or("").len() == 3 {
+            if zone_less && fraction.len() == 3 {
                 let fmt = "%Y-%m-%dT%H:%M:%S%.3f";
                 NaiveDateTime::parse_from_str(s, fmt)?.and_utc()
-            } else if s.split('.').next_back().unwrap_or("").len() == 6 {
+            } else if zone_less && fraction.len() == 6 {
                 // Handle microseconds (6 decimal places)
                 let fmt = "%Y-%m-%dT%H:%M:%S%.6f";
                 NaiveDateTime::parse_from_str(s, fmt)?.and_utc()
@@ -164,24 +181,38 @@ pub fn parse_str_to_time(s: &str) -> Result<DateTime<Utc>, anyhow::Error> {
 // return timestamp and is_valid micros value
 #[inline(always)]
 pub fn parse_timestamp_micro_from_value(v: &json::Value) -> Result<(i64, bool), anyhow::Error> {
-    let (ts, is_i64) = match v {
-        json::Value::String(s) => (parse_str_to_timestamp_micros(s)?, false),
+    match v {
+        json::Value::String(s) => parse_timestamp_micro_from_str(s),
         json::Value::Number(n) => {
-            if n.is_i64() {
-                (n.as_i64().unwrap(), true)
-            } else if n.is_u64() {
-                (n.as_u64().unwrap() as i64, true)
+            if let Some(n) = n.as_i64() {
+                Ok(parse_timestamp_micro_from_integer(n))
+            } else if let Some(n) = n.as_u64() {
+                Ok(parse_timestamp_micro_from_integer(n as i64))
             } else if n.is_f64() {
-                (n.as_f64().unwrap() as i64, false)
+                Ok((
+                    parse_i64_to_timestamp_micros(n.as_f64().unwrap() as i64),
+                    false,
+                ))
             } else {
-                return Err(anyhow::anyhow!("Invalid time format [timestamp]"));
+                Err(anyhow::anyhow!("Invalid time format [timestamp]"))
             }
         }
-        _ => return Err(anyhow::anyhow!("Invalid time format [type]")),
-    };
+        _ => Err(anyhow::anyhow!("Invalid time format [type]")),
+    }
+}
+
+/// `parse_timestamp_micro_from_value` for a JSON string.
+pub fn parse_timestamp_micro_from_str(s: &str) -> Result<(i64, bool), anyhow::Error> {
+    Ok((
+        parse_i64_to_timestamp_micros(parse_str_to_timestamp_micros(s)?),
+        false,
+    ))
+}
+
+/// `parse_timestamp_micro_from_value` for a JSON integer.
+pub fn parse_timestamp_micro_from_integer(ts: i64) -> (i64, bool) {
     let new_ts = parse_i64_to_timestamp_micros(ts);
-    let is_valid = is_i64 && new_ts == ts;
-    Ok((new_ts, is_valid))
+    (new_ts, ts > 0 && new_ts == ts)
 }
 
 pub fn parse_milliseconds(s: &str) -> Result<u64, anyhow::Error> {
@@ -234,16 +265,7 @@ pub fn parse_milliseconds(s: &str) -> Result<u64, anyhow::Error> {
     Ok(total)
 }
 
-pub fn parse_timezone_to_offset(offset: &str) -> i64 {
-    parse_timezone_to_offset_opt(offset).expect("Invalid time zone offset")
-}
-
-/// Parse a fixed timezone offset string into seconds east of UTC.
-///
-/// Accepts the same forms as [`parse_timezone_to_offset`] (`"+08:00"`, `"-07:00"`,
-/// `"UTC"`, `"CST"`, empty string), but returns `None` for unsupported / malformed
-/// input (e.g. IANA names like `"Asia/Shanghai"`) instead of panicking. Use this
-/// whenever the timezone string can come from user-supplied SQL.
+/// Parses a fixed timezone offset into seconds east of UTC; `None` on unsupported input.
 pub fn parse_timezone_to_offset_opt(offset: &str) -> Option<i64> {
     // let offset = "+08:00"; // or "-07:00" or "UTC"
     let (sign, time): (i64, &str) = if let Some(stripped) = offset.strip_prefix('+') {
@@ -262,10 +284,10 @@ pub fn parse_timezone_to_offset_opt(offset: &str) -> Option<i64> {
     let mut seconds: i64 = 0;
     for part in time.split(':') {
         let val = part.parse::<i64>().ok()?;
-        seconds = seconds * 60 + val * 60;
+        seconds = seconds.checked_mul(60)?.checked_add(val.checked_mul(60)?)?;
     }
 
-    Some(sign * seconds)
+    sign.checked_mul(seconds)
 }
 
 /// Resolve a timezone string into seconds east of UTC, evaluated at `reference_micros`.
@@ -350,8 +372,28 @@ pub fn parse_interval_to_minutes(s: &str) -> i64 {
     }
 }
 
+/// Rejects a range `file_list` would refuse, so a handler can answer 400 before searching.
+pub fn validate_time_range(start_time: i64, end_time: i64) -> Result<(), &'static str> {
+    if start_time <= 0 || end_time <= 0 {
+        return Err("start_time and end_time must be positive microsecond timestamps");
+    }
+    if start_time >= end_time {
+        return Err("start_time must be before end_time");
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_month_of_reads_the_utc_month() {
+        assert_eq!(month_of(1_788_800_853_300_917), 202609);
+        assert_eq!(month_of(0), 197001);
+        // A month boundary is the one place an off-by-one lands on the wrong grant.
+        assert_eq!(month_of(1_767_225_599_000_000), 202512);
+        assert_eq!(month_of(1_767_225_600_000_000), 202601);
+    }
+
     use super::*;
 
     #[test]
@@ -390,6 +432,27 @@ mod tests {
         );
         assert!(test_fn("2021-01-01T00:00:00.123Z").is_ok_and(|v| v == 1609459200123000));
         assert!(test_fn("2021-01-01T00:00:00.123456789").is_err());
+    }
+
+    #[test]
+    fn test_parse_str_to_time_rfc3339_fraction_lengths() {
+        let v_exp_arr = [
+            ("2021-01-01T00:00:00.1Z", 1609459200100000),
+            ("2021-01-01T00:00:00.12Z", 1609459200120000),
+            ("2021-01-01T00:00:00.123Z", 1609459200123000),
+            ("2021-01-01T00:00:00.1234Z", 1609459200123400),
+            ("2021-01-01T00:00:00.12345Z", 1609459200123450),
+            ("2021-01-01T00:00:00.123456Z", 1609459200123456),
+            ("2021-01-01T00:00:00.1234567Z", 1609459200123456),
+            ("2021-01-01T00:00:00.12345678Z", 1609459200123456),
+            ("2021-01-01T00:00:00.123456789Z", 1609459200123456),
+            ("2021-01-01T00:00:00.12+08:00", 1609430400120000),
+            ("2021-01-01T00:00:00.12345-08:00", 1609488000123450),
+        ];
+        for (input, v_exp) in v_exp_arr {
+            let got = parse_str_to_time(input).map(|v| v.timestamp_micros()).ok();
+            assert_eq!(got, Some(v_exp), "{input}");
+        }
     }
 
     #[test]
@@ -479,17 +542,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_timezone_to_offset() {
-        assert_eq!(parse_timezone_to_offset(""), 0);
-        assert_eq!(parse_timezone_to_offset("UTC"), 0);
-        assert_eq!(parse_timezone_to_offset("CST"), 28800);
-        assert_eq!(parse_timezone_to_offset("+08:00"), 28800);
-        assert_eq!(parse_timezone_to_offset("-08:00"), -28800);
-    }
-
-    #[test]
     fn test_parse_timezone_to_offset_opt() {
-        // valid forms match the panicking variant
         assert_eq!(parse_timezone_to_offset_opt(""), Some(0));
         assert_eq!(parse_timezone_to_offset_opt("UTC"), Some(0));
         assert_eq!(parse_timezone_to_offset_opt("CST"), Some(28800));
@@ -501,6 +554,8 @@ mod tests {
         // invalid / unsupported input returns None instead of panicking
         assert_eq!(parse_timezone_to_offset_opt("America/New_York"), None);
         assert_eq!(parse_timezone_to_offset_opt("+ab:cd"), None);
+        assert_eq!(parse_timezone_to_offset_opt("+1:1:1:1:1:1:1:1:1:1:1"), None);
+        assert_eq!(parse_timezone_to_offset_opt("-9223372036854775807:0"), None);
     }
 
     #[test]
@@ -651,6 +706,14 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_i64_to_timestamp_micros_overflow_is_checked() {
+        assert_eq!(try_parse_i64_to_timestamp_micros(-10_000_000_000_000), None);
+        assert_eq!(try_parse_i64_to_timestamp_micros(-1), Some(-1_000_000));
+        assert_eq!(parse_i64_to_timestamp_micros(-10_000_000_000_000), i64::MIN);
+        assert_eq!(parse_i64_to_timestamp_micros(i64::MIN), i64::MIN);
+    }
+
+    #[test]
     fn test_parse_milliseconds_edge_cases() {
         assert_eq!(parse_milliseconds("1ms").unwrap(), 1);
         assert_eq!(parse_milliseconds("100ms").unwrap(), 100);
@@ -712,8 +775,15 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Invalid time zone offset")]
-    fn test_parse_timezone_to_offset_invalid_panics() {
-        parse_timezone_to_offset("America/New_York");
+    fn test_validate_time_range_rejects_what_file_list_refuses() {
+        let positive = Err("start_time and end_time must be positive microsecond timestamps");
+        let ordered = Err("start_time must be before end_time");
+        assert_eq!(validate_time_range(0, 10), positive);
+        assert_eq!(validate_time_range(-1, 10), positive);
+        assert_eq!(validate_time_range(1, 0), positive);
+        assert_eq!(validate_time_range(1, -5), positive);
+        assert_eq!(validate_time_range(10, 10), ordered);
+        assert_eq!(validate_time_range(11, 10), ordered);
+        assert_eq!(validate_time_range(1, 2), Ok(()));
     }
 }

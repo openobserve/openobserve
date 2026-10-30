@@ -25,6 +25,9 @@ import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { toZonedTime } from "date-fns-tz";
 import { formatDate, isTimeSeries, isTimeStamp } from "./dateTimeUtils";
 import { getDataValue } from "./aliasUtils";
+import { RE2JS } from "re2js";
+import { metricThresholdColor, type Thresholds } from "./thresholds";
+import { isSeriesOverrideEntry } from "./seriesOverrides";
 
 /** Persisted `override_config` item type discriminants (mirrored in the Rust schema). */
 export const OVERRIDE_CONFIG_TYPES = {
@@ -37,9 +40,38 @@ export const OVERRIDE_CONFIG_TYPES = {
   FIELD_TYPE: "field_type",
 } as const;
 
-/** Apply a per-column field-type override ("num"/"text" force; "auto"/absent keep detected). */
+// Value-mapping regexes run synchronously on every table cell, so both sides are bounded.
+const MAX_VALUE_MAPPING_PATTERN_LENGTH = 256;
+const MAX_VALUE_MAPPING_TEST_LENGTH = 1024;
+
+const REGEX_KEY_PREFIX = "__regex_";
+const SPECIAL_KEY_PREFIX = "__special_";
+
+/** What a "special" value mapping can match. */
+export const SPECIAL_VALUE_MATCHES: readonly string[] = ["null", "nan", "empty", "true", "false"];
+
+// Compiled at cache build so a table never recompiles a pattern per cell.
+const compiledRegexByCache = new WeakMap<Map<any, any>, Map<string, RE2JS | null>>();
+
+// g and y have no counterpart: RE2JS.test is stateless and searches the whole value.
+const RE2_FLAG_BY_JS_FLAG: Record<string, number> = {
+  i: RE2JS.CASE_INSENSITIVE,
+  m: RE2JS.MULTILINE,
+  s: RE2JS.DOTALL,
+};
+
+const warnedValueMappingPatterns = new Set<string>();
+
+/** Why a value-mapping regex cannot be saved. */
+export type ValueMappingPatternError = "tooLong" | "unsupported";
+
+/** Apply a per-column field-type override ("num"/"bar_gauge" and "text"/"json" force; "sparkline", "auto" and absent keep detected). */
 export const resolveIsNumber = (detected: boolean, fieldType: string | undefined): boolean =>
-  fieldType === "num" ? true : fieldType === "text" ? false : detected;
+  fieldType === "num" || fieldType === "bar_gauge"
+    ? true
+    : fieldType === "text" || fieldType === "json"
+      ? false
+      : detected;
 
 // ---------------------------------------------------------------------------
 // Value-mapping helpers
@@ -57,6 +89,12 @@ export const parseRegexPattern = (input: string): { pattern: string; flags: stri
   return { pattern: input, flags: "" };
 };
 
+/** Why a value-mapping regex cannot run: over the length cap, or syntax the linear-time engine rejects such as lookaround or backreferences. */
+export const valueMappingPatternError = (input: string): ValueMappingPatternError | null => {
+  if (input.length > MAX_VALUE_MAPPING_PATTERN_LENGTH) return "tooLong";
+  return tryCompileLinearRegex(input) ? null : "unsupported";
+};
+
 /** Build a fast-lookup cache from `config.mappings`, storing the full mapping object. */
 export const buildValueMappingCache = (mappings: any): Map<any, any> | null => {
   if (!mappings || !Array.isArray(mappings)) {
@@ -64,12 +102,15 @@ export const buildValueMappingCache = (mappings: any): Map<any, any> | null => {
   }
 
   const cache = new Map<any, any>();
+  const compiled = new Map<string, RE2JS | null>();
 
   mappings.forEach((mapping: any) => {
     if (!mapping) return;
-    const hasText = mapping.text != null && mapping.text !== "";
-    const hasColor = mapping.color != null && mapping.color !== "";
-    if (!hasText && !hasColor) return;
+    // A mapping is cached when it carries any effect: text, background, or text color.
+    const nonEmpty = (v: any) => v != null && v !== "";
+    if (!nonEmpty(mapping.text) && !nonEmpty(mapping.color) && !nonEmpty(mapping.textColor)) {
+      return;
+    }
 
     const hasRange =
       mapping.from !== undefined &&
@@ -79,18 +120,27 @@ export const buildValueMappingCache = (mappings: any): Map<any, any> | null => {
 
     const type = mapping.type ?? (mapping.pattern ? "regex" : hasRange ? "range" : "value");
 
-    if (type === "regex") {
-      // Regex mapping – stored with a special prefix; pattern tested during lookup
-      cache.set(`__regex_${mapping.pattern ?? ""}`, mapping);
+    if (type === "special") {
+      if (SPECIAL_VALUE_MATCHES.includes(mapping.match)) {
+        cache.set(`${SPECIAL_KEY_PREFIX}${mapping.match}`, mapping);
+      }
+    } else if (type === "regex") {
+      const key = `${REGEX_KEY_PREFIX}${mapping.pattern ?? ""}`;
+      cache.set(key, mapping);
+      compiled.set(key, compileValueMappingRegex(String(mapping.pattern ?? "")));
     } else if (type === "range") {
       // Range mapping – encoded key so direct + range share the same Map
       cache.set(`__range_${mapping.from}_${mapping.to}`, mapping);
+    } else if (type === "gt" || type === "lt" || type === "gte" || type === "lte") {
+      cache.set(`__op_${type}_${mapping.value}`, mapping);
     } else if (mapping.value !== undefined && mapping.value !== null) {
       cache.set(mapping.value, mapping);
     }
   });
 
-  return cache.size > 0 ? cache : null;
+  if (cache.size === 0) return null;
+  compiledRegexByCache.set(cache, compiled);
+  return cache;
 };
 
 /**
@@ -100,14 +150,18 @@ export const buildValueMappingCache = (mappings: any): Map<any, any> | null => {
 export const lookupValueMappingFull = (
   value: any,
   cache: Map<any, any> | null,
-  requireField?: "text" | "color",
+  requireField?: "text" | "color" | "textColor",
 ): any | null => {
   if (!cache) return null;
 
   const ok = (m: any) => !requireField || (m && m[requireField] != null && m[requireField] !== "");
 
+  const special = specialMatchOf(value);
+  let m = special ? cache.get(`${SPECIAL_KEY_PREFIX}${special}`) : undefined;
+  if (m !== undefined && ok(m)) return m;
+
   // Direct match (then string-coerced, e.g. key "3" vs numeric value 3)
-  let m = cache.get(value);
+  m = cache.get(value);
   if (m !== undefined && ok(m)) return m;
 
   const strValue = String(value);
@@ -129,22 +183,71 @@ export const lookupValueMappingFull = (
     }
   }
 
-  // Regex match
+  // Threshold match (gt/lt/gte/lte) — numeric comparison against the operand.
+  // Last matching threshold wins, matching the column-formatting conditional
+  // rules convention (e.g. `>1000` overrides `>400` for 2301).
+  if (!Number.isNaN(numValue)) {
+    let thresholdHit: any = null;
+    for (const [key, mapping] of cache.entries()) {
+      if (typeof key === "string" && key.startsWith("__op_")) {
+        const rest = key.slice(5); // "__op_".length === 5
+        const sep = rest.indexOf("_");
+        const op = rest.slice(0, sep);
+        const operand = parseFloat(rest.slice(sep + 1));
+        if (Number.isNaN(operand) || !ok(mapping)) continue;
+        const hit =
+          (op === "gt" && numValue > operand) ||
+          (op === "lt" && numValue < operand) ||
+          (op === "gte" && numValue >= operand) ||
+          (op === "lte" && numValue <= operand);
+        if (hit) thresholdHit = mapping;
+      }
+    }
+    if (thresholdHit) return thresholdHit;
+  }
+
+  if (strValue.length > MAX_VALUE_MAPPING_TEST_LENGTH) return null;
+  const compiled = compiledRegexByCache.get(cache);
   for (const [key, mapping] of cache.entries()) {
-    if (typeof key === "string" && key.startsWith("__regex_")) {
-      const rawPattern = key.slice(8); // "__regex_".length === 8
-      try {
-        const { pattern, flags } = parseRegexPattern(rawPattern);
-        if (new RegExp(pattern, flags).test(strValue) && ok(mapping)) {
-          return mapping;
-        }
-      } catch {
-        // invalid regex pattern, skip
+    if (typeof key === "string" && key.startsWith(REGEX_KEY_PREFIX)) {
+      const regex = compiled?.get(key);
+      if (regex && regex.test(strValue) && ok(mapping)) {
+        return mapping;
       }
     }
   }
 
   return null;
+};
+
+/** Which special mapping a value meets: null, NaN, the empty string, or a true/false boolean or text. */
+export const specialMatchOf = (value: unknown): string | null => {
+  if (value === null || value === undefined) return "null";
+  if (typeof value === "number") return Number.isNaN(value) ? "nan" : null;
+  if (typeof value === "boolean") return String(value);
+  if (typeof value !== "string") return null;
+  if (value === "") return "empty";
+  const text = value.trim().toLowerCase();
+  if (text === "nan") return "nan";
+  return text === "true" || text === "false" ? text : null;
+};
+
+/** True when the panel names what a missing value shows: a no-value replacement or a special null mapping. */
+export const showsMissingValue = (config: any): boolean =>
+  String(config?.no_value_replacement ?? "") !== "" ||
+  (Array.isArray(config?.mappings) &&
+    config.mappings.some((m: any) => m?.type === "special" && m?.match === "null"));
+
+/** A missing cell's text: a matching special mapping's text, else the no-value replacement. */
+export const missingCellText = (
+  value: unknown,
+  cache: Map<any, any> | null,
+  missingValue: string,
+): string => {
+  const special = specialMatchOf(value);
+  // Only special mappings, so a value mapping on the text "null" keeps missing cells on the replacement.
+  const text = special ? cache?.get(`${SPECIAL_KEY_PREFIX}${special}`)?.text : null;
+  return text != null && text !== "" ? text : String(missingValue);
 };
 
 /** Look up the mapped display text for a value (null when none has text). */
@@ -283,6 +386,8 @@ export const parseOverrideConfigs = (overrideConfigs: any[] | undefined): Overri
     return { colorConfigMap, unitConfigMap, styleConfigMap, conditionalRulesMap, fieldTypeMap };
 
   for (const o of overrideConfigs) {
+    // Chart series overrides share the array; they never style a table column.
+    if (isSeriesOverrideEntry(o)) continue;
     const alias = o?.field?.value;
     if (!alias) continue;
     const aliasLower = alias.toLowerCase();
@@ -370,7 +475,9 @@ export const formatNumericValue = (
   decimals: number,
   missingValue = "",
 ): string => {
-  if (val === null || val === undefined || val === "") return String(missingValue);
+  if (val === null || val === undefined || val === "") {
+    return missingCellText(val, valueMappingCache, missingValue);
+  }
 
   const mapped = lookupValueMapping(val, valueMappingCache);
   if (mapped != null) return mapped;
@@ -379,4 +486,111 @@ export const formatNumericValue = (
   return !Number.isNaN(val)
     ? `${formatUnitValue(getUnitValue(val, unit ?? "", customUnit ?? "", decimals)) ?? 0}`
     : val;
+};
+
+// ---------------------------------------------------------------------------
+// Metric single-value styling (driven by config.mappings)
+// ---------------------------------------------------------------------------
+
+export interface DisplayedValueMapping {
+  text?: string | null;
+  color?: string | null;
+  textColor?: string | null;
+}
+
+export interface ResolvedMetricStyle {
+  /** Display text: mapped string when a mapping matched, else the unit-formatted value. */
+  text: string;
+  /** Explicit text color; undefined means the caller applies its contrast fallback. */
+  textColor?: string;
+  /** Final background color ("" when none). */
+  bgColor: string;
+}
+
+export interface MetricStyleOptions {
+  mappings: any;
+  unit: string | null | undefined;
+  customUnit: string | null | undefined;
+  decimals: number | null | undefined;
+  panelBackground: string;
+  /** Panel threshold steps; a step colour sits between a mapping colour and the panel background. */
+  thresholds?: Thresholds | null;
+  /** Text for a missing value (null, empty or NaN); empty keeps today's text. */
+  missingValue?: string | null;
+}
+
+/**
+ * Resolve display text, text color, and background for a single metric value from
+ * `config.mappings` (value / range / regex / thresholds → text + colors). Precedence:
+ *   text: mapping text → unit-formatted value
+ *   fill: mapping textColor → (caller contrast fallback)
+ *   bg:   mapping color → threshold step color → panel background
+ */
+export const resolveMetricValueStyle = (
+  rawValue: unknown,
+  opts: MetricStyleOptions,
+): ResolvedMetricStyle => {
+  const { mappings, unit, customUnit, decimals, panelBackground, thresholds } = opts;
+  const mapping = lookupDisplayedValueMapping(rawValue, buildValueMappingCache(mappings), decimals);
+
+  const missingValue = String(opts.missingValue ?? "");
+  const isMissing =
+    rawValue === null || rawValue === undefined || rawValue === "" || String(rawValue) === "NaN";
+  const formatted =
+    missingValue !== "" && isMissing
+      ? missingValue
+      : formatNumericValue(rawValue, null, unit, customUnit, decimals ?? 2);
+  const mappedText = mapping?.text;
+  const text = mappedText != null && mappedText !== "" ? mappedText : formatted;
+  const textColor = mapping?.textColor || undefined;
+  const bgColor =
+    mapping?.color || metricThresholdColor(rawValue, thresholds ?? null) || panelBackground || "";
+
+  return { text, textColor, bgColor };
+};
+
+/** First mapping for a single displayed value, also trying the value as rounded to `decimals`. */
+export const lookupDisplayedValueMapping = (
+  rawValue: unknown,
+  cache: ReturnType<typeof buildValueMappingCache>,
+  decimals: number | null | undefined,
+): DisplayedValueMapping | null => {
+  let mapping = lookupValueMappingFull(rawValue, cache);
+  const numValue =
+    rawValue === null || rawValue === undefined || rawValue === "" ? NaN : Number(rawValue);
+  if (!mapping && cache && !Number.isNaN(numValue)) {
+    const fixed = numValue.toFixed(decimals ?? 2);
+    if (fixed !== String(rawValue)) {
+      mapping = lookupValueMappingFull(fixed, cache);
+    }
+    if (!mapping) {
+      const normalized = String(Number(fixed));
+      if (normalized !== fixed && normalized !== String(rawValue)) {
+        mapping = lookupValueMappingFull(normalized, cache);
+      }
+    }
+  }
+  return mapping;
+};
+
+/** Compile a `/pattern/flags` or plain pattern with the linear-time engine; null when it does not compile. */
+export const tryCompileLinearRegex = (input: string): RE2JS | null => {
+  const { pattern, flags } = parseRegexPattern(input);
+  let re2Flags = 0;
+  for (const flag of flags) re2Flags |= RE2_FLAG_BY_JS_FLAG[flag] ?? 0;
+  try {
+    return RE2JS.compile(RE2JS.translateRegExp(pattern), re2Flags);
+  } catch {
+    return null;
+  }
+};
+
+const compileValueMappingRegex = (input: string): RE2JS | null => {
+  const regex =
+    input.length <= MAX_VALUE_MAPPING_PATTERN_LENGTH ? tryCompileLinearRegex(input) : null;
+  if (!regex && !warnedValueMappingPatterns.has(input)) {
+    warnedValueMappingPatterns.add(input);
+    console.warn(`Value mapping regex skipped, it is too long or unsupported: ${input}`);
+  }
+  return regex;
 };

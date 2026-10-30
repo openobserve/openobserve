@@ -15,13 +15,17 @@ describe("systemProvidedVariablesForScope", () => {
       "statistics",
       "spans",
       "steps",
+      "tool_calls",
     ]);
   });
 
-  it("provides statistics and steps for session targets", () => {
+  it("provides the conversation, statistics, steps and tool calls for session targets", () => {
     expect(systemProvidedVariablesForScope("session").map(({ name }) => name)).toEqual([
+      "input",
+      "output",
       "statistics",
       "steps",
+      "tool_calls",
     ]);
   });
 });

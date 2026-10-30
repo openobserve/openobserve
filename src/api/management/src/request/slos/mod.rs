@@ -28,7 +28,14 @@ use axum::{
 };
 use config::meta::slo::{Slo, SloStatusView};
 use openobserve_api_common::extractors::Headers;
+#[cfg(feature = "enterprise")]
+use openobserve_core::auth::{check_folder_write_permissions, check_permissions};
 use openobserve_core::{auth::UserEmail, slo::service as slo_service};
+#[cfg(feature = "enterprise")]
+use openobserve_core::{
+    authz::WriteCheck,
+    background_access::{StreamReadCheck, guard_loaded, rbac_enforced},
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -56,19 +63,6 @@ pub struct SloListResponse {
     pub list: Vec<SloListItem>,
 }
 
-fn disabled() -> Option<Response> {
-    if config::get_config().slo.enabled {
-        return None;
-    }
-    Some(
-        MetaHttpResponse::error(
-            StatusCode::NOT_IMPLEMENTED.as_u16(),
-            "SLOs are disabled. Set ZO_SLO_ENABLED=true to enable them.".to_string(),
-        )
-        .into_response(),
-    )
-}
-
 /// List SLOs in an organization.
 #[utoipa::path(
     get,
@@ -89,9 +83,6 @@ fn disabled() -> Option<Response> {
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id))]
 pub async fn list_slos(Path(org_id): Path<String>, Query(q): Query<ListQuery>) -> Response {
-    if let Some(r) = disabled() {
-        return r;
-    }
     match openobserve_core::slo::service::list_with_status(&org_id, q.folder.as_deref()).await {
         Ok(list) => MetaHttpResponse::json(SloListResponse {
             list: list
@@ -123,9 +114,6 @@ pub async fn list_slos(Path(org_id): Path<String>, Query(q): Query<ListQuery>) -
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, slo_id = %slo_id))]
 pub async fn get_slo(Path((org_id, slo_id)): Path<(String, String)>) -> Response {
-    if let Some(r) = disabled() {
-        return r;
-    }
     match openobserve_core::slo::service::get_with_status(&org_id, &slo_id).await {
         Ok(Some((slo, status))) => MetaHttpResponse::json(SloListItem { slo, status }),
         Ok(None) => not_found(),
@@ -147,6 +135,7 @@ pub async fn get_slo(Path((org_id, slo_id)): Path<(String, String)>) -> Response
     responses(
         (status = 200, description = "Created", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Bad Request", content_type = "application/json", body = MetaHttpResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
     ),
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id))]
@@ -155,23 +144,52 @@ pub async fn create_slo(
     Headers(user_email): Headers<UserEmail>,
     Json(mut slo): Json<Slo>,
 ) -> Response {
-    if let Some(r) = disabled() {
-        return r;
-    }
     // The path segment is authoritative: it is what the permission check ran
     // against, so a body claiming a different org must not be honoured.
     slo.org = org_id;
     if slo.id.is_empty() {
         slo.id = config::ider::generate();
     }
+    // Resolve the effective destination BEFORE authorizing it: an empty
+    // folder_id writes to the default folder, which the `?folder=` gate did not
+    // necessarily cover, so skipping the check on empty would leave a hole.
     if slo.folder_id.is_empty() {
         slo.folder_id = config::meta::folder::DEFAULT_FOLDER.to_string();
+    }
+    #[cfg(feature = "enterprise")]
+    if !check_folder_write_permissions(
+        &slo.org,
+        &user_email.user_id,
+        "alert_folders",
+        &slo.folder_id,
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
     }
     if slo.owner.is_none() {
         slo.owner = Some(user_email.user_id.clone());
     }
-
-    match slo_service::create(&mut slo).await {
+    if slo.name.is_empty() || slo.name.len() > 256 {
+        return MetaHttpResponse::bad_request(
+            "name must be non empty and less than 256 characters",
+        );
+    }
+    #[cfg(feature = "enterprise")]
+    let created = {
+        let org_id = slo.org.clone();
+        let check = StreamReadCheck {
+            org_id: &org_id,
+            user_id: &user_email.user_id,
+        };
+        let check = rbac_enforced()
+            .await
+            .then_some(&check as &dyn WriteCheck<Slo>);
+        slo_service::create_checked(&mut slo, check).await
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let created = slo_service::create(&mut slo).await;
+    match created {
         Ok(()) => MetaHttpResponse::json(
             MetaHttpResponse::message(StatusCode::OK, "SLO saved")
                 .with_id(slo.id.clone())
@@ -198,6 +216,7 @@ pub async fn create_slo(
     responses(
         (status = 200, description = "Updated", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Bad Request", content_type = "application/json", body = MetaHttpResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
     ),
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, slo_id = %slo_id))]
@@ -206,18 +225,59 @@ pub async fn update_slo(
     Headers(user_email): Headers<UserEmail>,
     Json(mut slo): Json<Slo>,
 ) -> Response {
-    if let Some(r) = disabled() {
-        return r;
-    }
     // Both taken from the path, for the same reason as create: they are what
     // the permission check ran against.
     slo.org = org_id;
     slo.id = slo_id;
+    // An update that changes folder_id is also a move, so the destination needs
+    // its own check. Compared against the stored folder because a plain edit
+    // round-trips the current one unchanged.
+    #[cfg(feature = "enterprise")]
+    if !slo.folder_id.is_empty() {
+        let current = slo_service::folders_of(&slo.org, std::slice::from_ref(&slo.id))
+            .await
+            .ok()
+            .and_then(|mut found| found.pop().map(|(_, folder_id)| folder_id));
+        if current.as_deref() != Some(slo.folder_id.as_str())
+            && !check_folder_write_permissions(
+                &slo.org,
+                &user_email.user_id,
+                "alert_folders",
+                &slo.folder_id,
+            )
+            .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
     if slo.owner.is_none() {
         slo.owner = Some(user_email.user_id.clone());
     }
-
-    match slo_service::update(&mut slo).await {
+    #[cfg(not(feature = "enterprise"))]
+    let editor = slo.owner.clone();
+    // only a named owner moves ownership; an omitted one keeps the stored owner
+    #[cfg(feature = "enterprise")]
+    {
+        slo.owner = slo.owner.take().filter(|owner| !owner.is_empty());
+    }
+    #[cfg(feature = "enterprise")]
+    let editor = Some(user_email.user_id.clone());
+    #[cfg(feature = "enterprise")]
+    let updated = {
+        let org_id = slo.org.clone();
+        let check = StreamReadCheck {
+            org_id: &org_id,
+            user_id: &user_email.user_id,
+        };
+        let check = rbac_enforced()
+            .await
+            .then_some(&check as &dyn WriteCheck<Slo>);
+        slo_service::update_checked(&mut slo, editor.as_deref(), check).await
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let updated = slo_service::update(&mut slo, editor.as_deref()).await;
+    match updated {
         Ok(()) => MetaHttpResponse::json(
             MetaHttpResponse::message(StatusCode::OK, "SLO updated")
                 .with_id(slo.id.clone())
@@ -248,15 +308,12 @@ pub async fn update_slo(
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, slo_id = %slo_id))]
 pub async fn delete_slo(Path((org_id, slo_id)): Path<(String, String)>) -> Response {
-    if let Some(r) = disabled() {
-        return r;
-    }
     match slo_service::delete(&org_id, &slo_id).await {
         Ok(true) => {
             MetaHttpResponse::json(MetaHttpResponse::message(StatusCode::OK, "SLO deleted"))
         }
         Ok(false) => not_found(),
-        Err(e) => internal(anyhow::anyhow!(e.to_string())),
+        Err(e) => save_error(e),
     }
 }
 
@@ -277,12 +334,13 @@ pub struct MoveSlosRequestBody {
     tag = "SLOs",
     operation_id = "MoveSlos",
     summary = "Move SLOs between folders",
-    description = "Relocates one or more SLOs into another folder. SLOs share the alert folder namespace, so the destination is an alert folder. A move never changes an SLO's definition and never restarts its measurement.",
+    description = "Relocates one or more SLOs into another folder. SLOs share the alert folder namespace, so the destination is an alert folder. Requires write access to each SLO being moved, and to the destination folder. A move never changes an SLO's definition and never restarts its measurement.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization identifier")),
     request_body(content = inline(MoveSlosRequestBody), description = "The SLOs and the destination folder", content_type = "application/json"),
     responses(
         (status = 200, description = "Moved", content_type = "application/json", body = MetaHttpResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
         (status = 409, description = "Name already used in the destination", content_type = "application/json", body = MetaHttpResponse),
     ),
@@ -296,9 +354,6 @@ pub async fn move_slos(
     Headers(user_email): Headers<UserEmail>,
     Json(req_body): Json<MoveSlosRequestBody>,
 ) -> Response {
-    if let Some(r) = disabled() {
-        return r;
-    }
     if req_body.slo_ids.is_empty() {
         return MetaHttpResponse::error(
             StatusCode::BAD_REQUEST.as_u16(),
@@ -306,6 +361,47 @@ pub async fn move_slos(
         )
         .into_response();
     }
+    // The move route is bypass:true, so both sides are authorized here. Source
+    // first: an SLO is checked as an alert parented by its current folder, the
+    // same shape /{org}/slos/{id} PUT resolves to.
+    #[cfg(feature = "enterprise")]
+    {
+        let sources = match slo_service::folders_of(&org_id, &req_body.slo_ids).await {
+            Ok(sources) => sources,
+            Err(e) => return save_error(e),
+        };
+        for (slo_id, folder_id) in &sources {
+            if !check_permissions(
+                slo_id,
+                &org_id,
+                &user_email.user_id,
+                "alerts",
+                "PUT",
+                Some(folder_id),
+                false,
+                true,
+                false,
+            )
+            .await
+            {
+                return MetaHttpResponse::forbidden("Unauthorized Access");
+            }
+        }
+    }
+
+    // SLOs share the alert folder namespace, so the destination is an alert folder.
+    #[cfg(feature = "enterprise")]
+    if !check_folder_write_permissions(
+        &org_id,
+        &user_email.user_id,
+        "alert_folders",
+        &req_body.dst_folder_id,
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
+
     match slo_service::move_to_folder(
         &org_id,
         &req_body.slo_ids,
@@ -358,9 +454,18 @@ pub struct EnableQuery {
 pub async fn enable_slo(
     Path((org_id, slo_id)): Path<(String, String)>,
     Query(q): Query<EnableQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
-    if let Some(r) = disabled() {
-        return r;
+    #[cfg(feature = "enterprise")]
+    if q.value
+        && let Err(resp) = guard_loaded(
+            &org_id,
+            &user_email.user_id,
+            openobserve_core::background_access::stored_slo_sources(&org_id, &slo_id),
+        )
+        .await
+    {
+        return resp;
     }
     match slo_service::set_enabled(&org_id, &slo_id, q.value).await {
         Ok(true) => MetaHttpResponse::json(MetaHttpResponse::message(
@@ -391,12 +496,101 @@ pub async fn enable_slo(
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, slo_id = %slo_id))]
 pub async fn get_slo_groups(Path((org_id, slo_id)): Path<(String, String)>) -> Response {
-    if let Some(r) = disabled() {
-        return r;
-    }
     match openobserve_core::slo::service::group_status(&org_id, &slo_id).await {
         Ok(groups) => MetaHttpResponse::json(serde_json::json!({ "list": groups })),
         Err(e) => internal(e),
+    }
+}
+
+/// The alerts an `alert` SLI could point at, each ineligible one saying why.
+///
+/// Lives under `/alerts` rather than `/slos` because it answers a question
+/// about alerts, and is authorized as one. Ineligible alerts are returned
+/// rather than hidden: "your alert is not in the list" is not an explanation,
+/// and every reason here has a remedy the user can apply before saving —
+/// which is the whole point of the endpoint (S-16 §5.1, §5.4).
+#[utoipa::path(
+    get,
+    path = "/{org_id}/alerts/slo-eligible",
+    context_path = "/api",
+    tag = "SLOs",
+    operation_id = "ListSloEligibleAlerts",
+    summary = "List alerts usable as an SLI source",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization identifier")),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
+    ),
+)]
+#[tracing::instrument(skip_all, fields(org_id = %org_id))]
+pub async fn list_slo_eligible_alerts(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(not(feature = "enterprise"))]
+    let user_id: Option<&str> = None;
+    #[cfg(feature = "enterprise")]
+    let user_id = Some(user_email.user_id.as_str());
+
+    match slo_service::list_slo_eligible_alerts(&org_id, user_id).await {
+        Ok(list) => MetaHttpResponse::json(serde_json::json!({ "list": list })),
+        Err(e) => internal(anyhow::anyhow!(e.to_string())),
+    }
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct AlertSliPreviewQuery {
+    /// Rolling window, seconds — 7d, 30d or 90d, as an SLO's own window is.
+    pub window_secs: i64,
+    /// 60 or 300 (S-4).
+    pub slice_interval_secs: i64,
+}
+
+/// What an alert SLI would have measured, before the SLO exists.
+///
+/// Returns the ledger intervals for the ribbon plus the achieved SLI and the
+/// coverage behind it — the alert analogue of the time-slice preview. Computed
+/// by the same fold the ingest pass runs, so the preview cannot disagree with
+/// the SLO it is previewing.
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/{alert_id}/slo-preview",
+    context_path = "/api",
+    tag = "SLOs",
+    operation_id = "PreviewAlertSli",
+    summary = "Preview the uptime an alert would produce as an SLI source",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization identifier"),
+        ("alert_id" = String, Path, description = "Source alert identifier"),
+        ("window_secs" = i64, Query, description = "Rolling window in seconds"),
+        ("slice_interval_secs" = i64, Query, description = "Slice width in seconds"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Bad Request", content_type = "application/json", body = MetaHttpResponse),
+        (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
+    ),
+)]
+#[tracing::instrument(skip_all, fields(org_id = %org_id, alert_id = %alert_id))]
+pub async fn preview_alert_sli(
+    Path((org_id, alert_id)): Path<(String, String)>,
+    Query(q): Query<AlertSliPreviewQuery>,
+) -> Response {
+    match slo_service::alert_sli_preview(&org_id, &alert_id, q.window_secs, q.slice_interval_secs)
+        .await
+    {
+        Ok(preview) => MetaHttpResponse::json(preview),
+        Err(openobserve_core::slo::service::SloError::NotFound) => MetaHttpResponse::error(
+            StatusCode::NOT_FOUND.as_u16(),
+            "alert not found".to_string(),
+        )
+        .into_response(),
+        Err(e @ openobserve_core::slo::service::SloError::Validation(_)) => {
+            MetaHttpResponse::error(StatusCode::BAD_REQUEST.as_u16(), e.to_string()).into_response()
+        }
+        Err(e) => internal(anyhow::anyhow!(e.to_string())),
     }
 }
 
@@ -418,14 +612,22 @@ fn internal(e: anyhow::Error) -> Response {
 /// the rejection to show its working.
 fn save_error(e: openobserve_core::slo::service::SloError) -> Response {
     use openobserve_core::slo::service::SloError;
+    let e = match e {
+        SloError::Refused(refusal) => return refusal.into_response(),
+        e => e,
+    };
     let status = match &e {
         SloError::Validation(_) => StatusCode::BAD_REQUEST,
         SloError::Budget(_) => StatusCode::PAYLOAD_TOO_LARGE,
         SloError::NotFound => StatusCode::NOT_FOUND,
         // A name clash is the user's to fix, not a server fault.
-        SloError::DuplicateName(_) | SloError::MoveNameConflict => StatusCode::CONFLICT,
+        SloError::DuplicateName(_)
+        | SloError::MoveNameConflict
+        | SloError::AlertCascadeConflict(_) => StatusCode::CONFLICT,
         SloError::FolderNotFound(_) => StatusCode::NOT_FOUND,
+        SloError::TemporarilyUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
         SloError::Db(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        SloError::Refused(_) => StatusCode::FORBIDDEN,
     };
     if status == StatusCode::INTERNAL_SERVER_ERROR {
         tracing::error!("[slo] save failed: {e}");

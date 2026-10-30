@@ -1,10 +1,12 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nText } from "@/types/i18n";
+
 export type TreeNodeKey = string | number;
 
 export interface TreeNode {
   /** Display text — also the default `node-key` field */
-  label: string;
+  label: I18nText;
   /** Child nodes; absence or empty array means this is a leaf */
   children?: TreeNode[];
   /** Whether this node is disabled */

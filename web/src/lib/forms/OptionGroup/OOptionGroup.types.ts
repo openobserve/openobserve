@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nText } from "@/types/i18n";
+
 export type OptionGroupType = "radio" | "checkbox";
 export type OptionGroupOrientation = "horizontal" | "vertical";
 export type OptionGroupSize = "xs" | "sm" | "md";
@@ -8,7 +10,7 @@ export type OptionPrimitive = string | number | boolean;
 
 export interface OptionGroupOption {
   /** Display label */
-  label: string;
+  label: I18nText;
   /** Bound value */
   value: OptionPrimitive;
   /** Disable just this option */
@@ -28,11 +30,11 @@ export interface OptionGroupProps {
   /** Layout direction */
   orientation?: OptionGroupOrientation;
   /** Label rendered above the group */
-  label?: string;
+  label?: I18nText;
   /** Helper text below the group */
-  helpText?: string;
+  helpText?: I18nText;
   /** Error message — when provided the group shows error styling */
-  errorMessage?: string;
+  errorMessage?: I18nText;
   /** Marks the field as being in error state without a message */
   error?: boolean;
   /** Disables the entire group */

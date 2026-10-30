@@ -303,7 +303,13 @@ pub async fn delete_annotation_panels(
     if panels.is_empty() {
         return MetaHttpResponse::bad_request("panels cannot be empty".to_string());
     }
-    match timed_annotations::delete_timed_annotation_panels(&timed_annotation_id, panels).await {
+    match timed_annotations::delete_timed_annotation_panels(
+        &dashboard_id,
+        &timed_annotation_id,
+        panels,
+    )
+    .await
+    {
         Ok(_) => (StatusCode::OK, "").into_response(),
         Err(e) => {
             log::error!("Error deleting timed annotation panels: {e}");

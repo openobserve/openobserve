@@ -21,6 +21,7 @@ import { ref } from "vue";
 import Databricks from "./Databricks.vue";
 import databricksCard from "@/components/ingestion/setupCard/content/databricks";
 import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
+import { gt } from "@/types/i18n";
 
 const mockEndpoint = ref({
   url: "https://test.openobserve.ai",
@@ -52,7 +53,7 @@ const SUBS = { url: "https://test.openobserve.ai", org: "test-org", token: "dGVz
 
 describe("databricksCard builder", () => {
   it("builds a logs card posting to the org's logs endpoint", () => {
-    const card = databricksCard(SUBS);
+    const card = databricksCard(SUBS, gt);
     expect(card.provider.name).toBe("Databricks");
     expect(card.provider.metaBadges).toEqual(["Logs"]);
     expect(card.detect).toMatchObject({
@@ -73,7 +74,7 @@ describe("Databricks.vue", () => {
     if (wrapper) wrapper.unmount();
   });
   it("renders the shared card", () => {
-    expect(getDataSourceCard("databricks", SUBS)?.provider.name).toBe("Databricks");
+    expect(getDataSourceCard("databricks", SUBS, gt)?.provider.name).toBe("Databricks");
     wrapper = mount(Databricks, { global: { plugins: [mockStore, mockI18n] } });
     expect(wrapper.findComponent({ name: "SetupCardRenderer" }).exists()).toBe(true);
   });

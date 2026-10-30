@@ -1,3 +1,5 @@
+import type { I18nText } from "@/types/i18n";
+
 export enum PageType {
   LOGS = "logs",
   STREAM_EXPLORER = "stream_explorer",
@@ -85,7 +87,7 @@ export interface SearchAroundError {
       error: string;
       error_detail?: string;
       code?: number;
-      message?: string;
+      message?: I18nText;
       trace_id?: string;
     };
     status?: number;
@@ -93,7 +95,7 @@ export interface SearchAroundError {
   request?: {
     status: number;
   };
-  message: string;
+  message: I18nText;
   trace_id?: string;
 }
 

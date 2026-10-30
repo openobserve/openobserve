@@ -27,9 +27,11 @@
 //! Because nodes carry their own x/y, dot and label move together (unlike
 //! label-only shifting, which detaches the text from its node).
 
+import type { I18nText } from "@/types/i18n";
+
 export interface LayoutNode {
   id: string;
-  label?: string;
+  label?: I18nText;
 }
 export interface LayoutEdge {
   from: string | null;

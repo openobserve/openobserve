@@ -1,0 +1,1360 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+  Create an offline experiment. Single pane of glass, modeled on AddAlert: the
+  name IS the page title, configuration runs down the left, and the right rail
+  answers "what will actually run" live — so there is no terminal Review step.
+
+  This component OWNS the one <OForm> (owner pattern): the form is built with
+  useOForm and read back through form.useStore, so there is a single source of
+  truth and no mirror ref. Every control binds by `name=` into the schema.
+-->
+<template>
+  <!-- h-full, not flex-1: the AI shell renders router-view inside a plain
+     `overflow-y-auto` section, so there is no flex parent for flex-1 to fill.
+     Filling the height is what lets the columns scroll internally and keeps the
+     action row on screen (AddAlert does the same). -->
+  <OForm :form="form" class="h-full w-full" v-slot="{ isSubmitting }">
+    <OPageLayout
+      :back="{
+        label: t('aiObservability.nav.experiments'),
+        onClick: goBack,
+        dataTest: 'ai-experiment-form-back-btn',
+      }"
+      title-overflow="visible"
+      bleed
+    >
+      <template #title>
+        <span data-test="ai-experiment-form-title">
+          {{
+            cloning
+              ? t("aiObservability.experiments.form.cloneTitle")
+              : t("aiObservability.experiments.form.pageTitle")
+          }}
+        </span>
+      </template>
+
+      <div class="flex min-h-0 flex-1 gap-0 overflow-hidden max-[68.75rem]:flex-col">
+        <div
+          class="flex min-h-0 min-w-0 flex-[6.5] flex-col gap-2 overflow-auto p-2 max-[68.75rem]:flex-[1_1_auto]"
+        >
+          <!-- Identity — what this run IS: its name, what it measures, and the
+             dataset it is pinned to. The dataset lives here because nothing
+             below means anything until one is chosen, and only same-dataset
+             experiments can ever be compared. -->
+          <section
+            class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
+            data-test="ai-experiment-form-identity-section"
+          >
+            <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
+              <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
+                {{ t("aiObservability.experiments.form.identitySection") }}
+              </span>
+            </div>
+            <div class="flex flex-col gap-3 px-4 py-3.5">
+              <OFormInput
+                name="name"
+                :label="t('aiObservability.experiments.form.nameLabel')"
+                :placeholder="t('aiObservability.experiments.form.namePlaceholder')"
+                size="sm"
+                required
+                data-test="ai-experiment-form-name-input"
+              />
+
+              <OFormTextarea
+                name="description"
+                :label="t('aiObservability.experiments.form.descriptionLabel')"
+                :placeholder="t('aiObservability.experiments.form.descriptionPlaceholder')"
+                size="sm"
+                :rows="3"
+                data-test="ai-experiment-form-description-input"
+              />
+
+              <div class="flex flex-wrap items-start gap-4">
+                <div class="min-w-0 flex-1">
+                  <!-- A clone exists to be compared with its source, and the
+                       server only compares runs over the same dataset. -->
+                  <OFormSelect
+                    name="datasetId"
+                    :label="t('aiObservability.experiments.dataset')"
+                    :options="datasetOptions"
+                    :placeholder="t('aiObservability.experiments.form.datasetPlaceholder')"
+                    searchable
+                    required
+                    :disabled="cloning"
+                    :help-text="
+                      cloning ? t('aiObservability.experiments.form.cloneDatasetLocked') : undefined
+                    "
+                    data-test="ai-experiment-form-dataset-select"
+                  />
+                </div>
+                <div class="min-w-0 flex-1">
+                  <OFormSelect
+                    name="sources"
+                    :label="t('aiObservability.experiments.form.sourcesLabel')"
+                    :options="sourceOptions"
+                    :placeholder="t('aiObservability.experiments.form.sourcesPlaceholder')"
+                    :help-text="t('aiObservability.experiments.form.sourcesHelp')"
+                    multiple
+                    clearable
+                    :searchable="false"
+                    :disabled="!datasetSelected"
+                    data-test="ai-experiment-form-sources-select"
+                  />
+                </div>
+              </div>
+
+              <!-- Version is shown, never chosen: an experiment snapshots the
+                 dataset as it is now, and no endpoint lists prior versions. -->
+              <p
+                v-if="datasetSelected"
+                class="text-text-secondary m-0 text-xs leading-normal"
+                data-test="ai-experiment-form-dataset-meta"
+              >
+                {{
+                  t("aiObservability.experiments.form.datasetPinned", {
+                    version: selectedDatasetVersion,
+                  })
+                }}
+                {{
+                  t("aiObservability.experiments.form.datasetRows", {
+                    rows: selectedDataset?.itemCount ?? 0,
+                  })
+                }}
+              </p>
+            </div>
+          </section>
+
+          <!-- Task and Scorers are BOTH required, so neither hides behind a
+             tab: a tab strip reads as "pick one", and a required section you
+             never opened only announces itself as a validation error. -->
+          <section
+            class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
+            data-test="ai-experiment-form-task-section"
+          >
+            <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
+              <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
+                {{ t("aiObservability.experiments.form.tabTask") }}
+              </span>
+            </div>
+            <div class="flex flex-col gap-4 px-4 py-3.5">
+              <div class="flex flex-wrap items-start gap-4">
+                <div class="min-w-0 flex-1">
+                  <OFormSelect
+                    name="taskType"
+                    :label="t('aiObservability.experiments.form.taskTypeLabel')"
+                    :options="taskTypeOptions"
+                    :searchable="false"
+                    data-test="ai-experiment-form-task-type-select"
+                  />
+                </div>
+                <div class="w-40 shrink-0">
+                  <!-- No min/max here: they never reach the native input, and a
+                       native `max` would not stop typing anyway. The schema is
+                       the enforcement and the help text is the statement of it. -->
+                  <OFormInput
+                    name="trialCount"
+                    type="number"
+                    :label="t('aiObservability.experiments.trials')"
+                    :help-text="
+                      taskType === 'inline_prompt' &&
+                      Number(temperature) === 0 &&
+                      Number(trialCount) > 1
+                        ? t('aiObservability.experiments.form.trialsDeterministicWarning')
+                        : t('aiObservability.experiments.form.trialsHelp')
+                    "
+                    data-test="ai-experiment-form-trials-input"
+                  />
+                </div>
+              </div>
+
+              <!-- Provider owns a full row with a refresh affordance and the
+                   resolved endpoint underneath — the same treatment the LLM
+                   judge scorer form gives it, because it is the same decision. -->
+              <template v-if="taskType === 'inline_prompt'">
+                <div>
+                  <div class="flex items-end gap-2">
+                    <OFormSelect
+                      name="providerId"
+                      :label="t('aiObservability.experiments.provider')"
+                      :options="providerOptions"
+                      :placeholder="t('aiObservability.experiments.form.providerPlaceholder')"
+                      searchable
+                      required
+                      class="min-w-0 flex-1"
+                      data-test="ai-experiment-form-provider-select"
+                      @update:model-value="onProviderChange"
+                    />
+                    <OButton
+                      variant="ghost"
+                      size="icon-md"
+                      icon-left="refresh"
+                      :loading="refreshingProviders"
+                      :title="t('aiObservability.experiments.form.providerRefresh')"
+                      data-test="ai-experiment-form-provider-refresh-btn"
+                      @click="refreshProviders"
+                    />
+                  </div>
+
+                  <div
+                    v-if="selectedProvider"
+                    class="border-status-info-text rounded-default bg-status-info-bg text-text-body mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 border px-3 py-2 text-xs"
+                    data-test="ai-experiment-form-provider-summary"
+                  >
+                    <span class="bg-status-info-text h-2 w-2 shrink-0 rounded-full" />
+                    <span class="text-text-secondary">
+                      {{ t("aiObservability.experiments.form.providerEndpointLabel") }}
+                      <span class="font-mono">{{
+                        resolvedEndpointOf(selectedProvider) || "—"
+                      }}</span>
+                    </span>
+                    <span class="text-text-secondary">{{ separator }}</span>
+                    <span class="text-text-secondary">
+                      {{ t("aiObservability.experiments.form.providerDefaultModelLabel") }}
+                      <span class="font-mono">{{ defaultModelOf(selectedProvider) || dash }}</span>
+                    </span>
+                  </div>
+
+                  <div class="text-2xs text-text-secondary mt-1">
+                    <i18n-t keypath="aiObservability.experiments.form.providerHelp" tag="span">
+                      <template #settingsLink>
+                        <router-link
+                          :to="{ name: 'llmProviders' }"
+                          class="text-accent font-semibold no-underline hover:underline"
+                          target="_blank"
+                        >
+                          {{ t("aiObservability.experiments.form.providerHelpSettingsLink") }}
+                        </router-link>
+                      </template>
+                    </i18n-t>
+                  </div>
+                </div>
+
+                <div class="flex flex-wrap items-start gap-4">
+                  <div class="min-w-0 flex-1">
+                    <OFormSelect
+                      name="model"
+                      :label="t('aiObservability.experiments.model')"
+                      :options="modelOptions"
+                      :placeholder="t('aiObservability.experiments.form.modelPlaceholder')"
+                      searchable
+                      creatable
+                      clearable
+                      :disabled="!providerSelected"
+                      :help-text="t('aiObservability.experiments.form.modelHelp')"
+                      data-test="ai-experiment-form-model-select"
+                    />
+                  </div>
+                  <div class="w-40 shrink-0">
+                    <OFormInput
+                      name="temperature"
+                      type="number"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      :label="t('aiObservability.experiments.form.temperatureLabel')"
+                      :help-text="
+                        Number(temperature) === 0
+                          ? t('aiObservability.experiments.form.temperatureDeterministic')
+                          : t('aiObservability.experiments.form.temperatureHelp')
+                      "
+                      data-test="ai-experiment-form-temperature-input"
+                    />
+                  </div>
+                </div>
+
+                <OFormTextarea
+                  name="systemPrompt"
+                  :label="t('aiObservability.experiments.form.systemPromptLabel')"
+                  :placeholder="t('aiObservability.experiments.form.systemPromptPlaceholder')"
+                  :rows="3"
+                  data-test="ai-experiment-form-system-prompt"
+                />
+
+                <div class="flex flex-col gap-2">
+                  <OFormTextarea
+                    name="userPrompt"
+                    :label="t('aiObservability.experiments.form.userPromptLabel')"
+                    :placeholder="t('aiObservability.experiments.form.userPromptPlaceholder')"
+                    :rows="6"
+                    required
+                    data-test="ai-experiment-form-user-prompt"
+                  />
+                  <!-- Chips: `input` plus the fields every row shares; `expected_output` feeds scorers only. -->
+                  <div class="flex flex-wrap items-center gap-1.5">
+                    <span class="text-text-secondary text-xs">
+                      {{ t("aiObservability.experiments.form.variablesLabel") }}
+                    </span>
+                    <OButton
+                      v-for="variable in promptVariables"
+                      :key="variable.name"
+                      type="button"
+                      variant="outline"
+                      size="xs"
+                      :data-test="`ai-experiment-form-variable-${variable.name}`"
+                      @click="insertVariable(variable.token)"
+                    >
+                      {{ variable.token }}
+                    </OButton>
+                    <span
+                      class="text-text-secondary text-xs opacity-60"
+                      data-test="ai-experiment-form-variable-expected_output"
+                    >
+                      {{
+                        t("aiObservability.experiments.form.expectedOutputScorersOnly", {
+                          token: expectedOutputToken,
+                        })
+                      }}
+                    </span>
+                  </div>
+                  <p
+                    v-if="usesExpectedOutput"
+                    class="text-status-warning-text text-2xs"
+                    data-test="ai-experiment-form-expected-leak-warning"
+                  >
+                    {{
+                      t("aiObservability.playground.expectedLeakWarning", {
+                        token: expectedOutputToken,
+                      })
+                    }}
+                  </p>
+                </div>
+              </template>
+
+              <template v-else-if="taskType === 'prompt_ref'">
+                <OFormSelect
+                  name="promptId"
+                  :label="t('aiObservability.experiments.form.managedPromptLabel')"
+                  :options="promptOptions"
+                  :placeholder="t('aiObservability.experiments.form.managedPromptPlaceholder')"
+                  searchable
+                  required
+                  data-test="ai-experiment-form-prompt-select"
+                />
+                <div class="flex flex-wrap items-end gap-3">
+                  <OFormSelect
+                    name="promptSelectionMode"
+                    :label="t('aiObservability.experiments.form.promptResolveBy')"
+                    :options="promptSelectionModeOptions"
+                    class="w-40"
+                    data-test="ai-experiment-form-prompt-mode"
+                  />
+                  <OFormInput
+                    v-if="promptSelectionMode === 'label'"
+                    name="promptLabel"
+                    :label="t('aiObservability.promptManagement.label')"
+                    :placeholder="t('aiObservability.experiments.form.promptLabelPlaceholder')"
+                    class="min-w-0 flex-1"
+                    data-test="ai-experiment-form-prompt-label"
+                  />
+                  <OFormSelect
+                    v-else
+                    name="promptVersion"
+                    :label="t('aiObservability.promptManagement.version')"
+                    :options="promptVersionOptions"
+                    class="min-w-0 flex-1"
+                    data-test="ai-experiment-form-prompt-version"
+                  />
+                  <OButton
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    :loading="resolvingPrompt"
+                    :disabled="!promptId"
+                    @click="resolvePromptSelection"
+                  >
+                    {{ t("aiObservability.experiments.form.promptResolve") }}
+                  </OButton>
+                </div>
+                <div
+                  v-if="resolvedPrompt"
+                  class="rounded-default border-status-success-text bg-status-success-bg border px-3 py-2 text-xs"
+                  data-test="ai-experiment-form-prompt-pin"
+                >
+                  {{
+                    t("aiObservability.experiments.form.promptImmutablePin", {
+                      name: resolvedPrompt.prompt.name,
+                      version: resolvedPrompt.version.version,
+                    })
+                  }}
+                  <span class="text-text-secondary font-mono">
+                    · {{ resolvedPrompt.prompt.entityId }}</span
+                  >
+                </div>
+                <OFormSelect
+                  name="providerId"
+                  :label="t('aiObservability.experiments.provider')"
+                  :options="providerOptions"
+                  :placeholder="t('aiObservability.experiments.form.providerPlaceholder')"
+                  searchable
+                  required
+                  data-test="ai-experiment-form-prompt-provider"
+                  @update:model-value="onProviderChange"
+                />
+                <div class="flex flex-wrap items-start gap-4">
+                  <div class="min-w-0 flex-1">
+                    <OFormSelect
+                      name="model"
+                      :label="t('aiObservability.experiments.form.promptModelOverrideLabel')"
+                      :options="modelOptions"
+                      :placeholder="
+                        t('aiObservability.experiments.form.promptModelOverridePlaceholder')
+                      "
+                      searchable
+                      creatable
+                      clearable
+                      :disabled="!providerSelected"
+                      :help-text="
+                        promptModelOverride
+                          ? t('aiObservability.experiments.form.promptModelOverrideActive')
+                          : t('aiObservability.experiments.form.promptModelOverrideInherited')
+                      "
+                      data-test="ai-experiment-form-prompt-model"
+                    />
+                  </div>
+                  <div class="w-48 shrink-0">
+                    <OFormInput
+                      name="temperature"
+                      type="number"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      :label="t('aiObservability.experiments.form.promptTemperatureOverrideLabel')"
+                      :help-text="
+                        promptTemperatureOverride
+                          ? t('aiObservability.experiments.form.promptTemperatureOverrideActive')
+                          : t('aiObservability.experiments.form.promptTemperatureOverrideInherited')
+                      "
+                      data-test="ai-experiment-form-prompt-temperature"
+                    />
+                  </div>
+                </div>
+              </template>
+
+              <!-- A remote task is pinned by `name@version`, so the only things
+                   left to choose are the two overrides the API accepts. -->
+              <template v-else>
+                <OFormSelect
+                  name="taskRef"
+                  :label="t('aiObservability.experiments.form.remoteTaskLabel')"
+                  :options="remoteTaskOptions"
+                  :placeholder="t('aiObservability.experiments.form.remoteTaskPlaceholder')"
+                  :loading="loadingRemoteTasks"
+                  :help-text="t('aiObservability.experiments.form.remoteTaskHelp')"
+                  searchable
+                  required
+                  data-test="ai-experiment-form-remote-task-select"
+                  @update:model-value="onRemoteTaskChange"
+                />
+
+                <p
+                  v-if="!loadingRemoteTasks && !remoteTaskOptions.length"
+                  class="text-text-secondary border-border-default rounded-default bg-surface-base m-0 border px-3 py-2.5 text-xs"
+                  data-test="ai-experiment-form-remote-task-empty"
+                >
+                  {{ t("aiObservability.experiments.form.remoteTaskEmpty") }}
+                </p>
+
+                <div v-if="selectedRemoteTask" class="flex flex-wrap items-start gap-4">
+                  <div class="w-44 shrink-0">
+                    <OFormInput
+                      name="taskTimeoutSeconds"
+                      type="number"
+                      min="1"
+                      max="600"
+                      :label="t('aiObservability.experiments.form.taskTimeoutLabel')"
+                      :help-text="t('aiObservability.experiments.form.taskOverrideHelp')"
+                      data-test="ai-experiment-form-task-timeout-input"
+                    />
+                  </div>
+                  <div class="w-44 shrink-0">
+                    <OFormInput
+                      name="taskMaxConcurrency"
+                      type="number"
+                      min="1"
+                      max="32"
+                      :label="t('aiObservability.experiments.form.taskConcurrencyLabel')"
+                      :help-text="t('aiObservability.experiments.form.taskOverrideHelp')"
+                      data-test="ai-experiment-form-task-concurrency-input"
+                    />
+                  </div>
+                </div>
+              </template>
+            </div>
+          </section>
+
+          <section
+            class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
+            data-test="ai-experiment-form-scorers-section"
+          >
+            <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
+              <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
+                {{ t("aiObservability.experiments.scorers") }}
+              </span>
+            </div>
+            <div class="flex flex-col gap-4 px-4 py-3.5">
+              <OFormSelect
+                name="scorerIds"
+                :label="t('aiObservability.experiments.scorers')"
+                :options="scorerOptions"
+                :placeholder="t('aiObservability.experiments.form.scorersPlaceholder')"
+                :help-text="t('aiObservability.experiments.form.scorersHelp')"
+                multiple
+                searchable
+                required
+                :disabled="!scorers.length"
+                data-test="ai-experiment-form-scorers-select"
+              />
+
+              <div
+                v-if="!scorers.length"
+                class="border-dialog-header-border rounded-default text-text-secondary border border-dashed px-3.5 py-3 text-center text-xs"
+              >
+                {{ t("aiObservability.experiments.form.scorersEmpty") }}
+              </div>
+
+              <!-- Per-scorer applicability, straight from preview(): which
+                   rows this scorer can actually score, and how many lack the
+                   reference answer it needs. -->
+              <div
+                v-if="scorerApplicability.length"
+                class="border-dialog-header-border rounded-default flex flex-col gap-2 border px-3.5 py-3"
+                data-test="ai-experiment-form-applicability"
+              >
+                <span class="text-compact text-text-heading font-semibold">
+                  {{ t("aiObservability.experiments.form.applicabilityTitle") }}
+                </span>
+                <p
+                  v-for="entry in scorerApplicability"
+                  :key="`${entry.scorerId}:${entry.scorerVersion}`"
+                  class="text-text-secondary m-0 text-xs leading-normal"
+                >
+                  {{
+                    t("aiObservability.experiments.scorerApplicability", {
+                      scorer: entry.scorerId,
+                      version: entry.scorerVersion,
+                      eligible: entry.eligibleSlotCount,
+                      noReference: entry.noReferenceSlotCount,
+                    })
+                  }}
+                </p>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <ExperimentPreviewPanel
+          :dataset-selected="datasetSelected"
+          :preview-ready="previewReady"
+          :preview="preview"
+          :loading="previewing"
+          :error="previewFailed"
+          :error-message="previewErrorMessage"
+          :dataset-label="datasetLabel"
+          :temperature="Number(temperature) || 0"
+          :scorer-count="scorerIds.length"
+          :trial-count="Number(trialCount) || 1"
+        />
+      </div>
+
+      <footer
+        class="bg-surface-base border-border-default sticky bottom-0 z-1 flex shrink-0 items-center justify-end gap-2 border-t px-5.5 py-3"
+      >
+        <OButton
+          type="button"
+          variant="outline"
+          size="sm-action"
+          :disabled="isSubmitting || sendingConfirmed"
+          data-test="ai-experiment-form-cancel-btn"
+          @click="goBack"
+        >
+          {{ t("aiObservability.experiments.cancel") }}
+        </OButton>
+        <OButton
+          type="submit"
+          variant="primary"
+          size="sm-action"
+          :loading="isSubmitting || sendingConfirmed"
+          data-test="ai-experiment-form-submit-btn"
+        >
+          {{
+            cloning
+              ? t("aiObservability.experiments.form.cloneSubmit")
+              : t("aiObservability.experiments.form.submit")
+          }}
+        </OButton>
+      </footer>
+    </OPageLayout>
+  </OForm>
+
+  <EditorDraftDialogs :draft="experimentDraft" />
+  <ConfirmDialog
+    v-model="costDialog.show"
+    :title="t('aiObservability.experiments.form.costConfirmTitle')"
+    :message="costDialog.message"
+    :ok-label="t('aiObservability.experiments.form.costConfirmOk')"
+    @update:ok="confirmCost"
+  />
+</template>
+
+<script setup lang="ts">
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { debounce } from "lodash-es";
+import { useStore } from "vuex";
+import { useRoute, useRouter } from "vue-router";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import llmDatasetsService, {
+  commonInputFields,
+  DATASET_ITEMS_MAX_PAGE_SIZE,
+  type LlmDataset,
+  type LlmDatasetItem,
+} from "@/services/llm-datasets.service";
+import { type RemoteTask } from "@/services/remote-tasks.service";
+import { chatProviders } from "@/services/llm-playground.service";
+import { remoteTasksListQuery } from "@/services/llm-experiments.queries";
+import {
+  cloneExperimentMutation,
+  createExperimentMutation,
+} from "@/services/llm-experiments.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { queryClient } from "@/composables/query/queryClient";
+import llmExperimentsService, {
+  type ExperimentCreatePayload,
+  type ExperimentPreview,
+  type LlmExperiment,
+} from "@/services/llm-experiments.service";
+import llmPromptsService, {
+  type Prompt,
+  type ResolvedPrompt,
+} from "@/services/llm-prompts.service";
+import onlineEvalsService, { type Provider, type Scorer } from "@/services/online-evals.service";
+import {
+  defaultModelOf,
+  entityId,
+  resolvedEndpointOf,
+  scorerTypeOf,
+} from "@/enterprise/components/onlineEvals/utils/evalEntity";
+import {
+  createPreviewRequestGate,
+  formatEstimatedCost,
+  withPreviewScorers,
+} from "../../views/AIObservability/experimentPreview";
+import { aiExperimentsRoute } from "../../views/AIObservability/experimentRoutes";
+import ExperimentPreviewPanel from "./ExperimentPreviewPanel.vue";
+import {
+  EXPERIMENT_ROW_SOURCES,
+  experimentFormDefaults,
+  experimentFormFromExperiment,
+  makeExperimentSchema,
+  type ExperimentForm,
+} from "./ExperimentForm.schema";
+
+defineOptions({ name: "ExperimentForm" });
+
+const { t } = useI18nTyped();
+const store = useStore();
+const route = useRoute();
+const router = useRouter();
+
+const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
+
+const datasets = ref<LlmDataset[]>([]);
+const scorers = ref<Scorer[]>([]);
+const providers = ref<Provider[]>([]);
+const refreshingProviders = ref(false);
+const preview = ref<ExperimentPreview | null>(null);
+const previewing = ref(false);
+const previewFailed = ref(false);
+const previewErrorMessage = ref("");
+const prompts = ref<Prompt[]>([]);
+const resolvedPrompt = ref<ResolvedPrompt | null>(null);
+const resolvingPrompt = ref(false);
+let promptResolveRequest = 0;
+const previewRequests = createPreviewRequestGate();
+/** previewKey() of the values the preview on screen was built for. */
+let previewedFor = "";
+const nextIdempotencyKey = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`;
+const idempotencyKey = ref(nextIdempotencyKey());
+// The body awaiting the user's OK to go over the cost warning threshold. Cancel
+// just closes the dialog: the form keeps its state and nothing is resent.
+const costDialog = reactive({
+  show: false,
+  message: "" as I18nText,
+  body: null as ExperimentCreatePayload | null,
+});
+// True while a confirmed create runs: it starts from the dialog, outside the
+// form's own submit, so isSubmitting does not cover it.
+const sendingConfirmed = ref(false);
+// Set while the leave dialog's Save runs, so a successful create stays on the page.
+let leaveSave: { saved: boolean } | null = null;
+// A continued prompt_ref draft keeps its own model and temperature over the resolved prompt's.
+let draftOverrides: { model: string; temperature: number } | null = null;
+
+/** A query value only when it is really there — an absent key must fall through
+ *  to the form default, not overwrite it with "". */
+function queryParam(key: string): string | undefined {
+  const value = route.query[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+// Built once, not computed: useOForm hands the schema straight to TanStack,
+// which would receive an unwrapped-nothing Ref.
+/** Set when the form was opened as "clone this run" rather than "new run". */
+const cloneOfId = computed(() => String(route.query.clone_of ?? ""));
+const cloning = computed(() => Boolean(cloneOfId.value));
+const cloneSource = ref<LlmExperiment | null>(null);
+
+const schema = makeExperimentSchema(t);
+const form = useOForm<ExperimentForm>({
+  defaultValues: experimentFormDefaults(String(route.query.dataset ?? ""), {
+    providerId: queryParam("provider"),
+    model: queryParam("model"),
+    temperature: queryParam("temperature"),
+    systemPrompt: queryParam("systemPrompt"),
+    userPrompt: queryParam("userPrompt"),
+  }),
+  schema,
+  onSubmit,
+});
+
+// Reads the owner needs that form context cannot give it: the task branch,
+// the rail's summary values, and the fields that change the slot maths.
+const datasetId = form.useStore((s: any) => s.values.datasetId as string);
+const providerId = form.useStore((s: any) => s.values.providerId as string);
+const scorerIds = form.useStore((s: any) => (s.values.scorerIds ?? []) as string[]);
+const trialCount = form.useStore((s: any) => s.values.trialCount as number);
+const temperature = form.useStore((s: any) => s.values.temperature as number);
+// Read through useStore, never form.state: the latter is an untracked snapshot,
+// so a computed built on it silently serves a stale value.
+const userPrompt = form.useStore((s: any) => s.values.userPrompt as string);
+const systemPrompt = form.useStore((s: any) => s.values.systemPrompt as string);
+const sources = form.useStore((s: any) => (s.values.sources ?? []) as string[]);
+const isDirty = form.useStore((s: any) => s.isDirty as boolean);
+const formValues = form.useStore((state) => state.values);
+
+const datasetSelected = computed(() => !!datasetId.value);
+const providerSelected = computed(() => !!providerId.value);
+const taskType = form.useStore((state: any) => state.values.taskType as string);
+const taskRef = form.useStore((state: any) => String(state.values.taskRef ?? ""));
+const promptId = form.useStore((state: any) => String(state.values.promptId ?? ""));
+const promptSelectionMode = form.useStore((state: any) =>
+  String(state.values.promptSelectionMode ?? "label"),
+);
+const promptLabel = form.useStore((state: any) => String(state.values.promptLabel ?? "production"));
+const promptVersion = form.useStore((state: any) => String(state.values.promptVersion ?? ""));
+const model = form.useStore((state: any) => String(state.values.model ?? ""));
+
+const remoteTasks = ref<RemoteTask[]>([]);
+const loadingRemoteTasks = ref(false);
+
+const taskTypeOptions = computed(() => [
+  {
+    label: t("aiObservability.experiments.form.taskTypeInline"),
+    value: "inline_prompt",
+    subLabel: t("aiObservability.experiments.form.taskTypeInlineHelp"),
+  },
+  {
+    label: t("aiObservability.experiments.form.taskTypePromptRef"),
+    value: "prompt_ref",
+    subLabel: t("aiObservability.experiments.form.taskTypePromptRefHelp"),
+  },
+  {
+    label: t("aiObservability.experiments.form.taskTypeRemote"),
+    value: "remote",
+    subLabel: t("aiObservability.experiments.form.taskTypeRemoteHelp"),
+  },
+]);
+
+// Only a published, verified, still-active version can be pinned — the server
+// resolves the ref against the registry and refuses anything else, so a draft
+// must never reach this list. Each head appears at its newest published
+// version, which is what `list` returns.
+const remoteTaskOptions = computed(() =>
+  remoteTasks.value
+    .filter((task) => task.isReferenceable && task.taskRef)
+    .map((task) => ({
+      label: raw(`${task.name} (v${task.version})`),
+      value: task.taskRef as string,
+      subLabel: raw(task.endpoint),
+    })),
+);
+const promptSelectionModeOptions = computed(() => [
+  { label: t("aiObservability.promptManagement.label"), value: "label" },
+  { label: t("aiObservability.promptManagement.version"), value: "version" },
+]);
+const promptOptions = computed(() =>
+  prompts.value
+    .filter((prompt) => prompt.status === "active")
+    .map((prompt) => ({
+      label: raw(prompt.name),
+      value: prompt.entityId,
+      subLabel: t("aiObservability.experiments.form.promptLatestVersion", {
+        version: prompt.latestVersion,
+      }),
+    })),
+);
+const promptVersionOptions = computed(() => {
+  const selected = prompts.value.find((prompt) => prompt.entityId === promptId.value);
+  if (!selected) return [];
+  return Array.from({ length: selected.latestVersion }, (_, index) => {
+    const version = selected.latestVersion - index;
+    return { label: raw(`v${version}`), value: String(version) };
+  });
+});
+const promptModelOverride = computed(
+  () =>
+    Boolean(resolvedPrompt.value) &&
+    Boolean(model.value) &&
+    model.value !== (resolvedPrompt.value?.version.config.model ?? ""),
+);
+const promptTemperatureOverride = computed(() => {
+  const base = resolvedPrompt.value?.version.config.params?.temperature;
+  return resolvedPrompt.value != null && Number(temperature.value) !== Number(base ?? 0);
+});
+
+async function loadPrompts() {
+  if (!orgId.value) return;
+  try {
+    prompts.value = await llmPromptsService.list(orgId.value);
+  } catch {
+    prompts.value = [];
+  }
+}
+
+async function resolvePromptSelection() {
+  const selected = prompts.value.find((prompt) => prompt.entityId === promptId.value);
+  if (!selected) {
+    resolvedPrompt.value = null;
+    return;
+  }
+  const request = ++promptResolveRequest;
+  resolvingPrompt.value = true;
+  try {
+    const resolved = await llmPromptsService.resolve(orgId.value, {
+      name: selected.name,
+      ...(promptSelectionMode.value === "label"
+        ? { label: promptLabel.value.trim() || "production" }
+        : { version: Number(promptVersion.value) }),
+    });
+    if (request !== promptResolveRequest) return;
+    resolvedPrompt.value = resolved;
+    // A new version re-runs this resolve, so the draft's overrides wait for that one too.
+    const settled = promptVersion.value === String(resolved.version.version);
+    form.setFieldValue("promptId", resolved.prompt.entityId);
+    form.setFieldValue("promptVersion", String(resolved.version.version));
+    if (draftOverrides) {
+      form.setFieldValue("model", draftOverrides.model);
+      form.setFieldValue("temperature", draftOverrides.temperature);
+      if (settled) draftOverrides = null;
+      return;
+    }
+    if (!model.value) form.setFieldValue("model", resolved.version.config.model ?? "");
+    const baseTemperature = resolved.version.config.params?.temperature;
+    if (typeof baseTemperature === "number") {
+      form.setFieldValue("temperature", baseTemperature);
+    }
+  } catch {
+    if (request !== promptResolveRequest) return;
+    resolvedPrompt.value = null;
+  } finally {
+    if (request === promptResolveRequest) resolvingPrompt.value = false;
+  }
+}
+
+const selectedRemoteTask = computed(
+  () => remoteTasks.value.find((task) => task.taskRef === taskRef.value) ?? null,
+);
+
+/** Overrides start at the task's registered values, so the numbers on screen
+ *  are the ones that will actually be used rather than empty boxes. */
+function onRemoteTaskChange(value: unknown) {
+  const picked = remoteTasks.value.find((task) => task.taskRef === String(value ?? ""));
+  if (!picked) return;
+  form.setFieldValue("taskTimeoutSeconds", String(Math.round(picked.timeoutMs / 1000)));
+  form.setFieldValue("taskMaxConcurrency", String(picked.maxConcurrency));
+}
+
+async function loadRemoteTasks() {
+  if (!orgId.value) return;
+  loadingRemoteTasks.value = true;
+  try {
+    remoteTasks.value = await queryClient.fetchQuery(remoteTasksListQuery(orgId.value));
+  } catch {
+    remoteTasks.value = [];
+  } finally {
+    loadingRemoteTasks.value = false;
+  }
+}
+
+const selectedDataset = computed(
+  () => datasets.value.find((d) => d.id === datasetId.value) ?? null,
+);
+// A clone keeps the version its source pinned. Re-pinning to the dataset's head
+// would compare two runs over different rows and call the difference a result.
+const selectedDatasetVersion = computed(() =>
+  cloneSource.value
+    ? cloneSource.value.datasetVersion
+    : (selectedDataset.value?.globalVersion ?? 0),
+);
+
+// preview() validates the entire create body, so it can only run once the task
+// section is complete. Short of that the rail says what is missing rather than
+// reporting a failure the user did not cause.
+const previewReady = computed(() => {
+  if (!datasetId.value) return false;
+  if (taskType.value === "remote") return taskRef.value.includes("@");
+  if (taskType.value === "prompt_ref") {
+    return Boolean(providerId.value && resolvedPrompt.value && Number(promptVersion.value) > 0);
+  }
+  return !!providerId.value && !!String(userPrompt.value ?? "").trim();
+});
+const datasetLabel = computed(() =>
+  selectedDataset.value ? `${selectedDataset.value.name} @ v${selectedDatasetVersion.value}` : "",
+);
+
+const datasetOptions = computed(() =>
+  datasets.value.map((dataset) => ({ label: raw(dataset.name), value: dataset.id })),
+);
+
+const sourceOptions = computed(() =>
+  EXPERIMENT_ROW_SOURCES.map((source) => ({
+    label: t(`aiObservability.experiments.form.sources.${source}`),
+    value: source,
+  })),
+);
+
+const providerOptions = computed(() =>
+  providers.value.map((provider) => ({ label: raw(provider.name), value: provider.id })),
+);
+
+const selectedProvider = computed(
+  () => providers.value.find((p) => p.id === providerId.value) ?? null,
+);
+
+const modelOptions = computed(() => {
+  const models =
+    selectedProvider.value?.availableModels ?? selectedProvider.value?.available_models ?? [];
+  return models.map((model) => ({ label: raw(model), value: model }));
+});
+
+// A reference-based scorer needs a golden answer, which only a dataset row
+// carries — the opposite of eval jobs, where they are unusable.
+const scorerOptions = computed(() =>
+  scorers.value.map((scorer) => {
+    const referenceBased = scorer.referenceBased ?? scorer.reference_based ?? false;
+    const type = scorerTypeOf(scorer).replace("_", " ");
+    return {
+      label: raw(scorer.name),
+      value: entityId(scorer),
+      badge: referenceBased
+        ? `${type} · v${scorer.version} · reference-based`
+        : `${type} · v${scorer.version}`,
+    };
+  }),
+);
+
+const scorerApplicability = computed(() => preview.value?.applicability?.scorerApplicability ?? []);
+
+/** First page of the selected dataset; source toggles filter it without refetching. */
+const datasetRows = ref<LlmDatasetItem[]>([]);
+/** Fields every selected-source row shares — suggestions; preview validation stays the authority. */
+const datasetInputFields = computed(() =>
+  commonInputFields(
+    sources.value.length
+      ? datasetRows.value.filter((item) => sources.value.includes(item.source))
+      : datasetRows.value,
+  ),
+);
+const promptVariables = computed(() =>
+  ["input", ...datasetInputFields.value].map((name) => ({ name, token: raw(`{{ ${name} }}`) })),
+);
+const expectedOutputToken = raw("{{ expected_output }}");
+const usesExpectedOutput = computed(() =>
+  [systemPrompt.value, userPrompt.value].some((prompt) =>
+    /\{\{\s*expected_output\s*\}\}/.test(String(prompt ?? "")),
+  ),
+);
+
+/** Bumped per load, so a slow response for a since-deselected dataset is dropped. */
+let datasetRowsRequest = 0;
+
+async function loadDatasetRows() {
+  const id = datasetId.value;
+  const request = ++datasetRowsRequest;
+  if (!id || !orgId.value) {
+    datasetRows.value = [];
+    return;
+  }
+  try {
+    const page = await llmDatasetsService.listItems(orgId.value, id, {
+      size: DATASET_ITEMS_MAX_PAGE_SIZE,
+    });
+    if (request === datasetRowsRequest) datasetRows.value = page.items;
+  } catch {
+    if (request === datasetRowsRequest) datasetRows.value = [];
+  }
+}
+
+function goBack() {
+  router.push(aiExperimentsRoute(orgId.value));
+}
+
+// Punctuation, not prose — the endpoint strip separates facts the way the
+// scorer form does.
+const separator = raw("·");
+const dash = raw("—");
+
+// A provider added in another tab should be reachable without reloading.
+async function refreshProviders() {
+  if (!orgId.value) return;
+  refreshingProviders.value = true;
+  try {
+    providers.value = chatProviders(await onlineEvalsService.providers.list(orgId.value));
+  } catch {
+    toast({
+      variant: "error",
+      message: t("aiObservability.experiments.form.providerRefreshError"),
+    });
+  } finally {
+    refreshingProviders.value = false;
+  }
+}
+
+function onProviderChange() {
+  // The model list is provider-scoped, so a stale model would silently 400.
+  form.setFieldValue("model", "");
+}
+
+function insertVariable(token: string) {
+  const current = String(userPrompt.value ?? "");
+  form.setFieldValue("userPrompt", current ? `${current}\n${token}` : token);
+}
+
+/** Explicit keys — a spread would leak schema-only fields and ship the task
+ *  branch's unused strings. */
+function remoteOverrides(values: ExperimentForm) {
+  const timeout = Number(values.taskTimeoutSeconds);
+  const concurrency = Number(values.taskMaxConcurrency);
+  const overrides = {
+    ...(Number.isFinite(timeout) && timeout > 0 ? { timeoutMs: timeout * 1000 } : {}),
+    ...(Number.isFinite(concurrency) && concurrency > 0 ? { maxConcurrency: concurrency } : {}),
+  };
+  return Object.keys(overrides).length ? overrides : null;
+}
+function promptOverrides(values: ExperimentForm) {
+  const base = resolvedPrompt.value?.version.config;
+  if (!base) return null;
+  const overrides: NonNullable<
+    Extract<ExperimentCreatePayload["task"], { type: "prompt_ref" }>["paramsOverrides"]
+  > = {};
+  const requestedModel = values.model.trim();
+  if (requestedModel && requestedModel !== (base.model ?? "")) overrides.model = requestedModel;
+  const requestedTemperature = Number(values.temperature);
+  const baseTemperature = Number(base.params?.temperature ?? 0);
+  if (Number.isFinite(requestedTemperature) && requestedTemperature !== baseTemperature) {
+    overrides.params = { temperature: requestedTemperature };
+  }
+  return Object.keys(overrides).length ? overrides : null;
+}
+
+function buildTask(values: ExperimentForm): ExperimentCreatePayload["task"] {
+  if (values.taskType === "remote") {
+    return { type: "remote", taskRef: values.taskRef, overrides: remoteOverrides(values) };
+  }
+  if (values.taskType === "prompt_ref") {
+    return {
+      type: "prompt_ref",
+      id: values.promptId,
+      version: Number(values.promptVersion),
+      providerId: values.providerId,
+      paramsOverrides: promptOverrides(values),
+    };
+  }
+  const messages = [
+    ...(values.systemPrompt.trim()
+      ? [{ role: "system", content: values.systemPrompt.trim() }]
+      : []),
+    { role: "user", content: values.userPrompt },
+  ];
+  return {
+    type: "inline_prompt",
+    messages,
+    providerId: values.providerId,
+    model: values.model.trim() || null,
+    params: { temperature: Number(values.temperature) },
+  };
+}
+
+function buildPayload(values: ExperimentForm): ExperimentCreatePayload {
+  return {
+    name: values.name.trim(),
+    description: values.description.trim() || null,
+    datasetId: values.datasetId,
+    datasetVersion: selectedDatasetVersion.value,
+    datasetFilter: values.sources.length ? { sources: [...values.sources] } : null,
+    task: buildTask(values),
+    scorers: values.scorerIds.map((id) => ({ id })),
+    trialCount: Number(values.trialCount),
+    idempotencyKey: idempotencyKey.value,
+  };
+}
+
+// Create and clone both add a row the browser this navigates to would otherwise miss.
+const createExperimentWrite = useMutation(() => createExperimentMutation(orgId.value));
+const cloneExperimentWrite = useMutation(() => cloneExperimentMutation(orgId.value));
+
+async function submitClone(payload: ExperimentCreatePayload): Promise<string> {
+  // datasetId and datasetVersion are deliberately absent: an omitted field keeps
+  // what the source pinned, which is the only pin a comparison stays valid over.
+  const { datasetId: _datasetId, datasetVersion: _datasetVersion, ...overrides } = payload;
+  return (
+    await cloneExperimentWrite.mutateAsync({
+      experimentId: cloneOfId.value,
+      overrides: { ...overrides, idempotencyKey: overrides.idempotencyKey ?? undefined },
+    })
+  ).id;
+}
+
+function askCostConfirmation(body: ExperimentCreatePayload) {
+  const estimate = preview.value?.costEstimate;
+  costDialog.message =
+    estimate?.estimatedCost != null
+      ? t("aiObservability.experiments.form.costConfirmMessage", {
+          cost: formatEstimatedCost(estimate.estimatedCost),
+          threshold: formatEstimatedCost(estimate.warningThreshold),
+        })
+      : t("aiObservability.experiments.form.costConfirmMessageUnpriced");
+  costDialog.body = body;
+  costDialog.show = true;
+}
+
+async function confirmCost() {
+  const body = costDialog.body;
+  costDialog.body = null;
+  if (!body) return;
+  sendingConfirmed.value = true;
+  try {
+    await send({ ...body, confirmCostEstimate: true });
+  } finally {
+    sendingConfirmed.value = false;
+  }
+}
+
+/** What a preview depends on: the payload without its name, description and key. */
+function previewKey(payload: ExperimentCreatePayload): string {
+  return JSON.stringify({ ...payload, name: "", description: null, idempotencyKey: null });
+}
+
+async function onSubmit(values: ExperimentForm) {
+  if (sendingConfirmed.value) return;
+  // The server pins scorer versions itself; reusing the preview's pins when
+  // one is in hand just closes the gap if a version ships mid-edit.
+  const payload = buildPayload(values);
+  // A preview that is still loading, or was built before the last edit, carries
+  // the old scorers and the old cost, so decide on a fresh one.
+  if (previewing.value || previewedFor !== previewKey(payload)) {
+    runPreviewAfterTyping.cancel();
+    await runPreview();
+  }
+  const body = preview.value ? withPreviewScorers(payload, preview.value) : payload;
+  if (preview.value?.costEstimate?.confirmationRequired) {
+    askCostConfirmation(body);
+    return;
+  }
+  await send(body);
+}
+
+async function send(body: ExperimentCreatePayload) {
+  try {
+    const createdId = cloning.value
+      ? await submitClone(body)
+      : (await createExperimentWrite.mutateAsync(body)).experiment.id;
+    idempotencyKey.value = nextIdempotencyKey();
+    toast({
+      variant: "success",
+      message: cloning.value
+        ? t("aiObservability.experiments.cloneSuccess")
+        : t("aiObservability.experiments.createSuccess"),
+    });
+    if (leaveSave) {
+      leaveSave.saved = true;
+      return;
+    }
+    experimentDraft.markSaved();
+    router.push(aiExperimentsRoute(orgId.value, { selectedId: createdId }));
+  } catch (error: any) {
+    // 412 = over the cost warning threshold. Nothing was stored, so the
+    // confirmed retry may reuse the same idempotency key.
+    // The preview on screen said no confirmation was needed, so it is out of
+    // date: refresh it so the dialog shows the cost the server used.
+    if (error?.response?.status === 412) {
+      await runPreview();
+      askCostConfirmation(body);
+      return;
+    }
+    // An AxiosError IS an Error, so error.message is only ever "Request failed
+    // with status code 400" — the server's reason lives on the response body.
+    toast({
+      variant: "error",
+      message:
+        raw(error?.response?.data?.message) ||
+        raw(error?.response?.data?.error) ||
+        (cloning.value
+          ? t("aiObservability.experiments.cloneError")
+          : t("aiObservability.experiments.createError")),
+    });
+  }
+}
+
+async function runPreview() {
+  if (!orgId.value || !previewReady.value) {
+    preview.value = null;
+    previewFailed.value = false;
+    return;
+  }
+  const request = previewRequests.start();
+  previewing.value = true;
+  previewFailed.value = false;
+  previewErrorMessage.value = "";
+  const payload = buildPayload(form.state.values);
+  try {
+    const result = await llmExperimentsService.preview(orgId.value, payload);
+    if (previewRequests.isCurrent(request)) {
+      preview.value = result;
+      previewedFor = previewKey(payload);
+    }
+  } catch (error: any) {
+    if (previewRequests.isCurrent(request)) {
+      preview.value = null;
+      previewFailed.value = true;
+      previewErrorMessage.value = String(
+        error?.response?.data?.message ?? error?.response?.data?.error ?? "",
+      );
+    }
+  } finally {
+    if (previewRequests.isCurrent(request)) previewing.value = false;
+  }
+}
+
+// The fields that change the slot maths or the server's cost estimate re-request.
+// The messages and the model are priced too (characters / 4 times the model's
+// price), so typing in them re-requests after a pause. The request gate inside
+// runPreview keeps a slow response from landing on top of a newer one.
+watch(
+  [datasetId, trialCount, scorerIds, sources, taskType, taskRef, promptVersion, providerId, model],
+  runPreview,
+  { deep: true },
+);
+const runPreviewAfterTyping = debounce(runPreview, 500);
+watch([systemPrompt, userPrompt], runPreviewAfterTyping);
+onBeforeUnmount(() => runPreviewAfterTyping.cancel());
+watch(datasetId, loadDatasetRows, { immediate: true });
+watch([promptId, promptSelectionMode, promptLabel, promptVersion], resolvePromptSelection);
+
+const experimentDraft = useEditorDraft<ExperimentForm>({
+  kind: "experiment",
+  entityLabel: () => t("common.editorDraft.entities.experiment"),
+  // A clone draft is keyed by its source run, so its dot lands on that run's Clone action.
+  entityId: () => cloneOfId.value || null,
+  snapshot: () => ({ ...formValues.value }),
+  apply: async (data) => {
+    draftOverrides =
+      data.taskType === "prompt_ref" ? { model: data.model, temperature: data.temperature } : null;
+    for (const [field, value] of Object.entries(data)) {
+      form.setFieldValue(field as keyof ExperimentForm, value as never);
+    }
+    await nextTick();
+    if (!resolvingPrompt.value) draftOverrides = null;
+  },
+  base: () => (cloning.value ? cloneDefinition(cloneSource.value) : undefined),
+  hasChanges: () => isDirty.value,
+  save: async () => {
+    const run = { saved: false };
+    leaveSave = run;
+    try {
+      await form.handleSubmit();
+    } finally {
+      leaveSave = null;
+    }
+    return run.saved;
+  },
+});
+
+// Only what a clone copies is hashed; status and progress change while the source runs.
+function cloneDefinition(source: LlmExperiment | null) {
+  if (!source) return null;
+  return {
+    id: source.id,
+    name: source.name,
+    description: source.description,
+    datasetId: source.datasetId,
+    datasetVersion: source.datasetVersion,
+    datasetFilter: source.datasetFilter,
+    task: source.task,
+    scorers: source.scorers,
+    trialCount: source.trialCount,
+  };
+}
+
+onMounted(async () => {
+  if (!orgId.value) return;
+  try {
+    [datasets.value, scorers.value, providers.value] = await Promise.all([
+      llmDatasetsService.list(orgId.value),
+      onlineEvalsService.scorers.list(orgId.value),
+      onlineEvalsService.providers.list(orgId.value),
+    ]);
+  } catch {
+    toast({ variant: "error", message: t("aiObservability.experiments.loadError") });
+    return;
+  }
+  // Registry reads are best-effort until their task type is selected.
+  await Promise.all([loadRemoteTasks(), loadPrompts()]);
+  providers.value = chatProviders(providers.value);
+  if (cloning.value && !(await loadCloneSource())) return;
+  const preselected = providers.value.find((p) => p.isDefault ?? p.is_default);
+  if (preselected && !providerId.value) form.setFieldValue("providerId", preselected.id);
+  if (previewReady.value) runPreview();
+  await experimentDraft.start();
+});
+
+// Seeded field by field rather than through defaultValues: the source is only
+// in hand after a request, and the form is already mounted by then.
+async function loadCloneSource(): Promise<boolean> {
+  let source: LlmExperiment;
+  try {
+    // Smallest sample the server accepts, not none: only the definition is read
+    // here, but `sampleSize` is validated as 1..20 and 0 is a 400.
+    source = (await llmExperimentsService.get(orgId.value, cloneOfId.value, 1)).experiment;
+  } catch (error: any) {
+    toast({
+      variant: "error",
+      message:
+        raw(error?.response?.data?.message) || t("aiObservability.experiments.cloneLoadError"),
+    });
+    return false;
+  }
+  cloneSource.value = source;
+  const values = experimentFormFromExperiment(
+    source,
+    t("aiObservability.experiments.form.cloneNameSuffix", { name: source.name }),
+  );
+  for (const [field, value] of Object.entries(values)) {
+    form.setFieldValue(field as keyof ExperimentForm, value as never);
+  }
+  return true;
+}
+</script>

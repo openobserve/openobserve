@@ -22,8 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :width="45"
     :show-close="false"
     data-test="add-condition-drawer"
-    primary-button-label="Save"
-    secondary-button-label="Cancel"
+    :primary-button-label="t('common.save')"
+    :secondary-button-label="t('common.cancel')"
     secondary-button-variant="outline"
     :neutral-button-label="pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
     neutral-button-variant="outline-destructive"
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-right>
       <button
         type="button"
-        aria-label="Close drawer"
+        :aria-label="t('pipeline.closeDrawer')"
         data-test="o-drawer-close-btn"
         @mousedown.prevent
         @click="openCancelDialog"
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="text-banner-warning-text text-sm"
                     data-test="add-condition-note-heading"
                   >
-                    Condition value Guidelines:
+                    {{ t("pipeline.conditionValueGuidelines") }}
                   </div>
                   <div
                     class="text-banner-warning-text flex flex-col gap-1 text-sm"
@@ -101,38 +101,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="text-status-warning-text mt-0.5 shrink-0"
                       />
                       <span>
-                        To check for an empty value, use
-                        <span class="highlight text-text-link font-bold">""</span>. Example:
-                        <span
-                          class="code rounded-default bg-code-bg text-code-text px-1 py-px font-mono"
-                          >app_name != ""</span
-                        >
-                      </span>
-                    </div>
-                    <div class="flex items-start gap-2">
-                      <OIcon
-                        name="info"
-                        size="sm"
-                        class="text-status-warning-text mt-0.5 shrink-0"
-                      />
-                      <span>
-                        To check for an Null value, use
-                        <span class="highlight text-text-link font-bold">null</span>. Example:
-                        <span
-                          class="code rounded-default bg-code-bg text-code-text px-1 py-px font-mono"
-                          >app_name != null</span
-                        >
-                      </span>
-                    </div>
-                    <div class="flex items-start gap-2">
-                      <OIcon
-                        name="info"
-                        size="sm"
-                        class="text-status-warning-text mt-0.5 shrink-0"
-                      />
-                      <span>
-                        To add a custom column, type column name and press
-                        <span class="highlight text-text-link font-bold">Enter</span>.
+                        {{ t("pipeline.customColumnGuideline") }}
+                        <span class="highlight text-text-link font-bold">{{
+                          t("pipeline.enterKey")
+                        }}</span
+                        >.
                       </span>
                     </div>
                     <div class="flex items-start gap-2">
@@ -141,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="sm"
                         class="text-status-error-text mt-0.5 shrink-0"
                       />
-                      <span>If conditions are not met, the record will be dropped.</span>
+                      <span>{{ t("pipeline.conditionsNotMetWarning") }}</span>
                     </div>
                     <div class="flex items-start gap-2">
                       <OIcon
@@ -149,9 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="sm"
                         class="text-status-error-text mt-0.5 shrink-0"
                       />
-                      <span
-                        >If the record does not have the specified field, it will be dropped.</span
-                      >
+                      <span>{{ t("pipeline.missingFieldWarning") }}</span>
                     </div>
                   </div>
                 </div>
@@ -172,10 +143,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 <script lang="ts" setup>
 import { computed, onMounted, ref, type Ref, onBeforeMount, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ConditionBuilder from "@/components/flow/forms/ConditionBuilder.vue";
-import { getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import useStreams from "@/composables/useStreams";
@@ -183,31 +153,11 @@ import ConfirmDialog from "../../ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
-// V1 interfaces (legacy support)
-interface FilterCondition {
-  column: string;
-  operator: string;
-  value: any;
-  ignore_case: boolean;
-  id: string;
-}
-
-interface ConditionGroup {
-  // V2 properties
-  filterType?: "group";
-  logicalOperator?: "AND" | "OR";
-  conditions?: (FilterCondition | ConditionGroup)[];
-  // V1 properties (legacy)
-  groupId?: string;
-  label?: "and" | "or";
-  items?: (FilterCondition | ConditionGroup)[];
-}
-
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const store = useStore();
 
-const { getStream } = useStreams();
+const { getStream } = useStreams(t);
 
 const emit = defineEmits(["update:node", "cancel:hideform", "delete:node"]);
 
@@ -233,7 +183,7 @@ const filteredColumns: any = ref([]);
 
 const originalStreamFields: Ref<any[]> = ref([]);
 
-const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
+const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop(t);
 
 const selected = ref(null);
 watch(selected, (newValue: any) => {
@@ -243,46 +193,11 @@ let parser: any;
 
 const dialog = ref({
   show: false,
-  title: "",
-  message: "",
+  // raw("") is only the empty placeholder — the real values are assigned from t().
+  title: raw(""),
+  message: raw(""),
   okCallback: () => {},
 });
-
-const getDefaultStreamRoute: any = () => {
-  if (pipelineObj.isEditNode) {
-    return pipelineObj.currentSelectedNodeData.data;
-  }
-  return {
-    name: "",
-    destination: {
-      org_id: "",
-      stream_name: "",
-      stream_type: "logs",
-    },
-    is_real_time: true,
-    query_condition: {
-      sql: "",
-      type: "sql",
-      aggregation: null,
-    },
-    trigger_condition: {
-      period: 15,
-      frequency_type: "minutes",
-      cron: "",
-      frequency: 15,
-      timezone: "UTC",
-    },
-    context_attributes: [
-      {
-        key: "",
-        value: "",
-        id: getUUID(),
-      },
-    ],
-    description: "",
-    enabled: true,
-  };
-};
 
 // The SHARED ConditionBuilder owns V0/V1 -> V2 conversion and the lowercase
 // operator normalization; pipelines just hand it the saved rule.
@@ -451,8 +366,8 @@ const openCancelDialog = () => {
     }
 
     dialog.value.show = true;
-    dialog.value.title = "Discard Changes";
-    dialog.value.message = "Are you sure you want to cancel condition changes?";
+    dialog.value.title = t("common.discardChanges");
+    dialog.value.message = t("pipeline.cancelConditionChangesConfirm");
     dialog.value.okCallback = closeDialog;
   } catch (e) {
     closeDialog();
@@ -498,7 +413,9 @@ const saveCondition = async () => {
     console.error("Error saving condition:", error);
     toast({
       variant: "error",
-      message: "Error saving condition: " + (error as Error).message,
+      message: t("toastMessages.NodeForm.errorSavingCondition", {
+        error: (error as Error).message,
+      }),
       timeout: 5000,
     });
     emit("cancel:hideform");
@@ -507,8 +424,8 @@ const saveCondition = async () => {
 
 const openDeleteDialog = () => {
   dialog.value.show = true;
-  dialog.value.title = "Delete Node";
-  dialog.value.message = "Are you sure you want to delete stream routing?";
+  dialog.value.title = t("pipeline.deleteNodeTitle");
+  dialog.value.message = t("pipeline.deleteStreamRoutingConfirm");
   dialog.value.okCallback = deleteRoute;
 };
 

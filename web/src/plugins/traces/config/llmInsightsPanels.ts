@@ -28,21 +28,27 @@
  *   {{interval}}  — auto-selected histogram bucket width string ("5 minutes" etc.)
  */
 
+import { type I18nKey } from "@/types/i18n";
+import {
+  LLM_LATENCY_SERIES_COLORS,
+  LLM_ERRORS_COLOR,
+  LLM_SPANS_COLOR,
+  LLM_TOKENS_COLOR,
+} from "@/utils/dashboard/colorPalette";
+
 export type LLMPanelType = "stacked-area" | "stacked-bar" | "horizontal-bar" | "table";
 
 export type LLMTableColumnFormat =
-  | "time"
-  | "service-chip"
-  | "error"
-  | "cost"
-  | "view-link"
-  | "text";
+  "time" | "service-chip" | "error" | "cost" | "view-link" | "text";
 
 export interface LLMTableColumn {
   /** Hit field used as the value source. May be omitted for "view-link". */
   field?: string;
-  /** Header label (rendered uppercase). */
-  label: string;
+  /**
+   * Header label, translated at the render site (this module is a plain config,
+   * so a resolved string would not follow the locale). Omit for no header.
+   */
+  labelKey?: I18nKey;
   format?: LLMTableColumnFormat;
   align?: "left" | "right";
 }
@@ -58,8 +64,12 @@ export interface LLMPanelQuery {
   seriesField?: string;
   /** Hit field used for the y-value (or bar length). */
   valueField?: string;
-  /** Legend label used when seriesField is not set. */
-  seriesLabel?: string;
+  /**
+   * i18n KEY for the legend label used when seriesField is not set. Resolved by
+   * `buildLLMPanelSchema` — see {@link LLMTableColumn.labelKey} for why this
+   * module stores a key rather than a translated string.
+   */
+  seriesLabelKey?: I18nKey;
   /**
    * Hint to the renderer for axis / tooltip formatting.
    * - "cost": prefix with `$` and use 2-decimal precision in tooltips.
@@ -74,8 +84,13 @@ export interface LLMPanelLayout {
 
 export interface LLMPanelDef {
   id: string;
-  title: string;
-  subtitle?: string;
+  /**
+   * i18n KEY for the panel heading — see {@link LLMTableColumn.labelKey} for why
+   * these are keys and not text. Resolved by LLMSchemaPanel / LLMErrorTable.
+   */
+  titleKey: I18nKey;
+  /** i18n KEY for the panel sub-heading. */
+  subtitleKey?: I18nKey;
   type: LLMPanelType;
   layout: LLMPanelLayout;
   query: LLMPanelQuery;
@@ -92,20 +107,8 @@ export interface LLMPanelDef {
   series?: Array<{ field: string; label: string; color: string }>;
   /** Column definitions for "table" panels. */
   columns?: LLMTableColumn[];
-  /** Friendly message shown when the panel has no data (overrides "No data"). */
-  emptyStateText?: string;
-}
-
-/**
- * i18n base key for a panel's title/subtitle. The panel `id` (kebab-case) maps
- * to a camelCase key under `aiObservability.panels` — e.g. "traces-over-time" →
- * "aiObservability.panels.tracesOverTime". Render sites resolve `${key}.title` /
- * `${key}.subtitle` and fall back to the hardcoded `title`/`subtitle` when the
- * key is missing, so the en.json copy is the source of truth where it exists.
- */
-export function panelI18nKey(id: string): string {
-  const camel = id.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-  return `aiObservability.panels.${camel}`;
+  /** i18n key for the message shown when the panel has no data (overrides "No data"). */
+  emptyStateKey?: I18nKey;
 }
 
 // Time-range pruning is handled by the search engine via the start_time /
@@ -123,11 +126,20 @@ const TOKENS_FIELD = `gen_ai_usage_total_tokens`;
 const MODEL_FIELD = `gen_ai_response_model`;
 const OBSERVATION_TYPE_FIELD = `gen_ai_operation_name`;
 
+// Scope for every panel that groups by model. `baseFilter` alone admits ALL
+// gen_ai spans — including `execute_tool` children and evaluator spans, which
+// legitimately carry no model (the OTEL gen_ai conventions only put a model on
+// generation/embedding operations). Bucketing those under a synthetic
+// "unknown" model made them dominate the per-model panels: an agent emits one
+// generation span per turn but a tool span per tool call, so "unknown" read as
+// ~9x the real model and its token bar was always a flat zero.
+const modelScopedFilter = `${baseFilter} AND ${MODEL_FIELD} IS NOT NULL`;
+
 export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
   {
     id: "cost-trend",
-    title: "Cost trend",
-    subtitle: "USD by model",
+    titleKey: "aiObservability.panels.costTrend.title",
+    subtitleKey: "aiObservability.panels.costTrend.subtitle",
     type: "stacked-bar",
     layout: { colSpan: 1 },
     query: {
@@ -140,8 +152,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
           ${MODEL_FIELD} as model,
           COALESCE(SUM(${COST_FIELD}), 0) as cost
         FROM {{stream}}
-        WHERE ${baseFilter}
-          AND ${MODEL_FIELD} IS NOT NULL
+        WHERE ${modelScopedFilter}
         GROUP BY ts, ${MODEL_FIELD}
         ORDER BY ts
       `,
@@ -153,8 +164,8 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
   },
   {
     id: "token-trend",
-    title: "Token trend",
-    subtitle: "tokens by model",
+    titleKey: "aiObservability.panels.tokenTrend.title",
+    subtitleKey: "aiObservability.panels.tokenTrend.subtitle",
     type: "stacked-bar",
     layout: { colSpan: 1 },
     query: {
@@ -164,8 +175,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
           ${MODEL_FIELD} as model,
           COALESCE(SUM(${TOKENS_FIELD}), 0) as tokens
         FROM {{stream}}
-        WHERE ${baseFilter}
-          AND ${MODEL_FIELD} IS NOT NULL
+        WHERE ${modelScopedFilter}
         GROUP BY ts, ${MODEL_FIELD}
         ORDER BY ts
       `,
@@ -176,8 +186,8 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
   },
   {
     id: "span-trend",
-    title: "Span trend",
-    subtitle: "span count by kind",
+    titleKey: "aiObservability.panels.spanTrend.title",
+    subtitleKey: "aiObservability.panels.spanTrend.subtitle",
     type: "stacked-bar",
     layout: { colSpan: 1 },
     query: {
@@ -198,8 +208,8 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
   },
   {
     id: "latency-by-model",
-    title: "Latency by model",
-    subtitle: "p50 / p90 / p95 / p99",
+    titleKey: "aiObservability.panels.latencyByModel.title",
+    subtitleKey: "aiObservability.panels.latencyByModel.subtitle",
     type: "horizontal-bar",
     layout: { colSpan: 1 },
     limit: 8,
@@ -210,14 +220,14 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
       // render as grouped bars per model (see `series`).
       sql: `
         SELECT
-          COALESCE(${MODEL_FIELD}, 'unknown') as model,
+          ${MODEL_FIELD} as model,
           approx_percentile_cont(duration, 0.5)  / 1000.0 as p50_ms,
           approx_percentile_cont(duration, 0.9)  / 1000.0 as p90_ms,
           approx_percentile_cont(duration, 0.95) / 1000.0 as p95_ms,
           approx_percentile_cont(duration, 0.99) / 1000.0 as p99_ms
         FROM {{stream}}
-        WHERE ${baseFilter}
-        GROUP BY COALESCE(${MODEL_FIELD}, 'unknown')
+        WHERE ${modelScopedFilter}
+        GROUP BY ${MODEL_FIELD}
         ORDER BY p95_ms DESC
       `,
       seriesField: "model",
@@ -225,16 +235,16 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     },
     // Severity escalation: slate (typical) → red (slow tail).
     series: [
-      { field: "p50_ms", label: "p50", color: "#64748b" },
-      { field: "p90_ms", label: "p90", color: "#f59e0b" },
-      { field: "p95_ms", label: "p95", color: "#f97316" },
-      { field: "p99_ms", label: "p99", color: "#ef4444" },
+      { field: "p50_ms", label: "p50", color: LLM_LATENCY_SERIES_COLORS.p50 },
+      { field: "p90_ms", label: "p90", color: LLM_LATENCY_SERIES_COLORS.p90 },
+      { field: "p95_ms", label: "p95", color: LLM_LATENCY_SERIES_COLORS.p95 },
+      { field: "p99_ms", label: "p99", color: LLM_LATENCY_SERIES_COLORS.p99 },
     ],
   },
   {
     id: "traces-over-time",
-    title: "Traces over time",
-    subtitle: "trace count by service",
+    titleKey: "aiObservability.panels.tracesOverTime.title",
+    subtitleKey: "aiObservability.panels.tracesOverTime.subtitle",
     type: "stacked-bar",
     layout: { colSpan: 1 },
     query: {
@@ -255,11 +265,11 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
   },
   {
     id: "errors-over-time",
-    title: "Errors over time",
-    subtitle: "error count",
+    titleKey: "aiObservability.panels.errorsOverTime.title",
+    subtitleKey: "aiObservability.panels.errorsOverTime.subtitle",
     type: "stacked-bar",
     layout: { colSpan: 1 },
-    color: "#ef4444",
+    color: LLM_ERRORS_COLOR,
     query: {
       // No baseFilter: OTel SDKs typically propagate the failure to a deep
       // child span (e.g. tool.<name>) which doesn't carry
@@ -276,25 +286,25 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
       `,
       timeField: "ts",
       valueField: "count",
-      seriesLabel: "errors",
+      seriesLabelKey: "traces.lLMInsightsDashboard.errorsSeries",
     },
   },
   {
     id: "spans-by-model",
-    title: "Spans by model",
-    subtitle: "call count per model",
+    titleKey: "aiObservability.panels.spansByModel.title",
+    subtitleKey: "aiObservability.panels.spansByModel.subtitle",
     type: "horizontal-bar",
     layout: { colSpan: 1 },
-    color: "#3b82f6",
+    color: LLM_SPANS_COLOR,
     limit: 10,
     query: {
       sql: `
         SELECT
-          COALESCE(${MODEL_FIELD}, 'unknown') as model,
+          ${MODEL_FIELD} as model,
           COUNT(*) as count
         FROM {{stream}}
-        WHERE ${baseFilter}
-        GROUP BY COALESCE(${MODEL_FIELD}, 'unknown')
+        WHERE ${modelScopedFilter}
+        GROUP BY ${MODEL_FIELD}
         ORDER BY count DESC
       `,
       seriesField: "model",
@@ -303,20 +313,20 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
   },
   {
     id: "tokens-by-model",
-    title: "Tokens by model",
-    subtitle: "total tokens per model",
+    titleKey: "aiObservability.panels.tokensByModel.title",
+    subtitleKey: "aiObservability.panels.tokensByModel.subtitle",
     type: "horizontal-bar",
     layout: { colSpan: 1 },
-    color: "#a855f7",
+    color: LLM_TOKENS_COLOR,
     limit: 10,
     query: {
       sql: `
         SELECT
-          COALESCE(${MODEL_FIELD}, 'unknown') as model,
+          ${MODEL_FIELD} as model,
           COALESCE(SUM(${TOKENS_FIELD}), 0) as tokens
         FROM {{stream}}
-        WHERE ${baseFilter}
-        GROUP BY COALESCE(${MODEL_FIELD}, 'unknown')
+        WHERE ${modelScopedFilter}
+        GROUP BY ${MODEL_FIELD}
         ORDER BY tokens DESC
       `,
       seriesField: "model",
@@ -325,11 +335,11 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
   },
   {
     id: "recent-errors",
-    title: "Recent errors",
-    subtitle: "last 10 failed spans",
+    titleKey: "aiObservability.panels.recentErrors.title",
+    subtitleKey: "aiObservability.panels.recentErrors.subtitle",
     type: "table",
     layout: { colSpan: 2 },
-    emptyStateText: "No errors in this time range",
+    emptyStateKey: "traces.lLMErrorTable.noErrorsInRange",
     query: {
       // No baseFilter for the same reason as errors-over-time. Operation
       // label uses `operation_name` (the actual OO traces column) — `span_name`
@@ -351,11 +361,11 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
       `,
     },
     columns: [
-      { field: "_timestamp", label: "Time", format: "time" },
-      { field: "service_name", label: "Service", format: "service-chip" },
-      { field: "operation", label: "Operation", format: "error" },
-      { field: "trace_id", label: "Trace ID", format: "text" },
-      { field: "trace_id", label: "", format: "view-link", align: "right" },
+      { field: "_timestamp", labelKey: "traces.lLMErrorTable.time", format: "time" },
+      { field: "service_name", labelKey: "traces.lLMErrorTable.service", format: "service-chip" },
+      { field: "operation", labelKey: "traces.lLMErrorTable.operation", format: "error" },
+      { field: "trace_id", labelKey: "traces.lLMErrorTable.traceId", format: "text" },
+      { field: "trace_id", format: "view-link", align: "right" },
     ],
   },
 ];

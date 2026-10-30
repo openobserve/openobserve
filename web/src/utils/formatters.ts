@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import { gt } from "@/types/i18n";
+
 export const b64EncodeUnicode = (str: string) => {
   try {
     return btoa(
@@ -111,12 +113,17 @@ export const truncateText = (text: string, maxLength: number): string => {
   return `${text.slice(0, Math.max(maxLength - 1, 0))}…`;
 };
 
+// True when `num / divisor` would print as 1000.0 or more at one decimal, so the
+// value belongs in the next unit up (999 950 is "1.0M", not "1000.0K").
+const roundsToNextUnit = (num: number, divisor: number) =>
+  Number((num / divisor).toFixed(1)) >= 1000;
+
 export const formatLargeNumber = (number: number) => {
   if (number === undefined || number === null) return "";
 
-  if (number >= 1000000000) {
+  if (number >= 1000000000 || roundsToNextUnit(number, 1000000)) {
     return (number / 1000000000).toFixed(1) + "B";
-  } else if (number >= 1000000) {
+  } else if (number >= 1000000 || roundsToNextUnit(number, 1000)) {
     return (number / 1000000).toFixed(1) + "M";
   } else if (number >= 1000) {
     return (number / 1000).toFixed(1) + "K";
@@ -138,6 +145,7 @@ export const formatEventCount = (num: number): string => {
   const units = ["", "K", "M", "B", "T"];
   let tier = Math.floor(Math.log10(num) / 3);
 
+  if (tier < units.length - 1 && roundsToNextUnit(num, Math.pow(10, tier * 3))) tier++;
   if (tier >= units.length) tier = units.length - 1;
 
   const scaled = num / Math.pow(10, tier * 3);
@@ -211,30 +219,23 @@ export const formatTimeWithSuffix = (us: number) => {
 };
 
 export function formatDuration(ms: number) {
-  if (!ms || ms === 0) return "0 sec";
+  if (!ms || ms === 0) return gt("common.secShort", { count: 0 });
   const seconds = (ms / 1000).toFixed(2);
   const minutes = (Number(seconds) / 60).toFixed(2);
   const hours = (Number(minutes) / 60).toFixed(2);
   const days = (Number(hours) / 24).toFixed(2);
 
-  let formatted = `${seconds} sec`;
-
-  if (ms > 86400000) {
-    formatted = `${days} days ${hours} hr`;
-  } else if (ms > 3600000) {
-    formatted = `${hours} hr `;
-  } else if (ms > 60000) {
-    formatted = `${minutes} min`;
-  }
-
-  return formatted.trim();
+  if (ms > 86400000) return gt("common.daysHrShort", { days, hours });
+  if (ms > 3600000) return gt("common.hrShort", { count: hours });
+  if (ms > 60000) return gt("common.minShort", { count: minutes });
+  return gt("common.secShort", { count: seconds });
 }
 
 export const durationFormatter = (durationInSeconds: number): string => {
   let formattedDuration;
 
   if (durationInSeconds < 0) {
-    formattedDuration = "Invalid duration";
+    formattedDuration = gt("common.invalidDuration");
   } else if (durationInSeconds < 60) {
     formattedDuration = `${durationInSeconds}s`;
   } else if (durationInSeconds < 3600) {
@@ -275,6 +276,150 @@ export const convertToCamelCase = (str: string) => {
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 };
 
+/** Display symbol for a model-pricing tier-condition operator. */
+export function operatorSymbol(op: string): string {
+  const map: Record<string, string> = {
+    gt: ">",
+    gte: "≥",
+    lt: "<",
+    lte: "≤",
+    eq: "=",
+    neq: "≠",
+  };
+  return map[op] || op;
+}
+
+/** Attribute rule → `openai.response.service_tier +1 is one of flex, priority`, labelled through `t`. */
+export function formatTierRule(
+  rule: { keys?: string[]; op?: string; values?: string[]; value?: number | null },
+  t: (_key: string) => string,
+): string {
+  const keys = (rule?.keys ?? []).map((k) => String(k ?? "").trim()).filter(Boolean);
+  const key = keys.length > 1 ? `${keys[0]} +${keys.length - 1}` : (keys[0] ?? "");
+  const op = rule?.op ?? "in";
+  const labels: Record<string, string> = {
+    in: "modelPricing.ruleOpIn",
+    not_in: "modelPricing.ruleOpNotIn",
+    exists: "modelPricing.ruleOpExists",
+    not_exists: "modelPricing.ruleOpNotExists",
+  };
+  if (op === "exists" || op === "not_exists") return `${key} ${t(labels[op])}`;
+  if (op === "in" || op === "not_in") {
+    return `${key} ${t(labels[op])} ${(rule?.values ?? []).join(", ")}`;
+  }
+  return `${key} ${operatorSymbol(op)} ${rule?.value ?? ""}`;
+}
+
+/**
+ * Minutes past UTC midnight → `HH:MM`. 1440 renders as `24:00` so a range
+ * ending at midnight labels its end rather than wrapping back to `00:00`.
+ */
+export function minuteOfDayToHhmm(minute: number): string {
+  if (minute === 1440) return "24:00";
+  const m = ((Math.round(minute) % 1440) + 1440) % 1440;
+  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+}
+
+/** Recurring UTC windows → `"01:00–04:00, 06:00–10:00 UTC"`. */
+export function formatUtcWindows(
+  windows: Array<{ start_minute: number; end_minute: number }>,
+): string {
+  if (!windows?.length) return "";
+  const ranges = windows
+    .map((w) => `${minuteOfDayToHhmm(w.start_minute)}–${minuteOfDayToHhmm(w.end_minute)}`)
+    .join(", ");
+  return `${ranges} UTC`;
+}
+
+// Constructing an Intl.DateTimeFormat is the expensive part and these run on every
+// render. `null` caches a timezone the runtime rejects, so it is not retried.
+const hhmmFormatters = new Map<string, Intl.DateTimeFormat | null>();
+const abbrFormatters = new Map<string, Intl.DateTimeFormat | null>();
+
+function cachedFormatter(
+  cache: Map<string, Intl.DateTimeFormat | null>,
+  timeZone: string,
+  build: () => Intl.DateTimeFormat,
+): Intl.DateTimeFormat | null {
+  const cached = cache.get(timeZone);
+  if (cached !== undefined) return cached;
+  let formatter: Intl.DateTimeFormat | null;
+  try {
+    formatter = build();
+  } catch {
+    formatter = null;
+  }
+  cache.set(timeZone, formatter);
+  return formatter;
+}
+
+/**
+ * A UTC minute-of-day rendered as `HH:MM` in the given IANA timezone (today's
+ * offset — good enough for a conversion hint; DST shifts it by design).
+ * Returns "" for an unknown timezone.
+ */
+export function utcMinuteToTzHhmm(minute: number, timeZone: string): string {
+  const formatter = cachedFormatter(
+    hhmmFormatters,
+    timeZone,
+    () =>
+      new Intl.DateTimeFormat("en-GB", {
+        timeZone,
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+      }),
+  );
+  if (!formatter) return "";
+  const m = ((Math.round(minute) % 1440) + 1440) % 1440;
+  const now = new Date();
+  const d = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), Math.floor(m / 60), m % 60),
+  );
+  return formatter.format(d);
+}
+
+/** Short display name for an IANA timezone at `at` (default now), e.g. "GMT+5:30" or "PST". */
+export function timezoneAbbr(timeZone: string, at: Date = new Date()): string {
+  const formatter = cachedFormatter(
+    abbrFormatters,
+    timeZone,
+    () =>
+      new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        timeZoneName: "short",
+      }),
+  );
+  if (!formatter) return timeZone;
+  const parts = formatter.formatToParts(at);
+  return parts.find((p) => p.type === "timeZoneName")?.value ?? timeZone;
+}
+
+/**
+ * Recurring UTC windows converted into the given timezone —
+ * `"06:30–09:30, 11:30–15:30 GMT+5:30"`. Returns "" when there is nothing to
+ * show: no windows, an unknown timezone, or a timezone equivalent to UTC
+ * (where the conversion would just repeat the UTC line).
+ */
+export function formatUtcWindowsInTz(
+  windows: Array<{ start_minute: number; end_minute: number }>,
+  timeZone: string,
+): string {
+  if (!windows?.length || !timeZone) return "";
+  const ranges = windows.map((w) => {
+    const start = utcMinuteToTzHhmm(w.start_minute, timeZone);
+    const end = utcMinuteToTzHhmm(w.end_minute, timeZone);
+    if (!start || !end) return "";
+    return `${start}–${end}`;
+  });
+  if (ranges.some((r) => !r)) return "";
+  const utcRanges = windows.map(
+    (w) => `${minuteOfDayToHhmm(w.start_minute % 1440)}–${minuteOfDayToHhmm(w.end_minute % 1440)}`,
+  );
+  if (ranges.join(", ") === utcRanges.join(", ")) return "";
+  return `${ranges.join(", ")} ${timezoneAbbr(timeZone)}`;
+}
+
 /**
  * Re-exported, not reimplemented: `@/utils/zincutils` barrels this module, so
  * this is how the many `import { convertUnixToDateFormat } from "@/utils/zincutils"`
@@ -282,3 +427,28 @@ export const convertToCamelCase = (str: string) => {
  * exactly one.
  */
 export { convertUnixToDateFormat } from "@/utils/date";
+
+/**
+ * Compact duration for a MICROSECOND span, e.g. `4m 12s`.
+ *
+ * Lives here, not in `utils/oncall.ts`, because "how long has this been open"
+ * has to read identically on a page, an incident and an alert history row — the
+ * moment two modules own a duration formatter they drift.
+ *
+ * Rounds toward zero and drops empty leading units. Negative spans (clock skew
+ * across nodes) render as `—` rather than a negative duration.
+ */
+export const formatMicrosDuration = (micros: number): string => {
+  if (!Number.isFinite(micros) || micros < 0) return "—";
+  const totalSeconds = Math.floor(micros / 1_000_000);
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes < 60) return seconds ? `${minutes}m ${seconds}s` : `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remMinutes = minutes % 60;
+  if (hours < 24) return remMinutes ? `${hours}h ${remMinutes}m` : `${hours}h`;
+  const days = Math.floor(hours / 24);
+  const remHours = hours % 24;
+  return remHours ? `${days}d ${remHours}h` : `${days}d`;
+};

@@ -15,7 +15,8 @@
 
 import { createRouter, createWebHistory } from "vue-router";
 import { getDecodedUserInfo, getPath, mergeRoutes } from "@/utils/zincutils";
-import segment from "@/services/segment_analytics";
+import { gt } from "@/types/i18n";
+import { openobserveRum } from "@openobserve/browser-rum";
 import config from "@/aws-exports";
 
 import userCloudRoutes from "@/enterprise/composables/router";
@@ -76,16 +77,39 @@ export default function (store: any) {
   const router = createRouter(routerMap);
 
   router.beforeEach((to: any, from: any, next: any) => {
-    // Set page title with OpenObserve prefix
-    if (to.meta && to.meta.title) {
-      document.title = `OpenObserve - ${to.meta.title}`;
+    // Set page title with OpenObserve prefix.
+    //
+    // Routes carry an i18n KEY (`meta.titleKey`), not the text: the route tables
+    // are module-scope, so translating where a route is declared would freeze the
+    // tab title at whatever locale happened to be active at import time. Resolving
+    // here — per navigation — keeps it in the current locale. `gt` (not `t`)
+    // because a navigation guard runs outside any component setup. `title` is the
+    // English literal fallback the routes not yet migrated to `titleKey` still carry.
+    const routeTitle = to.meta?.titleKey ? gt(to.meta.titleKey) : to.meta?.title;
+    if (routeTitle) {
+      // The brand prefix is a product noun, never translated; the page name is.
+      document.title = `OpenObserve - ${routeTitle}`;
     } else {
       document.title = "OpenObserve";
     }
 
     const isAuthenticated = store.state.loggedIn;
 
-    if (!isAuthenticated && (to.path == "/cb" || to.path == "/web/cb")) {
+    // Public routes (unauthenticated viewer plane) opt out of the auth guard
+    // entirely — never redirect an anonymous visitor to /login.
+    if (to.meta && to.meta.public) {
+      next();
+      return;
+    }
+
+    if (
+      !isAuthenticated &&
+      (to.meta?.public === true ||
+        to.path === "/cb" ||
+        to.path === "/web/cb" ||
+        to.path === "/slack/oauth/callback" ||
+        to.path === "/web/slack/oauth/callback")
+    ) {
       next();
     } else if (!isAuthenticated) {
       const sessionUserInfo = getDecodedUserInfo();
@@ -119,13 +143,13 @@ export default function (store: any) {
       }
     } else {
       getDecodedUserInfo();
-
-      segment.track("page view", {
-        path: to.path,
-        referrer: from.path,
-      });
       next();
     }
+  });
+
+  // Route names keep RUM view names low-cardinality; paths embed entity ids.
+  router.afterEach((to: any, _from: any, failure: any) => {
+    if (!failure && to.name) openobserveRum.setViewName(String(to.name));
   });
   return router;
 }

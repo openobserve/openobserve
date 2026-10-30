@@ -20,6 +20,8 @@
 // The stream is a `streamInput`, so the name flows into the exporter config AND
 // the live detection — they can never drift apart.
 
+import { raw, type TranslateFn } from "@/types/i18n";
+
 import config from "@/aws-exports";
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent, RichCardStepVariant } from "../types";
@@ -53,13 +55,32 @@ service:
     traces:
       exporters: [otlp/openobserve]`;
 
+// OpenObserve Cloud's public gRPC gateway — primary (US) region only, so this
+// is offered instead of the self-hosted variant, never alongside it. `otlp` is
+// the OTel Collector Contrib's real gRPC exporter type; unlike the self-hosted
+// port this is a TLS-terminated public endpoint, so insecure stays false.
+const GRPC_CLOUD_YAML = `exporters:
+  otlp/openobserve:
+    endpoint: grpc.openobserve.ai:443
+    headers:
+      Authorization: "Basic {token}"
+      organization: {org}
+      stream-name: {stream}
+    tls:
+      insecure: false
+
+service:
+  pipelines:
+    traces:
+      exporters: [otlp/openobserve]`;
+
 // Env vars for an SDK pointed straight at OpenObserve (no collector in between).
 const SDK_ENV = `export OTEL_EXPORTER_OTLP_ENDPOINT="{url}/api/{org}"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic {token},stream-name={stream}"
 export OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf"
 export OTEL_SERVICE_NAME="my-service"`;
 
-export default function otlpTracesCard(subs: CardSubstitutions): RichCardContent {
+export default function otlpTracesCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   const isCloud = config.isCloud === "true";
   // The gRPC endpoint is a self-hosted port; cloud terminates HTTP only.
   const host = subs.url.replace(/^https?:\/\//, "").replace(/\/$/, "");
@@ -74,69 +95,81 @@ export default function otlpTracesCard(subs: CardSubstitutions): RichCardContent
   const variants: RichCardStepVariant[] = [
     {
       id: "http",
-      label: "Collector · OTLP HTTP",
+      label: raw("Collector · OTLP HTTP"),
       icon: getImageURL("images/ingestion/otlp.svg"),
       code: { ...code(HTTP_YAML), filename: "config.yaml" },
-      note: "The default for the OpenTelemetry Collector — works everywhere, including behind proxies and load balancers.",
+      note: t("ingestion.setupCard.otlpHttpNote"),
     },
     {
       id: "sdk",
-      label: "SDK (No Collector)",
+      label: raw("SDK (No Collector)"),
       icon: getImageURL("images/rum/events/terminal.png"),
       code: code(SDK_ENV, "bash"),
-      note: "Standard OTEL_* environment variables — every OpenTelemetry SDK reads these, so no code change is needed.",
+      note: t("ingestion.setupCard.otlpSdkEnvNote"),
     },
   ];
 
-  // gRPC is self-hosted only.
-  if (!isCloud) {
+  // gRPC: the self-hosted port everywhere except cloud, and cloud's public
+  // gateway only on the primary (US) region — never both at once.
+  if (subs.isPrimaryCloud) {
     variants.splice(1, 0, {
       id: "grpc",
-      label: "Collector · OTLP gRPC",
+      label: raw("Collector · OTLP gRPC"),
+      icon: getImageURL("images/ingestion/otlp.svg"),
+      code: { ...code(GRPC_CLOUD_YAML), filename: "config.yaml" },
+      note: t("ingestion.setupCard.otlpGrpcCloudNote"),
+    });
+  } else if (!isCloud) {
+    variants.splice(1, 0, {
+      id: "grpc",
+      label: raw("Collector · OTLP gRPC"),
       icon: getImageURL("images/ingestion/otlp.svg"),
       code: { ...code(grpcYaml(host, insecure)), filename: "config.yaml" },
-      note: "Lower overhead than HTTP for high span volumes. Port 5081 must be reachable from the collector.",
+      note: t("ingestion.setupCard.otlpGrpcNote"),
     });
   }
 
   return {
     provider: {
-      name: "Traces (OpenTelemetry)",
-      tagline:
-        "Point any OpenTelemetry exporter at OpenObserve — collector or SDK, HTTP or gRPC. Your endpoint and token are filled in below.",
+      id: "otlpTraces",
+      name: t("ingestion.setupCard.providerNameOtlpTraces"),
+      tagline: t("ingestion.setupCard.taglineOtlpTraces"),
       logo: getImageURL("images/ingestion/otlp.svg"),
       tone: "#f5a800",
-      runtime: "Any",
-      setupTime: "~2 min",
-      metaBadges: ["Traces"],
+      runtime: t("ingestion.setupCard.runtimeAny"),
+      setupTime: t("ingestion.setupCard.setupTime2Min"),
+      metaBadges: [t("common.traces")],
     },
     steps: [
       {
         id: "configure",
-        title: "Point Your Exporter at OpenObserve",
-        description:
-          "Add this to your collector config, or set the environment variables if your app exports directly. Everything is already filled in for this organization.",
-        chip: { kind: "editor", label: "Editor" },
+        titleKey: "ingestion.setupCard.pointExporterTitle",
+        descriptionKey: "ingestion.setupCard.pointExporterDesc",
+        chip: { kind: "editor", labelKey: "ingestion.setupCard.chipEditor" },
         required: true,
         completeOn: "copy",
         variants,
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description:
-          "Restart the collector (or your app), exercise a request that produces a span, then hit Test.",
-        chip: { kind: "traces", label: "Traces" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyOtlpTracesDesc",
+        chip: { kind: "traces", labelKey: "ingestion.setupCard.chipTraces" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Spans", "Service Map", "Latency", "Errors"],
+        pills: [
+          t("ingestion.setupCard.pillSpans"),
+          t("ingestion.setupCard.pillServiceMap"),
+          t("ingestion.setupCard.pillLatency"),
+          t("rum.errors"),
+        ],
       },
     ],
     streamInput: {
-      label: "Traces Stream Name",
+      labelKey: "ingestion.setupCard.tracesStreamNameLabel",
       default: "default",
-      placeholder: "default",
-      help: "Written into the config above as `stream-name`, and watched by the check below.",
+      placeholder: raw("default"),
+      helpKey: "ingestion.setupCard.otlpTracesStreamHelp",
     },
     // Every span carries a trace id, so any row on the target stream proves the
     // exporter is wired up correctly.
@@ -146,9 +179,8 @@ export default function otlpTracesCard(subs: CardSubstitutions): RichCardContent
       filter: "trace_id IS NOT NULL",
     },
     extras: {
-      fixTitle: "Check The Exporter Is Actually Wired Into The Pipeline",
-      fixBody:
-        "Defining an exporter is not enough — it has to be listed in a pipeline. This is the single most common reason a correct-looking config sends nothing:",
+      fixTitle: t("ingestion.setupCard.otlpFixTitle"),
+      fixBody: t("ingestion.setupCard.otlpFixBody"),
       fixLang: "yaml",
       fixSnippet: `service:
   pipelines:
@@ -158,20 +190,20 @@ export default function otlpTracesCard(subs: CardSubstitutions): RichCardContent
       exporters: [otlphttp/openobserve]   # <- must be listed here`,
       troubleshooting: [
         {
-          q: "The collector logs 401 or 403",
-          a: "The `Authorization` header must be `Basic <token>` using this organization's ingestion token — the value above is already correct. If it was rotated, re-copy from this page.",
+          q: t("ingestion.setupCard.otlpTrouble401Q"),
+          a: t("ingestion.setupCard.otlpTrouble401A"),
         },
         {
-          q: "Spans arrive but land in the wrong stream",
-          a: "The `stream-name` header decides the stream. Set it to the same name as the field above, otherwise the check below watches a stream nothing is written to.",
+          q: t("ingestion.setupCard.otlpTroubleStreamQ"),
+          a: t("ingestion.setupCard.otlpTroubleStreamA"),
         },
         {
-          q: "gRPC connection fails with a TLS error",
-          a: `The \`tls.insecure\` flag must match the endpoint's scheme — it is set to \`${insecure}\` above based on this deployment's URL. A plain-HTTP endpoint needs \`insecure: true\`; an HTTPS one needs \`false\`.`,
+          q: t("ingestion.setupCard.otlpTroubleTlsQ"),
+          a: t("ingestion.setupCard.otlpTroubleTlsA", { insecure }),
         },
         {
-          q: "Should I use HTTP or gRPC?",
-          a: "HTTP is the safe default and traverses proxies and load balancers cleanly. gRPC has lower overhead at high span volume but needs port 5081 reachable end to end.",
+          q: t("ingestion.setupCard.otlpTroubleHttpGrpcQ"),
+          a: t("ingestion.setupCard.otlpTroubleHttpGrpcA"),
         },
       ],
     },

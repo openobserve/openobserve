@@ -33,11 +33,14 @@ vi.mock("@/composables/useSyntheticResults", () => ({
 
 const mockGetSynthetics = vi.fn().mockResolvedValue({ data: {} });
 
-vi.mock("@/services/synthetics", () => ({
-  default: {
-    get: (...args: any[]) => mockGetSynthetics(...args),
-  },
-}));
+vi.mock("@/services/synthetics", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get: (...args: any[]) => mockGetSynthetics(...args),
+    },
+  });
+});
 
 vi.mock("vuex", async (importOriginal) => {
   const actual = await importOriginal<typeof import("vuex")>();
@@ -53,6 +56,7 @@ vi.mock("vue-i18n", () => ({
 
 vi.mock("vue-router", () => ({
   useRoute: vi.fn(() => ({ query: {} })),
+  useRouter: vi.fn(() => ({ currentRoute: { value: { fullPath: "/" } } })),
 }));
 
 // ── Stubs for O2 and layout components ──────────────────────────────────────
@@ -185,6 +189,18 @@ describe("ProtocolRunSummary", () => {
   describe("result display", () => {
     beforeEach(() => {
       loading.value = false;
+    });
+
+    it("cuts a long target inside its badge with a cut-only tooltip", async () => {
+      protocolRunDetail.value = makeProtocolRun({ target: "https://example.com/a/long/path" });
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const target = wrapper
+        .findAll('[data-test="o-truncated-text"]')
+        .find((t) => t.text() === "https://example.com/a/long/path");
+      expect(target?.attributes("data-o-tooltip-trigger")).toBe("overflow");
     });
 
     it("should display passed status badge when run has passed status", async () => {

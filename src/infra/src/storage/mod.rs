@@ -21,11 +21,7 @@ use std::{
 
 use async_trait::async_trait;
 use bytes::{Bytes, buf::Buf};
-use config::{
-    get_config, is_local_disk_storage,
-    meta::stream::{FileKey, FileMeta},
-    metrics,
-};
+use config::{get_config, is_local_disk_storage, meta::stream::FileMeta, metrics};
 use datafusion::parquet::{data_type::AsBytes, file::metadata::ParquetMetaData};
 use futures::{StreamExt, TryStreamExt, stream::BoxStream};
 use hashbrown::HashMap;
@@ -38,6 +34,7 @@ use parquet::file::metadata::{FooterTail, ParquetMetaDataReader};
 
 pub mod accounts;
 mod local;
+pub(crate) mod range_plan;
 mod remote;
 pub mod wal;
 
@@ -45,13 +42,29 @@ pub use remote::test_config as test_remote_config;
 
 pub const CONCURRENT_REQUESTS: usize = 1000;
 
+// Preserve object_store's existing coalesced-read concurrency bound.
+const COALESCED_RANGE_CONCURRENCY: usize = 10;
+// Objects per bulk delete in a strict prefix delete; S3 caps one request at 1000 keys.
+const DEL_PREFIX_CHUNK: usize = 1000;
+
 static MULTI_ACCOUNTS: Lazy<Box<dyn ObjectStoreExt>> = Lazy::new(accounts::default);
+
+/// Storage tier applied consistently to every object that belongs to one
+/// logical data file, including its metrics and Tantivy indexes.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum StorageTier {
+    #[default]
+    Default,
+    InfrequentAccess,
+}
 
 // Create a wrapper trait that extends ObjectStore
 #[async_trait]
 pub trait ObjectStoreExt: std::fmt::Display + Send + Sync + Debug + 'static {
     fn get_account(&self, org_id: &str, file: &str) -> Option<String>;
     async fn add_account(&self, key: String, acc: Box<dyn ObjectStore>);
+    async fn remove_account(&self, key: &str);
+    fn has_account(&self, name: &str) -> bool;
     async fn put(&self, account: &str, location: &Path, payload: PutPayload) -> Result<PutResult>;
     async fn put_opts(
         &self,
@@ -143,6 +156,15 @@ pub fn get_account(org_id: &str, file: &str) -> Option<String> {
     MULTI_ACCOUNTS.get_account(org_id, file)
 }
 
+/// The account name an org's own storage provider is loaded under.
+pub fn org_account(org_id: &str) -> String {
+    get_org_storage_key(org_id)
+}
+
+pub fn has_account(name: &str) -> bool {
+    MULTI_ACCOUNTS.has_account(name)
+}
+
 pub async fn add_account(org_id: &str, acc: Box<dyn ObjectStore>) {
     let key = get_org_storage_key(org_id);
     MULTI_ACCOUNTS.add_account(key, acc).await;
@@ -170,6 +192,133 @@ pub async fn get_ranges(
     MULTI_ACCOUNTS
         .get_ranges(account, &file.into(), ranges)
         .await
+}
+
+pub(crate) async fn get_ranges_opt<F, Fut>(ranges: &[Range<u64>], fetch: F) -> Result<Vec<Bytes>>
+where
+    F: FnOnce(Vec<Range<u64>>) -> Fut + Send,
+    Fut: std::future::Future<Output = Result<Vec<Bytes>>> + Send,
+{
+    if ranges.is_empty() {
+        return Ok(Vec::new());
+    }
+    let ordered = ranges.iter().all(|range| range.start < range.end)
+        && ranges.windows(2).all(|pair| pair[0].end <= pair[1].start);
+    let plan = if ranges.len() > 1 && ordered {
+        Some(range_plan::plan_coalesced_ranges(ranges).map_err(|error| {
+            object_store::Error::Generic {
+                store: "RangePlan",
+                source: Box::new(std::io::Error::other(error.to_string())),
+            }
+        })?)
+    } else {
+        None
+    };
+    let fetched_ranges = plan
+        .as_ref()
+        .map_or_else(|| ranges.to_vec(), |plan| plan.ranges.clone());
+    let data = fetch(fetched_ranges).await?;
+    match plan {
+        Some(plan) => plan
+            .into_payloads(data)
+            .map_err(|error| object_store::Error::Generic {
+                store: "RangePlan",
+                source: Box::new(std::io::Error::other(error.to_string())),
+            }),
+        None => Ok(data),
+    }
+}
+
+/// Clipped fetches must still contain the start of every requested nonempty subrange.
+pub async fn coalesce_ranges_checked<F, Fut>(
+    ranges: &[Range<u64>],
+    fetch: F,
+    coalesce: u64,
+) -> Result<Vec<Bytes>>
+where
+    F: FnMut(Range<u64>) -> Fut + Send,
+    Fut: std::future::Future<Output = Result<Bytes>> + Send,
+{
+    if ranges.is_empty() {
+        return Ok(Vec::new());
+    }
+    for range in ranges {
+        if range.start > range.end || usize::try_from(range.end - range.start).is_err() {
+            return Err(Error::BadRange(format!("{range:?}")).into());
+        }
+    }
+    let mut sorted = ranges.to_vec();
+    sorted.sort_unstable_by_key(|range| range.start);
+    let mut merged: Vec<Range<u64>> = Vec::with_capacity(sorted.len());
+    for range in sorted {
+        if let Some(previous) = merged.last_mut()
+            && range.start.saturating_sub(previous.end) <= coalesce
+        {
+            previous.end = previous.end.max(range.end);
+        } else {
+            merged.push(range);
+        }
+    }
+    for range in &merged {
+        if usize::try_from(range.end - range.start).is_err() {
+            return Err(Error::BadRange(format!("{range:?}")).into());
+        }
+    }
+    let fetched: Vec<Bytes> = futures::stream::iter(merged.iter().cloned())
+        .map(fetch)
+        .buffered(COALESCED_RANGE_CONCURRENCY)
+        .try_collect()
+        .await?;
+    ranges
+        .iter()
+        .map(|range| {
+            let index = merged
+                .partition_point(|fetch| fetch.start <= range.start)
+                .checked_sub(1)
+                .ok_or_else(|| Error::OutOfRange(format!("{range:?}")))?;
+            let fetch = &merged[index];
+            let bytes = &fetched[index];
+            let start = usize::try_from(range.start - fetch.start)
+                .map_err(|_| Error::OutOfRange(format!("{range:?}")))?;
+            let end = usize::try_from(range.end - fetch.start)
+                .map_err(|_| Error::OutOfRange(format!("{range:?}")))?
+                .min(bytes.len());
+            if start > end || (range.start < range.end && start == end) {
+                return Err(Error::OutOfRange(format!("{range:?}")).into());
+            }
+            Ok(bytes.slice(start..end))
+        })
+        .collect()
+}
+
+#[cfg(unix)]
+pub(crate) fn read_ranges_from_file(
+    file: &std::fs::File,
+    ranges: &[Range<u64>],
+) -> std::io::Result<Vec<Bytes>> {
+    use std::os::unix::fs::FileExt;
+
+    if ranges.is_empty() {
+        return Ok(Vec::new());
+    }
+    let size = file.metadata()?.len();
+    let ranges = ranges
+        .iter()
+        .map(|range| {
+            object_store::GetRange::Bounded(range.clone())
+                .as_range(size)
+                .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error))
+        })
+        .collect::<std::io::Result<Vec<_>>>()?;
+    let mut output = Vec::with_capacity(ranges.len());
+    for range in ranges {
+        let len = usize::try_from(range.end - range.start)
+            .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error))?;
+        let mut bytes = vec![0; len];
+        file.read_exact_at(&mut bytes, range.start)?;
+        output.push(Bytes::from(bytes));
+    }
+    Ok(output)
 }
 
 pub async fn head(account: &str, file: &str) -> Result<ObjectMeta> {
@@ -202,6 +351,18 @@ pub async fn put(account: &str, file: &str, data: bytes::Bytes) -> Result<()> {
     Ok(())
 }
 
+pub async fn put_with_tier(
+    account: &str,
+    file: &str,
+    data: bytes::Bytes,
+    tier: StorageTier,
+) -> Result<()> {
+    match tier {
+        StorageTier::Default => put(account, file, data).await,
+        StorageTier::InfrequentAccess => put_infrequent_access(account, file, data).await,
+    }
+}
+
 async fn put_multipart(account: &str, file: &str, data: bytes::Bytes) -> Result<()> {
     let path = Path::from(file);
     let upload = MULTI_ACCOUNTS.put_multipart(account, &path).await?;
@@ -211,7 +372,7 @@ async fn put_multipart(account: &str, file: &str, data: bytes::Bytes) -> Result<
     Ok(())
 }
 
-pub async fn put_with_compliance(account: &str, file: &str, data: bytes::Bytes) -> Result<()> {
+async fn put_infrequent_access(account: &str, file: &str, data: bytes::Bytes) -> Result<()> {
     let cfg = get_config();
     let attrs = match cfg.s3.provider.as_str() {
         "aws" | "s3" => Attributes::from_iter([(
@@ -350,16 +511,37 @@ pub async fn del(files: Vec<(&str, &str)>) -> Result<()> {
     Ok(())
 }
 
-pub async fn get_row_group_size(file: &FileKey) -> u32 {
-    if let Some(row_group_size) = file.row_group_size {
-        return row_group_size;
+/// Deletes every object or fails; only a missing object counts as deleted.
+pub async fn del_strict(files: Vec<(&str, &str)>) -> Result<()> {
+    // An unknown account would resolve to the default store and delete nothing of the org's.
+    if let Some((account, _)) = files.iter().find(|(account, _)| !has_account(account)) {
+        return Err(account_not_loaded(account));
     }
-    get_parquet_metadata(&file.account, &file.key)
-        .await
-        .ok()
-        .and_then(|(_, meta)| meta.row_groups().iter().map(|rg| rg.num_rows()).max())
-        .unwrap_or_default()
-        .max(config::PARQUET_MAX_ROW_GROUP_SIZE as i64) as u32
+    let files: Vec<(String, Path)> = files
+        .into_iter()
+        .map(|(account, file)| (account.to_string(), Path::from(file)))
+        .collect();
+    futures::stream::iter(files)
+        .map(|(account, file)| async move {
+            match MULTI_ACCOUNTS.delete(&account, &file).await {
+                Ok(()) | Err(object_store::Error::NotFound { .. }) => Ok(()),
+                Err(e) => Err(e),
+            }
+        })
+        .buffer_unordered(get_config().limit.cpu_num.max(1))
+        .try_collect::<Vec<()>>()
+        .await?;
+    Ok(())
+}
+
+/// Strictly deletes `prefix` from the default store and from a loaded account named `org_id`.
+pub async fn del_org_prefix_strict(org_id: &str, prefix: &str) -> Result<usize> {
+    let mut deleted = del_prefix_strict("", prefix).await?;
+    // `put(org_id, ..)` resolves to an account only when one is configured under that bare name.
+    if !org_id.is_empty() && has_account(org_id) {
+        deleted += del_prefix_strict(org_id, prefix).await?;
+    }
+    Ok(deleted)
 }
 
 pub async fn get_file_meta(account: &str, file: &str) -> Result<FileMeta, anyhow::Error> {
@@ -487,9 +669,202 @@ impl From<Error> for object_store::Error {
     }
 }
 
+// A failed listing must be an error here: `list` panics on one.
+async fn del_prefix_strict(account: &str, prefix: &str) -> Result<usize> {
+    del_prefix_strict_in_chunks(account, prefix, DEL_PREFIX_CHUNK).await
+}
+
+/// Deletes the listing chunk by chunk as it streams in, so memory holds one chunk at a time.
+async fn del_prefix_strict_in_chunks(account: &str, prefix: &str, chunk: usize) -> Result<usize> {
+    let mut listing = MULTI_ACCOUNTS
+        .list(account, Some(&prefix.into()))
+        .map_ok(|meta| meta.location)
+        .try_chunks(chunk.max(1));
+    let mut deleted = 0;
+    while let Some(paths) = listing.try_next().await.map_err(|e| e.1)? {
+        deleted += paths.len();
+        del_paths_strict(account, paths).await?;
+    }
+    Ok(deleted)
+}
+
+/// The error for a strict delete aimed at an account this node has not loaded.
+fn account_not_loaded(account: &str) -> object_store::Error {
+    object_store::Error::Generic {
+        store: "storage",
+        source: format!("storage account {account} is not loaded on this node").into(),
+    }
+}
+
+/// One bulk request where the store supports it; a "not found" there falls back to `del_strict`.
+async fn del_paths_strict(account: &str, paths: Vec<Path>) -> Result<()> {
+    if !is_local_disk_storage() && get_config().s3.feature_bulk_delete {
+        if !has_account(account) {
+            return Err(account_not_loaded(account));
+        }
+        let stream = futures::stream::iter(paths.clone().into_iter().map(Ok)).boxed();
+        match MULTI_ACCOUNTS.delete_stream(account, stream).await {
+            Ok(_) => return Ok(()),
+            Err(object_store::Error::NotFound { .. }) => {}
+            Err(e) => return Err(e),
+        }
+    }
+    let files: Vec<String> = paths.iter().map(|p| p.to_string()).collect();
+    del_strict(files.iter().map(|f| (account, f.as_str())).collect()).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn optimized_ranges_share_one_batch_and_preserve_eof_clipping() {
+        let mut fetched = Vec::new();
+        let result = get_ranges_opt(&[0..2, 4..20], |planned| {
+            fetched = planned;
+            std::future::ready(Ok(vec![Bytes::from_static(b"0123456789")]))
+        })
+        .await
+        .unwrap();
+        assert_eq!(fetched, vec![0..20]);
+        assert_eq!(
+            result,
+            vec![Bytes::from_static(b"01"), Bytes::from_static(b"456789")]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_coalesce_ranges_checked_order_clipping_and_zero_width() {
+        let calls = std::sync::atomic::AtomicUsize::new(0);
+        let fetch = |range: Range<u64>| {
+            calls.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            std::future::ready(
+                object_store::GetRange::Bounded(range)
+                    .as_range(16)
+                    .map(|range| {
+                        Bytes::from_static(b"0123456789abcdef")
+                            .slice(range.start as usize..range.end as usize)
+                    })
+                    .map_err(|error| object_store::Error::Generic {
+                        store: "fixture",
+                        source: Box::new(error),
+                    }),
+            )
+        };
+        let ranges = [14..20, 1..5, 3..7, 1..5, 16..16, 3..3];
+        assert_eq!(
+            coalesce_ranges_checked(&ranges, fetch, 1).await.unwrap(),
+            vec![
+                Bytes::from_static(b"ef"),
+                Bytes::from_static(b"1234"),
+                Bytes::from_static(b"3456"),
+                Bytes::from_static(b"1234"),
+                Bytes::new(),
+                Bytes::new()
+            ]
+        );
+        assert_eq!(calls.load(std::sync::atomic::Ordering::Relaxed), 2);
+    }
+
+    #[tokio::test]
+    async fn test_coalesce_ranges_checked_rejects_clipped_subrange_starts() {
+        for ranges in [
+            vec![1..3, 20..21, 3..3],
+            vec![14..20, 16..17],
+            vec![1..3, 20..20],
+        ] {
+            let result = coalesce_ranges_checked(
+                &ranges,
+                |range| async move {
+                    let range = object_store::GetRange::Bounded(range)
+                        .as_range(16)
+                        .map_err(|error| object_store::Error::Generic {
+                            store: "fixture",
+                            source: Box::new(error),
+                        })?;
+                    Ok(Bytes::from_static(b"0123456789abcdef")
+                        .slice(range.start as usize..range.end as usize))
+                },
+                object_store::OBJECT_STORE_COALESCE_DEFAULT,
+            )
+            .await;
+            assert!(result.is_err(), "{ranges:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_coalesce_ranges_checked_empty_invalid_and_backend_errors() {
+        let no_read = |_: Range<u64>| -> std::future::Ready<Result<Bytes>> {
+            panic!("invalid/empty request reached storage")
+        };
+        assert!(
+            coalesce_ranges_checked(&[], no_read, 1)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            coalesce_ranges_checked(&[Range { start: 7, end: 3 }], no_read, 1)
+                .await
+                .is_err()
+        );
+        let error = coalesce_ranges_checked(
+            std::slice::from_ref(&(0..1)),
+            |_| async {
+                Err(object_store::Error::NotFound {
+                    path: "missing".into(),
+                    source: Box::new(std::io::Error::from(std::io::ErrorKind::NotFound)),
+                })
+            },
+            1,
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(error, object_store::Error::NotFound { .. }));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_read_ranges_from_file_order_overlap_and_eof() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(file.path(), b"0123456789abcdef").unwrap();
+        let ranges = [10..14, 1..5, 3..7, 1..5, 14..20];
+        assert_eq!(
+            read_ranges_from_file(file.as_file(), &ranges).unwrap(),
+            vec![
+                Bytes::from_static(b"abcd"),
+                Bytes::from_static(b"1234"),
+                Bytes::from_static(b"3456"),
+                Bytes::from_static(b"1234"),
+                Bytes::from_static(b"ef"),
+            ]
+        );
+        assert!(
+            read_ranges_from_file(file.as_file(), &[])
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_read_ranges_from_file_rejects_invalid_and_bounds_huge_end() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(file.path(), b"0123456789abcdef").unwrap();
+        for range in [Range { start: 7, end: 3 }, 3..3, 16..17, u64::MAX..u64::MAX] {
+            let error = read_ranges_from_file(file.as_file(), &[range]).unwrap_err();
+            assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+        }
+        let result = read_ranges_from_file(file.as_file(), std::slice::from_ref(&(14..u64::MAX)));
+        if usize::BITS == 64 {
+            assert_eq!(result.unwrap(), vec![Bytes::from_static(b"ef")]);
+        } else {
+            // Match GetRange::is_valid on 32-bit targets: reject before clipping.
+            assert_eq!(result.unwrap_err().kind(), std::io::ErrorKind::InvalidInput);
+        }
+        std::fs::write(file.path(), b"").unwrap();
+        assert!(read_ranges_from_file(file.as_file(), std::slice::from_ref(&(0..1))).is_err());
+    }
 
     #[test]
     fn test_error_display_out_of_range() {
@@ -526,6 +901,59 @@ mod tests {
     fn test_bytes_size_in_mb_empty() {
         let b = bytes::Bytes::new();
         assert_eq!(bytes_size_in_mb(&b), 0.0);
+    }
+
+    #[tokio::test]
+    async fn test_del_strict_refuses_an_unloaded_account() {
+        let err = del_strict(vec![(
+            "orgdel_unloaded:default",
+            "files/o/logs/s/a.parquet",
+        )])
+        .await
+        .unwrap_err();
+        assert!(err.to_string().contains("orgdel_unloaded:default"), "{err}");
+    }
+
+    #[tokio::test]
+    async fn test_del_org_prefix_strict_covers_the_org_named_account() {
+        let (org, kept) = ("delorgpfx_t1", "delorgpfx_t9");
+        for name in [org, kept] {
+            MULTI_ACCOUNTS
+                .add_account(
+                    name.to_string(),
+                    Box::new(object_store::memory::InMemory::new()),
+                )
+                .await;
+        }
+        let key = |o: &str| format!("synthetics/{o}/c1/run1/shot.png");
+        for o in [org, kept] {
+            put("", &key(o), Bytes::from_static(b"d")).await.unwrap();
+            put(o, &key(o), Bytes::from_static(b"n")).await.unwrap();
+        }
+        assert_eq!(
+            get_bytes(org, &key(org)).await.unwrap(),
+            Bytes::from_static(b"n")
+        );
+
+        del_org_prefix_strict(org, &format!("synthetics/{org}/"))
+            .await
+            .unwrap();
+        assert!(
+            head("", &key(org)).await.is_err(),
+            "the default store kept the org's object"
+        );
+        assert!(
+            head(org, &key(org)).await.is_err(),
+            "the org-named account kept the object"
+        );
+        assert!(head("", &key(kept)).await.is_ok());
+        assert!(head(kept, &key(kept)).await.is_ok());
+        del_org_prefix_strict(org, &format!("synthetics/{org}/"))
+            .await
+            .unwrap();
+        del_org_prefix_strict(kept, &format!("synthetics/{kept}/"))
+            .await
+            .unwrap();
     }
 
     #[test]

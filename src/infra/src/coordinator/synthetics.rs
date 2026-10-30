@@ -13,43 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Cluster-coordinator events for the synthetics in-memory caches.
-//!
-//! Each node keeps its own copy of the synthetics configuration caches
-//! (`table::synthetics_checks`, `synthetics_locations`, `synthetics_probe_tokens`,
-//! `synthetics_agents`). A write only clears the cache on the node that
-//! performed it, so without a cross-node signal every other node keeps serving
-//! the old value until its TTL expires.
-//!
-//! This module is that signal, modelled on [`super::alerts`] and
-//! [`super::pipelines`]: writers call an `emit_*` function after committing to
-//! the database, and every node runs [`watch`], which invalidates the matching
-//! cache entry the moment the event arrives.
-//!
-//! # Key layout
-//!
-//! One watch prefix, with a `kind` segment so a single watcher serves all four
-//! caches:
-//!
-//! ```text
-//! /synthetics/check/{org_id}/{synthetics_id}   one check definition changed
-//! /synthetics/location/all                     the location registry changed
-//! /synthetics/token/{org_id}                   an org's probe tokens changed
-//! /synthetics/agent/{agent_id}                 one agent re-registered
-//! ```
-//!
-//! `location` and `token` events are coarse on purpose. Both back whole-set
-//! caches that are cheap to rebuild (tens of rows), so naming the exact row
-//! would add parsing for no benefit.
-//!
-//! # Why the handler lives here rather than being passed in
-//!
-//! [`super::alerts::watch_events`] takes callbacks because its handler lives in
-//! the `db` crate, which `infra` cannot reference. The synthetics caches are in
-//! `infra::table`, the same crate as this module, so [`watch`] calls the
-//! invalidation functions directly — same pattern, one less layer of
-//! indirection.
-
 use crate::{db::Event, errors::Error};
 
 pub const SYNTHETICS_WATCHER_PREFIX: &str = "/synthetics/";
@@ -58,20 +21,21 @@ const KIND_CHECK: &str = "check";
 const KIND_LOCATION: &str = "location";
 const KIND_TOKEN: &str = "token";
 const KIND_AGENT: &str = "agent";
+const KIND_VARIABLE: &str = "variable";
 
 /// A check definition was created or updated.
 pub async fn emit_check_put(org_id: &str, synthetics_id: &str) -> Result<(), Error> {
-    emit_put(&check_key(org_id, synthetics_id)).await
+    super::emit_put(&check_key(org_id, synthetics_id)).await
 }
 
 /// A check definition was deleted.
 pub async fn emit_check_delete(org_id: &str, synthetics_id: &str) -> Result<(), Error> {
-    emit_delete(&check_key(org_id, synthetics_id)).await
+    super::emit_delete(&check_key(org_id, synthetics_id)).await
 }
 
 /// The location registry changed (add / update / remove).
 pub async fn emit_locations_changed() -> Result<(), Error> {
-    emit_put(&format!("{SYNTHETICS_WATCHER_PREFIX}{KIND_LOCATION}/all")).await
+    super::emit_put(&format!("{SYNTHETICS_WATCHER_PREFIX}{KIND_LOCATION}/all")).await
 }
 
 /// An org's probe tokens changed — created, enabled/disabled, or default moved.
@@ -79,28 +43,22 @@ pub async fn emit_locations_changed() -> Result<(), Error> {
 /// Disabling a token is revocation, so this is the event whose delivery latency
 /// is the fleet-wide revocation window.
 pub async fn emit_tokens_changed(org_id: &str) -> Result<(), Error> {
-    emit_put(&format!("{SYNTHETICS_WATCHER_PREFIX}{KIND_TOKEN}/{org_id}")).await
+    super::emit_put(&format!("{SYNTHETICS_WATCHER_PREFIX}{KIND_TOKEN}/{org_id}")).await
 }
 
-/// An agent re-registered, so its capabilities may have changed.
-pub async fn emit_agent_changed(agent_id: &str) -> Result<(), Error> {
-    emit_put(&format!(
-        "{SYNTHETICS_WATCHER_PREFIX}{KIND_AGENT}/{agent_id}"
+pub async fn emit_variables_changed(org_id: &str) -> Result<(), Error> {
+    super::emit_put(&format!(
+        "{SYNTHETICS_WATCHER_PREFIX}{KIND_VARIABLE}/{org_id}"
     ))
     .await
 }
 
-async fn emit_put(key: &str) -> Result<(), Error> {
-    let cluster_coordinator = super::get_coordinator().await;
-    cluster_coordinator
-        .put(key, bytes::Bytes::from(""), true, None)
-        .await?;
-    Ok(())
-}
-
-async fn emit_delete(key: &str) -> Result<(), Error> {
-    let cluster_coordinator = super::get_coordinator().await;
-    cluster_coordinator.delete(key, false, true, None).await
+/// An agent re-registered, so its capabilities may have changed.
+pub async fn emit_agent_changed(agent_id: &str) -> Result<(), Error> {
+    super::emit_put(&format!(
+        "{SYNTHETICS_WATCHER_PREFIX}{KIND_AGENT}/{agent_id}"
+    ))
+    .await
 }
 
 fn check_key(org_id: &str, synthetics_id: &str) -> String {
@@ -149,6 +107,10 @@ async fn apply(key: &str) {
         },
         Some(KIND_LOCATION) => crate::table::synthetics_locations::invalidate_cache().await,
         Some(KIND_TOKEN) => crate::table::synthetics_probe_tokens::invalidate_cache(),
+        Some(KIND_VARIABLE) => match parts.get(2) {
+            Some(org) => crate::table::synthetics_variables::invalidate_cache(org),
+            None => log::error!("watch_synthetics: malformed variable key {key}"),
+        },
         Some(KIND_AGENT) => match parts.get(2) {
             Some(agent_id) => crate::table::synthetics_agents::invalidate_cache(agent_id),
             None => log::error!("watch_synthetics: malformed agent key {key}"),
@@ -178,6 +140,7 @@ mod tests {
             format!("{SYNTHETICS_WATCHER_PREFIX}{KIND_LOCATION}/all"),
             format!("{SYNTHETICS_WATCHER_PREFIX}{KIND_TOKEN}/o"),
             format!("{SYNTHETICS_WATCHER_PREFIX}{KIND_AGENT}/a"),
+            format!("{SYNTHETICS_WATCHER_PREFIX}{KIND_VARIABLE}/o"),
         ] {
             assert!(k.starts_with(SYNTHETICS_WATCHER_PREFIX), "{k}");
         }

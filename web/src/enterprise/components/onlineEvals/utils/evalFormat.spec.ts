@@ -9,6 +9,9 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+
+import { gt, type TranslateFn } from "@/types/i18n";
+
 import {
   defaultOutputSchema,
   defaultTestValue,
@@ -17,6 +20,7 @@ import {
   formatTemplateVariable,
   parseJson,
   parseOptionalJson,
+  relativeTime,
   showError,
   splitCsv,
   statusClass,
@@ -128,16 +132,16 @@ describe("defaultTestValue", () => {
   // "Run test" immediately. They're well-known prompt-engineering variable
   // names — drift here would mean an empty test panel.
   it("returns canned text for known variable names", () => {
-    expect(defaultTestValue("input")).toContain("Paris");
-    expect(defaultTestValue("output")).toContain("Paris");
-    expect(defaultTestValue("context")).toContain("France");
-    expect(defaultTestValue("metadata")).toBe("{}");
-    expect(defaultTestValue("trace.id")).toBe("test_trace_123");
-    expect(defaultTestValue("span.id")).toBe("test_span_456");
+    expect(defaultTestValue("input", gt)).toContain("Paris");
+    expect(defaultTestValue("output", gt)).toContain("Paris");
+    expect(defaultTestValue("context", gt)).toContain("France");
+    expect(defaultTestValue("metadata", gt)).toBe("{}");
+    expect(defaultTestValue("trace.id", gt)).toBe("test_trace_123");
+    expect(defaultTestValue("span.id", gt)).toBe("test_span_456");
   });
 
   it("returns empty string for unknown variables", () => {
-    expect(defaultTestValue("whatever")).toBe("");
+    expect(defaultTestValue("whatever", gt)).toBe("");
   });
 });
 
@@ -173,6 +177,28 @@ describe("formatDate", () => {
   });
 });
 
+describe("relativeTime", () => {
+  // Echo the key and named args; TranslateFn's overloads can't be inferred
+  // from a single arrow, so the stub is cast through unknown.
+  const t = ((key: string, named?: Record<string, unknown>) =>
+    `${key}:${JSON.stringify(named)}`) as unknown as TranslateFn;
+
+  it("picks the largest whole unit", () => {
+    const now = Date.now();
+    expect(relativeTime(now - 5_000, t)).toBe('refreshButton.secondsAgo:{"sec":5}');
+    expect(relativeTime(now - 3 * 60_000, t)).toBe('refreshButton.minutesAgo:{"min":3}');
+    expect(relativeTime(now - 2 * 3_600_000, t)).toBe('refreshButton.hoursAgo:{"h":2}');
+    expect(relativeTime(now - 3 * 86_400_000, t)).toBe(
+      'onlineEvals.quality.overview.relativeTime.daysAgo:{"day":3}',
+    );
+  });
+
+  it("returns an em dash for future or invalid times", () => {
+    expect(relativeTime(Date.now() + 60_000, t)).toBe("—");
+    expect(relativeTime(Number.NaN, t)).toBe("—");
+  });
+});
+
 describe("statusClass", () => {
   it("maps healthy statuses to is-good", () => {
     for (const s of ["active", "default", "configured"]) {
@@ -180,8 +206,8 @@ describe("statusClass", () => {
     }
   });
 
-  it("maps draft / paused / degraded statuses to is-warn", () => {
-    for (const s of ["draft", "paused", "degraded"]) {
+  it("maps draft / paused statuses to is-warn", () => {
+    for (const s of ["draft", "paused"]) {
       expect(statusClass(s)).toEqual({ "is-good": false, "is-warn": true, "is-muted": false });
     }
   });

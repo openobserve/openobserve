@@ -45,12 +45,12 @@ use datafusion::{
     optimizer::{AnalyzerRule, OptimizerRule},
     physical_expr_adapter::DefaultPhysicalExprAdapterFactory,
     physical_optimizer::PhysicalOptimizerRule,
-    prelude::{SessionContext, col},
+    prelude::SessionContext,
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::WorkGroup;
 use vortex::{VortexSessionDefault, io::session::RuntimeSessionExt, session::VortexSession};
-use vortex_datafusion::VortexFormat;
+use vortex_datafusion::{VortexFormat, VortexTableOptions};
 
 use super::{
     peak_memory_pool::PeakMemoryPool, planner::extension_planner::OpenobserveQueryPlanner,
@@ -58,6 +58,7 @@ use super::{
 };
 use crate::{
     datafusion::{
+        sort_order::FileSortOrder,
         storage::file_statistics_cache,
         table_provider::{listing_adapter::ListingTableAdapter, uniontable::NewUnionTable},
     },
@@ -66,8 +67,8 @@ use crate::{
 
 pub const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
 
-pub fn create_session_config(
-    sorted_by_time: bool,
+fn create_session_config(
+    sort_order: FileSortOrder,
     target_partitions: usize,
 ) -> Result<SessionConfig> {
     let cfg = get_config();
@@ -80,6 +81,7 @@ pub fn create_session_config(
     let mut config = SessionConfig::from_env()?
         .with_batch_size(get_batch_size())
         .with_target_partitions(target_partitions)
+        .with_collect_statistics(true)
         .with_information_schema(true);
 
     config
@@ -87,17 +89,28 @@ pub fn create_session_config(
         .execution
         .listing_table_ignore_subdirectory = false;
 
+    // DF55 migrated aggregate streams regress grouped-agg perf; revisit on the next DF bump.
+    config.options_mut().execution.enable_migration_aggregate = false;
+
     config.options_mut().sql_parser.dialect = Dialect::PostgreSQL;
 
     config.options_mut().execution.parquet.pushdown_filters =
-        cfg.common.feature_pushdown_filter_enabled;
+        cfg.search.feature_pushdown_filter_enabled;
     // config = config.set_bool("datafusion.execution.parquet.reorder_filters", true);
 
-    if sorted_by_time {
+    // any declared order: chain non-overlapping files into ordered partitions instead of sorting
+    if sort_order.is_sorted() {
         config
             .options_mut()
             .execution
             .split_file_groups_by_statistics = true;
+    }
+    // hash-sorted only: timestamp-ordered sessions still want the round-robin exchange
+    if sort_order == FileSortOrder::HashTimestampAsc {
+        config
+            .options_mut()
+            .optimizer
+            .enable_round_robin_repartition = false;
     }
 
     // When set to true, skips verifying that the schema produced by planning the input of
@@ -188,7 +201,7 @@ pub struct DataFusionContextBuilder<'a> {
     analyzer_rules: Vec<Arc<dyn AnalyzerRule + Send + Sync>>,
     optimizer_rules: Vec<Arc<dyn OptimizerRule + Send + Sync>>,
     physical_optimizer_rules: Vec<Arc<dyn PhysicalOptimizerRule + Send + Sync>>,
-    sorted_by_time: bool,
+    sort_order: FileSortOrder,
 }
 
 impl<'a> Default for DataFusionContextBuilder<'a> {
@@ -205,7 +218,7 @@ impl<'a> DataFusionContextBuilder<'a> {
             analyzer_rules: vec![],
             optimizer_rules: vec![],
             physical_optimizer_rules: vec![],
-            sorted_by_time: false,
+            sort_order: FileSortOrder::None,
         }
     }
 
@@ -243,8 +256,8 @@ impl<'a> DataFusionContextBuilder<'a> {
         self
     }
 
-    pub fn sorted_by_time(mut self, sorted_by_time: bool) -> Self {
-        self.sorted_by_time = sorted_by_time;
+    pub fn sort_order(mut self, sort_order: FileSortOrder) -> Self {
+        self.sort_order = sort_order;
         self
     }
 
@@ -261,7 +274,7 @@ impl<'a> DataFusionContextBuilder<'a> {
         )
         .await?;
 
-        let session_config = create_session_config(self.sorted_by_time, target_partitions)?;
+        let session_config = create_session_config(self.sort_order, target_partitions)?;
         let runtime_env = Arc::new(create_runtime_env(self.trace_id, memory_size).await?);
         let mut builder = SessionStateBuilder::new()
             .with_config(session_config)
@@ -273,10 +286,10 @@ impl<'a> DataFusionContextBuilder<'a> {
         if !self.optimizer_rules.is_empty() {
             builder = builder.with_optimizer_rules(self.optimizer_rules)
         }
-        for rule in self.physical_optimizer_rules {
-            builder = builder.with_physical_optimizer_rule(rule);
+        if !self.physical_optimizer_rules.is_empty() {
+            builder = builder.with_physical_optimizer_rules(self.physical_optimizer_rules)
         }
-        if cfg.common.feature_join_match_one_enabled {
+        if cfg.search.feature_join_match_one_enabled || cfg.search.feature_shared_cte_enabled {
             builder = builder.with_query_planner(Arc::new(OpenobserveQueryPlanner::new()));
         }
         Ok(SessionContext::new_with_state(builder.build()))
@@ -315,6 +328,7 @@ pub fn register_builtin_udfs(ctx: &SessionContext) {
     ctx.register_udf(super::udf::spath_udf::SPATH_UDF.clone());
     ctx.register_udf(super::udf::to_arr_string_udf::TO_ARR_STRING.clone());
     ctx.register_udf(super::udf::histogram_udf::HISTOGRAM_UDF.clone());
+    ctx.register_udf(super::udf::fold_native_frames_udf::FOLD_NATIVE_FRAMES_UDF.clone());
     ctx.register_udf(super::udf::match_all_hash_udf::MATCH_ALL_HASH_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::FUZZY_MATCH_ALL_UDF.clone());
@@ -326,6 +340,15 @@ pub fn register_builtin_udfs(ctx: &SessionContext) {
     ));
     ctx.register_udaf(AggregateUDF::from(
         super::udaf::approx_topk_distinct::ApproxTopKDistinct::new(),
+    ));
+    ctx.register_udaf(AggregateUDF::from(
+        super::udaf::sequence::SequenceDepth::new(),
+    ));
+    ctx.register_udaf(AggregateUDF::from(
+        super::udaf::sequence::SequenceStepTimes::new(),
+    ));
+    ctx.register_udwf(datafusion::logical_expr::WindowUDF::from(
+        super::udaf::sequence::SequenceStepMatch::new(),
     ));
     ctx.register_udf(super::udf::cast_to_timestamp_udf::CAST_TO_TIMESTAMP_UDF.clone());
 
@@ -492,32 +515,41 @@ pub fn catalog_functions(org_id: &str) -> Vec<CatalogFunction> {
     by_name.into_values().collect()
 }
 
+/// Builds the session for a metrics scan whose files carry `sort_order`.
+pub async fn metrics_session_context(
+    session: &SearchSession,
+    sort_order: FileSortOrder,
+) -> Result<SessionContext> {
+    DataFusionContextBuilder::new()
+        .trace_id(&session.id)
+        .work_group(session.work_group.clone())
+        .sort_order(sort_order)
+        .build(session.target_partitions)
+        .await
+}
+
+/// Registers the metrics files as `table_name`, declaring `sort_order` on the table.
 pub async fn register_metrics_table(
+    ctx: &SessionContext,
     session: &SearchSession,
     schema: Arc<Schema>,
     table_name: &str,
     files: Vec<FileKey>,
-) -> Result<SessionContext> {
-    let ctx = DataFusionContextBuilder::new()
-        .trace_id(&session.id)
-        .work_group(session.work_group.clone())
-        .build(session.target_partitions)
-        .await?;
-
+    sort_order: FileSortOrder,
+) -> Result<()> {
     let tables = TableBuilder::new()
+        .sort_order(sort_order)
         .file_stat_cache(ctx.runtime_env().cache_manager.get_file_statistic_cache())
         .build(session.clone(), files, schema.clone())
         .await?;
-    let union_table = Arc::new(NewUnionTable::new(schema, tables));
-    ctx.register_table(table_name, union_table)?;
-
-    Ok(ctx)
+    ctx.register_table(table_name, Arc::new(NewUnionTable::new(schema, tables)))?;
+    Ok(())
 }
 
 /// Create a datafusion table from a list of files and a schema
 pub struct TableBuilder {
-    sorted_by_time: bool,
-    file_stat_cache: Option<Arc<dyn FileStatisticsCache>>,
+    sort_order: FileSortOrder,
+    file_stat_cache: Option<Arc<FileStatisticsCache>>,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
     timestamp_filter: Option<(i64, i64)>,
@@ -532,7 +564,7 @@ impl Default for TableBuilder {
 impl TableBuilder {
     pub fn new() -> Self {
         Self {
-            sorted_by_time: false,
+            sort_order: FileSortOrder::None,
             file_stat_cache: None,
             index_condition: None,
             fst_fields: vec![],
@@ -540,15 +572,14 @@ impl TableBuilder {
         }
     }
 
-    pub fn sorted_by_time(mut self, sorted_by_time: bool) -> Self {
-        self.sorted_by_time = sorted_by_time;
+    /// Physical sort order of `files`; declared to DataFusion so ordered
+    /// scans do not need an extra sort.
+    pub fn sort_order(mut self, sort_order: FileSortOrder) -> Self {
+        self.sort_order = sort_order;
         self
     }
 
-    pub fn file_stat_cache(
-        mut self,
-        file_stat_cache: Option<Arc<dyn FileStatisticsCache>>,
-    ) -> Self {
+    pub fn file_stat_cache(mut self, file_stat_cache: Option<Arc<FileStatisticsCache>>) -> Self {
         self.file_stat_cache = file_stat_cache;
         self
     }
@@ -655,18 +686,23 @@ impl TableBuilder {
             FileFormat::Parquet => Arc::new(ParquetFormat::default()),
             FileFormat::Vortex => {
                 let vortex_session = VortexSession::default().with_tokio();
-                Arc::new(VortexFormat::new(vortex_session))
+                if self.sort_order.is_sorted() {
+                    // the shards already parallelize; per-file spawned read-ahead only buys memory
+                    let mut options = VortexTableOptions::default();
+                    options.scan_concurrency = Some(1);
+                    Arc::new(VortexFormat::new_with_options(vortex_session, options))
+                } else {
+                    Arc::new(VortexFormat::new(vortex_session))
+                }
             }
         };
 
-        let mut listing_options = ListingOptions::new(file_format)
-            .with_target_partitions(target_partitions)
-            .with_collect_stat(true);
+        let mut listing_options = ListingOptions::new(file_format);
 
-        if self.sorted_by_time {
+        if self.sort_order.is_sorted() {
             // specify sort columns for parquet file
-            listing_options = listing_options
-                .with_file_sort_order(vec![vec![col(TIMESTAMP_COL_NAME).sort(false, false)]]);
+            listing_options =
+                listing_options.with_file_sort_order(vec![self.sort_order.logical_sort_exprs()]);
         }
 
         let schema_key = schema.hash_key();
@@ -718,9 +754,11 @@ impl TableBuilder {
         let mut table = ListingTableAdapter::try_new(
             config,
             session.id.clone(),
+            self.sort_order,
             self.index_condition.clone(),
             self.fst_fields.clone(),
             self.timestamp_filter,
+            target_partitions,
         )?;
         if self.file_stat_cache.is_some() {
             table = table.with_cache(self.file_stat_cache.clone());
@@ -778,7 +816,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_session_config_default() -> Result<()> {
-        let config = create_session_config(false, 0)?;
+        let config = create_session_config(FileSortOrder::None, 0)?;
 
         // Test default configurations
         assert_eq!(
@@ -788,10 +826,18 @@ mod tests {
                 .cpu_num
                 .max(get_config().limit.datafusion_min_partition_num)
         );
-        assert_eq!(config.options().execution.batch_size, get_batch_size());
+        assert_eq!(
+            config.options().execution.batch_size.get(),
+            get_batch_size()
+        );
         assert_eq!(config.options().sql_parser.dialect, Dialect::PostgreSQL);
         assert!(!config.options().execution.listing_table_ignore_subdirectory);
         assert!(config.information_schema());
+        assert!(!config.options().execution.enable_migration_aggregate);
+        assert_eq!(
+            config.options().execution.parquet.pushdown_filters,
+            get_config().search.feature_pushdown_filter_enabled
+        );
         // Join dynamic filter pushdown must stay disabled: its runtime filter can't cross our
         // distributed RemoteScan/Flight boundary and breaks our custom join rewrites.
         assert!(
@@ -807,7 +853,7 @@ mod tests {
     #[tokio::test]
     async fn test_create_session_config_with_partitions() -> Result<()> {
         let target_partitions = 8;
-        let config = create_session_config(true, target_partitions)?;
+        let config = create_session_config(FileSortOrder::TimestampDesc, target_partitions)?;
 
         let expected_partitions = std::cmp::max(
             get_config().limit.datafusion_min_partition_num,
@@ -824,9 +870,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_create_session_config_sorted_by_time() -> Result<()> {
-        let config = create_session_config(true, 4)?;
-        assert!(config.options().execution.split_file_groups_by_statistics);
+    async fn test_create_session_config_sorted() -> Result<()> {
+        for order in [
+            FileSortOrder::TimestampDesc,
+            FileSortOrder::HashTimestampAsc,
+        ] {
+            let config = create_session_config(order, 4)?;
+            assert!(config.options().execution.split_file_groups_by_statistics);
+        }
         Ok(())
     }
 
@@ -873,7 +924,7 @@ mod tests {
         let builder = DataFusionContextBuilder::new();
         assert_eq!(builder.trace_id, "");
         assert_eq!(builder.work_group, None);
-        assert!(!builder.sorted_by_time);
+        assert_eq!(builder.sort_order, FileSortOrder::None);
         assert!(builder.analyzer_rules.is_empty());
         assert!(builder.optimizer_rules.is_empty());
         assert!(builder.physical_optimizer_rules.is_empty());
@@ -884,18 +935,18 @@ mod tests {
         let builder = DataFusionContextBuilder::new()
             .trace_id("test-trace-123")
             .work_group(Some("test-group".to_string()))
-            .sorted_by_time(true);
+            .sort_order(FileSortOrder::TimestampDesc);
 
         assert_eq!(builder.trace_id, "test-trace-123");
         assert_eq!(builder.work_group, Some("test-group".to_string()));
-        assert!(builder.sorted_by_time);
+        assert_eq!(builder.sort_order, FileSortOrder::TimestampDesc);
     }
 
     #[tokio::test]
     async fn test_datafusion_context_builder_build() -> Result<()> {
         let builder = DataFusionContextBuilder::new()
             .trace_id("test-trace")
-            .sorted_by_time(true);
+            .sort_order(FileSortOrder::TimestampDesc);
 
         let ctx = builder.build(4).await?;
 
@@ -1280,7 +1331,7 @@ mod tests {
     #[test]
     fn test_table_builder_new() {
         let builder = TableBuilder::new();
-        assert!(!builder.sorted_by_time);
+        assert_eq!(builder.sort_order, FileSortOrder::None);
         assert!(builder.file_stat_cache.is_none());
         assert!(builder.index_condition.is_none());
         assert!(builder.fst_fields.is_empty());
@@ -1289,10 +1340,10 @@ mod tests {
     #[test]
     fn test_table_builder_with_options() {
         let builder = TableBuilder::new()
-            .sorted_by_time(true)
+            .sort_order(FileSortOrder::TimestampDesc)
             .fst_fields(vec!["field1".to_string()]);
 
-        assert!(builder.sorted_by_time);
+        assert_eq!(builder.sort_order, FileSortOrder::TimestampDesc);
         assert_eq!(builder.fst_fields, vec!["field1".to_string()]);
     }
 
@@ -1356,22 +1407,27 @@ mod tests {
                 row_group_size: None,
             }];
 
-            let result = register_metrics_table(&session, schema, "test_table", files).await;
+            let ctx = metrics_session_context(&session, FileSortOrder::None).await?;
+            register_metrics_table(
+                &ctx,
+                &session,
+                schema,
+                "test_table",
+                files,
+                FileSortOrder::None,
+            )
+            .await?;
 
-            // Should create context successfully
-            assert!(result.is_ok());
-            if let Ok(ctx) = result {
-                // Verify table is registered
-                assert!(
-                    ctx.catalog("datafusion")
-                        .unwrap()
-                        .schema("public")
-                        .unwrap()
-                        .table("test_table")
-                        .await
-                        .is_ok()
-                );
-            }
+            // Verify table is registered
+            assert!(
+                ctx.catalog("datafusion")
+                    .unwrap()
+                    .schema("public")
+                    .unwrap()
+                    .table("test_table")
+                    .await
+                    .is_ok()
+            );
 
             Ok(())
         }
@@ -1396,7 +1452,7 @@ mod tests {
                 row_group_size: None,
             }];
 
-            let builder = TableBuilder::new().sorted_by_time(true);
+            let builder = TableBuilder::new().sort_order(FileSortOrder::TimestampDesc);
 
             let result = builder.build(session, files, schema).await;
             assert!(result.is_ok());
@@ -1435,8 +1491,8 @@ mod tests {
         #[tokio::test]
         async fn test_session_config_bloom_filter_settings() -> Result<()> {
             // Test bloom filter configurations
-            let config1 = create_session_config(false, 4)?;
-            let config2 = create_session_config(true, 4)?;
+            let config1 = create_session_config(FileSortOrder::None, 4)?;
+            let config2 = create_session_config(FileSortOrder::TimestampDesc, 4)?;
 
             // Both should be valid configurations
             assert!(config1.options().execution.target_partitions > 0);
@@ -1448,7 +1504,7 @@ mod tests {
         #[tokio::test]
         async fn test_session_config_partition_bounds() -> Result<()> {
             // Test minimum partition enforcement
-            let config = create_session_config(false, 1)?; // Very small number
+            let config = create_session_config(FileSortOrder::None, 1)?; // Very small number
 
             let actual_partitions = config.options().execution.target_partitions;
             assert!(actual_partitions >= get_config().limit.datafusion_min_partition_num);

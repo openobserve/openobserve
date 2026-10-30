@@ -64,7 +64,8 @@ impl PartitionSqlContext {
         let ts_column = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_complex).map(|(v, _)| v);
         let is_streaming_agg = is_streaming_aggregate(&req.sql, ts_column.as_deref());
         let apply_over_hits = req.query_fn.as_ref().is_some_and(|v| {
-            !v.is_empty() && RESULT_ARRAY.is_match(&base64::decode_url(v).unwrap_or(v.to_string()))
+            !v.is_empty()
+                && RESULT_ARRAY.is_match(&base64::decode_url(v).unwrap_or_else(|_| v.to_string()))
         });
 
         let use_single_partition = is_explain

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 // Copyright 2026 OpenObserve Inc.
 //
 // OStatCard — the reusable KPI / stat tile. The ONE stat primitive across the
@@ -14,34 +15,51 @@
 //
 // Colour comes only from `tone` (token-backed, both themes). `clickable` makes it
 // a button (e.g. a filter tile); `selected` marks the active filter with an
-// accent BORDER (no fills). Value is shown verbatim unless `compact` — pass "—"
+// accent BORDER (no fills). Value is shown verbatim unless `compactValue` — pass "—"
 // for "no data"; a real 0 renders as "0".
 
 import { computed, useSlots } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { StatTone, StatTrend } from "./OStatStrip.types";
 import { formatCompactCount } from "@/utils/formatters";
+import useBreakpoint from "@/composables/useBreakpoint";
+
+const { lgUp } = useBreakpoint();
 
 const props = withDefaults(
   defineProps<{
-    label?: string;
+    label?: I18nText;
     value?: string | number;
+    /**
+     * Short qualifier shown beside the label — what the value IS, when the
+     * label alone is ambiguous (e.g. "wait time" under a generic "Database
+     * time"). Not a second metric and never a trend.
+     */
+    sub?: I18nText;
+    /** Render the qualifier as this glyph; `sub` becomes its accessible name and default tooltip. */
+    subIcon?: IconName;
+    /** The glyph's tooltip when it should say more than `sub`. */
+    subTooltip?: I18nText;
     icon?: IconName;
     tone?: StatTone;
     trend?: StatTrend;
     /** Denominator for the proportion bar (this stat's share of the whole). */
     max?: number;
     /** Show a numeric value as "819.5K"; the exact number moves to the tooltip. */
-    compact?: boolean;
+    compactValue?: boolean;
     /** Render as a button with hover feedback (e.g. a filter tile). */
     clickable?: boolean;
     /** Active-filter state — accent border. */
     selected?: boolean;
+    /** Placeholder for the value until it first arrives; a 0 shown meanwhile reads as a real count. */
+    loading?: boolean;
     dataTest?: string;
   }>(),
-  { tone: "neutral", clickable: false, selected: false, compact: false },
+  { tone: "neutral", clickable: false, selected: false, loading: false, compactValue: false },
 );
 
 const slots = useSlots();
@@ -108,11 +126,11 @@ const tc = computed(() => TONES[props.tone ?? "neutral"] ?? TONES.neutral);
 const displayValue = computed(() => {
   const v = props.value;
   if (v === "" || v == null || v === "—") return "—";
-  return props.compact && typeof v === "number" ? formatCompactCount(v) : v;
+  return props.compactValue && typeof v === "number" ? formatCompactCount(v) : v;
 });
 const exactTitle = computed(() => {
   const v = props.value;
-  return props.compact && typeof v === "number" && String(v) !== displayValue.value
+  return props.compactValue && typeof v === "number" && String(v) !== displayValue.value
     ? v.toLocaleString()
     : undefined;
 });
@@ -145,37 +163,62 @@ const trendClass = computed(() =>
   <component
     :is="clickable ? 'button' : 'div'"
     :type="clickable ? 'button' : undefined"
-    class="rounded-default bg-surface-base flex min-w-0 flex-col justify-center gap-1 overflow-hidden border px-2.5 py-1 text-left transition-colors"
+    :aria-pressed="clickable ? String(selected) : undefined"
+    class="rounded-default bg-surface-base flex min-w-0 flex-col justify-center gap-1 overflow-hidden border px-2.5 py-1 text-left transition-colors max-lg:px-1.5"
     :class="[
       selected ? 'border-accent' : 'border-border-default',
       clickable ? 'cursor-pointer' : '',
       clickable && !selected ? 'hover:border-accent' : '',
     ]"
+    :title="label && !lgUp ? String(label) : undefined"
     :data-test="dataTest"
   >
     <div class="flex min-w-0 items-center justify-between gap-2">
       <div class="flex min-w-0 items-baseline gap-1.5">
         <!-- The VALUE never shrinks: it is the payload, and a clipped "499.51…" is
              a useless number. When the tile is too narrow (5 tiles on a laptop),
-             the squeeze is absorbed by the label below, which stays readable
-             truncated because the tone icon already identifies the metric. -->
+             the squeeze is absorbed by the label, which truncates but stays: a
+             bare number under an icon does not say which metric it is. -->
         <span
-          class="shrink-0 text-2xl leading-none font-semibold whitespace-nowrap"
+          class="shrink-0 text-2xl leading-none font-semibold whitespace-nowrap max-lg:text-lg"
           :class="isMuted ? 'text-text-muted' : tc.value"
         >
-          <slot name="value">{{ displayValue }}</slot>
+          <OSkeleton
+            v-if="loading"
+            type="text"
+            class="block h-6 w-12 max-lg:h-4.5 max-lg:w-6"
+            data-test="o-stat-card-value-skeleton"
+          />
+          <slot v-else name="value">{{ displayValue }}</slot>
           <OTooltip v-if="exactTitle" :content="exactTitle" />
         </span>
-        <span v-if="label" class="text-text-secondary truncate text-xs font-medium">{{
+        <OTruncatedText v-if="label" class="text-text-secondary text-xs font-medium">{{
           label
-        }}</span>
-        <span v-if="trend" class="text-2xs shrink-0 font-semibold" :class="trendClass"
+        }}</OTruncatedText>
+        <span v-if="trend" class="text-2xs shrink-0 font-semibold max-lg:hidden" :class="trendClass"
           >{{ trendArrow }} {{ trend.label }}</span
         >
+        <!-- A QUALIFIER on the value, not a second metric: it says what the
+             number IS (which measurement, whose count), so a tile under a
+             generic heading cannot be read as the wrong quantity. Truncates
+             before the value does — the value never shrinks. -->
+        <OIcon
+          v-if="sub && subIcon"
+          :name="subIcon"
+          size="xs"
+          :label="sub"
+          class="text-text-label self-center max-lg:hidden"
+          data-test="o-stat-card-sub-icon"
+        >
+          <OTooltip :content="subTooltip || sub" />
+        </OIcon>
+        <OTruncatedText v-else-if="sub" class="text-text-label text-2xs max-lg:hidden">{{
+          sub
+        }}</OTruncatedText>
       </div>
       <span
         v-if="icon || slots.icon"
-        class="rounded-default grid h-7 w-7 shrink-0 place-items-center"
+        class="rounded-default grid h-7 w-7 shrink-0 place-items-center max-lg:h-6 max-lg:w-6"
         :class="tc.chip"
       >
         <slot name="icon">

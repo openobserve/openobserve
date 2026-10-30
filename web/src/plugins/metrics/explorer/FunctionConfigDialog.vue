@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODialog
     :open="modelValue"
-    :title="card.name"
+    :title="raw(card.name)"
     size="xl"
     data-test="metrics-fn-config"
     @update:open="$emit('update:modelValue', $event)"
@@ -39,12 +39,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header>
       <div class="flex min-w-0 flex-col">
         <div class="flex min-w-0 items-center gap-2">
-          <span
-            class="truncate font-mono text-sm font-semibold"
-            :title="card.name"
-            data-test="metrics-fn-metric"
-            >{{ card.name }}</span
-          >
+          <OTruncatedText class="font-mono text-sm font-semibold" data-test="metrics-fn-metric">{{
+            card.name
+          }}</OTruncatedText>
           <!-- The registry's metricType group — same badge the card footer shows. -->
           <OTag
             type="metricType"
@@ -54,12 +51,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <!-- Keep classes in sync with ODialog's built-in subTitle. -->
-        <span
-          class="text-dialog-content-text mt-0.5 block truncate text-sm opacity-70"
+        <OTruncatedText
+          class="text-dialog-content-text mt-0.5 block text-sm opacity-70"
           data-test="metrics-fn-subtitle"
         >
           {{ t("metrics.explorer.fn.subtitle") }}
-        </span>
+        </OTruncatedText>
       </div>
     </template>
 
@@ -97,17 +94,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ORadio
           size="xs"
           :value="variant.id"
-          :label="variant.label"
+          :label="variantLabel(variant)"
           :data-test="`metrics-fn-radio-${variant.id}`"
         />
 
-        <div
-          class="text-3xs text-text-secondary truncate font-mono"
-          :title="exprOf(variant)"
+        <OTruncatedText
+          as="div"
+          class="text-3xs text-text-secondary font-mono"
           :data-test="`metrics-fn-expr-${variant.id}`"
         >
           {{ exprOf(variant) }}
-        </div>
+        </OTruncatedText>
 
         <div class="relative h-30">
           <div
@@ -182,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="p"
             size="xs"
             :model-value="isChecked(variant, p)"
-            :label="`p${p}`"
+            :label="raw(`p${p}`)"
             :disabled="isOnlyChecked(variant, p)"
             :data-test="`metrics-fn-percentile-${variant.id}-${p}`"
             @update:model-value="togglePercentile(variant, p)"
@@ -223,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { computed, defineComponent, ref, watch, type PropType } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import MetricCardChart from "./MetricCardChart.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -238,6 +235,7 @@ import { isCancelled } from "@/composables/metrics/useMetricsPreviewQueue";
 import { parseSearchError } from "@/utils/query/searchError";
 import type { MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import { hasSamples, type FnOverride } from "@/composables/metrics/useMetricsExplorerGrid";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 type TileStatus = "idle" | "loading" | "done" | "error" | "unavailable";
 
@@ -262,6 +260,7 @@ const sameNumbers = (a: number[] | null, b: number[] | null) => {
 export default defineComponent({
   name: "FunctionConfigDialog",
   components: {
+    OTruncatedText,
     MetricCardChart,
     ODialog,
     OButton,
@@ -295,10 +294,15 @@ export default defineComponent({
   },
   emits: ["update:modelValue", "apply", "restore"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const variants = computed<any[]>(() => props.defaults?.variants ?? []);
     const variantById = (id: string) => variants.value.find((v) => v.id === id) ?? null;
+
+    // `metricDefaults` is evaluated at import time, so it stores an i18n key;
+    // resolve it here per render. `label` stays for names built from live data.
+    const variantLabel = (variant: any): I18nText =>
+      variant?.labelKey ? t(variant.labelKey) : (variant?.label ?? raw(""));
 
     /* ----------------------------------------------------------- selection */
 
@@ -548,8 +552,10 @@ export default defineComponent({
     const onRestore = () => emit("restore");
 
     return {
+      raw,
       t,
       variants,
+      variantLabel,
       selectedId,
       select,
       isChecked,

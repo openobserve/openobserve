@@ -2,7 +2,8 @@
 
 <script setup lang="ts">
 import type { Row, Table } from "@tanstack/vue-table";
-import { computed, inject, ref, onMounted, useSlots } from "vue";
+import { computed, inject, ref, onBeforeUnmount, onMounted, useSlots, watch } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OTableBodyCell from "./OTableBodyCell.vue";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
 import OTableExpandButton from "./OTableExpandButton.vue";
@@ -29,9 +30,11 @@ const props = defineProps<{
   getHighlightedHtml?: (columnId: string, cellValue: any) => string | null;
   wrap?: boolean;
   dense?: boolean;
+  compact?: boolean;
   bordered?: boolean;
   striped?: boolean;
   rowClassFn?: string | ((row: any) => string);
+  isActive?: boolean;
   rowStyleFn?: (row: any) => Record<string, any>;
   /** Virtual scroll: callback for measuring row DOM element height */
   measureEl?: (el: HTMLElement | null) => void;
@@ -59,6 +62,21 @@ const props = defineProps<{
   /** Per-row predicate: when false, the drag handle is hidden for this row. */
   rowDraggable?: boolean;
 }>();
+
+const { t } = useI18nTyped();
+const selectLabel = computed(() => {
+  let named: unknown;
+  for (const cell of props.row.getVisibleCells()) {
+    const value = cell.getValue();
+    if ((typeof value === "string" && value.trim()) || typeof value === "number") {
+      named = value;
+      break;
+    }
+  }
+  return t("components.table.selectRow", {
+    name: raw(String(named ?? props.row.index + 1).slice(0, 80)),
+  });
+});
 
 const emit = defineEmits<{
   "toggle-selection": [row: any];
@@ -90,6 +108,28 @@ onMounted(() => {
   }
 });
 
+// The virtualizer observes only the data row, so the detail row's mount, unmount and reflow re-measure it.
+const expansionRowRef = ref<HTMLElement | null>(null);
+let expansionObserver: ResizeObserver | null = null;
+watch(
+  expansionRowRef,
+  (el) => {
+    expansionObserver?.disconnect();
+    expansionObserver = null;
+    if (!props.dynamicRowHeight || !props.measureRowElement || !rowRef.value) return;
+    if (!el || typeof ResizeObserver === "undefined") {
+      props.measureRowElement(rowRef.value);
+      return;
+    }
+    expansionObserver = new ResizeObserver(() => {
+      if (rowRef.value) props.measureRowElement?.(rowRef.value);
+    });
+    expansionObserver.observe(el);
+  },
+  { flush: "post" },
+);
+onBeforeUnmount(() => expansionObserver?.disconnect());
+
 const rowClass = computed(() => {
   if (typeof props.rowClassFn === "function") {
     return props.rowClassFn(props.row.original);
@@ -104,6 +144,11 @@ const rowStyle = computed(() => {
 const isStriped = computed(() => {
   return props.striped && props.row.index % 2 === 1;
 });
+
+// A row with no detected level gets "transparent", which paints no spine.
+const hasVisibleSpine = computed(
+  () => !!props.statusBarColor && props.statusBarColor !== "transparent",
+);
 
 const hasExpansionSlot = computed(() => !!slots.expansion);
 
@@ -148,6 +193,12 @@ function onClick(event: MouseEvent) {
   emit("row-click", props.row.original, event);
 }
 
+// Clicks on the checkbox itself are stopped by OCheckbox, so this only sees misses on the cell padding.
+function onSelectCellClick() {
+  if (props.isRowSelectable && !props.isRowSelectable(props.row.original)) return;
+  emit("toggle-selection", props.row.original);
+}
+
 function onDblclick(event: MouseEvent) {
   emit("row-dblclick", props.row.original, event);
 }
@@ -170,15 +221,26 @@ function onRowMouseleave() {
     :ref="setRowRef"
     :data-test="`o2-table-row-${row.index}`"
     :data-index="dynamicRowHeight ? virtualIndex : undefined"
+    :data-active-row="isActive ? 'true' : undefined"
+    :aria-current="isActive ? 'true' : undefined"
     :tabindex="clickable ? 0 : undefined"
     :class="[
       'group/row',
-      'transition-colors duration-150',
+      'transition-[background-color] duration-(--duration-hover-out) hover:duration-(--duration-hover-in)',
       clickable ? 'cursor-pointer' : '',
-      'hover:bg-table-row-hover-bg',
-      clickable ? 'focus-visible:bg-table-row-hover-bg focus:outline-none' : '',
-      isRowSelected ? 'bg-table-row-selected-bg' : '',
-      !isRowSelected && isStriped ? 'bg-table-row-striped-bg' : '',
+      isRowSelected || isActive
+        ? 'bg-table-row-selected-bg [--color-text-secondary:var(--color-table-row-text-secondary-tinted)]'
+        : 'hover:bg-table-row-hover-bg hover:[--color-text-secondary:var(--color-table-row-text-secondary-tinted)]',
+      clickable
+        ? 'focus-visible:outline-focus-ring-accent outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-solid'
+        : '',
+      clickable && !isRowSelected && !isActive
+        ? 'focus-visible:bg-table-row-hover-bg focus-visible:[--color-text-secondary:var(--color-table-row-text-secondary-tinted)]'
+        : '',
+      isActive ? 'ring-focus-ring-accent ring-2 ring-inset' : '',
+      isRowSelected && !isActive && hasVisibleSpine ? 'ring-accent ring-1 ring-inset' : '',
+      (isRowSelected || isActive) && !hasVisibleSpine ? 'o2-table-row-selected-bar' : '',
+      !isRowSelected && !isActive && isStriped ? 'bg-table-row-striped-bg' : '',
       statusBarColor ? 'o2-table-row-with-status' : '',
       rowClass,
     ]"
@@ -216,7 +278,7 @@ function onRowMouseleave() {
       :class="[
         'text-left align-middle',
         bordered ? 'border-table-row-divider border-b' : '',
-        isRowSelectable && !isRowSelectable(row.original) ? 'cursor-not-allowed' : '',
+        isRowSelectable && !isRowSelectable(row.original) ? 'cursor-not-allowed' : 'cursor-pointer',
       ]"
       :style="{
         width: TABLE_CHECKBOX_COL_WIDTH + 'px',
@@ -225,11 +287,13 @@ function onRowMouseleave() {
         paddingLeft: 'var(--spacing-table-edge)',
       }"
       data-test="o2-table-select-cell"
+      @click.stop="onSelectCellClick"
     >
       <div class="flex items-center justify-start">
         <OTableSelectCheckbox
           :model-value="isRowSelected ?? false"
           :row-id="String(row.index)"
+          :label="selectLabel"
           :disabled="isRowSelectable ? !isRowSelectable(row.original) : false"
           @update:model-value="emit('toggle-selection', row.original)"
         />
@@ -266,6 +330,7 @@ function onRowMouseleave() {
       :get-highlighted-html="getHighlightedHtml"
       :wrap="wrap"
       :dense="dense"
+      :compact="compact"
       :bordered="bordered"
       :enable-cell-copy="enableCellCopy"
       :get-cell-style="getCellStyle"
@@ -285,6 +350,10 @@ function onRowMouseleave() {
       <!-- Per-cell hover-action overlay — forwarded to every cell -->
       <template v-if="slots['cell-hover-actions']" #cell-hover-actions="caProps">
         <slot name="cell-hover-actions" v-bind="caProps" />
+      </template>
+      <!-- Inline actions beside the copy button — forwarded to every cell -->
+      <template v-if="slots['copy-actions']" #copy-actions="ccaProps">
+        <slot name="copy-actions" v-bind="ccaProps" />
       </template>
     </OTableBodyCell>
   </tr>
@@ -317,6 +386,8 @@ function onRowMouseleave() {
   <!-- Expanded row content -->
   <tr
     v-if="hasExpansionSlot && isExpanded"
+    ref="expansionRowRef"
+    data-row-expansion
     :data-test="`o2-table-expanded-row-${row.index}`"
     class="bg-table-row-expanded-bg"
   >
@@ -354,6 +425,22 @@ function onRowMouseleave() {
   bottom: 0;
   width: 0.25rem;
   background: var(--row-status-color, transparent);
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* keep(complex-state): selection bar on a row without a status spine, drawn like the spine so a pinned or expand cell cannot cover it */
+.o2-table-row-selected-bar > td:first-child {
+  position: relative;
+}
+.o2-table-row-selected-bar > td:first-child::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0.125rem;
+  background: var(--color-accent);
   z-index: 2;
   pointer-events: none;
 }

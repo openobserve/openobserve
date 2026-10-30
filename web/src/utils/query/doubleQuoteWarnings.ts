@@ -28,6 +28,8 @@
  * offsets out and can be tested as such.
  */
 
+import type { TranslateFn } from "@/types/i18n";
+
 export interface DoubleQuoteIssue {
   /** Index of the opening quote in the ORIGINAL text. */
   startOffset: number;
@@ -35,9 +37,6 @@ export interface DoubleQuoteIssue {
   endOffset: number;
   message: string;
 }
-
-const MESSAGE_DOUBLE = "Double quotes are not valid for string values. Use single quotes instead.";
-const MESSAGE_MIXED = "Mismatched quotes. Use matching single quotes for string values.";
 
 /**
  * Blank out everything that is not executable SQL, preserving every offset.
@@ -118,7 +117,7 @@ const maskNonCode = (text: string): string => {
 const VALUE_QUOTE_REGEX =
   /(?:NOT\s+LIKE|NOT\s+IN\s*\(|!=|<>|>=|<=|=|>|<|LIKE|IN\s*\()\s*("[^'"]*'|'[^'"]*"|"[^"]*")/gi;
 
-export const findDoubleQuoteIssues = (text: string): DoubleQuoteIssue[] => {
+export const findDoubleQuoteIssues = (t: TranslateFn, text: string): DoubleQuoteIssue[] => {
   if (!text) return [];
 
   // Matched against the masked copy; offsets index the original, which the
@@ -138,7 +137,9 @@ export const findDoubleQuoteIssues = (text: string): DoubleQuoteIssue[] => {
     issues.push({
       startOffset,
       endOffset: startOffset + quoted.length,
-      message: isMixed ? MESSAGE_MIXED : MESSAGE_DOUBLE,
+      message: isMixed
+        ? t("sqlEditor.diagnostics.mismatchedQuotes")
+        : t("sqlEditor.diagnostics.doubleQuotedValue"),
     });
   }
 

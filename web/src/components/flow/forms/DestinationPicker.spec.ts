@@ -23,9 +23,12 @@ const mockToast = vi.fn();
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: (...a: any[]) => mockToast(...a) }));
 
 const mockList = vi.fn();
-vi.mock("@/services/alert_destination", () => ({
-  default: { list: (...args: any[]) => mockList(...args) },
-}));
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: (...args: any[]) => mockList(...args) },
+  });
+});
 
 const OSelectStub = {
   name: "OSelect",
@@ -82,19 +85,38 @@ describe("DestinationPicker", () => {
     expect(mockList).toHaveBeenCalledWith(expect.objectContaining({ module: "pipeline" }));
   });
 
+  // The dropdown shows each URL, then hides it once chosen — leaving a bare name and
+  // no way to confirm where the step actually posts without reopening the list.
+  it("shows the selected destination's endpoint after the dropdown closes", async () => {
+    const wrapper = createWrapper({ initialName: "sink-a" });
+    await flushPromises();
+    const details = wrapper.find('[data-test="destination-picker-details"]');
+    expect(details.exists()).toBe(true);
+    expect(details.text()).toContain("http://a.example.com");
+  });
+
+  it("follows the selection rather than pinning to the initial destination", async () => {
+    const wrapper = createWrapper({ initialName: "sink-a" });
+    await flushPromises();
+    (wrapper.vm as any).form.setFieldValue("selectedDestination", "sink-b");
+    await flushPromises();
+    expect(wrapper.find('[data-test="destination-picker-details"]').text()).toContain(
+      "this-is-a-very-long-destination-url",
+    );
+  });
+
   it("exposes the fetched destinations as options", async () => {
     const wrapper = createWrapper();
     await flushPromises();
     expect(wrapper.find(".o-select").attributes("data-count")).toBe("2");
   });
 
-  it("truncates long destination URLs in the sub-label", async () => {
+  it("passes the full destination URL to the sub-label", async () => {
     const wrapper = createWrapper();
     await flushPromises();
     const opts = (wrapper.vm as any).destinationOptions;
     const long = opts.find((o: any) => o.value === "sink-b");
-    expect(long.subLabel.endsWith("...")).toBe(true);
-    expect(long.subLabel.length).toBe(73); // 70 + "..."
+    expect(long.subLabel).toBe(listResponse.data[1].url);
   });
 
   it("preselects initialName", async () => {
@@ -121,6 +143,24 @@ describe("DestinationPicker", () => {
     const payload = await (wrapper.vm as any).submit();
     expect(payload.destination_name).toBe("sink-a");
     expect(payload.org_id).toBeDefined();
+  });
+
+  // `optional` (Workflows placeholder): an empty selection is ALLOWED — submit()
+  // resolves an empty destination_name instead of null, and no required check runs.
+  it("optional: submit resolves an empty destination_name when nothing is selected", async () => {
+    const wrapper = createWrapper({ optional: true });
+    await flushPromises();
+    const payload = await (wrapper.vm as any).submit();
+    expect(payload).not.toBeNull();
+    expect(payload.destination_name).toBe("");
+    expect(payload.org_id).toBeDefined();
+  });
+
+  it("optional: still resolves the selected destination when one is chosen", async () => {
+    const wrapper = createWrapper({ initialName: "sink-a", optional: true });
+    await flushPromises();
+    const payload = await (wrapper.vm as any).submit();
+    expect(payload.destination_name).toBe("sink-a");
   });
 
   it("emits expand when toggling create mode", async () => {
@@ -221,5 +261,108 @@ describe("DestinationPicker", () => {
     await wrapper.find(".o-switch").trigger("click"); // off
     await flushPromises();
     expect(mockList).toHaveBeenCalled();
+  });
+
+  // ── forcedType="custom" narrows the list (Workflows) ──────────────────────
+  // The pipeline endpoint returns every destination type, but a workflow node can
+  // only execute a custom webhook.
+
+  const mixedResponse = {
+    data: [
+      { name: "webhook", url: "http://w.example.com", destination_type_name: "custom" },
+      { name: "splunk-hec", url: "http://s.example.com", destination_type_name: "splunk" },
+      { name: "dd-events", url: "http://d.example.com", destination_type: "datadog" },
+      { name: "legacy", url: "http://l.example.com" }, // no type at all
+    ],
+  };
+
+  it("forcedType custom: drops only prebuilt provider destinations", async () => {
+    mockList.mockResolvedValueOnce(mixedResponse);
+    const wrapper = createWrapper({ forcedType: "custom" });
+    await flushPromises();
+    expect((wrapper.vm as any).destinationOptions.map((o: any) => o.value)).toEqual([
+      "webhook",
+      "legacy",
+    ]);
+  });
+
+  // The bug this guards: `destination_type_name` is optional on the backend and omitted
+  // from the JSON when unset, so every destination made through the plain API is untyped.
+  // Treating untyped as "not custom" hid them all from the workflow picker.
+  it("forcedType custom: an untyped destination is listed", async () => {
+    mockList.mockResolvedValueOnce(mixedResponse);
+    const wrapper = createWrapper({ forcedType: "custom" });
+    await flushPromises();
+    const values = (wrapper.vm as any).destinationOptions.map((o: any) => o.value);
+    expect(values).toContain("legacy");
+  });
+
+  it("forcedType custom: untyped pipeline destinations are all listed", async () => {
+    mockList.mockResolvedValueOnce({
+      data: [
+        { name: "audit", url: "http://127.0.0.1:9099/audit" },
+        { name: "pagerduty", url: "http://127.0.0.1:9099/pagerduty" },
+        { name: "slack", url: "http://127.0.0.1:9099/slack" },
+        {
+          name: "wf_probe_custom",
+          url: "http://127.0.0.1:9099/probe2",
+          destination_type_name: "custom",
+        },
+      ],
+    });
+    const wrapper = createWrapper({ forcedType: "custom" });
+    await flushPromises();
+    expect((wrapper.vm as any).destinationOptions.map((o: any) => o.value)).toEqual([
+      "audit",
+      "pagerduty",
+      "slack",
+      "wf_probe_custom",
+    ]);
+  });
+
+  it("without forcedType: every destination is listed (pipelines are unaffected)", async () => {
+    mockList.mockResolvedValueOnce(mixedResponse);
+    const wrapper = createWrapper();
+    await flushPromises();
+    expect((wrapper.vm as any).destinationOptions).toHaveLength(4);
+  });
+
+  it("matches the type case-insensitively", async () => {
+    mockList.mockResolvedValueOnce({
+      data: [{ name: "shouty", url: "http://x.example.com", destination_type_name: " CUSTOM " }],
+    });
+    const wrapper = createWrapper({ forcedType: "custom" });
+    await flushPromises();
+    expect((wrapper.vm as any).destinationOptions.map((o: any) => o.value)).toEqual(["shouty"]);
+  });
+
+  // The important one: a node saved before the filter existed must not silently
+  // lose its destination when the drawer reopens.
+  it("keeps an already-saved non-custom destination in the list, flagged", async () => {
+    mockList.mockResolvedValueOnce(mixedResponse);
+    const wrapper = createWrapper({ forcedType: "custom", initialName: "splunk-hec" });
+    await flushPromises();
+    const opts = (wrapper.vm as any).destinationOptions;
+    expect(opts.map((o: any) => o.value)).toEqual(["splunk-hec", "webhook", "legacy"]);
+    expect(opts[0].subLabel).toBe("Unsupported type — workflows support custom destinations only");
+  });
+
+  it("still resolves the retained non-custom destination on submit", async () => {
+    mockList.mockResolvedValueOnce(mixedResponse);
+    const wrapper = createWrapper({ forcedType: "custom", initialName: "splunk-hec" });
+    await flushPromises();
+    await expect((wrapper.vm as any).submit()).resolves.toMatchObject({
+      destination_name: "splunk-hec",
+    });
+  });
+
+  it("does not duplicate an already-saved custom destination", async () => {
+    mockList.mockResolvedValueOnce(mixedResponse);
+    const wrapper = createWrapper({ forcedType: "custom", initialName: "webhook" });
+    await flushPromises();
+    expect((wrapper.vm as any).destinationOptions.map((o: any) => o.value)).toEqual([
+      "webhook",
+      "legacy",
+    ]);
   });
 });

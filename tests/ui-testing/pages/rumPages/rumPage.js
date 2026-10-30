@@ -39,7 +39,11 @@ export class RumPage {
     }
 
     async gotoRumPage() {
-        await this.rumPageMenu.click();
+        // The sidebar click can be swallowed by the nav flyout under load, so retry until the RUM route loads.
+        await expect(async () => {
+            await this.rumPageMenu.click();
+            await this.page.waitForURL('**/rum**', { timeout: 5000 });
+        }).toPass({ timeout: 30000, intervals: [500, 1000, 2000] });
     }
 
     async rumPageDefaultOrg() {
@@ -83,6 +87,17 @@ export class RumPage {
         // date-time-relative-{value}-{unit}-btn) — label text is not stable.
         await this.page.locator('[data-test="date-time-relative-1-h-btn"]').click();
         await this.page.waitForTimeout(1000);
+        await this.closeDateTimePickerIfOpen();
+    }
+
+    /** The auto-apply picker stays open after a pick, and its popover covers the run-query button beside it. */
+    async closeDateTimePickerIfOpen() {
+        const panel = this.page.locator('#date-time-menu');
+        if (!(await panel.isVisible().catch(() => false))) return;
+        await this.page.keyboard.press('Escape');
+        const closed = await panel.waitFor({ state: 'hidden', timeout: 2000 }).then(() => true).catch(() => false);
+        if (!closed) await this.page.locator(this.dateTimeDropdown).click();
+        await expect(panel).toBeHidden({ timeout: 5000 });
     }
 
     async clickRunQuery() {
@@ -172,11 +187,11 @@ export class RumPage {
         await loadingSpinner.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
     }
 
-    async expectTagsSectionVisible() {
-        // #12764 (scoped scss styles removal) dropped the `.tags-title` class from the
-        // RUM error-detail sections; the Tags section title now carries a data-test hook.
-        const tagsSection = this.page.locator('[data-test="error-tags-title"]').first();
-        await expect(tagsSection).toBeVisible({ timeout: 5000 });
+    async expectContextSectionVisible() {
+        // The error-detail redesign replaced the flat "Tags" strip with the
+        // context card (user, device, geo, deployment) in the right rail.
+        const contextSection = this.page.locator('[data-test="rum-error-context-card"]').first();
+        await expect(contextSection).toBeVisible({ timeout: 5000 });
     }
 
     async getErrorViewerContainerText() {
@@ -260,7 +275,11 @@ export class RumPage {
     }
 
     async clickPrettyTab() {
-        await this.prettyTab.click();
+        // A click dispatched while the tab strip is still mounting is swallowed, the Pretty pane never renders, and every later Pretty assertion burns its full timeout against an unchanged Raw tab — so retry until the tab reports itself selected.
+        await expect(async () => {
+            await this.prettyTab.click({ timeout: 5000 });
+            await expect(this.prettyTab).toHaveAttribute('aria-selected', 'true', { timeout: 3000 });
+        }).toPass({ timeout: 30000, intervals: [500, 1000, 2000] });
     }
 
     /** Assert the (minified) frame text — e.g. the bundle file name — is shown. */
@@ -288,11 +307,9 @@ export class RumPage {
         });
     }
 
-    /** Pretty tab's explicit "no sourcemaps" outcome (message text variants). */
+    /** Pretty tab's terminal "no sourcemaps" outcome — frames with no source_info render the unavailable panel, but NO frames fall through to the error panel (allSourceInfoNull is false when translatedStackTrace is empty), so matching only the two message strings missed the empty-frames path. */
     async expectPrettyUnavailableMessage(timeoutMs = 30000) {
-        await expect(
-            this.prettyUnavailableText.or(this.prettyTranslateFailedText).first(),
-        ).toBeVisible({ timeout: timeoutMs });
+        await this.expectPrettyUnavailableState(timeoutMs);
     }
 
     /**
@@ -313,8 +330,8 @@ export class RumPage {
     }
 
     /** The translating spinner must be gone (not hung). */
-    async expectPrettyLoadingResolved() {
-        await expect(this.prettyLoadingText).toHaveCount(0);
+    async expectPrettyLoadingResolved(timeoutMs = 30000) {
+        await expect(this.prettyLoadingText).toHaveCount(0, { timeout: timeoutMs });
     }
 
 }

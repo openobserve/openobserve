@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed, type Ref } from "vue";
+import { raw } from "@/types/i18n";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 
 /**
@@ -31,10 +32,10 @@ import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useT
  * `=~ "500|503"` is the only way to say "either of these".
  */
 const EXAMPLES = [
-  'pod = "api-1"',
-  'status =~ "500|503"',
-  'job != "canary"',
-  'pod =~ "api-1|api-2"',
+  raw('pod = "api-1"'),
+  raw('status =~ "500|503"'),
+  raw('job != "canary"'),
+  raw('pod =~ "api-1|api-2"'),
 ];
 
 /** Each prompt costs ~2-4s to type, hold and erase; more is never reached. */

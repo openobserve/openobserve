@@ -1,17 +1,17 @@
 <template>
   <div data-test="promql-labelfilter-editor">
-    <div class="flex flex-row pl-2">
+    <div class="flex flex-row ps-2">
       <div
         data-test="promql-labelfilter-editor-label"
         class="flex min-w-24 items-center whitespace-nowrap"
       >
         <span
-          class="rounded-default bg-badge-orange-ol-text mr-1.5 h-2 w-2 shrink-0"
+          class="rounded-default bg-badge-orange-ol-text me-1.5 h-2 w-2 shrink-0"
           aria-hidden="true"
         ></span>
         {{ t("panel.labelFilters") }}
       </div>
-      <span class="mr-0.5 ml-0.5 flex items-center">:</span>
+      <span class="ms-0.5 me-0.5 flex items-center">:</span>
       <div class="scroll m-0.5 flex min-h-8 flex-wrap items-center gap-2">
         <!-- Label Filter Items -->
         <div
@@ -111,6 +111,7 @@
               </div>
             </ODropdown>
             <OButton
+              :aria-label="t('common.remove')"
               variant="ghost"
               size="icon-chip"
               class="!w-4"
@@ -145,7 +146,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { PromqlLabelMatcher } from "@/components/promql/types";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 
@@ -160,12 +161,14 @@ const emit = defineEmits<{
   "update:labels": [value: PromqlLabelMatcher[]];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Get fetchPromQLLabels from composable
 const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-const { fetchPromQLLabels, fetchPromQLLabelValues } =
-  useDashboardPanelData(dashboardPanelDataPageKey);
+const { fetchPromQLLabels, fetchPromQLLabelValues } = useDashboardPanelData(
+  dashboardPanelDataPageKey,
+  t,
+);
 
 const availableLabels = computed<string[]>(
   () => props.dashboardPanelData?.meta?.promql?.availableLabels || [],
@@ -182,7 +185,7 @@ const operatorOptions = ["=", "!=", "=~", "!~"];
 
 // Computed: available labels minus ones already selected in other rows
 const availableLabelOptions = computed(() => {
-  const selectedLabels = props.labels.map((l) => l.label);
+  const selectedLabels: string[] = props.labels.map((l) => l.label);
   return availableLabels.value.filter((label) => !selectedLabels.includes(label));
 });
 
@@ -236,7 +239,7 @@ const addLabel = () => {
   const newLabels: PromqlLabelMatcher[] = [
     ...props.labels,
     {
-      label: "",
+      label: raw(""),
       op: "=",
       value: "",
     },
@@ -272,27 +275,12 @@ const getLabelValueOptions = (labelKey: string) => {
   const actualValues = labelValuesMap.value.get(labelKey) || [];
   actualValues.forEach((value: string) => {
     options.push({
-      label: value,
+      label: raw(value),
       value: value,
       isVariable: false,
     });
   });
 
   return options;
-};
-
-const getOperatorHint = (op: string): string => {
-  switch (op) {
-    case "=":
-      return t("metrics.labelFilterEditor.exactMatch");
-    case "!=":
-      return t("metrics.labelFilterEditor.notEqualTo");
-    case "=~":
-      return t("metrics.labelFilterEditor.regexPattern");
-    case "!~":
-      return t("metrics.labelFilterEditor.regexNotMatching");
-    default:
-      return "";
-  }
 };
 </script>

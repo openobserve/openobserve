@@ -1,0 +1,29 @@
+name: Classify changed paths
+description: One shared answer to "which suites does this change need", replacing per-workflow path regexes
+inputs:
+  base:
+    description: Ref to diff against; the caller must have fetched it (fetch-depth 0)
+    default: origin/${{ github.base_ref || 'main' }}
+  head:
+    description: Commit to diff to
+    default: ${{ github.sha }}
+outputs:
+  run_unit_backend: { value: "${{ steps.c.outputs.run_unit_backend }}" }
+  run_unit_ui: { value: "${{ steps.c.outputs.run_unit_ui }}" }
+  run_api: { value: "${{ steps.c.outputs.run_api }}" }
+  run_db: { value: "${{ steps.c.outputs.run_db }}" }
+  run_playwright: { value: "${{ steps.c.outputs.run_playwright }}" }
+  run_enterprise: { value: "${{ steps.c.outputs.run_enterprise }}" }
+  changed_workflows: { value: "${{ steps.c.outputs.changed_workflows }}" }
+  unknown: { value: "${{ steps.c.outputs.unknown }}" }
+runs:
+  using: composite
+  steps:
+    - id: c
+      shell: bash
+      env:
+        BASE: ${{ inputs.base }}
+        HEAD: ${{ inputs.head }}
+      run: |
+        CHANGED=$(git -c core.quotepath=false diff --name-only "$BASE" "$HEAD" 2>/dev/null || true)
+        printf '%s\n' "$CHANGED" | "$GITHUB_ACTION_PATH/classify.sh" | tee -a "$GITHUB_OUTPUT"

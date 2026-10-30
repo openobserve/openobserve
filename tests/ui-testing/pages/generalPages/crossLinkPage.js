@@ -80,6 +80,59 @@ export class CrossLinkPage {
         return `[data-test="log-detail-row-${fieldName}"]`;
     }
 
+    // ---- Sentinel POM locator getters (relocated from spec raw selectors) ----
+    getAddCrossLinkBtnLocator() {
+        return this.page.locator('[data-test="add-cross-link-btn"]');
+    }
+
+    getCrossLinkEmptyLocator() {
+        return this.page.locator('[data-test="cross-link-empty"]').first();
+    }
+
+    getCrossLinkListLocator() {
+        return this.page.locator('[data-test="cross-link-list"]').first();
+    }
+
+    getCrossLinkNameInputLocator() {
+        return this.page.locator('[data-test="cross-link-name-input"]');
+    }
+
+    getCrossLinkUrlInputLocator() {
+        return this.page.locator('[data-test="cross-link-url-input"]');
+    }
+
+    getCrossLinkFieldInputLocator() {
+        return this.page.locator('[data-test="cross-link-field-input"]');
+    }
+
+    getCrossLinkCancelBtnLocator() {
+        return this.page.locator('[data-test="cross-link-dialog"] [data-test="o-dialog-secondary-btn"]');
+    }
+
+    getCrossLinkItemLocator(idx) {
+        return this.page.locator(this.crossLinkItem(idx));
+    }
+
+    getCrossLinkEditBtnLocator(idx) {
+        return this.page.locator(this.crossLinkEditBtn(idx));
+    }
+
+    getCrossLinkDeleteBtnLocator(idx) {
+        return this.page.locator(this.crossLinkDeleteBtn(idx));
+    }
+
+    getLogDetailRowLocator(fieldName) {
+        return this.page.locator(this.logDetailRow(fieldName));
+    }
+
+    async getCrossLinkItemNameCount() {
+        return await this.page.locator('[data-test^="cross-link-item-name-"]').count();
+    }
+
+    async getDeletableCrossLinkCount() {
+        return await this.page.locator('[data-test^="cross-link-delete-"]').count();
+    }
+
     logDetailsCrossLinkMenuItem(crossLinkName) {
         return `[data-test="log-details-cross-link-${crossLinkName}"]`;
     }
@@ -88,9 +141,16 @@ export class CrossLinkPage {
     async navigateToStreams() {
         testLogger.debug('Navigating to streams page via URL');
         const orgId = process.env["ORGNAME"] || 'default';
+        // enable_cross_linking only arrives with the org-scoped /api/<org>/config; the public /config lacks it and the tab stays hidden until it lands.
+        const isOrgConfig = (resp) => /\/api\/[^/]+\/config(\?|$)/.test(new URL(resp.url()).pathname) && resp.status() === 200;
+        let orgConfig = this.page.waitForResponse(isOrgConfig, { timeout: 20000 }).catch(() => null);
         await this.page.goto(`${process.env["ZO_BASE_URL"] || 'http://localhost:5080'}/web/streams?org_identifier=${orgId}`);
+        if (!(await orgConfig)) {
+            orgConfig = this.page.waitForResponse(isOrgConfig, { timeout: 20000 }).catch(() => null);
+            await this.page.reload();
+            await orgConfig;
+        }
         await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-        await this.page.waitForTimeout(2000);
     }
 
     async searchStream(streamName) {
@@ -102,25 +162,42 @@ export class CrossLinkPage {
         const inputInside = this.page.locator('[data-test="streams-search-stream-input"] input');
         await inputInside.click();
         await inputInside.fill(streamName);
-        await this.page.waitForTimeout(1500);
+        this.lastSearchedStream = streamName;
+        // The target row is already painted in the unfiltered list, so wait for the filter to drop every other row; clicking earlier hits a row the re-render replaces.
+        await this.page.waitForFunction((name) => {
+            const cells = [...document.querySelectorAll('[data-test^="log-stream-name-cell-"]')];
+            return cells.length > 0 && cells.every((c) => c.textContent.trim().includes(name));
+        }, streamName, { timeout: 15000 }).catch(() => {
+            testLogger.warn('Stream list did not narrow to the searched stream within 15s', { streamName });
+        });
     }
 
     async openStreamDetail() {
         testLogger.debug('Opening stream details');
         // Resolve the schema/Stream Detail action button via its data-test
         // (see LogStream.vue: data-test="log-stream-schema-btn").
-        const btn = this.page.locator('[data-test="log-stream-schema-btn"]').first();
+        const nameCell = this.lastSearchedStream
+            ? this.page.locator(`[data-test="log-stream-name-cell-${this.lastSearchedStream}"]`)
+            : null;
+        const row = nameCell && (await nameCell.count()) > 0
+            ? nameCell.locator("xpath=ancestor::*[starts-with(@data-test,'o2-table-row-')]").first()
+            : this.page;
+        const btn = row.locator('[data-test="log-stream-schema-btn"]').first();
+        const settingsTab = this.page.locator('[data-test="schema-settings-tab"]');
         await btn.waitFor({ state: 'visible', timeout: 15000 });
         await btn.click();
-        // Wait for the schema panel dialog to fully render with tabs
-        await this.page.waitForTimeout(3000);
+        // The tab strip only renders once the schema request resolves (schema.vue loadingState); one re-click covers a click swallowed by a list re-render.
+        if (!(await settingsTab.waitFor({ state: 'visible', timeout: 15000 }).then(() => true, () => false))) {
+            await btn.click();
+            await settingsTab.waitFor({ state: 'visible', timeout: 30000 });
+        }
     }
 
     async isCrossLinkingTabVisible() {
         testLogger.debug('Checking if cross-linking tab is visible');
         const tab = this.page.locator('[data-test="schema-cross-linking-tab"]');
         try {
-            await tab.waitFor({ state: 'visible', timeout: 5000 });
+            await tab.waitFor({ state: 'visible', timeout: 15000 });
             return true;
         } catch {
             return false;
@@ -129,8 +206,10 @@ export class CrossLinkPage {
 
     async clickCrossLinkingTab() {
         testLogger.debug('Clicking cross-linking tab');
+        await this.page.locator('[data-test="schema-settings-tab"]').waitFor({ state: 'visible', timeout: 30000 });
         const tab = this.page.locator('[data-test="schema-cross-linking-tab"]');
-        await tab.waitFor({ state: 'visible', timeout: 10000 });
+        // The tab is gated on zoConfig.enable_cross_linking, which only lands with the org-scoped /config response.
+        await tab.waitFor({ state: 'visible', timeout: 20000 });
         await tab.click();
         // Wait for cross-link tab content to render
         await this.page.waitForTimeout(2000);
@@ -269,6 +348,11 @@ export class CrossLinkPage {
         await this.page.locator(this.crossLinkSaveBtn).click();
     }
 
+    async clickSaveAndWait() {
+        await this.clickSave();
+        await this.expectDialogNotVisible();
+    }
+
     async clickCancel() {
         testLogger.debug('Clicking cancel button');
         await this.page.locator(this.crossLinkCancelBtn).click();
@@ -343,7 +427,7 @@ export class CrossLinkPage {
         for (const field of fields) {
             await this.addField(field);
         }
-        await this.clickSave();
+        await this.clickSaveAndWait();
     }
 
     async getCrossLinkItemText(idx) {
@@ -550,15 +634,18 @@ export class CrossLinkPage {
      */
     captureCrossLinkRequests() {
         const captured = [];
+        const payloads = [];
         const handler = (req) => {
             const url = req.url();
             if (url.includes('result_schema') && url.includes('cross_linking=true')) {
                 captured.push(url);
+                payloads.push(req.postData() || '');
             }
         };
         this.page.on('request', handler);
         return {
             getUrls: () => captured.slice(),
+            getPayloads: () => payloads.slice(),
             getCount: () => captured.length,
             stop: () => this.page.off('request', handler),
         };
@@ -567,7 +654,8 @@ export class CrossLinkPage {
     /**
      * Begin capturing `result_schema?cross_linking=true` responses so the
      * caller can later assert how many fired. The cross-link dropdown depends
-     * on these responses landing (one per selected stream) before
+     * on these responses landing (one per query, covering every selected
+     * stream) before
      * `searchObj.data.crossLinks` is fully populated.
      *
      * Returns a small handle with `getCount()` + `waitForAtLeast(n)` helpers,
@@ -699,13 +787,6 @@ export class CrossLinkPage {
         return this.page.locator(this.crossLinkItem(idx));
     }
 
-    async crossLinkItemEditBtnLocatorByIdx(idx) {
-        return this.page.locator(this.crossLinkEditBtn(idx));
-    }
-
-    async crossLinkItemDeleteBtnLocatorByIdx(idx) {
-        return this.page.locator(this.crossLinkDeleteBtn(idx));
-    }
 
     // ── Locator getters for assertions in spec files ──────────────────────────
 

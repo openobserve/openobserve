@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { gt } from "@/types/i18n";
+
 import { getDataValue } from "./aliasUtils";
+import { addCommasToNumber } from "@/utils/formatters";
 
 /**
  * Process the SQL data and convert it into a format suitable for the echarts
@@ -96,8 +99,12 @@ export const processData = (
       allKeys.length > top_results) ||
     (!top_results && allKeys.length > (store.state?.zoConfig?.max_dashboard_series ?? 100))
   ) {
-    extras.limitNumberOfSeriesWarningMessage =
-      "Limiting the displayed series to ensure optimal performance";
+    const shown = Math.min(limitSeries, allKeys.length);
+    extras.seriesLimit = { shown, total: allKeys.length, cap: limitSeries };
+    extras.limitNumberOfSeriesWarningMessage = gt("dashboard.utils.seriesLimitWarningCounts", {
+      shown: addCommasToNumber(shown),
+      total: addCommasToNumber(allKeys.length),
+    });
   }
 
   const topKeys = allKeys.slice(0, limitSeries).map(([key]) => key);

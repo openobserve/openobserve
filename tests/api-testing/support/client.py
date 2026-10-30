@@ -118,3 +118,8 @@ class OpenObserveClient:
     def kvstore(self):
         from .endpoints.kvstore import KVStoreAPI
         return KVStoreAPI(self)
+
+    @property
+    def otlp(self):
+        from .endpoints.otlp import OtlpAPI
+        return OtlpAPI(self)

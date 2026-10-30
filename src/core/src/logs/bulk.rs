@@ -19,11 +19,9 @@ use std::{
 };
 
 use axum::body::Bytes;
-#[cfg(feature = "cloud")]
-use config::meta::self_reporting::usage::is_reserved_internal_stream;
 use config::{
     BLOCKED_STREAMS, TIMESTAMP_COL_NAME, get_config,
-    meta::stream::StreamType,
+    meta::{self_reporting::usage::is_internal_rollup_stream, stream::StreamType},
     metrics,
     utils::{
         json,
@@ -32,19 +30,18 @@ use config::{
     },
 };
 use infra::errors::Result;
-use ingestion_common::{
-    BulkResponse, BulkResponseError, BulkResponseItem, IngestionRequest, IngestionValueType,
-};
+use ingestion_common::{BulkResponse, BulkResponseError, BulkResponseItem};
 use schema::{get_future_discard_error, get_upto_discard_error};
 use transform::TRANSFORM_FAILED;
 
 use crate::{
     ingestion::check_ingestion_allowed,
-    logs::{ingestion_log_enabled, log_failed_record},
+    logs::{columnar::JsonColumnar, ingest::BulkPlan, ingestion_log_enabled, log_failed_record},
 };
 pub const TS_PARSE_FAILED: &str = "timestamp_parsing_failed";
 pub const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
 pub const PIPELINE_EXEC_FAILED: &str = "pipeline_execution_failed";
+pub const STREAM_NAME_TOO_LONG: &str = "stream_name_too_long";
 
 pub async fn ingest(
     thread_id: usize,
@@ -71,12 +68,14 @@ pub async fn ingest(
 
     let log_ingestion_errors = ingestion_log_enabled().await;
     let mut action = String::new();
+    let mut raw_stream_name = String::new();
     let mut stream_name = String::new();
     let mut doc_id: Option<String> = None;
     let stream_type = StreamType::Logs;
 
     let mut stream_key_cache: HashMap<String, String> = HashMap::new();
     let mut streams_data: HashMap<String, Vec<json::Value>> = HashMap::new();
+    let mut plans: HashMap<String, Option<BulkPlan>> = HashMap::new();
     let mut next_line_is_data = false;
     // Read lines as bytes to handle potential invalid UTF-8 characters
     let mut line_buffer = Vec::new();
@@ -96,12 +95,22 @@ pub async fn ingest(
         if line_buffer.is_empty() {
             continue;
         }
+
+        let is_data = std::mem::take(&mut next_line_is_data);
+        if is_data
+            && stream_columnar(&mut plans, org_id, &stream_name, (min_ts, max_ts))
+                .await
+                .is_some_and(|c| c.parse_bulk_line(&line_buffer, doc_id.as_deref()))
+        {
+            tokio::task::coop::consume_budget().await;
+            continue;
+        }
         // Use from_utf8_lossy to handle potential invalid UTF-8 characters
         // Invalid UTF-8 sequences will be replaced with the replacement character (�)
         let line_str = String::from_utf8_lossy(&line_buffer);
         let mut value: json::Value = json::from_slice(line_str.as_bytes())?;
 
-        if !next_line_is_data {
+        if !is_data {
             // check bulk operate
             let Some((line_action, line_stream_name, line_doc_id)) =
                 super::parse_bulk_index(&value)
@@ -111,18 +120,24 @@ pub async fn ingest(
             if line_action != action {
                 action = line_action.to_string();
             }
-            if line_stream_name != stream_name {
-                stream_name = line_stream_name.to_string();
+            // formatting reads the shared config, too costly to repeat for every action line
+            if line_stream_name != raw_stream_name {
+                raw_stream_name = line_stream_name.to_string();
+                stream_name = if cfg.common.skip_formatting_stream_name {
+                    raw_stream_name.clone()
+                } else {
+                    format_stream_name(raw_stream_name.clone())
+                };
             }
             doc_id = line_doc_id.map(|id| id.to_string());
 
-            if stream_name.is_empty() || stream_name == "_" || stream_name == "/" {
+            if raw_stream_name.is_empty() || raw_stream_name == "_" || raw_stream_name == "/" {
                 let err_msg = "Invalid stream name: ".to_string() + &line_str;
-                log::warn!("[LOGS:BULK] {err_msg}");
+                log::warn!("[LOGS:BULK] {err_msg}, org_id: {org_id}");
                 bulk_res.errors = true;
                 let err = BulkResponseError::new(
                     err_msg.to_string(),
-                    stream_name.to_string(),
+                    raw_stream_name.to_string(),
                     err_msg,
                     "0".to_string(),
                 );
@@ -130,30 +145,26 @@ pub async fn ingest(
                 item.insert(
                     action.to_string(),
                     BulkResponseItem::new_failed(
-                        stream_name.to_string(),
+                        raw_stream_name.to_string(),
                         doc_id.clone().unwrap_or_default(),
                         err,
                         Some(value),
-                        stream_name.to_string(),
+                        raw_stream_name.to_string(),
                     ),
                 );
                 bulk_res.items.push(item);
                 continue; // skip
             }
 
-            if !cfg.common.skip_formatting_stream_name {
-                stream_name = format_stream_name(stream_name);
-            }
-
-            // Reject reserved self-reporting streams (usage/stats/triggers/...).
-            // Bulk is always a user path (internal self-reporting uses the
-            // non-bulk `IngestionRequest::Usage` channel), so this is safe.
-            // Cloud-only: OSS / self-hosted may legitimately use these names.
-            #[cfg(feature = "cloud")]
-            if is_reserved_internal_stream(&stream_name) {
-                let err_msg =
-                    format!("stream '{stream_name}' is reserved and cannot be ingested into");
-                log::warn!("[LOGS:BULK] {err_msg}");
+            // Reject internal rollup streams (_o2_*, _agent_signals) in ALL
+            // editions — written only by internal aggregation jobs (service
+            // graph, agent signals, database monitoring) through the internal
+            // gRPC channel; bulk is always a user path (design §5.3).
+            if is_internal_rollup_stream(&stream_name) {
+                let err_msg = format!(
+                    "stream '{stream_name}' is an internal rollup stream and cannot be ingested into"
+                );
+                log::warn!("[LOGS:BULK] {err_msg}, org_id: {org_id}");
                 bulk_res.errors = true;
                 let err = BulkResponseError::new(
                     err_msg.clone(),
@@ -189,57 +200,16 @@ pub async fn ingest(
             }
             next_line_is_data = true;
         } else {
-            next_line_is_data = false;
-
             // get json object
             let mut local_val = match value.take() {
                 json::Value::Object(v) => v,
                 _ => unreachable!(),
             };
 
-            // set _id
-            if let Some(doc_id) = &doc_id {
-                local_val.insert("_id".to_string(), json::Value::String(doc_id.to_string()));
-            }
-
-            // check _timestamp
-            let (timestamp, has_valid_timestamp) = match local_val.get(TIMESTAMP_COL_NAME) {
-                Some(v) => match parse_timestamp_micro_from_value(v) {
-                    Ok(t) => (t.0, t.1),
-                    Err(_e) => {
-                        bulk_res.errors = true;
-                        metrics::INGEST_ERRORS
-                            .with_label_values(&[
-                                org_id,
-                                StreamType::Logs.as_str(),
-                                &stream_name,
-                                TS_PARSE_FAILED,
-                            ])
-                            .inc();
-                        log_failed_record(log_ingestion_errors, &value, TS_PARSE_FAILED);
-                        add_record_status(
-                            stream_name.to_string(),
-                            doc_id.clone(),
-                            action.to_string(),
-                            Some(value),
-                            &mut bulk_res,
-                            Some(TS_PARSE_FAILED.to_string()),
-                            Some(TS_PARSE_FAILED.to_string()),
-                        );
-                        continue;
-                    }
-                },
-                None => (now_micros(), false),
-            };
-
-            // check ingestion time
-            if timestamp < min_ts || timestamp > max_ts {
+            if let Err(failure_reason) =
+                prepare_bulk_record(&mut local_val, doc_id.as_deref(), min_ts, max_ts)
+            {
                 bulk_res.errors = true;
-                let failure_reason = if timestamp < min_ts {
-                    Some(get_upto_discard_error().to_string())
-                } else {
-                    Some(get_future_discard_error().to_string())
-                };
                 metrics::INGEST_ERRORS
                     .with_label_values(&[
                         org_id,
@@ -256,15 +226,9 @@ pub async fn ingest(
                     Some(value),
                     &mut bulk_res,
                     Some(TS_PARSE_FAILED.to_string()),
-                    failure_reason,
+                    Some(failure_reason),
                 );
                 continue;
-            }
-            if !has_valid_timestamp {
-                local_val.insert(
-                    TIMESTAMP_COL_NAME.to_string(),
-                    json::Value::Number(timestamp.into()),
-                );
             }
 
             let val = json::Value::Object(local_val);
@@ -278,26 +242,90 @@ pub async fn ingest(
         tokio::task::coop::consume_budget().await;
     }
 
+    plans.retain(|_, plan| plan.as_ref().is_some_and(|p| p.columnar.rows() > 0));
+    for stream in plans.keys() {
+        streams_data.entry(stream.clone()).or_default();
+    }
+
+    // Checked up front, pipeline destinations included: a whole-request 503 is retried safely.
+    #[cfg(feature = "vectorscan")]
+    {
+        let streams: Vec<(&str, u64)> = streams_data
+            .iter()
+            .map(|(stream, records)| (stream.as_str(), records.len() as u64))
+            .collect();
+        let streams =
+            crate::ingestion::with_pipeline_destinations(org_id, stream_type, &streams).await;
+        let streams: Vec<(&str, u64)> = streams.iter().map(|(s, n)| (s.as_str(), *n)).collect();
+        if let Some(reason) =
+            crate::ingestion::sdr_fail_closed_refusal(org_id, stream_type, &streams, |_| false)
+                .await
+        {
+            return Err(infra::errors::Error::ResourceError(reason));
+        }
+    }
+
     // process data by stream
+    #[cfg(feature = "vectorscan")]
+    let mut written_any = false;
     for (stream_name, records) in streams_data {
-        match super::ingest::ingest(
+        #[cfg(feature = "vectorscan")]
+        let record_count = records.len();
+        let plan = plans.remove(&stream_name).flatten();
+        match super::ingest::ingest_bulk(
             thread_id,
             org_id,
             &stream_name,
-            IngestionRequest::JsonValues(IngestionValueType::Bulk, records),
+            records,
+            plan,
             user.clone(),
-            None,
-            false,
         )
         .await
         {
             Ok(v) => {
+                #[cfg(feature = "vectorscan")]
+                {
+                    written_any = true;
+                }
                 for status in v.status {
+                    // the stream status keeps the items but not the write's errors flag
+                    bulk_res.errors |= status
+                        .items
+                        .iter()
+                        .flat_map(|item| item.values())
+                        .any(|item| item.error.is_some());
                     bulk_res.items.extend(status.items);
                 }
             }
             Err(e) => {
                 log::error!("[LOGS:BULK] stream {org_id}/logs/{stream_name}: Ingestion error: {e}");
+                // Once a group is written, a whole-request retry would duplicate it: 503 per item.
+                #[cfg(feature = "vectorscan")]
+                if crate::ingestion::is_sdr_fail_closed_refusal(&e) {
+                    if !written_any {
+                        return Err(e);
+                    }
+                    bulk_res.errors = true;
+                    for _ in 0..record_count {
+                        add_record_status(
+                            stream_name.to_string(),
+                            None,
+                            action.to_string(),
+                            None,
+                            &mut bulk_res,
+                            Some("service_unavailable".to_string()),
+                            Some(e.to_string()),
+                        );
+                        if let Some(item) = bulk_res
+                            .items
+                            .last_mut()
+                            .and_then(|i| i.values_mut().next())
+                        {
+                            item.status = 503;
+                        }
+                    }
+                    continue;
+                }
                 bulk_res.errors = true;
                 metrics::INGEST_ERRORS
                     .with_label_values(&[
@@ -390,15 +418,117 @@ pub fn add_record_status(
             bulk_res.items.push(item);
         }
         None => {
-            item.insert(
-                action,
-                BulkResponseItem::new(stream_name.clone(), doc_id, value, stream_name),
-            );
             if !get_config().common.bulk_api_response_errors_only {
-                bulk_res.items.push(item);
+                bulk_res
+                    .items
+                    .push(success_item(action, &stream_name, doc_id));
             }
         }
     }
+}
+
+/// The response item of a written record; callers skip it under `bulk_api_response_errors_only`.
+pub fn success_item(
+    action: String,
+    stream_name: &str,
+    doc_id: String,
+) -> HashMap<String, BulkResponseItem> {
+    HashMap::from([(
+        action,
+        BulkResponseItem::new(
+            stream_name.to_string(),
+            doc_id,
+            None,
+            stream_name.to_string(),
+        ),
+    )])
+}
+
+/// Success items for records written together, reading the config once rather than per record.
+pub fn add_success_items(
+    stream_name: &str,
+    doc_ids: Vec<Option<String>>,
+    bulk_res: &mut BulkResponse,
+) {
+    if get_config().common.bulk_api_response_errors_only {
+        return;
+    }
+    bulk_res.items.extend(
+        doc_ids.into_iter().map(|doc_id| {
+            success_item("index".to_string(), stream_name, doc_id.unwrap_or_default())
+        }),
+    );
+}
+
+/// `_bulk`'s own step for a data record: set the action's `_id`, then check and set `_timestamp`.
+pub(super) fn prepare_bulk_record(
+    record: &mut json::Map<String, json::Value>,
+    doc_id: Option<&str>,
+    min_ts: i64,
+    max_ts: i64,
+) -> std::result::Result<(), String> {
+    if let Some(doc_id) = doc_id {
+        record.insert("_id".to_string(), json::Value::String(doc_id.to_string()));
+    }
+    let parsed = record
+        .get(TIMESTAMP_COL_NAME)
+        // flattening renames a key such as `@timestamp` to `_timestamp`
+        .or_else(|| {
+            record
+                .iter()
+                .find(|(key, value)| {
+                    // what `format_key` turns into `_timestamp`, matched without allocating
+                    let key = key.as_bytes();
+                    key.len() == TIMESTAMP_COL_NAME.len()
+                        && !key[0].is_ascii_alphanumeric()
+                        && key[1..].eq_ignore_ascii_case(&TIMESTAMP_COL_NAME.as_bytes()[1..])
+                        && (value.is_string() || value.is_number())
+                })
+                .map(|(_, value)| value)
+        })
+        .map(parse_timestamp_micro_from_value);
+    let (timestamp, has_valid_timestamp) = resolve_bulk_timestamp(parsed, min_ts, max_ts)?;
+    // inserted last, a stamped `_timestamp` is the one flattening keeps
+    if !has_valid_timestamp || !record.contains_key(TIMESTAMP_COL_NAME) {
+        record.insert(
+            TIMESTAMP_COL_NAME.to_string(),
+            json::Value::Number(timestamp.into()),
+        );
+    }
+    Ok(())
+}
+
+/// `_bulk`'s verdict on a parsed `_timestamp`, stamping now when absent; the error is the reason.
+pub(super) fn resolve_bulk_timestamp(
+    parsed: Option<anyhow::Result<(i64, bool)>>,
+    min_ts: i64,
+    max_ts: i64,
+) -> std::result::Result<(i64, bool), String> {
+    let (timestamp, has_valid_timestamp) = match parsed {
+        Some(parsed) => parsed.map_err(|_| TS_PARSE_FAILED.to_string())?,
+        None => (now_micros(), false),
+    };
+    if timestamp < min_ts {
+        return Err(get_upto_discard_error().to_string());
+    }
+    if timestamp > max_ts {
+        return Err(get_future_discard_error().to_string());
+    }
+    Ok((timestamp, has_valid_timestamp))
+}
+
+/// The stream's columnar rows, planned on its first data line of the request.
+async fn stream_columnar<'a>(
+    plans: &'a mut HashMap<String, Option<BulkPlan>>,
+    org_id: &str,
+    stream_name: &str,
+    time_range: (i64, i64),
+) -> Option<&'a mut JsonColumnar> {
+    if !plans.contains_key(stream_name) {
+        let plan = super::ingest::plan_bulk_columnar(org_id, stream_name, time_range).await;
+        plans.insert(stream_name.to_string(), plan);
+    }
+    Some(&mut plans.get_mut(stream_name)?.as_mut()?.columnar)
 }
 
 #[cfg(test)]
@@ -424,6 +554,147 @@ mod tests {
             None,
         );
         assert!(bulk_res.items.len() == 1);
+    }
+
+    #[test]
+    fn test_prepare_bulk_record() {
+        let now = now_micros();
+        let (min_ts, max_ts) = (now - 3_600_000_000, now + 3_600_000_000);
+        let prepare = |record: json::Value, doc_id: Option<&str>| {
+            let mut record = record.as_object().unwrap().clone();
+            prepare_bulk_record(&mut record, doc_id, min_ts, max_ts).map(|()| record)
+        };
+        let record = prepare(json::json!({"_id": "own", "_timestamp": now}), Some("a")).unwrap();
+        assert_eq!(record["_id"], "a");
+        assert_eq!(record["_timestamp"], json::json!(now));
+        let record = prepare(json::json!({"_id": "own", "level": "x"}), None).unwrap();
+        assert_eq!(record["_id"], "own");
+        assert!(record["_timestamp"].as_i64().is_some_and(|ts| ts >= now));
+        let record = prepare(json::json!({"_timestamp": now / 1_000_000}), None).unwrap();
+        assert_eq!(
+            record["_timestamp"],
+            json::json!(now / 1_000_000 * 1_000_000)
+        );
+        assert_eq!(
+            prepare(json::json!({"_timestamp": "garbage"}), None),
+            Err(TS_PARSE_FAILED.to_string())
+        );
+        assert_eq!(
+            prepare(json::json!({"_timestamp": min_ts - 1}), None),
+            Err(get_upto_discard_error().to_string())
+        );
+        assert_eq!(
+            prepare(json::json!({"_timestamp": max_ts + 1}), None),
+            Err(get_future_discard_error().to_string())
+        );
+    }
+
+    // cloud builds reject the unknown test org at the trial check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_ingest_fails_only_the_stream_whose_key_is_too_long() {
+        let long_name = "b".repeat(infra::file_list::STREAM_KEY_MAX_LEN);
+        let body = format!(
+            "{{\"index\": {{\"_index\": \"test_bulk_key_len_ok\", \"_id\": \"1\"}}}}\n{{\"message\": \"a\"}}\n\
+             {{\"index\": {{\"_index\": \"{long_name}\", \"_id\": \"2\"}}}}\n{{\"message\": \"b\"}}\n"
+        );
+        let resp = ingest(
+            1,
+            "test_org_id",
+            Bytes::from(body),
+            IngestUser::from_user_email("a@a.com"),
+        )
+        .await
+        .unwrap();
+
+        let bounded =
+            infra::file_list::stream_key_violation("test_org_id", StreamType::Logs, &long_name)
+                .is_some();
+        let rejected: Vec<&BulkResponseItem> = resp
+            .items
+            .iter()
+            .flat_map(|item| item.values())
+            .filter(|item| {
+                item.error
+                    .as_ref()
+                    .is_some_and(|e| e.err_type == STREAM_NAME_TOO_LONG)
+            })
+            .collect();
+        if bounded {
+            assert_eq!(rejected.len(), 1);
+            assert_eq!(rejected[0]._id, "2");
+            assert_eq!(rejected[0]._index, long_name);
+        } else {
+            assert!(rejected.is_empty());
+        }
+        assert_eq!(resp.errors, bounded);
+        assert!(
+            infra::schema::exists("test_org_id", StreamType::Logs, "test_bulk_key_len_ok").await
+        );
+        assert_eq!(
+            infra::schema::exists("test_org_id", StreamType::Logs, &long_name).await,
+            !bounded
+        );
+    }
+
+    #[test]
+    fn test_prepare_bulk_record_reads_a_key_flattened_into_timestamp() {
+        let now = now_micros();
+        let (min_ts, max_ts) = (now - 3_600_000_000, now + 3_600_000_000);
+        let ts = (now - 60_000_000) / 1000 * 1000;
+        let iso = chrono::DateTime::from_timestamp_micros(ts)
+            .unwrap()
+            .to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        let stored = |record: json::Value| {
+            let mut record = record.as_object().unwrap().clone();
+            prepare_bulk_record(&mut record, None, min_ts, max_ts)?;
+            crate::logs::ingest::prepare_record(json::Value::Object(record), 0, min_ts, max_ts)
+                .map(|(_, timestamp)| timestamp)
+                .map_err(|_| "rejected after flattening".to_string())
+        };
+        assert_eq!(
+            stored(json::json!({"@timestamp": ts, "level": "a"})),
+            Ok(ts)
+        );
+        assert_eq!(stored(json::json!({"@timestamp": iso})), Ok(ts));
+        assert_eq!(stored(json::json!({"_Timestamp": ts})), Ok(ts));
+        assert!(stored(json::json!({"Atimestamp": ts, "éimestamp": ts})).unwrap() >= now);
+        // the checked value is the stored one, also when a second key is renamed
+        assert_eq!(
+            stored(json::json!({"@timestamp": ts, "-timestamp": min_ts - 1})),
+            Ok(ts)
+        );
+        assert_eq!(
+            stored(json::json!({"@timestamp": "garbage"})),
+            Err(TS_PARSE_FAILED.to_string())
+        );
+        assert_eq!(
+            stored(json::json!({"@timestamp": min_ts - 1})),
+            Err(get_upto_discard_error().to_string())
+        );
+        assert_eq!(
+            stored(json::json!({"@timestamp": max_ts + 1})),
+            Err(get_future_discard_error().to_string())
+        );
+        // a value that is neither a string nor a number is not a time, so the record is stamped now
+        for value in [
+            json::Value::Null,
+            json::json!(true),
+            json::json!([ts]),
+            json::json!({"a": ts}),
+        ] {
+            let stamped = stored(json::json!({"@timestamp": value})).unwrap();
+            assert!(stamped >= now, "{value}");
+        }
+        // `_timestamp` is stamped as before, now with the record's own time
+        let mut record = json::json!({"@timestamp": ts});
+        let record = record.as_object_mut().unwrap();
+        prepare_bulk_record(record, None, min_ts, max_ts).unwrap();
+        assert_eq!(record[TIMESTAMP_COL_NAME], json::json!(ts));
+        // `_timestamp` itself is checked first
+        let mut record = json::json!({"@timestamp": min_ts - 1, "_timestamp": ts});
+        let record = record.as_object_mut().unwrap();
+        assert_eq!(prepare_bulk_record(record, None, min_ts, max_ts), Ok(()));
     }
 
     #[tokio::test]

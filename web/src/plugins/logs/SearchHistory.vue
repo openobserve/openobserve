@@ -6,6 +6,14 @@
     :back="{ onClick: closeSearchHistory }"
     bleed
   >
+    <template #subtitle>
+      <div class="flex min-w-0 items-center gap-2">
+        <OTag type="streamType" :value="activeStreamType" />
+        <OTruncatedText v-if="activeStreamName" class="leading-normal">{{
+          activeStreamName
+        }}</OTruncatedText>
+      </div>
+    </template>
     <template #actions>
       <OButton
         data-test="search-history-wrap-content-btn"
@@ -23,20 +31,24 @@
         <OTooltip :content="t('search.messageWrapContent')" />
       </OButton>
       <div
-        class="text-status-warning-text border-status-warning-text rounded-default flex h-9 items-center border px-2"
+        class="text-status-warning-text border-status-warning-text rounded-default flex h-9 items-center border px-2 max-md:hidden"
       >
-        <OIcon name="info" class="mr-1" size="sm" />
+        <OIcon name="info" class="me-1" size="sm" />
         <div>
           {{ t("search_history.delayMessage") }} <b>{{ delayMessage }}</b>
         </div>
       </div>
       <div class="[&_#date-time-button]:h-9!">
+        <!-- Without its shift arrows on phones the picker fits beside the title. -->
         <DateTime
           data-test-name="search-history-date-time"
           ref="searchDateTimeRef"
           auto-apply
           menu-align="end"
-          :default-type="searchObj.data.datetime.type"
+          :hide-range-shift="isMobile"
+          :default-type="restoredDate.valueType || searchObj.data.datetime.type"
+          :default-relative-time="restoredDate.relativeTimePeriod || '15m'"
+          :default-absolute-time="restoredDate.absolute"
           @on:date-change="updateDateTime"
         />
       </div>
@@ -59,17 +71,34 @@
         </OButton>
       </div>
     </template>
+    <div
+      class="text-status-warning-text border-border-default flex shrink-0 items-center border-b px-3 py-1.5 text-xs md:hidden"
+    >
+      <OIcon name="info" class="me-1 shrink-0" size="sm" />
+      <div>
+        {{ t("search_history.delayMessage") }} <b>{{ delayMessage }}</b>
+      </div>
+    </div>
     <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
       <OTable
+        ref="oTableRef"
         :frame="false"
         :data="dataToBeLoaded"
         :columns="columnsToBeRendered"
         row-key="uuid"
         :loading="isLoading"
+        :forbidden="forbidden"
         pagination="client"
         :page-size="pageSize"
         :page-size-options="pageSizeOptions"
+        :current-page="currentPage"
+        @update:current-page="currentPage = $event"
+        @update:page-size="pageSize = $event"
         sorting="client"
+        :sort-by="sortBy"
+        :sort-order="sortOrder"
+        @update:sort-by="sortBy = $event"
+        @update:sort-order="sortOrder = $event"
         expansion="single"
         :expand-on-row-click="true"
         v-model:expanded-ids="expandedIds"
@@ -117,12 +146,13 @@
                              accent lives on the block's left border, which marks
                              which language you're looking at. -->
                     <OButton
+                      :aria-label="t('common.copyToClipboard')"
                       data-test="search-history-copy-sql-btn"
                       variant="outline"
                       size="icon-chip"
-                      class="ml-2"
+                      class="ms-2"
                       @click.stop="
-                        copyToClipboard(row.sql, {
+                        copyToClipboard(row.sql, t, {
                           successMessage: t('logs.searchHistory.sqlQueryCopied'),
                           timeout: 5000,
                         })
@@ -141,7 +171,7 @@
                   @click.stop="goToLogs(row)"
                 >
                   <template #icon-left><OIcon name="search" size="xs" /></template>
-                  {{ t("logs.searchHistory.logs") }}
+                  {{ goToLogsLabel(row) }}
                 </OButton>
                 <OButton
                   v-if="
@@ -160,7 +190,7 @@
               </div>
               <div class="flex items-start justify-center">
                 <div
-                  class="border-border-default border-l-sql-accent bg-surface-subtle text-text-body o2-colorized-query h-full max-h-50 w-full overflow-y-auto border border-l-3 p-2.5"
+                  class="border-border-default border-s-sql-accent bg-surface-subtle text-text-body h-full max-h-50 w-full overflow-y-auto border border-s-3 p-2.5"
                 >
                   <!-- Monaco-colorized SQL (sanitized in colorizeRow), same
                            as the dashboard Query Inspector. Falls back to plain
@@ -175,8 +205,7 @@
                   <pre
                     v-else
                     class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
-                    >{{ row?.sql }}</pre
-                  >
+                    >{{ row?.sql }}</pre>
                 </div>
               </div>
             </div>
@@ -190,12 +219,13 @@
                   <span>
                     <!-- Same neutral copy affordance as the SQL block above. -->
                     <OButton
+                      :aria-label="t('common.copyToClipboard')"
                       data-test="search-history-copy-function-btn"
                       variant="outline"
                       size="icon-chip"
-                      class="ml-2"
+                      class="ms-2"
                       @click.stop="
-                        copyToClipboard(row.function, {
+                        copyToClipboard(row.function, t, {
                           successMessage: t('logs.searchHistory.functionDefinitionCopied'),
                           timeout: 5000,
                         })
@@ -207,7 +237,7 @@
 
               <div class="flex items-start justify-center">
                 <div
-                  class="border-border-default border-l-function-accent bg-surface-subtle text-text-body o2-colorized-query h-full max-h-50 w-full overflow-y-auto border border-l-3 p-2.5"
+                  class="border-border-default border-s-function-accent bg-surface-subtle text-text-body h-full max-h-50 w-full overflow-y-auto border border-s-3 p-2.5"
                 >
                   <pre
                     v-if="colorizedFunction[row.uuid]"
@@ -218,8 +248,7 @@
                   <pre
                     v-else
                     class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
-                    >{{ row?.function }}</pre
-                  >
+                    >{{ row?.function }}</pre>
                 </div>
               </div>
             </div>
@@ -228,7 +257,7 @@
                    the query blocks above. -->
           <div v-show="activeTab === 'more_details'" class="px-4">
             <QueryEditor
-              style="height: 200px"
+              style="height: 12.5rem"
               :ref="`QueryEditorRef${row.trace_id + row.sql}`"
               :editor-id="`search-query-editor${row.trace_id + row.sql}`"
               :debounceTime="600"
@@ -245,13 +274,8 @@
           </div>
         </template>
 
-        <template #bottom>
-          <div class="flex h-12 w-full items-center justify-between">
-            <div class="mr-md flex w-25 items-center text-xs font-normal">
-              {{ resultTotal }} {{ t("search_history.results") }}
-            </div>
-            <div class="mr-2 ml-auto">{{ t("logs.searchHistory.maxLimit") }} <b>1000</b></div>
-          </div>
+        <template v-if="dataToBeLoaded.length > 0" #footer-note>
+          <span>{{ t("logs.searchHistory.maxLimit") }} <b>1000</b></span>
         </template>
       </OTable>
     </div>
@@ -269,7 +293,7 @@
           {{ t("logs.index.searchHistoryNotEnabled") }}
         </div>
         <div class="mt-2 flex items-center justify-center opacity-80">
-          <OIcon name="info" class="mr-1" size="md" />
+          <OIcon name="info" class="me-1" size="md" />
           <span class="text-center text-xl font-semibold">
             {{ t("logs.index.enableUsageReporting") }}</span
           >
@@ -283,28 +307,40 @@
 </template>
 <script lang="ts">
 //@ts-nocheck
-import { ref, onMounted, computed, onUnmounted } from "vue";
+import {
+  ref,
+  onMounted,
+  computed,
+  onUnmounted,
+  defineAsyncComponent,
+  defineComponent,
+  watch,
+} from "vue";
+import { useListViewState } from "@/composables/useListViewState";
 import { timestampToTimezoneDate, b64EncodeUnicode, getUUID } from "@/utils/zincutils";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
-import { defineAsyncComponent, defineComponent } from "vue";
 import { searchState } from "@/composables/useLogs/searchState";
 import searchService from "@/services/search";
 import DOMPurify from "dompurify";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import DateTime from "@/components/DateTime.vue";
-import { useI18n } from "vue-i18n";
+import useBreakpoint from "@/composables/useBreakpoint";
+import { useI18nTyped } from "@/types/i18n";
 import AppTabs from "@/components/common/AppTabs.vue";
 
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import { resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import { useShortcuts, getManager } from "@/lib/vue-shortcut-manager";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -324,7 +360,9 @@ export default defineComponent({
     QueryEditor,
     OButton,
     OIcon,
+    OTag,
     OTooltip,
+    OTruncatedText,
     OTable,
     OTimeCell,
     OPageLayout,
@@ -345,23 +383,67 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
+    const { isMobile } = useBreakpoint();
     const searchDateTimeRef = ref(null);
     const wrapText = ref(true);
     const { searchObj } = searchState();
     const dataToBeLoaded: any = ref([]);
-    const dateTimeToBeSent = ref({
-      valueType: "relative",
-      relativeTimePeriod: "15m",
+    const viewState = useListViewState("searchHistory", {
+      valueType: "",
+      relativeTimePeriod: "",
       startTime: 0,
       endTime: 0,
+      pageSize: 100,
+      currentPage: 1,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
     });
+    const restoredDate = {
+      valueType: viewState.valueType,
+      relativeTimePeriod: viewState.relativeTimePeriod,
+      absolute:
+        viewState.valueType === "absolute"
+          ? { startTime: viewState.startTime, endTime: viewState.endTime }
+          : null,
+    };
+    const dateTimeToBeSent = ref({
+      valueType: viewState.valueType || "relative",
+      relativeTimePeriod: viewState.relativeTimePeriod || "15m",
+      startTime: viewState.startTime,
+      endTime: viewState.endTime,
+    });
+    const oTableRef: any = ref(null);
+    const currentPage = ref(viewState.currentPage);
+    const sortBy = ref(viewState.sortBy);
+    const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
+    let pendingPageRestore = true;
     const columnsToBeRendered = ref<OTableColumnDef[]>([]);
     const expandedIds = ref<string[]>([]);
     const isLoading = ref(false);
+    const forbidden = ref(false);
     const moreDetailsToDisplay = ref("");
 
     const { extractTimestamps } = logsUtils();
+
+    const ALLOWED_HISTORY_STREAM_TYPES = ["logs", "metrics", "traces"];
+
+    // The route query (set by the page the user navigated from, e.g. Data
+    // Sources or the Logs page itself) is the source of truth for which
+    // telemetry type/stream this history view is scoped to; searchObj is the
+    // fallback for a same-session deep link that didn't carry the query.
+    // The query param is attacker-controlled (URL), so it's whitelisted here
+    // as defense in depth on top of the backend validation.
+    const activeStreamType = computed(() => {
+      const fromRoute = route.query.stream_type as string;
+      if (ALLOWED_HISTORY_STREAM_TYPES.includes(fromRoute)) return fromRoute;
+      return searchObj.data.stream.streamType || "logs";
+    });
+    const activeStreamName = computed(() =>
+      route.query.stream === undefined
+        ? searchObj.data.stream.selectedStream[0] || ""
+        : (route.query.stream as string),
+    );
 
     const activeTab = ref("query");
     const tabs = ref([
@@ -379,9 +461,7 @@ export default defineComponent({
 
     onUnmounted(() => {});
 
-    const resultTotal = ref<number>(0);
-
-    const pageSize = ref(100);
+    const pageSize = ref(viewState.pageSize);
     const pageSizeOptions = [5, 10, 20, 50, 100];
 
     // Columns are a fixed schema (not derived from the response), so they can be
@@ -421,6 +501,7 @@ export default defineComponent({
           router.currentRoute.value.query.org_identifier ||
           store.state.selectedOrganization.identifier;
         isLoading.value = true;
+        forbidden.value = false;
         if (dateTimeToBeSent.value.valueType === "relative") {
           const convertedData = extractTimestamps(dateTimeToBeSent.value.relativeTimePeriod);
           dateTimeToBeSent.value.startTime = convertedData.from * 1000;
@@ -449,12 +530,15 @@ export default defineComponent({
           return;
         }
 
-        const response = await searchService.get_history(org_identifier, startTime, endTime);
+        const response = await searchService.get_history(
+          org_identifier,
+          startTime,
+          endTime,
+          activeStreamType.value,
+          activeStreamName.value,
+        );
         const limitedHits = response.data.hits;
         const filteredHits = limitedHits.filter((hit) => hit.event === "Search");
-        if (filteredHits.length > 0) {
-          resultTotal.value = filteredHits.length;
-        }
         columnsToBeRendered.value = generateColumns();
         filteredHits.forEach((hit: any) => {
           //adding uuid to each which will be used to track the expanded "row"
@@ -491,12 +575,21 @@ export default defineComponent({
         });
         dataToBeLoaded.value = filteredHits;
         isLoading.value = false;
-      } catch (error) {
-        toast({
-          variant: "error",
-          message: t("logs.searchHistory.fetchFailed"),
-          timeout: 5000,
-        });
+        if (pendingPageRestore) {
+          pendingPageRestore = false;
+          // Macrotask so the restored page wins over the table's own reset on data change.
+          setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
+        }
+      } catch (error: any) {
+        forbidden.value = error?.response?.status === 403;
+        // The grouped access toast already reports a 403; a second red toast adds nothing.
+        if (!forbidden.value) {
+          toast({
+            variant: "error",
+            message: t("logs.searchHistory.fetchFailed"),
+            timeout: 5000,
+          });
+        }
         console.log(error, "error");
         isLoading.value = false;
       } finally {
@@ -509,12 +602,16 @@ export default defineComponent({
         return t("logs.searchHistory.sixtySeconds");
       } else {
         const minutes = Math.floor(delay / 60);
-        return t("logs.searchHistory.minutes", { minutes });
+        return t("logs.searchHistory.minutes", { count: minutes });
       }
     });
 
     const updateDateTime = async (value: any) => {
       dateTimeToBeSent.value = value;
+      viewState.valueType = value.valueType;
+      viewState.relativeTimePeriod = value.relativeTimePeriod ?? "";
+      viewState.startTime = value.startTime;
+      viewState.endTime = value.endTime;
       searchDateTimeRef.value.setAbsoluteTime(value.startTime, value.endTime);
       // Auto-run on a genuine user time change (consistent with the rest of the
       // app). Skip programmatic emits — the setAbsoluteTime() call above re-emits
@@ -522,7 +619,7 @@ export default defineComponent({
       if (value.userChangedValue) fetchSearchHistory();
     };
     const formatTime = (took) => {
-      return `${took.toFixed(2)} sec`;
+      return t("logs.searchHistory.tookSeconds", { seconds: took.toFixed(2) });
     };
     const calculateDuration = (startTime, endTime) => {
       const durationMicroseconds = endTime - startTime;
@@ -531,45 +628,52 @@ export default defineComponent({
       // Store the raw duration in a separate property
       const rawDuration = durationSeconds;
 
-      let result = "";
+      // One whole-sentence key per unit combination — the remainder clause cannot
+      // be appended as a translated fragment without breaking other locales.
+      let result: string = "";
 
       if (durationSeconds < 60) {
-        result = `${durationSeconds.toFixed(2)} seconds`;
+        result = t("logs.searchHistory.durationSeconds", {
+          seconds: durationSeconds.toFixed(2),
+        });
       } else if (durationSeconds < 3600) {
         const minutes = Math.floor(durationSeconds / 60);
         const seconds = durationSeconds % 60;
-        result = `${minutes} minutes`;
-        if (seconds > 0) {
-          result += ` and ${seconds.toFixed(2)} seconds`;
-        }
+        result =
+          seconds > 0
+            ? t("logs.searchHistory.durationMinutesSeconds", {
+                minutes,
+                seconds: seconds.toFixed(2),
+              })
+            : t("logs.searchHistory.durationMinutes", { minutes });
       } else if (durationSeconds < 86400) {
         const hours = Math.floor(durationSeconds / 3600);
         const minutes = Math.floor((durationSeconds % 3600) / 60);
-        result = `${hours} hours`;
-        if (minutes > 0) {
-          result += ` and ${minutes} minutes`;
-        }
+        result =
+          minutes > 0
+            ? t("logs.searchHistory.durationHoursMinutes", { hours, minutes })
+            : t("logs.searchHistory.durationHours", { hours });
       } else if (durationSeconds < 2592000) {
         const days = Math.floor(durationSeconds / 86400);
         const hours = Math.floor((durationSeconds % 86400) / 3600);
-        result = `${days} days`;
-        if (hours > 0) {
-          result += ` and ${hours} hours`;
-        }
+        result =
+          hours > 0
+            ? t("logs.searchHistory.durationDaysHours", { days, hours })
+            : t("logs.searchHistory.durationDays", { days });
       } else if (durationSeconds < 31536000) {
         const months = Math.floor(durationSeconds / 2592000);
         const days = Math.floor((durationSeconds % 2592000) / 86400);
-        result = `${months} months`;
-        if (days > 0) {
-          result += ` and ${days} days`;
-        }
+        result =
+          days > 0
+            ? t("logs.searchHistory.durationMonthsDays", { months, days })
+            : t("logs.searchHistory.durationMonths", { months });
       } else {
         const years = Math.floor(durationSeconds / 31536000);
         const months = Math.floor((durationSeconds % 31536000) / 2592000);
-        result = `${years} years`;
-        if (months > 0) {
-          result += ` and ${months} months`;
-        }
+        result =
+          months > 0
+            ? t("logs.searchHistory.durationYearsMonths", { years, months })
+            : t("logs.searchHistory.durationYears", { years });
       }
 
       return { formatted: result, raw: rawDuration };
@@ -607,6 +711,11 @@ export default defineComponent({
         colorizeRow(row);
       }
     };
+    // goToLogs re-opens the row's own stream_type (logs/metrics/traces), so the
+    // button label must match that destination rather than always saying "Logs".
+    const goToLogsLabel = (row: { stream_type?: string }) =>
+      resolveBadgeLabel("streamType", row.stream_type || "logs");
+
     const goToLogs = (row) => {
       // emit('closeSearchHistory');
       const stream: string = row.stream_name;
@@ -615,7 +724,7 @@ export default defineComponent({
       const query = b64EncodeUnicode(row.sql);
 
       const queryObject = {
-        stream_type: "logs",
+        stream_type: row.stream_type || "logs",
         stream,
         period: "15m",
         refresh,
@@ -674,6 +783,14 @@ export default defineComponent({
         return filtered;
       }, {});
     }
+    watch([pageSize, currentPage, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        pageSize: pageSize.value,
+        currentPage: currentPage.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
+    });
     useShortcuts([
       {
         id: "searchHistoryRefresh",
@@ -682,17 +799,15 @@ export default defineComponent({
         },
       },
     ]);
-    // Own page: claim the keyboard scope and load history on mount, then hand the
-    // scope back to the logs page on leave.
     onMounted(() => {
-      getManager()?.setScope("search-history");
       fetchSearchHistory();
     });
-    onUnmounted(() => {
-      getManager()?.setScope("logs");
-    });
+
     return {
+      isMobile,
       searchObj,
+      activeStreamType,
+      activeStreamName,
       store,
       generateColumns,
       fetchSearchHistory,
@@ -701,10 +816,12 @@ export default defineComponent({
       t,
       route,
       isLoading,
+      forbidden,
       updateDateTime,
       searchDateTimeRef,
       expandedIds,
       goToLogs,
+      goToLogsLabel,
       goToInspector,
       onExpandedIdsChange,
       colorizedSql,
@@ -712,9 +829,13 @@ export default defineComponent({
       copyToClipboard,
       formatTime,
       delayMessage,
-      resultTotal,
       pageSize,
       pageSizeOptions,
+      currentPage,
+      sortBy,
+      sortOrder,
+      oTableRef,
+      restoredDate,
       activeTab,
       tabs,
       moreDetailsToDisplay,
@@ -725,14 +846,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped>
-/* keep(generated-content): Monaco's colorize() injects .mtkN token spans via
-   v-html, so these can't be template utilities. Every colour but .mtk1 comes
-   from Monaco's own global stylesheet; .mtk1 is its default-text token, which
-   we point back at the block's own colour so the query inherits our theme
-   instead of Monaco's. Mirrors dashboards/QueryInspector.vue. */
-.o2-colorized-query :deep(.mtk1) {
-  color: inherit;
-}
-</style>

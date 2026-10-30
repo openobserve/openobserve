@@ -131,15 +131,22 @@ describe("AlertSettingsHelpDrawer", () => {
     expect(chips.some((c) => c.text() === "{alert_name}")).toBe(true);
   });
 
-  it("does NOT advertise {alert_agg_value} (server never substitutes it)", async () => {
-    // Regression: this is a phantom variable; offering it would send literal
-    // '{alert_agg_value}' to the destination.
+  it("advertises {alert_agg_value} and {alert_description} (both are substituted by the server)", async () => {
+    // alert_agg_value is now a real substituted variable (see src/core/src/alerts/alert.rs),
+    // so the drawer must advertise it alongside alert_description.
     w = mountDrawer({ topic: "variables" });
     await w.find('[data-test="help-builtin-toggle"]').trigger("click");
     const chips = w.findAll('[data-test="help-builtin-var"]');
-    expect(chips.some((c) => c.text() === "{alert_agg_value}")).toBe(false);
-    // and it should advertise the real {alert_description}
+    expect(chips.some((c) => c.text() === "{alert_agg_value}")).toBe(true);
     expect(chips.some((c) => c.text() === "{alert_description}")).toBe(true);
+  });
+
+  it("advertises {alert_start_time_millis} and {alert_end_time_millis} (both are substituted by the server)", async () => {
+    w = mountDrawer({ topic: "variables" });
+    await w.find('[data-test="help-builtin-toggle"]').trigger("click");
+    const chips = w.findAll('[data-test="help-builtin-var"]');
+    expect(chips.some((c) => c.text() === "{alert_start_time_millis}")).toBe(true);
+    expect(chips.some((c) => c.text() === "{alert_end_time_millis}")).toBe(true);
   });
 
   it("teaches the WHY with a before/after comparison", () => {
@@ -291,7 +298,7 @@ describe("AlertSettingsHelpDrawer", () => {
     // no empty <pre> preview box left on screen
     // only the worked-example blocks (row code, main code, rendered result) —
     // no empty preview box for the absent row template.
-    expect(w.findAll("pre.preview-box").length).toBe(3);
+    expect(w.findAll('[data-test="help-preview-box"]').length).toBe(3);
   });
 
   it("rowTemplate panel renders the preview box when a row template IS set", () => {
@@ -309,7 +316,9 @@ describe("AlertSettingsHelpDrawer", () => {
     for (const topic of ["template", "variables", "rowTemplate"] as const) {
       w = mountDrawer({ topic, currentTemplate: "", rowTemplate: "" });
       await w.vm.$nextTick();
-      const emptyPre = w.findAll("pre.preview-box").filter((p) => p.text().trim() === "");
+      const emptyPre = w
+        .findAll('[data-test="help-preview-box"]')
+        .filter((p) => p.text().trim() === "");
       expect(emptyPre.length).toBe(0);
       w.unmount();
     }

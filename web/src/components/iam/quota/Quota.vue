@@ -28,15 +28,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div :style="{ marginTop: 0 }" class="app-table-container flex min-h-0 flex-1 flex-col">
       <div class="bg-card-glass-bg mt-2.5 mb-2.5">
         <div class="px-3 py-2">
-          <div class="mb-2 flex w-full items-center justify-between">
-            <div class="flex items-center">
+          <div
+            class="mb-2 flex w-full items-center justify-between max-md:flex-wrap max-md:gap-y-1.5"
+          >
+            <div class="flex items-center max-md:min-w-0 max-md:flex-wrap max-md:gap-y-1.5">
               <OSelect
                 :loading="isOrgLoading"
                 :model-value="selectedOrganization?.value"
                 :options="organizationToDisplay"
                 searchable
                 :placeholder="t('iam.quotaPage.selectOrganization')"
-                class="no-case input-width org-select mr-3 w-75 py-2"
+                class="no-case input-width org-select me-3 w-75 py-2"
                 labelKey="label"
                 valueKey="value"
                 @update:model-value="handleOrgSelect"
@@ -67,12 +69,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </div>
           </div>
-          <div class="mb-2 flex w-full items-center justify-between">
-            <div v-if="selectedOrganization && activeType == 'table'" class="flex items-center">
+          <div
+            class="mb-2 flex w-full items-center justify-between max-md:flex-wrap max-md:gap-y-1.5"
+          >
+            <div
+              v-if="selectedOrganization && activeType == 'table'"
+              class="flex items-center max-md:min-w-0 max-md:flex-wrap max-md:gap-y-1.5"
+            >
               <OSearchInput
                 data-test="pipeline-list-search-input"
                 v-model="searchQuery"
-                style="width: 200px"
+                style="width: 12.5rem"
                 :placeholder="
                   {
                     'api-limits': t('quota.api-search'),
@@ -88,14 +95,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 searchable
                 clearable
                 :placeholder="t('iam.quotaPage.selectApiCategory')"
-                class="no-case input-width category-select mr-3 ml-3 w-75 p-0"
+                class="no-case input-width category-select ms-3 me-3 w-75 p-0"
                 labelKey="label"
                 valueKey="value"
                 @update:model-value="handleApiCategorySelect"
               />
             </div>
-            <div v-if="selectedOrganization" class="float-right ml-auto flex items-center">
-              <div class="app-tabs-container mr-3 h-9 w-fit">
+            <div
+              v-if="selectedOrganization"
+              class="float-right ms-auto flex items-center max-md:flex-wrap max-md:justify-end max-md:gap-y-1.5"
+            >
+              <div class="app-tabs-container me-3 h-9 w-fit">
                 <AppTabs
                   data-test="time-unit-tabs"
                   class="tabs-selection-container"
@@ -127,6 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="generateColumns()"
           row-key="module_name"
           :loading="isApiLimitsLoading"
+          :forbidden="apiLimitsForbidden"
           :global-filter="searchQuery"
           pagination="client"
           :page-size="20"
@@ -147,7 +158,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @action="(id) => id === 'clear-filters' && (searchQuery = '')"
             />
           </template>
-          <template #bottom />
           <template
             v-for="col in apiLimitCrudColumnIds"
             :key="col"
@@ -212,6 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="roleLimitsColumns"
           row-key="uuid"
           :loading="isRolesLoading"
+          :forbidden="roleLimitsForbidden"
           :global-filter="searchQuery"
           pagination="client"
           :page-size="20"
@@ -234,7 +245,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @action="(id) => id === 'clear-filters' && (searchQuery = '')"
             />
           </template>
-          <template #bottom />
           <template #cell-role_name="{ row }">
             {{ row.role_name }}
           </template>
@@ -331,7 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
-        class="border-border-default bg-surface-base sticky top-0 bottom-0 z-1 mt-auto ml-auto flex w-full justify-end gap-2 border-t py-2 pr-3"
+        class="border-border-default bg-surface-base sticky top-0 bottom-0 z-1 ms-auto mt-auto flex w-full justify-end gap-2 border-t py-2 pe-3"
         v-if="editTable && activeType == 'table'"
       >
         <OButton variant="outline" size="sm-action" @click="cancelChanges">
@@ -347,7 +357,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
       <div
-        class="border-border-default bg-surface-base sticky top-0 bottom-0 z-1 mt-auto ml-auto flex w-full justify-end gap-2 border-t pr-3"
+        class="border-border-default bg-surface-base sticky top-0 bottom-0 z-1 ms-auto mt-auto flex w-full justify-end gap-2 border-t pe-3"
         v-if="editTable && activeType == 'json'"
       >
         <OButton
@@ -394,7 +404,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { useI18n } from "vue-i18n";
+import { rolesQuery } from "@/services/iam.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { raw, useI18nTyped } from "@/types/i18n";
 import {
   computed,
   defineComponent,
@@ -417,7 +429,6 @@ import { useTheme } from "@/composables/useTheme";
 import organizationsService from "@/services/organizations";
 import AppTabs from "@/components/common/AppTabs.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import { getRoles } from "@/services/iam";
 import ratelimitService from "@/services/rate_limit";
 import { useRouter } from "vue-router";
 import { getImageURL, getUUID } from "@/utils/zincutils";
@@ -444,19 +455,20 @@ export default defineComponent({
     OTable,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const selectedOrganization = ref<any>(null);
     const store = useStore();
     const { isDark } = useTheme();
     const organizations = ref<any[]>([]);
     const isOrgLoading = ref<boolean>(false);
-    const resultTotal = ref<number>(0);
     const {
       getApiLimitsByOrganization,
       getRoleLimitsByOrganization,
       getModulesToDisplay,
       isRoleLimitsLoading,
       isApiLimitsLoading,
+      apiLimitsForbidden,
+      roleLimitsForbidden,
     } = useRateLimiter();
     const rolesLimitRows = ref<any[]>([]);
     const rolesColumns = ref<any[]>([]);
@@ -501,20 +513,27 @@ export default defineComponent({
         icon: "table-chart",
       },
       {
-        label: "JSON",
+        label: raw("JSON"),
         value: "json",
         icon: "data-object",
         disabled: activeTab.value === "role-limits" && !expandedRow.value,
       },
     ]);
 
+    // The rate unit the column headers are quoted in. Untranslated: "Req/s" is the
+    // conventional symbol for a rate, and it is interpolated INTO the header message
+    // (`quota.listLimit` = "List {unit}") rather than concatenated onto it, so a
+    // locale that wants it somewhere else in the phrase can move it.
     const getTimeUnitLabel = () => {
-      const unitMap: any = {
-        second: "(Req/s)",
-        minute: "(Req/m)",
-        hour: "(Req/h)",
+      // Translated: this lands inside `quota.*Limit` as {unit}, so it is user
+      // copy, not a token. Keeping it as a TS literal moved text out of the
+      // catalogue where no translator can reach it.
+      const unitMap: Record<string, string> = {
+        second: t("quota.unitPerSecond"),
+        minute: t("quota.unitPerMinute"),
+        hour: t("quota.unitPerHour"),
       };
-      return unitMap[activeTimeUnit.value] || "(Req/s)";
+      return unitMap[activeTimeUnit.value] || t("quota.unitPerSecond");
     };
 
     const apiLimitCrudColumnIds = computed(() =>
@@ -541,7 +560,7 @@ export default defineComponent({
         },
         {
           id: "list",
-          header: `${t("quota.listLimit")} ${unitLabel}`,
+          header: t("quota.listLimit", { unit: unitLabel }),
           accessorKey: "list",
           sortable: true,
           resizable: true,
@@ -551,7 +570,7 @@ export default defineComponent({
         },
         {
           id: "get",
-          header: `${t("quota.getLimit")} ${unitLabel}`,
+          header: t("quota.getLimit", { unit: unitLabel }),
           accessorKey: "get",
           sortable: true,
           resizable: true,
@@ -561,7 +580,7 @@ export default defineComponent({
         },
         {
           id: "create",
-          header: `${t("quota.createLimit")} ${unitLabel}`,
+          header: t("quota.createLimit", { unit: unitLabel }),
           accessorKey: "create",
           sortable: true,
           resizable: true,
@@ -571,7 +590,7 @@ export default defineComponent({
         },
         {
           id: "update",
-          header: `${t("quota.updateLimit")} ${unitLabel}`,
+          header: t("quota.updateLimit", { unit: unitLabel }),
           accessorKey: "update",
           sortable: true,
           resizable: true,
@@ -581,7 +600,7 @@ export default defineComponent({
         },
         {
           id: "delete",
-          header: `${t("quota.deleteLimit")} ${unitLabel}`,
+          header: t("quota.deleteLimit", { unit: unitLabel }),
           accessorKey: "delete",
           sortable: true,
           resizable: true,
@@ -608,7 +627,7 @@ export default defineComponent({
         },
         {
           id: "list",
-          header: `${t("quota.listLimit")} ${unitLabel}`,
+          header: t("quota.listLimit", { unit: unitLabel }),
           accessorKey: "list",
           sortable: true,
           resizable: true,
@@ -618,7 +637,7 @@ export default defineComponent({
         },
         {
           id: "get",
-          header: `${t("quota.getLimit")} ${unitLabel}`,
+          header: t("quota.getLimit", { unit: unitLabel }),
           accessorKey: "get",
           sortable: true,
           resizable: true,
@@ -628,7 +647,7 @@ export default defineComponent({
         },
         {
           id: "create",
-          header: `${t("quota.createLimit")} ${unitLabel}`,
+          header: t("quota.createLimit", { unit: unitLabel }),
           accessorKey: "create",
           sortable: true,
           resizable: true,
@@ -638,7 +657,7 @@ export default defineComponent({
         },
         {
           id: "update",
-          header: `${t("quota.updateLimit")} ${unitLabel}`,
+          header: t("quota.updateLimit", { unit: unitLabel }),
           accessorKey: "update",
           sortable: true,
           resizable: true,
@@ -648,7 +667,7 @@ export default defineComponent({
         },
         {
           id: "delete",
-          header: `${t("quota.deleteLimit")} ${unitLabel}`,
+          header: t("quota.deleteLimit", { unit: unitLabel }),
           accessorKey: "delete",
           sortable: true,
           resizable: true,
@@ -713,18 +732,14 @@ export default defineComponent({
             selectedOrganization.value.value,
             activeTimeUnit.value,
           );
-          resultTotal.value = apiLimitsRows.value.length;
         } else {
           //here we are getting the role limits for the selected organization
           await getRolesByOrganization();
         }
-        //these are the modules that are displayed in the dropdown
-        //to select the api category that user can use to filter the api limits
-        if (!store.state.modulesToDisplay[selectedOrganization.value.value]) {
-          apiCategories.value = await getModulesToDisplay(selectedOrganization.value.value);
-        } else {
-          apiCategories.value = store.state.modulesToDisplay[selectedOrganization.value.value];
-        }
+        // The module dropdown is loaded by the `selectedOrganization` watcher
+        // below, which the assignment above has already triggered. Loading it
+        // here too raced that watcher — the store guard cannot help, since
+        // neither call has resolved yet — and fetched the list twice.
       }
     });
 
@@ -787,10 +802,8 @@ export default defineComponent({
             selectedOrganization.value.value,
             activeTimeUnit.value,
           );
-          resultTotal.value = apiLimitsRows.value.length;
         } else {
           apiLimitsRows.value = store.state.allApiLimitsByOrgId[selectedOrganization.value.value];
-          resultTotal.value = apiLimitsRows.value.length;
         }
       } else if (activeTab.value === "role-limits") {
         await getRolesByOrganization();
@@ -810,7 +823,7 @@ export default defineComponent({
             "default",
           );
           organizations.value = response.data.data.map((org: any) => ({
-            label: org.name,
+            label: raw(org.name),
             value: org.identifier,
           }));
           organizations.value.sort((a: any, b: any) => a.label.localeCompare(b.label));
@@ -822,7 +835,7 @@ export default defineComponent({
         }
       } else {
         organizations.value = store.state.organizations.map((org: any) => ({
-          label: org.name,
+          label: raw(org.name),
           value: org.identifier,
         }));
       }
@@ -865,7 +878,6 @@ export default defineComponent({
         } else {
           apiLimitsRows.value = store.state.allApiLimitsByOrgId[selectedOrganization.value.value];
         }
-        resultTotal.value = apiLimitsRows.value.length;
       }
     };
     //this is used to save the changes and switch the tab
@@ -903,8 +915,10 @@ export default defineComponent({
       //so we need to get the roles from the api
       try {
         isRolesLoading.value = true;
-        const response = await getRoles(selectedOrganization.value?.value);
-        rolesLimitRows.value = response.data.map((role: any) => ({
+        const response = await queryClient.fetchQuery(
+          rolesQuery(selectedOrganization.value?.value),
+        );
+        rolesLimitRows.value = response.map((role: any) => ({
           role_name: role,
           uuid: getUUID(),
           list: 10,
@@ -913,7 +927,6 @@ export default defineComponent({
           update: 10,
           delete: 10,
         }));
-        resultTotal.value = rolesLimitRows.value.length;
         isRolesLoading.value = false;
       } catch (error) {
         isRolesLoading.value = false;
@@ -1011,7 +1024,6 @@ export default defineComponent({
             selectedOrganization.value.value,
             activeTimeUnit.value,
           );
-          resultTotal.value = apiLimitsRows.value.length;
         } else if (activeTab.value === "role-limits") {
           roleLevelModuleRows.value = await getRoleLimitsByOrganization(
             selectedOrganization.value.value,
@@ -1081,7 +1093,6 @@ export default defineComponent({
             selectedOrganization.value.value,
             activeTimeUnit.value,
           );
-          resultTotal.value = apiLimitsRows.value.length;
         } else {
           roleLevelModuleRows.value = await getRoleLimitsByOrganization(
             selectedOrganization.value.value,
@@ -1128,6 +1139,8 @@ export default defineComponent({
         a.download = `rate_limit_template_${selectedOrganization.value.label}.json`;
         document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
       } catch (error) {
         console.log(error);
       }
@@ -1459,7 +1472,6 @@ export default defineComponent({
             newTimeUnit,
           );
         }
-        resultTotal.value = apiLimitsRows.value.length;
       } else if (activeTab.value === "role-limits" && openedRole.value) {
         const storeKey = `${openedRole.value}_${newTimeUnit}`;
         if (store.state.allRoleLimitsByOrgIdByRole[selectedOrganization.value.value]?.[storeKey]) {
@@ -1484,6 +1496,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       isDark,
       t,
       selectedOrganization,
@@ -1496,7 +1509,6 @@ export default defineComponent({
       typeTabs,
       editTable,
       searchQuery,
-      resultTotal,
       rolesLimitRows,
       rolesColumns,
       apiLimitsRows,
@@ -1572,6 +1584,8 @@ export default defineComponent({
       jsonDiff,
       isRoleLimitsLoading,
       isApiLimitsLoading,
+      apiLimitsForbidden,
+      roleLimitsForbidden,
       isRolesLoading,
       activeTimeUnit,
       timeUnitTabs,

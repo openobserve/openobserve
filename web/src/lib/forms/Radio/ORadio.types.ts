@@ -1,8 +1,11 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nText } from "@/types/i18n";
+
 import type { InjectionKey } from "vue";
 
 export type RadioSize = "xs" | "sm" | "md";
+export type RadioVariant = "default" | "card";
 export type RadioValue = string | number | boolean;
 
 export const RADIO_VALUE_MAP_KEY: InjectionKey<Map<string, RadioValue>> = Symbol("RadioValueMap");
@@ -11,7 +14,7 @@ export interface RadioGroupProps {
   /** Currently selected value */
   modelValue?: RadioValue;
   /** Accessible name for the group — rendered as a visually-hidden legend */
-  label?: string;
+  label?: I18nText;
   /** Disables all radio buttons in the group */
   disabled?: boolean;
   /** Marks the field required — renders a `*` after the label (no manual ` *`). */
@@ -42,11 +45,13 @@ export interface RadioProps {
   /** Compatibility alias for `value` */
   val?: RadioValue;
   /** Accessible label */
-  label?: string;
+  label?: I18nText;
   /** Control size */
   size?: RadioSize;
   /** Prevents interaction */
   disabled?: boolean;
+  /** Visual treatment for the label/control surface. */
+  variant?: RadioVariant;
   /** HTML id — forwarded for label association */
   id?: string;
 }

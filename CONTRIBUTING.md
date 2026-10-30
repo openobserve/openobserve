@@ -84,13 +84,22 @@ There are 2 areas of development.
 
 ### Server
 
+Create a `.env` file in the root `openobserve` directory (if not already present) with the following content to allow the local Vite UI server to communicate with the backend without CORS errors:
+
+```env
+ZO_WEB_URL="http://localhost:8081"
+ZO_CORS_ALLOWED_ORIGINS="http://localhost:3000, http://localhost:5173, http://localhost:8081"
+```
+
+Start the backend server:
+
 ```shell
 ZO_ROOT_USER_EMAIL="root@example.com" ZO_ROOT_USER_PASSWORD="Complexpass#123" cargo run
 ```
 
 This will start the openobserve API server on port 5080
 
-environment variables ZO_ROOT_USER_EMAIL and ZO_ROOT_USER_PASSWORD can be used first time to configure default admin user when openobserve is started.
+environment variables ZO_ROOT_USER_EMAIL and ZO_ROOT_USER_PASSWORD can be used first time to configure default admin user when openobserve is started. A new install generates the salt for presigned and ext-token logins and stores it in the meta db; set ZO_EXT_AUTH_SALT to a random secret of 16 to 48 bytes (for example `openssl rand -hex 24`) only if you want it kept out of the db, and then keep the same value across restarts and nodes.
 
 ### UI
 
@@ -145,6 +154,9 @@ We check for following in CI pipeline for any pull requests.
    - You can test for linting failures by running `./eslint.sh` in web folder.
 
 ## How to contribute code
+
+External contributors without write access may have at most 2 open pull requests at a time, including drafts.
+If you already have 2 open PRs, wait for one to be merged or close one before opening another.
 
 1. Fork the repository on github (e.g. awesomedev/openobserve)
 1. Clone the repo from the forked repository ( e.g. awesomedev/openobserve) to your machine.

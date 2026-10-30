@@ -1,0 +1,139 @@
+<!-- Copyright 2026 OpenObserve Inc. -->
+
+<template>
+  <OPageLayout
+    data-test="ai-experiments-page"
+    :title="t('aiObservability.nav.experiments')"
+    :subtitle="t('aiObservability.subtitle.experiments')"
+    icon="science"
+    bleed
+  >
+    <template #actions>
+      <OButton
+        size="sm"
+        variant="primary"
+        data-test="ai-experiments-new-btn"
+        :aria-label="
+          experimentDrafts.hasNew
+            ? t('common.editorDraft.newDot', { label: t('aiObservability.experiments.newButton') })
+            : undefined
+        "
+        @click="openCreate('')"
+      >
+        {{ t("aiObservability.experiments.newButton") }}
+        <EditorDraftDot
+          v-if="experimentDrafts.hasNew"
+          :saved-at="experimentDrafts.savedAt(null)"
+          corner
+          data-test="ai-experiments-new-draft-dot"
+        />
+      </OButton>
+    </template>
+
+    <div class="flex h-full min-h-0 flex-col p-4">
+      <section class="min-h-0 min-w-0 flex-1 space-y-3 overflow-auto">
+        <OEmptyState
+          v-if="!loading && !experiments.length"
+          size="hero"
+          preset="no-experiments"
+          data-test="ai-experiments-empty"
+          @action="openCreate('')"
+        />
+        <ExperimentBrowser
+          v-else
+          :org-id="orgId"
+          :loading="loading"
+          :last-updated-at="lastUpdatedAt"
+          :experiments="experiments"
+          :datasets="datasets"
+          @new="openCreate"
+          @refresh="refresh(true)"
+          @select="openExperiment"
+          @baseline-changed="onBaselineChanged"
+          sync-url
+        />
+      </section>
+    </div>
+  </OPageLayout>
+</template>
+
+<script setup lang="ts">
+import { computed, onMounted, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { useStore } from "vuex";
+import { raw, useI18nTyped } from "@/types/i18n";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import ExperimentBrowser from "@/enterprise/components/AIObservability/ExperimentBrowser.vue";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import llmDatasetsService, { type LlmDataset } from "@/services/llm-datasets.service";
+import type { LlmExperiment } from "@/services/llm-experiments.service";
+import { experimentsListQuery } from "@/services/llm-experiments.queries";
+import { experimentKeys } from "@/services/llm-experiments.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { aiExperimentCreateRoute, aiExperimentDetailRoute } from "./experimentRoutes";
+
+defineOptions({ name: "AIExperimentsPage" });
+
+const { t } = useI18nTyped();
+const store = useStore();
+const route = useRoute();
+const router = useRouter();
+const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
+const experiments = ref<LlmExperiment[]>([]);
+const datasets = ref<LlmDataset[]>([]);
+const loading = ref(false);
+const lastUpdatedAt = ref<number | null>(null);
+const experimentDrafts = useEditorDraftIds("experiment");
+
+function onBaselineChanged(experiment: LlmExperiment, previousBaselineId: string | null) {
+  experiments.value = experiments.value.map((row) => {
+    if (row.id === experiment.id) return experiment;
+    if (previousBaselineId && row.id === previousBaselineId) return { ...row, isBaseline: false };
+    return row;
+  });
+}
+
+// `force` reaches the server: the mount may serve the cached list, but Refresh and post-write reloads must not.
+async function refresh(force = false) {
+  if (!orgId.value) return;
+  loading.value = true;
+  try {
+    if (force) {
+      await queryClient.invalidateQueries({ queryKey: experimentKeys.all(orgId.value) });
+    }
+    const opts = experimentsListQuery(orgId.value);
+    [experiments.value, datasets.value] = await Promise.all([
+      queryClient.fetchQuery(opts),
+      llmDatasetsService.list(orgId.value),
+    ]);
+    lastUpdatedAt.value = queryClient.getQueryState(opts.queryKey)?.dataUpdatedAt ?? Date.now();
+  } catch (error: any) {
+    // Surface the server's message; a bare catch here hid a stale ?selected=
+    // 404 behind "failed to load experiments" while the list rendered fine.
+    toast({
+      variant: "error",
+      message: raw(error?.response?.data?.message) || t("aiObservability.experiments.loadError"),
+    });
+  } finally {
+    loading.value = false;
+  }
+}
+
+function openExperiment(experimentId: string) {
+  router.push(aiExperimentDetailRoute(orgId.value, experimentId));
+}
+
+function openCreate(datasetId: string) {
+  const selectedDatasetId = datasetId || String(route.query.dataset ?? "");
+  const known = datasets.value.some((dataset) => dataset.id === selectedDatasetId);
+  router.push(
+    aiExperimentCreateRoute(orgId.value, { datasetId: known ? selectedDatasetId : undefined }),
+  );
+}
+
+onMounted(refresh);
+</script>

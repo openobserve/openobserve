@@ -57,11 +57,24 @@ fn create_destinations_table_statement() -> TableCreateStatement {
                 .primary_key(),
         )
         .col(ColumnDef::new(Destinations::Org).string_len(100).not_null())
-        .col(ColumnDef::new(Destinations::Name).string_len(256).not_null())
-        .col(ColumnDef::new(Destinations::Module).string_len(10).not_null())
+        .col(
+            ColumnDef::new(Destinations::Name)
+                .string_len(256)
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(Destinations::Module)
+                .string_len(10)
+                .not_null(),
+        )
         .col(ColumnDef::new(Destinations::TemplateId).char_len(27).null())
         .col(ColumnDef::new(Destinations::Type).json().not_null())
-        .foreign_key(sea_query::ForeignKey::create().name(DESTINATIONS_TEMPLATES_FK).from(Destinations::Table, Destinations::TemplateId).to(Templates::Table, Templates::Id))
+        .foreign_key(
+            sea_query::ForeignKey::create()
+                .name(DESTINATIONS_TEMPLATES_FK)
+                .from(Destinations::Table, Destinations::TemplateId)
+                .to(Templates::Table, Templates::Id),
+        )
         .to_owned()
 }
 

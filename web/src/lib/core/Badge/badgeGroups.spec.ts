@@ -2,6 +2,7 @@
 
 import { describe, it, expect } from "vitest";
 import { resolveBadge, normalizeKey, BADGE_GROUPS } from "./badgeGroups";
+import enUS from "@/locales/languages/en-US.json";
 
 describe("badgeGroups", () => {
   it("normalizes separators and case", () => {
@@ -16,7 +17,13 @@ describe("badgeGroups", () => {
     expect(r.variant).toBe("blue-soft");
     expect(r.icon).toBe("bolt");
     expect(r.dot).toBe(false);
-    expect(r.label).toBe("Real-time");
+    expect(r.labelKey).toBe("components.badge.alertType.realtime");
+  });
+
+  it("resolves oncallResponseState exhausted to Nobody answered", () => {
+    const r = resolveBadge("oncallResponseState", "exhausted");
+    expect(r.variant).toBe("error-soft");
+    expect(r.labelKey).toBe("oncall.state_exhausted");
   });
 
   it("resolves alertStatus to dot mode (no icon)", () => {
@@ -25,6 +32,30 @@ describe("badgeGroups", () => {
     expect(r.variant).toBe("success-soft");
     expect(r.dot).toBe(true);
     expect(r.icon).toBeUndefined();
+  });
+
+  it("resolves licenseWaiverStatus", () => {
+    expect(resolveBadge("licenseWaiverStatus", "active").variant).toBe("success-soft");
+    expect(resolveBadge("licenseWaiverStatus", "scheduled").variant).toBe("blue-soft");
+    const past = resolveBadge("licenseWaiverStatus", "past");
+    expect(past.variant).toBe("default-soft");
+    expect(past.labelKey).toBe("components.badge.licenseWaiverStatus.past");
+    const ended = resolveBadge("licenseWaiverStatus", "ended");
+    expect(ended.variant).toBe("default-soft");
+    expect(ended.labelKey).toBe("components.badge.licenseWaiverStatus.ended");
+  });
+
+  it("resolves downtimeStatus to dot mode with an amber active state", () => {
+    expect(resolveBadge("downtimeStatus", "active").variant).toBe("warning-soft");
+    expect(resolveBadge("downtimeStatus", "scheduled").variant).toBe("blue-soft");
+    expect(resolveBadge("downtimeStatus", "ended").variant).toBe("default-soft");
+    const cancelled = resolveBadge("downtimeStatus", "cancelled");
+    expect(cancelled.variant).toBe("default-outline");
+    expect(cancelled.dot).toBe(true);
+    expect(cancelled.labelKey).toBe("components.badge.downtimeStatus.cancelled");
+    const early = resolveBadge("downtimeStatus", "ended_early");
+    expect(early.variant).toBe("default-soft");
+    expect(early.labelKey).toBe("components.badge.downtimeStatus.endedEarly");
   });
 
   it("resolves logLevel to plain mode (no dot, no icon)", () => {
@@ -79,10 +110,10 @@ describe("badgeGroups", () => {
   it("resolves normalizeState boolean → primary/Normalized, default/Not Normalized", () => {
     const t = resolveBadge("normalizeState", true);
     expect(t.variant).toBe("primary");
-    expect(t.label).toBe("Normalized");
+    expect(t.labelKey).toBe("components.badge.normalizeState.true");
     const f = resolveBadge("normalizeState", false);
     expect(f.variant).toBe("default");
-    expect(f.label).toBe("Not Normalized");
+    expect(f.labelKey).toBe("components.badge.normalizeState.false");
   });
 
   it("resolves fieldDiffStatus (new→success, existing→default, sm)", () => {
@@ -184,10 +215,15 @@ describe("badgeGroups", () => {
   // Legacy `condition_not_satisfied` and current `normal` are the same state,
   // so they must render with the same word — otherwise history rows read
   // differently depending on whether they predate the RunOutcome rename.
+  // `normal` carries no explicit label: it falls back to the humanised value,
+  // which is the same word the `.normal` key holds.
   it("alert 'condition_not_satisfied' resolves to the Normal label", () => {
-    expect(resolveBadge("alertState", "condition_not_satisfied").label).toBe("Normal");
-    expect(resolveBadge("alertState", "Condition Not Satisfied").label).toBe("Normal");
-    expect(resolveBadge("alertState", "normal").label).toBe("Normal");
+    expect(resolveBadge("alertState", "condition_not_satisfied").labelKey).toBe(
+      "components.badge.alertState.normal",
+    );
+    expect(resolveBadge("alertState", "Condition Not Satisfied").labelKey).toBe(
+      "components.badge.alertState.normal",
+    );
   });
 
   // The backend's `completed` meant "the alert fired". Rendering it green
@@ -195,13 +231,27 @@ describe("badgeGroups", () => {
   it("alert 'completed' is a FIRING state, not a success state", () => {
     const r = resolveBadge("alertState", "completed");
     expect(r.variant).toBe("error-soft");
-    expect(r.label).toBe("Firing");
+    expect(r.labelKey).toBe("components.badge.alertState.firing");
   });
 
   it("alert 'notify_failed' renders as a firing state", () => {
     const r = resolveBadge("alertState", "notify_failed");
     expect(r.variant).toBe("error-soft");
-    expect(r.label).toBe("Notify Failed");
+    expect(r.labelKey).toBe("components.badge.alertState.notifyfailed");
+  });
+
+  it("alert 'acknowledged' is blue with a person, apart from firing red and muted amber", () => {
+    const r = resolveBadge("alertState", "acknowledged");
+    expect(r.variant).toBe("blue-soft");
+    expect(r.icon).toBe("person");
+    expect(r.labelKey).toBe("components.badge.alertState.acknowledged");
+  });
+
+  it("an ack event history row is a quiet person badge", () => {
+    const r = resolveBadge("alertState", "ack_event");
+    expect(r.variant).toBe("default-soft");
+    expect(r.icon).toBe("person");
+    expect(r.labelKey).toBe("components.badge.alertState.ackevent");
   });
 
   it("alert 'firing' and 'normal' resolve to opposite tones", () => {
@@ -230,6 +280,14 @@ describe("badgeGroups", () => {
     for (const value of ["skipped", "warning"]) {
       expect(resolveBadge("pipelineRunOutcome", value).variant, value).toBe("warning-soft");
     }
+  });
+
+  it("pipeline run outcome firing is labelled Succeeded", () => {
+    const firing = resolveBadge("pipelineRunOutcome", "firing");
+    expect(firing.labelKey).toBe("components.badge.pipelineRunOutcome.succeeded");
+    expect(enUS.components.badge.pipelineRunOutcome.succeeded).toBe("Succeeded");
+    expect(resolveBadge("pipelineRunOutcome", "succeeded").labelKey).toBe(firing.labelKey);
+    expect(resolveBadge("alertState", "firing").labelKey).not.toBe(firing.labelKey);
   });
 
   it("resolves the groups added in the OTag type/value sweep", () => {
@@ -277,5 +335,46 @@ describe("badgeGroups", () => {
     expect(resolveBadge("countChip", "errorstrong").variant).toBe("error");
     expect(resolveBadge("logsResultChip", "error").variant).toBe("error-soft");
     expect(resolveBadge("logsResultChip", "error").shape).toBe("rounded");
+  });
+});
+
+describe("aiMode", () => {
+  it("renders consent-required as a warning instead of free usage", () => {
+    const result = resolveBadge("aiMode", "consent_required");
+    expect(result.variant).toBe("warning-soft");
+    expect(result.labelKey).toBe("paidUsage.modeConsentRequired");
+  });
+
+  it("does not label an unknown backend mode as free usage", () => {
+    const result = resolveBadge("aiMode", "future_mode");
+    expect(result.variant).toBe("default-soft");
+    expect(result.labelKey).toBe("paidUsage.modeUnknown");
+  });
+});
+
+// "waiting" is the status every anomaly config carries until its first model
+// trains. Without a registry entry it fell through to genericEntry, whose label
+// is humanize() — English in every locale, and unstyled.
+describe("alertStatus: waiting", () => {
+  it("resolves from the registry, not the humanize fallback", () => {
+    const r = resolveBadge("alertStatus", "waiting");
+    expect(r.labelKey).toBe("components.badge.alertStatus.waiting");
+    expect(r.variant).toBe("default-soft");
+  });
+});
+
+describe("slackInstallStatus", () => {
+  it("AC-12.4 maps every installation status to a coloured, translated badge", () => {
+    const expected = {
+      healthy: "success-soft",
+      degraded: "warning-soft",
+      pending: "blue-soft",
+      revoked: "error-soft",
+    };
+    for (const [status, variant] of Object.entries(expected)) {
+      const r = resolveBadge("slackInstallStatus", status);
+      expect(r.variant).toBe(variant);
+      expect(r.labelKey).toBe(`components.badge.slackInstallStatus.${status}`);
+    }
   });
 });

@@ -29,17 +29,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { getDashboard } from "../../utils/commons.ts";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
+import analytics from "@/services/product_analytics";
 
 export default defineComponent({
   name: "ExportDashboard",
   components: { OButton, OTooltip },
   props: ["dashboardId"],
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const route = useRoute();
     const downloadDashboard = async () => {
@@ -55,6 +56,7 @@ export default defineComponent({
       const fileName = dashboard.title || "dashboard";
       htmlA.setAttribute("download", fileName + ".dashboard.json");
       htmlA.click();
+      analytics.track("dashboard_exported", { format: "json" });
     };
 
     return {

@@ -235,7 +235,10 @@ test.describe("Logs Regression Bugs", () => {
     // Enter subquery
     const subquery = 'SELECT kubernetes_pod_name FROM (SELECT * FROM "e2e_automate" WHERE kubernetes_pod_name IS NOT NULL LIMIT 10)';
     testLogger.info(`Entering subquery: ${subquery}`);
+    // Bug #7751 is about SQL-mode queries; filter mode rejects the LIMIT before any request is sent.
+    await pm.logsPage.enableSqlModeIfNeeded();
     await pm.logsPage.clearAndFillQueryEditor(subquery);
+    await pm.logsPage.expectSqlModeActive();
     await pm.logsPage.waitForTimeout(500);
 
     // Run query
@@ -307,7 +310,10 @@ test.describe("Logs Regression Bugs", () => {
     // Enter aggregation query
     const aggQuery = 'SELECT kubernetes_pod_name, count(*) as total FROM "e2e_automate" WHERE kubernetes_pod_name IS NOT NULL GROUP BY kubernetes_pod_name LIMIT 10';
     testLogger.info(`Entering aggregation query: ${aggQuery}`);
+    // Bug #7751 is about SQL-mode queries; filter mode rejects the LIMIT before any request is sent.
+    await pm.logsPage.enableSqlModeIfNeeded();
     await pm.logsPage.clearAndFillQueryEditor(aggQuery);
+    await pm.logsPage.expectSqlModeActive();
     await pm.logsPage.waitForTimeout(500);
 
     // Run query
@@ -1149,16 +1155,14 @@ test.describe("Logs Regression Bugs", () => {
    * Log detail sidebar default tab (originally Bug #9724).
    * https://github.com/openobserve/openobserve/issues/9724
    *
-   * Bug #9724 / PR #9703 originally made the sidebar open on the JSON tab.
-   * PR #13368 ("logs sidebar table will be default view and draggable tabs")
-   * intentionally changed the default to the Table tab. This test now verifies
-   * the current intended behavior — Table is the default view — while still
-   * confirming both tabs render and JSON remains reachable by switching tabs.
+   * The sidebar opens on JSON — the first tab in the bar. PR #13368 briefly made
+   * Table the default; that was reverted back to the JSON default this test asserts,
+   * while still confirming both tabs render and Table stays reachable by switching.
    */
-  test("Log detail sidebar opens with Table tab by default (#13368)", {
-    tag: ['@regressionBugs', '@logDetail', '@sidebar', '@bug9724', '@P1', '@logs']
+  test("Log detail sidebar opens with JSON tab by default", {
+    tag: ['@regressionBugs', '@logDetail', '@sidebar', '@bug-9724', '@P1', '@logs']
   }, async ({ page }) => {
-    testLogger.info('Test: Log detail sidebar default tab verification (#13368)');
+    testLogger.info('Test: Log detail sidebar default tab verification');
 
     // Navigate to logs page
     await pm.logsPage.clickMenuLinkLogsItem();
@@ -1182,11 +1186,9 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info('Step 2: Verifying sidebar is visible');
     await pm.logsPage.expectLogDetailSidebarVisible();
 
-    // Step 3: Verify Table tab is selected by default (#13368 core verification)
-    testLogger.info('Step 3: Verifying Table tab is selected by default');
-    await pm.logsPage.verifyTableTabSelectedByDefault();
-    // Wrap toggle is only rendered on the Table tab, so it must be visible on open
-    await pm.logsPage.verifyWrapToggleVisibleInTableTab();
+    // Step 3: Verify JSON tab is selected by default (core verification)
+    testLogger.info('Step 3: Verifying JSON tab is selected by default');
+    await pm.logsPage.verifyJsonTabSelectedByDefault();
 
     // Step 4: Verify both tabs are visible
     testLogger.info('Step 4: Verifying both JSON and Table tabs are visible');
@@ -1196,29 +1198,31 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info('Step 5: Verifying navigation buttons are visible');
     await pm.logsPage.verifyNavigationButtonsVisible();
 
-    // Step 6: Click on JSON tab and verify switch
-    testLogger.info('Step 6: Switching to JSON tab');
+    // Step 6: Click on Table tab and verify switch
+    testLogger.info('Step 6: Switching to Table tab');
+    await pm.logsPage.clickLogDetailTableTab();
+    await pm.logsPage.verifyTableTabSelected();
+    // Wrap toggle is only rendered on the Table tab
+    await pm.logsPage.verifyWrapToggleVisibleInTableTab();
+
+    // Step 7: Click back to JSON tab and verify switch
+    testLogger.info('Step 7: Switching back to JSON tab');
     await pm.logsPage.clickLogDetailJsonTab();
     await pm.logsPage.verifyJsonTabSelected();
 
-    // Step 7: Click back to Table tab and verify switch
-    testLogger.info('Step 7: Switching back to Table tab');
-    await pm.logsPage.clickLogDetailTableTab();
-    await pm.logsPage.verifyTableTabSelected();
-
-    // Step 8: Close sidebar and reopen - verify Table tab is still default
+    // Step 8: Close sidebar and reopen - verify JSON tab is still default
     testLogger.info('Step 8: Close and reopen sidebar to verify default state persists');
     await pm.logsPage.closeLogDetailSidebar();
     await pm.logsPage.expectLogDetailSidebarNotVisible();
 
     // Reopen sidebar
     await pm.logsPage.openLogDetailSidebar();
-    await pm.logsPage.verifyTableTabSelectedByDefault();
+    await pm.logsPage.verifyJsonTabSelectedByDefault();
 
     // Close sidebar
     await pm.logsPage.closeLogDetailSidebar();
 
-    testLogger.info('✓ #13368 verification complete: Log detail sidebar opens with Table tab by default');
+    testLogger.info('✓ Verification complete: Log detail sidebar opens with JSON tab by default');
   });
 
   // ============================================================================
@@ -1540,7 +1544,7 @@ test.describe("Logs Regression Bugs", () => {
   // ======================================================================
 
   test("Bug #11400: should validate double-quoted strings in query editor", {
-    tag: ['@P2', '@functional', '@bug11400', '@logs', '@regressionBugs']
+    tag: ['@P2', '@functional', '@bug-11400', '@logs', '@regressionBugs']
   }, async ({ page }) => {
     testLogger.info("Testing double-quote validation in query editor (logs page context)");
 
@@ -1586,7 +1590,7 @@ test.describe("Logs Regression Bugs", () => {
   // ======================================================================
 
   test("Bug #11400: should filter functions from value suggestions in WHERE clause", {
-    tag: ['@P2', '@functional', '@bug11400', '@logs', '@regressionBugs']
+    tag: ['@P2', '@functional', '@bug-11400', '@logs', '@regressionBugs']
   }, async ({ page }) => {
     testLogger.info("Testing that functions are filtered from value suggestions");
 
@@ -1624,6 +1628,8 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.triggerEditorSuggestions();
     await pm.logsPage.waitForSuggestionWidgetVisible(5000);
     testLogger.info('✅ Suggestion widget appeared');
+    // Checking for functions before the values load would pass on an empty list.
+    await pm.logsPage.waitForSuggestionRows();
 
     // Verify the suggestion widget does NOT contain function names
     const result = await pm.logsPage.checkSuggestionForFunctions();
@@ -1644,13 +1650,13 @@ test.describe("Logs Regression Bugs", () => {
   // Bug #11400 sub-issue #2: Mixed quote handling in multi-condition WHERE
   // clauses. Fix: PR #11403 - hasOpenQuote regex scoped to textUpToCursor
   // slice, not the full query. This ensures that in a query like:
-  //   WHERE http = 'te' AND host = 'te
-  // the open quote in the second condition ('te) is correctly detected even
-  // though the first condition has a closed quote ('te').
+  //   WHERE kubernetes_namespace_name = 've' AND kubernetes_container_name = 'zi
+  // the open quote in the second condition ('zi) is correctly detected even
+  // though the first condition has a closed quote ('ve').
   // ======================================================================
 
   test("Bug #11400: should handle mixed quotes in multi-condition WHERE clauses", {
-    tag: ['@P2', '@functional', '@bug11400', '@logs', '@regressionBugs']
+    tag: ['@P2', '@functional', '@bug-11400', '@logs', '@regressionBugs']
   }, async ({ page }) => {
     testLogger.info("Testing mixed quote handling in multi-condition WHERE clauses");
 
@@ -1677,18 +1683,18 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info('✅ Auto-search completed, field values cached');
 
     // Set multi-condition WHERE query with mixed quotes.
-    // The first condition has a properly closed quote: http = 'te'
-    // The second condition has a partial open quote: host = 'te
+    // The first condition has a properly closed quote: kubernetes_namespace_name = 've'
+    // The second condition has a partial open quote: kubernetes_container_name = 'zi
     // The hasOpenQuote fix ensures the second condition correctly detects
     // the opening quote, even though the first condition's quote is closed.
-    const mixedQuoteQuery = `SELECT * FROM "e2e_automate" WHERE http = 'te' AND host = 'te`;
+    const mixedQuoteQuery = `SELECT * FROM "e2e_automate" WHERE kubernetes_namespace_name = 've' AND kubernetes_container_name = 'zi`;
     await pm.logsPage.setQueryEditorContent(mixedQuoteQuery);
 
     // Wait for Monaco to process the content
     await page.waitForTimeout(500);
 
     // Verify the query text is set correctly - the full query should be present
-    await pm.logsPage.expectQueryEditorContainsText('host = \'te');
+    await pm.logsPage.expectQueryEditorContainsText('kubernetes_container_name = \'zi');
     testLogger.info('✅ Mixed quote query text verified in editor');
 
     // Verify no error states are present (editor should not show errors for this pattern)
@@ -1700,16 +1706,17 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info('✅ No editor error states for mixed quote pattern');
 
     // SECONDARY CHECK: Trigger Ctrl+Space to open suggestion widget in the
-    // value context of the second condition (after host = 'te).
+    // value context of the second condition (after kubernetes_container_name = 'zi).
     // This is the key behavior the hasOpenQuote fix enables: the scoped
     // regex must detect the open quote in the second condition independently
     // from the closed quote in the first condition, so value completions work.
-    // Without the fix, the regex would see the closed quote ('te') from the
+    // Without the fix, the regex would see the closed quote ('ve') from the
     // first condition and fail to detect the open quote in the second.
     testLogger.info('Triggering suggestion widget after partial open quote in second condition...');
     await pm.logsPage.triggerEditorSuggestions();
     await pm.logsPage.waitForSuggestionWidgetVisible(5000);
     testLogger.info('✅ Suggestion widget appeared in mixed quote context');
+    await pm.logsPage.waitForSuggestionRows();
 
     // Verify functions are NOT in suggestions (value context filtering).
     // The suggestion engine SHOULD filter functions when cursor is in a value
@@ -1722,6 +1729,11 @@ test.describe("Logs Regression Bugs", () => {
 
     // Verify actual field values are suggested (proving hasOpenQuote fix works)
     expect(result.rowCount).toBeGreaterThan(0);
+    // Must be values of kubernetes_container_name, not a cached list from another field.
+    expect(result.firstFew.some((row) => row.includes('ziox'))).toBe(true);
+    // A row count alone passed on keyword/function rows before #15344, so the
+    // value context must also be proven to exclude functions.
+    expect(result.hasFunctions, 'Functions must not be suggested inside an open quote').toBe(false);
     testLogger.info(`✅ ${result.rowCount} value suggestions in mixed quote context`);
 
     testLogger.info("Test passed: Mixed quote handling verified");

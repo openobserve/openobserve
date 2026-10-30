@@ -16,9 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OButton
-    variant="ghost"
-    size="icon-toolbar"
+    :variant="bordered ? 'outline' : 'ghost'"
+    :size="bordered ? 'icon-sm' : 'icon-toolbar'"
     data-test="navbar-theme-toggle-btn"
+    :aria-label="raw(tooltipText)"
     @click="toggleDarkMode"
   >
     <Transition name="theme-icon" mode="out-in">
@@ -29,14 +30,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="size-5!"
       />
     </Transition>
-    <OTooltip side="top" align="center" :content="tooltipText" />
+    <OTooltip side="top" align="center" :content="raw(tooltipText)" />
   </OButton>
 </template>
 
 <script lang="ts">
 import { ref, watch, onMounted, computed, defineComponent } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -44,9 +45,14 @@ import { switchThemeMode } from "@/utils/theme";
 
 export default defineComponent({
   components: { OButton, OIcon, OTooltip },
+  props: {
+    // Outlined 32px square, for headers whose other controls are outlined buttons.
+    bordered: { type: Boolean, default: false },
+  },
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
+    // eslint-disable-next-line no-restricted-syntax -- this component IS the theme seam's UI: darkMode is the toggle's own bound state, not a private copy of the app theme it should be reading from useTheme().
     const darkMode = ref(false);
 
     onMounted(() => {
@@ -67,10 +73,11 @@ export default defineComponent({
       }
     });
 
-    const tooltipText = computed(() => {
-      const mode = darkMode.value ? t("common.lightMode") : t("common.darkMode");
-      return `${t("common.switchTo")} ${mode}`;
-    });
+    // Whole sentence per target theme: "Switch to" + mode glued two translated
+    // fragments together, which breaks wherever the word order differs.
+    const tooltipText = computed(() =>
+      darkMode.value ? t("common.switchToLightMode") : t("common.switchToDarkMode"),
+    );
 
     watch(darkMode, () => {
       setTheme(darkMode.value ? "dark" : "light");
@@ -90,7 +97,8 @@ export default defineComponent({
 
     const setTheme = (theme: any) => {
       try {
-        localStorage.setItem("theme", theme);
+        // A kiosk ?theme= is for that screen only and must not become the saved preference.
+        if (!store.state.themeOverride) localStorage.setItem("theme", theme);
       } catch (error) {
         // Handle localStorage not available
         console.warn("localStorage not available for theme storage:", error);
@@ -112,6 +120,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       store,
       darkMode,
       tooltipText,

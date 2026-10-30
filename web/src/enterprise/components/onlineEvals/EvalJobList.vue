@@ -9,7 +9,7 @@
         :columns="columns"
         row-key="id"
         :loading="loading"
-        :footer-title="t('onlineEvals.job.listTitle')"
+        :forbidden="forbidden"
         :global-filter="search"
         :show-global-filter="false"
         :page-size="20"
@@ -36,16 +36,15 @@
         </template>
 
         <template #toolbar-trailing>
-          <OButton
+          <ORefreshButton
+            layout="inline"
             variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
-            :loading="loading"
+            :last-run-at="lastRunAt"
+            :loading="refreshing || loading"
+            shortcut-id="evalJobsRefresh"
             data-test="eval-job-list-refresh-btn"
             @click="emit('refresh')"
-          >
-            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="evalJobsRefresh" />
-          </OButton>
+          />
         </template>
 
         <template #subheader>
@@ -58,6 +57,7 @@
               :loading="loading"
               selectable
               :selected-key="selectedStatKey"
+              default-key="all"
               @select="onStatSelect"
             />
           </div>
@@ -75,26 +75,56 @@
           </div>
         </template>
 
-        <template #bottom="{ totalRows }">
-          <span class="text-xs font-normal">
-            {{ totalRows.toLocaleString() }} {{ t("onlineEvals.job.listTitle") }}
-          </span>
+        <template #selection-actions>
           <OButton
-            v-if="selectedIds.length > 0"
             variant="outline-destructive"
             size="sm"
-            class="ml-3"
             icon-left="delete"
             data-test="eval-job-bulk-delete-btn"
             :loading="actionLoading"
             @click="handleBulkDelete"
           >
-            {{ t("onlineEvals.job.deleteBulkButton") }} ({{ selectedIds.length }})
+            {{ t("common.delete") }}
           </OButton>
+        </template>
+
+        <template #cell-name="{ row }">
+          <div class="flex min-w-0 items-center gap-2">
+            <OTruncatedText>{{ row.name }}</OTruncatedText>
+            <EditorDraftDot
+              v-if="jobDrafts.ids.has(String(row.id))"
+              :saved-at="jobDrafts.savedAt(String(row.id))"
+              class="shrink-0"
+              :data-test="`eval-job-list-${row.id}-draft-dot`"
+            />
+          </div>
         </template>
 
         <template #cell-status="{ row }">
           <OTag type="evalStatus" :value="statusOf(row)" :label="statusLabel(statusOf(row))" />
+        </template>
+
+        <template #cell-health="{ row }">
+          <span v-if="!healthOf(row)" class="text-text-secondary">—</span>
+          <span v-else class="inline-flex">
+            <OTag type="evalJobHealth" :value="healthOf(row)?.state" :label="healthLabel(row)" />
+            <OTooltip>
+              <template #content>
+                <div v-if="healthOf(row)?.recentRuns">{{ healthSummary(row) }}</div>
+                <div>{{ healthSince(row) }}</div>
+                <div>{{ healthChecked(row) }}</div>
+              </template>
+            </OTooltip>
+          </span>
+        </template>
+
+        <template #cell-lastError="{ row }">
+          <span v-if="!lastErrorOf(row)" class="text-text-secondary">—</span>
+          <span v-else class="inline-flex min-w-0 items-center gap-1.5">
+            <span class="truncate">{{ lastErrorKind(row) }}</span>
+            <span class="text-text-secondary shrink-0">{{ lastErrorAgo(row) }}</span>
+            <OTooltip :content="lastErrorMessage(row)" max-width="30rem" hoverable />
+          </span>
         </template>
 
         <template #cell-stream="{ row }">
@@ -124,6 +154,7 @@
               icon-left="play-arrow"
               :loading="pendingStatusId === row.id"
               :disabled="pendingStatusId !== null && pendingStatusId !== row.id"
+              class="max-md:hidden"
               @click.stop="$emit('activate', row)"
             />
             <OButton
@@ -135,6 +166,7 @@
               icon-left="pause"
               :loading="pendingStatusId === row.id"
               :disabled="pendingStatusId !== null && pendingStatusId !== row.id"
+              class="max-md:hidden"
               @click.stop="$emit('pause', row)"
             />
             <OButton
@@ -143,6 +175,7 @@
               size="icon-sm"
               :title="t('onlineEvals.actions.edit')"
               icon-left="edit"
+              class="max-md:hidden"
               @click.stop="$emit('edit', row)"
             />
             <OButton
@@ -151,8 +184,60 @@
               size="icon-sm"
               :title="t('onlineEvals.actions.delete')"
               icon-left="delete"
+              class="max-md:hidden"
               @click.stop="$emit('delete', row)"
             />
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  :aria-label="t('common.moreActions')"
+                  icon-left="more-vert"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="eval-job-list-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                v-if="canActivate(row.status)"
+                icon-left="play-arrow"
+                class="md:hidden"
+                :disabled="pendingStatusId !== null && pendingStatusId !== row.id"
+                :data-test="`eval-job-list-${row.name}-activate-btn-menu`"
+                @select="$emit('activate', row)"
+              >
+                <span>{{ t("onlineEvals.actions.activate") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="canPause(row.status)"
+                icon-left="pause"
+                variant="destructive"
+                class="md:hidden"
+                :disabled="pendingStatusId !== null && pendingStatusId !== row.id"
+                :data-test="`eval-job-list-${row.name}-pause-btn-menu`"
+                @select="$emit('pause', row)"
+              >
+                <span>{{ t("onlineEvals.actions.pause") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="edit"
+                class="md:hidden"
+                :data-test="`eval-job-list-${row.name}-edit-btn-menu`"
+                @select="$emit('edit', row)"
+              >
+                <span>{{ t("onlineEvals.actions.edit") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="delete"
+                variant="destructive"
+                class="md:hidden"
+                :data-test="`eval-job-list-${row.name}-delete-btn-menu`"
+                @select="$emit('delete', row)"
+              >
+                <span>{{ t("onlineEvals.actions.delete") }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </div>
         </template>
       </OTable>
@@ -162,32 +247,50 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw, type I18nKey, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { COL } from "@/lib/core/Table/OTable.types";
-import type { EvalJob, EvalJobStatus } from "@/services/online-evals.service";
+import type {
+  EvalJob,
+  EvalJobHealth,
+  EvalJobHealthState,
+  EvalJobLastError,
+  EvalJobStatus,
+} from "@/services/online-evals.service";
 import { statusOf, targetScopeOf, valueOf } from "./utils/evalEntity";
+import { relativeTime } from "./utils/evalFormat";
 import { formatDate } from "@/utils/date";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EvalListShell from "./EvalListShell.vue";
 import { useNumberedRows } from "./composables/useNumberedRows";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
 
 const props = defineProps<{
   rows: EvalJob[];
   search: string;
   loading?: boolean;
+  forbidden?: boolean;
   /** A bulk action (e.g. delete-selected) is in flight — shows the table overlay. */
   actionLoading?: boolean;
   /** ID of the job whose activate/pause request is currently in flight. */
   pendingStatusId?: string | null;
+  /** Epoch-ms of the last list read, for the refresh button's age label. */
+  lastRunAt?: number | null;
+  /** A reload is in flight — spins the refresh button and blocks a second click. */
+  refreshing?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -203,14 +306,15 @@ const emit = defineEmits<{
 }>();
 
 function canActivate(status: EvalJobStatus): boolean {
-  return status === "draft" || status === "paused" || status === "degraded";
+  return status === "draft" || status === "paused";
 }
 
 function canPause(status: EvalJobStatus): boolean {
-  return status === "active" || status === "degraded";
+  return status === "active";
 }
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
+const jobDrafts = useEditorDraftIds("eval_job");
 const statusFilter = ref<EvalJobStatus | null>(null);
 const selectedIds = ref<string[]>([]);
 
@@ -237,7 +341,7 @@ const columns = computed(() =>
   [
     {
       id: "#",
-      header: "#",
+      header: raw("#"),
       accessorKey: "#",
       sortable: false,
       size: 56,
@@ -249,6 +353,7 @@ const columns = computed(() =>
       accessorKey: "name",
       sortable: true,
       size: COL.name,
+      minSize: 160,
       // `flex` (not `autoWidth`): fills leftover width on load AND stays
       // resizable — matches Dashboards/AlertList; `autoWidth` has no resize grip.
       meta: { align: "left", flex: true },
@@ -284,6 +389,23 @@ const columns = computed(() =>
       sortable: true,
       size: COL.count,
       meta: { align: "right" },
+    },
+    {
+      id: "health",
+      header: t("onlineEvals.job.columns.health"),
+      // Sorts worst-first when descending: waiting > degraded > healthy > idle.
+      accessorFn: (row: EvalJob) => HEALTH_SEVERITY[healthOf(row)?.state ?? "none"],
+      sortable: true,
+      size: 190,
+      meta: { align: "left" },
+    },
+    {
+      id: "lastError",
+      header: t("onlineEvals.job.columns.lastError"),
+      accessorFn: (row: EvalJob) => healthOf(row)?.lastError?.at ?? 0,
+      sortable: true,
+      size: 200,
+      meta: { align: "left" },
     },
     {
       id: "created",
@@ -326,38 +448,22 @@ const statusCounts = computed(() => {
   const rows = props.rows || [];
   let active = 0;
   let paused = 0;
-  let degraded = 0;
   let draft = 0;
-  let archived = 0;
   for (const r of rows) {
     const s = statusOf(r);
     if (s === "active") active += 1;
     else if (s === "paused") paused += 1;
-    else if (s === "degraded") degraded += 1;
     else if (s === "draft") draft += 1;
-    else if (s === "archived") archived += 1;
   }
-  return { active, paused, degraded, draft, archived, total: rows.length };
+  return { active, paused, draft, total: rows.length };
 });
-// The strip is the ONLY status filter (the redundant dropdown was removed), so it
-// carries every backend status. Attention-first order (degraded, paused, active,
-// then the inert draft/archived), "All" last — matching the Alerts / Incidents
-// strip. Tones echo the evalStatus chip exactly (degraded = orange, not red).
+// "archived" has no tile: nothing in the UI archives a job, so it would always read zero.
 const summaryStats = computed<StatItem[]>(() => {
   const c = statusCounts.value;
   const has = c.total > 0;
   const v = (n: number): string | number => (has ? n : "—");
   const share = has ? c.total : undefined;
   return [
-    {
-      key: "degraded",
-      label: t("onlineEvals.jobStatus.degraded"),
-      value: v(c.degraded),
-      icon: "error-outline",
-      tone: "orange",
-      max: share,
-      dataTest: "eval-job-summary-degraded",
-    },
     {
       key: "paused",
       label: t("onlineEvals.jobStatus.paused"),
@@ -386,15 +492,6 @@ const summaryStats = computed<StatItem[]>(() => {
       dataTest: "eval-job-summary-draft",
     },
     {
-      key: "archived",
-      label: t("onlineEvals.jobStatus.archived"),
-      value: v(c.archived),
-      icon: "inventory-2",
-      tone: "neutral",
-      max: share,
-      dataTest: "eval-job-summary-archived",
-    },
-    {
       key: "all",
       label: t("onlineEvals.summaryAll"),
       value: v(c.total),
@@ -412,29 +509,32 @@ function onStatSelect(key: string) {
   statusFilter.value = key === "all" || statusFilter.value === key ? null : (key as EvalJobStatus);
 }
 
-// Extreme-left status rail (mirrors the Incidents rail) — reads "does this job
-// need attention?": degraded=orange, paused=amber, active=green, and the inert
-// states (draft/archived) a quiet grey. Tones match the status tiles + chip.
-function evalJobRowStyle(row: EvalJob): Record<string, string> {
-  const s = statusOf(row);
-  const color =
-    s === "active"
-      ? "var(--color-success-500)"
-      : s === "degraded"
-        ? "var(--color-orange-500)"
-        : s === "paused"
-          ? "var(--color-warning-500)"
-          : "var(--color-grey-400)";
-  return { boxShadow: `inset 0.25rem 0 0 0 ${color}` };
+// Health drives the rail only for active jobs; it never changes the persisted status.
+function needsAttention(row: EvalJob): boolean {
+  const health = healthOf(row)?.state;
+  return (
+    statusOf(row) === "active" && (health === "degraded" || health === "waiting_for_credentials")
+  );
 }
 
-// Light exception wash (matches the Alerts list) — degraded jobs (failing) get a
+function evalJobRowStyle(row: EvalJob): Record<string, string> {
+  const s = statusOf(row);
+  const color = needsAttention(row)
+    ? "var(--color-orange-500)"
+    : s === "active"
+      ? "var(--color-success-500)"
+      : s === "paused"
+        ? "var(--color-warning-500)"
+        : "var(--color-grey-400)";
+  return { boxShadow: `var(--shadow-rail-geom) ${color}` };
+}
+
+// Light exception wash (matches the Alerts list) — jobs needing attention get a
 // warm wash, paused a muted grey; healthy/active/draft/archived stay clean so
 // attention goes to what's off, not the norm.
 function evalJobRowClass(row: EvalJob): string {
-  const s = statusOf(row);
-  if (s === "degraded") return "!bg-status-warning-bg";
-  if (s === "paused") return "!bg-surface-panel";
+  if (needsAttention(row)) return "!bg-status-warning-bg";
+  if (statusOf(row) === "paused") return "!bg-surface-panel";
   return "";
 }
 
@@ -461,8 +561,7 @@ function statusLabel(status: EvalJobStatus) {
 
 function scorerCountText(row: EvalJob) {
   const count = (row.scorers || []).length;
-  if (count === 1) return t("onlineEvals.job.scorerCount", { count });
-  return t("onlineEvals.job.scorersCount", { count });
+  return t("onlineEvals.job.scorerCount", { count });
 }
 
 function targetScopeLabel(row: EvalJob) {
@@ -473,6 +572,83 @@ function rowCreated(row: EvalJob) {
   return Number(
     valueOf(row, "createdAt", "created_at") || valueOf(row, "updatedAt", "updated_at") || 0,
   );
+}
+
+const HEALTH_SEVERITY: Record<EvalJobHealthState | "none", number> = {
+  none: 0,
+  no_recent_runs: 1,
+  healthy: 2,
+  degraded: 3,
+  waiting_for_credentials: 4,
+};
+
+const HEALTH_LABELS: Record<EvalJobHealthState, I18nKey> = {
+  healthy: "onlineEvals.job.health.healthy",
+  degraded: "onlineEvals.job.health.degraded",
+  waiting_for_credentials: "onlineEvals.job.health.waitingForCredentials",
+  no_recent_runs: "onlineEvals.job.health.noRecentRuns",
+};
+
+const ERROR_KIND_LABELS: Record<string, I18nKey> = {
+  provider_auth: "onlineEvals.job.errorKinds.providerAuth",
+  rate_limited: "onlineEvals.job.errorKinds.rateLimited",
+  timeout: "onlineEvals.job.errorKinds.timeout",
+  provider_5xx: "onlineEvals.job.errorKinds.provider5xx",
+  parse_error: "onlineEvals.job.errorKinds.parseError",
+  mapping_error: "onlineEvals.job.errorKinds.mappingError",
+  scorer_missing: "onlineEvals.job.errorKinds.scorerMissing",
+  execution_error: "onlineEvals.job.errorKinds.executionError",
+};
+
+function healthOf(row: EvalJob): EvalJobHealth | undefined {
+  return row.health ?? undefined;
+}
+
+function lastErrorOf(row: EvalJob): EvalJobLastError | undefined {
+  return healthOf(row)?.lastError ?? undefined;
+}
+
+function healthLabel(row: EvalJob): I18nText {
+  const health = healthOf(row);
+  return health ? t(HEALTH_LABELS[health.state]) : raw("—");
+}
+
+function healthSummary(row: EvalJob): I18nText {
+  const health = healthOf(row);
+  return t("onlineEvals.job.health.summary", {
+    errors: health?.recentErrors ?? 0,
+    runs: health?.recentRuns ?? 0,
+  });
+}
+
+function healthSince(row: EvalJob): I18nText {
+  return t("onlineEvals.job.health.since", { time: microsAgo(healthOf(row)?.since) });
+}
+
+function healthChecked(row: EvalJob): I18nText {
+  return t("onlineEvals.job.health.checked", { time: microsAgo(healthOf(row)?.evaluatedAt) });
+}
+
+function microsAgo(micros: number | null | undefined): string {
+  return micros ? relativeTime(micros / 1000, t) : "—";
+}
+
+/** Known kinds get a translated label; a kind from a newer server shows as-is. */
+function lastErrorKind(row: EvalJob): I18nText {
+  const kind = lastErrorOf(row)?.kind ?? "";
+  const key = ERROR_KIND_LABELS[kind];
+  return key ? t(key) : raw(kind);
+}
+
+function lastErrorAgo(row: EvalJob): string {
+  const at = lastErrorOf(row)?.at;
+  // `at` is the span's `_timestamp`, in microseconds.
+  return at ? relativeTime(at / 1000, t) : "—";
+}
+
+function lastErrorMessage(row: EvalJob): I18nText {
+  const error = lastErrorOf(row);
+  return raw(error?.message || error?.kind || "");
 }
 
 function formatDateShort(value: number) {

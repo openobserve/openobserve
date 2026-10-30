@@ -36,12 +36,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="regex-pattern-list-add-pattern-btn"
             variant="primary"
             size="sm"
+            :aria-label="
+              regexDrafts.hasNew
+                ? t('common.editorDraft.newDot', { label: t('regex_patterns.create_pattern') })
+                : undefined
+            "
             @click="createRegexPattern"
-            >{{ t("regex_patterns.create_pattern") }}</OButton
-          >
+            >{{ t("regex_patterns.create_pattern") }}
+            <EditorDraftDot
+              v-if="regexDrafts.hasNew"
+              :saved-at="regexDrafts.savedAt(null)"
+              corner
+              data-test="regex-pattern-list-add-draft-dot"
+          /></OButton>
         </template>
         <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
           <OTable
+            ref="oTableRef"
             :frame="false"
             data-test="regex-pattern-list-table"
             :data="visibleRows"
@@ -50,8 +61,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selected-ids="selectedPatternIds"
             selection="multiple"
             pagination="client"
-            :page-size="20"
+            :page-size="pageSize"
             :page-size-options="[10, 20, 50, 100]"
+            :current-page="currentPage"
+            :sort-by="sortBy"
+            :sort-order="sortOrder"
+            @update:page-size="pageSize = $event"
+            @update:current-page="currentPage = $event"
+            @update:sort-by="sortBy = $event"
+            @update:sort-order="sortOrder = $event"
             sorting="client"
             filter-mode="client"
             :default-columns="false"
@@ -61,6 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             table-id="settings-regex-patterns"
             :show-global-filter="false"
             :loading="listLoading"
+            :forbidden="forbidden"
             @update:selected-ids="handleSelectedIdsUpdate"
           >
             <template #toolbar>
@@ -71,20 +90,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template #toolbar-trailing>
-              <OButton
+              <ORefreshButton
+                layout="inline"
                 variant="outline"
-                size="icon-sm"
-                icon-left="refresh"
-                :loading="listLoading"
+                :last-run-at="lastUpdatedAt"
+                :loading="fetching"
+                shortcut-id="regexPatternsRefresh"
                 data-test="regex-pattern-list-refresh-btn"
-                @click="getRegexPatterns"
-              >
-                <OTooltip
-                  side="bottom"
-                  :content="t('common.refresh')"
-                  shortcut-id="regexPatternsRefresh"
-                />
-              </OButton>
+                @click="refreshRegexPatterns"
+              />
             </template>
             <template #empty>
               <OEmptyState
@@ -102,6 +116,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
               />
             </template>
+            <template #cell-name="{ row }">
+              <div class="flex min-w-0 items-center gap-2">
+                <OTruncatedText>{{ row.name }}</OTruncatedText>
+                <EditorDraftDot
+                  v-if="regexDrafts.ids.has(row.id)"
+                  :saved-at="regexDrafts.savedAt(row.id)"
+                  :data-test="`regex-pattern-list-${row.id}-draft-dot`"
+                />
+              </div>
+            </template>
             <template #cell-pattern="{ row }">
               <OCodeCell :value="row.pattern" />
             </template>
@@ -118,6 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-row-action="export"
                   variant="ghost"
                   size="icon-sm"
+                  class="max-md:hidden"
                   :title="t('settings.regexPatternList.exportTitle')"
                   @click.stop="exportRegexPattern(row)"
                   icon-left="download"
@@ -127,6 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-row-action="edit"
                   variant="ghost"
                   size="icon-sm"
+                  class="max-md:hidden"
                   :title="t('regex_patterns.edit')"
                   @click.stop="editRegexPattern(row)"
                   icon-left="edit"
@@ -136,29 +162,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-row-action="delete"
                   variant="ghost-destructive"
                   size="icon-sm"
+                  class="max-md:hidden"
                   :title="t('regex_patterns.delete')"
                   @click.stop="confirmDeleteRegexPattern(row)"
                   icon-left="delete"
                 />
+                <ODropdown side="bottom" align="end">
+                  <template #trigger>
+                    <OButton
+                      :aria-label="t('common.moreActions')"
+                      icon-left="more-vert"
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      class="md:hidden"
+                      data-test="regex-pattern-list-row-more-actions"
+                      @click.stop
+                    />
+                  </template>
+                  <ODropdownItem
+                    icon-left="download"
+                    class="md:hidden"
+                    :data-test="`regex-pattern-list-${row.id}-export-regex-pattern-menu`"
+                    @select="exportRegexPattern(row)"
+                  >
+                    <span>{{ t("settings.regexPatternList.exportTitle") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="edit"
+                    class="md:hidden"
+                    :data-test="`regex-pattern-list-${row.id}-update-regex-pattern-menu`"
+                    @select="editRegexPattern(row)"
+                  >
+                    <span>{{ t("regex_patterns.edit") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="delete"
+                    variant="destructive"
+                    class="md:hidden"
+                    :data-test="`regex-pattern-list-${row.id}-delete-regex-pattern-menu`"
+                    @select="confirmDeleteRegexPattern(row)"
+                  >
+                    <span>{{ t("regex_patterns.delete") }}</span>
+                  </ODropdownItem>
+                </ODropdown>
               </div>
             </template>
-            <template #bottom>
-              <div class="flex items-center gap-2">
-                <span class="text-xs font-normal">
-                  {{ resultTotal }} {{ t("regex_patterns.bottom_header") }}
-                </span>
-                <OButton
-                  v-if="selectedPatterns.length > 0"
-                  data-test="regex-pattern-list-delete-patterns-btn"
-                  variant="outline-destructive"
-                  size="sm-action"
-                  icon-left="delete"
-                  :loading="bulkDeleteLoading"
-                  @click="openBulkDeleteDialog"
-                >
-                  {{ t("settings.regexPatternList.delete") }}
-                </OButton>
-              </div>
+            <template #selection-actions>
+              <OButton
+                data-test="regex-pattern-list-delete-patterns-btn"
+                variant="outline-destructive"
+                size="sm"
+                icon-left="delete"
+                :loading="bulkDeleteLoading"
+                @click="openBulkDeleteDialog"
+              >
+                {{ t("settings.regexPatternList.delete") }}
+              </OButton>
             </template>
           </OTable>
         </div>
@@ -167,13 +226,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ImportRegexPattern
       v-else-if="showImportRegexPatternDialog"
       @cancel:hideform="showImportRegexPatternDialog = false"
-      @update:list="getRegexPatterns"
-      :regex-patterns="regexPatterns.map((pattern) => pattern.name)"
+      @update:list="refreshRegexPatterns"
+      :regex-patterns="regexPatterns.map((pattern: any) => pattern.name)"
     />
     <ConfirmDialog
       v-model="deleteDialog.show"
-      :title="deleteDialog.title"
-      :message="deleteDialog.message"
+      :title="t('settings.regexPatternList.deleteTitle')"
+      message-keypath="settings.regexPatternList.deleteMessage"
+      :message-name="deleteDialog.name"
+      ok-variant="destructive"
       @update:ok="deleteRegexPattern"
       @update:cancel="deleteDialog.show = false"
     />
@@ -181,6 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('settings.regexPatternList.bulkDeleteTitle')"
       :message="t('settings.regexPatternList.bulkDeleteMessage', { n: selectedPatterns.length })"
+      ok-variant="destructive"
       @update:ok="bulkDeleteRegexPatterns"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -190,16 +252,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="showAddRegexPatternDialog.show"
       :data="showAddRegexPatternDialog.data"
       :is-edit="showAddRegexPatternDialog.isEdit"
-      @update:list="getRegexPatterns"
+      @update:list="refreshRegexPatterns"
       @close="closeAddRegexPatternDialog"
     />
   </div>
 </template>
 
 <script lang="ts">
-import { ref, onMounted, defineComponent, computed } from "vue";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useQuery } from "@tanstack/vue-query";
+import { regexPatternsQuery } from "@/services/regex_pattern.queries";
+import { regexPatternKeys } from "@/services/regex_pattern.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { ref, onMounted, defineComponent, computed, watch } from "vue";
 import type { Ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { convertUnixToDateFormat } from "@/utils/zincutils";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { useRouter } from "vue-router";
@@ -210,7 +277,9 @@ import ImportRegexPattern from "./ImportRegexPattern.vue";
 import config from "@/aws-exports";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
@@ -221,6 +290,11 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { useListViewState } from "@/composables/useListViewState";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 
 export default defineComponent({
   name: "RegexPatternList",
@@ -231,15 +305,41 @@ export default defineComponent({
     ImportRegexPattern,
     OEmptyState,
     OButton,
-    OTooltip,
+    ODropdown,
+    ODropdownItem,
+    ORefreshButton,
     OSearchInput,
     OTable,
     OCodeCell,
     OTimeCell,
+    OTruncatedText,
+    EditorDraftDot,
   },
   setup() {
-    const filterQuery = ref("");
-    const { t } = useI18n();
+    const viewState = useListViewState("regex-patterns", {
+      filterQuery: "",
+      pageSize: 20,
+      currentPage: 1,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+    });
+    const filterQuery = ref(viewState.filterQuery);
+    const pageSize = ref(viewState.pageSize);
+    const currentPage = ref(viewState.currentPage);
+    const sortBy = ref(viewState.sortBy);
+    const sortOrder = ref(viewState.sortOrder);
+    const oTableRef = ref<any>(null);
+
+    watch([filterQuery, pageSize, currentPage, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        filterQuery: filterQuery.value,
+        pageSize: pageSize.value,
+        currentPage: currentPage.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
+    });
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
 
@@ -295,21 +395,57 @@ export default defineComponent({
 
     const deleteDialog = ref({
       show: false,
-      title: t("settings.regexPatternList.deleteTitle"),
-      message: t("settings.regexPatternList.deleteMessage"),
       data: "" as any,
+      name: "",
     });
 
-    const regexPatterns = ref<any[]>([]);
+    const orgIdForList = useOrgId();
+    const regexPatternsList = useQuery(() =>
+      Object.assign(regexPatternsQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
+    );
+
+    // The list is the query, not a copy of it: any invalidation of the scope
+    // repaints these rows with no wiring here.
+    const regexPatterns = computed(() =>
+      (regexPatternsList.data.value ?? []).map((pattern: any) => ({
+        ...pattern,
+        created_at: convertUnixToDateFormat(pattern.created_at),
+        updated_at: convertUnixToDateFormat(pattern.updated_at),
+      })),
+    );
     const selectedPatterns: Ref<any[]> = ref([]);
     const confirmBulkDelete = ref(false);
     const bulkDeleteLoading = ref(false);
 
-    const resultTotal = ref(0);
-
-    const listLoading = ref(false);
+    const listLoading = regexPatternsList.isPending;
+    // setTimeout(0) runs after TanStack's deferred auto-reset-on-data-change, so the restored page wins.
+    watch(
+      listLoading,
+      (v) => {
+        if (v) return;
+        setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
+      },
+      { once: true, immediate: true },
+    );
+    // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+    const forbidden = computed(() => {
+      const e: any = regexPatternsList.error.value;
+      return e?.status === 403 || e?.response?.status === 403;
+    });
+    // Request in flight, with rows still on screen — the refresh button's
+    // spinner. `listLoading` stays for the skeleton, which only a cold read wants.
+    const fetching = regexPatternsList.isFetching;
+    // Epoch ms of the last successful read — drives the button's "1m ago" label.
+    const lastUpdatedAt = regexPatternsList.dataUpdatedAt;
 
     const showImportRegexPatternDialog = ref(false);
+
+    const regexDrafts = useEditorDraftIds("regex_pattern");
+    const dropRegexDrafts = (ids: string[]) => {
+      const org = store.state.selectedOrganization.identifier;
+      for (const id of ids)
+        deleteEditorDraftsFor({ kind: "regex_pattern", org, entityId: String(id) });
+    };
 
     const showAddRegexPatternDialog = ref({
       show: false,
@@ -325,12 +461,10 @@ export default defineComponent({
     };
 
     onMounted(async () => {
-      if (store.state.organizationData.regexPatterns.length == 0) {
-        await getRegexPatterns();
-      } else {
-        regexPatterns.value = store.state.organizationData.regexPatterns;
-        resultTotal.value = regexPatterns.value.length;
-      }
+      // Unconditional: the cache paints what it has straight away and only
+      // reaches the server when the entry is stale. Reading Vuex instead
+      // short-circuited that, so the list never revalidated after the first load.
+      await getRegexPatterns();
       if (router.currentRoute.value.query.from == "logs" && config.isEnterprise == "true") {
         createRegexPattern();
       }
@@ -347,7 +481,6 @@ export default defineComponent({
           filtered.push(rows[i]);
         }
       }
-      resultTotal.value = filtered.length;
       return filtered;
     };
 
@@ -357,27 +490,35 @@ export default defineComponent({
       showAddRegexPatternDialog.value.data = {};
     };
 
-    const getRegexPatterns = async () => {
-      listLoading.value = true;
-      try {
-        const response = await regexPatternsService.list(
-          store.state.selectedOrganization.identifier,
-        );
-        regexPatterns.value = response.data.patterns.map((pattern: any) => ({
-          ...pattern,
-          created_at: convertUnixToDateFormat(pattern.created_at),
-          updated_at: convertUnixToDateFormat(pattern.updated_at),
-        }));
-        store.dispatch("setRegexPatterns", regexPatterns.value);
-        resultTotal.value = regexPatterns.value.length;
-      } catch (error: any) {
-        toast({
-          message: error.data.message || t("settings.regexPatternList.errorFetching"),
-          variant: "error",
-        });
-      } finally {
-        listLoading.value = false;
-      }
+    // `force` for the refresh shortcut and post-mutation reloads — those must
+    // reach the server; a plain call is a cache hit while the list is fresh.
+    // Bound to refresh / "list changed" events: always hits the server.
+    const refreshRegexPatterns = () => getRegexPatterns(true);
+
+    // Bridge for consumers still reading the Vuex copy.
+    watch(
+      regexPatterns,
+      (rows: any[]) => {
+        store.dispatch("setRegexPatterns", rows);
+      },
+      { immediate: true },
+    );
+
+    // The query owns its failure now, so this reports it once per error however
+    // the read was triggered.
+    watch(regexPatternsList.error, (error: any) => {
+      // The grouped access toast already reports a 403; a second red toast adds nothing.
+      if (!error || forbidden.value) return;
+      toast({
+        message: error.data?.message || t("settings.regexPatternList.errorFetching"),
+        variant: "error",
+      });
+    });
+
+    // `force` is only meaningful for an explicit refresh now: a write that
+    // invalidates the scope repaints these rows on its own.
+    const getRegexPatterns = async (force = false) => {
+      if (force) await regexPatternsList.refetch();
     };
 
     const editRegexPattern = (row: any) => {
@@ -389,6 +530,7 @@ export default defineComponent({
     const confirmDeleteRegexPattern = (row: any) => {
       deleteDialog.value.show = true;
       deleteDialog.value.data = row.id;
+      deleteDialog.value.name = row.name;
     };
 
     const deleteRegexPattern = async () => {
@@ -397,7 +539,18 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           deleteDialog.value.data,
         );
-        getRegexPatterns();
+        // Drop the row from the cache first so it disappears now, not when the
+        // refetch lands; the forced reload re-persists the corrected list.
+        const deletedId = deleteDialog.value.data;
+        dropRegexDrafts([deletedId]);
+        queryClient.setQueriesData(
+          { queryKey: regexPatternKeys.all(store.state.selectedOrganization.identifier) },
+          (list: any) =>
+            Array.isArray(list)
+              ? list.filter((p: any) => p.id !== deletedId && p.name !== deletedId)
+              : list,
+        );
+        getRegexPatterns(true);
         toast({
           message: t("settings.regexPatternList.deletedSuccess"),
           variant: "success",
@@ -488,6 +641,7 @@ export default defineComponent({
           { ids: patternIds },
         );
         const { successful, unsuccessful } = res.data;
+        dropRegexDrafts(successful);
 
         if (successful.length > 0 && unsuccessful.length === 0) {
           toast({
@@ -497,7 +651,7 @@ export default defineComponent({
         } else if (successful.length > 0 && unsuccessful.length > 0) {
           toast({
             message: t("settings.regexPatternList.bulkDeletePartial", {
-              successful: successful.length,
+              count: successful.length,
               unsuccessful: unsuccessful.length,
             }),
             variant: "warning",
@@ -511,7 +665,7 @@ export default defineComponent({
 
         selectedPatterns.value = [];
         confirmBulkDelete.value = false;
-        await getRegexPatterns();
+        await getRegexPatterns(true);
       } catch (error: any) {
         const errorMessage =
           error?.data?.message ||
@@ -532,22 +686,31 @@ export default defineComponent({
       {
         id: "regexPatternsRefresh",
         handler: () => {
-          if (!isInputFocused()) getRegexPatterns();
+          if (!isInputFocused()) getRegexPatterns(true);
         },
       },
     ]);
 
     return {
+      regexDrafts,
+      refreshRegexPatterns,
       t,
       store,
       router,
       filterQuery,
+      pageSize,
+      currentPage,
+      sortBy,
+      sortOrder,
+      oTableRef,
       columns,
       regexPatterns,
       filterData,
-      resultTotal,
       createRegexPattern,
       listLoading,
+      fetching,
+      lastUpdatedAt,
+      forbidden,
       editRegexPattern,
       deleteRegexPattern,
       deleteDialog,

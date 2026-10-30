@@ -16,11 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <div class="flex gap-1">
+    <div class="flex gap-3 max-md:flex-wrap max-md:gap-1">
       <!-- Query Type: SQL / PromQL -->
       <OToggleGroup
         v-if="showQueryType"
-        variant="primary"
         :model-value="selectedButtonQueryType"
         @update:model-value="onUpdateQueryMode($event as string)"
       >
@@ -31,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OToggleGroupItem
           v-if="
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
-              .stream_type == 'metrics'
+              .stream_type == 'metrics' && !isCustomSqlPanel(dashboardPanelData.data.type)
           "
           value="promql"
           size="sm"
@@ -44,12 +43,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Builder Mode: Builder / Custom -->
       <OToggleGroup
-        variant="primary"
         :model-value="selectedButtonType"
         @update:model-value="onUpdateBuilderMode($event as string)"
       >
         <OToggleGroupItem
-          v-if="dashboardPanelData.data.type != 'custom_chart'"
+          v-if="
+            dashboardPanelData.data.type != 'custom_chart' &&
+            !isCustomSqlPanel(dashboardPanelData.data.type) &&
+            !isFormulaQuery(
+              dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex],
+            )
+          "
           value="builder"
           size="sm"
           data-test="dashboard-builder-query-type"
@@ -75,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, watch, onMounted, nextTick, inject, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import useDefaultPanelFields from "@/composables/dashboard/useDefaultPanelFields";
@@ -84,6 +88,11 @@ import { useStore } from "vuex";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { isFormulaQuery } from "@/utils/dashboard/promql/formula";
+import { isCustomSqlPanel } from "@/utils/dashboard/chartTypeGroups";
+import { promqlToBuilder } from "@/components/promql/astToBuilder";
+import { promqlRenderer } from "@/components/promql/operations/queryModeller";
+import { normalizeSteps } from "@/components/promql/types";
 
 export default defineComponent({
   name: "QueryTypeSelector",
@@ -97,12 +106,12 @@ export default defineComponent({
   emits: [],
   setup() {
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
     const { dashboardPanelData, removeXYFilters, updateXYFieldsForCustomQueryMode } =
-      useDashboardPanelData(dashboardPanelDataPageKey);
-    const { applyDefaultPanelFields } = useDefaultPanelFields(dashboardPanelDataPageKey);
+      useDashboardPanelData(dashboardPanelDataPageKey, t);
+    const { applyDefaultPanelFields } = useDefaultPanelFields(dashboardPanelDataPageKey, t);
     // Pages that re-seed default builder fields on the in-page Builder toggle.
     // (Entering a builder surface parses on mount, not via this handler.)
     const SEED_ON_TOGGLE_PAGES = ["dashboard", "metrics", "build", "logs"];
@@ -129,9 +138,13 @@ export default defineComponent({
         ? "custom"
         : "builder";
 
-      if (dashboardPanelData.data.type == "custom_chart") {
+      if (
+        dashboardPanelData.data.type == "custom_chart" ||
+        isCustomSqlPanel(dashboardPanelData.data.type)
+      ) {
         // For custom_chart, check the actual query type and customQuery flag
         selectedButtonType.value = "custom";
+        await nextTick();
         ignoreSelectedButtonTypeUpdate.value = false;
         return;
       }
@@ -150,6 +163,15 @@ export default defineComponent({
     onMounted(async () => {
       initializeSelectedButtonType();
     });
+
+    // The editor stays mounted across these type switches, so the toggles follow the reset query.
+    watch(
+      () => dashboardPanelData.data.type,
+      (type, oldType) => {
+        if (isCustomSqlPanel(type) || isCustomSqlPanel(oldType)) initializeSelectedButtonType();
+      },
+      { flush: "post" },
+    );
 
     // onActivated(async () => {
     //     initializeSelectedButtonType()
@@ -210,7 +232,61 @@ export default defineComponent({
       // }
     };
 
-    const onUpdateBuilderMode = (selectedQueryType: any) => {
+    const switchPromqlCodeToBuilder = async () => {
+      const index = dashboardPanelData.layout.currentQueryIndex;
+      const slot = dashboardPanelData.data.queries[index];
+      const text = slot.query;
+      // Unedited since the builder wrote it: its saved state (incomplete filters too) is the exact answer.
+      if (text === builderRendering(slot)) {
+        dashboardPanelData.meta.errors.queryErrors = [];
+        selectedButtonType.value = "builder";
+        dashboardPanelData.layout.showQueryBar = true;
+        return;
+      }
+      const mapped = await promqlToBuilder(store.state.selectedOrganization?.identifier, text);
+      // The user moved tab or edited the code while this parsed; the result describes neither.
+      if (
+        dashboardPanelData.layout.currentQueryIndex !== index ||
+        dashboardPanelData.data.queries[index] !== slot ||
+        slot.query !== text
+      ) {
+        return;
+      }
+      if (!mapped.ok) {
+        dashboardPanelData.meta.errors.queryErrors = [mapped.reason];
+        return;
+      }
+      slot.fields.stream = mapped.query.metric;
+      slot.fields.promql_labels = mapped.query.labels;
+      slot.fields.promql_operations = mapped.query.operations;
+      dashboardPanelData.meta.errors.queryErrors = [];
+      selectedButtonType.value = "builder";
+      dashboardPanelData.layout.showQueryBar = true;
+    };
+
+    const builderRendering = (slot: any): string | null => {
+      try {
+        return promqlRenderer.renderQuery({
+          metric: slot.fields?.stream ?? "",
+          labels: slot.fields?.promql_labels ?? [],
+          operations: normalizeSteps(slot.fields?.promql_operations ?? []),
+        });
+      } catch {
+        return null;
+      }
+    };
+
+    const onUpdateBuilderMode = async (selectedQueryType: any) => {
+      const slot = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
+      if (
+        isPromQLMode.value &&
+        isCustomMode.value &&
+        selectedQueryType === "builder" &&
+        slot?.query?.trim()
+      ) {
+        await switchPromqlCodeToBuilder();
+        return;
+      }
       if (selectedQueryType != selectedButtonType.value) {
         // some exceptions
         // If user is switching from auto to custom, promql to auto, promql to custom-sql,
@@ -223,15 +299,7 @@ export default defineComponent({
           dashboardPanelData.layout.showQueryBar = true;
         } else {
           popupSelectedButtonType.value = selectedQueryType;
-
-          // Set appropriate message based on the transition
-          if (isPromQLMode.value && isCustomMode.value && selectedQueryType === "builder") {
-            // Switching from PromQL custom to builder
-            confirmDialogMessage.value = t("dashboard.queryTypeSelector.switchToBuilderConfirm");
-          } else {
-            // Default message for other transitions
-            confirmDialogMessage.value = t("dashboard.queryTypeSelector.changeQueryModeConfirm");
-          }
+          confirmDialogMessage.value = t("dashboard.queryTypeSelector.changeQueryModeConfirm");
 
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query != ""
             ? (confirmQueryModeChangeDialog.value = true)
@@ -327,6 +395,7 @@ export default defineComponent({
         if (streamType !== "metrics") return;
         if (dashboardPanelData.data.queryType === "promql") return;
         if (dashboardPanelData.data.type === "custom_chart") return;
+        if (isCustomSqlPanel(dashboardPanelData.data.type)) return;
 
         const query = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
         if (!query) return;
@@ -442,6 +511,8 @@ export default defineComponent({
       selectedButtonType,
       store,
       selectedButtonQueryType,
+      isFormulaQuery,
+      isCustomSqlPanel,
     };
   },
   components: { ConfirmDialog, OToggleGroup, OToggleGroupItem, OIcon },

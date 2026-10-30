@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" style="color-scheme:light dark">
+  <defs>
+    <linearGradient id="scatter-dot" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0.3" stop-color="#6CF5C2"/>
+      <stop offset="0.65" stop-color="#05E39C"/>
+    </linearGradient>
+  </defs>
+  <path d="M0 0.5H2V62H63.4V64H0Z" fill="#191919" style="fill:light-dark(#191919,#FFFFFF)"/>
+  <g fill="#FE93D3">
+    <rect x="13" y="7.4" width="12.75" height="2.4"/>
+    <rect x="13" y="12.4" width="12.4" height="2.4"/>
+    <rect x="13" y="17.4" width="7" height="2"/>
+  </g>
+  <g fill="#FECE85">
+    <rect x="2" y="12.4" width="4" height="2.2"/>
+    <rect x="2" y="24.8" width="4" height="2.1"/>
+    <rect x="2" y="37.15" width="4" height="2.3"/>
+    <rect x="2" y="49.5" width="4" height="2.2"/>
+  </g>
+  <g fill="url(#scatter-dot)">
+    <circle cx="51.2" cy="13.4" r="3.25"/>
+    <circle cx="38.35" cy="25.6" r="3.25"/>
+    <circle cx="51.1" cy="25.7" r="3.25"/>
+    <circle cx="26.2" cy="38.3" r="3.25"/>
+    <circle cx="38.5" cy="38.4" r="3.25"/>
+    <circle cx="51.1" cy="38.3" r="3.25"/>
+    <circle cx="13.7" cy="51.3" r="3.25"/>
+    <circle cx="26.4" cy="51.2" r="3.25"/>
+  </g>
+</svg>

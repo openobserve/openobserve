@@ -16,6 +16,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import PlayerEventsSidebar from "@/components/rum/PlayerEventsSidebar.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import i18n from "@/locales";
 
 const node = document.createElement("div");
@@ -243,6 +244,63 @@ describe("PlayerEventsSidebar", () => {
 
       expect(wrapper.find('[data-test="search-input"]').exists()).toBe(false);
     });
+
+    it("keeps the Traces tab alive across toggles — mounts it exactly once", async () => {
+      // Every toggle used to destroy PlayerTracesTab and refire its whole fetch
+      // pipeline via onMounted. KeepAlive must preserve the instance instead.
+      let mountCount = 0;
+      const CountingTracesTab = {
+        name: "PlayerTracesTab",
+        template: '<div data-test="counting-traces-tab" />',
+        props: ["sessionId", "currentTime", "startTime", "endTime", "rumWindowUs"],
+        mounted() {
+          mountCount++;
+        },
+      };
+      wrapper.unmount();
+      wrapper = mount(PlayerEventsSidebar, {
+        attachTo: "#app",
+        props: { events: mockEvents, sessionDetails: mockSessionDetails },
+        global: { plugins: [i18n], stubs: { ...stubs, PlayerTracesTab: CountingTracesTab } },
+      });
+      await wrapper.vm.$nextTick();
+      const appTabs = wrapper.findComponent({ name: "AppTabs" });
+
+      await appTabs.vm.$emit("update:active-tab", "traces");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="counting-traces-tab"]').exists()).toBe(true);
+
+      await appTabs.vm.$emit("update:active-tab", "breadcrumbs");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="counting-traces-tab"]').exists()).toBe(false);
+
+      await appTabs.vm.$emit("update:active-tab", "traces");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="counting-traces-tab"]').exists()).toBe(true);
+
+      expect(mountCount).toBe(1);
+    });
+
+    it("passes rumWindowUs through to the Traces tab", async () => {
+      const TracesTab = {
+        name: "PlayerTracesTab",
+        template: '<div data-test="traces-tab-with-window" />',
+        props: ["sessionId", "currentTime", "startTime", "endTime", "rumWindowUs"],
+      };
+      const rumWindowUs = { start: 1_000, end: 2_000 };
+      wrapper.unmount();
+      wrapper = mount(PlayerEventsSidebar, {
+        attachTo: "#app",
+        props: { events: mockEvents, sessionDetails: mockSessionDetails, rumWindowUs },
+        global: { plugins: [i18n], stubs: { ...stubs, PlayerTracesTab: TracesTab } },
+      });
+      await wrapper.vm.$nextTick();
+
+      await wrapper.findComponent({ name: "AppTabs" }).vm.$emit("update:active-tab", "traces");
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.findComponent(TracesTab).props("rumWindowUs")).toEqual(rumWindowUs);
+    });
   });
 
   // ==========================================================================
@@ -371,17 +429,22 @@ describe("PlayerEventsSidebar", () => {
       expect(wrapper.find('[data-test="player-event-row-action"]').text()).toContain("Action");
     });
 
-    it("should provide title attribute equal to event name on event name element", () => {
-      const firstEventName = wrapper.find('[data-test="event-name"]');
+    it("should truncate only the event name, without a native title on it", () => {
+      const firstRow = wrapper.find('[data-test="player-event-row-error"]');
+      const name = firstRow.findComponent(OTruncatedText);
 
-      expect(firstEventName.attributes("title")).toBe("TypeError: Cannot read property 'foo'");
+      expect(name.attributes("data-test")).toBe("event-name");
+      expect(name.attributes("title")).toBeUndefined();
     });
 
-    it("should provide title attributes for all visible event name elements", () => {
-      const eventNames = wrapper.findAll('[data-test="event-name"]');
+    it("should keep the time and type badge outside the name's cut-text tooltip", () => {
+      const names = wrapper.findAllComponents(OTruncatedText);
 
-      eventNames.forEach((name: any, index: number) => {
-        expect(name.attributes("title")).toBe(mockEvents[index].name);
+      expect(names).toHaveLength(mockEvents.length);
+      names.forEach((name: any, index: number) => {
+        expect(name.text()).toBe(mockEvents[index].name);
+        expect(name.props("tooltip")).toBeUndefined();
+        expect(name.find('[data-test="event-type-badge"]').exists()).toBe(false);
       });
     });
   });
@@ -562,7 +625,7 @@ describe("PlayerEventsSidebar", () => {
   // ==========================================================================
 
   describe("Accessibility", () => {
-    it("should preserve full long event name text in title attribute", async () => {
+    it("should keep the full long event name as the name's tooltip text", async () => {
       const longEvent = {
         id: "long",
         type: "error",
@@ -573,7 +636,7 @@ describe("PlayerEventsSidebar", () => {
 
       await wrapper.setProps({ events: [longEvent] });
 
-      expect(wrapper.find('[data-test="event-name"]').attributes("title")).toBe(longEvent.name);
+      expect(wrapper.findComponent(OTruncatedText).text()).toBe(longEvent.name);
     });
   });
 

@@ -3,7 +3,7 @@
     <!-- Header -->
     <div class="mb-3 flex items-center justify-between">
       <div>
-        <div class="text-base font-bold">{{ title }}</div>
+        <div class="text-base font-bold">{{ resolvedTitle }}</div>
         <div v-if="subtitle" class="text-text-muted text-xs">
           {{ subtitle }}
         </div>
@@ -31,22 +31,23 @@
         <div class="flex items-start justify-between">
           <div class="min-w-0 flex-1">
             <!-- Name -->
-            <div
-              class="text-text-heading truncate text-sm font-bold font-medium"
-              :title="link.name"
+            <OTruncatedText
+              as="div"
+              class="text-text-heading text-sm font-bold font-medium"
+              :tooltip="raw(link.name)"
               :data-test="`cross-link-item-name-${idx}`"
             >
               {{ link.name }}
-              <OTag v-if="link._source" type="crossLinkSource" :value="link._source" class="ml-1" />
-            </div>
+              <OTag v-if="link._source" type="crossLinkSource" :value="link._source" class="ms-1" />
+            </OTruncatedText>
             <!-- URL -->
-            <div
-              class="text-text-muted mt-1 truncate text-xs"
-              :title="link.url"
+            <OTruncatedText
+              as="div"
+              class="text-text-muted mt-1 text-xs"
               :data-test="`cross-link-item-url-${idx}`"
             >
               {{ link.url }}
-            </div>
+            </OTruncatedText>
             <!-- Fields -->
             <div v-if="link.fields?.length" class="mt-1 flex flex-wrap gap-1">
               <OTag
@@ -56,13 +57,14 @@
                 class="max-w-50"
                 :data-test="`cross-link-field-chip-${fIdx}`"
               >
-                <span class="truncate text-xs" :title="field.name">{{ field.name }}</span>
+                <OTruncatedText class="text-xs">{{ field.name }}</OTruncatedText>
               </OTag>
             </div>
           </div>
           <!-- Actions -->
-          <div v-if="!readonly" class="ml-2 flex shrink-0 items-center gap-1">
+          <div v-if="!readonly" class="ms-2 flex shrink-0 items-center gap-1">
             <OButton
+              :aria-label="t('common.edit')"
               variant="ghost"
               size="icon-sm"
               icon-left="edit"
@@ -70,6 +72,7 @@
               :data-test="`cross-link-edit-${idx}`"
             />
             <OButton
+              :aria-label="t('common.delete')"
               variant="ghost-destructive"
               size="icon-sm"
               icon-left="delete"
@@ -100,10 +103,11 @@
 <script lang="ts">
 import { defineComponent, ref, computed, type PropType } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import CrossLinkDialog from "./CrossLinkDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 export interface CrossLink {
   name: string;
@@ -114,19 +118,20 @@ export interface CrossLink {
 
 export default defineComponent({
   name: "CrossLinkManager",
-  components: { CrossLinkDialog, OButton, OTag },
+  components: { CrossLinkDialog, OButton, OTag, OTruncatedText },
   props: {
     modelValue: {
       type: Array as PropType<CrossLink[]>,
       default: () => [],
     },
     title: {
-      type: String,
-      default: "Cross-Links",
+      type: String as unknown as PropType<I18nText>,
+      // Resolved in setup so the fallback is translated, not frozen at load.
+      default: undefined,
     },
     subtitle: {
-      type: String,
-      default: "",
+      type: String as unknown as PropType<I18nText>,
+      default: raw(""),
     },
     readonly: {
       type: Boolean,
@@ -144,7 +149,8 @@ export default defineComponent({
   emits: ["update:modelValue", "change"],
   setup(props, { emit }) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
+    const resolvedTitle = computed(() => props.title ?? t("common.crossLinks"));
     const showAddDialog = ref(false);
     const editingLink = ref<CrossLink | null>(null);
     const editingOriginalName = ref("");
@@ -192,6 +198,9 @@ export default defineComponent({
     }
 
     return {
+      resolvedTitle,
+
+      raw,
       t,
       store,
       links,

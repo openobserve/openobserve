@@ -456,43 +456,4 @@ CN5lTowpVXP2OIiiNTGa75Fj
         // Should fail due to invalid token, but we're testing the claims processing logic
         assert!(result.is_err(), "Should fail with invalid token");
     }
-
-    #[test]
-    fn test_verify_decode_token_user_role_assignment() {
-        // Test that user_role is correctly assigned based on login_flow
-        let token = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InRlc3Qta2V5In0.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.EkN-DOsnsuRjRO6BxXemmJDm3HbxrbRzXglbN2S4sOkopdU4IsDxTI8jO19W_A4K8ZPJijNLis4EZsHeY559a4DFOd50_OqgHGuERTqYZyuhtF39yxJPAjUESwxk2J5k_4zM3O-vtd1Ghyo4IbqKKSy6J9mTniYJPenn5-HIirE";
-
-        let jwks =
-            r#"{"keys":[{"kty":"RSA","kid":"test-key","n":"test-n","e":"AQAB","alg":"RS256"}]}"#;
-
-        // Test with login_flow = true (should assign ServiceAccount role)
-        let result_login = verify_decode_token(token, jwks, "test-aud", false, true);
-
-        // Test with login_flow = false (should not assign role)
-        let result_service = verify_decode_token(token, jwks, "test-aud", false, false);
-
-        // Both should fail due to invalid token, but we're testing the role assignment logic
-        assert!(
-            result_login.is_err() || result_service.is_err(),
-            "Both should fail with invalid token"
-        );
-    }
-
-    #[test]
-    fn test_verify_decode_token_response_structure() {
-        // Test that the function returns the expected response structure
-        let token = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InRlc3Qta2V5In0.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.EkN-DOsnsuRjRO6BxXemmJDm3HbxrbRzXglbN2S4sOkopdU4IsDxTI8jO19W_A4K8ZPJijNLis4EZsHeY559a4DFOd50_OqgHGuERTqYZyuhtF39yxJPAjUESwxk2J5k_4zM3O-vtd1Ghyo4IbqKKSy6J9mTniYJPenn5-HIirE";
-
-        let jwks =
-            r#"{"keys":[{"kty":"RSA","kid":"test-key","n":"test-n","e":"AQAB","alg":"RS256"}]}"#;
-
-        let result = verify_decode_token(token, jwks, "test-aud", false, false);
-
-        // Should fail due to invalid token, but we're testing the response structure
-        assert!(result.is_err(), "Should fail with invalid token");
-
-        // If it were to succeed, it should return a tuple with TokenValidationResponse and
-        // Option<TokenData> The TokenValidationResponse should have is_valid = true and
-        // is_internal_user = false
-    }
 }

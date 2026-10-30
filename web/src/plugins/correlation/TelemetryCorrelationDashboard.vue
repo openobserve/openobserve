@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="isOpen"
     side="right"
     :width="90"
-    :title="`Correlated Streams - ${serviceName}`"
+    :title="t('correlation.correlatedStreamsFor', { service: serviceName })"
     :sub-title="formatTimeRange(timeRange)"
     @update:open="(v) => !v && onClose()"
   >
@@ -49,11 +49,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             valueKey="value"
             @update:model-value="onPendingDimensionChange"
             class="dimension-dropdown"
-            style="min-width: 120px"
+            style="min-width: 7.5rem"
           />
           <OTooltip
             v-if="unstableDimensionKeys.has(key)"
-            content="Unstable dimension - changes on pod restart. Default: All values."
+            :content="t('correlation.unstableDimensionNote')"
             side="top"
           />
         </div>
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm-action"
           :disabled="!hasPendingChanges"
           @click="applyDimensionChanges"
-          class="ml-2"
+          class="ms-2"
           data-test="apply-dimension-filters"
         >
           {{ t("common.apply") }}
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="border-card-glass-border flex justify-end border-b border-solid p-2"
           >
             <OButton variant="ghost" size="sm-action" @click="loadDashboard" :loading="loading">
-              <OIcon name="refresh" size="xs" class="mr-1" />
+              <OIcon name="refresh" size="xs" class="me-1" />
               {{ t("common.refresh") }}
             </OButton>
           </div>
@@ -156,10 +156,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Grouped metric list -->
+                <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
                 <div
                   class="dimension-list-container min-h-0 flex-1 overflow-y-auto px-1.5"
                   style="max-height: calc(100vh - 210px)"
                 >
+                  <!-- eslint-enable local/no-hardcoded-px -->
                   <template
                     v-if="groupedFilteredMetricStreams.groups.some((g) => g.streams.length > 0)"
                   >
@@ -177,17 +179,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 collapsedGroups.has(group.id) ? 'chevron-right' : 'expand-more'
                               "
                               size="sm"
-                              class="mr-0.5"
+                              class="me-0.5"
                             />
                             <OIcon
                               v-if="typeof group.icon === 'string'"
                               :name="group.icon"
                               size="xs"
-                              class="mr-0.5"
+                              class="me-0.5"
                             />
                             <component v-else :is="group.icon" />
-                            <span>{{ group.label }}</span>
-                            <OTag type="fieldTag" class="ml-1">{{ group.streams.length }}</OTag>
+                            <span>{{ t(group.labelKey) }}</span>
+                            <OTag type="fieldTag" class="ms-1">{{ group.streams.length }}</OTag>
                           </div>
                           <div class="flex gap-1">
                             <OButton
@@ -196,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               @click.stop="selectAllInGroup(group.id)"
                               :disabled="getGroupSelectionState(group.id) === 'all'"
                             >
-                              All
+                              {{ t("correlation.all") }}
                             </OButton>
                             <OButton
                               variant="ghost"
@@ -204,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               @click.stop="deselectAllInGroup(group.id)"
                               :disabled="getGroupSelectionState(group.id) === 'none'"
                             >
-                              None
+                              {{ t("common.none") }}
                             </OButton>
                           </div>
                         </div>
@@ -228,23 +230,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             />
                           </div>
                           <div class="flex min-w-0 flex-1 flex-col">
-                            <span class="text-text-secondary! cursor-pointer truncate text-sm">{{
+                            <OTruncatedText class="text-text-secondary! cursor-pointer text-sm">{{
                               stream.stream_name
-                            }}</span>
+                            }}</OTruncatedText>
                           </div>
                         </div>
                       </template>
                     </template>
                   </template>
                   <div v-else class="px-2 pt-3 text-center">
-                    <OIcon name="info" size="sm" class="mr-1 align-middle" />
+                    <OIcon name="info" size="sm" class="me-1 align-middle" />
                     {{ t("search.noResult") }}
                   </div>
                 </div>
 
                 <!-- Footer: selected count -->
                 <div class="border-card-glass-border border-t border-solid p-3 text-xs font-normal">
-                  {{ selectedMetricStreams.length }} of {{ uniqueMetricStreams.length }} selected
+                  {{
+                    t("correlation.streamsSelectedCount", {
+                      selected: selectedMetricStreams.length,
+                      total: uniqueMetricStreams.length,
+                    })
+                  }}
                 </div>
               </div>
             </template>
@@ -276,13 +283,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           size="xs"
                         />
                         <component v-else :is="outerGroup.icon" />
-                        <span class="whitespace-nowrap">{{ outerGroup.label }}</span>
+                        <span class="whitespace-nowrap">{{ t(outerGroup.labelKey) }}</span>
                       </div>
-                      <span
+                      <OTruncatedText
                         v-if="outerTabResourceName[outerGroup.id]"
-                        class="max-w-40 truncate text-xs leading-tight opacity-75"
-                        :title="outerTabResourceName[outerGroup.id]"
-                        >{{ outerTabResourceName[outerGroup.id] }}</span
+                        class="max-w-40 text-xs leading-tight opacity-75"
+                        >{{ outerTabResourceName[outerGroup.id] }}</OTruncatedText
                       >
                     </div>
                   </OTab>
@@ -306,11 +312,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="flex items-center gap-1">
                       <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" />
                       <component v-else :is="group.icon" />
-                      <span>{{ group.label }}</span>
+                      <span>{{ t(group.labelKey) }}</span>
                       <OTag
                         type="tabChip"
                         :value="activeMetricGroupTab === group.id ? 'active' : 'inactive'"
-                        class="ml-1"
+                        class="ms-1"
                         :class="{
                           'opacity-40':
                             (groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0) === 0,
@@ -347,7 +353,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ error || t("correlation.metricsErrorDetails") }}
                     </div>
                     <OButton variant="ghost" size="sm-action" @click="loadDashboard">
-                      <OIcon name="refresh" size="xs" class="mr-1" />
+                      <OIcon name="refresh" size="xs" class="me-1" />
                       {{ t("correlation.retryButton") }}
                     </OButton>
                   </div>
@@ -405,7 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ tracesError || t("correlation.tracesErrorDetails") }}
             </div>
             <OButton variant="ghost" size="sm-action" @click="loadCorrelatedTraces">
-              <OIcon name="refresh" size="xs" class="mr-1" />
+              <OIcon name="refresh" size="xs" class="me-1" />
               {{ t("correlation.retryButton") }}
             </OButton>
           </div>
@@ -417,6 +423,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <TraceDetails
               mode="embedded"
+              :shortcuts-active="shortcutsActive"
               :trace-id-prop="extractedTraceId || ''"
               :stream-name-prop="sortedTraceStreams[0] ? sortedTraceStreams[0].stream_name : ''"
               :span-list-prop="traceSpanList"
@@ -451,7 +458,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     t("correlation.tracesFromService", { service: serviceName })
                   }}</span>
                 </div>
-                <div class="ml-auto flex items-center gap-2">
+                <div class="ms-auto flex items-center gap-2">
                   <OButton
                     variant="ghost"
                     size="sm-action"
@@ -459,7 +466,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="correlation-view-traces-page"
                     class="text-xs"
                   >
-                    <OIcon name="open-in-new" size="xs" class="mr-1" />
+                    <OIcon name="open-in-new" size="xs" class="me-1" />
                     {{ t("correlation.viewInTraces") }}
                     <OTooltip :content="t('correlation.viewInTraces')" side="top" />
                   </OButton>
@@ -517,7 +524,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :get-dimension-options="getDimensionOptions"
       :has-pending-changes="hasPendingChanges"
       :show-apply-button="true"
-      unstable-dimension-tooltip="Unstable dimension - changes on pod restart. Default: All values."
+      :unstable-dimension-tooltip="t('correlation.unstableDimensionTooltip')"
       @update:dimension="handleDimensionUpdate"
       @apply="applyDimensionChanges"
     />
@@ -546,7 +553,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="border-card-glass-border flex justify-end border-b border-solid p-2"
         >
           <OButton variant="ghost" size="sm-action" @click="loadDashboard" :loading="loading">
-            <OIcon name="refresh" size="xs" class="mr-1" />
+            <OIcon name="refresh" size="xs" class="me-1" />
             {{ t("common.refresh") }}
           </OButton>
         </div>
@@ -555,7 +562,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-if="loading"
           class="flex flex-1 flex-col items-center justify-center gap-3"
-          style="min-height: 300px"
+          style="min-height: 18.75rem"
         >
           <OSpinner size="sm" />
           <div class="text-sm opacity-70">
@@ -608,10 +615,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Grouped metric list -->
+              <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
               <div
                 class="dimension-list-container min-h-0 flex-1 overflow-y-auto"
                 style="max-height: calc(100vh - 210px)"
               >
+                <!-- eslint-enable local/no-hardcoded-px -->
                 <template
                   v-if="groupedFilteredMetricStreams.groups.some((g) => g.streams.length > 0)"
                 >
@@ -627,17 +636,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OIcon
                             :name="collapsedGroups.has(group.id) ? 'chevron-right' : 'expand-more'"
                             size="sm"
-                            class="mr-0.5"
+                            class="me-0.5"
                           />
                           <OIcon
                             v-if="typeof group.icon === 'string'"
                             :name="group.icon"
                             size="xs"
-                            class="mr-0.5"
+                            class="me-0.5"
                           />
                           <component v-else :is="group.icon" />
-                          <span>{{ group.label }}</span>
-                          <OTag type="fieldTag" class="ml-1">{{ group.streams.length }}</OTag>
+                          <span>{{ t(group.labelKey) }}</span>
+                          <OTag type="fieldTag" class="ms-1">{{ group.streams.length }}</OTag>
                         </div>
                         <div class="flex gap-1">
                           <OButton
@@ -646,7 +655,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click.stop="selectAllInGroup(group.id)"
                             :disabled="getGroupSelectionState(group.id) === 'all'"
                           >
-                            All
+                            {{ t("correlation.all") }}
                           </OButton>
                           <OButton
                             variant="ghost"
@@ -654,7 +663,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click.stop="deselectAllInGroup(group.id)"
                             :disabled="getGroupSelectionState(group.id) === 'none'"
                           >
-                            None
+                            {{ t("common.none") }}
                           </OButton>
                         </div>
                       </div>
@@ -678,23 +687,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           />
                         </div>
                         <div class="flex min-w-0 flex-1 flex-col">
-                          <span class="text-text-secondary! cursor-pointer truncate text-sm">{{
+                          <OTruncatedText class="text-text-secondary! cursor-pointer text-sm">{{
                             stream.stream_name
-                          }}</span>
+                          }}</OTruncatedText>
                         </div>
                       </div>
                     </template>
                   </template>
                 </template>
                 <div v-else class="px-2 pt-3 text-center">
-                  <OIcon name="info" size="sm" class="mr-1 align-middle" />
+                  <OIcon name="info" size="sm" class="me-1 align-middle" />
                   {{ t("search.noResult") }}
                 </div>
               </div>
 
               <!-- Footer: selected count -->
               <div class="border-card-glass-border border-t border-solid p-3 text-xs font-normal">
-                {{ selectedMetricStreams.length }} of {{ uniqueMetricStreams.length }} selected
+                {{
+                  t("correlation.streamsSelectedCount", {
+                    selected: selectedMetricStreams.length,
+                    total: uniqueMetricStreams.length,
+                  })
+                }}
               </div>
             </div>
           </template>
@@ -726,13 +740,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="xs"
                       />
                       <component v-else :is="outerGroup.icon" />
-                      <span class="text-xs whitespace-nowrap">{{ outerGroup.label }}</span>
+                      <span class="text-xs whitespace-nowrap">{{ t(outerGroup.labelKey) }}</span>
                     </div>
-                    <span
+                    <OTruncatedText
                       v-if="outerTabResourceName[outerGroup.id]"
-                      class="max-w-40 truncate text-xs leading-tight opacity-75"
-                      :title="outerTabResourceName[outerGroup.id]"
-                      >{{ outerTabResourceName[outerGroup.id] }}</span
+                      class="max-w-40 text-xs leading-tight opacity-75"
+                      >{{ outerTabResourceName[outerGroup.id] }}</OTruncatedText
                     >
                   </div>
                 </OTab>
@@ -756,11 +769,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="flex items-center gap-1">
                     <component v-if="typeof group.icon !== 'string'" :is="group.icon" />
                     <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" />
-                    <span>{{ group.label }}</span>
+                    <span>{{ t(group.labelKey) }}</span>
                     <OTag
                       type="tabChip"
                       :value="activeMetricGroupTab === group.id ? 'active' : 'inactive'"
-                      class="ml-1"
+                      class="ms-1"
                       :class="{
                         'opacity-40':
                           (groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0) === 0,
@@ -797,7 +810,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ error || t("correlation.metricsErrorDetails") }}
                   </div>
                   <OButton variant="ghost" size="sm-action" @click="loadDashboard">
-                    <OIcon name="refresh" size="xs" class="mr-1" />
+                    <OIcon name="refresh" size="xs" class="me-1" />
                     {{ t("correlation.retryButton") }}
                   </OButton>
                 </div>
@@ -840,7 +853,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="text-text-secondary text-sm">{{ tracesError }}</div>
           <OButton variant="outline" size="sm-action" class="mt-4" @click="loadCorrelatedTraces">
-            <OIcon name="refresh" size="xs" class="mr-1" />
+            <OIcon name="refresh" size="xs" class="me-1" />
             {{ t("correlation.retryButton") }}
           </OButton>
         </div>
@@ -852,6 +865,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <TraceDetails
             mode="embedded"
+            :shortcuts-active="shortcutsActive"
             :trace-id-prop="extractedTraceId || ''"
             :stream-name-prop="sortedTraceStreams[0] ? sortedTraceStreams[0].stream_name : ''"
             :span-list-prop="traceSpanList"
@@ -889,7 +903,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTag type="fieldTag" value="primary">
                 {{ tracesForDimensions.length }} {{ t("menu.traces") }}
               </OTag>
-              <div class="ml-auto flex items-center gap-2">
+              <div class="ms-auto flex items-center gap-2">
                 <OButton
                   variant="ghost"
                   size="sm-action"
@@ -897,7 +911,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="correlation-view-traces-page"
                   class="text-xs"
                 >
-                  <OIcon name="open-in-new" size="xs" class="mr-1" />
+                  <OIcon name="open-in-new" size="xs" class="me-1" />
                   {{ t("correlation.viewInTraces") }}
                   <OTooltip :content="t('correlation.viewInTraces')" side="top" />
                 </OButton>
@@ -973,11 +987,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="typeof group.icon === 'string'"
                   :name="group.icon"
                   size="xs"
-                  class="mr-0.5"
+                  class="me-0.5"
                 />
                 <component v-else :is="group.icon" />
-                <span>{{ group.label }}</span>
-                <OTag type="fieldTag" class="ml-1">{{ group.streams.length }}</OTag>
+                <span>{{ t(group.labelKey) }}</span>
+                <OTag type="fieldTag" class="ms-1">{{ group.streams.length }}</OTag>
               </div>
               <div class="flex gap-1">
                 <OButton
@@ -986,7 +1000,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="selectAllInGroup(group.id)"
                   :disabled="getGroupSelectionState(group.id) === 'all'"
                 >
-                  All
+                  {{ t("correlation.all") }}
                 </OButton>
                 <OButton
                   variant="ghost"
@@ -994,7 +1008,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="deselectAllInGroup(group.id)"
                   :disabled="getGroupSelectionState(group.id) === 'none'"
                 >
-                  None
+                  {{ t("common.none") }}
                 </OButton>
               </div>
             </div>
@@ -1024,7 +1038,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- No results message -->
       <div v-else class="px-2 pt-3 text-center">
-        <OIcon name="info" size="sm" class="mr-1 align-middle" />
+        <OIcon name="info" size="sm" class="me-1 align-middle" />
         {{ t("search.noResult") }}
       </div>
     </div>
@@ -1037,10 +1051,10 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
-import { ref, computed, watch, defineAsyncComponent, provide, nextTick } from "vue";
+import { ref, computed, watch, defineAsyncComponent, provide, nextTick, onUnmounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
 import useTraces from "@/composables/useTraces";
 import {
@@ -1060,6 +1074,12 @@ import {
 import type { StreamInfo } from "@/services/service_streams";
 import { enrichStreamsWithOverlap, sortStreamsByOverlap } from "@/utils/streamTimeOverlap";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
+import {
+  buildSqlCondition,
+  buildFieldToGroupIdMap,
+  applyDimensionEditsToFilters,
+  quoteSqlLiteral,
+} from "@/utils/telemetryCorrelation";
 import streamService from "@/services/stream";
 import searchService from "@/services/search";
 import { b64EncodeUnicode, getUUID, timestampToTimezoneDate } from "@/utils/zincutils";
@@ -1089,6 +1109,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -1108,7 +1129,7 @@ export interface TelemetryCorrelationDashboardProps {
   sourceEvent?: {
     timestamp?: number | string;
     severity?: string;
-    message?: string;
+    message?: I18nText;
   };
   metricStreams: StreamInfo[];
   logStreams?: StreamInfo[];
@@ -1126,11 +1147,13 @@ export interface TelemetryCorrelationDashboardProps {
   panelHeight?: number; // Override default panel height (grid units) for metric panels
   logsPanelWidth?: number; // Override default panel width (grid units) for logs panel
   logsPanelHeight?: number; // Override default panel height (grid units) for logs panel
+  shortcutsActive?: boolean;
 }
 
 const props = withDefaults(defineProps<TelemetryCorrelationDashboardProps>(), {
   mode: "dialog",
   externalActiveTab: "logs",
+  shortcutsActive: true,
 });
 
 const emit = defineEmits<{
@@ -1140,14 +1163,25 @@ const emit = defineEmits<{
 const { showErrorNotification } = useNotifications();
 const store = useStore();
 const router = useRouter();
-const { t } = useI18n();
-const { generateDashboard, generateLogsDashboard } = useMetricsCorrelationDashboard();
+const { t } = useI18nTyped();
+const { generateDashboard, generateLogsDashboard } = useMetricsCorrelationDashboard(t);
 const { semanticGroups, loadSemanticGroups } = useServiceCorrelation();
 const { formatTracesMetaData } = useTraces();
 const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
 
 // Track in-flight dimension-based trace stream so it can be cancelled on re-fetch
 let currentTracesStreamTraceId: string | null = null;
+
+// The in-flight traces stream outlives this component otherwise; cancel it on unmount.
+onUnmounted(() => {
+  if (currentTracesStreamTraceId) {
+    cancelStreamQueryBasedOnRequestId({
+      trace_id: currentTracesStreamTraceId,
+      org_id: currentOrgIdentifier.value,
+    });
+    currentTracesStreamTraceId = null;
+  }
+});
 
 // Resolved group definitions and their ids (reactive to prop changes)
 const groupDefs = computed(() => {
@@ -1410,15 +1444,10 @@ const applyUnstableDimensionDefaults = (streams: StreamInfo[]): StreamInfo[] => 
     return streams;
   }
 
-  // Build reverse lookup: field_name -> semantic_dimension_id
-  // Using semanticGroups from useServiceCorrelation()
-
-  const fieldToDimensionId = new Map<string, string>();
-  for (const group of semanticGroups.value) {
-    for (const field of group.fields) {
-      fieldToDimensionId.set(field, group.id);
-    }
-  }
+  // Reverse lookup: lowercased field_name -> semantic_dimension_id. Use the
+  // shared helper instead of a private case-sensitive map — mixed-case filter
+  // keys would otherwise silently miss (same defect class as F36).
+  const fieldToDimensionId = buildFieldToGroupIdMap(semanticGroups.value);
 
   const result = streams.map((stream) => {
     const updatedFilters = { ...(stream.filters ?? {}) };
@@ -1428,7 +1457,7 @@ const applyUnstableDimensionDefaults = (streams: StreamInfo[]): StreamInfo[] => 
     // For each filter in the stream, check if it maps to an unstable dimension
     for (const [filterKey, filterValue] of Object.entries(stream.filters ?? {})) {
       // Look up the semantic dimension ID for this field name
-      const dimensionId = fieldToDimensionId.get(filterKey);
+      const dimensionId = fieldToDimensionId.get(filterKey.toLowerCase());
 
       if (dimensionId && unstableDimIds.has(dimensionId)) {
         // This filter's field maps to an unstable dimension - set to wildcard
@@ -1596,7 +1625,7 @@ const originalValueForKey = (key: string): string => {
 type ChipKind = "context" | "subject";
 type DimensionChip = {
   key: string;
-  label: string;
+  label: I18nText;
   value: string;
   kind: ChipKind;
   active: boolean;
@@ -1635,8 +1664,7 @@ const subjectMatchCounts = computed<Record<string, number>>(() => {
       if (seen.has(stream.stream_name)) continue;
       seen.add(stream.stream_name);
       const schema = cachedSchemas[stream.stream_name]?.schema as
-        | Array<{ name: string }>
-        | undefined;
+        Array<{ name: string }> | undefined;
       if (schema && schema.length > 0 && subjectFieldAliases.size > 0) {
         if (schema.some((c) => subjectFieldAliases.has(c.name))) matchCount++;
       } else if (streamMatchesPatterns(stream.stream_name, button.poolPatterns)) {
@@ -1664,7 +1692,7 @@ const unifiedChips = computed<DimensionChip[]>(() =>
         })();
       return {
         key,
-        label: dimensionDisplayLabel(key),
+        label: raw(dimensionDisplayLabel(key)),
         value: originalValueForKey(key),
         kind: isSubject ? "subject" : "context",
         active: isSubject ? activeSubject.value === key : contextActive,
@@ -1688,7 +1716,9 @@ const getSubjectButtonLabel = (semanticId: string): string => {
   if (!specs) return semanticId;
 
   const spec = specs.find((s) => s.semanticIds.includes(semanticId));
-  return spec?.label || semanticId;
+  if (!spec) return semanticId;
+  // `label` only holds names that stay English (Pod, Cloud Run).
+  return spec.labelKey ? t(spec.labelKey) : (spec.label ?? semanticId);
 };
 
 const pinSubject = (newSubject: string | null, previousSubject: string | null) => {
@@ -2010,7 +2040,9 @@ const getDimensionOptions = (key: string, currentValue: string) => {
   // Add the original value option if it exists and is not already SELECT_ALL_VALUE
   if (originalValue && originalValue !== SELECT_ALL_VALUE) {
     options.push({
-      label: isUnstable ? `${originalValue} (current)` : originalValue,
+      label: isUnstable
+        ? t("correlation.currentValueOption", { value: originalValue })
+        : raw(originalValue),
       value: originalValue,
     });
   }
@@ -2019,7 +2051,7 @@ const getDimensionOptions = (key: string, currentValue: string) => {
   // This preserves previously selected values in the dropdown
   if (currentValue && currentValue !== SELECT_ALL_VALUE && currentValue !== originalValue) {
     options.push({
-      label: currentValue,
+      label: raw(currentValue),
       value: currentValue,
     });
   }
@@ -2091,35 +2123,22 @@ const applyDimensionChanges = () => {
   // Copy pending to active
   activeDimensions.value = { ...pendingDimensions.value };
 
-  // Build field_name -> dimension_id mapping from semantic groups
-  // This is the same approach as applyUnstableDimensionDefaults
-  const fieldToDimensionId = new Map<string, string>();
-  for (const group of semanticGroups.value) {
-    for (const field of group.fields) {
-      fieldToDimensionId.set(field, group.id);
-    }
-  }
+  // Build field_name -> dimension_id mapping from semantic groups.
+  // Uses the shared builder so lookups are case-insensitive and honour the
+  // backend's declaration-order priority when a field appears in two groups.
+  const fieldToDimensionId = buildFieldToGroupIdMap(semanticGroups.value);
 
-  // Update metric stream filters with new dimension values
-  // Use semantic groups to map filter field names to dimension IDs
-  selectedMetricStreams.value = selectedMetricStreams.value.map((stream) => {
-    const updatedFilters = { ...(stream.filters ?? {}) };
-
-    // For each filter in the stream, find its semantic dimension ID
-    // and update with the new value from activeDimensions
-    for (const [filterKey] of Object.entries(stream.filters ?? {})) {
-      const dimensionId = fieldToDimensionId.get(filterKey);
-      if (dimensionId && activeDimensions.value[dimensionId] !== undefined) {
-        const newValue = activeDimensions.value[dimensionId];
-        updatedFilters[filterKey] = newValue;
-      }
-    }
-
-    return {
-      ...stream,
-      filters: updatedFilters,
-    };
-  });
+  // Update metric stream filters with new dimension values.
+  // activeDimensions is raw-field-keyed in the dialog path and
+  // semantic-ID-keyed in the drawer path — the helper accepts both (F36).
+  selectedMetricStreams.value = selectedMetricStreams.value.map((stream) => ({
+    ...stream,
+    filters: applyDimensionEditsToFilters(
+      stream.filters ?? {},
+      activeDimensions.value,
+      fieldToDimensionId,
+    ),
+  }));
 
   // Note: For logs, the filters are built from config.matchedDimensions in the composable
   // which we're already updating via activeDimensions
@@ -2198,7 +2217,7 @@ const loadDashboard = async () => {
     // console.error("[TelemetryCorrelationDashboard] Error loading correlation dashboard:", err);
     const message: string = err.message || t("correlation.failedToLoad");
     error.value = message;
-    showErrorNotification(message);
+    showErrorNotification(raw(message));
   } finally {
     loading.value = false;
   }
@@ -2380,7 +2399,11 @@ const formatTimeRange = (range: TimeRange) => {
   const durationMicros = range.endTime - range.startTime;
   const durationMinutes = Math.round(durationMicros / 1000 / 60000);
 
-  return `${formatTime(range.startTime)} - ${formatTime(range.endTime)} (${durationMinutes} min)`;
+  return t("correlation.timeRangeWithDuration", {
+    start: formatTime(range.startTime),
+    end: formatTime(range.endTime),
+    minutes: durationMinutes,
+  });
 };
 
 // ============= TRACE CORRELATION FUNCTIONS =============
@@ -2670,7 +2693,7 @@ const fetchTraceByTraceId = async (traceId: string) => {
     org_identifier: currentOrgIdentifier.value,
     start_time: searchStartTime,
     end_time: searchEndTime,
-    filter: `trace_id='${traceId}'`,
+    filter: `trace_id=${quoteSqlLiteral(traceId)}`,
     size: 1,
     from: 0,
     stream_name: streamName,
@@ -2688,7 +2711,7 @@ const fetchTraceByTraceId = async (traceId: string) => {
   const query = {
     query: {
       sql: b64EncodeUnicode(
-        `SELECT * FROM "${streamName}" WHERE trace_id = '${traceId}' ORDER BY start_time`,
+        `SELECT * FROM "${streamName}" WHERE trace_id = ${quoteSqlLiteral(traceId)} ORDER BY start_time`,
       ),
       start_time: traceStartTime,
       end_time: traceEndTime,
@@ -2727,7 +2750,7 @@ const fetchTracesByDimensions = (): Promise<any[]> => {
   const filterParts: string[] = [];
   if (traceStreamInfo.filters) {
     for (const [fieldName, value] of Object.entries(traceStreamInfo.filters)) {
-      filterParts.push(`${fieldName}='${value}'`);
+      filterParts.push(buildSqlCondition(fieldName, value));
     }
   }
   const filter = filterParts.join(" AND ");
@@ -2851,7 +2874,7 @@ const openTracesPage = () => {
 
   if (traceStreamInfo?.filters) {
     for (const [fieldName, value] of Object.entries(traceStreamInfo.filters)) {
-      filterParts.push(`${fieldName}='${value}'`);
+      filterParts.push(buildSqlCondition(fieldName, value));
     }
   }
 
@@ -2912,7 +2935,7 @@ const loadCorrelatedTraces = async () => {
   } catch (err: any) {
     const message: string = err.message || t("correlation.tracesError");
     tracesError.value = message;
-    showErrorNotification(message);
+    showErrorNotification(raw(message));
   } finally {
     tracesLoading.value = false;
   }

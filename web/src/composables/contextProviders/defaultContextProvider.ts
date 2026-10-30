@@ -19,6 +19,8 @@
  * ```
  */
 
+import { gt } from "@/types/i18n";
+
 import type { ContextProvider, PageContext } from "./types";
 
 /**
@@ -38,7 +40,11 @@ export const createDefaultContextProvider = (router: any, store: any): ContextPr
       const currentRoute = router?.currentRoute?.value;
 
       return {
-        currentPage: currentRoute?.meta?.title || "unknown",
+        // Resolved text, not the raw `meta.titleKey`: this is the human-readable
+        // page label the assistant quotes back ("you're on Alerts"), and it should
+        // match what the user actually sees in their locale. The stable,
+        // language-independent identifier is already carried by `routeName` below.
+        currentPage: currentRoute?.meta?.titleKey ? gt(currentRoute.meta.titleKey) : "unknown",
 
         // Current route information
         routeName: currentRoute?.name || "unknown",

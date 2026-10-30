@@ -25,17 +25,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           fullscreen: isFullscreen,
           'print-mode-container': store.state.printMode,
         },
+        isFullscreen ? 'bg-surface-base!' : '',
         store.state.printMode === true ? 'pb-6' : '',
+        kioskMode && !kioskPointerActive ? 'cursor-none [&_*]:cursor-none!' : '',
       ]"
       class="h-full"
+      :data-kiosk="kioskMode ? 'true' : undefined"
     >
       <OPageLayout
         bleed
         :main-panel="false"
         :header-class="
-          isFullscreen || store.state.printMode === true
-            ? 'stickyHeader fullscreenHeader bg-surface-panel'
-            : 'shrink-0'
+          kioskMode
+            ? 'hidden'
+            : isFullscreen || store.state.printMode === true
+              ? 'stickyHeader fullscreenHeader bg-surface-panel'
+              : 'shrink-0'
         "
         :subtitle="folderNameFromFolderId"
         :icon="!isFullscreen && store.state.printMode !== true ? undefined : 'dashboard'"
@@ -51,22 +56,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #title>
           <span data-test="dashboard-name-title">{{ currentDashboardData.data?.title }}</span>
+          <OBadge
+            v-if="isEditingLayout"
+            variant="primary-soft"
+            size="sm"
+            icon="edit"
+            class="ms-2 align-middle"
+            data-test="dashboard-edit-badge"
+            >{{ t("dashboard.layoutEdit.editing") }}</OBadge
+          >
         </template>
         <template #actions>
           <!-- Add panel is the most-used action, so it leads the toolbar. -->
           <OButton
-            v-if="!isFullscreen"
+            v-if="!isFullscreen && !isEditingLayout"
             v-show="store.state.printMode !== true"
             variant="outline"
             size="icon-toolbar"
             @click="addPanelData"
             data-test="dashboard-panel-add"
             icon-left="add"
+            :aria-label="hasNewPanelDraft ? t('dashboard.panelDraft.addPanelDot') : t('panel.add')"
           >
-            <OTooltip :content="t('panel.add')" shortcut-id="dashboardAddPanel" />
+            <OTooltip
+              :content="hasNewPanelDraft ? t('dashboard.panelDraft.addPanelDot') : t('panel.add')"
+              shortcut-id="dashboardAddPanel"
+            />
+            <!-- A button's children are presentational, so the draft state is also in the button's own name. -->
+            <span
+              v-if="hasNewPanelDraft"
+              role="img"
+              :aria-label="t('dashboard.panelDraft.addPanelDot')"
+              class="bg-button-pending-bg ring-button-pending-bg/30 pointer-events-none absolute -end-1 -top-1 size-2.5 rounded-full ring-4"
+              data-test="dashboard-panel-add-draft-dot"
+            />
           </OButton>
           <!-- <DateTimePicker 
-            class="ml-2"
+            class="ms-2"
             ref="refDateTime"
             v-model="selectedDate"
             /> -->
@@ -86,148 +112,435 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="selectedDate"
             v-show="store.state.printMode === false"
             ref="dateTimePicker"
-            class="dashboard-icons h-7.5 [transition:all_0.2s_ease]"
+            class="dashboard-icons h-7.5 [transition:all_0.2s_ease] max-md:[&_.date-time-label]:hidden"
             size="sm"
-            v-model="selectedDate"
+            :modelValue="pickedDate ?? selectedDate"
+            :auto-apply-dashboard="true"
             :initialTimezone="initialTimezone"
             :disable="arePanelsLoading"
-            @hide="setTimeForVariables"
+            calendar-presets
+            @update:modelValue="timeGate.onPick"
+            @show="timeGate.onShow"
+            @hide="onTimePickerHide"
+            @timezone-change="timeGate.flush"
             data-test="dashboard-global-date-time-picker"
           />
+          <!-- Kiosk keeps this mounted on every width: it owns the refresh value and its URL sync. -->
           <AutoRefreshInterval
+            v-if="!isMobile || kioskMode"
             v-model="refreshInterval"
             trigger
             :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
-            @trigger="refreshData"
+            @trigger="onAutoRefreshTick"
             class="dashboard-icons hideOnPrintMode h-7.5 [transition:all_0.2s_ease]"
             size="sm"
           />
-          <OButton
-            v-if="config.isEnterprise == 'true' && arePanelsLoading"
-            v-show="store.state.printMode !== true"
-            variant="outline-destructive"
-            size="icon-toolbar"
-            @click="cancelQuery"
-            data-test="dashboard-cancel-btn"
-            icon-left="cancel"
-          >
-            <OTooltip :content="t('panel.cancel')" />
-          </OButton>
-          <OButton
-            v-else
-            v-show="store.state.printMode !== true"
-            :variant="isVariablesChanged ? 'warning' : 'outline'"
-            size="icon-toolbar"
-            @click="refreshData"
-            :disabled="arePanelsLoading"
-            :loading="arePanelsLoading"
-            data-test="dashboard-refresh-btn"
-            icon-left="refresh"
-          >
+          <OButtonGroup v-show="store.state.printMode !== true">
+            <!-- Wrapper mode: a child-mode tooltip would hover-bind only the icon, not the labelled button. -->
             <OTooltip
-              :content="
-                isVariablesChanged
-                  ? t('dashboard.viewDashboard.refreshToApplyVariables')
-                  : t('dashboard.viewDashboard.refresh')
-              "
-              shortcut-id="dashboardRefresh"
-            />
-          </OButton>
-
-          <ExportDashboard
-            v-if="!isFullscreen"
-            v-show="store.state.printMode !== true"
-            :dashboardId="currentDashboardData.data?.dashboardId"
-          />
-          <ShareButton
-            v-if="!isFullscreen"
-            v-show="store.state.printMode !== true"
-            :url="dashboardShareURL"
-            variant="outline"
-            size="icon-toolbar"
-            data-test="dashboard-share-btn"
-          />
+              v-if="config.isEnterprise == 'true' && arePanelsLoading"
+              :content="t('panel.cancel')"
+              :disabled="!isMobile"
+            >
+              <OButton
+                variant="cancel-query"
+                :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
+                @click="cancelQuery"
+                :aria-label="t('panel.cancel')"
+                data-test="dashboard-cancel-btn"
+                :icon-left="isMobile ? 'cancel' : undefined"
+              >
+                <!-- Both labels share one grid cell: Cancel keeps the Refresh width and still fits a longer translation. -->
+                <span v-if="!isMobile" class="grid items-center justify-items-center">
+                  <span
+                    class="invisible col-start-1 row-start-1 flex items-center gap-1.5"
+                    aria-hidden="true"
+                  >
+                    <OIcon name="refresh" size="sm" />{{ t("dashboard.viewDashboard.refresh") }}
+                  </span>
+                  <span class="col-start-1 row-start-1">{{ t("panel.cancel") }}</span>
+                </span>
+              </OButton>
+            </OTooltip>
+            <OTooltip v-else :content="refreshTooltip" shortcut-id="dashboardRefresh">
+              <OButton
+                :variant="refreshVariant"
+                :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
+                @click="refreshData()"
+                :disabled="arePanelsLoading"
+                :loading="arePanelsLoading"
+                :aria-label="t('dashboard.viewDashboard.refresh')"
+                data-test="dashboard-refresh-btn"
+                :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
+              >
+                <template v-if="!isMobile">{{ t("dashboard.viewDashboard.refresh") }}</template>
+              </OButton>
+            </OTooltip>
+            <ODropdown align="end" side="bottom">
+              <template #trigger>
+                <OButton
+                  :variant="refreshOptionsVariant"
+                  size="icon-toolbar"
+                  class="w-5"
+                  :aria-label="t('dashboard.viewDashboard.moreRefreshOptions')"
+                  data-test="dashboard-refresh-options-btn"
+                  icon-left="arrow-drop-down"
+                />
+              </template>
+              <ODropdownItem
+                data-test="dashboard-refresh-without-cache-btn"
+                icon-left="cached"
+                :disabled="arePanelsLoading"
+                @select="refreshData(true)"
+              >
+                {{ t("dashboard.viewDashboard.refreshCacheReload") }}
+              </ODropdownItem>
+              <template v-if="isAutoRunAvailable">
+                <ODropdownSeparator />
+                <ODropdownItem data-test="dashboard-auto-run-toggle-btn" @select="toggleAutoRun">
+                  <template #icon-left>
+                    <OIcon
+                      :name="isAutoRunOn ? 'autorenew' : 'sync-disabled'"
+                      size="sm"
+                      :class="isAutoRunOn ? 'text-accent' : ''"
+                    />
+                  </template>
+                  <span>
+                    <div class="font-medium">
+                      {{ isAutoRunOn ? t("search.turnOffLiveMode") : t("search.turnOnLiveMode") }}
+                    </div>
+                    <div class="text-text-secondary text-xs">
+                      {{ t("dashboard.viewDashboard.autoRunDescription") }}
+                    </div>
+                    <div class="text-text-secondary text-xs" data-test="dashboard-auto-run-scope">
+                      {{ t("dashboard.viewDashboard.autoRunScope") }}
+                    </div>
+                  </span>
+                </ODropdownItem>
+              </template>
+            </ODropdown>
+          </OButtonGroup>
           <OButton
-            v-if="!isFullscreen"
+            v-if="!isFullscreen && !isEditingLayout"
             v-show="store.state.printMode !== true"
             variant="outline"
-            size="icon-toolbar"
-            data-test="dashboard-setting-btn"
-            @click="openSettingsDialog"
-            icon-left="settings"
+            :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
+            icon-left="edit"
+            :aria-label="t('dashboard.layoutEdit.enter')"
+            data-test="dashboard-edit-btn"
+            @click="enterLayoutEdit"
           >
-            <OTooltip :content="t('dashboard.setting')" />
+            <template v-if="!isMobile">{{ t("dashboard.layoutEdit.edit") }}</template>
+            <OTooltip :content="t('dashboard.layoutEdit.enter')" />
           </OButton>
-          <OButton
-            variant="outline"
-            size="icon-toolbar"
-            @click="printDashboard"
-            data-test="dashboard-print-btn"
-          >
-            <template #icon-left
-              ><OIcon :name="store.state.printMode === true ? 'close' : 'print'" size="sm"
-            /></template>
-            <OTooltip
-              :content="store.state.printMode === true ? t('common.close') : t('dashboard.print')"
-            />
-          </OButton>
-          <OButton
-            v-show="store.state.printMode !== true"
-            variant="outline"
-            size="icon-toolbar"
-            @click="toggleFullscreen"
-            data-test="dashboard-fullscreen-btn"
-          >
-            <template #icon-left
-              ><OIcon :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'" size="sm"
-            /></template>
-            <OTooltip
-              :content="isFullscreen ? t('dashboard.exitFullscreen') : t('dashboard.fullscreen')"
-              shortcut-id="dashboardFullscreen"
-            />
-          </OButton>
-          <OButton
-            v-if="!isFullscreen"
-            v-show="store.state.printMode !== true"
-            variant="outline"
-            size="icon-toolbar"
-            @click="openScheduledReports"
-            data-test="view-dashboard-scheduled-reports"
-          >
-            <template #icon-left><OIcon name="description" size="sm" /></template>
-            <OTooltip :content="t('dashboard.scheduledDashboards')" />
-          </OButton>
-          <OButton
-            v-if="!isFullscreen"
-            v-show="store.state.printMode !== true"
-            variant="outline"
-            size="icon-toolbar"
-            data-test="dashboard-json-edit-btn"
-            @click="openJsonEditor"
-            icon-left="code"
-          >
-            <OTooltip :content="t('dashboard.editJson')" />
-          </OButton>
-          <!-- Pin as org-wide home dashboard: a low-frequency, set-once
-                 action, so it sits at the far right, icon-only. Filled pin +
-                 highlighted variant signal the "already home" state. -->
-          <OButton
-            v-if="!isFullscreen"
-            v-show="store.state.printMode !== true"
-            :variant="isHome(dashboardId) ? 'secondary' : 'outline'"
-            size="icon-toolbar"
-            :class="isHome(dashboardId) ? 'text-primary border-button-outline-border border' : ''"
-            @click="toggleHomeDashboard"
-            data-test="dashboard-view-set-home-btn"
-            :icon-left="isHome(dashboardId) ? 'keep' : 'keep-outline'"
-          >
-            <OTooltip
-              :content="
-                isHome(dashboardId) ? t('dashboard.removeFromHome') : t('dashboard.setAsHomeDesc')
-              "
-            />
-          </OButton>
+          <template v-if="isEditingLayout">
+            <div v-if="!isMobile" class="flex h-5 items-stretch">
+              <OSeparator vertical />
+            </div>
+            <template v-if="!isMobile">
+              <OButton
+                variant="outline"
+                size="icon-toolbar"
+                icon-left="undo"
+                :disabled="!canUndoLayout || isSavingLayout"
+                :aria-label="t('dashboard.layoutEdit.undo')"
+                data-test="dashboard-edit-undo-btn"
+                @click="undoLayout"
+              >
+                <OTooltip
+                  :content="t('dashboard.layoutEdit.undo')"
+                  shortcut-id="dashboardLayoutUndo"
+                />
+              </OButton>
+              <OButton
+                variant="outline"
+                size="icon-toolbar"
+                icon-left="redo"
+                :disabled="!canRedoLayout || isSavingLayout"
+                :aria-label="t('dashboard.layoutEdit.redo')"
+                data-test="dashboard-edit-redo-btn"
+                @click="redoLayout"
+              >
+                <OTooltip
+                  :content="t('dashboard.layoutEdit.redo')"
+                  shortcut-id="dashboardLayoutRedo"
+                />
+              </OButton>
+              <span
+                class="text-text-secondary text-xs whitespace-nowrap"
+                aria-live="polite"
+                data-test="dashboard-edit-changes-count"
+                >{{
+                  t("dashboard.layoutEdit.changes", { count: layoutChangeCount }, layoutChangeCount)
+                }}</span
+              >
+              <OButton
+                variant="ghost"
+                size="sm-toolbar"
+                icon-left="close"
+                :disabled="isSavingLayout"
+                data-test="dashboard-edit-discard-btn"
+                @click="requestExitLayoutEdit"
+              >
+                {{ t("dashboard.layoutEdit.discard") }}
+                <OTooltip
+                  :content="t('dashboard.layoutEdit.discardTooltip')"
+                  shortcut-id="dashboardLayoutExit"
+                />
+              </OButton>
+            </template>
+            <OButton
+              variant="primary"
+              size="sm-toolbar"
+              icon-left="check"
+              :disabled="layoutChangeCount === 0"
+              :loading="isSavingLayout"
+              data-test="dashboard-edit-save-btn"
+              @click="saveLayout"
+            >
+              {{ t("dashboard.layoutEdit.save") }}
+              <OTooltip
+                :content="t('dashboard.layoutEdit.saveTooltip')"
+                shortcut-id="dashboardSave"
+              />
+            </OButton>
+          </template>
         </template>
+
+        <template #actions-overflow>
+          <AutoRefreshInterval
+            v-if="isMobile && !kioskMode"
+            v-model="refreshInterval"
+            trigger
+            :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
+            @trigger="onAutoRefreshTick"
+            class="dashboard-icons hideOnPrintMode h-7.5 [transition:all_0.2s_ease]"
+            size="sm"
+          />
+          <!-- These save, print or reload outside the draft, so edit mode hides them until Save or Discard. -->
+          <template v-if="!isEditingLayout">
+            <ExportDashboard
+              v-if="!isFullscreen"
+              v-show="store.state.printMode !== true"
+              :dashboardId="currentDashboardData.data?.dashboardId"
+            />
+            <ShareButton
+              v-if="!isFullscreen"
+              v-show="store.state.printMode !== true"
+              :url="dashboardShareURL"
+              @copy:success="onDashboardShared"
+              variant="outline"
+              size="icon-toolbar"
+              data-test="dashboard-share-btn"
+            />
+            <span
+              v-if="!isFullscreen && store.state.zoConfig?.public_dashboards_enabled"
+              v-show="store.state.printMode !== true"
+              class="inline-flex items-center"
+              data-test="dashboard-publish-public"
+            >
+              <OButton
+                variant="outline"
+                size="icon-toolbar"
+                data-test="dashboard-publish-public-btn"
+                icon-left="public"
+                :aria-label="t('dashboard.publicDashboard.shareTooltip')"
+                @click="showPublicLinksPanel = true"
+              >
+                <OTooltip :content="t('dashboard.publicDashboard.shareTooltip')" />
+              </OButton>
+            </span>
+            <PublicLinksPanel
+              v-if="
+                currentDashboardData.data?.dashboardId &&
+                store.state.zoConfig?.public_dashboards_enabled
+              "
+              v-model="showPublicLinksPanel"
+              :dashboard-id="currentDashboardData.data.dashboardId"
+              :dashboard-title="currentDashboardData.data?.title"
+              :variables-config="currentDashboardData.data?.variables"
+              :time-obj="currentTimeObj"
+              :current-values="variablesData"
+              :dashboard-data="currentDashboardData.data"
+              :dashboard-variables="variablesManager"
+              :folder-id="(route.query.folder as string) ?? 'default'"
+            />
+            <OButton
+              v-if="!isFullscreen"
+              v-show="store.state.printMode !== true"
+              variant="outline"
+              size="icon-toolbar"
+              data-test="dashboard-setting-btn"
+              @click="openSettingsDialog"
+              icon-left="settings"
+              :aria-label="hasSettingsDraft ? settingsButtonLabel : undefined"
+            >
+              <OTooltip :content="settingsButtonLabel" />
+              <EditorDraftDot
+                v-if="hasSettingsDraft"
+                corner
+                :tooltip="false"
+                data-test="dashboard-setting-btn-draft-dot"
+              />
+            </OButton>
+            <OButton
+              variant="outline"
+              size="icon-toolbar"
+              @click="printDashboard"
+              data-test="dashboard-print-btn"
+            >
+              <template #icon-left
+                ><OIcon :name="store.state.printMode === true ? 'close' : 'print'" size="sm"
+              /></template>
+              <OTooltip
+                :content="store.state.printMode === true ? t('common.close') : t('dashboard.print')"
+              />
+            </OButton>
+            <OButton
+              v-show="store.state.printMode !== true"
+              variant="outline"
+              size="icon-toolbar"
+              @click="toggleFullscreen"
+              data-test="dashboard-fullscreen-btn"
+            >
+              <template #icon-left
+                ><OIcon :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'" size="sm"
+              /></template>
+              <OTooltip
+                :content="isFullscreen ? t('dashboard.exitFullscreen') : t('dashboard.fullscreen')"
+                shortcut-id="dashboardFullscreen"
+              />
+            </OButton>
+            <KioskSetupPopover
+              v-if="!isFullscreen"
+              v-show="store.state.printMode !== true"
+              :current-refresh-seconds="refreshInterval"
+              :min-refresh-seconds="store.state?.zoConfig?.min_auto_refresh_interval || 5"
+              @open="enterKiosk"
+            />
+            <OButton
+              v-if="!isFullscreen"
+              v-show="store.state.printMode !== true"
+              variant="outline"
+              size="icon-toolbar"
+              @click="openScheduledReports"
+              data-test="view-dashboard-scheduled-reports"
+            >
+              <template #icon-left><OIcon name="description" size="sm" /></template>
+              <OTooltip :content="t('dashboard.scheduledDashboards')" />
+            </OButton>
+            <OButton
+              v-if="!isFullscreen"
+              v-show="store.state.printMode !== true"
+              variant="outline"
+              size="icon-toolbar"
+              data-test="dashboard-json-edit-btn"
+              @click="openJsonEditor"
+              icon-left="code"
+            >
+              <OTooltip :content="t('dashboard.editJson')" />
+            </OButton>
+            <!-- Pin as org-wide home dashboard: a low-frequency, set-once
+                   action, so it sits at the far right, icon-only. Filled pin +
+                   highlighted variant signal the "already home" state. -->
+            <OButton
+              v-if="!isFullscreen"
+              v-show="store.state.printMode !== true"
+              :variant="isHome(dashboardId) ? 'secondary' : 'outline'"
+              size="icon-toolbar"
+              :class="isHome(dashboardId) ? 'text-primary border-button-outline-border border' : ''"
+              @click="toggleHomeDashboard"
+              data-test="dashboard-view-set-home-btn"
+              :icon-left="isHome(dashboardId) ? 'keep' : 'keep-outline'"
+            >
+              <OTooltip
+                :content="
+                  isHome(dashboardId) ? t('dashboard.removeFromHome') : t('dashboard.setAsHomeDesc')
+                "
+              />
+            </OButton>
+          </template>
+          <template v-if="isEditingLayout && isMobile">
+            <OButton
+              variant="outline"
+              size="icon-toolbar"
+              icon-left="undo"
+              :disabled="!canUndoLayout || isSavingLayout"
+              :aria-label="t('dashboard.layoutEdit.undo')"
+              data-test="dashboard-edit-undo-btn"
+              @click="undoLayout"
+            >
+              <OTooltip :content="t('dashboard.layoutEdit.undo')" />
+            </OButton>
+            <OButton
+              variant="outline"
+              size="icon-toolbar"
+              icon-left="redo"
+              :disabled="!canRedoLayout || isSavingLayout"
+              :aria-label="t('dashboard.layoutEdit.redo')"
+              data-test="dashboard-edit-redo-btn"
+              @click="redoLayout"
+            >
+              <OTooltip :content="t('dashboard.layoutEdit.redo')" />
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="sm-toolbar"
+              icon-left="close"
+              :disabled="isSavingLayout"
+              data-test="dashboard-edit-discard-btn"
+              @click="requestExitLayoutEdit"
+            >
+              {{ t("dashboard.layoutEdit.discard") }}
+            </OButton>
+          </template>
+        </template>
+
+        <KioskStrip
+          v-if="kioskMode && !playlistEmbed"
+          :title="currentDashboardData.data?.title"
+          :position="playlistPosition"
+          :time-range-label="kioskTimeRange"
+          :refresh-seconds="refreshInterval"
+          :health="kioskHealth"
+          :last-success-at="kioskLastSuccessAt"
+          :timezone="store.state.timezone"
+          :loading="arePanelsLoading"
+          :countdown="kioskCountdown"
+          @exit="exitKiosk"
+        />
+        <div v-if="playlistHolding" class="fixed inset-0 z-50">
+          <PlaylistHoldingCard
+            :label="playlistHolding.label"
+            :title="playlistHolding.title"
+            :note="playlistHolding.note"
+          />
+        </div>
+        <OBanner
+          v-if="hasUnsavedConflict"
+          variant="warning"
+          icon="warning"
+          dense
+          inline-actions
+          class="mx-page-edge mt-2 shrink-0"
+          data-test="dashboard-unsaved-conflict-banner"
+        >
+          {{
+            saveConflictState.myChange
+              ? t("dashboard.saveConflict.notSavedChange", { change: saveConflictState.myChange })
+              : t("dashboard.saveConflict.notSaved")
+          }}
+          <template #actions>
+            <OButton
+              variant="outline"
+              size="sm"
+              data-test="dashboard-unsaved-conflict-resolve"
+              @click="resolveSaveConflict"
+            >
+              {{ t("dashboard.saveConflict.resolve") }}
+            </OButton>
+          </template>
+        </OBanner>
 
         <RenderDashboardCharts
           :frame="false"
@@ -239,7 +552,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @refreshedVariablesDataUpdated="refreshedVariablesDataUpdated"
           @variablesManagerReady="onVariablesManagerReady"
           :initialVariableValues="initialVariableValues"
-          :viewOnly="store.state.printMode"
+          :viewOnly="store.state.printMode || kioskMode"
+          :kiosk="kioskMode"
+          :readOnlySelectors="playlistEmbed || playlistPageActive"
+          :fitToScreen="kioskMode && kioskFit"
+          :layoutMode="layoutMode"
+          @layoutChange="onLayoutChange"
           :dashboardData="currentDashboardData.data"
           :folderId="route.query.folder"
           :reportId="reportId"
@@ -263,6 +581,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @searchRequestTraceIds="searchRequestTraceIds"
           :runId="runId"
           @update:runId="updateRunId"
+          @send-to-ai-chat="(value, append) => $emit('sendToAiChat', value, append)"
         />
         <DashboardSettings
           v-model:open="showDashboardSettingsDialog"
@@ -293,6 +612,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :dashboard-data="currentDashboardData.data"
           :save-json-dashboard="saveJsonDashboard"
         />
+
+        <ODialog
+          :open="discardDialog.open"
+          size="sm"
+          :title="t('dashboard.layoutEdit.discardTitle')"
+          :persistent="discardForced"
+          :show-close="!discardForced"
+          :secondary-button-label="
+            discardForced
+              ? undefined
+              : discardDialog.reason === 'leave'
+                ? t('dashboard.layoutEdit.stay')
+                : t('dashboard.layoutEdit.keepEditing')
+          "
+          :primary-button-label="
+            discardForced
+              ? t('dashboard.layoutEdit.discardAndSignOut')
+              : discardDialog.reason === 'leave'
+                ? t('dashboard.layoutEdit.discardAndLeave')
+                : t('dashboard.layoutEdit.discard')
+          "
+          primary-button-variant="destructive"
+          :initial-focus="discardForced ? 'primary' : 'secondary'"
+          data-test="dashboard-edit-discard-dialog"
+          @update:open="(open) => !open && settleDiscard(false)"
+          @click:secondary="settleDiscard(false)"
+          @click:primary="settleDiscard(true)"
+        >
+          {{
+            discardForced
+              ? t(
+                  "dashboard.layoutEdit.leaveMessageForced",
+                  { count: layoutChangeCount },
+                  layoutChangeCount,
+                )
+              : discardDialog.reason === "leave"
+                ? t(
+                    "dashboard.layoutEdit.leaveMessage",
+                    { count: layoutChangeCount },
+                    layoutChangeCount,
+                  )
+                : t(
+                    "dashboard.layoutEdit.discardMessage",
+                    { count: layoutChangeCount },
+                    layoutChangeCount,
+                  )
+          }}
+        </ODialog>
       </OPageLayout>
     </div>
   </div>
@@ -314,13 +681,22 @@ import {
   computed,
 } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
+import { ANNOTATION_PREVIEW_CONTEXT_KEY } from "@/composables/dashboard/useDashboardAnnotationSources";
 import ShareButton from "@/components/common/ShareButton.vue";
+import analytics from "@/services/product_analytics";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
-import { useRouter } from "vue-router";
+import {
+  onBeforeRouteLeave,
+  onBeforeRouteUpdate,
+  useRouter,
+  type RouteLocationNormalized,
+} from "vue-router";
 import { getDashboard, movePanelToAnotherTab, getFoldersList } from "../../utils/commons.ts";
-import { parseDuration, generateDurationLabel, getConsumableRelativeTime } from "../../utils/date";
+import { generateDurationLabel, getConsumableRelativeTime } from "../../utils/date";
+import { parseCalendarToken } from "@/utils/dashboard/calendarPeriods";
 import { useRoute } from "vue-router";
+import { useListBackNavigation } from "@/composables/useListBackNavigation";
 import { deletePanel } from "../../utils/commons";
 import {
   getPanelTimeFromURL,
@@ -328,28 +704,104 @@ import {
 } from "@/utils/dashboard/panelTimeUtils";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
+import PublicLinksPanel from "@/components/dashboards/PublicLinksPanel.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import useNotifications from "@/composables/useNotifications";
+import {
+  onDashboardConflictResolved,
+  useDashboardSaveConflict,
+  useDashboardSaveConflictDialog,
+} from "@/composables/dashboard/useDashboardSaveConflict";
+import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
+import { DASHBOARD_FRESH_PANEL_TIME } from "@/composables/dashboard/dashboardFreshPanelTime";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import reports from "@/services/reports";
 import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
+import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
+import { useDashboardTimeGate } from "@/composables/dashboard/useDashboardTimeGate";
+import {
+  createDashboardFreshOnOpen,
+  DASHBOARD_FRESH_ON_OPEN,
+} from "@/composables/dashboard/dashboardFreshOnOpen";
 import PanelLayoutSettings from "./PanelLayoutSettings.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import { useLayoutEditDraft } from "@/composables/dashboard/useLayoutEditDraft";
+import { hasPanelDraft } from "@/composables/dashboard/usePanelDraft";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { draftSignOutForced } from "@/utils/drafts/draftSession";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useDraftLabel } from "@/components/common/drafts/useDraftLabel";
 import { useLoading } from "@/composables/useLoading";
 import { isEqual } from "lodash-es";
-import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
+import { panelRefreshTargets } from "@/utils/dashboard/convertCustomChartData";
 import { getUUID } from "@/utils/zincutils";
 import { createDashboardsContextProvider, contextRegistry } from "@/composables/contextProviders";
-import { hasPanelTime } from "@/utils/dashboard/panelTimeUtils";
+import {
+  arePickerValuesEqual,
+  hasPanelTime,
+  isEffectivePanelTimeRelative,
+  isEffectivePanelTimeCalendar,
+  pickerValueToTimeObj,
+  queryChangeAffectsPanelTimes,
+  toPickerSavedDate,
+} from "@/utils/dashboard/panelTimeUtils";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
-import { useShortcuts } from "@/lib/vue-shortcut-manager";
-import { isInputFocused } from "@/utils/keyboardShortcuts";
+import {
+  getManager,
+  getShortcutDef,
+  resolveShortcutKeys,
+  useShortcuts,
+} from "@/lib/vue-shortcut-manager";
+import { isInputFocused, isMacOS } from "@/utils/keyboardShortcuts";
+import useBreakpoint from "@/composables/useBreakpoint";
+import { queryClient } from "@/composables/query/queryClient";
+import { annotationKeys } from "@/services/dashboard_annotations.querykeys";
+import KioskStrip from "@/components/dashboards/kiosk/KioskStrip.vue";
+import KioskSetupPopover from "@/components/dashboards/kiosk/KioskSetupPopover.vue";
+import { KIOSK_PANEL_HEALTH_KEY, useKioskRefresh } from "@/composables/dashboard/useKioskRefresh";
+import {
+  applyKioskTheme,
+  clearKioskTheme,
+  useIdleReveal,
+} from "@/composables/dashboard/useKioskDisplay";
+import {
+  buildKioskQuery,
+  formatRelativePeriod,
+  isFitEnabled,
+  isKioskEnabled,
+  parseKioskTheme,
+  pickKioskParams,
+  resolveKioskRefresh,
+  stripKioskParams,
+} from "@/utils/dashboard/kiosk";
+import { minAutoRefreshSeconds, resolveOpenRefreshInterval } from "@/utils/dashboard/autoRefresh";
+import {
+  PLAYLIST_VIEW_PATH,
+  isPlaylistEmbed,
+  isPlaylistPage,
+  missingReasonFor,
+  parsePlaylistMisses,
+  parsePlaylistQuery,
+  pickPlaylistParams,
+  stripPlaylistParams,
+} from "@/utils/dashboard/playlist";
+import { usePlaylistFrame, usePlaylistPage } from "@/composables/dashboard/usePlaylistFrame";
+import PlaylistHoldingCard from "@/components/dashboards/kiosk/PlaylistHoldingCard.vue";
+import { pingBackend } from "@/services/health";
+import { raw } from "@/types/i18n";
 
 const DashboardJsonEditor = defineAsyncComponent(() => {
   return import("./DashboardJsonEditor.vue");
@@ -365,11 +817,13 @@ const ScheduledDashboards = defineAsyncComponent(() => {
 
 export default defineComponent({
   name: "ViewDashboard",
-  emits: ["onDeletePanel"],
+  emits: ["onDeletePanel", "sendToAiChat"],
   components: {
+    OBanner,
     OPageLayout,
     DateTimePickerDashboard,
     ShareButton,
+    PublicLinksPanel,
     AutoRefreshInterval,
     ExportDashboard,
     DashboardSettings,
@@ -378,11 +832,23 @@ export default defineComponent({
     PanelLayoutSettings,
     DashboardJsonEditor,
     OButton,
+    OButtonGroup,
+    ODropdown,
+    ODropdownItem,
+    ODropdownSeparator,
     OIcon,
     OTooltip,
+    OBadge,
+    OSeparator,
+    ODialog,
+    KioskStrip,
+    KioskSetupPopover,
+    PlaylistHoldingCard,
+    EditorDraftDot,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
+    const { isMobile } = useBreakpoint();
     const route = useRoute();
     const router = useRouter();
     const store = useStore();
@@ -390,11 +856,33 @@ export default defineComponent({
       data: {},
     });
     const showScheduledReportsDialog = ref(false);
-    const {
-      showPositiveNotification,
-      showErrorNotification,
-      showConfictErrorNotificationWithRefreshBtn,
-    } = useNotifications();
+
+    // Set before the first render so a reloaded TV never flashes the app chrome.
+    if (isKioskEnabled(route.query.kiosk) && !store.state.kioskMode) {
+      store.dispatch("setKioskMode", true);
+    }
+    const kioskMode = computed(() => store.state.kioskMode === true);
+    const kioskFit = computed(() => isFitEnabled(route.query.fit));
+    const { active: kioskPointerActive } = useIdleReveal(kioskMode);
+
+    // One slide of a TV playlist: inside the player's frame, or a full page when framing is blocked.
+    const playlistEmbed =
+      isKioskEnabled(route.query.kiosk) &&
+      isPlaylistEmbed(route.query) &&
+      typeof window !== "undefined" &&
+      window.parent !== window;
+    const playlistPageConfig =
+      isKioskEnabled(route.query.kiosk) && !playlistEmbed && isPlaylistPage(route.query)
+        ? parsePlaylistQuery(route.query)
+        : null;
+    // Filled in once the kiosk health exists; a playlist slide never falls back to the dashboard list.
+    const playlistReporters = {
+      missing: (_reason: "notFound" | "forbidden") => false,
+      error: () => false,
+    };
+
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
+    const saveConflict = useDashboardSaveConflict();
 
     // Variables manager will be initialized by RenderDashboardCharts
     // and we'll receive a reference to it via the @variablesManagerReady event
@@ -427,7 +915,7 @@ export default defineComponent({
 
     // Set/remove this dashboard as the single org-wide home dashboard, shared
     // reactive state with the dashboard list and HomeView via the composable.
-    const { isHome, setHomeDashboard, clearHomeDashboard } = useHomeDashboard();
+    const { isHome, setHomeDashboard, clearHomeDashboard } = useHomeDashboard(t);
     const toggleHomeDashboard = () => {
       const id = dashboardId.value as string | undefined;
       if (!id) return;
@@ -474,26 +962,23 @@ export default defineComponent({
       relativeTimePeriod: params.period ? params.period : "15m",
     });
 
-    const setTimeForVariables = () => {
-      if (selectedDate.value && dateTimePicker.value) {
-        const date = dateTimePicker.value?.getConsumableDateTime();
-        const startTime = new Date(date.startTime);
-        const endTime = new Date(date.endTime);
+    // Everything that loads data reads this, never the live picker: a range still waiting must not reach a panel.
+    const getAppliedGlobalTime = () => pickerValueToTimeObj(selectedDate.value);
 
+    const setTimeForVariables = () => {
+      const appliedTime = getAppliedGlobalTime();
+      if (appliedTime && dateTimePicker.value) {
         // Update only the variables time object
         currentTimeObjPerPanel.value = {
           ...currentTimeObjPerPanel.value,
-          __variables: {
-            start_time: startTime,
-            end_time: endTime,
-          },
+          __variables: appliedTime,
         };
       }
     };
 
     const dateTimePicker = ref(null); // holds a reference to the date time picker
 
-    // holds the date picker v-modal
+    // The applied range: what panels, the URL and the Share link use. The picker's own value is `pickedDate`.
     const selectedDate = ref(null);
 
     // holds the current time for the dashboard
@@ -501,6 +986,10 @@ export default defineComponent({
 
     // refresh interval v-model
     const refreshInterval = ref(0);
+    // The URL's refresh as a dashboard opens; null once applied, so reloading the same dashboard keeps the viewer's choice.
+    let openingUrlRefresh: { value: typeof route.query.refresh } | null = {
+      value: route.query.refresh,
+    };
 
     // initial timezone, which will come from the route query
     const initialTimezone = ref(route.query.timezone ?? null);
@@ -541,8 +1030,46 @@ export default defineComponent({
     // provide it to child components
     provide("selectedTabId", selectedTabId);
 
+    const { isAutoRunAvailable, isAutoRunOn, toggleAutoRun } = useAutoRunToggle();
+    // A wall screen has no Refresh button to apply a variable change, so kiosk applies it live.
+    const applyVariablesLive = computed(() => isAutoRunOn.value || kioskMode.value);
+    provide("dashboardAutoRun", applyVariablesLive);
+    provide(ANNOTATION_PREVIEW_CONTEXT_KEY, {
+      timeRange: () => currentTimeObjPerPanel.value?.__global,
+      variables: () => variablesManager.value?.committedVariablesData?.global ?? [],
+    });
+
+    const showRangeInPicker = (value: any) =>
+      dateTimePicker.value?.setSavedDate(toPickerSavedDate(value, store.state.timezone));
+
+    const timeGate = useDashboardTimeGate({
+      applied: selectedDate,
+      isAutoRunOn: () => isAutoRunOn.value,
+      showInPicker: showRangeInPicker,
+    });
+
+    const onTimePickerHide = () => {
+      timeGate.onHide();
+      setTimeForVariables();
+    };
+
+    const freshOnOpen = createDashboardFreshOnOpen({
+      isAutoRunOn: () => isAutoRunOn.value,
+      isRelativeRange: (panel) =>
+        isEffectivePanelTimeRelative(panel, route.query, selectedDate.value),
+      isCalendarRange: (panel) =>
+        isEffectivePanelTimeCalendar(panel, route.query, selectedDate.value),
+    });
+    provide(DASHBOARD_FRESH_ON_OPEN, freshOnOpen);
+    // A cross-dashboard drilldown keeps this view mounted, so each dashboard it opens is a new visit.
+    watch(
+      () => route.query.dashboard,
+      () => freshOnOpen.reset(),
+    );
+
     // variables data
     const variablesData = reactive({});
+    const showPublicLinksPanel = ref(false);
     const refreshedVariablesData = reactive({}); // Flag to track if variables have changed
 
     const variablesDataUpdated = (data: any) => {
@@ -594,6 +1121,8 @@ export default defineComponent({
       // Explicitly dereference to ensure Vue tracks the dependency
       const manager = variablesManager.value;
 
+      if (applyVariablesLive.value) return false;
+
       if (manager && "hasUncommittedChanges" in manager) {
         // Access the value (Vue auto-unwraps computed refs in composable returns)
         const hasChanges = manager.hasUncommittedChanges;
@@ -621,6 +1150,27 @@ export default defineComponent({
 
       return !isEqual(normalizedCurrent, normalizedRefreshed);
     });
+
+    // Panel calendar windows a zone change moved while Auto Run was off; Refresh or Auto Run applies them.
+    const zonePendingPanels = ref<Record<string, { start_time: Date; end_time: Date }>>({});
+    const zoneRefreshPending = computed(
+      () => !isAutoRunOn.value && Object.keys(zonePendingPanels.value).length > 0,
+    );
+    const isRefreshPending = computed(
+      () => isVariablesChanged.value || timeGate.needsRefresh.value || zoneRefreshPending.value,
+    );
+
+    const refreshTooltip = computed(() => {
+      if (isAutoRunOn.value) return t("dashboard.viewDashboard.autoRunDescription");
+      if (timeGate.needsRefresh.value || zoneRefreshPending.value) {
+        return isVariablesChanged.value
+          ? t("dashboard.refreshToApplyTimeRangeAndVariables")
+          : t("dashboard.refreshToApplyTimeRange");
+      }
+      return isVariablesChanged.value
+        ? t("dashboard.viewDashboard.refreshToApplyVariables")
+        : t("dashboard.viewDashboard.refresh");
+    });
     // ======= [START] default variable values
 
     const initialVariableValues = reactive({
@@ -636,9 +1186,8 @@ export default defineComponent({
 
     onMounted(async () => {
       await loadDashboard();
-      if (!store.state.organizationData.folders.length) {
-        await getFoldersList(store);
-      }
+      // Caught: a folder-list failure must not abort the panel setup below.
+      await getFoldersList(store).catch(() => null);
 
       // Set up dashboard context provider
       const dashboardProvider = createDashboardsContextProvider(
@@ -687,6 +1236,7 @@ export default defineComponent({
     const isInternalUrlUpdate = ref(false);
 
     const loadDashboard = async (onlyIfRequired = false) => {
+      zonePendingPanels.value = {};
       // check if drilldown or soft-refresh request
       if (onlyIfRequired) {
         // if current dashboard id and tab is same,  skip loading
@@ -729,11 +1279,16 @@ export default defineComponent({
         );
 
         if (!dashboard || typeof dashboard !== "object" || !Object.keys(dashboard).length) {
+          if (playlistReporters.missing("notFound")) return;
           showErrorNotification(t("dashboard.viewDashboard.dashboardNotFound"));
           goBackToDashboardList();
           return;
         }
       } catch (error: any) {
+        const missingReason = missingReasonFor(error?.response?.status);
+        if (missingReason ? playlistReporters.missing(missingReason) : playlistReporters.error()) {
+          return;
+        }
         showErrorNotification(error?.message || t("dashboard.viewDashboard.failedToLoadDashboard"));
         goBackToDashboardList();
         return;
@@ -741,6 +1296,7 @@ export default defineComponent({
 
       // Set the dashboard data - RenderDashboardCharts will initialize the variables manager
       currentDashboardData.data = dashboard;
+      applyOpeningRefresh(dashboard);
 
       // set selected tab from query params
       const selectedTab = dashboard?.tabs?.find((tab: any) => tab.tabId === route.query.tab);
@@ -754,6 +1310,8 @@ export default defineComponent({
         refreshedVariablesData.isVariablesLoading = false;
         refreshedVariablesData.values = [];
       }
+
+      const previousAppliedDate = selectedDate.value;
 
       // check if route has time related query params
       // if not, take dashboard default time settings
@@ -779,6 +1337,35 @@ export default defineComponent({
         // take route time related query params
         selectedDate.value = getSelectedDateFromQueryParams(route.query);
       }
+
+      if (previousAppliedDate && !arePickerValuesEqual(previousAppliedDate, selectedDate.value)) {
+        showAppliedDateInPicker();
+      }
+    };
+
+    const applyOpeningRefresh = (dashboard: any) => {
+      if (!openingUrlRefresh) return;
+      const urlRefresh = openingUrlRefresh.value;
+      openingUrlRefresh = null;
+      const configuredMin = store.state?.zoConfig?.min_auto_refresh_interval;
+      // A TV must keep refreshing: a too-low value is raised to the server minimum, not turned off.
+      if (urlRefresh !== undefined && kioskMode.value) {
+        refreshInterval.value = resolveKioskRefresh(urlRefresh, configuredMin);
+        return;
+      }
+      refreshInterval.value = resolveOpenRefreshInterval({
+        urlRefresh,
+        savedDefault: dashboard?.defaultRefreshInterval,
+        minSeconds: minAutoRefreshSeconds(configuredMin),
+      });
+    };
+
+    // The mounted picker reads its v-model only once, so a range applied by another dashboard's URL is pushed in.
+    const showAppliedDateInPicker = () => {
+      if (!dateTimePicker.value || !selectedDate.value) return;
+
+      timeGate.adopt();
+      showRangeInPicker(selectedDate.value);
     };
 
     // [START] cancel running queries
@@ -789,13 +1376,27 @@ export default defineComponent({
       arePanelsLoading.value = !allPanelsLoaded;
     };
 
-    const { traceIdRef, searchRequestTraceIds, cancelQuery } = useCancelQuery();
+    const { traceIdRef, searchRequestTraceIds, cancelQuery } = useCancelQuery(t);
 
     // [END] cancel running queries
 
     const openSettingsDialog = () => {
       showDashboardSettingsDialog.value = true;
     };
+
+    const settingsDrafts = useEditorDraftIds("dashboard_settings");
+    const draftLabel = useDraftLabel();
+    const hasSettingsDraft = computed(() =>
+      settingsDrafts.ids.has(String(route.query.dashboard ?? "")),
+    );
+    const settingsButtonLabel = computed(() =>
+      hasSettingsDraft.value
+        ? draftLabel(
+            t("dashboard.setting"),
+            settingsDrafts.savedAt(String(route.query.dashboard ?? "")),
+          )
+        : t("dashboard.setting"),
+    );
 
     const openLayoutConfig = (id: string) => {
       selectedPanelConfig.value.show = true;
@@ -809,43 +1410,143 @@ export default defineComponent({
       selectedPanelConfig.value.data = JSON.parse(JSON.stringify(panelData));
     };
 
+    // The layout dialog only exists in edit mode, so its result is one draft step, never a save.
     const savePanelLayout = async (layout) => {
-      const panel = getPanelFromTab(selectedTabId.value, selectedPanelConfig.value.data.id);
-      if (panel) panel.layout = layout;
+      const panel = getPanelFromTab(selectedTabId.value, selectedPanelConfig.value.data?.id);
 
       selectedPanelConfig.value.show = false;
       selectedPanelConfig.value.data = null;
 
+      if (!panel || !layout || !isEditingLayout.value) return;
+      panel.layout = layout;
+
       await nextTick();
-
-      window.dispatchEvent(new Event("resize"));
-
-      await renderDashboardChartsRef?.value?.saveDashboardData?.execute?.();
+      renderDashboardChartsRef.value?.syncGridToLayout?.();
+      layoutDraft.record();
     };
+
+    const layoutDraft = useLayoutEditDraft(() => currentDashboardData.data, {
+      onApply: () => renderDashboardChartsRef.value?.syncGridToLayout?.(),
+    });
+    const isEditingLayout = layoutDraft.isEditing;
+    const layoutChangeCount = layoutDraft.changeCount;
+    const canUndoLayout = layoutDraft.canUndo;
+    const canRedoLayout = layoutDraft.canRedo;
+    const layoutMode = computed(() => (isEditingLayout.value ? "edit" : "view"));
+    const isSavingLayout = ref(false);
+
+    const enterLayoutEdit = () => {
+      if (store.state.printMode || kioskMode.value) return;
+      layoutDraft.start();
+    };
+
+    const onLayoutChange = () => {
+      layoutDraft.record();
+    };
+
+    const undoLayout = () => {
+      if (!isSavingLayout.value) layoutDraft.undo();
+    };
+
+    const redoLayout = () => {
+      if (!isSavingLayout.value) layoutDraft.redo();
+    };
+
+    // The page keeps my unsaved edit on screen, so it must say it is not saved until the conflict is resolved.
+    const hasUnsavedConflict = computed(
+      () =>
+        !!dashboardSaveConflictState.unresolvedDashboardId &&
+        dashboardSaveConflictState.unresolvedDashboardId === String(route.query.dashboard),
+    );
+    const { reopen: reopenSaveConflict, reload: reloadSaveConflict } =
+      useDashboardSaveConflictDialog();
+    // Set when the edit-mode Save lost a conflict, so Discard can resolve that conflict too.
+    let layoutSaveConflicted = false;
+
+    const saveLayout = async () => {
+      if (!layoutDraft.isDirty.value || isSavingLayout.value) return;
+      isSavingLayout.value = true;
+      try {
+        // saveDashboardData owns the toast and the 409 path; a failed save keeps the draft.
+        const saved = await renderDashboardChartsRef.value?.saveDashboardData?.execute?.();
+        if (saved) layoutDraft.finish();
+        else if (hasUnsavedConflict.value) layoutSaveConflicted = true;
+      } finally {
+        isSavingLayout.value = false;
+      }
+    };
+
+    const discardDialog = reactive({ open: false, reason: "exit" as "exit" | "leave" });
+    // The password changed and the sign-out goes on whatever is answered, so Stay would only pretend to keep the edits.
+    const discardForced = computed(
+      () => discardDialog.reason === "leave" && draftSignOutForced.value,
+    );
+    let resolveDiscard: ((confirmed: boolean) => void) | null = null;
+
+    const confirmDiscard = (reason: "exit" | "leave") =>
+      new Promise<boolean>((resolve) => {
+        resolveDiscard?.(false);
+        resolveDiscard = resolve;
+        discardDialog.reason = reason;
+        discardDialog.open = true;
+      });
+
+    const settleDiscard = (confirmed: boolean) => {
+      discardDialog.open = false;
+      const resolve = resolveDiscard;
+      resolveDiscard = null;
+      resolve?.(confirmed);
+    };
+
+    const requestExitLayoutEdit = async () => {
+      if (!isEditingLayout.value || isSavingLayout.value) return;
+      if (layoutDraft.isDirty.value && !(await confirmDiscard("exit"))) return;
+      layoutDraft.discard();
+      // Discarding the layout that lost a save conflict is the conflict's Reload: show the latest and drop the not-saved banner.
+      if (layoutSaveConflicted && hasUnsavedConflict.value) await reloadSaveConflict();
+      layoutSaveConflicted = false;
+    };
+
+    // Esc belongs to an open dialog or menu first; the layout only hears it when nothing else would.
+    const onLayoutEscape = () => {
+      if (!isEditingLayout.value || discardDialog.open) return;
+      if (document.querySelector('[role="dialog"][data-state="open"], [role="menu"]')) return;
+      requestExitLayoutEdit();
+    };
+
+    // A dashboard-scoped Esc shadows the global one that closes the AI chat, so it exists only while editing.
+    let layoutEscapeId: string | undefined;
+    const toggleLayoutEscape = (editing: boolean) => {
+      const manager = getManager();
+      if (layoutEscapeId) manager?.unregisterById(layoutEscapeId);
+      layoutEscapeId = undefined;
+      const def = getShortcutDef("dashboardLayoutExit");
+      const key = def && resolveShortcutKeys(def, isMacOS())[0];
+      if (!editing || !manager || !def || !key) return;
+      layoutEscapeId = manager.register({
+        id: def.id,
+        key,
+        scope: def.scope,
+        handler: onLayoutEscape,
+      });
+    };
+    watch(isEditingLayout, toggleLayoutEscape, { flush: "sync" });
+
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!layoutDraft.isDirty.value) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    // A reload or drilldown swaps the dashboard object, which the draft no longer describes.
+    watch(
+      () => currentDashboardData.data,
+      (_next, previous) => {
+        if (isEditingLayout.value) layoutDraft.discard(previous);
+      },
+    );
 
     // ===== Panel Time Configuration =====
-
-    // Helper: Convert picker format to time object
-    const convertPickerToTimeObj = (pickerValue: any) => {
-      if (!pickerValue) return null;
-
-      if (pickerValue.valueType === "relative" && pickerValue.relativeTimePeriod) {
-        const result = getConsumableRelativeTime(pickerValue.relativeTimePeriod);
-        if (result) {
-          return {
-            start_time: new Date(result.startTime),
-            end_time: new Date(result.endTime),
-          };
-        }
-      } else if (pickerValue.valueType === "absolute") {
-        return {
-          start_time: new Date(pickerValue.startTime),
-          end_time: new Date(pickerValue.endTime),
-        };
-      }
-
-      return null;
-    };
 
     // Compute effective time for a specific panel
     // Priority: 1. URL params (highest) → 2. panel_time_range → 3. global time AS-IS
@@ -856,14 +1557,14 @@ export default defineComponent({
       // URL params always win, even if panel_time_range is null
       const urlPanelTime = getPanelTimeFromURL(panel.id, route.query);
       if (urlPanelTime) {
-        return convertPickerToTimeObj(urlPanelTime);
+        return pickerValueToTimeObj(urlPanelTime);
       }
 
       // Priority 2: Use panel's configured time range (if set)
       if (panel.config?.panel_time_range) {
         const pickerValue = convertPanelTimeRangeToPicker(panel.config.panel_time_range);
         if (pickerValue) {
-          return convertPickerToTimeObj(pickerValue);
+          return pickerValueToTimeObj(pickerValue);
         }
       }
 
@@ -871,10 +1572,10 @@ export default defineComponent({
       return globalTime;
     };
 
-    // Compute time for a single specific panel (for panel-level refresh)
-    const computeSinglePanelTime = (panelId: string) => {
+    // Compute time for a single specific panel (for panel-level refresh); true when it set one
+    const computeSinglePanelTime = (panelId: string): boolean => {
       if (!currentDashboardData.data?.tabs || !dateTimePicker.value) {
-        return;
+        return false;
       }
 
       // Find the panel across all tabs
@@ -887,24 +1588,19 @@ export default defineComponent({
         }
       }
 
-      if (!targetPanel) {
-        return;
+      const globalTime = getAppliedGlobalTime();
+      if (!targetPanel || !globalTime) {
+        return false;
       }
-
-      const globalTime = {
-        start_time: new Date(dateTimePicker.value.getConsumableDateTime().startTime),
-        end_time: new Date(dateTimePicker.value.getConsumableDateTime().endTime),
-      };
 
       // Check if panel has its own time configuration
       if (hasPanelTime(targetPanel)) {
         // Panel has panel-level time - only update this specific panel's time
         // DO NOT update __global to avoid triggering refreshes in other panels
         const effectiveTime = computePanelTime(targetPanel, globalTime);
-        if (effectiveTime) {
-          // CRITICAL: Update only this panel's time property, don't replace entire object
-          currentTimeObjPerPanel.value[panelId] = effectiveTime;
-        }
+        if (!effectiveTime) return false;
+        // CRITICAL: Update only this panel's time property, don't replace entire object
+        currentTimeObjPerPanel.value[panelId] = effectiveTime;
       } else {
         // Panel depends on global time
         // Create a panel-specific time entry (even though it normally uses __global)
@@ -912,7 +1608,18 @@ export default defineComponent({
         // CRITICAL: Update only this panel's time property, don't replace entire object
         currentTimeObjPerPanel.value[panelId] = globalTime;
       }
+      return true;
     };
+
+    provide(DASHBOARD_FRESH_PANEL_TIME, (panelId) => {
+      if (!applyVariablesLive.value) return undefined;
+      const panel = currentDashboardData.data?.tabs
+        ?.flatMap((tab: any) => tab.panels ?? [])
+        .find((p: any) => p.id === panelId);
+      const globalTime = panel && getAppliedGlobalTime();
+      if (!globalTime) return undefined;
+      return hasPanelTime(panel) ? computePanelTime(panel, globalTime) : globalTime;
+    });
 
     // Helper: Check if two time objects are equal
     const areTimesEqual = (time1: any, time2: any) => {
@@ -923,22 +1630,30 @@ export default defineComponent({
       );
     };
 
+    // Compared instead of the span because a calendar period's span grows with now.
+    let globalRelativePeriod: string | null = null;
+
     // Compute times for all panels in all tabs
     // @param forceRefresh - If true, always create new time objects to force all panels to refresh
     const computeAllPanelTimes = (forceRefresh = false) => {
-      if (!currentDashboardData.data?.tabs || !dateTimePicker.value) {
+      // A forced recompute resolves every panel in the current zone, so nothing is left waiting from a zone change.
+      if (forceRefresh) zonePendingPanels.value = {};
+      const globalTime = getAppliedGlobalTime();
+      if (!currentDashboardData.data?.tabs || !dateTimePicker.value || !globalTime) {
         return;
       }
 
-      const globalTime = {
-        start_time: new Date(dateTimePicker.value.getConsumableDateTime().startTime),
-        end_time: new Date(dateTimePicker.value.getConsumableDateTime().endTime),
-      };
-
-      // CRITICAL FIX: Preserve existing __global reference if time hasn't changed
-      // This prevents unnecessary refreshes of panels that depend on global time
+      // A non-forced recompute must not advance a relative range: its resolved now drifts a few hundred ms between calls during load, refiring every global panel's time watcher (cache paint → spurious refetch).
       const existingGlobalTime = currentTimeObjPerPanel.value.__global;
-      const shouldUpdateGlobal = forceRefresh || !areTimesEqual(existingGlobalTime, globalTime);
+      const isRelativeGlobal = selectedDate.value?.valueType === "relative";
+      const relativePeriod = isRelativeGlobal
+        ? (selectedDate.value?.relativeTimePeriod ?? null)
+        : null;
+      const globalTimeChanged = isRelativeGlobal
+        ? globalRelativePeriod !== relativePeriod
+        : !areTimesEqual(existingGlobalTime, globalTime);
+      const shouldUpdateGlobal = forceRefresh || !existingGlobalTime || globalTimeChanged;
+      if (shouldUpdateGlobal) globalRelativePeriod = relativePeriod;
 
       // Build the new panel times object
       const newPanelTimes: Record<string, any> = {
@@ -990,19 +1705,65 @@ export default defineComponent({
       });
     };
 
-    // when the date changes from the picker, update the current time object for the dashboard
+    // A zone change from any picker (header, panel, ViewPanel) moves every calendar window, which no single picker re-emits.
+    const reResolveCalendarRanges = () => {
+      const applied = selectedDate.value;
+      const picked = timeGate.picked.value;
+      // A header pick still waiting for Refresh is the range the user chose, so it is the one to keep or move.
+      const held = picked && !arePickerValuesEqual(picked, applied) ? picked : applied;
+      if (held?.valueType === "relative" && parseCalendarToken(held.relativeTimePeriod)) {
+        const window = getConsumableRelativeTime(held.relativeTimePeriod);
+        if (window)
+          timeGate.onPick({ ...held, startTime: window.startTime, endTime: window.endTime });
+      }
+      const globalTime = getAppliedGlobalTime();
+      if (!globalTime) return;
+      const moved: [string, { start_time: Date; end_time: Date }][] = [];
+      for (const tab of currentDashboardData.data?.tabs ?? []) {
+        for (const panel of tab.panels ?? []) {
+          if (!hasPanelTime(panel)) continue;
+          if (!isEffectivePanelTimeCalendar(panel, route.query, selectedDate.value)) continue;
+          const next = computePanelTime(panel, globalTime);
+          const current = currentTimeObjPerPanel.value[panel.id];
+          // Only a moved start counts; a "so far" end always differs by the moment it was read.
+          if (next && current?.start_time?.getTime() !== next.start_time?.getTime()) {
+            moved.push([panel.id, next]);
+          }
+        }
+      }
+      if (!isAutoRunOn.value) {
+        zonePendingPanels.value = Object.fromEntries(moved);
+        return;
+      }
+      zonePendingPanels.value = {};
+      for (const [id, next] of moved) currentTimeObjPerPanel.value[id] = next;
+    };
+    watch(
+      () => store.state.timezone,
+      async () => {
+        // A panel picker re-applies its own panel a tick after the zone changes; waiting lets that path win, so it loads once.
+        await nextTick();
+        await nextTick();
+        reResolveCalendarRanges();
+      },
+    );
+    watch(isAutoRunOn, (isOn) => {
+      if (!isOn) return;
+      for (const [id, next] of Object.entries(zonePendingPanels.value)) {
+        currentTimeObjPerPanel.value[id] = next;
+      }
+      zonePendingPanels.value = {};
+    });
+
+    // when the applied range changes, update the current time object for the dashboard
     watch(selectedDate, async () => {
-      if (selectedDate.value && dateTimePicker.value) {
-        // CRITICAL: Clear panelIdToBeRefreshed to ensure all panels refresh
+      const appliedTime = getAppliedGlobalTime();
+      if (appliedTime && dateTimePicker.value) {
+        // CRITICAL: Clear panelRefreshTargets to ensure all panels refresh
         // When global date time changes, all panels should update
-        panelIdToBeRefreshed.value = null;
+        panelRefreshTargets.clear();
 
-        const date = dateTimePicker.value?.getConsumableDateTime();
-
-        currentTimeObj.value = {
-          start_time: new Date(date.startTime),
-          end_time: new Date(date.endTime),
-        };
+        currentTimeObj.value = appliedTime;
 
         // DON'T reset currentTimeObjPerPanel here - let computeAllPanelTimes() handle it
         // This prevents losing panel-specific times during the update
@@ -1026,25 +1787,8 @@ export default defineComponent({
     watch(
       () => route.query,
       (newQuery, oldQuery) => {
-        // CRITICAL FIX: Only recompute if relevant params changed
-        // Skip if only panel time params (pt-*) changed - those are handled separately
-        // Check if global time params (period, from, to) or other params changed
-        const globalTimeParamsChanged =
-          newQuery.period !== oldQuery.period ||
-          newQuery.from !== oldQuery.from ||
-          newQuery.to !== oldQuery.to;
-
-        // Check if only panel time params changed
-        const onlyPanelParamsChanged =
-          Object.keys(newQuery).some(
-            (key) => key.startsWith("pt-") && newQuery[key] !== oldQuery?.[key],
-          ) && !globalTimeParamsChanged;
-
-        // If only panel params changed, don't recompute (panel refresh handles it)
-        // If global time or other params changed, recompute all panel times
-        if (!onlyPanelParamsChanged) {
-          // Re-compute panel times when URL changes (e.g., panel time params updated)
-          // Use forceRefresh=false to preserve existing time references where possible
+        // An applied variable rewrites var-* here; recomputing would re-run every relative panel-time panel.
+        if (queryChangeAffectsPanelTimes(newQuery, oldQuery)) {
           computeAllPanelTimes();
         }
       },
@@ -1070,6 +1814,7 @@ export default defineComponent({
         // loadDashboard() is already called during onMounted setup.
         if (!oldDashboardId) return;
         if (newDashboardId && newDashboardId !== oldDashboardId) {
+          openingUrlRefresh = { value: route.query.refresh };
           isDashboardLoading.value = true;
           try {
             await loadDashboard();
@@ -1191,36 +1936,27 @@ export default defineComponent({
 
     // [END] date picker related variables
 
-    // back button → the dashboards list the user actually came from.
-    //
-    // Prefer real history: a dashboard opened from the Favorites pseudo-folder
-    // carries the folder it *lives in* in the URL, so rebuilding the list route
-    // from route.query.folder would drop the user into that folder instead of
-    // Favorites. Going back restores whichever list view they left.
-    //
-    // Only honour history when the previous entry is the dashboards list itself
-    // (deep links have no previous entry; arriving via add_panel or another
-    // module would send the "Dashboards" button somewhere it doesn't name), and
-    // fall back to the folder-scoped push otherwise. In-view URL syncs use
-    // router.replace, so tab/time-range changes never bury the list entry.
-    const goBackToDashboardList = () => {
-      const back = (router.options?.history?.state as any)?.back;
-      if (typeof back === "string") {
-        // endsWith rather than === so a deployment served under a base path
-        // (getPath() can be "/web/") still matches if the base ever leaks in.
-        const path = back.split(/[?#]/)[0].replace(/\/$/, "");
-        if (path === "/dashboards" || path.endsWith("/dashboards")) {
-          return router.back();
-        }
-      }
-      return router.push({
+    // Fallback-only: a dashboard opened from the Favorites pseudo-folder carries the folder it lives in, so rebuilding from route.query.folder here (rather than Favorites) is only reached when there's no real history to go back to.
+    const goBackToDashboardList = useListBackNavigation({
+      // The Infrastructure pages push into a dashboard the same way the listing does, so back belongs there rather than on a listing the user never saw.
+      isListPath: (path) =>
+        path === "/dashboards" || path.endsWith("/dashboards") || path.startsWith("/infra/"),
+      fallback: () => ({
         path: "/dashboards",
         query: {
           folder: route.query.folder ?? "default",
           org_identifier: store.state.selectedOrganization.identifier,
         },
-      });
-    };
+      }),
+    });
+
+    const hasNewPanelDraft = computed(() =>
+      hasPanelDraft({
+        userEmail: String(store.state.userInfo?.email ?? ""),
+        org: String(store.state.selectedOrganization?.identifier ?? ""),
+        dashboardId: String(route.query.dashboard ?? ""),
+      }),
+    );
 
     //add panel
     const addPanelData = () => {
@@ -1231,34 +1967,136 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder ?? "default",
-          tab: route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
+          tab: route.query.tab ?? currentDashboardData?.data?.tabs?.[0]?.tabId,
         },
       });
     };
 
-    const refreshData = async () => {
-      if (!arePanelsLoading.value) {
-        // CRITICAL FIX: Clear panelIdToBeRefreshed for global refresh
-        // This allows all panels to refresh, not just the one previously refreshed
-        panelIdToBeRefreshed.value = null;
+    // Refresh is the dashboard's main action, but in layout edit Save owns the primary slot.
+    const refreshVariant = computed(() => {
+      if (isRefreshPending.value) return "pending";
+      return isEditingLayout.value ? "outline" : "primary";
+    });
 
-        // Generate new run ID for whole dashboard refresh
-        generateNewDashboardRunId();
+    const refreshOptionsVariant = computed(() => {
+      if (config.isEnterprise == "true" && arePanelsLoading.value) return "cancel-query";
+      return refreshVariant.value;
+    });
 
-        // Sync panel-level datetime pickers FIRST (updates URL)
-        await renderDashboardChartsRef.value?.syncAllPanelDateTimePickers();
-
-        // Recompute all panel times after syncing
-        // Pass forceRefresh=true to ensure ALL panels refresh (create new time objects)
-        computeAllPanelTimes(true);
-
-        // Commit all live variable changes to committed state
-        renderDashboardChartsRef.value?.commitAllVariables();
-
-        // Refresh the dashboard (syncs global datetime picker)
-        dateTimePicker.value.refresh();
-      }
+    const refreshData = async (withoutCache = false) => {
+      if (!arePanelsLoading.value) await runRefresh(withoutCache);
     };
+
+    const runRefresh = async (withoutCache = false) => {
+      // CRITICAL FIX: Clear panelRefreshTargets for global refresh
+      // This allows all panels to refresh, not just the one previously refreshed
+      panelRefreshTargets.clear();
+
+      // A global refresh overrides every per-panel choice; panels read the flag when their query fires.
+      shouldRefreshWithoutCachePerPanel.value = { __global: withoutCache === true };
+
+      // Annotations added elsewhere never expire this tab's cache, and a fixed range keeps the same key.
+      if (dashboardId.value) {
+        void queryClient.invalidateQueries({
+          queryKey: annotationKeys.dashboard(
+            store.state.selectedOrganization.identifier,
+            String(dashboardId.value),
+          ),
+          refetchType: "none",
+        });
+      }
+
+      // Generate new run ID for whole dashboard refresh
+      generateNewDashboardRunId();
+
+      // Sync panel-level datetime pickers FIRST (updates URL)
+      await renderDashboardChartsRef.value?.syncAllPanelDateTimePickers();
+
+      // Applied before the recompute below, which reads the applied range and not the picker.
+      timeGate.refresh();
+
+      // Recompute all panel times after syncing
+      // Pass forceRefresh=true to ensure ALL panels refresh (create new time objects)
+      computeAllPanelTimes(true);
+
+      // Commit all live variable changes to committed state
+      renderDashboardChartsRef.value?.commitAllVariables();
+    };
+
+    // Kiosk runs its own watchdog ticker, so the toolbar timer only drives the normal view.
+    const onAutoRefreshTick = () => {
+      if (!kioskMode.value) refreshData();
+    };
+
+    const kioskRefresh = useKioskRefresh({
+      enabled: kioskMode,
+      intervalSeconds: refreshInterval,
+      isLoading: arePanelsLoading,
+      // The first cycle can fire before the picker exists, while the dashboard definition still loads.
+      refresh: () => (dateTimePicker.value ? runRefresh() : undefined),
+      cancel: () => cancelQuery(),
+      probe: pingBackend,
+    });
+    provide(KIOSK_PANEL_HEALTH_KEY, kioskRefresh.registry);
+
+    const playlistFrame = usePlaylistFrame(playlistEmbed, {
+      title: computed(() => currentDashboardData.data?.title),
+      health: kioskRefresh.health,
+      failingCount: kioskRefresh.failingCount,
+      lastSuccessAt: kioskRefresh.lastSuccessAt,
+    });
+    const playlistPage = usePlaylistPage({
+      enabled: !!playlistPageConfig,
+      config: playlistPageConfig,
+      misses: parsePlaylistMisses(route.query),
+      ready: computed(
+        () =>
+          kioskRefresh.lastSuccessAt.value !== null || kioskRefresh.health.value.level === "bad",
+      ),
+      outage: computed(() => kioskRefresh.health.value.level === "bad"),
+      resolveHref: (query) =>
+        window.location.origin + router.resolve({ path: PLAYLIST_VIEW_PATH, query }).href,
+    });
+    playlistReporters.missing = (reason) => {
+      if (!playlistEmbed) return playlistPage.reportMissing(reason);
+      playlistFrame.reportMissing(reason);
+      return true;
+    };
+    playlistReporters.error = () => {
+      if (!playlistEmbed) return playlistPage.reportError();
+      playlistFrame.reportError();
+      return true;
+    };
+    const playlistPosition = computed(() =>
+      playlistPage.active
+        ? t("dashboard.playlist.position", {
+            current: playlistPage.position.value.index + 1,
+            total: playlistPage.position.value.count,
+          })
+        : null,
+    );
+    const playlistHolding = computed(() => {
+      if (!playlistPage.active) return null;
+      const { index, count } = playlistPage.position.value;
+      const waiting =
+        playlistPage.missing.value !== null ||
+        playlistPage.leaving.value ||
+        (kioskRefresh.lastSuccessAt.value === null && kioskRefresh.health.value.level !== "bad");
+      if (!waiting) return null;
+      const name = currentDashboardData.data?.title
+        ? raw(currentDashboardData.data.title)
+        : t("dashboard.playlist.slideName", { number: index + 1 });
+      const missing = playlistPage.missing.value;
+      return {
+        label: t("dashboard.playlist.loadingSlide", { current: index + 1, total: count }),
+        title: currentDashboardData.data?.title ?? null,
+        note: missing
+          ? missing === "forbidden"
+            ? t("dashboard.playlist.skippedForbidden", { name })
+            : t("dashboard.playlist.skippedNotFound", { name })
+          : null,
+      };
+    });
 
     const onDataZoom = (event: any) => {
       const selectedDateObj = {
@@ -1278,28 +2116,32 @@ export default defineComponent({
       // set it as a absolute time
       dateTimePicker?.value?.setCustomDate("absolute", selectedDateObj);
 
-      // refresh dashboard
+      // The picker reports the zoomed range here; a zoom applies at once even while Auto Run is off.
       dateTimePicker.value.refresh();
+      timeGate.refresh();
     };
 
     // ------- work with query params ----------
     onMounted(async () => {
       const params = route.query;
 
-      if (params.refresh) {
-        const refreshInSecs = parseDuration(params.refresh);
-        if (store.state?.zoConfig?.min_auto_refresh_interval) {
-          if (refreshInSecs < store.state?.zoConfig?.min_auto_refresh_interval) {
-            refreshInterval.value = 0;
-          } else {
-            refreshInterval.value = refreshInSecs;
-          }
-        }
+      if (params.refresh && kioskMode.value) {
+        // A TV must keep refreshing: a too-low value is raised to the server minimum, not turned off.
+        refreshInterval.value = resolveKioskRefresh(
+          params.refresh,
+          store.state?.zoConfig?.min_auto_refresh_interval,
+        );
+      } else if (params.refresh !== undefined) {
+        refreshInterval.value = resolveOpenRefreshInterval({
+          urlRefresh: params.refresh,
+          savedDefault: undefined,
+          minSeconds: minAutoRefreshSeconds(store.state?.zoConfig?.min_auto_refresh_interval),
+        });
       }
 
       // check if timezone query params exist
       // will be used for initial time zone only, so remove it from query
-      if (params.timezone) {
+      if (params.timezone && !kioskMode.value) {
         // get the query params
         const query = {
           ...route.query,
@@ -1314,8 +2156,10 @@ export default defineComponent({
         });
       }
 
-      // check if print query params exist
-      if (params.print !== undefined) {
+      if (kioskMode.value) {
+        setPrint(false);
+        applyKioskTheme(store, parseKioskTheme(route.query.theme));
+      } else if (params.print !== undefined) {
         // set print mode
         setPrint(params.print == "true" ? true : false);
       } else {
@@ -1463,6 +2307,31 @@ export default defineComponent({
 
         // Get global time params - ensure we always have time params
         const timeParams = getQueryParamsForDuration(selectedDate.value);
+        // Before the dashboard loads there is no picker value yet, so keep the range the link arrived with.
+        if (!selectedDate.value) {
+          if (route.query.period) timeParams.period = route.query.period;
+          else if (route.query.from && route.query.to) {
+            timeParams.from = route.query.from;
+            timeParams.to = route.query.to;
+          }
+        }
+
+        // Preserve the cell-explorer deep-link params so a shared "Copy link" reopens the drawer.
+        const cellParams: Record<string, any> = {};
+        for (const k of [
+          "cell_panel",
+          "cell_field",
+          "cell_value",
+          "cell_vtype",
+          "cell_stream",
+          "cell_stype",
+          "cell_t0",
+          "cell_t1",
+          "cell_where",
+          "cell_event_ts",
+        ]) {
+          if (route.query[k] !== undefined) cellParams[k] = route.query[k];
+        }
 
         const newQuery = {
           org_identifier: store.state.selectedOrganization.identifier,
@@ -1475,6 +2344,10 @@ export default defineComponent({
           ...panelTimeParams, // Panel time params (generated + preserved)
           print: store.state.printMode,
           searchtype: route.query.searchtype,
+          ...cellParams, // Keep cell-explorer deep link intact
+          ...(kioskMode.value
+            ? { ...pickKioskParams(route.query), ...pickPlaylistParams(route.query) }
+            : {}),
         };
 
         // CRITICAL: Only update URL if query has actually changed
@@ -1511,7 +2384,30 @@ export default defineComponent({
       { deep: true },
     );
 
+    // Resolve only reopens the dialog: no save is attempted, and the dialog re-reads the working copy, so an edit-mode draft that moved on is what Overwrite saves.
+    const resolveSaveConflict = () => reopenSaveConflict();
+
+    onDashboardConflictResolved((dashboardId, outcome) => {
+      if (dashboardId !== route.query.dashboard) return;
+      layoutSaveConflicted = false;
+      // Overwrite saved my layout, so edit mode ends as after a normal save; Reload drops the draft and its undo history.
+      if (isEditingLayout.value) {
+        if (outcome === "overwritten") layoutDraft.finish();
+        else layoutDraft.discard();
+      }
+      loadDashboard();
+    });
+
+    // Read before the save helpers edit the cached dashboard in place.
+    const panelTitleOf = (panelId: any) =>
+      (currentDashboardData.data as any)?.tabs
+        ?.flatMap((tab: any) => tab?.panels ?? [])
+        .find((panel: any) => panel?.id === panelId)?.title ?? String(panelId);
+
     const onDeletePanel = async (panelId: any) => {
+      const change = t("dashboard.saveConflict.change.deletedPanel", {
+        name: panelTitleOf(panelId),
+      });
       try {
         await deletePanel(
           store,
@@ -1526,12 +2422,12 @@ export default defineComponent({
           timeout: 2000,
         });
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              t("dashboard.viewDashboard.panelDeletionFailed"),
-          );
+        if (saveConflict.isConflict(error)) {
+          void saveConflict.openConflict({
+            dashboardId: route.query.dashboard as string,
+            folderId: (route.query.folder as string) ?? "default",
+            change,
+          });
         } else {
           showErrorNotification(
             error?.message ?? t("dashboard.viewDashboard.panelDeletionFailed"),
@@ -1545,6 +2441,7 @@ export default defineComponent({
 
     // move single panel to another tab
     const onMovePanel = async (panelId: any, newTabId: any) => {
+      const change = t("dashboard.saveConflict.change.movedPanel", { name: panelTitleOf(panelId) });
       try {
         await movePanelToAnotherTab(
           store,
@@ -1560,12 +2457,12 @@ export default defineComponent({
           timeout: 2000,
         });
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              t("dashboard.viewDashboard.panelMoveFailed"),
-          );
+        if (saveConflict.isConflict(error)) {
+          void saveConflict.openConflict({
+            dashboardId: route.query.dashboard as string,
+            folderId: (route.query.folder as string) ?? "default",
+            change,
+          });
         } else {
           showErrorNotification(error?.message ?? t("dashboard.viewDashboard.panelMoveFailed"), {
             timeout: 2000,
@@ -1573,6 +2470,8 @@ export default defineComponent({
         }
       }
     };
+
+    const onDashboardShared = () => analytics.track("dashboard_shared");
 
     /**
      * Computed property for dashboard share URL
@@ -1611,6 +2510,120 @@ export default defineComponent({
         isFullscreen.value = false;
       }
     };
+
+    // ===== Kiosk / TV mode =====
+    const minRefreshSeconds = computed(() => store.state?.zoConfig?.min_auto_refresh_interval || 5);
+
+    const kioskTimeRange = computed(() => {
+      const relative =
+        selectedDate.value?.valueType === "relative"
+          ? formatRelativePeriod(selectedDate.value?.relativeTimePeriod, t)
+          : null;
+      if (relative) return relative;
+      // Until the picker resolves the range, moment formats it as "Invalid date".
+      const start = currentTimeObj.value?.start_time?.getTime?.();
+      const end = currentTimeObj.value?.end_time?.getTime?.();
+      if (
+        !Number.isFinite(start) ||
+        !Number.isFinite(end) ||
+        timeString.value.includes("Invalid")
+      ) {
+        return raw("");
+      }
+      return raw(timeString.value.replace(/\s+/g, " ").trim());
+    });
+
+    const leaveKioskState = () => {
+      if (store.state.kioskMode) store.dispatch("setKioskMode", false);
+      clearKioskTheme(store);
+    };
+
+    // Set only when TV mode was entered from the toolbar; a TV link opened directly has no prior view to restore.
+    let refreshBeforeKiosk: number | null = null;
+    const restoreRefreshBeforeKiosk = () => {
+      if (refreshBeforeKiosk === null) return;
+      refreshInterval.value = refreshBeforeKiosk;
+      refreshBeforeKiosk = null;
+    };
+
+    const enterKiosk = async (options) => {
+      if (isEditingLayout.value) return;
+      const query = buildKioskQuery(route.query, options);
+      setPrint(false);
+      store.dispatch("setKioskMode", true);
+      applyKioskTheme(store, parseKioskTheme(query.theme));
+      refreshBeforeKiosk = refreshInterval.value;
+      // Pushed, not replaced, so browser Back also leaves TV mode.
+      await router.push({ query });
+      // Only after the push: the interval watcher rewrites the URL and would otherwise cancel it.
+      refreshInterval.value =
+        options.refreshSeconds > 0 ? Math.max(options.refreshSeconds, minRefreshSeconds.value) : 0;
+    };
+
+    const exitKiosk = async () => {
+      if (!kioskMode.value) return;
+      leaveKioskState();
+      const query = stripPlaylistParams(stripKioskParams(route.query));
+      if (refreshBeforeKiosk !== null) query.refresh = generateDurationLabel(refreshBeforeKiosk);
+      await router.replace({ query });
+      // Only after the replace: the interval watcher rewrites the URL and would otherwise race it.
+      restoreRefreshBeforeKiosk();
+    };
+
+    // Back/Forward across the kiosk entry flips the URL without going through enter/exit.
+    watch(
+      () => isKioskEnabled(route.query.kiosk),
+      (enabled) => {
+        if (enabled === kioskMode.value) return;
+        if (enabled) {
+          store.dispatch("setKioskMode", true);
+          applyKioskTheme(store, parseKioskTheme(route.query.theme));
+        } else {
+          leaveKioskState();
+          restoreRefreshBeforeKiosk();
+        }
+      },
+    );
+
+    const KIOSK_OPEN_POPUP = '[role="dialog"][data-state="open"], [role="menu"], [role="listbox"]';
+    // Read before the popup's own Esc handler closes it, so that Esc only closes the variable dropdown.
+    let escapeHitPopup = false;
+    const onKioskEscapeCapture = (event: KeyboardEvent) => {
+      if (event.key === "Escape") escapeHitPopup = !!document.querySelector(KIOSK_OPEN_POPUP);
+    };
+
+    const isTextEntry = (el: Element | null) =>
+      !!el && (el.matches("input, textarea") || (el as HTMLElement).isContentEditable);
+
+    const onKioskEscape = () => {
+      if (!kioskMode.value) return;
+      const hitPopup = escapeHitPopup || !!document.querySelector(KIOSK_OPEN_POPUP);
+      escapeHitPopup = false;
+      if (hitPopup || isTextEntry(document.activeElement)) return;
+      exitKiosk();
+    };
+
+    // Registered only while in kiosk so it never shadows the global Esc that closes the AI chat.
+    let kioskEscapeId: string | undefined;
+    const toggleKioskEscape = (enabled: boolean) => {
+      const manager = getManager();
+      if (kioskEscapeId) manager?.unregisterById(kioskEscapeId);
+      kioskEscapeId = undefined;
+      window.removeEventListener("keydown", onKioskEscapeCapture, true);
+      const def = getShortcutDef("dashboardKioskExit");
+      const key = def && resolveShortcutKeys(def, isMacOS())[0];
+      if (!enabled || !manager || !def || !key) return;
+      window.addEventListener("keydown", onKioskEscapeCapture, true);
+      kioskEscapeId = manager.register({
+        id: def.id,
+        key,
+        scope: def.scope,
+        // A focused select trigger counts as an input to the manager; onKioskEscape does its own text-entry check.
+        allowInInput: true,
+        handler: onKioskEscape,
+      });
+    };
+    watch(kioskMode, toggleKioskEscape, { immediate: true, flush: "sync" });
 
     const openScheduledReports = () => {
       if (isLoadingReports.value) return;
@@ -1654,6 +2667,7 @@ export default defineComponent({
 
     onMounted(() => {
       document.addEventListener("fullscreenchange", onFullscreenChange);
+      window.addEventListener("beforeunload", onBeforeUnload);
     });
 
     // Force remount key — bumped on AI dashboard events to force RenderDashboardCharts to remount
@@ -1679,6 +2693,10 @@ export default defineComponent({
 
     onUnmounted(() => {
       document.removeEventListener("fullscreenchange", onFullscreenChange);
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      toggleLayoutEscape(false);
+      toggleKioskEscape(false);
+      leaveKioskState();
 
       // Clean up AI dashboard event listener
       offDashboardEvent(handleAiDashboardEvent);
@@ -1695,21 +2713,77 @@ export default defineComponent({
       isFullscreen.value = false;
     });
 
+    // printMode hides the app shell globally, so leaving by browser Back (not ✕) must still clear it.
+    const clearPrintModeOnLeave = () => {
+      if (store.state.printMode) setPrint(false);
+      leaveKioskState();
+    };
+
+    // A later leave guard (the settings drawer's) can still keep the user here, so leaving acts only once the navigation lands.
+    let onLanded: { to: RouteLocationNormalized; run: () => void } | null = null;
+    const removeLandedHook = router.afterEach((to, _from, failure) => {
+      if (onLanded?.to !== to) return;
+      const { run } = onLanded;
+      onLanded = null;
+      if (!failure) run();
+    });
+    onUnmounted(() => {
+      removeLandedHook();
+      // A redirect never reports the original navigation, but unmounting means the user did leave.
+      const pending = onLanded;
+      onLanded = null;
+      pending?.run();
+    });
+
+    // Unsaved layout edits are the store's cached dashboard object, so a confirmed leave must roll them back.
+    onBeforeRouteLeave((to) => {
+      if (!layoutDraft.isDirty.value) {
+        onLanded = {
+          to,
+          run: () => {
+            layoutDraft.finish();
+            clearPrintModeOnLeave();
+          },
+        };
+        return;
+      }
+      return confirmDiscard("leave").then((confirmed) => {
+        if (!confirmed) return false;
+        onLanded = {
+          to,
+          run: () => {
+            layoutDraft.discard();
+            clearPrintModeOnLeave();
+          },
+        };
+        return true;
+      });
+    });
+
+    // Drilldown and Back/Forward to another dashboard reuse this page, so the leave guard never sees them.
+    onBeforeRouteUpdate((to, from) => {
+      if (to.query.dashboard === from.query.dashboard || !layoutDraft.isDirty.value) return;
+      return confirmDiscard("leave").then((confirmed) => {
+        if (!confirmed) return false;
+        onLanded = { to, run: () => layoutDraft.discard() };
+        return true;
+      });
+    });
+
     const currentTimeObjPerPanel = ref({});
     const shouldRefreshWithoutCachePerPanel = ref({});
 
     const refreshPanelRequest = (panelId, shouldRefreshWithoutCache) => {
-      // Set the panel ID to be refreshed
-      panelIdToBeRefreshed.value = panelId;
-
       // Store the shouldRefreshWithoutCache value for this panel
       shouldRefreshWithoutCachePerPanel.value = {
         ...shouldRefreshWithoutCachePerPanel.value,
         [panelId]: shouldRefreshWithoutCache || false,
       };
 
-      // Recompute time for this specific panel only
-      computeSinglePanelTime(panelId);
+      // Only a shown panel whose time was set loads, so only it can settle and end the refresh.
+      if (computeSinglePanelTime(panelId) && getPanelFromTab(selectedTabId.value, panelId)) {
+        panelRefreshTargets.set(panelId, false);
+      }
 
       setTimeString();
     };
@@ -1735,10 +2809,18 @@ export default defineComponent({
 
         // Save changes using existing renderDashboardChartsRef
         if (renderDashboardChartsRef?.value?.saveDashboardData?.execute) {
-          await renderDashboardChartsRef.value.saveDashboardData.execute();
+          const saved = await renderDashboardChartsRef.value.saveDashboardData.execute(
+            t("dashboard.saveConflict.change.editedJson"),
+          );
+          // A conflict opened the dialog with my JSON; reloading here would replace it on screen with the latest.
+          if (!saved) return;
 
           // Reload the dashboard to reflect changes
           await loadDashboard();
+
+          // The grid rebuilds only when panel ids change, so a layout-only JSON edit must move the widgets itself.
+          await nextTick();
+          renderDashboardChartsRef.value?.syncGridToLayout?.();
         } else {
           showErrorNotification(t("dashboard.viewDashboard.failedToUpdateJson"));
         }
@@ -1761,25 +2843,40 @@ export default defineComponent({
       {
         id: "dashboardAddPanel",
         handler: () => {
-          if (isInputFocused()) return;
+          if (isInputFocused() || isEditingLayout.value || kioskMode.value) return;
           addPanelData();
         },
       },
       {
         id: "dashboardSave",
-        handler: () => savePanelLayout(null),
+        handler: () => {
+          if (isInputFocused() || !isEditingLayout.value) return;
+          saveLayout();
+        },
+      },
+      {
+        id: "dashboardLayoutUndo",
+        handler: () => {
+          if (isEditingLayout.value) undoLayout();
+        },
+      },
+      {
+        id: "dashboardLayoutRedo",
+        handler: () => {
+          if (isEditingLayout.value) redoLayout();
+        },
       },
       {
         id: "dashboardFullscreen",
         handler: () => {
-          if (isInputFocused()) return;
+          if (isInputFocused() || isEditingLayout.value || kioskMode.value) return;
           toggleFullscreen();
         },
       },
       {
         id: "dashboardExport",
         handler: () => {
-          if (isInputFocused()) return;
+          if (isInputFocused() || kioskMode.value) return;
           // Trigger the whole-dashboard export (ExportDashboard button).
           (document.querySelector('[data-test="export-dashboard"]') as HTMLElement | null)?.click();
         },
@@ -1787,6 +2884,7 @@ export default defineComponent({
     ]);
 
     return {
+      isMobile,
       currentDashboardData,
       dashboardRemountKey,
       toggleFullscreen,
@@ -1794,6 +2892,7 @@ export default defineComponent({
       isFullscreen,
       goBackToDashboardList,
       addPanelData,
+      hasNewPanelDraft,
       toggleHomeDashboard,
       isHome,
       t,
@@ -1805,17 +2904,37 @@ export default defineComponent({
       selectedDate,
       currentTimeObj,
       currentTimeObjPerPanel,
+      computeAllPanelTimes,
+      reResolveCalendarRanges,
+      zoneRefreshPending,
       shouldRefreshWithoutCachePerPanel,
       refreshInterval,
       // ----------------
       refreshData,
+      isAutoRunAvailable,
+      isAutoRunOn,
+      toggleAutoRun,
+      refreshVariant,
+      refreshOptionsVariant,
       isVariablesChanged,
+      isRefreshPending,
+      refreshTooltip,
+      timeGate,
+      pickedDate: timeGate.picked,
+      onTimePickerHide,
       refreshedVariablesDataUpdated,
       onDeletePanel,
       variablesData,
+      variablesManager,
+      showPublicLinksPanel,
       variablesDataUpdated,
       showDashboardSettingsDialog,
+      hasUnsavedConflict,
+      resolveSaveConflict,
+      saveConflictState: dashboardSaveConflictState,
       openSettingsDialog,
+      hasSettingsDraft,
+      settingsButtonLabel,
       loadDashboard,
       refreshPanelRequest,
       updateRunId,
@@ -1823,6 +2942,7 @@ export default defineComponent({
       getQueryParamsForDuration,
       onDataZoom,
       dashboardShareURL,
+      onDashboardShared,
       selectedTabId,
       onMovePanel,
       printDashboard,
@@ -1848,6 +2968,21 @@ export default defineComponent({
       selectedPanelConfig,
       savePanelLayout,
       renderDashboardChartsRef,
+      isEditingLayout,
+      layoutChangeCount,
+      canUndoLayout,
+      canRedoLayout,
+      layoutMode,
+      isSavingLayout,
+      enterLayoutEdit,
+      onLayoutChange,
+      undoLayout,
+      redoLayout,
+      saveLayout,
+      requestExitLayoutEdit,
+      discardDialog,
+      discardForced,
+      settleDiscard,
       folderNameFromFolderId,
       showJsonEditorDialog,
       openJsonEditor,
@@ -1855,11 +2990,26 @@ export default defineComponent({
       setTimeForVariables,
       runId,
       onVariablesManagerReady,
+      kioskMode,
+      kioskFit,
+      kioskPointerActive,
+      playlistEmbed,
+      playlistPosition,
+      playlistHolding,
+      playlistPageActive: playlistPage.active,
+      kioskHealth: kioskRefresh.health,
+      kioskLastSuccessAt: kioskRefresh.lastSuccessAt,
+      kioskCountdown: kioskRefresh.countdown,
+      onAutoRefreshTick,
+      kioskTimeRange,
+      enterKiosk,
+      exitKiosk,
     };
   },
 });
 </script>
 
+<!-- eslint-disable-next-line vue/enforce-style-attribute -- must stay unscoped: the @media print block below targets ancestors outside this component (.o2-app-root, main, .o2-content-scroll, .scroll). `scoped` rewrites selectors to this component's own elements, so those rules would match nothing and dashboard printing would clip at viewport height. -->
 <style>
 /* keep(complex-state): fullscreen / sticky-header / print-mode toggled state
    classes (compound .stickyHeader.fullscreenHeader chain + high z-index stacking)
@@ -1877,6 +3027,9 @@ export default defineComponent({
   z-index: 5100 !important;
 }
 
+/* The fullscreen surface colour is `bg-surface-base!`, applied alongside this
+   class in the template — a background colour has a utility, the viewport-pinning
+   geometry below does not. */
 .fullscreen {
   width: 100vw !important;
   height: 100vh !important;
@@ -1886,7 +3039,6 @@ export default defineComponent({
   z-index: 5000 !important;
   margin: 0 !important;
   padding: 0 !important;
-  background-color: var(--color-surface-base) !important;
 }
 
 .print-mode-container {

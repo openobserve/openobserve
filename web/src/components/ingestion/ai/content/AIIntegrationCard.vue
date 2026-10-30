@@ -18,16 +18,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useStore } from "vuex";
 import useIngestion from "@/composables/useIngestion";
-import { b64EncodeStandard } from "@/utils/zincutils";
+import { basicIngestToken } from "@/composables/useCredentialSnippet";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import { parseCard } from "./parseCard";
 import { renderCardSegments, safeHttpUrl, type CardSubstitutions } from "./renderMarkdown";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   /** Raw `data-source-ui.md` content for this integration. */
-  content: string;
+  content: I18nText;
   /** Optional documentation URL shown as a footer link. */
   docUrl?: string;
 }>();
@@ -45,9 +48,16 @@ const subs = computed<CardSubstitutions>(() => {
   return {
     url: endpoint.value?.url ?? "",
     org: store.state.selectedOrganization?.identifier ?? "",
-    token: b64EncodeStandard(`${email}:${passcode}`) ?? "",
+    token: basicIngestToken(email, passcode),
   };
 });
+
+const passcodeForbidden = computed(
+  () => !!store.state.organizationData?.organizationPasscodeForbidden,
+);
+
+// cards come from a separate content repo, so a card may carry no {token} at all
+const contentNeedsPasscode = computed(() => String(props.content ?? "").includes("{token}"));
 
 const parsed = computed(() => parseCard(props.content));
 const metadata = computed(() => parsed.value.metadata);
@@ -65,7 +75,13 @@ const renderedSections = computed(() =>
 </script>
 
 <template>
-  <div class="o2-card min-w-0" data-test="ai-integration-card">
+  <OBanner
+    v-if="passcodeForbidden && contentNeedsPasscode"
+    variant="warning"
+    data-test="ai-integration-card-passcode-forbidden"
+    :content="t('ingestion.passcodeForbiddenMessage')"
+  />
+  <div v-else class="o2-card min-w-0" data-test="ai-integration-card">
     <div class="o2-card-inner min-w-0">
       <!-- Header chrome -->
       <header class="mb-5">
@@ -90,12 +106,16 @@ const renderedSections = computed(() =>
         v-for="(w, i) in warnings"
         :key="`warn-${i}`"
         variant="warning"
-        :content="w"
+        :content="raw(w)"
         class="mb-5"
       />
 
       <!-- Sections (all open — install guides read top to bottom) -->
-      <section v-for="section in renderedSections" :key="section.title" class="o2-section min-w-0">
+      <section
+        v-for="section in renderedSections"
+        :key="section.title"
+        class="o2-section border-border-default min-w-0 border-t"
+      >
         <h3 class="o2-section-title">{{ section.title }}</h3>
         <template v-for="(seg, j) in section.segments" :key="j">
           <div
@@ -110,22 +130,22 @@ const renderedSections = computed(() =>
       <!-- Documentation link — identical markup to the legacy ingestion cards
            (AIIntegrationDetail.vue) so it looks the same across all sections. -->
       <div v-if="docUrl" class="pt-6 pb-2 font-bold">
-        Click
+        {{ t("ingestion.docLinkClick") }}
         <a
           :href="safeHttpUrl(docUrl)"
           target="_blank"
           rel="noopener noreferrer"
           class="text-text-link hover:text-text-link-hover"
           style="text-decoration: underline"
-          >here</a
+          >{{ t("ingestion.docLinkHere") }}</a
         >
-        to check further documentation.
+        {{ t("ingestion.docLinkDefaultText") }}
       </div>
     </div>
   </div>
 </template>
 
-<style scoped lang="scss">
+<style scoped>
 /* keep(generated-content): .o2-card-md wraps markdown rendered at runtime — the
    :deep(:not(pre) > code)::before/::after backtick strip and :deep(table) rules
    target nodes this template never writes, so they cannot be utilities. */
@@ -139,7 +159,6 @@ const renderedSections = computed(() =>
 
 .o2-section {
   padding: 1.25rem 0;
-  border-top: 1px solid var(--color-border-default);
 
   &:first-of-type {
     border-top: none;

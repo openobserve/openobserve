@@ -23,7 +23,7 @@
             :data-test="`dashboard-add-condition-label-${conditionIndex}-${computedLabel(condition)}`"
             icon-right="arrow-drop-down"
           >
-            <span class="leading-normal font-normal whitespace-nowrap"
+            <OTruncatedText class="max-w-80 leading-normal font-normal"
               ><span class="text-text-body">{{ labelParts(condition).prefix }}</span
               ><span class="text-text-body">{{ labelParts(condition).field }}</span
               ><span v-if="labelParts(condition).op" class="text-text-secondary">{{
@@ -41,7 +41,7 @@
                 ><span class="text-badge-blue-ol-text">{{
                   labelParts(condition).valueClose
                 }}</span></template
-              ></span
+              ></OTruncatedText
             >
           </OButton>
         </template>
@@ -59,6 +59,7 @@
                   :data-test="`dashboard-add-condition-column-${conditionIndex}`"
                 />
                 <OButton
+                  :aria-label="t('common.remove')"
                   variant="outline"
                   size="icon"
                   class="shrink-0"
@@ -109,7 +110,8 @@
                         {{ t("common.value") }}
                       </div>
                       <OCombobox
-                        v-model="conditionModel.value"
+                        :model-value="conditionModel.value"
+                        @update:model-value="onValueInput"
                         :items="dashboardVariablesFilterItems"
                         search-regex="(?:^|[^$])\$?(\w+)"
                         :placeholder="t('common.enterValueOrVariable')"
@@ -130,7 +132,9 @@
                       searchable
                       :error="condition.values?.length === 0"
                       :error-message="
-                        condition.values?.length === 0 ? 'At least 1 item required' : ''
+                        condition.values?.length === 0
+                          ? t('common.atLeastOneItemRequired')
+                          : raw('')
                       "
                       data-test="dashboard-add-condition-list-tab"
                       class="o2-custom-select-dashboard"
@@ -143,6 +147,7 @@
         </div>
       </ODropdown>
       <OButton
+        :aria-label="t('common.remove')"
         variant="ghost"
         size="icon-chip"
         class="!w-4 shrink-0"
@@ -165,15 +170,15 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import { type SelectModelValue } from "@/lib/forms/Select/OSelect.types";
+import { type SelectModelValue, type SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { defineComponent, ref, computed, toRef, watch, inject } from "vue";
 import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import StreamFieldSelect from "@/components/dashboards/addPanel/StreamFieldSelect.vue";
-import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { buildCondition } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 
 export default defineComponent({
@@ -191,6 +196,7 @@ export default defineComponent({
     OCombobox,
     StreamFieldSelect,
     OSelect,
+    OTruncatedText,
   },
   props: [
     "condition",
@@ -203,9 +209,9 @@ export default defineComponent({
   ],
   setup(props, { emit }) {
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { t } = useI18nTyped();
     const { getAllSelectedStreams, getStreamNameFromStreamAlias, dashboardPanelData } =
-      useDashboardPanelData(dashboardPanelDataPageKey);
-    const { t } = useI18n();
+      useDashboardPanelData(dashboardPanelDataPageKey, t);
     const searchTerm = ref("");
 
     // Same reference as props.condition; mutation targets its nested fields only.
@@ -233,41 +239,40 @@ export default defineComponent({
       update(() => filteredListOptions.value);
     };
 
-    const operators = [
-      "=",
-      "<>",
-      ">=",
-      "<=",
-      ">",
-      "<",
-      "IN",
-      "NOT IN",
-      "str_match",
-      "str_match_ignore_case",
-      "match_all",
-      "re_match",
-      "re_not_match",
-      "Contains",
-      "Starts With",
-      "Ends With",
-      "Not Contains",
-      "Is Null",
-      "Is Not Null",
-    ];
+    // `value` is persisted as `condition.operator` and matched by identity in
+    // sqlUtils / dashboardAutoQueryBuilder / panelValidation, so it stays English.
+    // Only `label` is translated, and only where it is prose rather than syntax.
+    const operators = computed<SelectOption[]>(() => [
+      { label: raw("="), value: "=" },
+      { label: raw("<>"), value: "<>" },
+      { label: raw(">="), value: ">=" },
+      { label: raw("<="), value: "<=" },
+      { label: raw(">"), value: ">" },
+      { label: raw("<"), value: "<" },
+      { label: raw("IN"), value: "IN" },
+      { label: raw("NOT IN"), value: "NOT IN" },
+      { label: raw("str_match"), value: "str_match" },
+      { label: raw("str_match_ignore_case"), value: "str_match_ignore_case" },
+      { label: raw("match_all"), value: "match_all" },
+      { label: raw("re_match"), value: "re_match" },
+      { label: raw("re_not_match"), value: "re_not_match" },
+      { label: t("dashboard.filterOperators.contains"), value: "Contains" },
+      { label: t("dashboard.filterOperators.startsWith"), value: "Starts With" },
+      { label: t("dashboard.filterOperators.endsWith"), value: "Ends With" },
+      { label: t("dashboard.filterOperators.notContains"), value: "Not Contains" },
+      { label: t("dashboard.filterOperators.isNull"), value: "Is Null" },
+      { label: t("dashboard.filterOperators.isNotNull"), value: "Is Not Null" },
+    ]);
 
     const filterOptions = [
-      { label: "AND", value: "AND" },
-      { label: "OR", value: "OR" },
+      { label: raw("AND"), value: "AND" },
+      { label: raw("OR"), value: "OR" },
     ];
 
     const computedLabel = (condition: any) => {
       const builtCondition = buildCondition(condition, dashboardPanelData);
 
-      return builtCondition === ""
-        ? condition.column.field
-        : builtCondition?.length > MAX_FIELD_LABEL_CHARS
-          ? builtCondition.substring(0, MAX_FIELD_LABEL_CHARS) + "..."
-          : builtCondition;
+      return builtCondition === "" ? condition.column.field : builtCondition;
     };
 
     /**
@@ -323,6 +328,15 @@ export default defineComponent({
       conditionModel.value.column = {};
     };
 
+    // `emptyLiteral` keeps a `<> ''` that came from SQL. Once the user types a
+    // value, an empty value means "not entered yet" again. Cleared on input, not
+    // by watching the prop: chips are keyed by index, so removing one hands this
+    // component a different condition and a watcher would clear the wrong flag.
+    const onValueInput = (value: any) => {
+      conditionModel.value.value = value;
+      if (conditionModel.value.emptyLiteral) delete conditionModel.value.emptyLiteral;
+    };
+
     watch(
       () => props.condition.column,
       (newColumn, oldColumn) => {
@@ -344,12 +358,14 @@ export default defineComponent({
       computedLabel,
       labelParts,
       t,
+      raw,
       filterStreamFn,
       filterOptions,
       filterListFn,
       emitLogicalOperatorChange,
       handleFieldChange,
       removeColumnName,
+      onValueInput,
       conditionModel,
       filteredSchemaOptions,
       sortedFilteredListOptions: filteredListOptions,

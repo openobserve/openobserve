@@ -49,6 +49,7 @@ import {
   convertMinutesToCron,
   processQueryMetadataErrors,
 } from "./queryUtils";
+import { gt } from "@/types/i18n";
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -699,6 +700,40 @@ describe("getEndPoint", () => {
 
     expect(result.port).toBe("80");
   });
+
+  // A same-origin deployment sets the endpoint to a RELATIVE value. "/" becomes
+  // "" once the store strips its trailing slash, and `new URL("")` throws —
+  // which, since this runs in the setup() of every ingestion card, took the
+  // whole Data Sources page down rather than degrading one field.
+  it("resolves an empty endpoint against the page origin instead of throwing", () => {
+    // Pinned rather than read back off `window.location`: setLocation() above
+    // replaces it with a partial stub that has no `hostname`.
+    setLocation("http://o2.example.com:5190", "/web/");
+
+    expect(() => getEndPoint("")).not.toThrow();
+
+    const result = getEndPoint("");
+    expect(result.host).toBe("o2.example.com");
+    expect(result.port).toBe("5190");
+    expect(result.protocol).toBe("http");
+    // Empty in means the caller has no string of its own to preserve, so the
+    // snippets get a usable absolute origin rather than "undefined/api/...".
+    expect(result.url).toBe("http://o2.example.com:5190");
+  });
+
+  it("resolves a relative endpoint against the page origin", () => {
+    setLocation("http://o2.example.com:5190", "/web/");
+
+    const result = getEndPoint("/");
+
+    expect(result.host).toBe("o2.example.com");
+    // The caller's own string is preserved — snippets embed it verbatim.
+    expect(result.url).toBe("/");
+  });
+
+  it("falls back to the origin rather than throwing on a malformed URL", () => {
+    expect(() => getEndPoint("ht!tp://[not a url")).not.toThrow();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -772,50 +807,50 @@ describe("isAboveMinRefreshInterval", () => {
 
 describe("describeCron", () => {
   it("returns '' for empty string", () => {
-    expect(describeCron("")).toBe("");
+    expect(describeCron(gt, "")).toBe("");
   });
 
   it("returns '' for whitespace-only string", () => {
-    expect(describeCron("   ")).toBe("");
+    expect(describeCron(gt, "   ")).toBe("");
   });
 
   it("returns error for wrong number of fields", () => {
-    expect(describeCron("* * * * *")).toBe("invalid cron (expected 6 fields)");
+    expect(describeCron(gt, "* * * * *")).toBe("invalid cron (expected 6 fields)");
   });
 
   it("describes every N minutes pattern", () => {
-    expect(describeCron("0 */5 * * * *")).toBe("every 5 minutes");
+    expect(describeCron(gt, "0 */5 * * * *")).toBe("every 5 minutes");
   });
 
   it("describes every 1 minute (singular)", () => {
-    expect(describeCron("0 */1 * * * *")).toBe("every 1 minute");
+    expect(describeCron(gt, "0 */1 * * * *")).toBe("every 1 minute");
   });
 
   it("describes every N hours pattern", () => {
-    expect(describeCron("0 0 */2 * * *")).toBe("every 2 hours");
+    expect(describeCron(gt, "0 0 */2 * * *")).toBe("every 2 hours");
   });
 
   it("describes every 1 hour (singular)", () => {
-    expect(describeCron("0 0 */1 * * *")).toBe("every 1 hour");
+    expect(describeCron(gt, "0 0 */1 * * *")).toBe("every 1 hour");
   });
 
   it("describes daily at HH:MM pattern", () => {
-    const result = describeCron("0 30 14 * * *", "UTC");
+    const result = describeCron(gt, "0 30 14 * * *", "UTC");
     expect(result).toBe("daily at 14:30 (UTC)");
   });
 
   it("describes every hour at minute pattern", () => {
-    const result = describeCron("0 15 * * * *");
+    const result = describeCron(gt, "0 15 * * * *");
     expect(result).toBe("every hour at minute 15");
   });
 
   it("returns next check string for unrecognized but valid cron", () => {
-    const result = describeCron("0 0 10 15 * *", "UTC");
+    const result = describeCron(gt, "0 0 10 15 * *", "UTC");
     expect(result).toContain("next check at");
   });
 
   it("returns 'invalid cron expression' for invalid cron", () => {
-    const result = describeCron("99 99 99 99 99 99");
+    const result = describeCron(gt, "99 99 99 99 99 99");
     expect(result).toBe("invalid cron expression");
   });
 });

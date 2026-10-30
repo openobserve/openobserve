@@ -69,6 +69,8 @@ vi.mock("@/lib/forms/TagInput/OTagInput.vue", () => ({
 
 import ServiceIdentitySetup from "./ServiceIdentitySetup.vue";
 import serviceStreamsService from "@/services/service_streams";
+import { serviceStreamKeys } from "@/services/service_streams.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 
 // ─── Test setup ──────────────────────────────────────────────────────────────
 
@@ -94,6 +96,7 @@ const inlineOverrides = {
       foundInLogs: "Found in Logs",
       foundInTraces: "Found in Traces",
       foundInMetrics: "Found in Metrics",
+      foundInProfiles: "Found in Profiles",
       autoSuggestedBanner: "Auto suggested",
       identityConfigSaved: "Configuration saved",
       identityConfigSaveFailed: "Failed to save configuration",
@@ -307,6 +310,44 @@ describe("ServiceIdentitySetup", () => {
     });
   });
 
+  // The server builds the discovered-services list from this config, so a save expires the whole scope.
+  describe("saving", () => {
+    const scope = { queryKey: serviceStreamKeys.all("test-org") };
+    const oneSet = {
+      data: {
+        sets: [{ id: "k8s", label: "Kubernetes", distinguish_by: ["k8s-namespace"] }],
+        tracked_alias_ids: ["k8s-namespace"],
+      },
+    };
+
+    it("expires the service-correlation cache after a successful save", async () => {
+      vi.mocked(serviceStreamsService.getIdentityConfig).mockResolvedValueOnce(oneSet as any);
+      const spy = vi.spyOn(queryClient, "invalidateQueries");
+      wrapper = mountComponent();
+      await flushPromises();
+      await (wrapper.vm as any).saveConfig();
+      await flushPromises();
+
+      expect(serviceStreamsService.saveIdentityConfig).toHaveBeenCalled();
+      expect(spy).toHaveBeenCalledWith(scope);
+      spy.mockRestore();
+    });
+
+    it("leaves the cache alone when the save fails", async () => {
+      vi.mocked(serviceStreamsService.getIdentityConfig).mockResolvedValueOnce(oneSet as any);
+      vi.mocked(serviceStreamsService.saveIdentityConfig).mockRejectedValueOnce(new Error("boom"));
+      const spy = vi.spyOn(queryClient, "invalidateQueries");
+      wrapper = mountComponent();
+      await flushPromises();
+      await (wrapper.vm as any).saveConfig();
+      await flushPromises();
+
+      expect(serviceStreamsService.saveIdentityConfig).toHaveBeenCalled();
+      expect(spy).not.toHaveBeenCalledWith(scope);
+      spy.mockRestore();
+    });
+  });
+
   describe("warnings banner", () => {
     it("should not show the warnings banner when there are no warnings", async () => {
       wrapper = mountComponent();
@@ -413,117 +454,6 @@ describe("ServiceIdentitySetup", () => {
   });
 
   // ─── Migrated dialog/drawer coverage ──────────────────────────────────────
-
-  describe("Field Mapping ODialog", () => {
-    it("should render the field-mapping ODialog closed by default with the configured title and labels", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-
-      const dialogs = wrapper.findAll('[data-test="o-dialog-stub"]');
-      // At least the field-mapping + field-details dialogs are rendered (closed).
-      expect(dialogs.length).toBeGreaterThanOrEqual(2);
-
-      const fieldMappingDialog = dialogs.find(
-        (d) => d.attributes("data-title") === "Customize Field Mappings",
-      );
-      expect(fieldMappingDialog).toBeDefined();
-      expect(fieldMappingDialog!.attributes("data-open")).toBe("false");
-      expect(fieldMappingDialog!.attributes("data-size")).toBe("sm");
-      expect(fieldMappingDialog!.attributes("data-sub-title")).toBe("Map fields to service names");
-      expect(fieldMappingDialog!.attributes("data-primary-label")).toBe("Save");
-      expect(fieldMappingDialog!.attributes("data-secondary-label")).toBe("Cancel");
-    });
-
-    it("should open the field-mapping ODialog when openFieldMappingDialog() is called", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-
-      // No public DOM trigger exists in the empty-state layout, so call the
-      // exposed component method directly.
-
-      (wrapper.vm as any).openFieldMappingDialog();
-      await wrapper.vm.$nextTick();
-
-      const fieldMappingDialog = wrapper
-        .findAll('[data-test="o-dialog-stub"]')
-        .find((d) => d.attributes("data-title") === "Customize Field Mappings");
-      expect(fieldMappingDialog).toBeDefined();
-      expect(fieldMappingDialog!.attributes("data-open")).toBe("true");
-    });
-
-    it("should close the field-mapping ODialog when the secondary (Cancel) button is clicked", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-
-      (wrapper.vm as any).openFieldMappingDialog();
-      await wrapper.vm.$nextTick();
-
-      let fieldMappingDialog = wrapper
-        .findAll('[data-test="o-dialog-stub"]')
-        .find((d) => d.attributes("data-title") === "Customize Field Mappings");
-      expect(fieldMappingDialog!.attributes("data-open")).toBe("true");
-
-      // Click the stub's secondary button → component should set showFieldMappingDialog=false
-      await fieldMappingDialog!.find('[data-test="o-dialog-stub-secondary"]').trigger("click");
-      await wrapper.vm.$nextTick();
-
-      fieldMappingDialog = wrapper
-        .findAll('[data-test="o-dialog-stub"]')
-        .find((d) => d.attributes("data-title") === "Customize Field Mappings");
-      expect(fieldMappingDialog!.attributes("data-open")).toBe("false");
-    });
-
-    it("should emit update-service-fields and close when the primary (Save) button is clicked", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-
-      // Seed editableServiceFields via the public open-method so the saved
-      // value reflects what the dialog would actually send.
-
-      (wrapper.vm as any).openFieldMappingDialog();
-      await wrapper.vm.$nextTick();
-
-      // Drive the TagInput → editable list update through the v-model pipeline
-      const tagInput = wrapper.find('[data-test="tag-input"]');
-      expect(tagInput.exists()).toBe(true);
-      await tagInput
-        .findComponent({ name: "OTagInput" })
-        .vm.$emit("update:modelValue", ["service.name", "k8s.deployment"]);
-      await wrapper.vm.$nextTick();
-
-      const fieldMappingDialog = wrapper
-        .findAll('[data-test="o-dialog-stub"]')
-        .find((d) => d.attributes("data-title") === "Customize Field Mappings");
-      await fieldMappingDialog!.find('[data-test="o-dialog-stub-primary"]').trigger("click");
-      await flushPromises();
-
-      expect(wrapper.emitted("update-service-fields")).toBeTruthy();
-      expect(wrapper.emitted("update-service-fields")![0]).toEqual([
-        ["service.name", "k8s.deployment"],
-      ]);
-
-      // After save the dialog closes
-      const closedDialog = wrapper
-        .findAll('[data-test="o-dialog-stub"]')
-        .find((d) => d.attributes("data-title") === "Customize Field Mappings");
-      expect(closedDialog!.attributes("data-open")).toBe("false");
-    });
-
-    it("should reflect savingFieldMappings as the primary-button-loading prop", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-
-      const vm = wrapper.vm as any;
-      vm.openFieldMappingDialog();
-      vm.savingFieldMappings = true;
-      await wrapper.vm.$nextTick();
-
-      const fieldMappingDialog = wrapper
-        .findAll('[data-test="o-dialog-stub"]')
-        .find((d) => d.attributes("data-title") === "Customize Field Mappings");
-      expect(fieldMappingDialog!.attributes("data-primary-loading")).toBe("true");
-    });
-  });
 
   describe("Workload Insight ODrawer", () => {
     // The ODrawer lives inside the Workload Detection section which is

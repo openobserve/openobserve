@@ -12,17 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { I18nKey, I18nText } from "@/types/i18n";
 /**
  * Prebuilt destination types
  */
 export type PrebuiltTypeId =
-  | "slack"
-  | "discord"
-  | "msteams"
-  | "pagerduty"
-  | "servicenow"
-  | "email"
-  | "opsgenie";
+  "slack" | "discord" | "msteams" | "pagerduty" | "servicenow" | "email" | "opsgenie";
+
+/** A tile in the destination type picker: every prebuilt type, plus the Slack app. */
+export type DestinationTileId = PrebuiltTypeId | "slack_app";
+
+export interface DestinationTile {
+  disabled?: boolean;
+  id: DestinationTileId;
+  name: string;
+  descriptionKey: I18nKey;
+  icon: string;
+  image?: string;
+  /** Tells the two Slack tiles apart. */
+  tag?: { label: I18nText; variant: "success-soft" | "default-soft" };
+}
 
 /**
  * A user-facing validation message, expressed as an i18n KEY (+ optional
@@ -51,12 +60,24 @@ export type CredentialValidatorResult = true | ValidationMessage;
  */
 export interface CredentialField {
   key: string;
-  labelKey: string;
-  type: "text" | "password" | "email" | "select" | "toggle";
+  labelKey: I18nKey;
+  /**
+   * `email-multi` renders as a multi-select picker (not free text) and holds a
+   * `string[]` in the credentials record; every other type holds a string.
+   */
+  type: "text" | "password" | "email" | "email-multi" | "select" | "toggle";
   required: boolean;
-  hint?: string;
+  /**
+   * Helper text that reads identically in every language — a URL or an example
+   * value. Translatable copy belongs in {@link hintKey} instead.
+   */
+  hint?: I18nText;
+  /** Wins over {@link hint} when both are set. */
+  hintKey?: I18nKey;
   options?: Array<{ label: string; value: string; description?: string }>;
   validator?: (value: string) => CredentialValidatorResult;
+  /** Explicitly opts a non-secret value into `credential_*` metadata. */
+  persistInMetadata?: boolean;
 }
 
 /**
@@ -67,7 +88,6 @@ export interface PrebuiltConfig {
   templateBody: string;
   headers: Record<string, string>;
   method: "get" | "post" | "put";
-  urlValidator: (url: string) => boolean;
   credentialFields: CredentialField[];
 }
 
@@ -77,7 +97,12 @@ export interface PrebuiltConfig {
 export interface PrebuiltType {
   id: PrebuiltTypeId;
   name: string;
-  description: string;
+  /**
+   * i18n KEY, not resolved text. These objects are module-scope literals, so a
+   * resolved string would freeze at the boot locale; the selector calls `t()` on
+   * this at render time instead.
+   */
+  descriptionKey: I18nKey;
   icon: string; // Icon name or component reference
   image?: string; // Image URL for logo
   popular?: boolean;

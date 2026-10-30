@@ -16,9 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { BrowserCheck, BrowserCheckSchedule } from "@/types/synthetics";
 import { getCronIntervalDifferenceInSeconds } from "@/utils/queryUtils";
+import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
+import { browserTimezone, savedBrowserTimezone } from "@/utils/timezoneAliases";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -34,7 +36,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 function updateSchedule(patch: Partial<BrowserCheckSchedule>) {
   emit("update:check", {
@@ -47,7 +49,7 @@ function updateSchedule(patch: Partial<BrowserCheckSchedule>) {
 
 type FrequencyPreset = "1min" | "5min" | "15min" | "30min" | "1hour" | "cron" | "custom";
 
-const frequencyOptions: { label: string; value: FrequencyPreset }[] = [
+const frequencyOptions: { label: I18nText; value: FrequencyPreset }[] = [
   { label: t("synthetics.scheduleAlert.frequencyOptions.1min"), value: "1min" },
   { label: t("synthetics.scheduleAlert.frequencyOptions.5min"), value: "5min" },
   { label: t("synthetics.scheduleAlert.frequencyOptions.15min"), value: "15min" },
@@ -74,13 +76,7 @@ const frequencyPreset = computed<FrequencyPreset>({
   set: (v: FrequencyPreset) => {
     if (v === "cron") {
       const patch: Partial<BrowserCheckSchedule> = { type: "cron", isCustomFrequency: false };
-      if (!props.check.schedule.timezone) {
-        try {
-          patch.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        } catch {
-          patch.timezone = "UTC";
-        }
-      }
+      if (!props.check.schedule.timezone) patch.timezone = savedBrowserTimezone();
       updateSchedule(patch);
     } else if (v === "custom") {
       const cur = props.check.schedule;
@@ -143,41 +139,27 @@ watch(
   },
 );
 
-function buildTimezoneOptions(): { label: string; value: string }[] {
-  try {
-    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const options: { label: string; value: string }[] = [
-      {
-        label: t("synthetics.scheduleAlert.browserTime", { tz: browserTz }),
-        value: t("synthetics.scheduleAlert.browserTime", { tz: browserTz }),
-      },
-      { label: "UTC", value: "UTC" },
-    ];
-    // @ts-ignore - supportedValuesOf not in all TS versions
-    if (typeof Intl.supportedValuesOf === "function") {
-      // @ts-ignore
-      for (const tz of Intl.supportedValuesOf("timeZone") as string[]) {
-        if (tz !== "UTC") options.push({ label: tz, value: tz });
-      }
-    }
-    return options;
-  } catch {
-    /* fall through */
-  }
-  return [{ label: "UTC", value: "UTC" }];
-}
+// The stored zone is an option under its own name, so a legacy `Asia/Calcutta` saves back unchanged.
+const {
+  browserTz,
+  browserTimeValue,
+  timezoneOptions: zoneOptions,
+} = useTimezoneOptions({
+  browserEntry: true,
+  current: () => props.check.schedule.timezone,
+});
 
-const timezoneOptions = buildTimezoneOptions();
+// The browser entry's value is persisted and parsed back, so it stays English.
+const timezoneOptions = computed(() =>
+  zoneOptions.value.map((option) =>
+    option.value === browserTimeValue
+      ? { label: t("synthetics.scheduleAlert.browserTime", { tz: browserTz }), value: option.value }
+      : option,
+  ),
+);
 
 const timezone = computed({
-  get: () => {
-    if (props.check.schedule.timezone) return props.check.schedule.timezone;
-    try {
-      return Intl.DateTimeFormat().resolvedOptions().timeZone;
-    } catch {
-      return "UTC";
-    }
-  },
+  get: () => props.check.schedule.timezone || browserTimezone(),
   set: (v: string | number | boolean | null | undefined) =>
     updateSchedule({ timezone: v != null ? String(v) : "UTC" }),
 });
@@ -208,13 +190,7 @@ const startType = computed({
   get: () => props.check.schedule.startType ?? "now",
   set: (v: string) => {
     const patch: Partial<BrowserCheckSchedule> = { startType: v as "now" | "later" };
-    if (v === "later" && !props.check.schedule.timezone) {
-      try {
-        patch.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      } catch {
-        patch.timezone = "UTC";
-      }
-    }
+    if (v === "later" && !props.check.schedule.timezone) patch.timezone = savedBrowserTimezone();
     updateSchedule(patch);
   },
 });
@@ -233,7 +209,7 @@ const startTime = computed({
 <template>
   <div class="rounded-default border-border-default mb-4 border">
     <div class="border-border-default flex items-center border-b px-3 py-2.5">
-      <div class="rounded-default bg-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+      <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0" />
       <h3 class="text-text-heading text-base font-semibold">
         {{ t("synthetics.scheduleAlert.schedule") }}
       </h3>
@@ -301,7 +277,7 @@ const startTime = computed({
         <div>
           <div class="text-text-secondary mb-1 font-bold">
             {{ t("synthetics.scheduleAlert.cronExpression") }}
-            <OIcon name="info" size="sm" class="text-text-muted ml-1 cursor-pointer">
+            <OIcon name="info" size="sm" class="text-text-muted ms-1 cursor-pointer">
               <OTooltip side="right" align="center">
                 <template #content>
                   <span style="font-size: var(--text-sm); white-space: pre-line">
@@ -313,7 +289,7 @@ const startTime = computed({
           </div>
           <OInput
             v-model="cron"
-            placeholder="0 */5 * * * *"
+            :placeholder="raw('0 */5 * * * *')"
             class="w-83!"
             data-test="synthetics-check-schedule-cron-input"
           />

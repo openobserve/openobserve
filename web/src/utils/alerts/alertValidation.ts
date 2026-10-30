@@ -8,6 +8,8 @@ import { rangesFromServerError } from "@/utils/query/sqlDiagnostics";
 import CronExpressionParser from "cron-parser";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
+import type { I18nText } from "@/types/i18n";
 
 /**
  * Injected translator. Same shape as the one the alerts `*.schema.ts` factories
@@ -16,19 +18,19 @@ import { toast } from "@/lib/feedback/Toast/useToast";
  * the component layer. Callers pass vue-i18n's `t` (from `useI18n()`), which
  * this module cannot obtain itself: it has no Vue context.
  */
-export type Translator = (key: string, named?: Record<string, unknown>) => string;
+export type Translator = (key: string, named?: Record<string, unknown>) => I18nText;
 
 /** Last-resort translator for `validateAlert(alert)` — the context (and hence
  *  `t`) is optional there. Echoes the key back. The ONLY production caller
  *  (saveAlertJson) always supplies `t`; this exists so the no-context overload
  *  stays callable (it is exercised by validateAlerts.spec.ts, which asserts
  *  validity rather than message text on that path). */
-const echoKeyTranslator: Translator = (key) => key;
+const echoKeyTranslator: Translator = (key) => key as unknown as I18nText;
 
 interface QueryCondition {
   conditions?: {
     groupId?: string;
-    label?: string;
+    label?: I18nText;
     items?: Array<{
       column: string;
       operator: string;
@@ -87,7 +89,7 @@ interface Alert {
   destinations: string[];
   context_attributes: any[];
   enabled: boolean;
-  description?: string;
+  description?: I18nText;
   lastTriggeredAt?: number;
   createdAt?: string;
   updatedAt?: string;
@@ -166,14 +168,18 @@ export function validateAlert(alert: Alert, context?: AlertValidationContext): V
             } else {
               // Validate each condition item
               alert.query_condition.conditions.items.forEach((item, index) => {
-                if (!item.column || !item.operator || item.value === undefined) {
+                if (
+                  !item.column ||
+                  !item.operator ||
+                  (item.value === undefined && !isUnaryOperator(item.operator))
+                ) {
                   result.errors.push(
                     t("alerts.validation.conditionItemIncomplete", { index: index + 1 }),
                   );
                 }
 
                 const validOperators = ["=", ">", "<", ">=", "<=", "Contains", "NotContains"];
-                if (!validOperators.includes(item.operator)) {
+                if (!validOperators.includes(item.operator) && !isUnaryOperator(item.operator)) {
                   result.errors.push(
                     t("alerts.validation.invalidOperatorInConditionItem", {
                       operator: item.operator,
@@ -192,14 +198,21 @@ export function validateAlert(alert: Alert, context?: AlertValidationContext): V
               result.errors.push(t("alerts.validation.conditionsOrAndArray"));
             } else {
               conditions.forEach((condition, index) => {
-                if (!condition.column || !condition.operator || condition.value === undefined) {
+                if (
+                  !condition.column ||
+                  !condition.operator ||
+                  (condition.value === undefined && !isUnaryOperator(condition.operator))
+                ) {
                   result.errors.push(
                     t("alerts.validation.conditionIncomplete", { index: index + 1 }),
                   );
                 }
 
                 const validOperators = ["=", ">", "<", ">=", "<=", "Contains", "NotContains"];
-                if (!validOperators.includes(condition.operator)) {
+                if (
+                  !validOperators.includes(condition.operator) &&
+                  !isUnaryOperator(condition.operator)
+                ) {
                   result.errors.push(
                     t("alerts.validation.invalidOperatorInCondition", {
                       operator: condition.operator,
@@ -361,15 +374,10 @@ export function validateAlert(alert: Alert, context?: AlertValidationContext): V
   } else {
     result.errors.push(t("alerts.validation.triggerConditionRequired"));
   }
-  // Validate destinations
-  if (!Array.isArray(alert.destinations)) {
+  // Validate destinations: absent or empty saves an alert that notifies nobody.
+  if (alert.destinations !== undefined && !Array.isArray(alert.destinations)) {
     result.errors.push(t("alerts.validation.destinationsArray"));
-  } else if (alert.destinations.length === 0) {
-    // NOTE: no trailing period — deliberately NOT the same string as
-    // `alerts.validation.destinationRequired` ("At least one destination is
-    // required."), which the AlertSettings schema owns.
-    result.errors.push(t("alerts.validation.destinationRequiredPlain"));
-  } else if (context?.destinationsList) {
+  } else if (alert.destinations?.length && context?.destinationsList) {
     // Debug check for destinations list
     if (!Array.isArray(context.destinationsList) || context.destinationsList.length === 0) {
       result.errors.push(t("alerts.validation.noDestinationsInSystem"));
@@ -588,10 +596,13 @@ export const validateSqlQuery = async (
     return;
   }
 
-  const query = buildQueryPayload({
-    sqlMode: true,
-    streamName: formData.stream_name,
-  });
+  const query = buildQueryPayload(
+    {
+      sqlMode: true,
+      streamName: formData.stream_name,
+    },
+    t,
+  );
 
   delete query.aggs;
 
@@ -651,6 +662,8 @@ export const validateSqlQuery = async (
         reject("sql_error");
       });
   });
+  // Save awaits this later; until then a rejection would be reported as unhandled.
+  validateSqlQueryPromise.value.catch(() => {});
 };
 
 export const saveAlertJson = async (
@@ -710,6 +723,7 @@ export const saveAlertJson = async (
       }
 
       // Set up query for validation
+      // No `t` here: JsonValidationContext's buildQueryPayload is already bound (see useAlertForm).
       const query = buildQueryPayload({
         sqlMode: true,
         streamName: jsonPayload.stream_name,

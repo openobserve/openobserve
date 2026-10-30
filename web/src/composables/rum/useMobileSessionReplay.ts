@@ -30,6 +30,8 @@
  *   shape | text | image | placeholder | webview.
  */
 
+import type { I18nText } from "@/types/i18n";
+
 export interface Wireframe {
   id: number;
   x: number;
@@ -38,7 +40,7 @@ export interface Wireframe {
   height: number;
   type: string;
   text?: string;
-  label?: string;
+  label?: I18nText;
   base64?: string;
   resourceId?: string;
   shapeStyle?: {
@@ -223,6 +225,7 @@ export function wireframeStyle(w: Wireframe): Record<string, string> {
     style["align-items"] = "center";
     style["justify-content"] = "center";
     style.color = "rgba(0,0,0,0.4)";
+    // eslint-disable-next-line local/no-hardcoded-px -- replays a recording measured in device pixels; scaling would distort it
     style["font-size"] = "10px";
   }
   return style;

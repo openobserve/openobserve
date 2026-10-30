@@ -21,18 +21,20 @@
         <!-- Group header (only rendered for grouped/label rows) -->
         <template #group-header="{ row, groupName }">
           <div
-            class="field-group-header -ml-page-edge px-page-edge bg-surface-subtle text-field-list-group-text flex h-full w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 cursor-pointer items-center justify-between text-xs leading-7 font-semibold"
+            class="field-group-header -ms-page-edge px-page-edge bg-surface-subtle text-field-list-group-text flex h-full w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 cursor-pointer items-center justify-between text-xs leading-7 font-semibold"
             :data-test="`search-field-list-group-${row.group}-header`"
             @click="toggleGroup(row.group)"
           >
-            <div class="min-w-0 flex-1 truncate">
+            <OTruncatedText as="div" class="flex-1">
               {{ groupName }} ({{ groupFieldCount[row.group] ?? 0 }})
-            </div>
+            </OTruncatedText>
             <OButton
+              :aria-label="groupName"
+              :aria-expanded="expandGroupRows[row.group] !== false"
               v-if="(groupFieldCount[row.group] ?? 0) > 0"
               variant="ghost"
               size="icon"
-              class="flex-shrink-0"
+              class="size-5! flex-shrink-0"
             >
               <OIcon
                 :name="expandGroupRows[row.group] !== false ? 'expand-more' : 'chevron-right'"
@@ -46,7 +48,7 @@
         <template #field-row="{ row }">
           <OFieldRow>
             <span
-              class="field-type-container relative mr-[0.3rem] ml-[0.2rem] flex h-4 w-[0.55rem] shrink-0 items-center justify-center"
+              class="field-type-container relative ms-[0.2rem] me-[0.3rem] flex h-4 w-[0.55rem] shrink-0 items-center justify-center"
             >
               <OIcon
                 class="field-expand-icon text-text-muted absolute inline-flex w-4 shrink-0 items-center justify-center"
@@ -57,6 +59,7 @@
             <OFieldLabel :field="row" />
             <template #actions>
               <OButton
+                :aria-label="t('common.addFilter')"
                 v-if="!hideAddSearchTerm"
                 variant="ghost-neutral"
                 size="icon"
@@ -66,6 +69,7 @@
                 <OIcon name="add" size="sm" />
               </OButton>
               <OButton
+                :aria-label="t('common.copyToClipboard')"
                 v-if="!hideCopyValue && isExpandable(row)"
                 variant="ghost-neutral"
                 size="icon"
@@ -80,7 +84,7 @@
 
         <!-- Expansion: FieldValuesPanel -->
         <template #expansion="{ row }">
-          <div class="py-1 pr-1 pl-2">
+          <div class="py-1 ps-2 pe-1">
             <FieldValuesPanel
               :field-name="row.name"
               :field-values="fieldValues[row.name]"
@@ -156,14 +160,15 @@
 
         <!-- After list: pagination -->
         <template #after-list="bottomProps">
-          <div v-if="bottomProps.totalPages > 1" class="ml-auto flex items-center gap-1">
+          <div v-if="bottomProps.totalPages > 1" class="ms-auto flex items-center gap-1">
             <OTooltip
               side="left"
               align="center"
               max-width="18.75rem"
-              :content="`Total Fields: ${bottomProps.totalRows}`"
+              :content="t('common.totalFields', { count: bottomProps.totalRows })"
             />
             <OButton
+              :aria-label="t('search.firstPage')"
               variant="ghost-primary"
               size="icon-panel"
               :disabled="bottomProps.isFirstPage"
@@ -182,6 +187,7 @@
               >
             </template>
             <OButton
+              :aria-label="t('search.lastPage')"
               variant="ghost-primary"
               size="icon-panel"
               :disabled="bottomProps.isLastPage"
@@ -199,7 +205,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, type Ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import useFieldGrouping from "@/composables/useFieldGrouping";
@@ -208,13 +214,16 @@ import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
 import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
 import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { b64EncodeUnicode } from "@/utils/zincutils";
+import { escapeSingleQuotes } from "@/utils/queryUtils";
 import { copyToClipboard } from "@/utils/clipboard";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
+import { filterForParsing } from "@/composables/useLogs/freeTextSearch";
 
 const props = defineProps({
   fields: {
@@ -278,7 +287,7 @@ const emit = defineEmits<{
 }>();
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const expandedRows: Ref<Record<string, boolean>> = ref({});
 const expandedIds = ref<string[]>([]);
@@ -305,7 +314,10 @@ const extractColName = (col: any): string | null => {
   return null;
 };
 
-function walkFilters(query: string): {
+function walkFilters(
+  query: string,
+  fieldNames: ReadonlySet<string>,
+): {
   include: Record<string, string[]>;
   exclude: Record<string, string[]>;
 } {
@@ -314,7 +326,7 @@ function walkFilters(query: string): {
   if (!query?.trim()) return { include, exclude };
 
   try {
-    const parsed = fnParsedSQL(`select * from stream where ${query}`);
+    const parsed = fnParsedSQL(`select * from stream where ${filterForParsing(query, fieldNames)}`);
     if (!parsed?.where) return { include, exclude };
 
     const push = (target: Record<string, string[]>, field: string, value: string) => {
@@ -363,7 +375,12 @@ function walkFilters(query: string): {
   return { include, exclude };
 }
 
-const parsedFilters = computed(() => walkFilters((props as any).query));
+const parsedFilters = computed(() =>
+  walkFilters(
+    (props as any).query,
+    new Set<string>(((props as any).fields ?? []).map((field: any) => field?.name)),
+  ),
+);
 const activeIncludeFilterValues = computed(() => parsedFilters.value.include);
 const activeExcludeFilterValues = computed(() => parsedFilters.value.exclude);
 
@@ -461,7 +478,7 @@ const {
   fetchFieldValues,
   cancelFieldStream,
   resetFieldValues,
-} = useFieldValuesStream();
+} = useFieldValuesStream(t);
 
 const currentSizePerField: Ref<Record<string, number>> = ref({});
 const currentKeyword: Ref<Record<string, string>> = ref({});
@@ -654,8 +671,8 @@ const buildExpression = (fieldName: string, v: string, action: string) =>
       ? `${fieldName} IS NULL`
       : `${fieldName} IS NOT NULL`
     : action === "include"
-      ? `${fieldName}='${v}'`
-      : `${fieldName}!='${v}'`;
+      ? `${fieldName}='${escapeSingleQuotes(v)}'`
+      : `${fieldName}!='${escapeSingleQuotes(v)}'`;
 
 const handleAddSearchTerm = (fieldName: string, value: string, action: string) => {
   addSearchTerm(buildExpression(fieldName, value, action));
@@ -676,28 +693,28 @@ const addSearchTerm = (term: string) => {
 };
 
 const copyContentValue = (value: string) => {
-  copyToClipboard(value, { successMessage: "Value copied to clipboard" });
+  copyToClipboard(value, t, { successMessage: t("common.valueCopiedToClipboard") });
 };
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 /* keep(lib-override:o2-field-list): reaches into OFieldList/FieldValuesPanel internals
    via :deep() — those elements are owned by the child component, so no utility on this
    template can reach them. */
 
-// Expanded field values should read as inline content, not a selected card —
-// drop the bordered/rounded panel treatment so no border or background lingers
-// once the row is expanded and the pointer moves away.
+/* Expanded field values should read as inline content, not a selected card —
+   drop the bordered/rounded panel treatment so no border or background lingers
+   once the row is expanded and the pointer moves away. */
 :deep(.o-field-list__expansion) {
   border: none;
   border-radius: 0;
   margin-bottom: 0;
 }
 
-// Tighten the gap between expanded field values. FieldValuesPanel stacks
-// padding on both the <li> and its inner <label> (py-1 on each), which
-// reads as too much vertical space in the dense RUM sidebar. Drop the <li>
-// padding here (RUM-scoped) and keep the label padding as the click target.
+/* Tighten the gap between expanded field values. FieldValuesPanel stacks
+   padding on both the <li> and its inner <label> (py-1 on each), which
+   reads as too much vertical space in the dense RUM sidebar. Drop the <li>
+   padding here (RUM-scoped) and keep the label padding as the click target. */
 :deep(.o-field-list__expansion [data-test="field-values-panel-values-list"] > li) {
   padding-top: 0;
   padding-bottom: 0;

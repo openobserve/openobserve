@@ -17,36 +17,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex h-full flex-col p-0">
     <OPageLayout
+      overflow-first
       bleed
       v-if="!showImportTemplate && !showTemplateEditor"
-      :title="t('alert_templates.header')"
-      icon="description"
-      :subtitle="'Reusable alert message templates'"
+      :title="t('alerts.header')"
+      icon="shield-alert-outline"
+      :subtitle="t('alerts.subtitle')"
+      tabs-below
     >
+      <template #header-tabs>
+        <AlertSectionTabs />
+      </template>
+
       <template #actions>
-        <OToggleGroup
-          :model-value="activeTab"
-          @update:model-value="
-            (v: any) => {
-              activeTab = v;
-            }
+        <OButton
+          data-test="template-list-add-btn"
+          variant="primary"
+          size="sm"
+          :aria-label="
+            templateDrafts.hasNew
+              ? t('common.editorDraft.newDot', { label: t('alert_templates.add') })
+              : undefined
           "
-          data-test="template-list-tabs"
-          class="mr-2"
-        >
-          <OToggleGroupItem value="all" size="sm" data-test="template-tab-all">
-            <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
-            {{ t("alert_templates.filterAll") }}
-          </OToggleGroupItem>
-          <OToggleGroupItem value="prebuilt" size="sm" data-test="template-tab-prebuilt">
-            <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
-            {{ t("alert_templates.filterPrebuilt") }}
-          </OToggleGroupItem>
-          <OToggleGroupItem value="custom" size="sm" data-test="template-tab-custom">
-            <template #icon-left><OIcon name="settings" size="sm" /></template>
-            {{ t("alert_templates.filterCustom") }}
-          </OToggleGroupItem>
-        </OToggleGroup>
+          @click="editTemplate(null)"
+          >{{ t(`alert_templates.add`) }}
+          <EditorDraftDot
+            v-if="templateDrafts.hasNew"
+            :saved-at="templateDrafts.savedAt(null)"
+            corner
+            data-test="template-list-add-draft-dot"
+        /></OButton>
+      </template>
+      <template #actions-overflow>
         <OButton
           variant="outline"
           size="sm-action"
@@ -54,59 +56,81 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="template-import"
           >{{ t(`dashboard.import`) }}</OButton
         >
-        <OButton
-          data-test="template-list-add-btn"
-          variant="primary"
-          size="sm"
-          @click="editTemplate(null)"
-          >{{ t(`alert_templates.add`) }}</OButton
-        >
       </template>
+
       <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
         <OTable
+          ref="oTableRef"
           :frame="false"
           data-test="alert-templates-list-table"
           :data="visibleRows"
           :columns="columns"
           row-key="name"
           :loading="loading"
+          :forbidden="forbidden"
           :selected-ids="selectedTemplateIds"
           selection="multiple"
           :is-row-selectable="isTemplateRowSelectable"
           pagination="client"
-          :page-size="20"
+          :page-size="pageSize"
           :page-size-options="[5, 10, 20, 50, 100]"
-          :footer-title="t('alert_templates.header')"
+          :current-page="currentPage"
+          @update:page-size="pageSize = $event"
           sorting="client"
+          :sort-by="sortBy"
+          :sort-order="sortOrder"
+          @update:sort-by="sortBy = $event"
+          @update:sort-order="sortOrder = $event"
           filter-mode="client"
           :default-columns="false"
           show-index
           :show-global-filter="false"
           @update:selected-ids="handleSelectedIdsUpdate"
+          @update:current-page="onPageChange"
         >
           <template #toolbar>
-            <OSearchInput
-              v-model="filterQuery"
-              class="flex-1"
-              :placeholder="t('template.search')"
-              data-test="template-list-search-input"
-            />
+            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
+              <OToggleGroup
+                mobile-dropdown
+                :model-value="activeTab"
+                @update:model-value="
+                  (v: any) => {
+                    activeTab = v;
+                  }
+                "
+                data-test="template-list-tabs"
+              >
+                <OToggleGroupItem value="all" size="sm" data-test="template-tab-all">
+                  <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+                  {{ t("alert_templates.filterAll") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem value="prebuilt" size="sm" data-test="template-tab-prebuilt">
+                  <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
+                  {{ t("alert_templates.filterPrebuilt") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem value="custom" size="sm" data-test="template-tab-custom">
+                  <template #icon-left><OIcon name="settings" size="sm" /></template>
+                  {{ t("alert_templates.filterCustom") }}
+                </OToggleGroupItem>
+              </OToggleGroup>
+              <OSearchInput
+                v-model="filterQuery"
+                class="min-w-0 flex-1 max-md:min-w-40"
+                :placeholder="t('template.search')"
+                data-test="template-list-search-input"
+              />
+            </div>
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
-              :loading="loading"
+              :last-run-at="lastUpdatedAt"
+              :loading="fetching"
+              shortcut-id="alertTemplatesRefresh"
               data-test="template-list-refresh-btn"
-              @click="getTemplates"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="alertTemplatesRefresh"
-              />
-            </OButton>
+              @click="refreshTemplates"
+            />
           </template>
           <template #empty>
             <OEmptyState
@@ -138,8 +162,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #cell-name="{ row }">
-            <div class="flex items-center gap-2">
-              <span>{{ row.name }}</span>
+            <div class="flex min-w-0 items-center gap-2">
+              <OTruncatedText>{{ row.name }}</OTruncatedText>
+              <EditorDraftDot
+                v-if="templateDrafts.ids.has(row.name)"
+                :saved-at="templateDrafts.savedAt(row.name)"
+                :data-test="`alert-template-list-${row.name}-draft-dot`"
+              />
               <OTag
                 v-if="row.isPrebuilt"
                 type="templateOrigin"
@@ -157,8 +186,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-actions="{ row }">
             <OButton
-              title="Export Template"
-              class="ml-1"
+              :title="t('alert_templates.exportTemplate')"
+              class="ms-1 max-md:hidden"
               variant="ghost"
               size="icon-sm"
               @click.stop="exportTemplate(row)"
@@ -169,11 +198,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               :data-test="`alert-template-list-${row.name}-update-template`"
-              class="ml-1"
+              class="ms-1 max-md:hidden"
               variant="ghost"
               size="icon-sm"
               :title="
-                row.isPrebuilt ? t('alert_templates.systemReadOnly') : t('alert_templates.edit')
+                row.isPrebuilt ? t('alert_templates.systemReadOnlyEdit') : t('alert_templates.edit')
               "
               :disabled="row.isPrebuilt"
               @click="editTemplate(row)"
@@ -183,34 +212,123 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               :data-test="`alert-template-list-${row.name}-clone-template`"
-              class="ml-1"
+              class="ms-1 max-md:hidden"
               variant="ghost"
               size="icon-sm"
-              :title="t('alert_templates.clone')"
+              :aria-label="cloneActionLabel(row, t('alert_templates.clone'))"
               @click="cloneTemplate(row)"
               data-row-action="duplicate"
             >
               <OIcon name="content-copy" size="sm" />
+              <OTooltip
+                side="bottom"
+                :content="cloneActionLabel(row, t('alert_templates.clone'))"
+              />
+              <EditorDraftDot
+                v-if="templateDrafts.hasNewVariant(`clone:${row.name}`)"
+                corner
+                :tooltip="false"
+                :data-test="`alert-template-list-${row.name}-clone-draft-dot`"
+              />
             </OButton>
             <OButton
               :data-test="`alert-template-list-${row.name}-delete-template`"
-              class="ml-1"
+              class="ms-1 max-md:hidden"
               variant="ghost"
               size="icon-sm"
               :title="
-                row.isPrebuilt ? t('alert_templates.systemReadOnly') : t('alert_templates.delete')
+                row.isPrebuilt
+                  ? t('alert_templates.systemReadOnlyDelete')
+                  : t('alert_templates.delete')
               "
               :disabled="row.isPrebuilt"
+              :loading="deletingTemplates.has(row.name)"
               @click="conformDeleteDestination(row)"
               data-row-action="delete"
             >
               <OIcon name="delete" size="sm" />
             </OButton>
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  :aria-label="cloneActionLabel(row, t('dashboard.moreActions'))"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="alert-template-list-row-more-actions"
+                  @click.stop
+                >
+                  <OTooltip
+                    side="bottom"
+                    :content="cloneActionLabel(row, t('dashboard.moreActions'))"
+                  />
+                  <EditorDraftDot
+                    v-if="templateDrafts.hasNewVariant(`clone:${row.name}`)"
+                    corner
+                    :tooltip="false"
+                    :data-test="`alert-template-list-${row.name}-more-actions-draft-dot`"
+                  />
+                </OButton>
+              </template>
+              <ODropdownItem
+                icon-left="download"
+                class="md:hidden"
+                data-test="destination-export-menu"
+                @select="exportTemplate(row)"
+              >
+                <span>{{ t("alert_templates.exportTemplate") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="edit"
+                class="md:hidden"
+                :disabled="row.isPrebuilt"
+                :data-test="`alert-template-list-${row.name}-update-template-menu`"
+                @select="editTemplate(row)"
+              >
+                <span>{{
+                  row.isPrebuilt
+                    ? t("alert_templates.systemReadOnlyEdit")
+                    : t("alert_templates.edit")
+                }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="content-copy"
+                class="md:hidden"
+                :data-test="`alert-template-list-${row.name}-clone-template-menu`"
+                @select="cloneTemplate(row)"
+              >
+                <span>{{ t("alert_templates.clone") }}</span>
+                <EditorDraftDot
+                  v-if="templateDrafts.hasNewVariant(`clone:${row.name}`)"
+                  :saved-at="templateDrafts.savedAtVariant(`clone:${row.name}`)"
+                  :data-test="`alert-template-list-${row.name}-clone-template-menu-draft-dot`"
+                />
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="delete"
+                variant="destructive"
+                class="md:hidden"
+                :disabled="row.isPrebuilt"
+                :data-test="`alert-template-list-${row.name}-delete-template-menu`"
+                @select="conformDeleteDestination(row)"
+              >
+                <span>{{
+                  row.isPrebuilt
+                    ? t("alert_templates.systemReadOnlyDelete")
+                    : t("alert_templates.delete")
+                }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </template>
-          <template v-if="selectedTemplates.length > 0" #bottom>
-            <span class="text-text-secondary text-xs">
-              {{ selectedTemplates.length }} selected
-            </span>
+          <template #cell-used_by="{ row }">
+            <DependencyUsageCell
+              :graph="depGraph"
+              :focus="{ kind: 'template', name: row.name }"
+              @deleted="onDependencyDeleted"
+            />
+          </template>
+          <template #selection-actions>
             <OButton
               data-test="template-list-delete-templates-btn"
               variant="outline-destructive"
@@ -219,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="bulkDeleteLoading"
               @click="openBulkDeleteDialog"
             >
-              Delete
+              {{ t("common.delete") }}
             </OButton>
           </template>
         </OTable>
@@ -229,25 +347,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <AddTemplate
         :template="editingTemplate"
         :is-clone="cloningTemplate"
+        :clone-source="cloningSource"
         @cancel:hideform="toggleTemplateEditor"
-        @get:templates="getTemplates"
+        @get:templates="refreshTemplates"
       />
     </div>
     <div v-else class="min-h-0 flex-1">
-      <ImportTemplate :templates="templates" @update:templates="getTemplates" />
+      <ImportTemplate :templates="templates" @update:templates="refreshTemplates" />
     </div>
 
     <ConfirmDialog
-      title="Delete Template"
-      message="Are you sure you want to delete template?"
+      :title="t('alert_templates.deleteTemplateTitle')"
+      message-keypath="alert_templates.deleteTemplateMessage"
+      :message-name="confirmDelete.data?.name"
+      ok-variant="destructive"
       @update:ok="deleteTemplate"
       @update:cancel="cancelDeleteTemplate"
       v-model="confirmDelete.visible"
     />
 
     <ConfirmDialog
-      title="Delete Templates"
-      :message="`Are you sure you want to delete ${selectedTemplates.length} template(s)?`"
+      :title="t('alert_templates.deleteTemplatesTitle')"
+      :message="t('alerts.confirmDeleteTemplates', { count: selectedTemplates.length })"
+      ok-variant="destructive"
       @update:ok="bulkDeleteTemplates"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -255,38 +377,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 </template>
 <script lang="ts" setup>
-import { ref, onActivated, onMounted, watch, defineAsyncComponent, computed } from "vue";
+import {
+  bulkDeleteTemplatesMutation,
+  deleteTemplateMutation,
+  templatesQuery,
+} from "@/services/alert_templates.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { templateKeys } from "@/services/alert_templates.querykeys";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation, useQuery } from "@tanstack/vue-query";
+import { ref, onActivated, watch, defineAsyncComponent, computed } from "vue";
 import type { Ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import templateService from "@/services/alert_templates";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import type { TemplateData, Template } from "@/ts/interfaces";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import { useListViewState } from "@/composables/useListViewState";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
 import ImportTemplate from "./ImportTemplate.vue";
+import DependencyUsageCell from "./DependencyUsageCell.vue";
+import useDependencyGraph, {
+  invalidateDependencyGraphCache,
+  applyDependencyDeletion,
+  depNodeId,
+} from "@/composables/alerts/useDependencyGraph";
+import type { DepNodeKind } from "@/composables/alerts/useDependencyGraph";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useDraftLabel } from "@/components/common/drafts/useDraftLabel";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const AddTemplate = defineAsyncComponent(() => import("@/components/alerts/AddTemplate.vue"));
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const { track } = useReo();
-const templates: Ref<Template[]> = ref([]);
+const { graph: depGraph, loadGraph: loadDepGraph } = useDependencyGraph();
+const templateDrafts = useEditorDraftIds("alert_template");
+const draftLabel = useDraftLabel();
+// The corner dot is presentational, so an action that reopens a kept clone says so, dated, in its own name.
+const cloneActionLabel = (row: { name: string }, label: I18nText): I18nText => {
+  const variant = `clone:${row.name}`;
+  return templateDrafts.hasNewVariant(variant)
+    ? draftLabel(label, templateDrafts.savedAtVariant(variant))
+    : label;
+};
+const orgIdForList = useOrgId();
+const templatesList = useQuery(() =>
+  Object.assign(templatesQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
+);
+// The rows are the query, not a copy: only an observer applies `staleTime` and revalidates on mount.
+const templates = computed<Template[]>(() => (templatesList.data.value ?? []) as Template[]);
 const columns: OTableColumnDef[] = [
   {
     id: "name",
@@ -296,11 +458,21 @@ const columns: OTableColumnDef[] = [
     meta: { align: "left", autoWidth: true },
   },
   {
+    id: "used_by",
+    header: t("alert_dependencies.usedByColumn"),
+    cell: " ",
+    sortable: false,
+    resizable: true,
+    hideable: true,
+    size: 200,
+    meta: { align: "left" },
+  },
+  {
     id: "actions",
     header: t("alert_templates.actions"),
     isAction: true,
     pinned: "right",
-    size: 150,
+    size: 160,
     meta: { align: "center", actionCount: 4 },
   },
 ];
@@ -310,7 +482,7 @@ const editingTemplate: Ref<TemplateData | null> = ref(null);
 // True when the editor was opened via the clone action — the AddTemplate
 // form should treat the prefilled data as a fresh template (not an update).
 const cloningTemplate = ref(false);
-const resultTotal = ref<number>(0);
+const cloningSource = ref<string | null>(null);
 
 const confirmDelete: Ref<{
   visible: boolean;
@@ -319,10 +491,39 @@ const confirmDelete: Ref<{
 const selectedTemplates: Ref<any[]> = ref([]);
 const confirmBulkDelete = ref(false);
 const bulkDeleteLoading = ref(false);
-const filterQuery = ref("");
+const deletingTemplates = ref(new Set<string>());
+const viewState = useListViewState("alertTemplates", {
+  filterQuery: "",
+  tab: "all" as "all" | "prebuilt" | "custom",
+  pageSize: 20,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+});
+const filterQuery = ref(viewState.filterQuery);
+const pageSize = ref(viewState.pageSize);
+const sortBy = ref(viewState.sortBy);
+const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
 // Top-right tab filter — mirrors the alerts list pattern. "prebuilt" shows
 // system templates (name starts with `prebuilt_`), "custom" shows the rest.
-const activeTab = ref<"all" | "prebuilt" | "custom">("all");
+const activeTab = ref<"all" | "prebuilt" | "custom">(viewState.tab);
+watch([filterQuery, activeTab, pageSize, sortBy, sortOrder], () => {
+  Object.assign(viewState, {
+    filterQuery: filterQuery.value,
+    tab: activeTab.value,
+    pageSize: pageSize.value,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+  });
+});
+const oTableRef: any = ref(null);
+
+// URL-synced so returning from add/edit/import (Back/Update/Cancel) lands on the same page instead of resetting to page 1.
+const currentPage = ref(Number(router.currentRoute.value.query.page) || 1);
+const onPageChange = (page: number) => {
+  currentPage.value = page;
+  if (String(router.currentRoute.value.query.page ?? "1") === String(page)) return;
+  router.replace({ query: { ...router.currentRoute.value.query, page: String(page) } });
+};
 
 const selectedTemplateIds = computed(() => selectedTemplates.value.map((item: any) => item.name));
 
@@ -343,10 +544,6 @@ const isTemplateRowSelectable = (row: any) => !row?.isPrebuilt;
 onActivated(() => {
   if (!templates.value.length) updateRoute();
 });
-onMounted(() => {
-  getTemplates();
-});
-
 watch(
   () => router.currentRoute.value.query.action,
   (action) => {
@@ -357,43 +554,110 @@ watch(
   },
 );
 
-const loading = ref(false);
-const getTemplates = () => {
-  const dismiss = toast({
-    variant: "loading",
-    message: "Please wait while loading templates...",
-    timeout: 0,
-  });
+const loading = templatesList.isPending;
+// Request in flight with rows still on screen — the refresh button's spinner.
+// `loading` is the skeleton, for a cold read only.
+const fetching = templatesList.isFetching;
+// Epoch ms of the last successful read — drives the button's "1m ago" label.
+const lastUpdatedAt = templatesList.dataUpdatedAt;
+// Bound to refresh / post-write reloads: always reaches the server.
+const refreshTemplates = () => getTemplates(true);
+// A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+const forbidden = computed(() => {
+  const e: any = templatesList.error.value;
+  return e?.status === 403 || e?.response?.status === 403;
+});
+// The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
+watch(
+  loading,
+  (isLoading) => {
+    if (isLoading) return;
+    setTimeout(() => {
+      oTableRef.value?.restorePage?.(currentPage.value);
+    }, 0);
+  },
+  { once: true },
+);
 
-  loading.value = true;
-  templateService
-    .list({
-      org_identifier: store.state.selectedOrganization.identifier,
-    })
-    .then((res) => {
-      resultTotal.value = res.data.length;
-      templates.value = res.data;
-      updateRoute();
-    })
-    .catch((err) => {
-      dismiss();
-      if (err.response.status !== 403) {
-        toast({
-          variant: "error",
-          message: "Error while pulling templates.",
-        });
-      }
-    })
-    .finally(() => {
-      dismiss();
-      loading.value = false;
-    });
+// Read by the watcher below: the rebuild after a forced read must also re-read the lists this page does not own.
+let graphInputsStale = false;
+
+const getTemplates = async (force = false) => {
+  if (!force) return;
+  // Rebuilding the graph costs three more list calls, so only a forced read pays for it.
+  invalidateDependencyGraphCache();
+  graphInputsStale = true;
+  await templatesList.refetch();
 };
+
+let dismissLoading: (() => void) | null = null;
+watch(
+  loading,
+  (pending) => {
+    if (pending && !dismissLoading) {
+      dismissLoading = toast({
+        variant: "loading",
+        message: t("toastMessages.alerts.pleaseWaitWhileLoadingTemplates"),
+        timeout: 0,
+      });
+    } else if (!pending && dismissLoading) {
+      dismissLoading();
+      dismissLoading = null;
+    }
+  },
+  { immediate: true },
+);
+
+watch(templatesList.error, (err: any) => {
+  if (!err || err?.response?.status === 403) return;
+  toast({
+    variant: "error",
+    message: t("toastMessages.alerts.errorWhilePullingTemplates"),
+  });
+});
+// Splice the confirmed rows out at once; the mutation's background refetch only spins the refresh button.
+const dropTemplates = (names: string[]) => {
+  if (!names.length) return;
+  const gone = new Set(names);
+  // Anything that failed to delete stays selected, so a bulk retry is one click.
+  selectedTemplates.value = selectedTemplates.value.filter((tpl: any) => !gone.has(tpl.name));
+  const org = store.state.selectedOrganization.identifier;
+  for (const name of gone) {
+    deleteEditorDraftsFor({
+      kind: "alert_template",
+      org,
+      entityId: name,
+      variant: `clone:${name}`,
+    });
+  }
+  // The rows render straight from the cache, so pruning it is what removes them.
+  queryClient.setQueriesData({ queryKey: templateKeys.all(org) }, (list: any) =>
+    Array.isArray(list) ? list.filter((tpl: any) => !gone.has(tpl.name)) : list,
+  );
+  for (const name of gone)
+    depGraph.value = applyDependencyDeletion(org, depNodeId("template", name), depGraph.value);
+};
+
+// Both kinds need only the shared graph now: the rows re-render from the cache.
+const onDependencyDeleted = (_kind: DepNodeKind) => {
+  loadDepGraph(store.state.selectedOrganization.identifier);
+};
+// Re-runs on every refetch; editTemplate toggles, so re-opening the target already shown would close it.
 const updateRoute = () => {
-  if (router.currentRoute.value.query.action === "add") editTemplate();
-  if (router.currentRoute.value.query.action === "update")
-    editTemplate(getTemplateByName(router.currentRoute.value.query.name as string));
-  if (router.currentRoute.value.query.action === "import") {
+  const { action, name, clone } = router.currentRoute.value.query;
+  const cloneSourceRow = typeof clone === "string" && clone ? getTemplateByName(clone) : undefined;
+  if (action === "add" && cloneSourceRow) {
+    if (!showTemplateEditor.value || cloningSource.value !== cloneSourceRow.name)
+      openClone(cloneSourceRow);
+  } else if (action === "add") {
+    if (!showTemplateEditor.value || (editingTemplate.value && !cloningTemplate.value))
+      editTemplate();
+  }
+  if (action === "update") {
+    if (!showTemplateEditor.value || editingTemplate.value?.name !== name)
+      editTemplate(getTemplateByName(name as string));
+  }
+  if (action === "import") {
     showImportTemplate.value = true;
   }
 };
@@ -409,28 +673,28 @@ const editTemplate = (template: any = null) => {
   }
   resetEditingTemplate();
   cloningTemplate.value = false;
+  cloningSource.value = null;
   toggleTemplateEditor();
 
-  const query: { [key: string]: string } = {
-    action: template ? "update" : "add",
-    org_identifier: store.state.selectedOrganization.identifier,
-  };
-
-  if (template) query.name = template.name;
-
-  if (router.currentRoute.value.query.type)
-    query.type = router.currentRoute.value.query.type.toString() as string;
-
   if (!template) {
-    router.push({
-      name: "alertTemplates",
-      query,
-    });
-  } else {
-    editingTemplate.value = { ...template };
+    // Strip a stale `name` left over from a previous "update" visit — everything
+    // else (including `page`) survives the round trip to the editor and back.
+    const { name: _name, clone: _clone, ...restQuery } = router.currentRoute.value.query;
     router.push({
       name: "alertTemplates",
       query: {
+        ...restQuery,
+        action: "add",
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    });
+  } else {
+    editingTemplate.value = { ...template };
+    const { clone: _clone, ...restQuery } = router.currentRoute.value.query;
+    router.push({
+      name: "alertTemplates",
+      query: {
+        ...restQuery,
         action: "update",
         name: template.name,
         org_identifier: store.state.selectedOrganization.identifier,
@@ -441,11 +705,15 @@ const editTemplate = (template: any = null) => {
 const resetEditingTemplate = () => {
   editingTemplate.value = null;
 };
-const cloneTemplate = (template: any) => {
+const cloneTemplate = (template: Template) => {
   track("Button Click", {
     button: "Clone Template",
     page: "Alert Templates",
   });
+  openClone(template);
+};
+// The source rides in the URL so a reload reopens the clone on its own draft slot.
+const openClone = (template: Template) => {
   // Pre-fill the editor with a copy of the source template. AddTemplate
   // treats this as a create (since isClone=true), so the user can rename
   // and save without overwriting the original.
@@ -456,45 +724,61 @@ const cloneTemplate = (template: any) => {
     name: `Copy_of_${template.name}`,
   };
   cloningTemplate.value = true;
+  cloningSource.value = template.name;
   showTemplateEditor.value = true;
+  const { name: _name, ...restQuery } = router.currentRoute.value.query;
   router.push({
     name: "alertTemplates",
     query: {
+      ...restQuery,
       action: "add",
+      clone: template.name,
       org_identifier: store.state.selectedOrganization.identifier,
     },
   });
 };
+// Mutations rather than direct service calls: their scope reaches every cache the list feeds, on disk too.
+const deleteTemplateWrite = useMutation(() =>
+  deleteTemplateMutation(store.state.selectedOrganization.identifier),
+);
+const bulkDeleteTemplatesWrite = useMutation(() =>
+  bulkDeleteTemplatesMutation(store.state.selectedOrganization.identifier),
+);
 const deleteTemplate = () => {
-  if (confirmDelete.value?.data?.name) {
-    templateService
-      .delete({
-        org_identifier: store.state.selectedOrganization.identifier,
-        template_name: confirmDelete.value.data.name,
-      })
-      .then(() => {
-        toast({
-          variant: "success",
-          message: `Template ${confirmDelete.value.data.name} deleted successfully`,
-        });
-
-        getTemplates();
-      })
-      .catch((err) => {
-        if (err.response.data.code === 409) {
-          toast({
-            variant: "error",
-            message: err.response.data.message,
-          });
-        }
+  const name = confirmDelete.value?.data?.name;
+  if (!name) return;
+  deletingTemplates.value.add(name);
+  deleteTemplateWrite
+    .mutateAsync(name)
+    .then(() => {
+      toast({
+        variant: "success",
+        message: t("toastMessages.alerts.templateDeletedSuccessfully", { name }),
       });
-  }
+
+      dropTemplates([name]);
+    })
+    .catch((err: any) => {
+      // A network failure has no `err.response` at all, and a non-409 code used to
+      // fall through silently; the row stays either way, so it has to say why.
+      if (err?.response?.status === 403) return;
+      toast({
+        variant: "error",
+        message:
+          raw(err?.response?.data?.message) || t("alert_dependencies.deleteFailedToast", { name }),
+      });
+    })
+    .finally(() => {
+      deletingTemplates.value.delete(name);
+    });
 };
 const importTemplate = () => {
   showImportTemplate.value = true;
+  const { name: _name, ...restQuery } = router.currentRoute.value.query;
   router.push({
     name: "alertTemplates",
     query: {
+      ...restQuery,
       action: "import",
       org_identifier: store.state.selectedOrganization.identifier,
     },
@@ -510,13 +794,21 @@ const cancelDeleteTemplate = () => {
 };
 const toggleTemplateEditor = () => {
   showTemplateEditor.value = !showTemplateEditor.value;
-  if (!showTemplateEditor.value)
+  if (!showTemplateEditor.value) {
+    const {
+      action: _action,
+      name: _name,
+      clone: _clone,
+      ...restQuery
+    } = router.currentRoute.value.query;
     router.push({
       name: "alertTemplates",
       query: {
+        ...restQuery,
         org_identifier: store.state.selectedOrganization.identifier,
       },
     });
+  }
 };
 const filterData = (rows: any, terms: any) => {
   var filtered = [];
@@ -548,6 +840,18 @@ const exportTemplate = (row: any) => {
   URL.revokeObjectURL(url);
 };
 
+// Keyed on `dataUpdatedAt`: an unchanged refetch shares its object and would never wake a value watcher.
+watch(
+  () => templatesList.dataUpdatedAt.value,
+  () => {
+    if (!templatesList.data.value) return;
+    updateRoute();
+    loadDepGraph(orgIdForList.value, graphInputsStale ? ["alerts", "destinations"] : []);
+    graphInputsStale = false;
+  },
+  { immediate: true },
+);
+
 const visibleRows = computed(() => {
   const base = templates.value || [];
   const byTab =
@@ -559,15 +863,6 @@ const visibleRows = computed(() => {
   if (!filterQuery.value) return byTab;
   return filterData(byTab, filterQuery.value);
 });
-// Watch visibleRows to sync resultTotal with search filter
-watch(
-  visibleRows,
-  (newVisibleRows) => {
-    resultTotal.value = newVisibleRows.length;
-  },
-  { immediate: true },
-);
-
 const openBulkDeleteDialog = () => {
   confirmBulkDelete.value = true;
 };
@@ -576,39 +871,43 @@ const bulkDeleteTemplates = () => {
   bulkDeleteLoading.value = true;
   const templateNames = selectedTemplates.value.map((template: any) => template.name);
 
-  templateService
-    .bulkDelete(store.state.selectedOrganization.identifier, {
-      ids: templateNames,
-    })
+  bulkDeleteTemplatesWrite
+    .mutateAsync(templateNames)
     .then((res) => {
       const { successful, unsuccessful } = res.data;
 
       if (successful.length > 0 && unsuccessful.length === 0) {
         toast({
           variant: "success",
-          message: `Successfully deleted ${successful.length} template(s)`,
+          message: t("toastMessages.alerts.successfullyDeletedTemplates", {
+            count: successful.length,
+          }),
         });
       } else if (successful.length > 0 && unsuccessful.length > 0) {
         toast({
           variant: "warning",
-          message: `Deleted ${successful.length} template(s), but ${unsuccessful.length} failed`,
+          message: t("toastMessages.alerts.templatesDeletedWithFailures", {
+            count: successful.length,
+            failed: unsuccessful.length,
+          }),
         });
       } else if (unsuccessful.length > 0) {
         toast({
           variant: "error",
-          message: `Failed to delete ${unsuccessful.length} template(s)`,
+          message: t("toastMessages.alerts.failedToDeleteTemplates", {
+            count: unsuccessful.length,
+          }),
         });
       }
 
-      selectedTemplates.value = [];
       confirmBulkDelete.value = false;
-      getTemplates();
+      dropTemplates(successful);
     })
     .catch((err: any) => {
       const errorMessage =
         err.response?.data?.message ||
         err?.message ||
-        "Error while deleting templates. Please try again.";
+        t("alerts.messages.bulkDeleteTemplatesFailed");
       if (err.response?.status != 403 || err?.status != 403) {
         toast({
           variant: "error",
@@ -631,7 +930,7 @@ useShortcuts([
   {
     id: "alertTemplatesRefresh",
     handler: () => {
-      if (!isInputFocused()) getTemplates();
+      if (!isInputFocused()) refreshTemplates();
     },
   },
   {

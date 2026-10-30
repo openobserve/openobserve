@@ -150,7 +150,7 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
     // Switch to SQL mode to access the editor with autocomplete.
     // The syntax-guide was moved into the "More" dropdown menu,
     // so we must open that dropdown first to reveal the toggle.
-    const moreMenuBtn = page.locator('[data-test="traces-search-bar-more-menu-btn"]');
+    const moreMenuBtn = pm.tracesPage.getMoreMenuButton();
     await expect(moreMenuBtn, 'More menu button should be visible').toBeVisible({ timeout: 5000 });
     await moreMenuBtn.click();
     await page.waitForTimeout(500);
@@ -167,7 +167,7 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
 
     // Dismiss any open menus/popups (e.g. from stream selection) that
     // would intercept pointer events on the Monaco editor
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    await pm.tracesPage.getPageBody().click({ position: { x: 10, y: 10 } });
     await page.waitForTimeout(300);
 
     // page.keyboard.type() cannot route input to Monaco because Monaco
@@ -441,7 +441,7 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
       await page.waitForTimeout(500);
 
       // Find an org different from the current one to actually test switching
-      const orgItems = page.locator('[data-test="organization-menu-item-label-item-label"]');
+      const orgItems = pm.tracesPage.getOrgMenuItemLabels();
       const orgCount = await orgItems.count().catch(() => 0);
       let switchedOrg = false;
 

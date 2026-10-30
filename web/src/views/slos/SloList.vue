@@ -27,20 +27,31 @@
 <template>
   <OPageLayout
     :title="t('slos.title')"
-    icon="track-changes"
+    icon="target"
     :subtitle="t('slos.subtitle')"
     title-data-test="slos-slolist-title"
     bleed
   >
     <template #actions>
+      <!-- The provider behind the Terraform export, which is otherwise only
+           discoverable once the export dialog is already open. -->
+      <IacRegistryLinks data-test="slos-slolist-iac-registries" :compact="isMobile" />
       <OButton
         variant="primary"
         size="sm-action"
-        icon-left="add"
         data-test="slos-slolist-new"
+        :aria-label="
+          sloDrafts.hasNew ? t('common.editorDraft.newDot', { label: t('slos.new') }) : undefined
+        "
         @click="goToNew"
       >
         {{ t("slos.new") }}
+        <EditorDraftDot
+          v-if="sloDrafts.hasNew"
+          :saved-at="sloDrafts.savedAt(null)"
+          corner
+          data-test="slos-slolist-new-draft-dot"
+        />
       </OButton>
     </template>
 
@@ -48,10 +59,11 @@
          so `type="alerts"` is not a copy-paste slip — it is what makes a
          "payments" folder hold that team's alerts and its SLOs together. -->
     <template #sidebar>
-      <FolderList type="alerts" @update:activeFolderId="onFolderChange" />
+      <FolderList type="alerts" :drawer-on-mobile="false" @update:activeFolderId="onFolderChange" />
     </template>
 
     <OTable
+      ref="oTableRef"
       v-model:selected-ids="selectedIds"
       selection="multiple"
       :data="visibleRows"
@@ -59,8 +71,14 @@
       row-key="id"
       :loading="loading"
       :error="error"
-      :page-size="25"
+      :page-size="pageSize"
       :page-size-options="[25, 50, 100]"
+      :sort-by="sortBy"
+      :sort-order="sortOrder"
+      @update:sort-by="sortBy = $event"
+      @update:sort-order="sortOrder = $event"
+      @update:page-size="pageSize = $event"
+      :current-page="currentPage"
       :show-global-filter="false"
       table-id="slos-list"
       :persist-columns="true"
@@ -68,20 +86,11 @@
       :enable-column-resize="true"
       data-test="slos-slolist-table"
       @row-click="onRowClick"
+      @update:current-page="onPageChange"
     >
       <template #toolbar>
-        <div class="flex w-full items-center gap-2">
-          <OButton
-            v-if="selectedIds.length"
-            variant="outline"
-            size="sm-action"
-            icon-left="drive-file-move"
-            data-test="slos-slolist-move-selected"
-            @click="openMove(selectedRows)"
-          >
-            {{ t("slos.moveSelected", { count: selectedIds.length }) }}
-          </OButton>
-          <OToggleGroup v-model="typeFilter" data-test="slos-slolist-type-filter">
+        <div class="flex w-full min-w-0 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents">
+          <OToggleGroup v-model="typeFilter" mobile-dropdown data-test="slos-slolist-type-filter">
             <OToggleGroupItem
               v-for="opt in typeOptions"
               :key="opt.value"
@@ -99,7 +108,7 @@
                will not shrink below its content width without it, which is
                how a long placeholder pushes the toolbar wider than the table.
                Same wrapper the Alerts toolbar uses. -->
-          <div class="min-w-0 flex-1">
+          <div class="min-w-0 flex-1 max-md:min-w-40">
             <OSearchInput
               v-model="search"
               class="w-full"
@@ -116,16 +125,14 @@
            (OTable renders toolbar → column toggle → toolbar-trailing). Inside
            #toolbar it sat before the toggle and the two pages disagreed. -->
       <template #toolbar-trailing>
-        <OButton
+        <ORefreshButton
+          layout="inline"
           variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
-          :loading="loading"
+          :last-run-at="lastUpdatedAt"
+          :loading="fetching"
           data-test="slos-slolist-refresh"
-          @click="load"
-        >
-          <OTooltip side="bottom" :content="t('slos.refresh')" />
-        </OButton>
+          @click="refresh"
+        />
       </template>
 
       <!-- Health tiles sit in #subheader so search and the type filter stay
@@ -142,20 +149,27 @@
             :loading="loading"
             selectable
             :selected-key="healthFilter"
+            default-key="total"
             @select="onStatSelect"
           />
         </div>
       </template>
 
       <template #cell-name="{ row }">
-        <div class="flex items-center gap-2">
-          <span class="font-medium">{{ row.name }}</span>
+        <div class="flex min-w-0 items-center gap-2">
+          <OTruncatedText class="font-medium">{{ row.name }}</OTruncatedText>
+          <EditorDraftDot
+            v-if="sloDrafts.ids.has(row.id)"
+            :saved-at="sloDrafts.savedAt(row.id)"
+            class="shrink-0"
+            :data-test="`slos-slolist-${row.name}-draft-dot`"
+          />
           <OTag
             v-if="isGrouped(row)"
             variant="purple-soft"
             icon="layers"
             size="xs"
-            :label="String(row.group_by?.length ?? 0)"
+            :label="raw(String(row.group_by?.length ?? 0))"
           />
           <OTag
             v-if="!row.enabled"
@@ -164,6 +178,23 @@
             size="xs"
             :label="t('slos.paused')"
           />
+          <span v-if="activeCorrections(row).length" class="inline-flex">
+            <OTag
+              type="downtimeStatus"
+              value="active"
+              :label="t('alerts.downtimes.corrected')"
+              :data-test="`slos-slolist-corrected-${row.name}`"
+            />
+            <OTooltip
+              :content="
+                t('alerts.downtimes.correctedBy', {
+                  names: activeCorrections(row)
+                    .map((c) => c.name)
+                    .join(', '),
+                })
+              "
+            />
+          </span>
         </div>
       </template>
 
@@ -212,21 +243,27 @@
       </template>
 
       <template #cell-window="{ row }">
-        <span class="tabular-nums">{{ formatWindow(row.window_secs) }}</span>
-        <span class="text-text-secondary text-compact ml-1">{{ t("slos.rolling") }}</span>
+        <OTruncatedText as="div" :tooltip="windowText(row.window_secs)">
+          <span class="tabular-nums">{{ formatWindow(row.window_secs) }}</span>
+          <span class="text-text-secondary text-compact ms-1">{{ t("slos.rolling") }}</span>
+        </OTruncatedText>
       </template>
 
       <template #cell-tags="{ row }">
-        <div class="flex flex-wrap gap-1">
+        <OTruncatedText
+          as="div"
+          class="flex flex-wrap gap-1"
+          :tooltip="raw((row.tags || []).join(', '))"
+        >
           <OTag
             v-for="tag in (row.tags || []).slice(0, 2)"
             :key="tag"
             variant="default-soft"
             size="xs"
-            :label="tag"
+            :label="raw(tag)"
           />
           <span v-if="(row.tags || []).length > 2" class="text-text-secondary">…</span>
-        </div>
+        </OTruncatedText>
       </template>
 
       <template #cell-folder="{ row }">
@@ -239,6 +276,7 @@
             variant="ghost"
             size="icon-sm"
             icon-left="edit"
+            class="max-md:hidden"
             :title="t('slos.edit')"
             :data-test="`slos-slolist-edit-${row.name}`"
             @click="goToEdit(row)"
@@ -247,6 +285,7 @@
             variant="ghost"
             size="icon-sm"
             icon-left="drive-file-move"
+            class="max-md:hidden"
             :title="t('slos.move')"
             :data-test="`slos-slolist-move-${row.name}`"
             @click="openMove([row])"
@@ -255,6 +294,7 @@
             variant="ghost"
             size="icon-sm"
             :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+            class="max-md:hidden"
             :title="row.enabled ? t('slos.pause') : t('slos.resume')"
             :data-test="`slos-slolist-toggle-${row.name}`"
             @click="toggleEnabled(row)"
@@ -262,17 +302,100 @@
           <OButton
             variant="ghost"
             size="icon-sm"
+            icon-left="download"
+            class="max-md:hidden"
+            :title="t('common.export')"
+            :data-test="`slos-slolist-export-${row.name}`"
+            @click="openExport([row])"
+          />
+          <OButton
+            v-if="downtimesEnabled"
+            variant="ghost"
+            size="icon-sm"
+            icon-left="notifications-paused"
+            class="max-md:hidden"
+            :title="t('alerts.downtimes.mute.exclude')"
+            :data-test="`slos-slolist-exclude-${row.name}`"
+            @click="excludeWindow(row)"
+          />
+          <OButton
+            variant="ghost"
+            size="icon-sm"
             icon-left="delete"
+            class="max-md:hidden"
             :title="t('slos.delete')"
             :data-test="`slos-slolist-delete-${row.name}`"
             @click="confirmDelete(row)"
           />
+          <ODropdown side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                :aria-label="t('common.moreActions')"
+                icon-left="more-vert"
+                variant="ghost"
+                size="icon-xs-sq"
+                class="md:hidden"
+                data-test="slos-slolist-row-more-actions"
+                @click.stop
+              />
+            </template>
+            <ODropdownItem
+              icon-left="edit"
+              class="md:hidden"
+              :data-test="`slos-slolist-edit-${row.name}-menu`"
+              @select="goToEdit(row)"
+            >
+              <span>{{ t("slos.edit") }}</span>
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="drive-file-move"
+              class="md:hidden"
+              :data-test="`slos-slolist-move-${row.name}-menu`"
+              @select="openMove([row])"
+            >
+              <span>{{ t("slos.move") }}</span>
+            </ODropdownItem>
+            <ODropdownItem
+              :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+              class="md:hidden"
+              :data-test="`slos-slolist-toggle-${row.name}-menu`"
+              @select="toggleEnabled(row)"
+            >
+              <span>{{ row.enabled ? t("slos.pause") : t("slos.resume") }}</span>
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="download"
+              class="md:hidden"
+              :data-test="`slos-slolist-export-${row.name}-menu`"
+              @select="openExport([row])"
+            >
+              <span>{{ t("common.export") }}</span>
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="downtimesEnabled"
+              icon-left="notifications-paused"
+              class="md:hidden"
+              :data-test="`slos-slolist-exclude-${row.name}-menu`"
+              @select="excludeWindow(row)"
+            >
+              <span>{{ t("alerts.downtimes.mute.exclude") }}</span>
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="delete"
+              variant="destructive"
+              class="md:hidden"
+              :data-test="`slos-slolist-delete-${row.name}-menu`"
+              @select="confirmDelete(row)"
+            >
+              <span>{{ t("slos.delete") }}</span>
+            </ODropdownItem>
+          </ODropdown>
         </div>
       </template>
 
       <template #empty>
         <OEmptyState
-          icon="track-changes"
+          icon="target"
           :title="t('slos.empty.title')"
           :description="t('slos.empty.description')"
         >
@@ -280,6 +403,28 @@
             {{ t("slos.new") }}
           </OButton>
         </OEmptyState>
+      </template>
+
+      <template #selection-actions>
+        <OButton
+          variant="outline"
+          size="sm"
+          icon-left="drive-file-move"
+          data-test="slos-slolist-move-selected"
+          @click="openMove(selectedRows)"
+        >
+          {{ t("common.move") }}
+        </OButton>
+        <OButton
+          variant="outline"
+          size="sm"
+          icon-left="download"
+          :loading="exporting"
+          data-test="slos-slolist-export-selected"
+          @click="openExport(selectedRows)"
+        >
+          {{ t("common.export") }}
+        </OButton>
       </template>
     </OTable>
 
@@ -291,7 +436,44 @@
       :title="t('slos.deleteConfirmTitle')"
       data-test="slos-slolist-delete-dialog"
     >
-      <p>{{ t("slos.deleteConfirmBody", { name: pendingDelete?.name }) }}</p>
+      <i18n-t keypath="slos.deleteConfirmBody" tag="p" data-test="slos-slolist-delete-message">
+        <template #name>
+          <span
+            data-test="slos-slolist-delete-name"
+            class="text-text-heading font-semibold break-all"
+            >{{ pendingDelete?.name }}</span
+          >
+        </template>
+      </i18n-t>
+      <!-- The cascade, which is the irreversible part. Deleting an SLO deletes
+           every alert attached to it, and until this said so the dialog warned
+           only about disk. Three states, all distinct: still checking, a known
+           count, and "we could not find out" — silence is reserved for the one
+           case where it truly means nothing happens (zero attached). -->
+      <OBanner
+        v-if="alertCountState === 'loading'"
+        variant="info"
+        class="mt-3"
+        data-test="slos-slolist-delete-alert-count-loading"
+      >
+        {{ t("slos.deleteAlertsChecking") }}
+      </OBanner>
+      <OBanner
+        v-else-if="alertCountState === 'ready' && alertCount > 0"
+        variant="warning"
+        class="mt-3"
+        data-test="slos-slolist-delete-alert-count"
+      >
+        {{ t("slos.deleteAlertsNote", { count: alertCount }, alertCount) }}
+      </OBanner>
+      <OBanner
+        v-else-if="alertCountState === 'unknown'"
+        variant="warning"
+        class="mt-3"
+        data-test="slos-slolist-delete-alert-count-unknown"
+      >
+        {{ t("slos.deleteAlertsUnknown") }}
+      </OBanner>
       <!-- Not a footnote: deleting an SLO does NOT free the storage its slices
            occupy, and the budget stays charged until they age out (S-14c). -->
       <OBanner variant="info" class="mt-3">
@@ -301,7 +483,12 @@
         <OButton variant="outline" size="sm-action" @click="deleteDialog = false">
           {{ t("common.cancel") }}
         </OButton>
-        <OButton variant="destructive" size="sm-action" @click="doDelete">
+        <OButton
+          variant="destructive"
+          size="sm-action"
+          data-test="slos-slolist-delete-confirm"
+          @click="doDelete"
+        >
           {{ t("slos.delete") }}
         </OButton>
       </template>
@@ -332,29 +519,64 @@
         </OButton>
       </template>
     </ODialog>
+
+    <ExportResourceDialog
+      v-model:open="exportDialog"
+      :items="slosToExport"
+      :terraform="slosTerraform"
+      :title="t('slos.exportTitle', { count: slosToExport.length }, slosToExport.length)"
+      :sub-title="t('slos.exportSubtitle')"
+      file-prefix="slos"
+      data-test="slos-slolist-export-dialog"
+      @download="onExported"
+    />
   </OPageLayout>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { sloKeys } from "@/services/slos.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { useQuery } from "@tanstack/vue-query";
+import {
+  moveSlosMutation,
+  setSloEnabledMutation,
+  deleteSloMutation,
+} from "@/services/slos.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { slosQuery } from "@/services/slos.queries";
+// The export reads one SLO's definition on demand and never re-reads it, so it
+// stays off the query layer and calls the endpoint directly.
+import sloService from "@/services/slos";
+import { computed, onMounted, ref, nextTick, watch } from "vue";
+import { useDowntimesEnabled } from "@/composables/downtimes/useDowntimesEnabled";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
+import ExportResourceDialog from "@/components/common/ExportResourceDialog.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
+import IacRegistryLinks from "@/components/common/IacRegistryLinks.vue";
 import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -362,7 +584,11 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { SloListItem } from "@/ts/interfaces/slo";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import sloService from "@/services/slos";
+import useBreakpoint from "@/composables/useBreakpoint";
+import { useListViewState } from "@/composables/useListViewState";
+import alertsService from "@/services/alerts";
+import { sloDetailRoute } from "@/utils/alerts/sloAlertRouting";
+import { slosToTerraform } from "@/utils/slos/sloTerraform";
 import {
   ABSENT,
   compareByUrgency,
@@ -377,23 +603,85 @@ import {
   type SloHealth,
 } from "@/composables/useSloFormat";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
+const { isMobile } = useBreakpoint();
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
 
-const rows = ref<SloListItem[]>([]);
-const loading = ref(false);
-const error = ref<string | null>(null);
-const search = ref("");
-const typeFilter = ref("all");
-const healthFilter = ref<string | null>(null);
+// The org/folder a read is *currently* aimed at. `load()` may be handed a
+// folder the route refs have not caught up with yet, so the key tracks these
+// rather than `activeFolderId` directly.
+const readOrg = ref<string>(store.state.selectedOrganization?.identifier ?? "");
+const readFolder = ref<string | undefined>(undefined);
+
+const slosList = useQuery(() =>
+  // Held until the folder resolves: the reactive key would otherwise fetch an unscoped list first.
+  Object.assign(slosQuery(readOrg.value, readFolder.value), {
+    enabled: !!readOrg.value && readFolder.value !== undefined,
+  }),
+);
+
+// The list is the query, not a copy of it: a write that invalidates the SLO
+// scope repaints these rows with no wiring here.
+const rows = computed<SloListItem[]>(() => (slosList.data.value ?? []) as SloListItem[]);
+
+const loading = slosList.isPending;
+// A request in flight while rows stay on screen — the refresh button's spinner.
+// `loading` is the skeleton, which only a cold read wants.
+const fetching = slosList.isFetching;
+// Epoch ms of the last successful read — drives the button's "1m ago" label.
+const lastUpdatedAt = slosList.dataUpdatedAt;
+// A failed read has to reach the table. `loadError` is only for the imperative
+// refresh path; a mount read that fails (a disabled-feature 501, say) sets the
+// query's error and nothing else, so the table used to render an empty list
+// with no explanation.
+const loadError = ref<string | null>(null);
+const error = computed<string | null>(() => {
+  if (loadError.value) return loadError.value;
+  const e = slosList.error.value as any;
+  if (!e) return null;
+  return e?.response?.data?.message || e?.message || t("slos.loadFailed");
+});
+const savedView = useListViewState("slos", {
+  search: "",
+  typeFilter: "all",
+  healthFilter: null as string | null,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+  pageSize: 25,
+});
+const search = ref(savedView.search);
+const typeFilter = ref(savedView.typeFilter);
+const healthFilter = ref<string | null>(savedView.healthFilter);
+const sortBy = ref<string>(savedView.sortBy);
+const sortOrder = ref<"asc" | "desc">(savedView.sortOrder);
+const pageSize = ref<number>(savedView.pageSize);
+watch([search, typeFilter, healthFilter, sortBy, sortOrder, pageSize], () => {
+  Object.assign(savedView, {
+    search: search.value,
+    typeFilter: typeFilter.value,
+    healthFilter: healthFilter.value,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+    pageSize: pageSize.value,
+  });
+});
 const deleteDialog = ref(false);
 const pendingDelete = ref<SloListItem | null>(null);
 const selectedIds = ref<string[]>([]);
 const moveDialog = ref(false);
 const moveTarget = ref("");
 const pendingMove = ref<SloListItem[]>([]);
+const oTableRef: any = ref(null);
+
+// URL-synced so returning from add/edit/detail (Back/Update/Cancel) lands on the same page instead of resetting to page 1.
+const currentPage = ref(Number(route.query.page) || 1);
+const onPageChange = (page: number) => {
+  currentPage.value = page;
+  if (String(route.query.page ?? "1") === String(page)) return;
+  router.replace({ query: { ...route.query, page: String(page) } });
+};
 
 // The route is the source of truth for the active folder, so a reload or a
 // shared link lands on the same folder the rail is showing.
@@ -401,7 +689,77 @@ const activeFolderId = computed(() => (route.query.folder as string) || "default
 
 const org = computed(() => store.state.selectedOrganization?.identifier);
 
+const moveSlos = useMutation(() => moveSlosMutation(org.value));
+const setSloEnabled = useMutation(() => setSloEnabledMutation(org.value));
+const deleteSlo = useMutation(() => deleteSloMutation(org.value));
+const sloDrafts = useEditorDraftIds("slo");
+
 const selectedRows = computed(() => rows.value.filter((r) => selectedIds.value.includes(r.id)));
+
+// ── Export ──────────────────────────────────────────────────────────────────
+// The list rows carry measurement status rather than the full definition, so an
+// export re-reads each SLO and shows it as JSON or as an openobserve_slo
+// Terraform resource.
+const exportDialog = ref(false);
+const exporting = ref(false);
+const slosToExport = ref<Record<string, unknown>[]>([]);
+const slosTerraform = computed(() =>
+  slosToTerraform(slosToExport.value, { folderId: activeFolderId.value }),
+);
+
+async function fetchSloForExport(id: string): Promise<Record<string, unknown> | null> {
+  const res = await sloService.get(org.value, id);
+  const body = (res.data ?? {}) as Record<string, unknown>;
+  if (!body.name) return null;
+  // The endpoint flattens the definition alongside `status`, its live
+  // measurement, and carries counters the server assigns. None of that describes
+  // the SLO, and the id belongs to the one this was read from rather than the one
+  // a configuration creates, so an export keeps only the definition.
+  const {
+    id: _id,
+    status: _status,
+    definition_generation: _generation,
+    groups_estimate: _estimate,
+    groups_reserved: _reserved,
+    ...definition
+  } = body;
+  return definition;
+}
+
+async function openExport(items: SloListItem[]) {
+  if (exporting.value || !items.length) return;
+  exporting.value = true;
+  try {
+    const fetched = await Promise.all(items.map((item) => fetchSloForExport(item.id)));
+    const usable = fetched.filter((slo): slo is Record<string, unknown> => slo !== null);
+    if (!usable.length) throw new Error("empty export payload");
+    slosToExport.value = usable;
+    exportDialog.value = true;
+
+    // A definition that came back empty is a gap in the export. Dropping it
+    // quietly would leave the success toast reporting the smaller count as
+    // though everything had been exported.
+    const missing = items.filter((_, i) => fetched[i] === null).map((item) => item.name);
+    if (missing.length) {
+      toast({
+        variant: "warning",
+        message: t("slos.exportPartial", { names: missing.join(", ") }),
+      });
+    }
+  } catch (e: any) {
+    toast({
+      variant: "error",
+      message: raw(e?.response?.data?.message) || t("slos.exportFailed"),
+    });
+  } finally {
+    exporting.value = false;
+  }
+}
+
+function onExported({ count }: { format: string; count: number }) {
+  toast({ variant: "success", message: t("slos.exportSucceeded", { count }, count) });
+  selectedIds.value = [];
+}
 
 /** Folder ids are opaque; the rail and this column show the human name. */
 function folderName(folderId: string): string {
@@ -409,12 +767,19 @@ function folderName(folderId: string): string {
   return folders.find((f: any) => f.folderId === folderId)?.name || folderId;
 }
 
-const typeOptions = computed(() => [
-  { value: "all", label: t("slos.type.all"), icon: "format_list_bulleted" },
+// The two spans hold no space in their text, so the cut-cell tooltip spells it out.
+function windowText(secs: number) {
+  return raw(`${formatWindow(secs)} ${t("slos.rolling")}`);
+}
+
+const typeOptions = computed<{ value: string; label: I18nText; icon: IconName }[]>(() => [
+  { value: "all", label: t("slos.type.all"), icon: "format-list-bulleted" },
   { value: "count", label: t("slos.type.count"), icon: "functions" },
-  { value: "time_slice", label: t("slos.type.timeSlice"), icon: "timelapse" },
-  { value: "alert", label: t("slos.type.alert"), icon: "gpp_maybe" },
+  { value: "time_slice", label: t("slos.type.timeSlice"), icon: "timeline" },
+  { value: "alert", label: t("slos.type.alert"), icon: "shield-alert-outline" },
 ]);
+
+const downtimesEnabled = useDowntimesEnabled();
 
 const columns = computed<OTableColumnDef<SloListItem>[]>(() => [
   {
@@ -469,17 +834,14 @@ const columns = computed<OTableColumnDef<SloListItem>[]>(() => [
     hideable: true,
     size: 140,
   },
-  // No hardcoded `size`: OTable derives an action column's width from
-  // `actionCount` (4 × 32px button + 3 × 4px gap + padding), but only when
-  // `isAction` marks it as one. Without the flag it fell through to the
-  // generic size and clipped the last two buttons.
+  // OTable sizes this column from `actionCount` and clips the cell, so it must equal the desktop buttons in `#cell-actions`.
   {
     id: "actions",
     header: t("slos.column.actions"),
     accessor: () => "",
     sortable: false,
     isAction: true,
-    meta: { align: "center", actionCount: 4 },
+    meta: { align: "center", actionCount: downtimesEnabled.value ? 6 : 5 },
   },
 ]);
 
@@ -555,6 +917,7 @@ const stats = computed<StatItem[]>(() => {
   return [
     {
       key: "budget_blown",
+      dataTest: "slos-slolist-stat-budget_blown",
       label: t("slos.health.budget_blown"),
       value: counts.budget_blown,
       icon: "local-fire-department",
@@ -563,6 +926,7 @@ const stats = computed<StatItem[]>(() => {
     },
     {
       key: "at_risk",
+      dataTest: "slos-slolist-stat-at_risk",
       label: t("slos.health.at_risk"),
       value: counts.at_risk,
       icon: "trending-down",
@@ -571,6 +935,7 @@ const stats = computed<StatItem[]>(() => {
     },
     {
       key: "meeting",
+      dataTest: "slos-slolist-stat-meeting",
       label: t("slos.health.meeting"),
       value: counts.meeting,
       icon: "check-circle",
@@ -579,13 +944,21 @@ const stats = computed<StatItem[]>(() => {
     },
     {
       key: "no_data",
+      dataTest: "slos-slolist-stat-no_data",
       label: t("slos.health.no_data"),
       value: counts.no_data,
-      icon: "help",
+      icon: "help-outline",
       tone: "neutral",
       max: total,
     },
-    { key: "total", label: t("slos.totalSlos"), value: total, tone: "primary", selectable: false },
+    {
+      key: "total",
+      dataTest: "slos-slolist-stat-total",
+      label: t("slos.totalSlos"),
+      value: total,
+      tone: "primary",
+      selectable: true,
+    },
   ];
 });
 
@@ -607,30 +980,53 @@ function onStatSelect(key: string | null) {
   healthFilter.value = key === "total" ? null : key;
 }
 
-async function load() {
+// The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
+watch(
+  loading,
+  (isLoading) => {
+    if (isLoading) return;
+    setTimeout(() => {
+      oTableRef.value?.restorePage?.(currentPage.value);
+    }, 0);
+  },
+  { once: true },
+);
+
+// Bound to the refresh button: always hits the server.
+const refresh = () => load(null, undefined, true);
+
+// org and folder are both optional: mount and refresh call `load()` bare and
+// fall back to the current org and active folder — the folder-change path is the
+// only caller that passes a folder the refs have not caught up with yet.
+async function load(orgId?: string | null, folderId?: string, force = false) {
   if (!org.value) return;
-  loading.value = true;
-  error.value = null;
+  loadError.value = null;
+  // sometimes the folder id might not be updated so passed via
+  // query params.
+  readOrg.value = orgId ?? org.value;
+  readFolder.value = folderId ?? activeFolderId.value;
+  // Let the key pick up the new org/folder before asking for the data.
+  await nextTick();
   try {
-    const res = await sloService.list(org.value, activeFolderId.value);
-    rows.value = res.data?.list ?? [];
+    if (force) await slosList.refetch();
     // Selection is per-folder; carrying ids across a folder switch would let a
     // bulk move act on rows no longer on screen.
     selectedIds.value = [];
   } catch (e: any) {
-    error.value = e?.response?.data?.message || e?.message || t("slos.loadFailed");
-  } finally {
-    loading.value = false;
+    loadError.value = e?.response?.data?.message || e?.message || t("slos.loadFailed");
   }
 }
 
 function onFolderChange(folderId: string) {
   if (folderId === activeFolderId.value) return;
+  // A folder switch starts a new list: page 1 in table and URL alike.
+  currentPage.value = 1;
+  const { page: _page, ...carriedQuery } = route.query;
   router.push({
     name: "sloList",
-    query: { ...route.query, org_identifier: org.value, folder: folderId },
+    query: { ...carriedQuery, org_identifier: org.value, folder: folderId },
   });
-  load();
+  load(org.value, folderId);
 }
 
 function openMove(targets: SloListItem[]) {
@@ -650,14 +1046,13 @@ async function doMove() {
   moveDialog.value = false;
   if (!targets.length || !dst) return;
   try {
-    await sloService.move(
-      org.value,
-      targets.map((r) => r.id),
-      dst,
-    );
-    // They left the folder being shown, so drop them rather than re-fetching.
+    await moveSlos.mutateAsync({ ids: targets.map((r) => r.id), dstFolderId: dst });
+    // They left the folder being shown, so drop them from the cached entry
+    // rather than waiting for the invalidation's refetch to repaint.
     const moved = new Set(targets.map((r) => r.id));
-    rows.value = rows.value.filter((r) => !moved.has(r.id));
+    queryClient.setQueryData<SloListItem[]>(sloKeys.list(readOrg.value, readFolder.value), (old) =>
+      (old ?? []).filter((r) => !moved.has(r.id)),
+    );
     selectedIds.value = selectedIds.value.filter((id) => !moved.has(id));
     toast({
       variant: "success",
@@ -668,29 +1063,38 @@ async function doMove() {
   }
 }
 
+// Spreads the list's own query (page, folder, …) forward so the editor's `backTarget` has something to restore.
 function goToNew() {
-  router.push({ name: "addSlo", query: { org_identifier: org.value } });
+  router.push({ name: "addSlo", query: { ...route.query, org_identifier: org.value } });
+}
+
+const activeCorrections = (row: SloListItem) =>
+  (row.status?.corrections ?? []).filter((c) => c.status === "active");
+
+// Pre-filled from the row: only the SLOs module, all folders, and this SLO in Specific items.
+function excludeWindow(row: SloListItem) {
+  router.push({
+    name: "addDowntime",
+    query: { org_identifier: org.value, module: "slos", ids: row.id },
+  });
 }
 
 function goToEdit(row: SloListItem) {
   router.push({
     name: "editSlo",
     params: { slo_id: row.id },
-    query: { org_identifier: org.value },
+    query: { ...route.query, org_identifier: org.value },
   });
 }
 
 function onRowClick(row: SloListItem) {
-  router.push({
-    name: "sloDetail",
-    params: { slo_id: row.id },
-    query: { org_identifier: org.value },
-  });
+  const target = sloDetailRoute(row.id, org.value);
+  router.push({ ...target, query: { ...route.query, ...target.query } });
 }
 
 async function toggleEnabled(row: SloListItem) {
   try {
-    await sloService.setEnabled(org.value, row.id, !row.enabled);
+    await setSloEnabled.mutateAsync({ id: row.id, enabled: !row.enabled });
     row.enabled = !row.enabled;
     toast({
       variant: "success",
@@ -701,9 +1105,38 @@ async function toggleEnabled(row: SloListItem) {
   }
 }
 
+// How many alerts this delete would take with it (B2). Fetched LAZILY, here,
+// rather than per row while building the list: the count matters only at the
+// moment of confirming, and resolving it up front would put an N+1 on a page
+// that renders perfectly well without it.
+const alertCount = ref(0);
+const alertCountState = ref<"loading" | "ready" | "unknown">("loading");
+// Only the newest lookup may write. Without this, a slow answer for the SLO the
+// user opened first can land after they moved on and label THIS delete with
+// that SLO's count — and the number is the entire point of the banner.
+let alertCountToken = 0;
+
 function confirmDelete(row: SloListItem) {
   pendingDelete.value = row;
   deleteDialog.value = true;
+
+  alertCount.value = 0;
+  alertCountState.value = "loading";
+  const token = ++alertCountToken;
+  alertsService
+    .list_by_slo(org.value, row.id)
+    .then((res: any) => {
+      if (token !== alertCountToken) return;
+      alertCount.value = res?.data?.list?.length ?? 0;
+      alertCountState.value = "ready";
+    })
+    .catch(() => {
+      if (token !== alertCountToken) return;
+      // Never fall back to "ready, 0": that reads as "nothing else is
+      // destroyed", which is the one answer that could be catastrophically
+      // wrong here. Say the check failed instead.
+      alertCountState.value = "unknown";
+    });
 }
 
 async function doDelete() {
@@ -711,8 +1144,11 @@ async function doDelete() {
   deleteDialog.value = false;
   if (!row) return;
   try {
-    await sloService.delete(org.value, row.id);
-    rows.value = rows.value.filter((r) => r.id !== row.id);
+    await deleteSlo.mutateAsync(row.id);
+    deleteEditorDraftsFor({ kind: "slo", org: String(org.value ?? ""), entityId: row.id });
+    queryClient.setQueryData<SloListItem[]>(sloKeys.list(readOrg.value, readFolder.value), (old) =>
+      (old ?? []).filter((r) => r.id !== row.id),
+    );
     toast({ variant: "success", message: t("slos.deleted") });
   } catch (e: any) {
     toast({ variant: "error", message: e?.response?.data?.message || t("slos.deleteFailed") });

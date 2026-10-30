@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { BrowserCheck } from "@/types/synthetics";
 import OInput from "@/lib/forms/Input/OInput.vue";
 
@@ -26,7 +26,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 /**
  * Retry ceiling for this check's type, mirroring the server's
@@ -60,7 +60,7 @@ const retries = computed({
   },
 });
 
-const retryDelayMs = computed({
+const retryDelaySecs = computed({
   get: () => props.check.waitBeforeRetrySecs ?? 0,
   set: (v: string | number) =>
     emit("update:check", { ...props.check, waitBeforeRetrySecs: Number(v) }),
@@ -73,7 +73,7 @@ const retryDelayMs = computed({
     data-test="synthetics-check-retries"
   >
     <div class="border-border-default flex items-center border-b px-3 py-2.5">
-      <div class="rounded-default bg-accent mr-2 h-4 w-0.75 shrink-0" />
+      <div class="rounded-default bg-accent me-2 h-4 w-0.75 shrink-0" />
       <h3 class="text-text-heading text-base font-semibold">
         {{ t("synthetics.scheduleAlert.retries") }}
       </h3>
@@ -89,7 +89,7 @@ const retryDelayMs = computed({
           min="0"
           :max="maxRetries"
           class="w-25!"
-          placeholder="0"
+          :placeholder="raw('0')"
           data-test="synthetics-check-retries-count-input"
         />
         <span class="text-text-body text-sm whitespace-nowrap">{{
@@ -111,10 +111,10 @@ const retryDelayMs = computed({
           t("synthetics.scheduleAlert.retryDelay")
         }}</label>
         <OInput
-          v-model="retryDelayMs"
+          v-model="retryDelaySecs"
           type="number"
           class="w-25!"
-          placeholder="0"
+          :placeholder="raw('0')"
           data-test="synthetics-check-retries-delay-input"
         />
         <span class="text-text-body text-sm whitespace-nowrap">{{

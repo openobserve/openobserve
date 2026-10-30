@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test';
+import { confirmDraftSignOut } from '../generalPages/draftSignOut.js';
 import {
   dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator,
   Past30SecondsValue, openNavFlyoutChild
@@ -140,6 +141,13 @@ export class ReportsPage {
     return this.reportSearchInputField;
   }
 
+  // OTime wraps a (visually hidden) native <input type="time"> inside the
+  // schedule start-time role="group" field. Returns that inner input so specs
+  // can fill/read the 24h HH:MM value directly (force:true needed to fill).
+  scheduleStartTimeInput() {
+    return this.scheduleStartTimeField.locator('input[type="time"]');
+  }
+
   async navigateToReports() {
     await openNavFlyoutChild(this.page, 'reports');
     await expect(this.reportListTitle).toContainText('Reports');
@@ -179,8 +187,13 @@ export class ReportsPage {
 
   async createReportReportNameInput(TEST_REPORT_NAME) {
     await this.reportNameInputField.waitFor({ state: 'visible', timeout: 10000 });
-    await this.reportNameInputField.fill(TEST_REPORT_NAME);
-    await this.page.waitForTimeout(5000);
+    // onBeforeMount seeds the form via an async form.reset() that can land after this fill and wipe name to "" — re-fill until it survives, else the submit is silently blocked by "Name is required".
+    await expect(async () => {
+      await this.reportNameInputField.fill(TEST_REPORT_NAME);
+      await this.page.waitForTimeout(1000);
+      // Short timeout: the default expect timeout outlives the toPass budget, so a wiped value was never re-filled.
+      await expect(this.reportNameInputField).toHaveValue(TEST_REPORT_NAME, { timeout: 2000 });
+    }).toPass({ timeout: 20000, intervals: [1000, 2000, 3000] });
   }
 
   async createReportFolderInput() {
@@ -240,7 +253,22 @@ export class ReportsPage {
   }
 
   async createReportContinueButtonStep1() {
-    await this.continueButtonStep1.click({ force: true });
+    // Advance step 1 (dashboard) -> step 2 (schedule). On the EDIT flow the
+    // step-1 fields (folder/dashboard/tabs) are prefilled asynchronously via
+    // form.reset() after the report GET resolves; goToStep() validates those
+    // fields before advancing, so a single Continue click that lands before the
+    // prefill is applied fails validation and silently stays on step 1 (the
+    // schedule toggle never renders — the create/edit flow then times out looking
+    // for it). Retry the click until the schedule step is actually reached.
+    await expect(async () => {
+      if (await this.continueButtonStep1.isVisible().catch(() => false)) {
+        await this.continueButtonStep1.click({ force: true });
+      }
+      await expect(this.scheduleLaterBtn).toBeVisible({ timeout: 3000 });
+    }).toPass({ timeout: 20000, intervals: [500, 1000, 2000] });
+    // Preserve the original post-advance settle: downstream step-2 interactions
+    // (the scheduleLater toggle, the step-2 Continue) can be swallowed if driven
+    // before the freshly-mounted step has settled.
     await this.page.waitForTimeout(3000);
   }
 
@@ -337,25 +365,40 @@ export class ReportsPage {
   }
 
   async createReportSaveButton() {
-    await this.saveButton.click({ force: true });
+    const [response] = await Promise.all([
+      this.page.waitForResponse(
+        (resp) => {
+          const pathname = new URL(resp.url()).pathname;
+          return /^\/api\/(?:v2\/)?[^/]+\/reports\/?$/.test(pathname) &&
+            resp.request().method() === 'POST';
+        },
+        { timeout: 30000 }
+      ),
+      this.saveButton.click({ force: true }),
+    ]);
+
+    if (!response.ok()) {
+      const responseBody = await response.text().catch(() => '<response body unavailable>');
+      throw new Error(
+        `Report creation failed with HTTP ${response.status()}: ${responseBody}`
+      );
+    }
   }
 
   async verifyReportCreated(reportName) {
-    // Wait for save success toast
-    await this.toastSuccess.first().waitFor({ state: 'visible', timeout: 30000 });
-    await expect(this.toastSuccess.first()).toBeVisible({ timeout: 5000 });
+    await expect(this.page).toHaveURL(/\/web\/reports(?:\?|$)/, { timeout: 30000 });
 
-    // Navigate to reports list. waitForLoadState('networkidle') is insufficient
-    // here because Vue's onBeforeMount API call starts AFTER the browser idles —
-    // wait for the reports GET response explicitly so data is in the table before
-    // we attempt to search.
+    // Reload the reports list and wait for its collection request. Both v1 and
+    // v2 are accepted so this helper works across mixed-version deployments.
     const reportsApiPromise = this.page.waitForResponse(
-      (resp) =>
-        /\/api\/[^/]+\/reports(\?|$)/.test(resp.url()) &&
-        resp.request().method() === 'GET' &&
-        resp.status() === 200,
+      (resp) => {
+        const pathname = new URL(resp.url()).pathname;
+        return /^\/api\/(?:v2\/)?[^/]+\/reports\/?$/.test(pathname) &&
+          resp.request().method() === 'GET' &&
+          resp.ok();
+      },
       { timeout: 30000 }
-    ).catch(() => null);
+    );
     await this.page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
     await reportsApiPromise;
 
@@ -386,6 +429,28 @@ export class ReportsPage {
     await this.deleteReportBtn(reportName).click({ force: true });
     await this.confirmPrimaryBtn.waitFor({ state: 'visible', timeout: 10000 });
     await this.confirmPrimaryBtn.click();
+  }
+
+  // Switching tabs invalidates the folder cache and reloads — the path #7280's stale list came from.
+  /**
+   * Switch between the Scheduled ("shared") and Cached report tabs.
+   * @param {'shared'|'cached'} tabValue
+   */
+  async selectReportTab(tabValue) {
+    const tab = this.page.locator(`[data-test="tab-${tabValue}"]`);
+    await tab.waitFor({ state: 'visible', timeout: 15000 });
+    await tab.click();
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+  }
+
+  async expectReportListed(reportName) {
+    await this.reportSearchInputField.fill(reportName);
+    await expect(this.reportRow(reportName)).toBeVisible({ timeout: 20000 });
+  }
+
+  async expectReportNotListed(reportName) {
+    await this.reportSearchInputField.fill(reportName);
+    await expect(this.reportRow(reportName)).toHaveCount(0, { timeout: 20000 });
   }
 
   async setTimeToPast30Seconds() {
@@ -420,6 +485,7 @@ export class ReportsPage {
   async signOut() {
     await this.profileButton.click({ force: true });
     await this.signOutButton.click({ force: true });
+    await confirmDraftSignOut(this.page);
   }
 
   async pauseReport(reportName) {
@@ -509,6 +575,7 @@ export class ReportsPage {
     await this.signOutButton.waitFor({ state: 'visible', timeout: 5000 });
     // Now click the logout item
     await this.signOutButton.click({ force: true });
+    await confirmDraftSignOut(this.page);
   }
 
   async notAvailableReport(reportName) {

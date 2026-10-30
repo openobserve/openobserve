@@ -4,6 +4,7 @@ import { test } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { getAuthHeaders, getOrgIdentifier } from '../playwright-tests/utils/cloud-auth.js';
 import testLogger from '../playwright-tests/utils/test-logger.js';
+import { ingestBase } from '../playwright-tests/utils/ingest-url.js';
 
 // Left-nav group flyouts.
 // Several former top-level menu items (pipeline, functions, enrichment tables,
@@ -21,6 +22,7 @@ export const NAV_GROUP_TILE = {
     // The group root, not its inner tile: hover is handled on the root, and this
     // selector does not move if the group's parentLink ever changes.
     reliability: '[data-test="nav-group-reliability"]',
+    experience: '[data-test="nav-group-experience"]',
 };
 
 // route `name` of each child within its group (matches navGroups.ts).
@@ -36,6 +38,8 @@ export const NAV_FLYOUT_CHILD = {
     // the way you reach them is.
     destinations: { group: 'reliability', name: 'alertDestinations' },
     templates: { group: 'reliability', name: 'alertTemplates' },
+    // Synthetics is feature-gated, so the Experience tile itself lands on RUM.
+    synthetics: { group: 'experience', name: 'synthetics' },
 };
 
 /**
@@ -66,6 +70,64 @@ export async function openNavFlyoutChild(page, child) {
     // mid-click; force skips that wait and clicks the (already-visible) item
     // immediately on arrival, before the close timer can fire.
     await item.click({ force: true });
+}
+
+/**
+ * Click the Data nav tile to reach the Streams list, falling back to a direct goto when the click does not route.
+ * @param {import('@playwright/test').Page} page
+ */
+export async function gotoStreamsViaNav(page) {
+    const onStreams = (url) => new URL(url).pathname.replace(/\/+$/, '').endsWith('/streams');
+    const tile = page.locator(NAV_GROUP_TILE.data);
+    const tileReady = await tile.waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false);
+    // The tile renders while MainLayout is still booting and doubles as a hover-flyout trigger, so a click can be dropped without routing.
+    const navigated = tileReady && await tile.click({ timeout: 10000 })
+        .then(() => page.waitForURL(onStreams, { timeout: 10000 }))
+        .then(() => true)
+        .catch(() => false);
+    if (!navigated) {
+        const orgId = new URL(page.url()).searchParams.get('org_identifier') || getOrgIdentifier();
+        testLogger.warn('Data nav tile click did not reach /streams; navigating directly', { url: page.url() });
+        await page.goto(`${process.env['ZO_BASE_URL']}/web/streams?org_identifier=${orgId}`, { waitUntil: 'domcontentloaded' });
+    }
+    await expect(page).toHaveURL(/\/streams/, { timeout: 15000 });
+    await page.locator('[data-test="log-stream-table"]').waitFor({ state: 'visible', timeout: 30000 });
+}
+
+/**
+ * Click a left-nav link, re-clicking until the SPA route actually lands on `pathSuffix` (e.g. '/logs').
+ * @param {import('@playwright/test').Page} page
+ * @param {string} selector
+ * @param {string} pathSuffix
+ * @param {number} [attempts]
+ */
+export async function clickNavUntilRoute(page, selector, pathSuffix, attempts = 3) {
+    const onRoute = (url) => new URL(url).pathname.replace(/\/+$/, '').endsWith(pathSuffix);
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+        await page.locator(selector).click({ force: true });
+        // vue-router ignores a push to the still-current route while an earlier nav is pending, so an early click can be lost.
+        if (await page.waitForURL(onRoute, { timeout: 10000 }).then(() => true).catch(() => false)) return;
+        testLogger.warn(`Nav click on ${selector} did not reach ${pathSuffix} (attempt ${attempt}/${attempts})`, { url: page.url() });
+    }
+    expect(onRoute(page.url()), `left-nav click never routed to ${pathSuffix}; still on ${page.url()}`).toBe(true);
+}
+
+/**
+ * Switch the Logs page view mode ('logs' | 'visualize' | 'build' | 'patterns') via whichever control the toolbar renders.
+ * @param {import('@playwright/test').Page} page
+ * @param {string} mode
+ */
+export async function selectLogsViewMode(page, mode, timeout = 20000) {
+    const toggle = page.locator(`[data-test="logs-${mode}-toggle"]`);
+    const dropdownBtn = page.locator('[data-test="logs-view-mode-dropdown-btn"]');
+    // SearchBar.vue swaps the toggle group for a dropdown while its measured toolbar width is narrow, which can be transient.
+    await toggle.or(dropdownBtn).first().waitFor({ state: 'visible', timeout });
+    if (await toggle.isVisible()) {
+        await toggle.click();
+        return;
+    }
+    await dropdownBtn.click();
+    await page.locator(`[data-test="logs-view-mode-${mode}-item"]`).click();
 }
 
 /**
@@ -246,7 +308,7 @@ export class CommonActions {
         const baseUrl = process.env["ZO_BASE_URL"];
         const orgName = getOrgIdentifier();
         const data = [{"level":"info","job":"test","log":"test message for openobserve. this data ingestion has been done using a playwright automation script."}];
-        const ingestUrl = `${baseUrl}/api/${orgName}/${streamName}/_json`;
+        const ingestUrl = `${ingestBase(baseUrl)}/api/${orgName}/${streamName}/_json`;
         const listUrl = `${baseUrl}/api/${orgName}/streams?type=logs`;
 
         // Ingest with a retry loop around the "stream is being deleted" race.
@@ -339,7 +401,7 @@ export class CommonActions {
 
         testLogger.debug(`Ingesting test data with unique ID: ${uniqueId}`, { streamName, triggerField, triggerValue });
 
-        const response = await this.page.request.post(`${baseUrl}/api/${orgName}/${streamName}/_json`, {
+        const response = await this.page.request.post(`${ingestBase(baseUrl)}/api/${orgName}/${streamName}/_json`, {
             headers,
             data: [testData]
         });
@@ -374,7 +436,7 @@ export class CommonActions {
 
         testLogger.info(`Initializing alert test stream: ${streamName}`);
 
-        const response = await this.page.request.post(`${baseUrl}/api/${orgName}/${streamName}/_json`, {
+        const response = await this.page.request.post(`${ingestBase(baseUrl)}/api/${orgName}/${streamName}/_json`, {
             headers,
             data: initialData
         });
@@ -434,7 +496,7 @@ export class CommonActions {
         const dataPath = path.resolve(__dirname, '..', 'utils', 'td150.json');
         const data = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
 
-        const response = await this.page.request.post(`${baseUrl}/api/${orgName}/${streamName}/_json`, {
+        const response = await this.page.request.post(`${ingestBase(baseUrl)}/api/${orgName}/${streamName}/_json`, {
             headers,
             data
         });
@@ -593,92 +655,6 @@ export class CommonActions {
     static generateBasicAuthHeader(username, password) {
         const credentials = Buffer.from(`${username}:${password}`).toString('base64');
         return `Basic ${credentials}`;
-    }
-
-    /**
-     * Count alert notifications in validation stream
-     * Used for deduplication testing to verify suppression of duplicate alerts
-     * @param {string} validationStreamName - Name of the validation stream to query
-     * @param {string} alertName - Alert name to search for (partial match)
-     * @param {number} timeRangeMinutes - How far back to search (default: 15 minutes)
-     * @returns {Promise<{success: boolean, count: number, data: any[]}>}
-     */
-    async countAlertNotificationsInStream(validationStreamName, alertName, timeRangeMinutes = 15) {
-        const headers = getAuthHeaders();
-        const baseUrl = process.env["ZO_BASE_URL"];
-        const orgName = getOrgIdentifier();
-
-        const query = `SELECT * FROM "${validationStreamName}" WHERE str_match_ignore_case(text, '${alertName}')`;
-
-        const endTime = Date.now() * 1000; // microseconds
-        const startTime = endTime - (timeRangeMinutes * 60 * 1000 * 1000); // microseconds
-
-        const searchPayload = {
-            query: {
-                sql: query,
-                start_time: startTime,
-                end_time: endTime,
-                from: 0,
-                size: 1000
-            }
-        };
-
-        try {
-            const response = await this.page.request.post(`${baseUrl}/api/${orgName}/_search?type=logs`, {
-                headers,
-                data: searchPayload
-            });
-            const responseData = await response.json().catch(() => null);
-            const hits = responseData?.hits || [];
-            testLogger.debug(`Count notifications for "${alertName}" in ${validationStreamName}: found ${hits.length} notifications`);
-            return {
-                success: true,
-                count: hits.length,
-                data: hits
-            };
-        } catch (error) {
-            testLogger.error('Error counting notifications in stream', { error: error.message });
-            return { success: false, count: 0, data: [] };
-        }
-    }
-
-    /**
-     * Wait for exact notification count in validation stream
-     * Used for deduplication testing to verify the expected number of notifications
-     * @param {string} validationStreamName - Name of the validation stream
-     * @param {string} alertName - Alert name to search for
-     * @param {number} expectedCount - Expected number of notifications
-     * @param {number} maxWaitSeconds - Maximum time to wait (default: 120 seconds)
-     * @param {number} pollIntervalSeconds - How often to poll (default: 10 seconds)
-     * @returns {Promise<{match: boolean, actualCount: number, attempts: number}>}
-     */
-    async waitForExactNotificationCount(validationStreamName, alertName, expectedCount, maxWaitSeconds = 120, pollIntervalSeconds = 10) {
-        const maxAttempts = Math.ceil(maxWaitSeconds / pollIntervalSeconds);
-
-        testLogger.info(`Waiting for exactly ${expectedCount} notifications for "${alertName}" in "${validationStreamName}" (max ${maxWaitSeconds}s)...`);
-
-        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-            const result = await this.countAlertNotificationsInStream(validationStreamName, alertName, 15);
-
-            if (result.success && result.count === expectedCount) {
-                testLogger.info(`Found expected ${expectedCount} notifications after ${attempt * pollIntervalSeconds}s`);
-                return { match: true, actualCount: result.count, attempts: attempt };
-            }
-
-            if (result.count > expectedCount) {
-                testLogger.warn(`Found more notifications than expected: ${result.count} > ${expectedCount}`);
-                return { match: false, actualCount: result.count, attempts: attempt };
-            }
-
-            if (attempt < maxAttempts) {
-                testLogger.debug(`Attempt ${attempt}/${maxAttempts}: Found ${result.count} notifications, expected ${expectedCount}, waiting ${pollIntervalSeconds}s...`);
-                await new Promise(resolve => setTimeout(resolve, pollIntervalSeconds * 1000));
-            }
-        }
-
-        const finalResult = await this.countAlertNotificationsInStream(validationStreamName, alertName, 15);
-        testLogger.info(`Final count: ${finalResult.count} notifications (expected ${expectedCount})`);
-        return { match: finalResult.count === expectedCount, actualCount: finalResult.count, attempts: maxAttempts };
     }
 
     /**

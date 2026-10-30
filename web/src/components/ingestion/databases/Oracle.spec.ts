@@ -21,6 +21,7 @@ import { ref } from "vue";
 import Oracle from "./Oracle.vue";
 import oracleCard from "@/components/ingestion/setupCard/content/oracle";
 import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
+import { gt } from "@/types/i18n";
 
 const mockEndpoint = ref({
   url: "https://test.openobserve.ai",
@@ -52,7 +53,7 @@ const SUBS = { url: "https://test.openobserve.ai", org: "test-org", token: "dGVz
 
 describe("oracleCard builder", () => {
   it("builds metadata + step flow", () => {
-    const card = oracleCard(SUBS);
+    const card = oracleCard(SUBS, gt);
     expect(card.provider.name).toBe("Oracle");
     expect(card.detect).toMatchObject({
       streamType: "metrics",
@@ -68,7 +69,7 @@ describe("oracleCard builder", () => {
     ]);
   });
   it("has the grant SQL and an oracledb receiver config", () => {
-    const card = oracleCard(SUBS);
+    const card = oracleCard(SUBS, gt);
     expect(card.steps.find((s) => s.id === "prepare")!.code!.raw).toContain("CREATE USER otel");
     const config = card.steps
       .find((s) => s.id === "configure")!
@@ -84,7 +85,7 @@ describe("Oracle.vue", () => {
     if (wrapper) wrapper.unmount();
   });
   it("renders the shared card", () => {
-    expect(getDataSourceCard("oracle", SUBS)?.provider.name).toBe("Oracle");
+    expect(getDataSourceCard("oracle", SUBS, gt)?.provider.name).toBe("Oracle");
     wrapper = mount(Oracle, { global: { plugins: [mockStore, mockI18n] } });
     expect(wrapper.findComponent({ name: "SetupCardRenderer" }).exists()).toBe(true);
   });

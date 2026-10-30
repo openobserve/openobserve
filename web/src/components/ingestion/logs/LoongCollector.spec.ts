@@ -15,9 +15,9 @@ vi.mock("../../../utils/zincutils", () => ({
   getImageURL: vi.fn(() => "mock-image-url"),
 }));
 
-vi.mock("@/components/CopyContent.vue", () => ({
+vi.mock("@/components/ingestion/CredentialCodeBlock.vue", () => ({
   default: {
-    name: "CopyContent",
+    name: "CredentialCodeBlock",
     props: ["content"],
     template: "<div class='copy-content'>{{ content }}</div>",
   },

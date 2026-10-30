@@ -30,7 +30,7 @@ vi.mock("@/utils/zincutils", () => ({
 }));
 
 // Mock ContentCopy component
-vi.mock("@/components/CopyContent.vue", () => ({
+vi.mock("@/components/ingestion/CredentialCodeBlock.vue", () => ({
   default: {
     name: "ContentCopy",
     template: '<div class="content-copy-mock" :data-content="content">{{content}}</div>',
@@ -430,6 +430,39 @@ service:
       expect(exposedData.getOtelHttpConfig).toBeDefined();
       expect(typeof exposedData.getOtelHttpConfig).toBe("string");
       expect(exposedData.getOtelHttpConfig).toContain("otlphttp/openobserve");
+    });
+  });
+
+  describe("first event status", () => {
+    it("mounts one traces status bar for the org whose Copy config re-copies the HTTP block", () => {
+      wrapper = mount(OtelConfig, {
+        props: defaultProps,
+        global: {
+          plugins: [[{}], [store]],
+          provide: { store },
+          stubs: {
+            FirstEventStatus: {
+              name: "FirstEventStatus",
+              props: ["org", "signal", "snippetKind"],
+              emits: ["copy-command"],
+              template: '<div data-test="first-event-status" />',
+            },
+          },
+        },
+      });
+      const bars = wrapper.findAllComponents({ name: "FirstEventStatus" });
+      expect(bars).toHaveLength(1);
+      expect(bars[0].props("org")).toBe(store.state.selectedOrganization.identifier);
+      expect(bars[0].props("signal")).toBe("traces");
+      expect(bars[0].props("snippetKind")).toBe("config");
+
+      const copy = document.createElement("button");
+      copy.setAttribute("data-test", "ingestion-otel-http-code-block-copy-btn");
+      const click = vi.fn();
+      copy.addEventListener("click", click);
+      wrapper.element.appendChild(copy);
+      bars[0].vm.$emit("copy-command");
+      expect(click).toHaveBeenCalledTimes(1);
     });
   });
 });

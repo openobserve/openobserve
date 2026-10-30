@@ -369,12 +369,17 @@ export function anomalyExplanation(
   const avg = pattern.avg_frequency ?? 0;
 
   if (pct > 0 && pct < 1.0) {
-    const key = freq === 1 ? "search.patternAnomalyRare" : "search.patternAnomalyRarePlural";
-    return t(key, { pct: pct.toFixed(2), freq: freq.toLocaleString() });
+    // `count` alongside the display args: it never appears in the message, it is
+    // what vue-i18n reads to pick the plural form. `freq` itself is pre-formatted
+    // for display (thousands separators) and so cannot serve as the choice.
+    return t("search.patternAnomalyRare", {
+      pct: pct.toFixed(2),
+      freq: freq.toLocaleString(),
+      count: freq,
+    });
   }
   if (z < -1.5 && avg > 0) {
-    const key = freq === 1 ? "search.patternAnomalyLowFreq" : "search.patternAnomalyLowFreqPlural";
-    return t(key, {
+    return t("search.patternAnomalyLowFreq", {
       freq: freq.toLocaleString(),
       avg: Math.round(avg).toLocaleString(),
       z: z.toFixed(2),

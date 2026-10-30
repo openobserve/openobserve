@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { destinationKeys } from "@/services/alert_destination.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { nextTick } from "vue";
@@ -49,17 +51,23 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
 // Mock services
-vi.mock("@/services/alert_templates", () => ({
-  default: {
-    list: vi.fn(),
-  },
-}));
+vi.mock("@/services/alert_templates", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/alert_destination", () => ({
-  default: {
-    list: vi.fn(),
-  },
-}));
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+    },
+  });
+});
 
 // Mock useStore to return our test store
 vi.mock("vuex", () => ({
@@ -354,10 +362,9 @@ describe("AppAlerts", () => {
 
       await wrapper.vm.getDestinations();
 
-      expect(mockDestinationService.list).toHaveBeenCalledWith({
-        org_identifier: "test-org-123",
-        module: "alert",
-      });
+      expect(mockDestinationService.list).toHaveBeenCalledWith(
+        expect.objectContaining({ org_identifier: "test-org-123", module: "alert" }),
+      );
     });
 
     it("should update destinations ref with API response in getDestinations", async () => {
@@ -423,14 +430,14 @@ describe("AppAlerts", () => {
       consoleErrorSpy.mockRestore();
     });
 
-    it("should call getDestinations multiple times without issues", async () => {
+    it("should serve repeated getDestinations calls from one request", async () => {
       const wrapper = createWrapper();
 
       await wrapper.vm.getDestinations();
       await wrapper.vm.getDestinations();
       await wrapper.vm.getDestinations();
 
-      expect(mockDestinationService.list).toHaveBeenCalledTimes(3);
+      expect(mockDestinationService.list).toHaveBeenCalledTimes(1);
     });
 
     it("should maintain destinations state between calls", async () => {
@@ -442,6 +449,8 @@ describe("AppAlerts", () => {
       await wrapper.vm.getDestinations();
       expect(wrapper.vm.destinations).toEqual(firstDestinations);
 
+      // Cached until something invalidates it — mirrors a destination edit.
+      await queryClient.invalidateQueries({ queryKey: destinationKeys.all("test-org-123") });
       mockDestinationService.list.mockResolvedValueOnce({ data: secondDestinations });
       await wrapper.vm.getDestinations();
       expect(wrapper.vm.destinations).toEqual(secondDestinations);
@@ -453,10 +462,9 @@ describe("AppAlerts", () => {
 
       await wrapper.vm.getDestinations();
 
-      expect(mockDestinationService.list).toHaveBeenCalledWith({
-        org_identifier: "custom-org-789",
-        module: "alert",
-      });
+      expect(mockDestinationService.list).toHaveBeenCalledWith(
+        expect.objectContaining({ org_identifier: "custom-org-789", module: "alert" }),
+      );
     });
 
     it("should always pass 'alert' as module parameter", async () => {
@@ -506,7 +514,7 @@ describe("AppAlerts", () => {
 
       await wrapper.vm.getDestinations();
 
-      expect(wrapper.vm.destinations).toBe(null);
+      expect(wrapper.vm.destinations).toEqual([]);
     });
   });
 
@@ -716,7 +724,8 @@ describe("AppAlerts", () => {
       await Promise.all(promises);
 
       expect(mockTemplateService.list).toHaveBeenCalledTimes(2);
-      expect(mockDestinationService.list).toHaveBeenCalledTimes(2);
+      // Concurrent destination reads collapse into one in-flight request.
+      expect(mockDestinationService.list).toHaveBeenCalledTimes(1);
     });
 
     it("should handle empty organization identifier", async () => {
@@ -729,10 +738,9 @@ describe("AppAlerts", () => {
       expect(mockTemplateService.list).toHaveBeenCalledWith({
         org_identifier: "",
       });
-      expect(mockDestinationService.list).toHaveBeenCalledWith({
-        org_identifier: "",
-        module: "alert",
-      });
+      expect(mockDestinationService.list).toHaveBeenCalledWith(
+        expect.objectContaining({ org_identifier: "", module: "alert" }),
+      );
     });
 
     it("should handle null organization", async () => {
@@ -779,7 +787,8 @@ describe("AppAlerts", () => {
       await wrapper.vm.getDestinations();
 
       expect(wrapper.vm.templates).toBeUndefined();
-      expect(wrapper.vm.destinations).toBeUndefined();
+      // Normalised to an empty list so every consumer can map it unconditionally.
+      expect(wrapper.vm.destinations).toEqual([]);
     });
   });
 

@@ -51,6 +51,7 @@ vi.mock("./shared/gridBuilder", () => ({
 }));
 
 vi.mock("../colorPalette", () => ({
+  createDistinctSeriesColor: vi.fn(() => () => undefined),
   getSeriesColor: vi.fn((colorConfig, name) => {
     // Simple mock that returns colors based on name
     const colors: Record<string, string> = {
@@ -141,6 +142,60 @@ describe("PieConverter", () => {
       expect(result.series[0].type).toBe("pie");
       expect(result.series[0].data).toHaveLength(2);
       expect(result.tooltip).toBeDefined();
+    });
+
+    it("reduces an instant query's slices with last and a range query's with the saved reducer", async () => {
+      const { applyAggregation } = await import("./shared/dataProcessor");
+      const slice = (queryIndex: number, query_type: string) =>
+        ({
+          series: [{ name: `q${queryIndex}`, values: [[1, "50"]] }],
+          timestamps: [1],
+          queryIndex,
+          queryConfig: { query_type },
+        }) as any;
+      vi.mocked(applyAggregation).mockClear();
+      converter.convert(
+        [slice(0, "instant"), slice(1, "range"), { ...slice(2, "range"), queryConfig: undefined }],
+        { type: "donut", config: { aggregation: "count" } },
+        mockStore,
+        { legends: [] },
+      );
+      expect(vi.mocked(applyAggregation).mock.calls.map((call) => call[1])).toEqual([
+        "last",
+        "count",
+        "count",
+      ]);
+    });
+
+    it("keeps the saved reducer for an instant range-vector selector with many samples", async () => {
+      const { applyAggregation } = await import("./shared/dataProcessor");
+      vi.mocked(applyAggregation).mockClear();
+      converter.convert(
+        [
+          {
+            series: [
+              { name: "single", values: [[1, "50"]] },
+              {
+                name: "window",
+                values: [
+                  [1, "10"],
+                  [2, "20"],
+                ],
+              },
+            ],
+            timestamps: [1, 2],
+            queryIndex: 0,
+            queryConfig: { query_type: "instant" },
+          } as any,
+        ],
+        { type: "pie", config: { aggregation: "count" } },
+        mockStore,
+        { legends: [] },
+      );
+      expect(vi.mocked(applyAggregation).mock.calls.map((call) => call[1])).toEqual([
+        "last",
+        "count",
+      ]);
     });
 
     it("should populate extras.legends with series names", () => {
@@ -545,6 +600,39 @@ describe("PieConverter", () => {
       expect(result.series[0].label.fontSize).toBe(12);
     });
 
+    describe.each(["pie", "donut"])("%s percent decimals", (type) => {
+      const convertWith = (config: Record<string, any>) =>
+        converter.convert(
+          [{ series: [{ name: "series1", values: [[1, "100"]] }], timestamps: [1], queryIndex: 0 }],
+          { type, config },
+          mockStore,
+          mockExtras,
+        ).series[0];
+      const params = { name: "series1", value: 100, percent: 33.3333 };
+
+      it("rounds the slice percents and prints the labels at the panel decimals", () => {
+        const series = convertWith({ decimals: 4 });
+        expect(series.percentPrecision).toBe(4);
+        expect(series.label.formatter(params)).toBe("series1: 100.0000 (33.3333%)");
+
+        const whole = convertWith({ decimals: 0, label_format: "{b} {d}%" });
+        expect(whole.percentPrecision).toBe(0);
+        expect(whole.label.formatter({ ...params, percent: 33 })).toBe("series1 33%");
+      });
+
+      it("defaults to two decimals and caps the rounding precision", () => {
+        expect(convertWith({}).percentPrecision).toBe(2);
+        expect(convertWith({}).label.formatter({ ...params, percent: 33.33 })).toBe(
+          "series1: 100.00 (33.33%)",
+        );
+        const capped = convertWith({ decimals: 20 });
+        expect(capped.percentPrecision).toBe(13);
+        expect(capped.label.formatter({ ...params, percent: 33.3333333333333 })).toBe(
+          "series1: 100.00000000000000000000 (33.3333333333333%)",
+        );
+      });
+    });
+
     describe("label formatter", () => {
       it("should format label with default format", () => {
         const processedData: ProcessedPromQLData[] = [
@@ -575,7 +663,7 @@ describe("PieConverter", () => {
 
         const formatted = result.series[0].label.formatter(params);
 
-        expect(formatted).toBe("series1: 100.00 (50.0%)");
+        expect(formatted).toBe("series1: 100.00 (50.00%)");
       });
 
       it("should format label with custom label_format", () => {
@@ -609,7 +697,7 @@ describe("PieConverter", () => {
 
         const formatted = result.series[0].label.formatter(params);
 
-        expect(formatted).toBe("series1: 100.00 (50.0%)");
+        expect(formatted).toBe("series1: 100.00 (50.00%)");
       });
 
       it("should format label with unit", () => {
@@ -915,6 +1003,33 @@ describe("PieConverter", () => {
 
       expect(result).toBeDefined();
       expect(result.series[0].data).toHaveLength(1);
+    });
+
+    it("colours each slice from the chart-wide distinct map before the name hash", async () => {
+      const { createDistinctSeriesColor } = await import("../colorPalette");
+      vi.mocked(createDistinctSeriesColor).mockImplementationOnce((names, colorCfg, theme) => {
+        expect(names).toEqual(["Pending", "Succeeded"]);
+        expect(colorCfg).toBeUndefined();
+        expect(theme).toBe("light");
+        return (name: string) => (name === "Succeeded" ? "#5b8ef0" : undefined);
+      });
+      const processedData: ProcessedPromQLData[] = [
+        {
+          series: [
+            { name: "Pending", values: [[1, "3"]] },
+            { name: "Succeeded", values: [[1, "3"]] },
+          ],
+          timestamps: [1],
+          queryIndex: 0,
+        },
+      ];
+
+      const result = converter.convert(processedData, { type: "pie" }, mockStore, mockExtras);
+
+      const colorOf = (name: string) =>
+        result.series[0].data.find((d: any) => d.name === name).itemStyle?.color;
+      expect(colorOf("Succeeded")).toBe("#5b8ef0");
+      expect(colorOf("Pending")).toBe("#CCCCCC");
     });
 
     it("should handle when getSeriesColor returns null", async () => {

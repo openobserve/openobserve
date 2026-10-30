@@ -19,17 +19,33 @@
 // data source's copy.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { defineComponent, h } from "vue";
+import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
-import { createI18n } from "vue-i18n";
 import { createRouter, createWebHistory } from "vue-router";
 import SetupCardRenderer from "./SetupCardRenderer.vue";
 import { iconRegistry } from "@/lib/core/Icon/OIcon.icons";
 import type { RichCardContent } from "./types";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OStep from "@/lib/navigation/Stepper/OStep.vue";
+import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
+import linuxCard from "./content/linux";
+import postgresCard from "./content/postgres";
+import kubernetesCard from "./content/kubernetes";
+import { gt } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({ getStreams: vi.fn() }),
 }));
+
+const nameListMock = vi.fn();
+vi.mock("@/services/stream", () => ({
+  default: { nameList: (...a: any[]) => nameListMock(...a) },
+}));
+vi.mock("@/services/search", () => ({ default: { search: vi.fn() } }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 const store = createStore({
   state: {
@@ -39,7 +55,6 @@ const store = createStore({
     theme: "light",
   },
 });
-const i18n = createI18n({ locale: "en", messages: { en: {} } });
 const router = createRouter({
   history: createWebHistory(),
   routes: [{ path: "/", component: { template: "<div/>" } }],
@@ -47,7 +62,7 @@ const router = createRouter({
 const SUBS = { url: "https://o2.example.com", org: "test-org", token: "tok" };
 
 const CONTENT: RichCardContent = {
-  provider: { name: "Demo", tagline: "A demo card.", logo: "", tone: "#000" },
+  provider: { id: "demo", name: "Demo", tagline: "A demo card.", logo: "", tone: "#000" },
   steps: [
     {
       id: "install",
@@ -77,12 +92,27 @@ const CONTENT: RichCardContent = {
   },
 };
 
+const barStart = vi.fn();
+const barProbeNow = vi.fn();
+// The bar's own polling is covered by FirstEventStatus.spec; here it only reports into the card.
+const FirstEventStatusStub = defineComponent({
+  name: "FirstEventStatus",
+  props: ["org", "signal", "targetStream", "match", "filter", "guideName", "docUrl", "sourceLabel"],
+  emits: ["detected", "copy-command", "state"],
+  setup(_props, { expose }) {
+    expose({ start: barStart, probeNow: barProbeNow });
+    return () => h("div", { "data-test": "first-event-status-stub" });
+  },
+});
+
 const mountCard = (content: RichCardContent = CONTENT) =>
   mount(SetupCardRenderer, {
     props: { content, subs: SUBS },
-    global: { plugins: [store, i18n, router] },
+    global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
     attachTo: document.body,
   });
+
+const bar = (wrapper: VueWrapper<any>) => wrapper.findComponent(FirstEventStatusStub);
 
 describe("SetupCardRenderer — advanced section", () => {
   let wrapper: VueWrapper<any>;
@@ -118,6 +148,108 @@ describe("SetupCardRenderer — advanced section", () => {
   it("omits the accordion entirely when no advanced content is given", () => {
     wrapper = mountCard({ ...CONTENT, extras: { troubleshooting: [] } });
     expect(wrapper.find('[data-test="ai-advanced-accordion"]').exists()).toBe(false);
+  });
+});
+
+describe("SetupCardRenderer — ingest token gating", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  const tokenContent: RichCardContent = {
+    ...CONTENT,
+    steps: [
+      {
+        ...CONTENT.steps[0],
+        code: {
+          lang: "bash",
+          raw: "curl -H 'Authorization: Basic tok'",
+          masked: "curl -H 'Authorization: Basic ••••'",
+          dataTest: "token-block",
+        },
+      },
+      {
+        id: "plain",
+        title: "Plain",
+        completeOn: "copy",
+        code: { lang: "bash", raw: "helm repo update", dataTest: "plain-block" },
+      },
+      CONTENT.steps[1],
+    ],
+  };
+
+  const mountWithToken = (tokenState?: "ready" | "loading" | "unavailable") =>
+    mount(SetupCardRenderer, {
+      props: { content: tokenContent, subs: SUBS, tokenState },
+      global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
+      attachTo: document.body,
+    });
+  const has = (testId: string) => wrapper.find(`[data-test="${testId}"]`).exists();
+
+  it("shows a skeleton for the token block while the token loads, and keeps tokenless blocks", () => {
+    wrapper = mountWithToken("loading");
+    expect(has("token-block-loading")).toBe(true);
+    expect(has("token-block-copy-btn")).toBe(false);
+    expect(has("plain-block-copy-btn")).toBe(true);
+  });
+
+  it("drops the token block when no token can be had, and keeps tokenless blocks", () => {
+    wrapper = mountWithToken("unavailable");
+    expect(has("token-block-loading")).toBe(false);
+    expect(has("token-block-copy-btn")).toBe(false);
+    expect(has("plain-block-copy-btn")).toBe(true);
+  });
+
+  it("renders the token block by default", () => {
+    wrapper = mountWithToken();
+    expect(has("token-block-loading")).toBe(false);
+    expect(has("token-block-copy-btn")).toBe(true);
+  });
+});
+
+// Content builders (setupCard/content/*) store copy as i18n keys and the
+// renderer resolves them; a consumer that forgets t() shows the user a key.
+describe("SetupCardRenderer — key-as-data copy", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  const keyed: RichCardContent = {
+    ...CONTENT,
+    steps: [
+      {
+        id: "configure",
+        titleKey: "ingestion.setupCard.configureCollectorTitle",
+        descriptionKey: "ingestion.setupCard.configureCollectorDesc",
+        completeOn: "copy",
+        inputs: [
+          { id: "host", labelKey: "ingestion.setupCard.jmxHostLabel", default: "localhost" },
+        ],
+        variants: [
+          {
+            id: "generic",
+            labelKey: "ingestion.setupCard.jmxPortLabel",
+            code: { lang: "bash", raw: "echo hi" },
+          },
+        ],
+      },
+      CONTENT.steps[1],
+    ],
+  };
+
+  it("translates titleKey / descriptionKey / labelKey instead of printing the key", () => {
+    wrapper = mountCard(keyed);
+    const text = wrapper.text();
+    expect(text).toContain("Configure the OpenTelemetry Collector");
+    // inlineMd turns the `config.yaml` backticks into <code>, so match the prose.
+    expect(text).toContain("set the host/port below");
+    expect(text).toContain("JMX Host");
+    expect(text).toContain("JMX Port");
+    expect(text).not.toContain("ingestion.setupCard.");
   });
 });
 
@@ -218,6 +350,163 @@ describe("SetupCardRenderer — footer doc links", () => {
   });
 });
 
+// T1.2 (design 4.2/§6): the one new emit + detect-gated action; existing cards listen to neither.
+describe("SetupCardRenderer — first-event bar, detected emit & showOnDetect actions", () => {
+  let wrapper: VueWrapper<any>;
+
+  const hostContent = (): RichCardContent => ({
+    ...CONTENT,
+    steps: [
+      CONTENT.steps[0],
+      CONTENT.steps[1],
+      {
+        id: "dashboard",
+        title: "Get your dashboard",
+        description: "Opens after detection.",
+        completeOn: "detect",
+        action: {
+          id: "view-host-dashboard",
+          label: "View dashboard",
+          showOnDetect: true,
+        } as any,
+      },
+    ],
+    detect: { streamType: "metrics", match: "keyword", streamName: "system_", filter: "" },
+  });
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+    barStart.mockReset();
+    barProbeNow.mockReset();
+  });
+
+  it("mounts the bar on the detection step in place of the Test button", () => {
+    wrapper = mountCard();
+    expect(bar(wrapper).exists()).toBe(true);
+    expect(wrapper.find('[data-test="ai-c-test"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="ai-c-statusbar"]').exists()).toBe(false);
+  });
+
+  it("hands the bar the card's own detect stream and filter, so Test and the bar never disagree", () => {
+    wrapper = mountCard();
+    expect(bar(wrapper).props()).toMatchObject({
+      org: "test-org",
+      signal: "logs",
+      targetStream: "default",
+      filter: "a IS NOT NULL",
+      guideName: "Demo",
+    });
+  });
+
+  it("hands a keyword-matched card's name fragment and match mode to the bar", () => {
+    wrapper = mountCard(hostContent());
+    expect(bar(wrapper).props()).toMatchObject({
+      signal: "metrics",
+      targetStream: "system_",
+      match: "keyword",
+      filter: undefined,
+    });
+  });
+
+  it("emits `detected` exactly once, with the count, when the bar reports data", async () => {
+    wrapper = mountCard(hostContent());
+    bar(wrapper).vm.$emit("detected", { count: 3 });
+    await flushPromises();
+    bar(wrapper).vm.$emit("detected", { count: 5 });
+    await flushPromises();
+    expect(wrapper.emitted("detected")).toEqual([[3]]);
+  });
+
+  it("tracks data_source_connected with the provider id, not its label, on connect", async () => {
+    vi.mocked(analytics.track).mockClear();
+    wrapper = mountCard(hostContent());
+    bar(wrapper).vm.$emit("detected", { count: 3 });
+    await flushPromises();
+    expect(analytics.track).toHaveBeenCalledTimes(1);
+    expect(analytics.track).toHaveBeenCalledWith("data_source_connected", {
+      provider: "demo",
+      stream_type: "metrics",
+    });
+  });
+
+  it("does not emit `detected` on a fresh mount (no transition happened)", async () => {
+    wrapper = mountCard(hostContent());
+    await flushPromises();
+    expect(wrapper.emitted("detected")).toBeUndefined();
+  });
+
+  it("hides a showOnDetect action pre-connect and reveals it post-connect", async () => {
+    wrapper = mountCard(hostContent());
+    expect(wrapper.find('[data-test="ai-step-action-view-host-dashboard"]').exists()).toBe(false);
+    bar(wrapper).vm.$emit("detected", { count: 3 });
+    await flushPromises();
+    expect(wrapper.find('[data-test="ai-step-action-view-host-dashboard"]').exists()).toBe(true);
+  });
+
+  it("keeps actions WITHOUT showOnDetect visible regardless of detection state", () => {
+    // The ~30 existing cards must render identically (default false).
+    const content: RichCardContent = {
+      ...CONTENT,
+      steps: [
+        {
+          ...CONTENT.steps[0],
+          action: { id: "launch-console", label: "Launch" },
+        },
+        CONTENT.steps[1],
+      ],
+    };
+    wrapper = mountCard(content);
+    expect(wrapper.find('[data-test="ai-step-action-launch-console"]').exists()).toBe(true);
+  });
+
+  it("shows the most-likely-fix box only once the bar has a diagnosis, and rechecks through the bar", async () => {
+    const content: RichCardContent = {
+      ...CONTENT,
+      extras: { ...CONTENT.extras, fixSnippet: "import otel_first" },
+    };
+    wrapper = mountCard(content);
+    expect(wrapper.find('[data-test="ai-fix-code"]').exists()).toBe(false);
+    bar(wrapper).vm.$emit("state", "no-requests");
+    await flushPromises();
+    expect(wrapper.find('[data-test="ai-fix-code"]').exists()).toBe(true);
+    await wrapper.find('[data-test="ai-c-fix-recheck"]').trigger("click");
+    expect(barProbeNow).toHaveBeenCalledTimes(1);
+    bar(wrapper).vm.$emit("state", "received");
+    await flushPromises();
+    expect(wrapper.find('[data-test="ai-fix-code"]').exists()).toBe(false);
+  });
+
+  it("re-copies through the first step's own block when the bar asks for the command", async () => {
+    wrapper = mountCard();
+    const copyBtn = wrapper.find('[data-test="ingestion-setup-code-block-copy-btn"]');
+    expect(copyBtn.exists()).toBe(true);
+    const clicked = vi.fn();
+    copyBtn.element.addEventListener("click", clicked);
+    bar(wrapper).vm.$emit("copy-command");
+    expect(clicked).toHaveBeenCalledTimes(1);
+  });
+
+  it("names the cluster or host only once the user typed one, never the input's default (B5)", async () => {
+    const content: RichCardContent = {
+      ...CONTENT,
+      steps: [
+        {
+          ...CONTENT.steps[0],
+          inputs: [{ id: "cluster", label: "Cluster", default: "acme-prod-eks" } as any],
+        },
+        CONTENT.steps[1],
+      ],
+    };
+    wrapper = mountCard(content);
+    expect(bar(wrapper).props("sourceLabel")).toBeUndefined();
+    const input = wrapper.find('[data-test="ai-input-cluster"] input');
+    await input.setValue("web-07");
+    expect(bar(wrapper).props("sourceLabel")).toBe("web-07");
+    await input.setValue("acme-prod-eks");
+    expect(bar(wrapper).props("sourceLabel")).toBeUndefined();
+  });
+});
+
 describe("SetupCardRenderer — step-note jump links", () => {
   let wrapper: VueWrapper<any>;
 
@@ -283,5 +572,549 @@ describe("SetupCardRenderer — step-note jump links", () => {
     // ...and the payload survives only as inert escaped text, never an href.
     expect(html).not.toContain('href="javascript:');
     expect(wrapper.find(".step-note").text()).toContain("javascript:alert(1)");
+  });
+});
+
+describe("SetupCardRenderer — product analytics", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  it("tracks snippet_copied with the current route and partial flag, and restarts the bar's fast cadence", () => {
+    wrapper = mountCard();
+
+    wrapper.findComponent(OCodeBlock).vm.$emit("copy", { partial: true });
+
+    expect(analytics.track).toHaveBeenCalledWith("snippet_copied", {
+      route: router.currentRoute.value.name,
+      partial: true,
+    });
+    expect(barStart).toHaveBeenCalledWith("copy");
+  });
+
+  it("makes every step block copy on click and names the token only where it is masked", () => {
+    const content: RichCardContent = {
+      ...CONTENT,
+      steps: [
+        { ...CONTENT.steps[0], code: { lang: "bash", raw: "key=pc", masked: "key=••" } },
+        CONTENT.steps[1],
+      ],
+    };
+    const tokenStore = createStore({
+      state: {
+        selectedOrganization: { identifier: "test-org" },
+        userInfo: { email: "t@e.com" },
+        organizationData: {
+          organizationPasscode: "pc",
+          orgTokens: [{ name: "default", token: "pc" }],
+        },
+        theme: "light",
+      },
+    });
+    wrapper = mount(SetupCardRenderer, {
+      props: { content, subs: SUBS },
+      global: {
+        plugins: [tokenStore, router],
+        stubs: { FirstEventStatus: FirstEventStatusStub },
+      },
+    });
+    const block = wrapper.findComponent(OCodeBlock);
+    expect(block.props("tokenName")).toBe("default");
+  });
+});
+
+describe("SetupCardRenderer — Linux install step tracing toggle", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  const LINUX_SUBS = { ...SUBS, token: "dGVzdEB0b2tlbg==" };
+  const BASE_TAIL = `./install.sh ${LINUX_SUBS.url}/api/${LINUX_SUBS.org}/ ${LINUX_SUBS.token}`;
+  const installBlock = () => wrapper.findAllComponents(OCodeBlock)[0];
+  const installNotes = () =>
+    wrapper.find('[data-test="ai-variant-tabs"]').element.parentElement!.textContent ?? "";
+  const field = (id: string) => wrapper.find(`[data-test="ai-input-${id}"]`);
+  const type = (id: string, v: string) => field(id).find("input").setValue(v);
+  const warning = () => wrapper.find('[data-test="ai-variant-require-install"]');
+  const pick = async (id: string) => {
+    wrapper.findAllComponents(OToggleGroup)[0].vm.$emit("update:modelValue", id);
+    await flushPromises();
+  };
+  const mountLinux = () =>
+    mount(SetupCardRenderer, {
+      props: { content: linuxCard(LINUX_SUBS, gt), subs: LINUX_SUBS },
+      global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
+      attachTo: document.body,
+    });
+
+  it("shows the tracing fields only under traces, and leaves the default command unchanged", async () => {
+    wrapper = mountLinux();
+    expect(installBlock().props("code").endsWith(BASE_TAIL)).toBe(true);
+    expect(installNotes()).not.toContain("BTF");
+    for (const id of ["ports", "exe", "cmd", "serviceName"]) expect(field(id).exists()).toBe(false);
+    expect(wrapper.find('[data-test="ai-step-inputs-install"]').exists()).toBe(false);
+
+    await pick("traces");
+    for (const id of ["ports", "exe", "cmd", "serviceName"]) expect(field(id).exists()).toBe(true);
+    expect(installNotes()).toContain("BTF");
+    expect(warning().exists()).toBe(false);
+    expect(installBlock().props("code").endsWith(`${BASE_TAIL} --trace-ports '8080'`)).toBe(true);
+
+    await pick("logs-metrics");
+    expect(field("ports").exists()).toBe(false);
+    expect(installBlock().props("code").endsWith(BASE_TAIL)).toBe(true);
+  });
+
+  it("emits all four flags in order, single-quoted, with the token still masked", async () => {
+    wrapper = mountLinux();
+    await pick("traces");
+    await type("ports", "80,443,8000-8999");
+    await type("exe", "/opt/my app/*");
+    await type("cmd", "*it's.py*");
+    await type("serviceName", "checkout");
+    const flags =
+      " --trace-ports '80,443,8000-8999' --trace-exe '/opt/my app/*'" +
+      " --trace-cmd '*it'\\''s.py*' --service-name 'checkout'";
+    expect(installBlock().props("code").endsWith(`${BASE_TAIL}${flags}`)).toBe(true);
+    expect(installBlock().props("codeMasked").endsWith(flags)).toBe(true);
+    expect(installBlock().props("codeMasked")).not.toContain(LINUX_SUBS.token);
+  });
+
+  it("keeps a typed $ literal inside the quotes", async () => {
+    wrapper = mountLinux();
+    await pick("traces");
+    await type("exe", "/opt/$$x/*a$&$");
+    expect(installBlock().props("code").endsWith(` --trace-exe '/opt/$$x/*a$&$'`)).toBe(true);
+  });
+
+  it("omits blank (or whitespace-only) fields instead of falling back to a default", async () => {
+    wrapper = mountLinux();
+    await pick("traces");
+    await type("ports", "   ");
+    await type("cmd", "*reports.py*");
+    expect(installBlock().props("code").endsWith(`${BASE_TAIL} --trace-cmd '*reports.py*'`)).toBe(
+      true,
+    );
+  });
+
+  it("warns and hides the command when no selector is filled", async () => {
+    wrapper = mountLinux();
+    await pick("traces");
+    await type("serviceName", "checkout");
+    await type("ports", "");
+    expect(warning().exists()).toBe(true);
+    expect(warning().text()).toContain("Fill in at least one");
+    const codes = wrapper.findAllComponents(OCodeBlock).map((b) => b.props("code"));
+    expect(codes.some((c) => c.includes("install.sh"))).toBe(false);
+
+    await type("exe", "/opt/myapp/*");
+    expect(warning().exists()).toBe(false);
+    expect(
+      installBlock()
+        .props("code")
+        .endsWith(" --trace-exe '/opt/myapp/*' --service-name 'checkout'"),
+    ).toBe(true);
+  });
+
+  it("scrolls to the install step when the bar asks for a command that is hidden", async () => {
+    wrapper = mountLinux();
+    await pick("traces");
+    await type("ports", "");
+    expect(warning().exists()).toBe(true);
+    const original = (Element.prototype as any).scrollIntoView;
+    const scrollSpy = vi.fn();
+    (Element.prototype as any).scrollIntoView = scrollSpy;
+    try {
+      bar(wrapper).vm.$emit("copy-command");
+      expect(scrollSpy).toHaveBeenCalledTimes(1);
+      expect((scrollSpy.mock.contexts[0] as Element).contains(warning().element)).toBe(true);
+    } finally {
+      (Element.prototype as any).scrollIntoView = original;
+    }
+  });
+
+  it("marks the install step done when the traces command is copied", async () => {
+    wrapper = mountLinux();
+    await pick("traces");
+    const step = () => wrapper.findAllComponents(OStep)[0];
+    expect(step().props("done")).toBe(false);
+    installBlock().vm.$emit("copy", { partial: false });
+    await flushPromises();
+    expect(step().props("done")).toBe(true);
+  });
+
+  it("leaves step-level inputs where they were (Kubernetes cluster name)", async () => {
+    wrapper = mount(SetupCardRenderer, {
+      props: { content: kubernetesCard(LINUX_SUBS, gt), subs: LINUX_SUBS },
+      global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
+      attachTo: document.body,
+    });
+    expect(
+      wrapper.find('[data-test="ai-step-inputs-install"] [data-test="ai-input-cluster"]').exists(),
+    ).toBe(true);
+    expect(wrapper.find('[data-test="ai-variant-inputs-install"]').exists()).toBe(false);
+    await wrapper.find('[data-test="ai-input-cluster"] input').setValue("prod-eu");
+    expect(installBlock().props("code")).toContain("--cluster-name=prod-eu");
+    await wrapper.find('[data-test="ai-input-cluster"] input').setValue("");
+    expect(installBlock().props("code")).not.toContain("cluster1");
+  });
+});
+
+describe("SetupCardRenderer — Kubernetes instrument step (nested toggle)", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  const BASE = `helm repo update openobserve
+helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-collector \\
+  --version '>=0.6.0' --reset-then-reuse-values \\
+  --set ebpf.enabled=true`;
+  const codes = () => wrapper.findAllComponents(OCodeBlock).map((b) => b.props("code") as string);
+  const instrumentCode = () =>
+    codes().find((c) => c.includes("kubectl annotate") || c.includes("upgrade o2c"));
+  const field = (id: string) => wrapper.find(`[data-test="ai-input-${id}"]`);
+  const type = (id: string, v: string) => field(id).find("input").setValue(v);
+  const warning = () => wrapper.find('[data-test="ai-variant-require-instrument"]');
+  const subTabs = () => wrapper.find('[data-test="ai-subvariant-tabs-instrument"]');
+  const pickTop = async (id: string) => {
+    const tabs = wrapper
+      .findAll('[data-test="ai-variant-tabs"]')
+      .find((t) => t.find('[data-test="ai-variant-ebpf"]').exists())!;
+    tabs.findComponent(OToggleGroup).vm.$emit("update:modelValue", id);
+    await flushPromises();
+  };
+  const pickSub = async (id: string) => {
+    subTabs().findComponent(OToggleGroup).vm.$emit("update:modelValue", id);
+    await flushPromises();
+  };
+  const mountK8s = () =>
+    mount(SetupCardRenderer, {
+      props: { content: kubernetesCard(SUBS, gt), subs: SUBS },
+      global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
+      attachTo: document.body,
+    });
+
+  it("renders the nested language toggle under language libraries and switches code", async () => {
+    wrapper = mountK8s();
+    expect(subTabs().exists()).toBe(true);
+    for (const id of ["java", "dotnet", "nodejs", "python"]) {
+      expect(subTabs().find(`[data-test="ai-variant-${id}"]`).exists()).toBe(true);
+    }
+    expect(instrumentCode()).toContain("inject-java=");
+    await pickSub("python");
+    expect(instrumentCode()).toContain("inject-python=");
+    expect(instrumentCode()).not.toContain("inject-java=");
+
+    await pickTop("ebpf");
+    expect(subTabs().exists()).toBe(false);
+    await pickTop("libraries");
+    // Each top-level choice remembers its own nested selection.
+    expect(instrumentCode()).toContain("inject-python=");
+  });
+
+  it("shows the eBPF fields only under eBPF, opening with nothing selected", async () => {
+    wrapper = mountK8s();
+    for (const id of ["ebpfPorts", "ebpfExe", "ebpfCmd"]) expect(field(id).exists()).toBe(false);
+    await pickTop("ebpf");
+    for (const id of ["ebpfPorts", "ebpfExe", "ebpfCmd"]) expect(field(id).exists()).toBe(true);
+    expect(warning().exists()).toBe(true);
+    expect(codes().some((c) => c.includes("upgrade o2c"))).toBe(false);
+
+    await type("ebpfPorts", "8080");
+    expect(warning().exists()).toBe(false);
+    expect(instrumentCode()).toBe(
+      `${BASE} \\\n  --set-string 'ebpf.trace.ports={8080}'` +
+        ` \\\n  --set ebpf.trace.exePaths=null \\\n  --set ebpf.trace.cmdLines=null`,
+    );
+  });
+
+  it("emits one --set-string per filled field, in order, with comma-split quoted lists", async () => {
+    wrapper = mountK8s();
+    await pickTop("ebpf");
+    await type("ebpfPorts", " 8080, 9000-9100 ,,");
+    await type("ebpfExe", "/app/it's*");
+    await type("ebpfCmd", "*reports.py*, *worker*");
+    expect(instrumentCode()).toBe(
+      `${BASE} \\\n  --set-string 'ebpf.trace.ports={8080,9000-9100}'` +
+        ` \\\n  --set-string 'ebpf.trace.exePaths={/app/it'\\''s*}'` +
+        ` \\\n  --set-string 'ebpf.trace.cmdLines={*reports.py*,*worker*}'`,
+    );
+  });
+
+  it("sets blank fields to null so a selector from an earlier run is cleared", async () => {
+    wrapper = mountK8s();
+    await pickTop("ebpf");
+    await type("ebpfPorts", "  ");
+    await type("ebpfCmd", "*reports.py*");
+    expect(instrumentCode()).toBe(
+      `${BASE} \\\n  --set ebpf.trace.ports=null \\\n  --set ebpf.trace.exePaths=null` +
+        ` \\\n  --set-string 'ebpf.trace.cmdLines={*reports.py*}'`,
+    );
+  });
+
+  it("warns and hides the command when every selector is blank", async () => {
+    wrapper = mountK8s();
+    await pickTop("ebpf");
+    expect(warning().exists()).toBe(true);
+    expect(warning().text()).toContain("Fill in at least one");
+    expect(codes().some((c) => c.includes("upgrade o2c"))).toBe(false);
+  });
+
+  it("escapes backslashes and braces so a value cannot close the Helm list", async () => {
+    wrapper = mountK8s();
+    await pickTop("ebpf");
+    await type(
+      "ebpfCmd",
+      "*x*},exporters.otlphttp/openobserve.endpoint=https://evil.example,ebpf.trace.cmdLines={*y*",
+    );
+    await type("ebpfExe", String.raw`*a\b*`);
+    expect(instrumentCode()).toBe(
+      `${BASE} \\\n  --set ebpf.trace.ports=null` +
+        ` \\\n  --set-string 'ebpf.trace.exePaths={*a\\\\b*}'` +
+        ` \\\n  --set-string 'ebpf.trace.cmdLines={*x*\\},exporters.otlphttp/openobserve.endpoint=https://evil.example,ebpf.trace.cmdLines=\\{*y*}'`,
+    );
+  });
+
+  it("treats a field holding only commas and spaces as blank", async () => {
+    wrapper = mountK8s();
+    await pickTop("ebpf");
+    await type("ebpfPorts", " ,,, ");
+    await type("ebpfExe", ",");
+    expect(warning().exists()).toBe(true);
+    expect(codes().some((c) => c.includes("upgrade o2c"))).toBe(false);
+  });
+});
+
+describe("SetupCardRenderer — setup modes", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  const MODES: RichCardContent = {
+    provider: { id: "demo-db", name: "Demo DB", tagline: "A demo.", logo: "", tone: "#000" },
+    setupModes: [
+      { id: "auto", label: "Automatic" },
+      { id: "manual", label: "Manual" },
+    ],
+    steps: [
+      {
+        id: "prepare",
+        title: "Prepare",
+        completeOn: "copy",
+        code: { lang: "sql", raw: "SELECT 1" },
+      },
+      {
+        id: "auto",
+        mode: "auto",
+        title: "Quick install",
+        completeOn: "copy",
+        required: true,
+        inputs: [{ id: "host", label: "Host", default: "localhost" }],
+        code: { lang: "bash", raw: "install --host={host}" },
+        note: "Prefer the long way? Use [Manual](#manual).",
+      },
+      {
+        id: "m-config",
+        mode: "manual",
+        title: "Configure",
+        completeOn: "copy",
+        required: true,
+        inputs: [{ id: "host", label: "Host", default: "localhost" }],
+        code: { lang: "bash", raw: "endpoint: {host}" },
+      },
+      {
+        id: "m-run",
+        mode: "manual",
+        title: "Run",
+        completeOn: "copy",
+        code: { lang: "bash", raw: "run" },
+      },
+      { id: "verify", title: "Verify", completeOn: "detect", detectionAnchor: true },
+    ],
+    detect: { streamType: "metrics", match: "keyword", streamName: "demo", filter: "" },
+    extras: {
+      uninstall: { label: "Uninstall", code: { lang: "bash", raw: "uninstall --host={host}" } },
+    },
+  };
+
+  const stepIds = () =>
+    wrapper
+      .findAllComponents(OStep)
+      .map((s) => String(s.vm.$attrs["data-test"]).replace("ai-step-", ""));
+  const pickMode = async (id: string) => {
+    wrapper
+      .find('[data-test="ai-setup-mode-tabs"]')
+      .findComponent(OToggleGroup)
+      .vm.$emit("update:modelValue", id);
+    await flushPromises();
+  };
+  const copyStep = async (id: string) => {
+    wrapper.find(`[data-test="ai-step-${id}"]`).findComponent(OCodeBlock).vm.$emit("copy", {});
+    await flushPromises();
+  };
+  const activeStep = () => wrapper.findComponent(OStepper).props("modelValue");
+
+  it("renders no mode toggle and every step for a card without setupModes", () => {
+    wrapper = mountCard();
+    expect(wrapper.find('[data-test="ai-setup-mode-tabs"]').exists()).toBe(false);
+    expect(stepIds()).toEqual(["install", "verify"]);
+  });
+
+  it("opens on the first mode and shows untagged steps in both modes", async () => {
+    wrapper = mountCard(MODES);
+    expect(wrapper.find('[data-test="ai-setup-mode-auto"]').text()).toBe("Automatic");
+    expect(stepIds()).toEqual(["prepare", "auto", "verify"]);
+    await pickMode("manual");
+    expect(stepIds()).toEqual(["prepare", "m-config", "m-run", "verify"]);
+  });
+
+  it("counts only the visible steps toward completion and the active step", async () => {
+    wrapper = mountCard(MODES);
+    await copyStep("prepare");
+    await copyStep("auto");
+    // Hidden manual steps never block: the verify step (3rd visible) is next.
+    expect(activeStep()).toBe(3);
+    await pickMode("manual");
+    expect(activeStep()).toBe(2);
+    await copyStep("m-config");
+    await copyStep("m-run");
+    expect(activeStep()).toBe(4);
+  });
+
+  it("keeps a typed input value across modes, since both paths share its id", async () => {
+    wrapper = mountCard(MODES);
+    await wrapper.find('[data-test="ai-input-host"] input').setValue("db.internal");
+    expect(wrapper.find('[data-test="ai-step-auto"]').text()).toContain(
+      "install --host=db.internal",
+    );
+    await pickMode("manual");
+    expect(wrapper.find('[data-test="ai-step-m-config"]').text()).toContain(
+      "endpoint: db.internal",
+    );
+  });
+
+  it("switches to the manual mode from a [label](#manual) note link", async () => {
+    wrapper = mountCard(MODES);
+    (Element.prototype as any).scrollIntoView = vi.fn();
+    const link = wrapper.find('a.note-jump[data-jump="manual"]');
+    expect(link.text()).toBe("Manual");
+    await link.trigger("click");
+    await flushPromises();
+    expect(stepIds()).toContain("m-config");
+    expect(stepIds()).not.toContain("auto");
+  });
+
+  it("ignores a #manual link on a card that has no manual mode", async () => {
+    wrapper = mountCard({
+      ...MODES,
+      setupModes: [{ id: "auto", label: "Automatic" }],
+    });
+    await wrapper.find('a.note-jump[data-jump="manual"]').trigger("click");
+    await flushPromises();
+    expect(stepIds()).toEqual(["prepare", "auto", "verify"]);
+  });
+
+  it("auto-advances to the next visible step after switching modes", async () => {
+    wrapper = mountCard(MODES);
+    await pickMode("manual");
+    await pickMode("auto");
+    await pickMode("manual");
+    const targets: Element[] = [];
+    const original = (Element.prototype as any).scrollIntoView;
+    (Element.prototype as any).scrollIntoView = function (this: Element) {
+      targets.push(this);
+    };
+    try {
+      await copyStep("prepare");
+      // A step unmounted by the switch must not clear the ref of the step now in its slot.
+      expect(targets).toHaveLength(1);
+      expect(targets[0].closest('[data-test="ai-step-m-config"]')).not.toBeNull();
+      await copyStep("m-config");
+      expect(targets[1].closest('[data-test="ai-step-m-run"]')).not.toBeNull();
+    } finally {
+      (Element.prototype as any).scrollIntoView = original;
+    }
+  });
+
+  it("shows a mode-scoped uninstall section only in its mode", async () => {
+    wrapper = mountCard({
+      ...MODES,
+      extras: { uninstall: { ...MODES.extras!.uninstall!, mode: "auto" } },
+    });
+    expect(wrapper.find('[data-test="ai-uninstall-accordion"]').exists()).toBe(true);
+    await pickMode("manual");
+    expect(wrapper.find('[data-test="ai-uninstall-accordion"]').exists()).toBe(false);
+  });
+
+  it("fills step inputs into the uninstall command", async () => {
+    wrapper = mountCard(MODES);
+    await wrapper.find('[data-test="ai-input-host"] input').setValue("db.internal");
+    await wrapper.find('[data-test="ai-uninstall-accordion"] button').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="ai-uninstall-code"]').text()).toContain(
+      "uninstall --host=db.internal",
+    );
+  });
+
+  it("drives the Postgres card: installer by default, DBM variant adds --dbm and the log path", async () => {
+    const PG_SUBS = { ...SUBS, token: "dGVzdEB0b2tlbg==" };
+    wrapper = mount(SetupCardRenderer, {
+      props: { content: postgresCard(PG_SUBS, gt), subs: PG_SUBS },
+      global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
+      attachTo: document.body,
+    });
+    expect(stepIds()).not.toContain("install");
+    expect(stepIds()).not.toContain("dbm-configure");
+    expect(stepIds().slice(0, 3)).toEqual(["prepare", "quick-install", "verify"]);
+    const quick = () => wrapper.find('[data-test="ai-step-quick-install"]');
+    const code = () => quick().findComponent(OCodeBlock);
+    expect(code().props("code")).toContain("--db=postgres");
+    expect(code().props("code")).not.toContain("--dbm");
+    // Shown masked; the raw token is only in the copied text.
+    expect(code().props("codeMasked")).not.toContain(PG_SUBS.token);
+    expect(quick().find('[data-test="ai-input-logpath"]').exists()).toBe(false);
+
+    quick().findComponent(OToggleGroup).vm.$emit("update:modelValue", "metrics-dbm");
+    await flushPromises();
+    expect(code().props("code")).toContain("--dbm");
+    expect(code().props("code")).toContain("--log-path='/var/log/postgresql/postgresql*.log'");
+    expect(quick().find('[data-test="ai-input-logpath"]').exists()).toBe(true);
+
+    // Typed values are quoted and sanitised as the script will; a cleared field drops its flag.
+    await quick().find('[data-test="ai-input-serviceName"] input').setValue("Prod DB");
+    await quick().find('[data-test="ai-input-host"] input').setValue("db 1");
+    await quick().find('[data-test="ai-input-user"] input').setValue("");
+    expect(code().props("code")).toContain("--name='prod-db'");
+    expect(code().props("code")).toContain("--host='db 1'");
+    expect(code().props("code")).not.toContain("--db-user");
+    await wrapper.find('[data-test="ai-uninstall-accordion"] button').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="ai-uninstall-code"]').text()).toContain("--name='prod-db'");
+
+    await pickMode("manual");
+    // The script's uninstall does not apply to a manual install.
+    expect(wrapper.find('[data-test="ai-uninstall-accordion"]').exists()).toBe(false);
+    expect(stepIds()).toEqual([
+      "prepare",
+      "install",
+      "configure",
+      "run",
+      "verify",
+      "dbm-grant",
+      "dbm-logging",
+      "dbm-logging-verify",
+      "dbm-auto-explain",
+      "dbm-configure",
+      "dbm-run",
+      "verify-dbm",
+    ]);
   });
 });

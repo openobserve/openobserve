@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { PrebuiltConfig } from "./types";
+import { gt, raw } from "@/types/i18n";
+import { PrebuiltConfig, PrebuiltType } from "./types";
 
 /**
  * Opsgenie prebuilt destination configuration
@@ -22,7 +23,7 @@ export const opsgenieTemplate = {
   name: "prebuilt_opsgenie",
   body: JSON.stringify(
     {
-      message: "OpenObserve Alert: {alert_name}",
+      message: "OpenObserve [{alert_status}]: {alert_name}",
       alias: "openobserve-{alert_name}",
       description:
         "Alert Details:\n\nStream: {stream_name}\nType: {stream_type}\nCount: {alert_count}\nThreshold: {alert_operator} {alert_threshold}\nTime: {alert_time}",
@@ -57,15 +58,13 @@ export const opsgenieConfig: PrebuiltConfig = {
     Authorization: "GenieKey {api_key}",
   },
   method: "post",
-  urlValidator: (url: string) =>
-    url === "https://api.opsgenie.com/v2/alerts" || url === "https://api.eu.opsgenie.com/v2/alerts",
   credentialFields: [
     {
       key: "apiKey",
       labelKey: "alerts.prebuiltDestinations.opsgenieApiKey",
       type: "password",
       required: true,
-      hint: "Get your API key from Opsgenie integration settings",
+      hintKey: "alerts.prebuiltDestinations.opsgenieApiKeyHelp",
       validator: (key: string) =>
         key.length > 30 || {
           key: "alerts.prebuiltDestinations.opsgenieApiKeyLength",
@@ -76,19 +75,63 @@ export const opsgenieConfig: PrebuiltConfig = {
       labelKey: "alerts.prebuiltDestinations.opsgenieEuRegion",
       type: "toggle",
       required: false,
-      hint: "Enable for EU-based Opsgenie instances",
+      hintKey: "alerts.prebuiltDestinations.opsgenieEuRegionHelp",
+      persistInMetadata: true,
     },
     {
       key: "priority",
       labelKey: "alerts.prebuiltDestinations.opsgeniePriority",
       type: "select",
       required: false,
+      persistInMetadata: true,
+      // Getters, not resolved strings: this config object is module scope, so a
+      // plain call would freeze the copy at the boot locale.
       options: [
-        { label: "P1 (Critical)", value: "P1", description: "Highest priority alerts" },
-        { label: "P2 (High)", value: "P2", description: "High priority alerts" },
-        { label: "P3 (Moderate)", value: "P3", description: "Moderate priority alerts" },
-        { label: "P4 (Low)", value: "P4", description: "Low priority alerts" },
-        { label: "P5 (Informational)", value: "P5", description: "Informational alerts" },
+        {
+          get label() {
+            return gt("alerts.prebuiltDestinations.priorityP1");
+          },
+          value: "P1",
+          get description() {
+            return gt("alert_destinations.priorityP1Description");
+          },
+        },
+        {
+          get label() {
+            return gt("alerts.prebuiltDestinations.priorityP2");
+          },
+          value: "P2",
+          get description() {
+            return gt("alert_destinations.priorityP2Description");
+          },
+        },
+        {
+          get label() {
+            return gt("alerts.prebuiltDestinations.priorityP3");
+          },
+          value: "P3",
+          get description() {
+            return gt("alert_destinations.priorityP3Description");
+          },
+        },
+        {
+          get label() {
+            return gt("alerts.prebuiltDestinations.priorityP4");
+          },
+          value: "P4",
+          get description() {
+            return gt("alert_destinations.priorityP4Description");
+          },
+        },
+        {
+          get label() {
+            return gt("alerts.prebuiltDestinations.priorityP5");
+          },
+          value: "P5",
+          get description() {
+            return gt("alert_destinations.priorityP5Description");
+          },
+        },
       ],
     },
   ],
@@ -96,10 +139,10 @@ export const opsgenieConfig: PrebuiltConfig = {
 
 import opsgenieLogo from "@/assets/images/alerts/destinations/opsgenie.png";
 
-export const opsgenieDestinationType = {
+export const opsgenieDestinationType: PrebuiltType = {
   id: "opsgenie",
-  name: "Opsgenie",
-  description: "Create alerts in Opsgenie",
+  name: raw("Opsgenie"),
+  descriptionKey: "alert_destinations.prebuilt.opsgenieDescription",
   icon: "opsgenie",
   image: opsgenieLogo,
   popular: true,

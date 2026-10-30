@@ -20,8 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="running-queries-table"
       :data="rows"
       :columns="columns"
-      row-key="trace_id"
+      row-key="row_key"
       :loading="loadingState"
+      :forbidden="forbidden"
       :selected-ids="selectedRowIds"
       selection="multiple"
       pagination="client"
@@ -43,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="text-xs font-bold whitespace-nowrap"
             data-test="running-queries-last-refresh"
           >
-            Last Data Refresh Time: {{ lastRefreshed }}
+            {{ t("queries.lastDataRefreshTime") }} {{ lastRefreshed }}
           </span>
           <div class="flex-1"></div>
           <OToggleGroup
@@ -89,6 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon-left="format-list-bulleted"
           variant="ghost"
           size="icon-sm"
+          class="max-md:hidden"
           :title="t('queries.queryList')"
           data-test="queryList-btn"
           @click="listSchema(row)"
@@ -97,10 +99,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon-left="close"
           variant="ghost-destructive"
           size="icon-sm"
+          class="max-md:hidden"
           :title="t('queries.cancelQuery')"
           data-test="cancelQuery-btn"
           @click="confirmDeleteAction(row)"
         />
+        <ODropdown side="bottom" align="end">
+          <template #trigger>
+            <OButton
+              :aria-label="t('common.moreActions')"
+              icon-left="more-vert"
+              variant="ghost"
+              size="icon-xs-sq"
+              class="md:hidden"
+              data-test="running-queries-row-more-actions"
+              @click.stop
+            />
+          </template>
+          <ODropdownItem
+            icon-left="format-list-bulleted"
+            class="md:hidden"
+            data-test="queryList-btn-menu"
+            @select="listSchema(row)"
+          >
+            <span>{{ t("queries.queryList") }}</span>
+          </ODropdownItem>
+          <ODropdownItem
+            icon-left="close"
+            variant="destructive"
+            class="md:hidden"
+            data-test="cancelQuery-btn-menu"
+            @select="confirmDeleteAction(row)"
+          >
+            <span>{{ t("queries.cancelQuery") }}</span>
+          </ODropdownItem>
+        </ODropdown>
       </template>
       <template #cell-user_id="{ row }">
         <OUserCell :value="row.user_id" />
@@ -115,12 +148,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTag type="queryStatus" :value="row.status" />
       </template>
 
-      <template #bottom>
+      <template #selection-actions>
         <OButton
-          v-if="selectedRowsModel?.length"
           data-test="qm-multiple-cancel-query-btn"
           variant="outline-destructive"
-          size="sm-action"
+          size="sm"
           @click="handleMultiQueryCancel"
         >
           {{ t("queries.cancelQuery") }}
@@ -136,11 +168,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { ref, defineComponent, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -158,6 +192,8 @@ export default defineComponent({
     QueryList,
     OEmptyState,
     OButton,
+    ODropdown,
+    ODropdownItem,
     OTooltip,
     OToggleGroup,
     OToggleGroupItem,
@@ -176,6 +212,10 @@ export default defineComponent({
       required: false,
     },
     filtered: {
+      type: Boolean,
+      default: false,
+    },
+    forbidden: {
       type: Boolean,
       default: false,
     },
@@ -211,7 +251,7 @@ export default defineComponent({
     const { isMetaOrg } = useIsMetaOrg();
     const loadingState = ref(false);
 
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const showListSchemaDialog = ref(false);
 
     const listSchema = (row: any) => {
@@ -321,12 +361,12 @@ export default defineComponent({
     ];
 
     const selectedRowIds = computed(() =>
-      ((props.selectedRows as any[]) || []).map((r: any) => r.trace_id),
+      ((props.selectedRows as any[]) || []).map((r: any) => r.row_key),
     );
 
     const handleSelectedIdsUpdate = (ids: string[]) => {
       const rows = (props.rows as any[]) || [];
-      const map = new Map(rows.map((r: any) => [r.trace_id, r]));
+      const map = new Map(rows.map((r: any) => [r.row_key, r]));
       const selected = ids.map((id: any) => map.get(id)).filter(Boolean);
       emit("update:selectedRows", selected);
     };

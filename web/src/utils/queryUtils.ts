@@ -4,6 +4,7 @@ import config from "../aws-exports";
 import { useStore } from "vuex";
 import CronExpressionParser from "cron-parser";
 import { getFunctionErrorMessage } from "@/utils/timezone";
+import { gt, type TranslateFn } from "@/types/i18n";
 
 export const getPath = () => {
   const pos = window.location.pathname.indexOf("/web/");
@@ -228,7 +229,14 @@ export const mergeAndRemoveDuplicates = (arr1: string[], arr2: string[]): string
 };
 
 export const maxLengthCharValidation = (val: string = "", char_length: number = 50) => {
-  return (val && val.length <= char_length) || `Maximum ${char_length} characters allowed`;
+  // A Quasar `rules` entry: callers pass the function itself, so there is no
+  // call site that could hand in a `t` — resolve through the global instance.
+  return (
+    (val && val.length <= char_length) ||
+    gt("common.maxCharactersAllowed", {
+      length: char_length,
+    })
+  );
 };
 
 export const validateUrl = (val: string) => {
@@ -270,9 +278,33 @@ export const getIngestionURL = () => {
 };
 
 export const getEndPoint = (ingestionURL: string) => {
-  const url = new URL(ingestionURL);
+  /**
+   * Resolve against the page origin rather than requiring an absolute URL.
+   *
+   * A same-origin deployment (and the proxied dev servers) sets the endpoint to
+   * a RELATIVE value — "/" is the common one, which becomes "" once the store
+   * strips its trailing slash. `new URL("")` throws, and because this runs in
+   * the setup() of every ingestion card, that single throw took down the whole
+   * Data Sources page instead of degrading one field.
+   *
+   * The second argument is the documented fix for exactly this: it makes a
+   * relative or empty input resolve to where the app is actually served from,
+   * which is also the correct answer for a same-origin ingest endpoint.
+   */
+  const base = typeof window !== "undefined" ? window.location.origin : "http://localhost";
+  let url: URL;
+  try {
+    url = new URL(ingestionURL, base);
+  } catch {
+    // Still unusable (a malformed absolute URL) — fall back to the origin so
+    // the card renders with a wrong-but-editable host rather than crashing.
+    url = new URL(base);
+  }
+
   const endpoint = {
-    url: ingestionURL,
+    // Keep the caller's own string when it gave one: the snippets embed it
+    // verbatim, and rewriting an absolute URL here would change what users copy.
+    url: ingestionURL || url.origin,
     host: url.hostname,
     port: url.port || (url.protocol === "https:" ? "443" : "80"),
     protocol: url.protocol.replace(":", ""),
@@ -326,11 +358,11 @@ export function isAboveMinRefreshInterval(
   return value >= minInterval;
 }
 
-export const describeCron = (cronExpression: string, timezone?: string): string => {
+export const describeCron = (t: TranslateFn, cronExpression: string, timezone?: string): string => {
   if (!cronExpression || !cronExpression.trim()) return "";
   try {
     const parts = cronExpression.trim().split(/\s+/);
-    if (parts.length !== 6) return "invalid cron (expected 6 fields)";
+    if (parts.length !== 6) return t("common.invalidCronSixFields");
 
     const [sec, min, hour, dom, month, dow] = parts;
     const tz = timezone || "UTC";
@@ -360,7 +392,7 @@ export const describeCron = (cronExpression: string, timezone?: string): string 
       isEvery(month) &&
       isEvery(dow)
     ) {
-      return `every ${minStep} minute${minStep > 1 ? "s" : ""}`;
+      return t("common.cronEveryNMinutes", { count: minStep }, minStep);
     }
 
     if (
@@ -371,7 +403,7 @@ export const describeCron = (cronExpression: string, timezone?: string): string 
       isEvery(month) &&
       isEvery(dow)
     ) {
-      return `every ${hourStep} hour${hourStep > 1 ? "s" : ""}`;
+      return t("common.cronEveryNHours", { count: hourStep }, hourStep);
     }
 
     if (
@@ -384,7 +416,7 @@ export const describeCron = (cronExpression: string, timezone?: string): string 
     ) {
       const hh = String(fixedHour).padStart(2, "0");
       const mm = String(fixedMin).padStart(2, "0");
-      return `daily at ${hh}:${mm} (${tzLabel})`;
+      return t("common.cronDailyAt", { time: `${hh}:${mm}`, timezone: tzLabel });
     }
 
     if (
@@ -395,7 +427,7 @@ export const describeCron = (cronExpression: string, timezone?: string): string 
       isEvery(month) &&
       isEvery(dow)
     ) {
-      return `every hour at minute ${fixedMin}`;
+      return t("common.cronEveryHourAtMinute", { minute: fixedMin });
     }
 
     const interval = CronExpressionParser.parse(cronExpression, {
@@ -414,9 +446,9 @@ export const describeCron = (cronExpression: string, timezone?: string): string 
       second: "2-digit",
       hour12: false,
     });
-    return `next check at ${nextStr} (${tzLabel})`;
+    return t("common.cronNextCheckAt", { time: nextStr, timezone: tzLabel });
   } catch {
-    return "invalid cron expression";
+    return t("common.invalidCronExpression");
   }
 };
 

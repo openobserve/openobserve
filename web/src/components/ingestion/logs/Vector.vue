@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <IngestionContent>
-    <CopyContent class="copy-content-container-cls" :content="content" />
+  <IngestionContent :target-stream="targetStream" snippet-kind="config" config-tool="Vector">
+    <CredentialCodeBlock slug="vector" :content="content" />
   </IngestionContent>
 </template>
 
@@ -25,7 +25,7 @@ import { defineComponent, ref } from "vue";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
 import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincutils";
-import CopyContent from "@/components/CopyContent.vue";
+import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 export default defineComponent({
   name: "vector-mechanism",
@@ -37,7 +37,7 @@ export default defineComponent({
       type: String,
     },
   },
-  components: { CopyContent, IngestionContent },
+  components: { CredentialCodeBlock, IngestionContent },
   setup() {
     const store = useStore();
     const endpoint: any = ref({
@@ -49,10 +49,11 @@ export default defineComponent({
     });
     const ingestionURL = getIngestionURL();
     endpoint.value = getEndPoint(ingestionURL);
+    const targetStream = "default";
     const content = `[sinks.openobserve]
 type = "http"
 inputs = [ source or transform id ]
-uri = "${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/default/_json"
+uri = "${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/${targetStream}/_json"
 method = "post"
 auth.strategy = "basic"
 auth.user = "[EMAIL]"
@@ -62,6 +63,7 @@ encoding.codec = "json"
 encoding.timestamp_format = "rfc3339"
 healthcheck.enabled = false`;
     return {
+      targetStream,
       store,
       config,
       endpoint,

@@ -13,16 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
-import { getSeriesColor } from "../../colorPalette";
+import { createDistinctSeriesColor, getSeriesColor } from "../../colorPalette";
+import { createSeriesOverrideLookup } from "../../seriesOverrides";
 import { chartColor } from "@/utils/chartTheme";
 import {
   getChartDimensions,
   applyPieDonutChartAlignment,
   applyPieDonutCenterAdjustment,
   calculatePieChartContainer,
+  MAX_SEATS_PRECISION,
+  pieLegendPercentDecimals,
 } from "../../legendConfiguration";
 import { type SQLContext } from "../shared/types";
+import { escapeHtml } from "@/utils/html";
 
 /**
  * Applies chart-specific options for: pie AND donut
@@ -43,6 +46,12 @@ export function applyPieDonutChart(ctx: SQLContext): void {
     getAxisDataFromKey,
     getPieChartRadius,
   } = ctx;
+  const seriesOverrides = createSeriesOverrideLookup(panelSchema?.config);
+  const distinctColor = createDistinctSeriesColor(
+    (options?.xAxis?.[0]?.data ?? []).map(String),
+    panelSchema?.config?.color,
+    store.state.theme,
+  );
 
   if (panelSchema.type === "pie") {
     // Add more padding for pie chart
@@ -69,13 +78,8 @@ export function applyPieDonutChart(ctx: SQLContext): void {
             hoveredSeriesState?.value?.panelId != panelSchema.id
           )
             return "";
-          return `${name?.marker} ${name?.name} : <b>${formatUnitValue(
-            getUnitValue(
-              name?.value,
-              panelSchema.config?.unit,
-              panelSchema.config?.unit_custom,
-              panelSchema.config?.decimals,
-            ),
+          return `${name?.marker} ${escapeHtml(seriesOverrides.displayName(name?.name))} : <b>${escapeHtml(
+            seriesOverrides.formatValue(name?.value, name?.name),
           )}</b>`;
         } catch (error) {
           return "";
@@ -94,6 +98,7 @@ export function applyPieDonutChart(ctx: SQLContext): void {
             ? null
             : (params: any) => {
                 return (
+                  distinctColor(String(params.name)) ??
                   getSeriesColor(
                     panelSchema?.config?.color,
                     params.name,
@@ -102,7 +107,9 @@ export function applyPieDonutChart(ctx: SQLContext): void {
                     chartMax,
                     store.state.theme,
                     panelSchema?.config?.color?.colorBySeries,
-                  ) ?? null
+                    panelSchema?.config,
+                  ) ??
+                  null
                 );
               },
         },
@@ -111,8 +118,13 @@ export function applyPieDonutChart(ctx: SQLContext): void {
           formatter: "{d}%", // {b} represents name, {c} represents value {d} represents percent
           position: "inside", // You can adjust the position of the labels
           fontSize: 10,
+          // ECharts haloes inside labels in the slice colour, which glares where a label spills onto a dark panel.
+          textBorderColor: "transparent",
         },
-        percentPrecision: panelSchema.config?.decimals ?? 2,
+        percentPrecision: Math.min(
+          pieLegendPercentDecimals(panelSchema.config?.decimals),
+          MAX_SEATS_PRECISION,
+        ),
       };
       return seriesObj;
     });
@@ -211,14 +223,9 @@ export function applyPieDonutChart(ctx: SQLContext): void {
             hoveredSeriesState?.value?.panelId != panelSchema.id
           )
             return "";
-          return `${name?.marker} ${name?.name} : <b>${formatUnitValue(
-            getUnitValue(
-              name?.value,
-              panelSchema.config?.unit,
-              panelSchema.config?.unit_custom,
-              panelSchema.config?.decimals,
-            ),
-          )}<b/>`;
+          return `${name?.marker} ${escapeHtml(seriesOverrides.displayName(name?.name))} : <b>${escapeHtml(
+            seriesOverrides.formatValue(name?.value, name?.name),
+          )}</b>`;
         } catch (error) {
           return "";
         }
@@ -236,6 +243,7 @@ export function applyPieDonutChart(ctx: SQLContext): void {
             ? null
             : (params: any) => {
                 return (
+                  distinctColor(String(params.name)) ??
                   getSeriesColor(
                     panelSchema?.config?.color,
                     params.name,
@@ -244,7 +252,9 @@ export function applyPieDonutChart(ctx: SQLContext): void {
                     chartMax,
                     store.state.theme,
                     panelSchema?.config?.color?.colorBySeries,
-                  ) ?? null
+                    panelSchema?.config,
+                  ) ??
+                  null
                 );
               },
         },
@@ -253,8 +263,13 @@ export function applyPieDonutChart(ctx: SQLContext): void {
           formatter: "{d}%", // {b} represents name, {c} represents value {d} represents percent
           position: "inside", // You can adjust the position of the labels
           fontSize: 10,
+          // ECharts haloes inside labels in the slice colour, which glares where a label spills onto a dark panel.
+          textBorderColor: "transparent",
         },
-        percentPrecision: panelSchema.config?.decimals ?? 2,
+        percentPrecision: Math.min(
+          pieLegendPercentDecimals(panelSchema.config?.decimals),
+          MAX_SEATS_PRECISION,
+        ),
       };
       return seriesObj;
     });

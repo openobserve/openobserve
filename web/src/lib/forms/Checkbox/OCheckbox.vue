@@ -126,6 +126,7 @@ const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
       :name="name"
       type="button"
       role="checkbox"
+      :aria-label="ariaLabel"
       :aria-checked="checked === 'indeterminate' ? 'mixed' : checked"
       :data-state="dataState"
       :disabled="isDisabled"
@@ -139,13 +140,13 @@ const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
         // Checked
         color === 'primary' && 'data-[state=checked]:bg-checkbox-checked-bg',
         color === 'primary' && 'data-[state=checked]:border-checkbox-checked-border',
-        color === 'negative' && 'data-[state=checked]:bg-error-600',
-        color === 'negative' && 'data-[state=checked]:border-error-600',
+        color === 'negative' && 'data-[state=checked]:bg-error-500',
+        color === 'negative' && 'data-[state=checked]:border-error-500',
         // Indeterminate
         color === 'primary' && 'data-[state=indeterminate]:bg-checkbox-checked-bg',
         color === 'primary' && 'data-[state=indeterminate]:border-checkbox-checked-border',
-        color === 'negative' && 'data-[state=indeterminate]:bg-error-600',
-        color === 'negative' && 'data-[state=indeterminate]:border-error-600',
+        color === 'negative' && 'data-[state=indeterminate]:bg-error-500',
+        color === 'negative' && 'data-[state=indeterminate]:border-error-500',
         // Disabled
         'disabled:bg-checkbox-disabled-bg',
         'disabled:border-checkbox-disabled-border',
@@ -158,9 +159,10 @@ const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
       ]"
       @click="toggle"
     >
+      <!-- Clicks pass through the tick: unchecking removes it mid-click, and the label then re-clicks the box. -->
       <span
         v-if="checked === true"
-        class="text-checkbox-checked-fg flex size-full items-center justify-center"
+        class="text-checkbox-checked-fg pointer-events-none flex size-full items-center justify-center"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -178,7 +180,7 @@ const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
       </span>
       <span
         v-else-if="checked === 'indeterminate'"
-        class="text-checkbox-checked-fg flex size-full items-center justify-center"
+        class="text-checkbox-checked-fg pointer-events-none flex size-full items-center justify-center"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -198,7 +200,7 @@ const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
     <span
       v-if="$slots.label || label"
       :class="[
-        'o-input-label text-compact leading-tight select-none',
+        'o-input-label text-compact min-w-0 leading-tight select-none',
         isDisabled
           ? 'text-input-label-text-disabled font-normal'
           : 'text-input-label-text font-medium',

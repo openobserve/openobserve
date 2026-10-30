@@ -2,23 +2,27 @@
 // Copyright 2026 OpenObserve Inc.
 //
 // OCodeCell — monospace rendering for identifiers / SQL / tokens with an
-// optional copy-on-hover affordance. Truncates with ellipsis and
-// exposes the full value via a native title tooltip.
+// optional copy-on-hover affordance. Truncates with ellipsis and shows
+// the full value on hover only when it is cut.
 //
 //   <OCodeCell :value="row.trace_id" />
 //   <OCodeCell :value="row.query" :copy="false" />
 
 import { computed, ref } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 const props = withDefaults(
   defineProps<{
     value: unknown;
     /** Show the hover copy button. Default true. */
     copy?: boolean;
-    emptyLabel?: string;
+    emptyLabel?: I18nText;
+    /** Hover text in place of the value; `false` for secrets, which must never show on hover. */
+    tooltip?: I18nText | false;
   }>(),
-  { copy: true, emptyLabel: "—" },
+  { copy: true, emptyLabel: raw("—"), tooltip: undefined },
 );
 
 const text = computed(() => {
@@ -39,17 +43,19 @@ async function handleCopy(e: MouseEvent) {
     /* clipboard unavailable — no-op */
   }
 }
+
+const { t } = useI18nTyped();
 </script>
 
 <template>
   <span v-if="text === null" class="text-text-muted text-xs">{{ emptyLabel }}</span>
   <span v-else class="group/code inline-flex max-w-full min-w-0 items-center gap-1">
-    <span class="min-w-0 truncate font-mono text-xs" :title="text">{{ text }}</span>
+    <OTruncatedText class="font-mono text-xs" :tooltip="tooltip">{{ text }}</OTruncatedText>
     <button
       v-if="copy"
       type="button"
-      class="text-text-body shrink-0 cursor-pointer leading-none opacity-0 transition-opacity group-hover/code:opacity-60 hover:opacity-100!"
-      :title="copied ? 'Copied!' : 'Copy'"
+      class="text-text-body shrink-0 cursor-pointer leading-none opacity-0 transition-opacity group-hover/code:opacity-60 hover:opacity-100! max-md:opacity-60"
+      :title="copied ? t('common.copiedExclaim') : t('common.copy')"
       @click="handleCopy"
     >
       <OIcon :name="copied ? 'check' : 'content-copy'" size="xs" />

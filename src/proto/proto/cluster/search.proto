@@ -36,6 +36,8 @@ message QueryStatusResponse {
 
 message CancelQueryRequest {
     string trace_id = 1;
+    // The org whose queries are cancelled; nodes that predate the field ignore it.
+    string org_id = 2;
 }
 
 message CancelQueryResponse {
@@ -91,11 +93,12 @@ message SearchQuery {
     int64          start_time = 6;
     int64            end_time = 7;
     bool     track_total_hits = 9;
-    string        query_type = 10;
+    reserved 10;  // was query_type (table/metrics response modes, removed)
+    reserved "query_type";
     bool          uses_zo_fn = 12;
     string          query_fn = 13;
     bool            skip_wal = 14;
-    string         action_id = 15;
+    reserved 15;  // was action_id (action scripts, removed)
     int64 histogram_interval = 16;
     optional string timezone = 17;
     // Simplified sampling: just specify ratio (0.0-1.0), backend uses optimal defaults
@@ -113,17 +116,6 @@ message SamplingConfig {
     string temporal_strategy = 3;
     // Number of time buckets for stratified sampling (e.g., 24 for hourly over a day)
     optional int32 num_time_strata = 4;
-}
-
-message SearchEventContext {
-    optional string alert_key = 1;
-    optional string derived_stream_key = 2;
-    optional string report_key = 3;
-    optional string dashboard_id = 4;
-    optional string dashboard_name = 5;
-    optional string dashboard_folder_id = 6;
-    optional string dashboard_folder_name = 7;
-    optional string alert_name = 8;
 }
 
 message QueryStatus {
@@ -213,6 +205,7 @@ message GetLicenseUsageResponse {
     uint32                  days_since_last_report = 6;
     string                  last_usage_response = 7;
     repeated UsageResult    ingestion_history = 8;
+    string                  license_status_json = 9;
 
 }
 

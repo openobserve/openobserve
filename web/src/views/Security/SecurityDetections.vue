@@ -10,7 +10,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
      and every recent evaluation from alert history. -->
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -66,7 +66,7 @@ import { b64EncodeUnicode, formatEventCount } from "@/utils/formatters";
 import { displayOrder, positionOf, stepRow, type NavTable } from "@/utils/security/recordNav";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
@@ -739,7 +739,7 @@ watch(orgId, () => void refresh());
         <template #subheader>
           <div class="px-page-edge border-table-row-divider border-b py-1.5">
             <OStatStrip
-              compact
+              compact-values
               :items="stats"
               :loading="loading && !rows.length"
               selectable

@@ -234,10 +234,10 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
     });
 
     // NOTE: Consolidated from meta-org "JS radio NOT visible" + "VRL functions work" tests
-    // Both validations preserved: JS hidden check + VRL creation
+    // Both validations preserved: JS locked check + VRL creation
     test('P0: Non-meta org - JS radio edition-gated, VRL works', { tag: ['@smoke', '@P0'] }, async ({ page }) => {
       // JS radio visibility in a non-meta org is EDITION-dependent (see file header):
-      //   OSS      -> JS is _meta-only, so the radio is HIDDEN here.
+      //   OSS      -> JS is _meta-only, so the radio is shown LOCKED (lock icon) here.
       //   ENT/cloud-> JS is offered in every org, so the radio is VISIBLE here.
       // We detect the edition at runtime from the header edition button label
       // (data-test="upgrade-to-enterprise-btn"), which is driven by the SAME
@@ -254,9 +254,8 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       testLogger.info('VRL radio button visible');
 
       if (edition === 'opensource') {
-        const isJsRadioVisible = await pm.functionsPage.isJsRadioVisible();
-        expect(isJsRadioVisible).toBe(false);
-        testLogger.info(`OSS: JavaScript radio correctly hidden in ${nonMetaOrg} org`);
+        await pm.functionsPage.expectJsRadioLocked();
+        testLogger.info(`OSS: JavaScript radio correctly locked in ${nonMetaOrg} org`);
       } else {
         // enterprise / cloud
         await pm.functionsPage.expectJsRadioVisible();
@@ -323,7 +322,7 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
     // NOTE: Consolidated from meta-org "Org switching" + "VRL always visible" tests
     // Both validations preserved: JS visibility changes with org + VRL always visible
     test('P1: Radio visibility across orgs', { tag: ['@P1', '@orgSwitching', '@control'] }, async ({ page }) => {
-      // JS radio visibility in a NON-meta org is edition-gated (OSS hides it,
+      // JS radio visibility in a NON-meta org is edition-gated (OSS shows it locked,
       // ENT/cloud shows it); in the _meta org JS is ALWAYS visible on every
       // edition. VRL is always visible everywhere. We detect the edition from
       // the header edition button (same build-flag source as the JS gate).
@@ -333,8 +332,8 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
 
       const expectJsRadioForNonMeta = async (label) => {
         if (edition === 'opensource') {
-          await pm.functionsPage.expectJsRadioHidden();
-          testLogger.info(`OSS: JS hidden in ${nonMetaOrg} org (${label})`);
+          await pm.functionsPage.expectJsRadioLocked();
+          testLogger.info(`OSS: JS locked in ${nonMetaOrg} org (${label})`);
         } else {
           await pm.functionsPage.expectJsRadioVisible();
           testLogger.info(`${edition}: JS visible in ${nonMetaOrg} org (${label})`);

@@ -20,26 +20,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <img
       data-test="trace-row-service-icon"
       :src="serviceIconUrl"
-      class="mr-2 h-5 w-5 shrink-0"
+      class="me-2 h-5 w-5 shrink-0"
       aria-hidden="true"
       alt=""
     />
 
     <!-- Service name + badge -->
     <div class="flex min-w-0 flex-nowrap! items-center gap-[0.325rem]">
-      <span data-test="trace-row-service-name" class="text-text-body min-w-0 truncate text-xs">
+      <OTruncatedText data-test="trace-row-service-name" class="text-text-body text-xs">
         {{ item.service_name }}
-        <OTooltip side="bottom" align="center">
-          <template #content>{{ item.service_name }}</template>
-        </OTooltip>
-      </span>
+      </OTruncatedText>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import useTraces from "@/composables/useTraces";
 import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 import useTheme from "@/composables/useTheme";
@@ -55,7 +52,20 @@ const { getOrSetServiceColor } = useTraces();
 
 const rootColor = computed(() => getOrSetServiceColor(props.item.service_name) ?? "#9e9e9e");
 
-const serviceIconUrl = computed(() =>
-  getServiceIconDataUrl(props.item.service_name, isDark.value, rootColor.value),
-);
+const serviceIconUrl = computed(() => {
+  if (props.item.infer_service_system) {
+    return getServiceIconDataUrl(props.item.infer_service_system, isDark.value, rootColor.value);
+  }
+
+  if (props.item.infer_service_type) {
+    return getServiceIconDataUrl(
+      props.item.service_name,
+      isDark.value,
+      rootColor.value,
+      props.item.infer_service_type,
+    );
+  }
+
+  return getServiceIconDataUrl(props.item.service_name, isDark.value, rootColor.value);
+});
 </script>

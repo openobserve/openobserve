@@ -43,8 +43,7 @@ pub struct Entry {
     pub partition_key: Arc<str>, // 2023/12/18/00/country=US/state=CA
     pub data: Vec<Arc<serde_json::Value>>,
     pub data_size: usize,
-    // Decoded RecordBatch when the WAL entry was stored in Arrow IPC format,
-    // only populated by from_bytes during WAL replay
+    // set by a producer that already encoded arrow, and by from_bytes on WAL replay
     #[serde(skip)]
     pub batch: Option<RecordBatch>,
 }
@@ -221,8 +220,13 @@ impl Entry {
         stream_type: Arc<str>,
         schema: Arc<Schema>,
     ) -> Result<Arc<RecordBatchEntry>> {
-        let batch =
-            convert_json_to_record_batch(&schema, &self.data).context(ArrowJsonEncodeSnafu)?;
+        let batch = match &self.batch {
+            // encoded straight from the wire format upstream; nothing left to convert
+            Some(batch) => batch.clone(),
+            None => {
+                convert_json_to_record_batch(&schema, &self.data).context(ArrowJsonEncodeSnafu)?
+            }
+        };
 
         let arrow_size = batch.size();
         Ok(RecordBatchEntry::new(

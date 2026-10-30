@@ -25,6 +25,9 @@ import {
 import { parseDate } from "@internationalized/date";
 import type { DateValue } from "@internationalized/date";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18nTyped } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -76,7 +79,13 @@ const stagedDate = ref<DateValue | undefined>(rekaValue.value) as Ref<DateValue 
 const rekaMin = computed(() => tryParse(props.min));
 const rekaMax = computed(() => tryParse(props.max));
 
+// reka-ui commits a partially-typed year segment (e.g. a single "4" replacing "2026") as final on blur, which round-trips as "0004-01-02" and renders "1/2/4" unless guarded.
+function hasCompleteYear(value: DateValue): boolean {
+  return value.year >= 1000 && value.year <= 9999;
+}
+
 function handleDateChange(value: DateValue | null | undefined) {
+  if (value && !hasCompleteYear(value)) return;
   stagedDate.value = value ?? undefined;
   if (props.autoApply !== false) {
     const str = value ? value.toString() : "";
@@ -86,6 +95,7 @@ function handleDateChange(value: DateValue | null | undefined) {
 }
 
 function handleApply() {
+  if (stagedDate.value && !hasCompleteYear(stagedDate.value)) return;
   const str = stagedDate.value ? stagedDate.value.toString() : "";
   emit("update:modelValue", str);
   emit("change", str);
@@ -125,7 +135,7 @@ const wrapperClasses = computed(() => [
     ? "border-datepicker-error-border"
     : "border-datepicker-border hover:border-datepicker-hover-border",
   "focus-within:border-datepicker-focus-border",
-  "focus-within:ring-[0.125rem] focus-within:ring-accent/25",
+  "focus-within:ring-[0.125rem] focus-within:ring-focus-ring-accent",
   props.disabled ? "bg-datepicker-disabled-bg border-datepicker-disabled-border opacity-60" : "",
   heightClasses[props.size ?? "md"],
 ]);
@@ -136,7 +146,12 @@ const wrapperClasses = computed(() => [
     <label
       v-if="$slots.label || label || $slots.tooltip"
       :for="inputId"
-      class="o-input-label flex items-center gap-1 text-sm leading-tight font-semibold"
+      :class="[
+        'o-input-label text-compact flex items-center gap-1 leading-tight',
+        disabled
+          ? 'text-input-label-text-disabled font-normal'
+          : 'text-input-label-text font-medium',
+      ]"
     >
       <slot name="label">{{ label }}</slot
       ><span v-if="required" aria-hidden="true" class="select-none">*</span>
@@ -171,7 +186,7 @@ const wrapperClasses = computed(() => [
         <!-- Calendar trigger (calendar icon) -->
         <DatePickerTrigger
           class="text-datepicker-icon flex shrink-0 cursor-pointer items-center ps-3 outline-none disabled:cursor-not-allowed"
-          aria-label="Open calendar"
+          :aria-label="t('components.date.openCalendar')"
         >
           <OIcon name="calendar-month" size="sm" aria-hidden="true" />
         </DatePickerTrigger>
@@ -207,7 +222,7 @@ const wrapperClasses = computed(() => [
           v-if="clearable && modelValue"
           type="button"
           tabindex="-1"
-          aria-label="Clear"
+          :aria-label="t('components.date.clear')"
           class="text-datepicker-icon flex items-center pe-2 transition-colors hover:opacity-80"
           @click="handleClear"
         >
@@ -229,7 +244,7 @@ const wrapperClasses = computed(() => [
       <DatePickerContent
         :side-offset="4"
         align="start"
-        class="rounded-default bg-datepicker-popup-bg border-datepicker-popup-border z-50 border p-3 shadow-md"
+        class="rounded-default bg-datepicker-popup-bg border-datepicker-popup-border z-10001 border p-3 shadow-md"
       >
         <DatePickerCalendar v-slot="{ weekDays, grid }">
           <DatePickerHeader class="mb-3 flex items-center justify-between">
@@ -316,7 +331,7 @@ const wrapperClasses = computed(() => [
             class="rounded-default bg-datepicker-day-selected-bg text-datepicker-day-selected-text ring-offset-surface-base focus-visible:ring-datepicker-focus-ring px-4 py-1.5 text-xs font-medium ring-offset-1 transition-[box-shadow] duration-150 outline-none hover:opacity-90 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
             @click="handleApply"
           >
-            Apply
+            {{ t("common.apply") }}
           </button>
         </div>
       </DatePickerContent>

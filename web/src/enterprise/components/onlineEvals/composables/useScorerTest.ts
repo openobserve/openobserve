@@ -1,4 +1,5 @@
 import { ref, watch, type Ref } from "vue";
+import type { TranslateFn } from "@/types/i18n";
 import onlineEvalsService, {
   type ScorerTestPayload,
   type ScorerTestResult,
@@ -7,10 +8,10 @@ import { defaultTestValue, extractTemplateVariables } from "../utils/evalFormat"
 
 export type ScorerTestState = "idle" | "running" | "success" | "error";
 
-export function useScorerTest(template: Ref<string>) {
+export function useScorerTest(template: Ref<string>, t: TranslateFn) {
   const scorerTestInputs = ref<Record<string, string>>({
-    input: "The capital of France is Paris, located on the Seine river.",
-    output: "Paris is the capital of France.",
+    input: t("onlineEvals.scorerTestSampleInput"),
+    output: t("onlineEvals.scorerTestSampleOutput"),
     metadata: "{}",
   });
   const scorerTestState = ref<ScorerTestState>("idle");
@@ -26,7 +27,7 @@ export function useScorerTest(template: Ref<string>) {
 
       const next = { ...scorerTestInputs.value };
       variables.forEach((variable) => {
-        if (next[variable] === undefined) next[variable] = defaultTestValue(variable);
+        if (next[variable] === undefined) next[variable] = defaultTestValue(variable, t);
       });
       scorerTestInputs.value = next;
       scorerTestState.value = "idle";
@@ -47,14 +48,14 @@ export function useScorerTest(template: Ref<string>) {
       // failures (LLM call rejected, parse failure, etc.) but still HTTP 200.
       scorerTestState.value = data?.success ? "success" : "error";
       if (!data?.success) {
-        scorerTestError.value = data?.error ?? "Scorer test failed";
+        scorerTestError.value = data?.error ?? t("onlineEvals.scorerTestFailed");
       }
     } catch (err: any) {
       // HTTP-level failure (400 / 5xx / network). Surface the server message
       // when available so the user can act on it.
       const body = err?.response?.data ?? {};
       scorerTestError.value =
-        body.message || body.error || err?.message || "Failed to run scorer test";
+        body.message || body.error || err?.message || t("onlineEvals.failedToRunScorerTest");
       scorerTestState.value = "error";
     }
   }

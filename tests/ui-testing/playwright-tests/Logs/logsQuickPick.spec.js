@@ -164,7 +164,7 @@ test.describe("Logs No-Stream Quick Pick testcases", () => {
 
     // The "more" footer must be visible and report a positive remaining count.
     await pm.logsPage.expectQuickPickMoreFooterVisible();
-    const footerText = await page.locator(pm.logsPage.quickPickMoreFooter).innerText();
+    const footerText = await pm.logsPage.getQuickPickMoreFooterText();
     expect(footerText, 'More footer should report a remaining count').toMatch(/\d+/);
 
     testLogger.info(`Quick pick more footer verified (${footerText.trim()})`);

@@ -95,13 +95,19 @@ pub async fn update_timed_annotations(
 
 #[tracing::instrument]
 pub async fn delete_timed_annotation_panels(
+    dashboard_id: &str,
     timed_annotation_id: &str,
     panels: Vec<String>,
 ) -> Result<(), anyhow::Error> {
     if panels.is_empty() {
         return Err(anyhow::anyhow!("panels cannot be empty"));
     }
-    table::timed_annotation_panels::delete_many_panels(timed_annotation_id, panels.clone()).await?;
+    table::timed_annotation_panels::delete_many_panels_in_dashboard(
+        dashboard_id,
+        timed_annotation_id,
+        panels.clone(),
+    )
+    .await?;
     #[cfg(feature = "enterprise")]
     super_cluster::emit_timed_annotation_panels_delete_event(timed_annotation_id, panels).await?;
 

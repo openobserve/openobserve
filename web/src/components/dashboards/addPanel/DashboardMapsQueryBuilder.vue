@@ -17,17 +17,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div v-if="!promqlMode && dashboardPanelData.data.type == 'maps'">
     <!-- name container -->
-    <div class="flex flex-row pl-3">
+    <div class="flex flex-row ps-3">
       <div class="flex min-w-20 items-center whitespace-nowrap">
         <span
-          class="rounded-default bg-badge-indigo-ol-text mr-1.5 h-2 w-2 shrink-0"
+          class="rounded-default bg-badge-indigo-ol-text me-1.5 h-2 w-2 shrink-0"
           aria-hidden="true"
         ></span>
         {{ t("panel.mapname") }}
-        <OIcon name="info-outline" size="sm" class="ml-1" />
+        <OIcon name="info-outline" size="sm" class="ms-1" />
         <OTooltip :content="Hint" />
       </div>
-      <span class="mr-0.5 ml-0.5 flex items-center">:</span>
+      <span class="ms-0.5 me-0.5 flex items-center">:</span>
       <div
         class="axis-container droppable scroll flex min-h-8 w-full flex-1 flex-wrap items-center border border-dashed border-transparent"
         :class="{
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-name-layout"
       >
         <OButtonGroup
-          class="axis-field border-border-default border-s-badge-indigo-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
+          class="axis-field border-border-default border-s-badge-indigo-ol-border bg-surface-panel my-0.5 me-2 overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
           radius="sm"
           :divided="true"
           v-if="
@@ -62,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <OButton
+            :aria-label="t('common.dragToReorder')"
             variant="ghost"
             size="icon-chip"
             class="!w-4 !cursor-grab"
@@ -85,11 +86,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-maps-query-builder-dropdown w-[48.1875rem]! translate-y-2 overflow-hidden rounded-none p-0 shadow-md"
+              class="field-function-menu-popup dashboard-maps-query-builder-dropdown w-[min(48.1875rem,calc(100vw-1.5rem))]! translate-y-2 overflow-hidden rounded-none p-0 shadow-md max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto"
               :data-test="`dashboard-name-item-${nameLabel}-menu`"
             >
               <div
-                class="pt-0.75 pr-4 pb-4 pl-4"
+                class="ps-4 pe-4 pt-0.75 pb-4"
                 :style="{
                   width:
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
@@ -97,11 +98,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                       .fields.name.isDerived
                       ? 'auto'
-                      : '771px',
+                      : 'min(48.1875rem, calc(100vw - 1.5rem))',
                 }"
               >
                 <div>
-                  <div class="mr-1 mb-2">
+                  <div class="me-1 mb-2">
                     <DynamicFunctionPopUp
                       v-model="
                         dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
@@ -120,6 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </ODropdown>
           <OButton
+            :aria-label="t('common.remove')"
             variant="ghost"
             size="icon-chip"
             class="!w-4"
@@ -142,17 +144,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <OSeparator />
     <!-- value for maps container -->
-    <div class="flex flex-row pl-3">
+    <div class="flex flex-row ps-3">
       <div class="flex min-w-20 items-center whitespace-nowrap">
         <span
-          class="rounded-default bg-badge-success-ol-text mr-1.5 h-2 w-2 shrink-0"
+          class="rounded-default bg-badge-success-ol-text me-1.5 h-2 w-2 shrink-0"
           aria-hidden="true"
         ></span>
         {{ t("panel.mapvalue") }}
-        <OIcon name="info-outline" size="sm" class="ml-1" />
+        <OIcon name="info-outline" size="sm" class="ms-1" />
         <OTooltip :content="Hint" />
       </div>
-      <span class="mr-0.5 ml-0.5 flex items-center">:</span>
+      <span class="ms-0.5 me-0.5 flex items-center">:</span>
       <div
         class="axis-container droppable scroll flex min-h-8 w-full flex-1 flex-wrap items-center border border-dashed border-transparent"
         :class="{
@@ -169,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-value_for_maps-layout"
       >
         <OButtonGroup
-          class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
+          class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel my-0.5 me-2 overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
           radius="sm"
           :divided="true"
           v-if="
@@ -187,6 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <OButton
+            :aria-label="t('common.dragToReorder')"
             variant="ghost"
             size="icon-chip"
             class="!w-4 !cursor-grab"
@@ -210,11 +213,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-maps-query-builder-dropdown w-[48.1875rem]! translate-y-2 overflow-hidden rounded-none p-0 shadow-md"
+              class="field-function-menu-popup dashboard-maps-query-builder-dropdown w-[min(48.1875rem,calc(100vw-1.5rem))]! translate-y-2 overflow-hidden rounded-none p-0 shadow-md max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto"
               :data-test="`dashboard-value_for_maps-item-${valueLabel}-menu`"
             >
               <div
-                class="pt-0.75 pr-4 pb-4 pl-4"
+                class="ps-4 pe-4 pt-0.75 pb-4"
                 :style="{
                   width:
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
@@ -222,11 +225,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                       .fields.value_for_maps.isDerived
                       ? 'auto'
-                      : '771px',
+                      : 'min(48.1875rem, calc(100vw - 1.5rem))',
                 }"
               >
                 <div>
-                  <div class="mr-1 mb-2">
+                  <div class="me-1 mb-2">
                     <DynamicFunctionPopUp
                       v-model="
                         dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
@@ -245,6 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </ODropdown>
           <OButton
+            :aria-label="t('common.remove')"
             variant="ghost"
             size="icon-chip"
             class="!w-4"
@@ -277,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, reactive, watch, computed, inject } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import useDragHandle from "@/composables/useDragHandle";
 import { getImageURL } from "../../../utils/zincutils";
@@ -286,7 +290,6 @@ import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFuncti
 import { buildSQLQueryFromInput } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
 import useNotifications from "@/composables/useNotifications";
-import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -311,7 +314,7 @@ export default defineComponent({
   },
   props: ["dashboardData"],
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { showErrorNotification } = useNotifications();
 
     const expansionItems = reactive({
@@ -331,7 +334,7 @@ export default defineComponent({
       removeMapValue,
       promqlMode,
       cleanupDraggingFields,
-    } = useDashboardPanelData(dashboardPanelDataPageKey);
+    } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const triggerOperators = [
       { label: t("dashboard.count"), value: "count" },
@@ -341,19 +344,19 @@ export default defineComponent({
       { label: t("dashboard.min"), value: "min" },
       { label: t("dashboard.max"), value: "max" },
       {
-        label: t("dashboard.p50"),
+        label: raw("P50"),
         value: "p50",
       },
       {
-        label: t("dashboard.p90"),
+        label: raw("P90"),
         value: "p90",
       },
       {
-        label: t("dashboard.p95"),
+        label: raw("P95"),
         value: "p95",
       },
       {
-        label: t("dashboard.p99"),
+        label: raw("P99"),
         value: "p99",
       },
     ];
@@ -507,9 +510,7 @@ export default defineComponent({
           : "",
       );
 
-      return label?.length > MAX_FIELD_LABEL_CHARS
-        ? label.substring(0, MAX_FIELD_LABEL_CHARS) + "..."
-        : label;
+      return label;
     };
 
     const nameLabel = computed(() => {

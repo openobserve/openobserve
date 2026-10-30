@@ -24,6 +24,11 @@ vi.mock("./shared/useIngestionRoutes", () => ({
   default: vi.fn(() => mockIngestionRoutes),
 }));
 
+const mockRouteGuard = vi.fn();
+vi.mock("@/utils/zincutils", () => ({
+  routeGuard: (...args: unknown[]) => mockRouteGuard(...args),
+}));
+
 import useOSRoutes from "./router";
 import useIngestionRoutes from "./shared/useIngestionRoutes";
 
@@ -37,20 +42,112 @@ describe("useOSRoutes", () => {
     expect(parentRoutes).toEqual([]);
   });
 
-  it("homeChildRoutes contains the routes returned by useIngestionRoutes", () => {
+  it("homeChildRoutes starts with the routes returned by useIngestionRoutes", () => {
     const { homeChildRoutes } = useOSRoutes();
-    expect(homeChildRoutes).toEqual(mockIngestionRoutes);
+    expect(homeChildRoutes.slice(0, mockIngestionRoutes.length)).toEqual(mockIngestionRoutes);
   });
 
-  it("homeChildRoutes has the same length as the mocked ingestion routes", () => {
+  it("homeChildRoutes has three extra routes (the AI Monitor shell + its two siblings) beyond the mocked ingestion routes", () => {
     const { homeChildRoutes } = useOSRoutes();
-    expect(homeChildRoutes).toHaveLength(mockIngestionRoutes.length);
+    expect(homeChildRoutes).toHaveLength(mockIngestionRoutes.length + 3);
+  });
+
+  it("registers aiSessionDetails and the online-evals redirect alongside the AI Monitor shell", () => {
+    const { homeChildRoutes } = useOSRoutes();
+    const names = homeChildRoutes.map((r: any) => r.name ?? r.path);
+    expect(names).toContain("aiSessionDetails");
+    expect(homeChildRoutes.find((r: any) => r.path === "online-evals")).toMatchObject({
+      redirect: { name: "aiEvaluations" },
+    });
   });
 
   it("homeChildRoutes items match the mocked route objects", () => {
     const { homeChildRoutes } = useOSRoutes();
     expect(homeChildRoutes[0]).toEqual({ path: "ingestion", name: "ingestion" });
     expect(homeChildRoutes[1]).toEqual({ path: "ingestion/logs", name: "ingestLogs" });
+  });
+
+  it("registers every AI Observability route in OSS too, not just LLM Insights + Sessions", () => {
+    // OSS used to register only these two — the rest were enterprise-only,
+    // which silently broke any nav item that pointed at them once the rail
+    // started showing them locked-but-visible instead of hidden. All of
+    // them must resolve to SOME route now, even if `withFeatureGate` then
+    // redirects away in a true OSS build.
+    const { homeChildRoutes } = useOSRoutes();
+    const aiRoute = homeChildRoutes.find((r: any) => r.path === "ai");
+    expect(aiRoute).toBeDefined();
+    const names = aiRoute.children.map((c: any) => c.name);
+    expect(names).toEqual(
+      expect.arrayContaining([
+        "aiLLMInsights",
+        "aiSessions",
+        "aiAgentGraph",
+        "aiAgentBehavior",
+        "aiDiscovery",
+        "aiQueues",
+        "aiQueueDetail",
+        "aiQueueWorkbench",
+        "aiDatasets",
+        "aiDatasetDetail",
+        "aiPrompts",
+        "aiPromptCreate",
+        "aiPromptVersionCreate",
+        "aiPlayground",
+        "aiExperiments",
+        "aiExperimentCreate",
+        "aiExperimentCompare",
+        "aiExperimentDetail",
+        "aiRemoteTasks",
+        "aiRemoteTaskCreate",
+        "aiRemoteTaskEdit",
+        "aiRemoteTaskDetail",
+        "aiEvaluations",
+      ]),
+    );
+  });
+
+  it("gates every AI Observability route except LLM Insights/Sessions with a beforeEnter guard", () => {
+    const { homeChildRoutes } = useOSRoutes();
+    const aiRoute = homeChildRoutes.find((r: any) => r.path === "ai");
+    const ungated = new Set(["aiObservability", "aiLLMInsights", "aiSessions"]);
+    for (const child of aiRoute.children) {
+      if (ungated.has(child.name)) continue;
+      expect(typeof child.beforeEnter).toBe("function");
+    }
+  });
+
+  describe("the AI Monitor shell route", () => {
+    function aiRoute() {
+      const { homeChildRoutes } = useOSRoutes();
+      return homeChildRoutes.find((r: any) => r.path === "ai") as any;
+    }
+
+    it("redirects the bare /ai path to aiLLMInsights, same as the enterprise tree", () => {
+      const redirectChild = aiRoute().children[0];
+      expect(redirectChild).toEqual({
+        path: "",
+        name: "aiObservability",
+        redirect: { name: "aiLLMInsights" },
+      });
+    });
+
+    it("calls routeGuard from the shell's own beforeEnter, same as every other OSS route", () => {
+      const next = vi.fn();
+      aiRoute().beforeEnter({ path: "/ai" }, {}, next);
+      expect(mockRouteGuard).toHaveBeenCalledWith({ path: "/ai" }, {}, next);
+    });
+
+    it("lazy-loads each child's component rather than importing it eagerly", () => {
+      const [, llmInsightsChild, sessionsChild] = aiRoute().children;
+      expect(typeof llmInsightsChild.component).toBe("function");
+      expect(typeof sessionsChild.component).toBe("function");
+    });
+
+    it("gives llm-insights and sessions their own distinct paths under /ai", () => {
+      const [, llmInsightsChild, sessionsChild] = aiRoute().children;
+      expect(llmInsightsChild.path).toBe("llm-insights");
+      expect(sessionsChild.path).toBe("sessions");
+    });
   });
 
   it("useIngestionRoutes is called when the composable is invoked", () => {
@@ -91,6 +188,6 @@ describe("useOSRoutes", () => {
     vi.mocked(useIngestionRoutes).mockReturnValueOnce(customRoutes as any);
 
     const { homeChildRoutes } = useOSRoutes();
-    expect(homeChildRoutes).toEqual(customRoutes);
+    expect(homeChildRoutes.slice(0, customRoutes.length)).toEqual(customRoutes);
   });
 });

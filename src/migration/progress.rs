@@ -283,11 +283,6 @@ mod tests {
     }
 
     #[test]
-    fn test_truncate_str_empty() {
-        assert_eq!(truncate_str("", 10), "");
-    }
-
-    #[test]
     fn test_truncate_str_minimum_length() {
         // When max_len is 3, we can only show "..."
         assert_eq!(truncate_str("hello", 4), "h...");

@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { PrebuiltConfig } from "./types";
+import { gt } from "@/types/i18n";
+import { PrebuiltConfig, PrebuiltType } from "./types";
 
 /**
  * Email prebuilt destination configuration
@@ -20,6 +21,7 @@ import { PrebuiltConfig } from "./types";
  */
 export const emailTemplate = {
   name: "prebuilt_email",
+  /* eslint-disable local/no-hardcoded-px -- standalone HTML email document: rem resolves against the recipient's mail client, and every px sits on an interior line of this template literal, which cannot host a comment */
   body: `<!DOCTYPE html>
 <html>
 <head>
@@ -43,14 +45,14 @@ export const emailTemplate = {
         .detail-row:last-child { border-bottom: none; }
         .detail-label { font-weight: bold; color: #666; }
         .detail-value { color: #333; }
-        .button { display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; margin: 20px 0; }
+        .button { display: inline-block; background-color: #0069d9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; margin: 20px 0; }
         .footer { background-color: #f8f9fa; padding: 15px; text-align: center; color: #666; font-size: 12px; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🚨 Alert Notification</h1>
+            <h1>[{alert_status}] {alert_name}</h1>
         </div>
         <div class="content">
             <div class="alert-info">
@@ -69,7 +71,7 @@ export const emailTemplate = {
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Status:</span>
-                    <span class="detail-value">🔴 Firing</span>
+                    <span class="detail-value">{alert_status}</span>
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Count:</span>
@@ -93,6 +95,7 @@ export const emailTemplate = {
     </div>
 </body>
 </html>`,
+  /* eslint-enable local/no-hardcoded-px */
   type: "email" as const,
   title: "OpenObserve Alert Notification",
   isDefault: false,
@@ -105,14 +108,17 @@ export const emailConfig: PrebuiltConfig = {
     "Content-Type": "text/html",
   },
   method: "post",
-  urlValidator: () => false, // Email doesn't use URLs - always return false
   credentialFields: [
     {
       key: "recipients",
       labelKey: "alerts.prebuiltDestinations.emailRecipients",
-      type: "email",
+      type: "email-multi",
       required: true,
-      hint: "Comma-separated email addresses",
+      hintKey: "alerts.prebuiltDestinations.emailRecipientsHelp",
+      // Recipients are picked from the org's users / service accounts, so the
+      // normal path has no free text to mistype. The validator stays as a guard
+      // for legacy string values (edit-prefill of an older destination): an
+      // array's `toString()` is the comma-joined form this already parses.
       validator: (emails: string) => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         const emailList = emails.split(",").map((e) => e.trim());
@@ -145,10 +151,14 @@ export const emailConfig: PrebuiltConfig = {
 
 import emailLogo from "@/assets/images/alerts/destinations/email.png";
 
-export const emailDestinationType = {
+export const emailDestinationType: PrebuiltType = {
   id: "email",
-  name: "Email",
-  description: "Send HTML formatted email notifications",
+  // Lazy: this object is module scope, so a resolved string would freeze at the
+  // boot locale. The getter runs when the destination picker renders.
+  get name() {
+    return gt("alerts.email");
+  },
+  descriptionKey: "alert_destinations.prebuilt.emailDescription",
   icon: "email",
   image: emailLogo,
   popular: true,

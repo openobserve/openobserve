@@ -1,3 +1,5 @@
+import { type I18nText, type TranslateFn } from "@/types/i18n";
+
 import type { ScoreConfig, ScoreDataType } from "@/services/online-evals.service";
 
 const VALID_DATA_TYPES: ScoreDataType[] = ["numeric", "categorical", "boolean"];
@@ -24,7 +26,7 @@ export type ScoreConfigImportField =
 export interface ScoreConfigImportError {
   itemIndex: number;
   field: ScoreConfigImportField;
-  message: string;
+  message: I18nText;
   fixable?: boolean;
 }
 
@@ -87,9 +89,11 @@ export function validateScoreConfig(
     itemIndex: number;
     existingNames: Set<string>;
     nameCounts: Map<string, number>;
+    t: TranslateFn;
   },
 ): ScoreConfigImportError[] {
   const errors: ScoreConfigImportError[] = [];
+  const t = ctx.t;
   const idx = ctx.itemIndex;
   const display = idx + 1;
 
@@ -97,7 +101,7 @@ export function validateScoreConfig(
     errors.push({
       itemIndex: idx,
       field: "shape",
-      message: `Score config ${display}: must be a JSON object`,
+      message: t("onlineEvals.scoreConfigImport.mustBeJsonObject", { index: display }),
     });
     return errors;
   }
@@ -107,7 +111,7 @@ export function validateScoreConfig(
     errors.push({
       itemIndex: idx,
       field: "name",
-      message: `Score config ${display}: name is required and must be a non-empty string`,
+      message: t("onlineEvals.scoreConfigImport.nameRequired", { index: display }),
       fixable: true,
     });
   }
@@ -117,7 +121,10 @@ export function validateScoreConfig(
     errors.push({
       itemIndex: idx,
       field: "dataType",
-      message: `Score config ${display}: dataType must be one of ${VALID_DATA_TYPES.join(", ")}`,
+      message: t("onlineEvals.scoreConfigImport.dataTypeInvalid", {
+        index: display,
+        types: VALID_DATA_TYPES.join(", "),
+      }),
       fixable: true,
     });
   }
@@ -128,13 +135,13 @@ export function validateScoreConfig(
       errors.push({
         itemIndex: idx,
         field: "numericRange",
-        message: `Score config ${display}: numeric configs require numericRange.{min, max} as numbers`,
+        message: t("onlineEvals.scoreConfigImport.numericRangeRequired", { index: display }),
       });
     } else if (!(r.min < r.max)) {
       errors.push({
         itemIndex: idx,
         field: "numericRange",
-        message: `Score config ${display}: numericRange.min must be less than numericRange.max`,
+        message: t("onlineEvals.scoreConfigImport.numericRangeOrder", { index: display }),
       });
     }
   } else if (dataType === "categorical") {
@@ -143,19 +150,19 @@ export function validateScoreConfig(
       errors.push({
         itemIndex: idx,
         field: "categories",
-        message: `Score config ${display}: categorical configs require a non-empty categories array of strings`,
+        message: t("onlineEvals.scoreConfigImport.categoriesRequired", { index: display }),
       });
     } else if (!cats.every((c) => typeof c === "string" && c.length > 0)) {
       errors.push({
         itemIndex: idx,
         field: "categories",
-        message: `Score config ${display}: every category must be a non-empty string`,
+        message: t("onlineEvals.scoreConfigImport.categoryMustBeString", { index: display }),
       });
     } else if (new Set(cats).size !== cats.length) {
       errors.push({
         itemIndex: idx,
         field: "categories",
-        message: `Score config ${display}: categories must be unique`,
+        message: t("onlineEvals.scoreConfigImport.categoriesUnique", { index: display }),
       });
     }
   }
@@ -167,14 +174,14 @@ export function validateScoreConfig(
         errors.push({
           itemIndex: idx,
           field: "healthyThreshold",
-          message: `Score config ${display}: numeric healthyThreshold.direction must be 'gte' or 'lte'`,
+          message: t("onlineEvals.scoreConfigImport.numericDirectionInvalid", { index: display }),
         });
       }
       if (typeof ht.value !== "number") {
         errors.push({
           itemIndex: idx,
           field: "healthyThreshold",
-          message: `Score config ${display}: numeric healthyThreshold.value must be a number`,
+          message: t("onlineEvals.scoreConfigImport.numericValueInvalid", { index: display }),
         });
       }
     } else if (dataType === "categorical") {
@@ -183,7 +190,9 @@ export function validateScoreConfig(
         errors.push({
           itemIndex: idx,
           field: "healthyThreshold",
-          message: `Score config ${display}: categorical healthyThreshold.healthy_categories must be a non-empty array`,
+          message: t("onlineEvals.scoreConfigImport.categoricalHealthyCategoriesRequired", {
+            index: display,
+          }),
         });
       }
     } else if (dataType === "boolean") {
@@ -191,7 +200,9 @@ export function validateScoreConfig(
         errors.push({
           itemIndex: idx,
           field: "healthyThreshold",
-          message: `Score config ${display}: boolean healthyThreshold.healthy_value must be true or false`,
+          message: t("onlineEvals.scoreConfigImport.booleanHealthyValueInvalid", {
+            index: display,
+          }),
         });
       }
     }
@@ -203,7 +214,10 @@ export function validateScoreConfig(
       errors.push({
         itemIndex: idx,
         field: "nameConflict",
-        message: `Score config ${display}: name "${trimmed}" already exists in this org`,
+        message: t("onlineEvals.scoreConfigImport.nameExists", {
+          index: display,
+          name: trimmed,
+        }),
         fixable: true,
       });
     }
@@ -211,7 +225,10 @@ export function validateScoreConfig(
       errors.push({
         itemIndex: idx,
         field: "duplicate",
-        message: `Score config ${display}: name "${trimmed}" is used more than once in this import`,
+        message: t("onlineEvals.scoreConfigImport.nameDuplicate", {
+          index: display,
+          name: trimmed,
+        }),
       });
     }
   }
@@ -225,6 +242,7 @@ export function validateScoreConfig(
 export function prepareScoreConfigImport(
   rawItems: unknown[],
   existingScoreConfigs: ReadonlyArray<Pick<ScoreConfig, "name">>,
+  t: TranslateFn,
 ): PreparedScoreConfigImport {
   const existingNames = new Set(
     existingScoreConfigs.map((c) => (c.name ?? "").trim()).filter(Boolean),
@@ -240,7 +258,7 @@ export function prepareScoreConfigImport(
   }
 
   const items: PreparedScoreConfigItem[] = normalized.map((n, i) => {
-    const errors = validateScoreConfig(n, { itemIndex: i, existingNames, nameCounts });
+    const errors = validateScoreConfig(n, { itemIndex: i, existingNames, nameCounts, t });
     if (errors.length || !n) return { payload: null, errors };
     return { payload: buildPayload(n), errors };
   });

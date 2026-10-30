@@ -18,6 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <DataSourceSidebarLayout v-model="ingestiontabs" :splitter-width="250">
     <template #tabs>
+      <FirstSourcePickGroup
+        v-if="pickRoute === otelCollectorTab.name"
+        rail="metrics"
+        :tab="otelCollectorTab"
+        :rest-label="t('ingestion.metricsLabel')"
+      />
       <ORouteTab
         name="prometheus"
         data-test="ingestion-metrics-tab-prometheus"
@@ -28,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         :icon="'img:' + getImageURL('images/ingestion/prometheus.svg')"
-        label="Prometheus"
+        :label="t('ingestion.metrics.prometheus')"
       />
       <ORouteTab
         name="vmagent"
@@ -40,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         :icon="'img:' + getImageURL('images/ingestion/vmagent.svg')"
-        label="vmagent"
+        :label="t('ingestion.metrics.vmagent')"
       />
       <ORouteTab
         name="nightingale"
@@ -52,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         :icon="'img:' + getImageURL('images/ingestion/nightingale.svg')"
-        label="Nightingale"
+        :label="t('ingestion.metrics.nightingale')"
       />
       <ORouteTab
         name="categraf"
@@ -64,19 +70,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         :icon="'img:' + getImageURL('images/ingestion/categraf.png')"
-        label="Categraf"
+        :label="t('ingestion.metrics.categraf')"
       />
-      <ORouteTab
-        name="otelCollector"
-        :to="{
-          name: 'otelCollector',
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        }"
-        :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
-        label="OTEL Collector"
-      />
+      <ORouteTab v-if="pickRoute !== otelCollectorTab.name" v-bind="otelCollectorTab" />
       <ORouteTab
         name="telegraf"
         :to="{
@@ -86,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         :icon="'img:' + getImageURL('images/ingestion/telegraf.png')"
-        label="Telegraf"
+        :label="t('ingestion.metrics.telegraf')"
       />
       <ORouteTab
         name="cloudwatchMetrics"
@@ -97,14 +93,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         :icon="'img:' + getImageURL('images/ingestion/cloud_watch.svg')"
-        label="AWS CloudWatch Metrics"
+        :label="t('ingestion.metrics.awsCloudwatchMetrics')"
       />
     </template>
 
     <div class="h-full w-full">
       <div class="bg-card-glass-bg h-full overflow-y-auto pt-0.5">
         <router-view
-          :title="ingestiontabs"
           :currOrgIdentifier="currOrgIdentifier"
           :currUserEmail="currentUserEmail"
           @copy-to-clipboard-fn="copyToClipboardFn"
@@ -118,23 +113,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
 import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
+import FirstSourcePickGroup from "@/components/ingestion/FirstSourcePickGroup.vue";
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
 // import { config } from "../constants/config";
 import config from "../../../aws-exports";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import { resolveTab } from "@/utils/routeTabMaps";
+import { firstSourcePickRoute } from "@/components/login/firstSourceOptions";
 
 export default defineComponent({
   name: "IngestMetrics",
   components: {
     ORouteTab,
     DataSourceSidebarLayout,
+    FirstSourcePickGroup,
   },
   data() {
     return {};
@@ -146,7 +144,7 @@ export default defineComponent({
     },
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router: any = useRouter();
     const rowData: any = ref({});
@@ -198,17 +196,16 @@ export default defineComponent({
     });
 
     const copyToClipboardFn = (content: any) => {
-      copyToClipboard(content.innerText, {
-        successMessage: "Content Copied Successfully!",
-        errorMessage: "Error while copy content.",
+      copyToClipboard(content.innerText, t, {
+        successMessage: t("common.contentCopiedSuccessfully"),
+        errorMessage: t("ingestion.copyContentError"),
         timeout: 5000,
       }).then((success: boolean) => {
         if (success) {
-          segment.track("Button Click", {
+          analytics.track("Button Click", {
             button: "Copy to Clipboard",
             ingestion: router.currentRoute.value.name,
             user_org: store.state.selectedOrganization.identifier,
-            user_id: store.state.userInfo.email,
             page: "Ingestion",
           });
         }
@@ -218,6 +215,17 @@ export default defineComponent({
     const showUpdateDialogFn = () => {
       confirmUpdate.value = true;
     };
+
+    const otelCollectorTab = {
+      name: "otelCollector",
+      to: {
+        name: "otelCollector",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      },
+      icon: "img:" + getImageURL("images/ingestion/otlp.svg"),
+      label: t("ingestion.metrics.otelCollector"),
+    };
+    const pickRoute = firstSourcePickRoute(store.state.selectedOrganization.identifier);
 
     return {
       t,
@@ -232,6 +240,8 @@ export default defineComponent({
       ingestiontabs,
       getImageURL,
       verifyOrganizationStatus,
+      otelCollectorTab,
+      pickRoute,
     };
   },
 });

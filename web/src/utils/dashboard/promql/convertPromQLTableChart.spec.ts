@@ -463,8 +463,9 @@ describe("TableConverter", () => {
 
       const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
-      expect(result.columns[0].sticky).toBe(true);
-      expect(result.columns[0].headerClasses).toBe("sticky-column");
+      expect(result.columns[0].pinned).toBe("left");
+      expect(result.columns[0].classes).toBeUndefined();
+      expect(result.columns[1].pinned).toBeUndefined();
     });
 
     it("should make specific columns sticky in expanded_timeseries mode", () => {
@@ -493,7 +494,8 @@ describe("TableConverter", () => {
       const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       const jobColumn = result.columns.find((c: any) => c.name === "job");
-      expect(jobColumn.sticky).toBe(true);
+      expect(jobColumn.pinned).toBe("left");
+      expect(result.columns.find((c: any) => c.name === "instance").pinned).toBeUndefined();
     });
 
     it("should apply row limit in expanded_timeseries mode", () => {
@@ -894,7 +896,8 @@ describe("TableConverter", () => {
 
       const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
-      expect(result.columns[0].sticky).toBe(true);
+      expect(result.columns[0].pinned).toBe("left");
+      expect(result.columns[1].pinned).toBeUndefined();
     });
 
     it("should make specific columns sticky in all mode", () => {
@@ -923,7 +926,8 @@ describe("TableConverter", () => {
       const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       const jobColumn = result.columns.find((c: any) => c.name === "job");
-      expect(jobColumn.sticky).toBe(true);
+      expect(jobColumn.pinned).toBe("left");
+      expect(result.columns.find((c: any) => c.name === "instance").pinned).toBeUndefined();
     });
 
     it("should apply row limit in all mode", () => {

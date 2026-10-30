@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
     role="img"
-    aria-label="Waiting for data to arrive"
+    :aria-label="t('emptyState.illustrations.hourglass.ariaLabel')"
   >
     <circle cx="120" cy="90" r="68" fill="var(--color-primary-500)" opacity="0.05" />
     <ellipse cx="120" cy="160" rx="46" ry="8" fill="var(--color-primary-900)" opacity="0.1" />
@@ -165,5 +165,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { useI18nTyped } from "@/types/i18n";
+
 withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 260, animated: true });
+
+const { t } = useI18nTyped();
 </script>

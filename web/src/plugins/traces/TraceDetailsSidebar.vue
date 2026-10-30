@@ -21,8 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="trace-details-sidebar-header"
     >
       <div
-        :title="span.operation_name"
-        class="flex w-[calc(100%-1.5rem)] items-center truncate pb-0 pl-1"
+        class="flex w-[calc(100%-1.5rem)] items-center truncate ps-1 pb-0"
         data-test="trace-details-sidebar-header-operation-name"
       >
         <!-- Status Code Badge -->
@@ -31,14 +30,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="inline-flex items-center"
           data-test="trace-details-sidebar-header-toolbar-status-code"
         >
-          <OIcon name="error" size="sm" class="text-status-error-text! mr-1" />
+          <OIcon name="error" size="sm" class="text-status-error-text! me-1" />
         </span>
         <!-- Observation Type Badge (for LLM spans) -->
         <OTag
           v-if="isLLMSpan"
           type="observationType"
           :value="span.gen_ai_operation_name"
-          class="mr-1 normal-case!"
+          class="me-1 normal-case!"
           data-test="trace-details-sidebar-observation-badge"
           >{{
             span.gen_ai_operation_name?.charAt(0) +
@@ -46,10 +45,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}</OTag
         >
 
-        <span class="truncate">{{ span.operation_name }}</span>
+        <OTruncatedText>{{ span.operation_name }}</OTruncatedText>
       </div>
 
       <OButton
+        :aria-label="t('common.close')"
         variant="ghost"
         size="icon"
         @click="closeSidebar"
@@ -64,18 +64,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- Row 1: Trace Details -->
       <div class="flex flex-nowrap items-center justify-between overflow-x-auto p-1">
-        <div class="flex flex-nowrap items-center">
+        <div
+          class="flex min-w-0 flex-wrap items-center gap-y-1"
+          data-test="trace-details-sidebar-header-toolbar-chips"
+        >
           <!-- Service Badge -->
           <OTag
             type="metricChip"
-            class="text-2xs bg-surface-base border-border-default border-l-badge-blue-ol-border hover:bg-surface-panel mr-[0.325rem] h-5.5 shrink-0 border border-l-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+            class="text-2xs bg-surface-base border-border-default border-s-badge-blue-ol-border hover:bg-surface-panel me-[0.325rem] h-5.5 shrink-0 border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
             :title="span.service_name"
             data-test="trace-details-sidebar-header-toolbar-service"
           >
             <template #icon>
               <img :src="serviceIconUrl" class="h-3.5 w-3.5 shrink-0" aria-hidden="true" alt="" />
             </template>
-            <span class="text-3xs text-text-secondary mr-0.75 font-medium">{{
+            <span class="text-3xs text-text-secondary me-0.75 font-medium">{{
               t("traces.traceDetailsSidebar.service")
             }}</span>
             <span
@@ -89,39 +92,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Duration Badge -->
           <OTag
             type="metricChip"
-            class="text-2xs bg-surface-base border-border-default border-l-badge-indigo-ol-border hover:bg-surface-panel mr-[0.325rem] h-5.5 shrink-0 border border-l-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+            class="text-2xs bg-surface-base border-border-default border-s-badge-indigo-ol-border hover:bg-surface-panel me-[0.325rem] h-5.5 shrink-0 border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
             :title="getDuration"
             data-test="trace-details-sidebar-header-toolbar-duration"
           >
             <template #icon><OIcon name="schedule" size="xs" /></template>
-            <span class="text-3xs text-text-secondary mr-0.75 font-medium">{{
+            <span class="text-3xs text-text-secondary me-0.75 font-medium">{{
               t("traces.traceDetailsSidebar.duration")
             }}</span>
             <span class="text-3xs text-text-body font-semibold">{{ getDuration }}</span>
           </OTag>
 
+          <span v-if="operationPercentile" class="me-[0.325rem] inline-flex shrink-0">
+            <OTag
+              :variant="operationPercentile.variant"
+              size="sm"
+              data-test="trace-details-sidebar-header-toolbar-operation-percentile"
+              >{{
+                t("traces.traceDetailsSidebar.operationPercentileBand", {
+                  band: operationPercentile.band,
+                  operation: span.operation_name,
+                })
+              }}</OTag
+            >
+            <OTooltip
+              :content="operationPercentile.tooltip"
+              max-width="none"
+              content-class="whitespace-nowrap"
+            />
+          </span>
+
           <!-- TTFT Badge -->
           <OTag
             v-if="getTTFT"
             type="metricChip"
-            class="text-2xs bg-surface-base border-border-default border-l-badge-purple-ol-border hover:bg-surface-panel mr-[0.325rem] h-5.5 shrink-0 border border-l-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+            class="text-2xs bg-surface-base border-border-default border-s-badge-purple-ol-border hover:bg-surface-panel me-[0.325rem] h-5.5 shrink-0 border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
             :title="getTTFT"
             data-test="trace-details-sidebar-header-toolbar-ttft"
           >
             <template #icon><OIcon name="speed" size="xs" /></template>
-            <span class="text-3xs text-text-secondary mr-0.75 font-medium">TTFT</span>
+            <span class="text-3xs text-text-secondary me-0.75 font-medium">{{
+              t("traces.traceDetailsSidebar.ttft")
+            }}</span>
             <span class="text-3xs text-text-body font-semibold">{{ getTTFT }}</span>
           </OTag>
 
           <!-- Start Time Badge -->
           <OTag
             type="metricChip"
-            class="text-2xs bg-surface-base border-border-default border-l-badge-amber-ol-border hover:bg-surface-panel mr-[0.325rem] h-5.5 shrink-0 border border-l-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+            class="text-2xs bg-surface-base border-border-default border-s-badge-amber-ol-border hover:bg-surface-panel me-[0.325rem] h-5.5 shrink-0 border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
             :title="getStartTime"
             data-test="trace-details-sidebar-header-toolbar-start-time"
           >
             <template #icon><OIcon name="access-time" size="xs" /></template>
-            <span class="text-3xs text-text-secondary mr-0.75 font-medium">{{
+            <span class="text-3xs text-text-secondary me-0.75 font-medium">{{
               t("traces.traceDetailsSidebar.start")
             }}</span>
             <span class="text-3xs text-text-body font-semibold">{{ getStartTime }}</span>
@@ -131,24 +155,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-if="spanHttpResendCount"
             type="metricChip"
-            class="text-2xs bg-surface-base border-border-default hover:bg-surface-panel mr-[0.325rem] h-5.5 shrink-0 border border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+            class="text-2xs bg-surface-base border-border-default hover:bg-surface-panel me-[0.325rem] h-5.5 shrink-0 border border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
             :title="t('traces.traceDetailsSidebar.requestResent', { count: spanHttpResendCount })"
             data-test="trace-details-sidebar-header-toolbar-resend-count"
           >
             <template #icon><OIcon name="replay" size="xs" /></template>
-            <span class="text-3xs text-text-secondary mr-0.75 font-medium">{{
+            <span class="text-3xs text-text-secondary me-0.75 font-medium">{{
               t("traces.traceDetailsSidebar.resends")
             }}</span>
             <span class="text-3xs text-text-body font-semibold">{{ spanHttpResendCount }}</span>
           </OTag>
+
+          <OTag
+            v-if="promptAttributionTarget"
+            type="metricChip"
+            clickable
+            class="text-2xs bg-surface-base border-border-default border-s-badge-purple-ol-border hover:bg-surface-panel me-[0.325rem] h-5.5 shrink-0 cursor-pointer border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+            :title="promptAttributionText"
+            data-test="trace-details-sidebar-prompt-attribution"
+            @click.stop="openPromptAttribution"
+          >
+            <template #icon><OIcon name="edit" size="xs" /></template>
+            <span class="text-3xs text-text-body font-semibold">{{ promptAttributionText }}</span>
+          </OTag>
         </div>
 
-        <div class="flex items-center">
+        <div
+          class="flex shrink-0 items-center"
+          data-test="trace-details-sidebar-header-toolbar-actions"
+        >
           <!-- Span ID Badge -->
           <OTag
             type="metricChip"
             clickable
-            class="group text-2xs bg-surface-base border-border-default border-l-badge-teal-ol-border hover:bg-surface-panel mr-[0.325rem] h-5.5 shrink-0 cursor-pointer border border-l-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+            class="group text-2xs bg-surface-base border-border-default border-s-badge-teal-ol-border hover:bg-surface-panel me-[0.325rem] h-5.5 shrink-0 cursor-pointer border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
             :title="t('traces.traceDetailsSidebar.spanIdTitle', { id: span.span_id })"
             @click="copySpanId"
             data-test="trace-details-sidebar-header-toolbar-span-id"
@@ -158,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="content-copy"
               size="xs"
-              class="ml-1 opacity-60 transition-opacity duration-200 group-hover:opacity-100"
+              class="ms-1 opacity-60 transition-opacity duration-200 group-hover:opacity-100"
               data-test="trace-details-sidebar-header-toolbar-span-id-copy-icon"
             />
           </OTag>
@@ -180,18 +220,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OTooltip :content="viewLogsTooltipContent" />
             </span>
+            <OButton
+              v-if="spanProfileMatch"
+              variant="outline"
+              size="xs"
+              class="ms-1 h-full text-xs!"
+              data-test="trace-details-sidebar-header-toolbar-view-profile-btn"
+              @click.stop="viewSpanProfile"
+            >
+              {{ t("traces.viewProfile") }}
+            </OButton>
           </span>
 
-          <OButton
-            v-if="showEvaluateButton && canPreviewSpan"
-            variant="primary"
-            size="xs"
-            class="ml-1"
-            data-test="trace-details-sidebar-evaluate-span-btn"
-            @click.stop="evaluateSpan"
-          >
-            {{ t("onlineEvals.manualEvaluation.titles.span") }}
-          </OButton>
+          <!-- LLM workflow actions — icon-only, matching the trace header. The
+               row itself has no gap (its children carry their own margins), so
+               these three are grouped and spaced on the header's rhythm. -->
+          <div class="ms-2 flex items-center gap-2">
+            <OButton
+              v-if="showEvaluateButton && canPreviewSpan"
+              variant="outline"
+              size="icon-xs"
+              :aria-label="t('onlineEvals.manualEvaluation.titles.span')"
+              data-test="trace-details-sidebar-evaluate-span-btn"
+              @click.stop="evaluateSpan"
+            >
+              <OIcon name="rule" size="sm" />
+              <OTooltip side="bottom" :content="t('onlineEvals.manualEvaluation.titles.span')" />
+            </OButton>
+
+            <TraceAnnotateMenu
+              v-if="showAnnotateButtons"
+              ref-type="span"
+              :ref-id="String(span.span_id ?? '')"
+              :ref-trace-id="String(span.trace_id ?? '')"
+              :ref-trace-start-time="spanStartTimeUs"
+              :source-stream="spanSourceStream"
+              compact
+              data-test="trace-details-sidebar-annotate-span-btn"
+              @annotated-target="onScoreAnnotated"
+            />
+
+            <OButton
+              v-if="showAnnotateButtons"
+              variant="outline"
+              size="icon-xs"
+              :aria-label="t('aiObservability.traceActions.dataset.button')"
+              data-test="trace-details-sidebar-dataset-span-btn"
+              @click.stop="addSpanToDataset"
+            >
+              <OIcon name="table-chart" size="sm" />
+              <OTooltip side="bottom" :content="t('aiObservability.traceActions.dataset.button')" />
+            </OButton>
+
+            <OButton
+              v-if="canOpenPlayground"
+              variant="outline"
+              size="icon-xs"
+              :aria-label="t('aiObservability.traceActions.playground.button')"
+              data-test="trace-details-sidebar-playground-span-btn"
+              @click.stop="openInPlayground"
+            >
+              <OIcon name="play-circle" size="sm" />
+              <OTooltip
+                side="bottom"
+                :content="t('aiObservability.traceActions.playground.hint')"
+              />
+            </OButton>
+          </div>
         </div>
       </div>
 
@@ -205,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             type="metricChip"
             icon="psychology"
-            class="text-3xs bg-surface-base border-border-default border-l-badge-purple-ol-border h-5 shrink-0 border border-l-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+            class="text-3xs bg-surface-base border-border-default border-s-badge-purple-ol-border h-5 shrink-0 border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
             :title="span.gen_ai_response_model"
           >
             <span class="text-3xs text-badge-purple-ol-text font-semibold">{{
@@ -218,11 +313,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Input Tokens -->
             <OTag
               type="metricChip"
-              class="text-3xs bg-surface-base border-border-default border-l-badge-blue-ol-border text-badge-blue-ol-text h-5 min-w-15 shrink-0 justify-center border border-l-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+              class="text-3xs bg-surface-base border-border-default border-s-badge-blue-ol-border text-badge-blue-ol-text h-5 min-w-15 shrink-0 justify-center border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
               :title="t('traces.traceDetailsSidebar.inputTokens')"
             >
               <template #icon><OIcon name="arrow-upward" size="xs" /></template>
-              <span class="text-3xs mr-0.5 font-medium">{{
+              <span class="text-3xs me-0.5 font-medium">{{
                 t("traces.traceDetailsSidebar.in")
               }}</span>
               <span class="text-3xs font-medium">{{ llmMetrics.usage.input }}</span>
@@ -231,11 +326,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Output Tokens -->
             <OTag
               type="metricChip"
-              class="text-3xs bg-surface-base border-border-default border-l-badge-success-ol-border text-badge-success-ol-text h-5 min-w-15 shrink-0 justify-center border border-l-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+              class="text-3xs bg-surface-base border-border-default border-s-badge-success-ol-border text-badge-success-ol-text h-5 min-w-15 shrink-0 justify-center border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
               :title="t('traces.traceDetailsSidebar.outputTokens')"
             >
               <template #icon><OIcon name="arrow-downward" size="xs" /></template>
-              <span class="text-3xs mr-0.5 font-medium">{{
+              <span class="text-3xs me-0.5 font-medium">{{
                 t("traces.traceDetailsSidebar.out")
               }}</span>
               <span class="text-3xs font-medium">{{ llmMetrics.usage.output }}</span>
@@ -246,13 +341,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             type="metricChip"
             icon="attach-money"
-            class="text-3xs bg-surface-base border-border-default border-l-badge-orange-ol-border h-5 shrink-0 border border-l-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+            class="text-3xs bg-surface-base border-border-default border-s-badge-orange-ol-border h-5 shrink-0 border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
             :title="t('traces.traceDetailsSidebar.totalCost')"
           >
             <span class="text-3xs text-badge-orange-ol-text font-semibold"
-              >${{ Number(llmMetrics.cost.total).toFixed(5) }}</span
+              >{{ t("traces.sessionDetail.currencySymbol")
+              }}{{ Number(llmMetrics.cost.total).toFixed(5) }}</span
             >
           </OTag>
+
+          <!-- Real evaluator scores for this exact span; nothing renders until one
+               resolves. Scoring itself (Score Configs, Eval Jobs, Annotate) is
+               enterprise/cloud-only, so `_llm_scores` never exists on OSS —
+               without this gate the query would run on every LLM span for a
+               stream that can never be written to there. -->
+          <template
+            v-if="isLLMSpan && (config.isEnterprise === 'true' || config.isCloud === 'true')"
+          >
+            <OSeparator vertical class="mx-1.5 h-3.5" />
+            <span class="text-3xs text-text-secondary me-1 shrink-0 font-medium">{{
+              t("traces.traceDetailsSidebar.scores")
+            }}</span>
+            <TraceScoreChips
+              ref="scoreChipsRef"
+              scope="span"
+              :target-id="String(span.span_id ?? '')"
+              :start-time-us="spanStartTimeUs"
+            >
+              <template v-if="showAnnotateButtons" #empty>
+                <OTag
+                  type="metricChip"
+                  class="text-3xs bg-surface-base border-border-default h-5 shrink-0 border border-solid px-1.5"
+                  data-test="trace-details-sidebar-scores-empty"
+                >
+                  <span class="text-3xs text-text-secondary font-medium">{{
+                    t("traces.traceDetailsSidebar.notScoredYet")
+                  }}</span>
+                </OTag>
+              </template>
+            </TraceScoreChips>
+          </template>
         </div>
 
         <div class="flex items-center">
@@ -268,13 +396,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="px-page-edge span_details_tabs">
-      <OTabs
-        :model-value="activeTab"
-        @update:model-value="$emit('update:activeTab', $event)"
-        dense
-        align="left"
-        data-test="trace-details-sidebar-tabs"
-      >
+      <OTabs v-model="activeTabModel" dense align="left" data-test="trace-details-sidebar-tabs">
         <!-- LLM Preview Tab (conditional - shown first for LLM traces) -->
         <OTab
           v-if="canPreviewSpan"
@@ -300,7 +422,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="hasExceptionEvents.length"
             type="countChip"
             value="error"
-            class="ml-0"
+            class="ms-0"
             data-test="trace-details-sidebar-tabs-error-count"
             >{{ hasExceptionEvents.length }}</OTag
           >
@@ -324,18 +446,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="trace-details-sidebar-tabs-links"
           class="font-normal! capitalize"
         />
-        <!-- Correlation Tabs (only visible when service streams enabled and enterprise license) -->
+        <!-- Correlation Tabs (visible whenever service streams are enabled; locked without an enterprise license) -->
         <OTab
-          v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
+          v-if="serviceStreamsEnabled"
           name="correlated-logs"
           :label="t('correlation.correlatedLogs')"
+          :suffix-icon="!correlationAccess.allowed ? 'lock' : undefined"
           data-test="trace-details-sidebar-tabs-correlated-logs"
           class="font-normal! capitalize"
         />
         <OTab
-          v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
+          v-if="serviceStreamsEnabled"
           name="correlated-metrics"
           :label="t('correlation.correlatedMetrics')"
+          :suffix-icon="!correlationAccess.allowed ? 'lock' : undefined"
           data-test="trace-details-sidebar-tabs-correlated-metrics"
           class="font-normal! capitalize"
         />
@@ -345,13 +469,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="span_details_tab-panels h-[calc(100%-6rem)] overflow-hidden"
       :class="
-        activeTab === 'correlated-logs' || activeTab === 'correlated-metrics'
+        activeTabModel === 'correlated-logs' || activeTabModel === 'correlated-metrics'
           ? ''
           : 'px-page-edge py-2'
       "
     >
       <OTabPanels
-        :model-value="activeTab"
+        :model-value="activeTabModel"
         @update:model-value="$emit('update:activeTab', $event)"
         grow
         class="h-full overflow-y-auto"
@@ -360,13 +484,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTabPanel v-if="canPreviewSpan" name="preview" class="llm-preview-panel p-3">
           <div class="llm-preview-container h-full! w-full overflow-hidden overflow-x-auto">
             <!-- Input and Output Side by Side -->
-            <div class="io-container flex h-full! w-full!" ref="ioContainerRef">
+            <div
+              class="io-container flex h-full! w-full!"
+              :class="isFullscreen ? 'bg-surface-panel' : ''"
+              ref="ioContainerRef"
+            >
               <!-- Input Section -->
               <div
-                class="io-section flex h-full w-1/2 shrink-0 grow-0 basis-[calc(50%-0.4rem)] flex-col pr-2"
+                class="io-section flex h-full w-1/2 shrink-0 grow-0 basis-[calc(50%-0.4rem)] flex-col pe-2"
               >
                 <div
                   class="section-label text-text-heading mb-2 flex items-center justify-between text-sm font-bold"
+                  :class="isFullscreen ? 'bg-surface-panel' : ''"
                 >
                   <div>{{ t("traces.traceDetailsSidebar.input") }}</div>
                   <div class="flex items-center gap-1">
@@ -439,6 +568,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div
                   class="section-label text-text-heading mb-2 flex items-center justify-between text-sm font-bold"
+                  :class="isFullscreen ? 'bg-surface-panel' : ''"
                 >
                   <div>{{ t("traces.traceDetailsSidebar.output") }}</div>
                   <div class="flex items-center gap-1">
@@ -509,7 +639,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #icon-left
                   ><OIcon name="data-object" size="xs" class="shrink-0"
                 /></template>
-                JSON
+                {{ t("common.json") }}
               </OToggleGroupItem>
               <OToggleGroupItem value="table" size="xs" class="h-5! text-xs!">
                 <template #icon-left
@@ -541,8 +671,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       })
                     "
                   >
-                    <span class="mr-1 inline-flex shrink-0">
-                      <OButton variant="ghost" size="icon-xs-circle">
+                    <span class="me-1 inline-flex shrink-0">
+                      <OButton
+                        :aria-label="
+                          action.operator === '='
+                            ? t('traces.applyAndSearchEquals')
+                            : t('traces.applyAndSearchNotEquals')
+                        "
+                        variant="ghost"
+                        size="icon-xs-circle"
+                      >
                         <OIcon color="currentColor" class="h-[0.7rem]! w-[0.7rem]! pb-[0.185rem]!">
                           <component :is="action.iconComponent" />
                         </OIcon>
@@ -555,6 +693,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </JsonPreview>
           </div>
           <!-- Table View -->
+          <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
           <div
             v-else
             class="tab-content-dynamic-height border-card-glass-border flex-1 overflow-hidden border-1 border-solid"
@@ -565,6 +704,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             data-test="trace-details-sidebar-attributes-tenstack-table"
           >
+            <!-- eslint-enable local/no-hardcoded-px -->
             <OTable
               :data="attributesTableRows"
               :columns="attributesTableColumns"
@@ -590,8 +730,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           })
                         "
                       >
-                        <span class="mr-1 inline-flex shrink-0">
-                          <OButton variant="ghost" size="icon-xs-circle">
+                        <span class="me-1 inline-flex shrink-0">
+                          <OButton
+                            :aria-label="
+                              action.operator === '='
+                                ? t('traces.applyAndSearchEquals')
+                                : t('traces.applyAndSearchNotEquals')
+                            "
+                            variant="ghost"
+                            size="icon-xs-circle"
+                          >
                             <OIcon
                               color="currentColor"
                               class="h-[0.7rem]! w-[0.7rem]! pb-[0.185rem]!"
@@ -611,11 +759,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabPanel>
         <OTabPanel name="events" class="flex h-[30.6rem]! flex-col p-0">
           <template v-if="spanDetails.events.length">
+            <!-- Mini-timeline: the same events as the table, plotted against
+                 this span's own duration so "when within the span" is a glance
+                 rather than a subtraction. -->
+            <div
+              class="shrink-0 ps-1 pe-1 pb-[0.325rem]"
+              data-test="trace-details-sidebar-events-timeline"
+            >
+              <div class="text-3xs text-text-muted flex items-center justify-between pb-1">
+                <span>{{ t("traces.spanEventTimeline") }}</span>
+                <span>{{ getDuration }}</span>
+              </div>
+              <div
+                ref="eventTimelineRef"
+                class="bg-surface-panel border-card-glass-border rounded-default relative h-5 w-full border border-solid"
+              >
+                <button
+                  v-for="cluster in spanEventClusters"
+                  :key="cluster.key"
+                  type="button"
+                  class="absolute top-1/2 h-3 w-0.75 -translate-x-1/2 -translate-y-1/2 cursor-pointer p-0 before:absolute before:top-1/2 before:left-1/2 before:h-5 before:w-2.5 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
+                  :class="SEVERITY_MARKER_CLASS[cluster.severity]"
+                  :style="{ left: cluster.left + '%' }"
+                  :title="clusterLabel(cluster)"
+                  :aria-label="clusterAriaLabel(cluster)"
+                  :data-event-severity="cluster.severity"
+                  :data-event-count="cluster.events.length"
+                  data-test="span-event-timeline-marker"
+                  @click="onEventMarkerClick(cluster.events[0])"
+                />
+              </div>
+            </div>
             <!-- Wrap toggle toolbar -->
-            <div class="flex items-center gap-1 pb-[0.325rem] pl-1">
+            <div class="flex items-center gap-1 ps-1 pb-[0.325rem]">
               <OSwitch v-model="eventsWrap" :label="t('common.wrap')" size="md" class="gap-1!" />
             </div>
             <!-- TenstackTable for events -->
+            <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
             <div
               class="traces-events-table-container tab-content-dynamic-height border-card-glass-border rounded-default flex-1 overflow-hidden border-1 border-solid"
               :class="
@@ -625,11 +805,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               data-test="trace-details-sidebar-events-table"
             >
+              <!-- eslint-enable local/no-hardcoded-px -->
               <OTable
+                ref="eventsTableRef"
                 :data="eventsRowsWithKey"
                 :columns="eventsTableColumns"
                 row-key="__rowId"
                 :wrap="eventsWrap"
+                :cell-overflow-tooltip="false"
                 :default-columns="false"
                 :row-height="28"
                 :show-global-filter="false"
@@ -639,11 +822,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :enable-column-resize="true"
                 persist-columns
                 table-id="trace-details-events"
+                :expanded-ids="expandedEventIds"
+                @update:expanded-ids="expandedEventIds = $event"
               >
                 <template #expansion="{ row }">
                   <JsonPreview
                     :value="row"
-                    class="py-1.5 pl-1.5"
+                    class="py-1.5 ps-1.5"
                     copyButtonClass="left-1! w-fit! sticky!"
                     mode="expanded"
                     @copy="copyContentToClipboard"
@@ -671,7 +856,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabPanel>
 
         <OTabPanel name="database" class="h-full p-0">
-          <DbSpanDetails :span="span" />
+          <DbSpanDetails :span="span" :stream="streamName" />
         </OTabPanel>
 
         <OTabPanel name="links">
@@ -686,6 +871,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-for="(col, index) in linkColumns"
                     :key="'result_' + index"
                     :data-test="`trace-events-table-th-${col.label}`"
+                    class="bg-border-default"
                   >
                     {{ col.label }}
                   </th>
@@ -741,6 +927,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :source-stream="correlationProps.sourceStream"
             :source-type="correlationProps.sourceType"
             :available-dimensions="correlationProps.availableDimensions"
+            :semantic-groups="correlationProps.semanticGroups"
             :fts-fields="correlationProps.ftsFields"
             :time-range="correlationProps.timeRange"
             :hide-view-related-button="true"
@@ -819,21 +1006,43 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { cloneDeep } from "lodash-es";
 import { timestampToTimezoneDate } from "@/utils/timezone";
+import {
+  useSpanEventMarkers,
+  clusterSpanEventMarkers,
+  truncateEventName,
+  SEVERITY_MARKER_CLASS,
+  type SpanEventMarker,
+  type SpanEventCluster,
+} from "@/composables/traces/useSpanEvents";
 import { copyToClipboard } from "@/utils/clipboard";
 import { toggleFullscreen as domToggleFullScreen } from "@/utils/dom";
-import { defineComponent, onBeforeMount, ref, watch, type Ref, type PropType, inject } from "vue";
+import {
+  defineComponent,
+  onBeforeMount,
+  ref,
+  watch,
+  type Ref,
+  type PropType,
+  inject,
+  computed,
+  onMounted,
+  onUnmounted,
+  defineAsyncComponent,
+  nextTick,
+} from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
-import { useI18n } from "vue-i18n";
-import { computed } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { formatTimeWithSuffix, convertTimeFromNsToUs, getImageURL } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useRouter } from "vue-router";
-import { onMounted, onUnmounted, defineAsyncComponent, nextTick } from "vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import JsonPreview from "@/components/JsonPreview.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
@@ -851,6 +1060,7 @@ import {
 import DeployedCode from "@/components/icons/DeployedCode.vue";
 import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 import LLMContentRenderer from "@/plugins/traces/LLMContentRenderer.vue";
+import { extractGenAiPartText } from "@/plugins/traces/genAiParts";
 import OTable from "@/lib/core/Table/OTable.vue";
 import {
   hasTracePreview,
@@ -878,9 +1088,56 @@ import {
 } from "@/utils/traces/useSpanServiceDetection";
 import type { Span } from "@/ts/interfaces/traces/span.types";
 import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
+import llmPromptsService from "@/services/llm-prompts.service";
+import { aiPromptsRoute } from "@/views/AIObservability/promptRoutes";
+import searchService from "@/services/search";
+import { quoteSqlIdentifier, quoteSqlLiteral } from "@/utils/telemetryCorrelation";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import { queryClient } from "@/composables/query/queryClient";
+import { streamNameListQuery, streamSchemaQuery } from "@/services/stream.queries";
+import { encodeProfileFilters } from "@/services/profiles";
 
 // luxon equivalent of "MMM DD, YYYY HH:mm:ss.SSS Z" → e.g. "Jun 24, 2026 17:39:32.157 +0530"
 const HUMAN_TZ_FORMAT = "MMM dd, yyyy HH:mm:ss.SSS ZZZ";
+const OPERATION_STATS_MIN_SAMPLES = 20;
+const OPERATION_STATS_FALLBACK_WINDOW_US = 3_600_000_000;
+const OPERATION_STATS_FALLBACK_BUCKET_US = 600_000_000;
+const PROFILE_LINK_PAD_US = 60_000_000;
+const PROFILE_LINK_CONCURRENCY = 3;
+
+interface OperationStats {
+  n: number;
+  p50: number;
+  p75: number;
+  p90: number;
+  p99: number;
+}
+
+interface OperationStatsRequest {
+  key: string;
+  org: string;
+  stream: string;
+  service: string;
+  operation: string;
+  startTime: number;
+  endTime: number;
+}
+
+interface SpanProfileRequest {
+  key: string;
+  org: string;
+  traceId: string;
+  spanId: string;
+  startTime: number;
+  endTime: number;
+}
+
+interface SpanProfileMatch {
+  stream: string;
+  profileType: string;
+  profileUnit: string;
+  serviceName?: string;
+}
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -909,6 +1166,15 @@ export default defineComponent({
       type: String,
       default: "standalone",
     },
+    /**
+     * Index of the span event to focus, set when a waterfall or flame-graph
+     * marker is clicked. Selecting a span hides the timeline those markers live
+     * on, so the click lands here instead.
+     */
+    focusEventIndex: {
+      type: Number as PropType<number | null>,
+      default: null,
+    },
     activeTab: {
       type: String,
       default: "attributes",
@@ -925,6 +1191,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    showAnnotateButtons: {
+      type: Boolean,
+      default: false,
+    },
   },
   components: {
     OSeparator,
@@ -937,6 +1207,7 @@ export default defineComponent({
     OButton,
     OIcon,
     OTooltip,
+    OTruncatedText,
     OCollapsible,
     OEmptyState,
     LogsHighLighting,
@@ -946,6 +1217,12 @@ export default defineComponent({
     CorrelatedLogsTable,
     TelemetryCorrelationDashboard: defineAsyncComponent(
       () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
+    ),
+    TraceAnnotateMenu: defineAsyncComponent(
+      () => import("@/enterprise/components/AIObservability/TraceAnnotateMenu.vue"),
+    ),
+    TraceScoreChips: defineAsyncComponent(
+      () => import("@/enterprise/components/onlineEvals/TraceScoreChips.vue"),
     ),
     EqualIcon,
     NotEqualIcon,
@@ -967,15 +1244,21 @@ export default defineComponent({
     "apply-filter-immediately",
     "add-field-to-table",
     "evaluate",
+    "add-to-dataset",
     "update:activeTab",
   ],
   setup(props, { emit }) {
     const serviceDetectionConfig = inject(TRACE_SERVICE_DETECTION_KEY, ref(null));
     const { resolveSpanIdentity } = useSpanServiceDetection(serviceDetectionConfig);
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     // Check if this is an LLM span to set default tab
     const isLLMSpan = computed(() => isLLMTrace(props.span));
     const canPreviewSpan = computed(() => hasTracePreview(props.span));
+    // Score chips don't poll, so a fresh annotation must tell the chip row to re-check.
+    const scoreChipsRef = ref<{ refresh: () => void } | null>(null);
+    function onScoreAnnotated() {
+      scoreChipsRef.value?.refresh();
+    }
     const previewInput = computed(
       () => props.span?.gen_ai_input_messages ?? props.span?.attributes_prompt ?? "",
     );
@@ -989,7 +1272,10 @@ export default defineComponent({
       events: [],
     });
 
-    const { hasSpanError, hasExceptionEvents } = useTraceDetails(computed(() => props.span));
+    const { hasSpanError, hasExceptionEvents } = useTraceDetails(
+      computed(() => props.span),
+      t,
+    );
 
     const spanHttpResendCount = computed(() => {
       const attrs = props.span;
@@ -1000,13 +1286,25 @@ export default defineComponent({
       return !isNaN(num) && num > 0 ? num : null;
     });
 
-    const activeTab = computed({
+    const activeTabModel = computed({
       get: () => props.activeTab,
-      set: (value: string) => emit("update:activeTab", value),
+      // OTabs is controlled (`:model-value`), so refusing to emit here is
+      // what keeps a locked correlation tab from becoming active — clicking
+      // it opens the upgrade dialog instead of switching.
+      set: (value: string) => {
+        if (
+          (value === "correlated-logs" || value === "correlated-metrics") &&
+          !correlationAccess.value.allowed
+        ) {
+          openUpgradeDialog();
+          return;
+        }
+        emit("update:activeTab", value);
+      },
     });
 
     const navigateToError = () => {
-      activeTab.value = "error";
+      activeTabModel.value = "error";
     };
     const tags: Ref<{ [key: string]: string }> = ref({});
 
@@ -1080,6 +1378,70 @@ export default defineComponent({
     };
 
     const store = useStore();
+    const promptAttributionTarget = ref<{
+      entityId: string;
+      version: number;
+      name: string;
+      label: string | null;
+    } | null>(null);
+    let promptResolveRequest = 0;
+    const promptAttributionText = computed(() => {
+      const target = promptAttributionTarget.value;
+      if (!target) return "";
+      return `${target.name}@v${target.version}${target.label ? ` · ${target.label}` : ""}`;
+    });
+
+    async function resolvePromptAttribution() {
+      const request = ++promptResolveRequest;
+      promptAttributionTarget.value = null;
+      const name =
+        typeof props.span?.gen_ai_prompt_name === "string"
+          ? props.span.gen_ai_prompt_name.trim()
+          : "";
+      const version = Number(props.span?.gen_ai_prompt_version);
+      const label =
+        typeof props.span?.gen_ai_prompt_label === "string" && props.span.gen_ai_prompt_label.trim()
+          ? props.span.gen_ai_prompt_label.trim()
+          : null;
+      const orgId = String(store.state.selectedOrganization?.identifier ?? "");
+      // The prompts route and API are enterprise-only; OSS has nothing to link to.
+      if (!router.hasRoute("aiPrompts")) return;
+      if (!orgId || !name || !Number.isInteger(version) || version < 1) return;
+      try {
+        const resolved = await llmPromptsService.resolve(orgId, { name, version });
+        if (request !== promptResolveRequest || resolved.version.version !== version) return;
+        promptAttributionTarget.value = {
+          entityId: resolved.prompt.entityId,
+          version,
+          name: resolved.prompt.name,
+          label,
+        };
+      } catch {
+        if (request === promptResolveRequest) promptAttributionTarget.value = null;
+      }
+    }
+
+    function openPromptAttribution() {
+      const target = promptAttributionTarget.value;
+      if (!target) return;
+      router.push(
+        aiPromptsRoute(String(store.state.selectedOrganization?.identifier ?? ""), {
+          entityId: target.entityId,
+          version: target.version,
+        }),
+      );
+    }
+
+    watch(
+      () => [
+        props.span?.gen_ai_prompt_name,
+        props.span?.gen_ai_prompt_version,
+        props.span?.gen_ai_prompt_label,
+        store.state.selectedOrganization?.identifier,
+      ],
+      resolvePromptAttribution,
+      { immediate: true },
+    );
 
     const hasDbSpan = computed(() =>
       Object.keys(props.span ?? {}).some((key) => key.startsWith("db_")),
@@ -1123,8 +1485,8 @@ export default defineComponent({
         header: t("traces.traceDetailsSidebar.field"),
         size: 200,
         meta: {
-          headerClass: "border-b border-r border-b-card-glass-border",
-          cellClass: "border-r border-b-card-glass-border text-json-key",
+          headerClass: "border-b border-e border-b-card-glass-border",
+          cellClass: "border-e border-b-card-glass-border text-json-key",
         },
       },
       {
@@ -1160,14 +1522,14 @@ export default defineComponent({
     const tagColumns = [
       {
         name: "field",
-        label: "Field",
+        label: t("traces.traceDetailsSidebar.field"),
         field: "field",
         align: "left" as const,
         headerClasses: "text-left!",
       },
       {
         name: "value",
-        label: "Value",
+        label: t("traces.traceDetailsSidebar.value"),
         field: "value",
         align: "left" as const,
         headerClasses: "text-left!",
@@ -1248,7 +1610,7 @@ export default defineComponent({
             store.state.timezone,
             HUMAN_TZ_FORMAT,
           ),
-        label: "Timestamp",
+        label: t("traces.traceDetailsSidebar.timestamp"),
         align: "left" as const,
         sortable: true,
       },
@@ -1263,6 +1625,116 @@ export default defineComponent({
     ]);
 
     const eventsWrap = ref(false);
+
+    const eventsTableRef = ref<any>(null);
+
+    /**
+     * Row keys expanded in the events table.
+     *
+     * OTable drives expansion from this prop through `useTableExpansion`, which
+     * keeps its own Set — it does not read TanStack's expansion state, so
+     * `row.toggleExpanded()` on the table instance has no visible effect. Rows
+     * are keyed by `__rowId` (the array index, see `eventsRowsWithKey`), and a
+     * normalized event keeps that index, so a marker maps straight onto its row.
+     */
+    const expandedEventIds = ref<string[]>([]);
+
+    // Mini-timeline window is this span, not the trace: start_time is
+    // nanoseconds (see getTTFT above) and duration is already microseconds.
+    const spanEventMarkers = useSpanEventMarkers(
+      () => props.span?.events,
+      () => ({
+        startUs: Number(props.span?.start_time) / 1000,
+        durationUs: Number(props.span?.duration),
+      }),
+      () => store.state.zoConfig?.timestamp_column,
+    );
+
+    const eventMarkerLabel = (marker: SpanEventMarker) =>
+      marker.severity === "error"
+        ? t("traces.exceptionMarkerTooltip", { type: truncateEventName(marker.exceptionType) })
+        : t("traces.eventMarkerTooltip", {
+            name: truncateEventName(marker.name) || t("traces.spanEventFallback"),
+          });
+
+    // The mini-timeline resizes with the sidebar, so the cluster bucket is
+    // derived from the track's measured width rather than a fixed percentage.
+    const eventTimelineRef = ref<HTMLElement | null>(null);
+    const eventTimelineWidth = ref(0);
+
+    const onEventTimelineResize = () => {
+      eventTimelineWidth.value = eventTimelineRef.value?.clientWidth ?? 0;
+    };
+
+    /**
+     * The track is not in the DOM at mount: it lives inside the Events tab
+     * panel, which renders `v-if="isActive"` with no keep-alive, and is further
+     * gated on the span having events. Observing in `onMounted` therefore found
+     * nothing and never retried, leaving the width at 0 — where the cluster
+     * threshold is 0 and every event renders as its own overlapping marker.
+     * Watching the template ref attaches whenever the track appears and
+     * re-attaches after the user leaves the tab and comes back.
+     */
+    watch(
+      eventTimelineRef,
+      (element, _previous, onCleanup) => {
+        if (!element || typeof ResizeObserver === "undefined") return;
+
+        onEventTimelineResize();
+
+        const observer = new ResizeObserver(onEventTimelineResize);
+        observer.observe(element);
+        onCleanup(() => observer.disconnect());
+      },
+      { flush: "post" },
+    );
+
+    const spanEventClusters = computed(() =>
+      clusterSpanEventMarkers(spanEventMarkers.value, eventTimelineWidth.value),
+    );
+
+    const clusterLabel = (cluster: SpanEventCluster) =>
+      cluster.events.length > 1
+        ? t("traces.eventClusterTooltip", { count: cluster.events.length })
+        : eventMarkerLabel(cluster.events[0]);
+
+    const clusterAriaLabel = (cluster: SpanEventCluster) => {
+      if (cluster.events.length === 1) return eventMarkerLabel(cluster.events[0]);
+      const errors = cluster.events.filter((event) => event.severity === "error").length;
+      const count = cluster.events.length;
+      return errors === 1
+        ? t("traces.eventClusterAriaLabel", { count, errors })
+        : t("traces.eventClusterAriaLabelPlural", { count, errors });
+    };
+
+    // Rows are keyed by array index (see `eventsRowsWithKey`), and normalized
+    // events keep that index, so a marker maps straight onto its table row.
+    const focusEvent = (index: number) => {
+      expandedEventIds.value = [String(index)];
+    };
+
+    const onEventMarkerClick = (marker: SpanEventMarker) => {
+      focusEvent(marker.index);
+    };
+
+    // The expansion names a row of *this* span's events table. Carrying it to
+    // the next span expands an unrelated row that happens to share the index.
+    // `focusEventIndex` arrives a tick later (see TraceDetails.onSelectSpanEvent),
+    // so a marker-driven span change still lands on its event.
+    watch(
+      () => props.span?.span_id,
+      () => {
+        expandedEventIds.value = [];
+      },
+    );
+
+    watch(
+      () => props.focusEventIndex,
+      (index) => {
+        if (index === null || index === undefined) return;
+        focusEvent(index);
+      },
+    );
 
     // Keyed by a non-enumerable `__rowId` (the array index): span events can
     // share, or lack, `_timestamp`, so keying expansion on it would expand
@@ -1298,8 +1770,8 @@ export default defineComponent({
           accessorFn: (row: any) =>
             timestampToTimezoneDate(row[tsCol] / 1000000, store.state.timezone, HUMAN_TZ_FORMAT),
           meta: {
-            headerClass: "border-b border-r border-b-card-glass-border",
-            cellClass: "border-r border-b-card-glass-border",
+            headerClass: "border-b border-e border-b-card-glass-border",
+            cellClass: "border-e border-b-card-glass-border",
           },
         });
         allKeys.delete(tsCol);
@@ -1325,8 +1797,8 @@ export default defineComponent({
             return typeof val === "object" ? JSON.stringify(val) : String(val);
           },
           meta: {
-            headerClass: "border-b border-r border-b-card-glass-border",
-            cellClass: "border-r border-b-card-glass-border",
+            headerClass: "border-b border-e border-b-card-glass-border",
+            cellClass: "border-e border-b-card-glass-border",
           },
         });
       });
@@ -1340,14 +1812,14 @@ export default defineComponent({
       {
         name: "traceId",
         prop: (row: any) => (row.context ? row?.context?.traceId : ""),
-        label: "TraceId",
+        label: raw("TraceId"),
         align: "left",
         sortable: true,
       },
       {
         name: "spanId",
         prop: (row: any) => (row.context ? row?.context?.spanId : ""),
-        label: "spanId",
+        label: raw("spanId"),
         align: "left",
         sortable: true,
       },
@@ -1436,9 +1908,26 @@ export default defineComponent({
       },
     );
 
-    const viewSpanLogs = () => {
-      if (config.isEnterprise === "true" && correlationProps.value) {
-        navigateToCorrelatedLogs(correlationProps.value);
+    const viewSpanLogs = async () => {
+      if (config.isEnterprise === "true") {
+        const clickedSpan = spanKey(props.span);
+        await loadCorrelation();
+        // The user moved to another span while this lookup ran: do nothing.
+        if (spanKey(props.span) !== clickedSpan) return;
+        if (correlationProps.value?.logStreams?.length) {
+          navigateToCorrelatedLogs(correlationProps.value);
+        } else {
+          // Nothing correlated to this span — say so instead of navigating to an
+          // empty Logs page. A failed lookup reports its own reason; a successful
+          // lookup that found nothing gets the plain "no correlated logs" wording.
+          toast({
+            variant: "warning",
+            message:
+              correlationFailed.value && correlationError.value
+                ? raw(correlationError.value)
+                : t("traces.noCorrelatedLogsFound"),
+          });
+        }
       } else {
         const queryDetails = buildQueryDetails(props.span);
         navigateToLogs(queryDetails);
@@ -1449,14 +1938,306 @@ export default defineComponent({
       emit("evaluate", props.span);
     };
 
+    /** The trace stream this span was read from — the annotation API needs it. */
+    const spanSourceStream = computed(() => String(props.span?._stream ?? props.streamName ?? ""));
+
+    const operationStatsCache = ref<Record<string, OperationStats | null>>({});
+    const pendingOperationStats = new Set<string>();
+
+    const operationStatsRequest = computed((): OperationStatsRequest | null => {
+      const stream = spanSourceStream.value;
+      const service = props.span?.service_name;
+      const operation = props.span?.operation_name;
+      if (!stream || !service || !operation) return null;
+      const saved = searchObj.data?.queryPayload?.query;
+      // Re-resolving a relative range would move the window, so reuse the bounds the page searched.
+      const usePageBounds =
+        props.parentMode !== "embedded" &&
+        stream === searchObj.data?.stream?.selectedStream?.value &&
+        saved?.start_time &&
+        saved?.end_time;
+      let startTime: number;
+      let endTime: number;
+      if (usePageBounds) {
+        startTime = Number(saved.start_time);
+        endTime = Number(saved.end_time);
+      } else {
+        const spanStartUs = Math.floor(Number(props.span?.start_time) / 1_000);
+        if (!Number.isFinite(spanStartUs)) return null;
+        // Bucketing the span start lets nearby spans share one cached window that still contains each.
+        const bucketUs =
+          Math.floor(spanStartUs / OPERATION_STATS_FALLBACK_BUCKET_US) *
+          OPERATION_STATS_FALLBACK_BUCKET_US;
+        startTime = bucketUs - OPERATION_STATS_FALLBACK_WINDOW_US;
+        endTime =
+          bucketUs + OPERATION_STATS_FALLBACK_WINDOW_US + OPERATION_STATS_FALLBACK_BUCKET_US;
+      }
+      const org = String(store.state.selectedOrganization?.identifier ?? "");
+      const key = JSON.stringify([org, stream, service, operation, startTime, endTime]);
+      return { key, org, stream, service, operation, startTime, endTime };
+    });
+
+    const fetchOperationStats = async (req: OperationStatsRequest) => {
+      if (req.key in operationStatsCache.value || pendingOperationStats.has(req.key)) return;
+      pendingOperationStats.add(req.key);
+      const sql =
+        "SELECT COUNT(*) AS n, " +
+        "approx_percentile_cont(duration, 0.5) AS p50, " +
+        "approx_percentile_cont(duration, 0.75) AS p75, " +
+        "approx_percentile_cont(duration, 0.9) AS p90, " +
+        "approx_percentile_cont(duration, 0.99) AS p99 " +
+        `FROM ${quoteSqlIdentifier(req.stream)} ` +
+        `WHERE service_name = ${quoteSqlLiteral(req.service)} ` +
+        `AND operation_name = ${quoteSqlLiteral(req.operation)}`;
+      try {
+        const res = await searchService.search({
+          org_identifier: req.org,
+          query: {
+            query: { sql, start_time: req.startTime, end_time: req.endTime, from: 0, size: 1 },
+          },
+          page_type: "traces",
+        });
+        const hit = res?.data?.hits?.[0];
+        operationStatsCache.value[req.key] = hit
+          ? {
+              n: Number(hit.n),
+              p50: Number(hit.p50),
+              p75: Number(hit.p75),
+              p90: Number(hit.p90),
+              p99: Number(hit.p99),
+            }
+          : null;
+      } catch {
+        operationStatsCache.value[req.key] = null;
+      } finally {
+        pendingOperationStats.delete(req.key);
+      }
+    };
+
+    watch(
+      operationStatsRequest,
+      (req) => {
+        if (req) fetchOperationStats(req);
+      },
+      { immediate: true },
+    );
+
+    const operationPercentile = computed(() => {
+      const req = operationStatsRequest.value;
+      const stats = req ? operationStatsCache.value[req.key] : null;
+      const duration = Number(props.span?.duration);
+      // approx_percentile_cont returns 0 when the column type is not inferred.
+      if (!stats || !(stats.n >= OPERATION_STATS_MIN_SAMPLES) || !(stats.p50 > 0)) return null;
+      if (!Number.isFinite(duration)) return null;
+      let band = t("traces.traceDetailsSidebar.operationBandAboveP99");
+      let variant: BadgeVariant = "error-soft";
+      if (duration < stats.p50) {
+        [band, variant] = [t("traces.traceDetailsSidebar.operationBandBelowP50"), "default-soft"];
+      } else if (duration < stats.p75) {
+        [band, variant] = [t("traces.traceDetailsSidebar.operationBandP50ToP75"), "default-soft"];
+      } else if (duration < stats.p90) {
+        [band, variant] = [t("traces.traceDetailsSidebar.operationBandP75ToP90"), "default-soft"];
+      } else if (duration <= stats.p99) {
+        [band, variant] = [t("traces.traceDetailsSidebar.operationBandP90ToP99"), "warning-soft"];
+      }
+      const tooltip = t("traces.traceDetailsSidebar.operationPercentilesTooltip", {
+        p50: formatTimeWithSuffix(stats.p50),
+        p75: formatTimeWithSuffix(stats.p75),
+        p90: formatTimeWithSuffix(stats.p90),
+        p99: formatTimeWithSuffix(stats.p99),
+        n: stats.n.toLocaleString(),
+      });
+      return { band, variant, tooltip };
+    });
+
+    const spanProfileCache = ref<Record<string, SpanProfileMatch | null>>({});
+    const pendingSpanProfiles = new Set<string>();
+
+    const spanProfileRequest = computed((): SpanProfileRequest | null => {
+      const traceId = String(props.span?.trace_id ?? "");
+      const spanId = String(props.span?.span_id ?? "");
+      if (props.parentMode !== "standalone" || !traceId || !spanId) return null;
+      const startUs = Math.floor(Number(props.span?.start_time) / 1_000);
+      const endUs = Math.ceil(Number(props.span?.end_time) / 1_000);
+      if (!Number.isFinite(startUs)) return null;
+      const org = String(store.state.selectedOrganization?.identifier ?? "");
+      return {
+        key: JSON.stringify([org, traceId, spanId]),
+        org,
+        traceId,
+        spanId,
+        startTime: startUs - PROFILE_LINK_PAD_US,
+        endTime: (Number.isFinite(endUs) ? endUs : startUs) + PROFILE_LINK_PAD_US,
+      };
+    });
+
+    const probeProfileStream = async (
+      req: SpanProfileRequest,
+      stream: string,
+    ): Promise<SpanProfileMatch | null> => {
+      try {
+        const schema = await queryClient.fetchQuery(streamSchemaQuery(req.org, stream, "profiles"));
+        const fields = new Set(
+          (schema?.schema || schema?.fields || []).map((f: { name: string }) => f.name),
+        );
+        if (!fields.has("trace_id") || !fields.has("span_id")) return null;
+        const hasService = fields.has("service_name");
+        const columns = hasService
+          ? "profile_type, profile_unit, service_name"
+          : "profile_type, profile_unit";
+        const sql =
+          `SELECT ${columns}, COUNT(*) AS c FROM ${quoteSqlIdentifier(stream)} ` +
+          `WHERE trace_id = ${quoteSqlLiteral(req.traceId)} ` +
+          `AND span_id = ${quoteSqlLiteral(req.spanId)} GROUP BY ${columns}`;
+        const res = await searchService.search({
+          org_identifier: req.org,
+          query: {
+            query: { sql, start_time: req.startTime, end_time: req.endTime, from: 0, size: 100 },
+          },
+          page_type: "profiles",
+        });
+        const hits: Record<string, unknown>[] = res?.data?.hits ?? [];
+        const hit = hits.find((h) => String(h.profile_type).toLowerCase() === "cpu") ?? hits[0];
+        if (!hit) return null;
+        return {
+          stream,
+          profileType: String(hit.profile_type ?? ""),
+          profileUnit: String(hit.profile_unit ?? ""),
+          serviceName: hasService && hit.service_name ? String(hit.service_name) : undefined,
+        };
+      } catch {
+        return null;
+      }
+    };
+
+    const findSpanProfile = async (req: SpanProfileRequest) => {
+      const list = await queryClient.fetchQuery(streamNameListQuery(req.org, "profiles"));
+      const streams = list
+        .map((item: Record<string, unknown>) => String(item.name ?? item.stream_name ?? ""))
+        .filter(Boolean);
+      for (let i = 0; i < streams.length; i += PROFILE_LINK_CONCURRENCY) {
+        if (spanProfileRequest.value?.key !== req.key) return undefined;
+        const batch = streams.slice(i, i + PROFILE_LINK_CONCURRENCY);
+        const matches = await Promise.all(batch.map((s: string) => probeProfileStream(req, s)));
+        const match = matches.find(Boolean);
+        if (match) return match;
+      }
+      return null;
+    };
+
+    const detectSpanProfile = async (req: SpanProfileRequest) => {
+      if (req.key in spanProfileCache.value || pendingSpanProfiles.has(req.key)) return;
+      pendingSpanProfiles.add(req.key);
+      try {
+        const match = await findSpanProfile(req);
+        // An abandoned probe proved nothing, so it must not cache a miss.
+        if (match !== undefined) spanProfileCache.value[req.key] = match;
+      } catch {
+        spanProfileCache.value[req.key] = null;
+      } finally {
+        pendingSpanProfiles.delete(req.key);
+      }
+    };
+
+    watch(
+      spanProfileRequest,
+      (req) => {
+        if (req) detectSpanProfile(req);
+      },
+      { immediate: true },
+    );
+
+    const spanProfileMatch = computed(() => {
+      const req = spanProfileRequest.value;
+      return req ? (spanProfileCache.value[req.key] ?? null) : null;
+    });
+
+    const viewSpanProfile = () => {
+      const req = spanProfileRequest.value;
+      const match = spanProfileMatch.value;
+      if (!req || !match) return;
+      router.push({
+        name: "profiles",
+        query: {
+          org_identifier: req.org,
+          stream: match.stream,
+          from: String(req.startTime),
+          to: String(req.endTime),
+          ...(match.serviceName ? { service_name: match.serviceName } : {}),
+          profile_type: match.profileType,
+          profile_unit: match.profileUnit,
+          filters: encodeProfileFilters([
+            { key: "trace_id", op: "=", value: req.traceId },
+            { key: "span_id", op: "=", value: req.spanId },
+          ]),
+          view: "flame",
+        },
+      });
+    };
+
+    /** Span start in MICROSECONDS (`start_time` is nanoseconds), widened by 1µs
+     *  so an inclusive lower-bound search can't exclude the span itself. A span
+     *  with no usable start falls back to the trace's own start: the APIs take
+     *  this as a POSITIVE lower bound, so 0 would be rejected. */
+    const spanStartTimeUs = computed(() => {
+      const startNs = Number(props.span?.start_time);
+      if (Number.isFinite(startNs)) return Math.max(1, Math.floor(startNs / 1_000) - 1);
+      return Number(props.baseTracePosition?.startTimeUs) || 1;
+    });
+
+    // The enterprise drawers live in the parent (same shape as evaluate), so the
+    // sidebar only reports which span was acted on.
+    const addSpanToDataset = () => {
+      emit("add-to-dataset", props.span);
+    };
+
+    // Gated on the raw fields rather than on a parsed hand-off: this runs on
+    // every render, and parsing a whole conversation to decide whether to draw
+    // a button is work the render loop should not be doing.
+    const canOpenPlayground = computed(
+      () =>
+        props.showAnnotateButtons &&
+        isLLMSpan.value &&
+        Boolean(
+          props.span?.gen_ai_input_messages ||
+          props.span?.gen_ai_output_messages ||
+          props.span?.gen_ai_system_instructions ||
+          props.span?.attributes_prompt ||
+          props.span?.attributes_response,
+        ),
+    );
+
+    /** The Playground is enterprise-only, so its module is pulled on click
+     *  rather than bundled into the traces chunk. */
+    const openInPlayground = async () => {
+      const [{ handoffFromSpan, stashHandoff }, { aiPlaygroundRoute }] = await Promise.all([
+        import("@/enterprise/views/AIObservability/playgroundHandoff"),
+        import("@/enterprise/views/AIObservability/playgroundRoutes"),
+      ]);
+      const handoff = handoffFromSpan(props.span);
+      // Navigating on a failed stash would land the user on an empty bench with
+      // no explanation, so the failure is reported where it happened.
+      if (!handoff || !stashHandoff(handoff)) {
+        toast({
+          variant: "error",
+          message: t("aiObservability.playground.openInPlaygroundFailed"),
+        });
+        return;
+      }
+      router.push(
+        aiPlaygroundRoute(store.state.selectedOrganization?.identifier ?? "", { fromSpan: true }),
+      );
+    };
+
     const getStartTime = computed(() => {
       return formatTimeWithSuffix(
-        convertTimeFromNsToUs(props.span.start_time) - (props.baseTracePosition?.startTimeUs || 0),
+        convertTimeFromNsToUs(props.span.start_time) -
+          (props.baseTracePosition?.traceStartUs ?? props.baseTracePosition?.startTimeUs ?? 0),
       );
     });
 
     const copySpanId = () => {
-      copyToClipboard(props.span?.span_id || "", {
+      copyToClipboard(props.span?.span_id || "", t, {
         successMessage: t("traces.traceDetailsSidebar.spanIdCopied"),
       });
     };
@@ -1465,7 +2246,7 @@ export default defineComponent({
       const attributes = props.span?.attributes || {};
       const attributesText = JSON.stringify(attributes, null, 2);
 
-      copyToClipboard(attributesText, {
+      copyToClipboard(attributesText, t, {
         successMessage: t("traces.traceDetailsSidebar.attributesCopied"),
       });
     };
@@ -1536,6 +2317,9 @@ export default defineComponent({
     // Correlation state
     const correlationLoading = ref(false);
     const correlationError = ref<string | null>(null);
+    // True when the lookup itself failed (request error, missing span/stream) as
+    // opposed to succeeding with nothing correlated — the two need different wording.
+    const correlationFailed = ref(false);
     const correlationProps = ref<any>(null);
     const { findRelatedTelemetry, loadSemanticGroups, semanticGroups } = useServiceCorrelation();
 
@@ -1620,29 +2404,51 @@ export default defineComponent({
       return normalizeSeverity(span.severity_text ?? span.severity);
     };
 
+    // Keyed by span so a mid-load View Logs awaits this span's lookup and never reuses another's.
+    let correlationRequest: { key: string; promise: Promise<void> } | null = null;
+    const spanKey = (span: any) => `${span?.trace_id ?? ""}/${span?.span_id ?? ""}`;
+
     /**
      * Load correlation data for this span (called when user clicks on correlation tabs)
      */
-    const loadCorrelation = async () => {
-      // Skip if already loaded or loading
-      if (correlationProps.value || correlationLoading.value) {
+    const loadCorrelation = (): Promise<void> => {
+      if (correlationProps.value) return Promise.resolve();
+      const key = spanKey(props.span);
+      if (correlationRequest?.key !== key) {
+        const promise: Promise<void> = fetchCorrelation(key).finally(() => {
+          if (correlationRequest?.promise === promise) correlationRequest = null;
+        });
+        correlationRequest = { key, promise };
+      }
+      return correlationRequest.promise;
+    };
+
+    const fetchCorrelation = async (key: string) => {
+      // A lookup whose span is no longer shown must not write its result.
+      const isStale = () => spanKey(props.span) !== key;
+
+      // Skip if already loaded
+      if (correlationProps.value) {
         return;
       }
 
       // Gate correlation feature behind enterprise check to avoid 403 errors
       if (config.isEnterprise !== "true") {
         correlationError.value = t("traces.traceDetailsSidebar.enterpriseLicenseRequired");
+        correlationFailed.value = true;
         return;
       }
 
       if (!props.span || !props.streamName) {
         console.warn("[TraceDetailsSidebar] Cannot load correlation: missing span or stream name");
         correlationError.value = t("traces.traceDetailsSidebar.missingSpanOrStream");
+        correlationFailed.value = true;
         return;
       }
 
       correlationLoading.value = true;
       correlationError.value = null;
+      correlationFailed.value = false;
 
       try {
         try {
@@ -1670,6 +2476,7 @@ export default defineComponent({
           5, // 5 minute time window
           props.streamName,
         );
+        if (isStale()) return;
 
         if (result && result.correlationData) {
           const correlationData = result.correlationData;
@@ -1678,6 +2485,8 @@ export default defineComponent({
           const spanStartUs = convertTimeFromNsToUs(props.span.start_time);
           const spanEndUs = convertTimeFromNsToUs(props.span.end_time);
           const bufferUs = 5 * 60 * 1000000; // 5 minutes buffer
+          // Microseconds, from the trace's own spans (TraceDetails).
+          const selectedTrace = searchObj.data?.traceDetails?.selectedTrace;
 
           // Build availableDimensions from raw span attributes (actual field names)
           // This is critical for log queries to use the correct field names (e.g., k8s_pod_name)
@@ -1743,20 +2552,36 @@ export default defineComponent({
             sourceType: "traces",
             // Use log stream filters and log record as availableDimensions for field name resolution and traceId extraction
             availableDimensions: { ...logFilters, ...context.fields },
+            // Lets filter edits resolve across streams that alias the same
+            // semantic group under different field names (F35).
+            semanticGroups: semanticGroups.value,
             ftsFields: [],
             timeRange: {
               startTime: spanStartUs - bufferUs,
               endTime: spanEndUs + bufferUs,
             },
+            // Fallback window for when View Logs widens from the span to the trace.
+            traceTimeRange:
+              selectedTrace?.trace_start_time && selectedTrace?.trace_end_time
+                ? {
+                    startTime: selectedTrace.trace_start_time - bufferUs,
+                    endTime: selectedTrace.trace_end_time + bufferUs,
+                  }
+                : undefined,
           };
         } else {
           correlationError.value = t("correlation.noDataFound");
         }
       } catch (err: any) {
+        if (isStale()) return;
         console.error("[TraceDetailsSidebar] Correlation failed:", err);
         correlationError.value = err.message || t("correlation.failedToLoad");
+        correlationFailed.value = true;
       } finally {
-        correlationLoading.value = false;
+        // A newer span's lookup owns the loading flag while it runs.
+        if (!correlationRequest || correlationRequest.key === key) {
+          correlationLoading.value = false;
+        }
       }
     };
 
@@ -1766,6 +2591,7 @@ export default defineComponent({
       () => {
         correlationProps.value = null;
         correlationError.value = null;
+        correlationFailed.value = false;
 
         // Load correlation proactively so View Logs button has data
         if (props.serviceStreamsEnabled) {
@@ -1776,7 +2602,7 @@ export default defineComponent({
     );
 
     // Load correlation data when user clicks on correlation tabs
-    watch(activeTab, (newTab) => {
+    watch(activeTabModel, (newTab) => {
       if (newTab === "correlated-logs" || newTab === "correlated-metrics") {
         loadCorrelation();
       }
@@ -1806,7 +2632,7 @@ export default defineComponent({
         }
 
         // Copy to clipboard
-        copyToClipboard(textToCopy, {
+        copyToClipboard(textToCopy, t, {
           successMessage: t("traces.traceDetailsSidebar.copiedToClipboard", {
             type: type.charAt(0).toUpperCase() + type.slice(1),
           }),
@@ -1864,10 +2690,11 @@ export default defineComponent({
           parsed = raw;
         }
         if (Array.isArray(parsed)) {
+          // filter drops both null (unsupported part type) and "" (no content); "" from join -> null so callers get one consistent falsy value.
           return (
             parsed
-              .filter((p: any) => p.type === "text" && p.content)
-              .map((p: any) => p.content)
+              .map((p: any) => extractGenAiPartText(p))
+              .filter((text): text is string => !!text)
               .join("\n") || null
           );
         }
@@ -1917,7 +2744,7 @@ export default defineComponent({
 
     // Format model parameters for display
     const formatModelParams = (params: any) => {
-      return formatModelParameters(params);
+      return formatModelParameters(params, t);
     };
 
     const serviceIconUrl = computed(() =>
@@ -1929,21 +2756,37 @@ export default defineComponent({
     );
 
     const copyContentToClipboard = (log: any) => {
-      copyToClipboard(JSON.stringify(log), {
+      copyToClipboard(JSON.stringify(log), t, {
         successMessage: t("traces.traceDetailsSidebar.contentCopied"),
         timeout: 1000,
       });
     };
 
+    const correlationAccess = useLockedAffordance("correlation");
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+
     return {
       t,
-      activeTab,
+      correlationAccess,
+      activeTabModel,
       filterActions,
       closeSidebar,
       eventColumns,
       eventsWrap,
       eventsTableColumns,
       eventsRowsWithKey,
+      eventsTableRef,
+      focusEvent,
+      expandedEventIds,
+      spanEventMarkers,
+      eventMarkerLabel,
+      onEventMarkerClick,
+      eventTimelineRef,
+      onEventTimelineResize,
+      spanEventClusters,
+      clusterLabel,
+      clusterAriaLabel,
+      SEVERITY_MARKER_CLASS,
       pagination,
       spanDetails,
       store,
@@ -1953,9 +2796,17 @@ export default defineComponent({
       spanHttpResendCount,
       navigateToError,
       getDuration,
+      operationPercentile,
+      spanProfileMatch,
+      viewSpanProfile,
       getTTFT,
       viewSpanLogs,
       evaluateSpan,
+      addSpanToDataset,
+      canOpenPlayground,
+      openInPlayground,
+      spanStartTimeUs,
+      spanSourceStream,
       getStartTime,
       copySpanId,
       copyAttributesToClipboard,
@@ -1980,7 +2831,12 @@ export default defineComponent({
       config,
       // LLM
       isLLMSpan,
+      promptAttributionTarget,
+      promptAttributionText,
+      openPromptAttribution,
       canPreviewSpan,
+      scoreChipsRef,
+      onScoreAnnotated,
       previewInput,
       previewOutput,
       previewOperationName,
@@ -2007,7 +2863,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 /* keep(complex-state): Deliberate CSS — generated content the template can't class up,
    child-component internals reached with :deep(), :fullscreen chains, and
    scrollbar rails. */
@@ -2055,7 +2911,9 @@ export default defineComponent({
 .trace-details-sidebar :deep(.trace-detail-tab-table) {
   th,
   td {
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table cell divider must not scale with text or it smears at fractional zoom */
     border-bottom: 1px solid var(--color-table-row-divider);
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table cell divider must not scale with text or it smears at fractional zoom */
     border-right: 1px solid var(--color-table-row-divider);
     text-align: left;
     padding: 0.5rem;
@@ -2068,7 +2926,6 @@ export default defineComponent({
   }
 
   th {
-    background-color: var(--color-surface-panel);
   }
 
   th:first-child,
@@ -2092,7 +2949,8 @@ export default defineComponent({
     border-bottom: none;
   }
 
-  td span {
+  /* The error tab's empty state is an icon+text flex row; a full-width span there squeezes the text to one letter per line. */
+  td span:not([data-test="exception-stacktrace-empty"] span) {
     display: inline-block;
     width: 100%;
     word-break: break-word;
@@ -2144,7 +3002,6 @@ export default defineComponent({
 /* complex-state — :fullscreen chains on the LLM input/output panes */
 .llm-preview-container {
   .io-container:fullscreen {
-    background-color: var(--color-surface-panel);
     padding: 0.75rem;
     height: 100vh;
     max-height: 100vh;
@@ -2158,7 +3015,6 @@ export default defineComponent({
       flex-direction: column;
 
       .section-label {
-        background: var(--color-surface-panel);
         border-radius: var(--radius-default);
       }
 
@@ -2210,7 +3066,6 @@ export default defineComponent({
   position: sticky;
   opacity: 1;
   z-index: 1;
-  background: var(--color-grey-200);
 }
 
 .thead-sticky tr:last-child > * {

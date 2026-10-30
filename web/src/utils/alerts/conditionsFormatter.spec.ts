@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildConditionsString } from "./conditionsFormatter";
+import { buildConditionsString, isUnaryOperator } from "./conditionsFormatter";
 import type { StreamFieldsMap } from "./alertQueryBuilder";
 
 describe("conditionsFormatter", () => {
@@ -8,6 +8,26 @@ describe("conditionsFormatter", () => {
     name: { label: "name", value: "name", type: "String" },
     city: { label: "city", value: "city", type: "String" },
   };
+
+  describe("isUnaryOperator", () => {
+    it("matches the canonical spellings and the serde aliases", () => {
+      expect(isUnaryOperator("is_null")).toBe(true);
+      expect(isUnaryOperator("is_not_null")).toBe(true);
+      expect(isUnaryOperator("is_empty")).toBe(true);
+      expect(isUnaryOperator("is_not_empty")).toBe(true);
+      expect(isUnaryOperator("IsNull")).toBe(true);
+      expect(isUnaryOperator("IsNotEmpty")).toBe(true);
+      expect(isUnaryOperator("=")).toBe(false);
+      expect(isUnaryOperator("Contains")).toBe(false);
+      expect(isUnaryOperator(undefined)).toBe(false);
+    });
+
+    it("does not match inherited object properties", () => {
+      expect(isUnaryOperator("constructor")).toBe(false);
+      expect(isUnaryOperator("__proto__")).toBe(false);
+      expect(isUnaryOperator("toString")).toBe(false);
+    });
+  });
 
   describe("buildConditionsString", () => {
     it("generates display format (lowercase operators, no WHERE)", () => {
@@ -303,6 +323,99 @@ describe("conditionsFormatter", () => {
       expect(result).toBe("WHERE name NOT LIKE '%test%'");
     });
 
+    it("handles null-check operators without a value", () => {
+      const group = {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [
+          {
+            filterType: "condition",
+            column: "name",
+            operator: "is_null",
+            value: "",
+            logicalOperator: "AND",
+          },
+          {
+            filterType: "condition",
+            column: "city",
+            operator: "is_not_null",
+            logicalOperator: "AND",
+          },
+        ],
+      };
+
+      expect(
+        buildConditionsString(group, {
+          sqlMode: true,
+          addWherePrefix: true,
+          formatValues: true,
+          streamFieldsMap,
+        }),
+      ).toBe("WHERE name IS NULL AND city IS NOT NULL");
+
+      expect(buildConditionsString(group, { sqlMode: false })).toBe(
+        "name is null and city is not null",
+      );
+    });
+
+    it("handles empty-check operators, degrading to null checks on numeric columns", () => {
+      const group = {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [
+          {
+            filterType: "condition",
+            column: "name",
+            operator: "is_empty",
+            value: "",
+            logicalOperator: "AND",
+          },
+          {
+            filterType: "condition",
+            column: "age",
+            operator: "is_not_empty",
+            logicalOperator: "AND",
+          },
+        ],
+      };
+
+      expect(
+        buildConditionsString(group, {
+          sqlMode: true,
+          addWherePrefix: true,
+          formatValues: true,
+          streamFieldsMap,
+        }),
+      ).toBe("WHERE (name IS NULL OR name = '') AND age IS NOT NULL");
+
+      expect(buildConditionsString(group, { sqlMode: false })).toBe(
+        "name is empty and age is not empty",
+      );
+    });
+
+    it("treats every known string type as string for empty checks", () => {
+      const typedMap: StreamFieldsMap = {
+        v: { label: "v", value: "v", type: "Utf8View" },
+        n: { label: "n", value: "n", type: "Int32" },
+      };
+      const group = {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [
+          { filterType: "condition", column: "v", operator: "is_empty", logicalOperator: "AND" },
+          { filterType: "condition", column: "n", operator: "is_empty", logicalOperator: "AND" },
+        ],
+      };
+
+      expect(
+        buildConditionsString(group, {
+          sqlMode: true,
+          formatValues: true,
+          streamFieldsMap: typedMap,
+        }),
+      ).toBe("(v IS NULL OR v = '') AND n IS NULL");
+    });
+
     it("handles mixed OR and AND operators", () => {
       const group = {
         filterType: "group",
@@ -340,6 +453,61 @@ describe("conditionsFormatter", () => {
       });
 
       expect(result).toBe("WHERE age > 18 AND age < 65 OR city = 'NYC'");
+    });
+
+    // Regression: a value containing a literal ' must double it before being
+    // wrapped in the outer quotes, in both display and SQL mode, and whether
+    // or not formatValues routes through the type-aware formatValue() path.
+    it("escapes an embedded single quote in display mode (formatValues=false)", () => {
+      const group = {
+        filterType: "condition",
+        column: "city",
+        operator: "=",
+        value: "O'Hare",
+      };
+
+      expect(buildConditionsString(group, { sqlMode: false, formatValues: false })).toBe(
+        "city = 'O''Hare'",
+      );
+    });
+
+    it("escapes an embedded single quote in SQL mode (formatValues=true)", () => {
+      const group = {
+        filterType: "condition",
+        column: "city",
+        operator: "=",
+        value: "O'Hare",
+      };
+
+      expect(
+        buildConditionsString(group, { sqlMode: true, formatValues: true, streamFieldsMap }),
+      ).toBe("city = 'O''Hare'");
+    });
+
+    it("escapes an embedded single quote in a LIKE (contains) pattern", () => {
+      const group = {
+        filterType: "condition",
+        column: "name",
+        operator: "contains",
+        value: "O'Hare",
+      };
+
+      expect(
+        buildConditionsString(group, { sqlMode: true, formatValues: true, streamFieldsMap }),
+      ).toBe("name LIKE '%O''Hare%'");
+    });
+
+    it("escapes an embedded single quote in a NOT LIKE (not_contains) pattern", () => {
+      const group = {
+        filterType: "condition",
+        column: "name",
+        operator: "not_contains",
+        value: "O'Hare",
+      };
+
+      expect(
+        buildConditionsString(group, { sqlMode: true, formatValues: true, streamFieldsMap }),
+      ).toBe("name NOT LIKE '%O''Hare%'");
     });
   });
 });

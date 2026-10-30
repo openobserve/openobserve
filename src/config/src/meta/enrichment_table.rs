@@ -123,12 +123,6 @@ impl EnrichmentTableUrlJob {
         self.error_message = Some(error);
         self.updated_at = chrono::Utc::now().timestamp_micros();
     }
-
-    pub fn update_progress(&mut self, bytes: u64, records: i64) {
-        self.total_bytes_fetched += bytes;
-        self.total_records_processed += records;
-        self.updated_at = chrono::Utc::now().timestamp_micros();
-    }
 }
 
 #[cfg(test)]
@@ -136,171 +130,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_status_to_i16_conversion() {
-        assert_eq!(i16::from(EnrichmentTableStatus::Pending), 0);
-        assert_eq!(i16::from(EnrichmentTableStatus::Processing), 1);
-        assert_eq!(i16::from(EnrichmentTableStatus::Completed), 2);
-        assert_eq!(i16::from(EnrichmentTableStatus::Failed), 3);
-    }
-
-    #[test]
-    fn test_status_from_ref_to_i16_conversion() {
-        assert_eq!(i16::from(&EnrichmentTableStatus::Pending), 0);
-        assert_eq!(i16::from(&EnrichmentTableStatus::Processing), 1);
-        assert_eq!(i16::from(&EnrichmentTableStatus::Completed), 2);
-        assert_eq!(i16::from(&EnrichmentTableStatus::Failed), 3);
-    }
-
-    #[test]
-    fn test_i16_to_status_conversion() {
-        assert_eq!(
-            EnrichmentTableStatus::from(0),
-            EnrichmentTableStatus::Pending
-        );
-        assert_eq!(
-            EnrichmentTableStatus::from(1),
-            EnrichmentTableStatus::Processing
-        );
-        assert_eq!(
-            EnrichmentTableStatus::from(2),
-            EnrichmentTableStatus::Completed
-        );
-        assert_eq!(
-            EnrichmentTableStatus::from(3),
-            EnrichmentTableStatus::Failed
-        );
-    }
-
-    #[test]
-    fn test_i16_to_status_invalid_defaults_to_pending() {
-        // Test that invalid status codes default to Pending
-        assert_eq!(
-            EnrichmentTableStatus::from(99),
-            EnrichmentTableStatus::Pending
-        );
-        assert_eq!(
-            EnrichmentTableStatus::from(-1),
-            EnrichmentTableStatus::Pending
-        );
-    }
-
-    #[test]
-    fn test_enrichment_table_url_job_new() {
-        let job = EnrichmentTableUrlJob::new(
-            "test_org".to_string(),
-            "test_table".to_string(),
-            "https://example.com/data.csv".to_string(),
-            false,
-        );
-
-        assert_eq!(job.org_id, "test_org");
-        assert_eq!(job.table_name, "test_table");
-        assert_eq!(job.url, "https://example.com/data.csv");
-        assert_eq!(job.status, EnrichmentTableStatus::Pending);
-        assert_eq!(job.error_message, None);
-        assert_eq!(job.total_bytes_fetched, 0);
-        assert_eq!(job.total_records_processed, 0);
-        assert_eq!(job.retry_count, 0);
-        assert!(!job.append_data);
-        assert_eq!(job.last_byte_position, 0);
-        assert!(!job.supports_range);
-    }
-
-    #[test]
-    fn test_mark_processing() {
-        let mut job = EnrichmentTableUrlJob::new(
-            "org".to_string(),
-            "table".to_string(),
-            "url".to_string(),
-            false,
-        );
-        let before = job.updated_at;
-
-        std::thread::sleep(std::time::Duration::from_millis(10));
-        job.mark_processing();
-
-        assert_eq!(job.status, EnrichmentTableStatus::Processing);
-        assert!(job.updated_at > before);
-    }
-
-    #[test]
-    fn test_mark_completed() {
-        let mut job = EnrichmentTableUrlJob::new(
-            "org".to_string(),
-            "table".to_string(),
-            "url".to_string(),
-            false,
-        );
-        job.error_message = Some("error".to_string());
-
-        job.mark_completed();
-
-        assert_eq!(job.status, EnrichmentTableStatus::Completed);
-        assert_eq!(job.error_message, None);
-    }
-
-    #[test]
-    fn test_mark_failed() {
-        let mut job = EnrichmentTableUrlJob::new(
-            "org".to_string(),
-            "table".to_string(),
-            "url".to_string(),
-            false,
-        );
-
-        job.mark_failed("Test error".to_string());
-
-        assert_eq!(job.status, EnrichmentTableStatus::Failed);
-        assert_eq!(job.error_message, Some("Test error".to_string()));
-    }
-
-    #[test]
-    fn test_increment_retry() {
-        let mut job = EnrichmentTableUrlJob::new(
-            "org".to_string(),
-            "table".to_string(),
-            "url".to_string(),
-            false,
-        );
-        job.status = EnrichmentTableStatus::Processing;
-
-        job.increment_retry("Retry error".to_string());
-
-        assert_eq!(job.retry_count, 1);
-        assert_eq!(job.status, EnrichmentTableStatus::Pending);
-        assert_eq!(job.error_message, Some("Retry error".to_string()));
-
-        job.increment_retry("Second retry".to_string());
-        assert_eq!(job.retry_count, 2);
-    }
-
-    #[test]
-    fn test_update_progress() {
-        let mut job = EnrichmentTableUrlJob::new(
-            "org".to_string(),
-            "table".to_string(),
-            "url".to_string(),
-            false,
-        );
-
-        job.update_progress(1024, 10);
-        assert_eq!(job.total_bytes_fetched, 1024);
-        assert_eq!(job.total_records_processed, 10);
-
-        job.update_progress(2048, 20);
-        assert_eq!(job.total_bytes_fetched, 3072);
-        assert_eq!(job.total_records_processed, 30);
-    }
-
-    #[test]
-    fn test_job_with_append_data_true() {
-        let job = EnrichmentTableUrlJob::new(
-            "org".to_string(),
-            "table".to_string(),
-            "url".to_string(),
-            true,
-        );
-        assert!(job.append_data);
+    fn test_status_i16_mapping() {
+        // These codes are persisted in the DB; changing them breaks stored jobs.
+        let cases = [
+            (EnrichmentTableStatus::Pending, 0),
+            (EnrichmentTableStatus::Processing, 1),
+            (EnrichmentTableStatus::Completed, 2),
+            (EnrichmentTableStatus::Failed, 3),
+        ];
+        for (status, code) in cases {
+            assert_eq!(i16::from(&status), code);
+            assert_eq!(i16::from(status.clone()), code);
+            assert_eq!(EnrichmentTableStatus::from(code), status);
+        }
+        for invalid in [99, -1] {
+            assert_eq!(
+                EnrichmentTableStatus::from(invalid),
+                EnrichmentTableStatus::Pending
+            );
+        }
     }
 
     #[test]
@@ -312,9 +160,11 @@ mod tests {
             false,
         );
 
-        // Pending -> Processing
+        // Pending -> Processing refreshes updated_at: stale-job recovery keys off it
+        job.updated_at = 0;
         job.mark_processing();
         assert_eq!(job.status, EnrichmentTableStatus::Processing);
+        assert!(job.updated_at > 0);
 
         // Processing -> Failed
         job.mark_failed("Error occurred".to_string());
@@ -325,28 +175,17 @@ mod tests {
         job.increment_retry("Retrying after failure".to_string());
         assert_eq!(job.status, EnrichmentTableStatus::Pending);
         assert_eq!(job.retry_count, 1);
+        assert_eq!(
+            job.error_message,
+            Some("Retrying after failure".to_string())
+        );
+        job.increment_retry("Second retry".to_string());
+        assert_eq!(job.retry_count, 2);
 
-        // Pending -> Processing -> Completed
+        // Pending -> Processing -> Completed clears the error
         job.mark_processing();
         job.mark_completed();
         assert_eq!(job.status, EnrichmentTableStatus::Completed);
         assert_eq!(job.error_message, None);
-    }
-
-    #[test]
-    fn test_bidirectional_status_conversion() {
-        // Test round-trip conversion
-        let statuses = vec![
-            EnrichmentTableStatus::Pending,
-            EnrichmentTableStatus::Processing,
-            EnrichmentTableStatus::Completed,
-            EnrichmentTableStatus::Failed,
-        ];
-
-        for status in statuses {
-            let as_i16: i16 = status.clone().into();
-            let back_to_status: EnrichmentTableStatus = as_i16.into();
-            assert_eq!(status, back_to_status);
-        }
     }
 }

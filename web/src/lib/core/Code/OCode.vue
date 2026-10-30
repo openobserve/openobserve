@@ -1,12 +1,15 @@
 ﻿<script setup lang="ts">
 import type { CodeProps, CodeSlots } from "./OCode.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { ref } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 
 withDefaults(defineProps<CodeProps>(), {
   block: false,
   copyable: false,
   truncate: false,
+  tooltip: undefined,
 });
 
 defineSlots<CodeSlots>();
@@ -34,6 +37,8 @@ async function copy() {
     // Never alert or throw; this is a convenience feature, not critical.
   }
 }
+
+const { t } = useI18nTyped();
 </script>
 
 <template>
@@ -47,7 +52,7 @@ async function copy() {
     ><slot /></code><button
       v-if="copyable"
       type="button"
-      :aria-label="copied ? 'Copied!' : 'Copy to clipboard'"
+      :aria-label="copied ? t('common.copiedExclaim') : t('common.copyToClipboard')"
       class="absolute top-2 right-2 rounded-default p-1 transition-colors duration-150 text-code-copy-icon hover:text-code-copy-hover-icon hover:bg-code-copy-hover-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       @click.prevent="copy"
     ><OIcon
@@ -65,14 +70,18 @@ async function copy() {
       'rounded-default border-code-border bg-code-bg text-code-text border',
       'px-1 py-px',
       'font-mono text-xs leading-none',
-      truncate ? 'max-w-full truncate' : '',
+      truncate ? 'max-w-full min-w-0' : '',
     ]"
   >
-    <slot />
+    <!-- An inline-flex chip clips its text with no "…", so the text cuts inside its own box. -->
+    <OTruncatedText v-if="truncate" class="-my-px py-px" :tooltip="tooltip"
+      ><slot
+    /></OTruncatedText>
+    <slot v-else />
     <button
       v-if="copyable"
       type="button"
-      :aria-label="copied ? 'Copied!' : 'Copy'"
+      :aria-label="copied ? t('common.copiedExclaim') : t('common.copy')"
       class="rounded-default text-code-copy-icon hover:text-code-copy-hover-icon hover:bg-code-copy-hover-bg focus-visible:ring-accent shrink-0 p-px transition-colors duration-150 focus-visible:ring-1 focus-visible:outline-none"
       @click.prevent="copy"
     >

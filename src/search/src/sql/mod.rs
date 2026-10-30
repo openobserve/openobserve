@@ -36,7 +36,11 @@ use infra::{
 };
 use proto::cluster_rpc::SearchQuery;
 use regex::Regex;
-use sqlparser::{ast::VisitMut, dialect::PostgreSqlDialect, parser::Parser};
+use sqlparser::{
+    ast::{Statement, VisitMut},
+    dialect::PostgreSqlDialect,
+    parser::Parser,
+};
 
 use crate::sql::{
     rewriter::{
@@ -92,8 +96,16 @@ impl Sql {
         let search_event_type = req
             .search_event_type
             .as_ref()
-            .and_then(|s| SearchEventType::try_from(s.as_str()).ok());
-        Self::new(query, &req.org_id, req.stream_type, search_event_type).await
+            .and_then(|s| s.parse::<SearchEventType>().ok());
+        Self::resolve(
+            query,
+            &req.org_id,
+            req.stream_type,
+            search_event_type,
+            false,
+            req.chat_history_reader,
+        )
+        .await
     }
 
     pub async fn new(
@@ -112,6 +124,25 @@ impl Sql {
         search_event_type: Option<SearchEventType>,
         extract_patterns: bool,
     ) -> Result<Sql, Error> {
+        Self::resolve(
+            query,
+            org_id,
+            stream_type,
+            search_event_type,
+            extract_patterns,
+            false,
+        )
+        .await
+    }
+
+    async fn resolve(
+        query: &SearchQuery,
+        org_id: &str,
+        stream_type: StreamType,
+        search_event_type: Option<SearchEventType>,
+        extract_patterns: bool,
+        marked_chat_history_reader: bool,
+    ) -> Result<Sql, Error> {
         let cfg = get_config();
         let sql = query.sql.clone();
         let offset = query.from as i64;
@@ -121,6 +152,21 @@ impl Sql {
         // 1. get table name
         let stream_names = resolve_stream_names_with_type(&sql)
             .map_err(|e| Error::ErrorCode(ErrorCodes::SearchSQLNotValid(e.to_string())))?;
+        // Every data query is resolved here, whoever issues it (UI, dashboards,
+        // alerts, reports, scheduled pipelines). The AI chat-events stream holds
+        // every user's conversations; only the Chat API reader may query it, and
+        // to anyone else it does not exist.
+        let chat_history_reader = marked_chat_history_reader
+            || config::meta::self_reporting::ai_chat::is_chat_history_reader();
+        if !chat_history_reader
+            && let Some(protected) = stream_names.iter().find(|s| {
+                config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(&s.stream_name())
+            })
+        {
+            return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
+                protected.stream_name(),
+            )));
+        }
         let mut total_schemas = HashMap::with_capacity(stream_names.len());
         for stream in stream_names.iter() {
             let stream_name = stream.stream_name();
@@ -139,7 +185,16 @@ impl Sql {
         let mut statement = Parser::parse_sql(&PostgreSqlDialect {}, &sql)
             .map_err(|e| Error::ErrorCode(ErrorCodes::SearchSQLNotValid(e.to_string())))?
             .pop()
-            .unwrap();
+            .ok_or_else(|| {
+                Error::ErrorCode(ErrorCodes::SearchSQLNotValid("empty sql".to_string()))
+            })?;
+
+        // Search is read-only: reject non-SELECT (e.g. COPY ... TO) that could write files.
+        if !is_read_only_sql_statement(&statement) {
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                "only SELECT queries are supported".to_string(),
+            )));
+        }
 
         //********************Change the sql start*********************************//
         // 2. rewrite track_total_hits
@@ -182,11 +237,14 @@ impl Sql {
         }
         let need_sort_by_time = order_by.len() == 1
             && order_by[0].0 == TIMESTAMP_COL_NAME
-            && order_by[0].1 == OrderBy::Desc;
+            && order_by[0].1 == OrderBy::Desc
+            && !total_schemas.iter().any(|(stream, _)| {
+                matches!(stream.get_stream_type(stream_type), StreamType::Metrics)
+            });
 
-        // check if need exact limit and offset
-        if (limit == -1 || limit == 0)
-            && let Some(n) = column_visitor.limit
+        // An explicit SQL LIMIT wins over the request size; the plan keeps it anyway.
+        if let Some(n) = column_visitor.limit
+            && n > 0
         {
             limit = n;
         }
@@ -216,7 +274,7 @@ impl Sql {
                 &columns,
                 has_original_column,
                 query.quick_mode || cfg.limit.quick_mode_force_enabled,
-                cfg.limit.quick_mode_num_fields,
+                stream_type,
                 &search_event_type,
                 match_visitor.has_match_all,
             );
@@ -342,6 +400,14 @@ impl std::fmt::Display for Sql {
     }
 }
 
+fn is_read_only_sql_statement(statement: &Statement) -> bool {
+    match statement {
+        Statement::Query(_) => true,
+        Statement::Explain { statement, .. } => is_read_only_sql_statement(statement),
+        _ => false,
+    }
+}
+
 fn o2_id_is_needed(
     schemas: &HashMap<TableReference, Arc<SchemaCache>>,
     search_event_type: &Option<SearchEventType>,
@@ -425,6 +491,40 @@ fn parse_sampling_config(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn parse_one(sql: &str) -> Statement {
+        Parser::parse_sql(&PostgreSqlDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap()
+    }
+
+    #[test]
+    fn test_read_only_sql_statement_allows_select_and_explain() {
+        assert!(is_read_only_sql_statement(&parse_one("SELECT * FROM logs")));
+        assert!(is_read_only_sql_statement(&parse_one(
+            "EXPLAIN SELECT * FROM logs"
+        )));
+        assert!(is_read_only_sql_statement(&parse_one(
+            "WITH t AS (SELECT 1) SELECT * FROM t"
+        )));
+    }
+
+    #[test]
+    fn test_read_only_sql_statement_rejects_writes() {
+        for sql in [
+            "COPY (SELECT * FROM logs) TO 'file:///tmp/x.parquet'",
+            "COPY logs TO 'file:///tmp/x.parquet'",
+            "INSERT INTO logs VALUES (1)",
+            "CREATE TABLE t (a INT)",
+            "EXPLAIN COPY (SELECT 1) TO 'file:///tmp/x.parquet'",
+        ] {
+            assert!(
+                !is_read_only_sql_statement(&parse_one(sql)),
+                "should reject: {sql}"
+            );
+        }
+    }
 
     #[test]
     fn test_re_only_select_matches_star() {

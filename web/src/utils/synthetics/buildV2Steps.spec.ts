@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { BrowserStep } from "@/types/synthetics";
-import { buildV2Step, buildV2Steps, isSaveableJourney } from "./buildV2Steps";
+import { buildV2Step, buildV2Steps, isSaveableJourney, isStorableAction } from "./buildV2Steps";
 
 function step(overrides: Partial<BrowserStep> = {}): BrowserStep {
   return {
@@ -66,6 +66,36 @@ describe("isSaveableJourney", () => {
 
   it("rejects an empty journey", () => {
     expect(isSaveableJourney([])).toBe(false);
+  });
+});
+
+describe("hover and click fidelity", () => {
+  it("stores hover now that Playwright records it", () => {
+    // 1.56 added hover to the recorder model and the probe executes it, so an
+    // authored hover no longer vanishes at save.
+    expect(buildV2Step(step({ id: "s3", action: "hover" })).action).toBe("hover");
+    expect(isSaveableJourney([nav(), step({ id: "s3", action: "hover" })])).toBe(true);
+  });
+
+  it("carries the click button and count onto the storage wire, in snake_case", () => {
+    const wire = buildV2Step(step({ action: "click", button: "right", clickCount: 2 }));
+    expect(wire.button).toBe("right");
+    expect(wire.click_count).toBe(2);
+  });
+
+  it("omits button and count at their defaults, so old payloads are byte-identical", () => {
+    // The guarantee behind shipping these without a schema version bump: a step
+    // with no click metadata must serialise exactly as it did before they existed.
+    const wire = buildV2Step(step({ action: "click" }));
+    expect(wire).not.toHaveProperty("button");
+    expect(wire).not.toHaveProperty("click_count");
+    expect(Object.keys(wire).sort()).toEqual(["action", "id", "locator", "name"]);
+  });
+
+  it("omits a left button and a single click, which carry no information", () => {
+    const wire = buildV2Step(step({ action: "click", button: "left", clickCount: 1 }));
+    expect(wire).not.toHaveProperty("button");
+    expect(wire).not.toHaveProperty("click_count");
   });
 });
 
@@ -187,7 +217,9 @@ describe("buildV2Step", () => {
   });
 
   it("refuses to build a step that cannot be stored", () => {
-    expect(() => buildV2Step(step({ action: "hover" }))).toThrow(/cannot be stored/);
+    // `wait` rather than `hover`: hover became storable in 1.56, but scroll,
+    // wait and screenshot still have no counterpart in the recorder model.
+    expect(() => buildV2Step(step({ action: "wait" }))).toThrow(/cannot be stored/);
   });
 
   it("maps a whole journey in order", () => {
@@ -214,5 +246,26 @@ describe("SE-18: a completed manual step does not block the save", () => {
       },
     ];
     expect(isSaveableJourney(journey)).toBe(true);
+  });
+});
+
+describe("subtest steps", () => {
+  it("stores a subtest step as the reference and nothing else", () => {
+    const wire = buildV2Step({
+      id: "s2",
+      action: "subtest",
+      name: "Log in (shared)",
+      subtest: { id: "login-test", name: "Login" },
+    });
+    expect(wire).toEqual({
+      id: "s2",
+      action: "subtest",
+      name: "Log in (shared)",
+      subtest: { id: "login-test" },
+    });
+  });
+
+  it("is storable", () => {
+    expect(isStorableAction("subtest")).toBe(true);
   });
 });

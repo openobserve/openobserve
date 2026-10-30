@@ -4,6 +4,9 @@
 import { computed, inject } from "vue";
 import type { Column } from "@tanstack/vue-table";
 import { TABLE_CHECKBOX_COL_SIZE, type OTableColumnDef } from "../OTable.types";
+import { useI18nTyped } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   /** Number of skeleton rows. Default: 10 */
@@ -90,13 +93,13 @@ const cellStyle = (col: Column<any, any>): Record<string, any> => {
     style.left = `${col.getStart?.("left") ?? 0}px`;
     style.zIndex = 1;
     style.background = "var(--color-table-cell-bg)";
-    style.boxShadow = "2px 0 4px -2px var(--color-border-default)";
+    style.boxShadow = "var(--shadow-sticky-left)";
   } else if (pin === "right") {
     style.position = "sticky";
     style.right = `${col.getAfter?.("right") ?? 0}px`;
     style.zIndex = 1;
     style.background = "var(--color-table-cell-bg)";
-    style.boxShadow = "-2px 0 4px -2px var(--color-border-default)";
+    style.boxShadow = "var(--shadow-sticky-right)";
   }
   return style;
 };
@@ -131,7 +134,7 @@ const alignClassFor = (col: Column<any, any>): string => {
     data-test="o2-table-skeleton-body"
     aria-busy="true"
     aria-live="polite"
-    aria-label="Loading data"
+    :aria-label="t('components.tableLoading.ariaLabel')"
   >
     <tr
       v-for="r in rowCount"

@@ -14,6 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import i18nInstance from "@/locales";
+
+const t = (i18nInstance.global as any).t;
 import { nextTick } from "vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 
@@ -47,7 +50,7 @@ describe("useDragAndDrop", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    useDnD = useDragAndDrop();
+    useDnD = useDragAndDrop(t);
     // Mock the global document
     Object.defineProperty(global, "document", {
       value: {

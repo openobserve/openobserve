@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="valueSearchTerm"
           clearable
           size="sm"
-          :placeholder="`Search ${fieldName} values…`"
+          :placeholder="t('common.searchValuesIn', { field: fieldName })"
           @clear="valueSearchTerm = ''"
         />
       </div>
@@ -41,16 +41,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="selection-count text-3! text-3xs text-accent font-medium"
           data-test="field-values-panel-selection-count"
         >
-          {{ selectedValues.length }} selected
+          {{ selectedValues.length }} {{ t("search.selectedLabel") }}
         </span>
-        <span v-else class="selection-hint text-3! text-3xs text-text-secondary"
-          >Select to filter</span
-        >
+        <span v-else class="selection-hint text-3! text-3xs text-text-secondary">{{
+          t("search.selectToFilter")
+        }}</span>
         <OButton
           v-if="selectedValues.length > 0"
           variant="ghost"
           size="icon"
-          title="Clear selection"
+          :title="t('search.clearSelection')"
           class="selection-clear-btn"
           @click="clearSelection"
           data-test="field-values-panel-clear-selection-btn"
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
       <div
-        class="filter-mode-toggle border-card-glass-border rounded-default flex overflow-hidden border"
+        class="filter-mode-toggle border-card-glass-border rounded-default flex overflow-hidden border [&_button:focus-visible]:-outline-offset-2!"
         data-test="field-values-panel-filter-mode-toggle"
       >
         <OButton
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-chip"
           class="filter-mode-btn rounded-none! [transition:background_0.15s,color_0.15s]"
           :disabled="filterMode !== 'include' && isModeToggleDisabled"
-          title="Include mode (=)"
+          :title="t('search.includeModeHint')"
           @click="setFilterMode('include')"
           data-test="field-values-panel-include-mode-btn"
         >
@@ -77,11 +77,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OIcon>
         </OButton>
         <OButton
-          :variant="filterMode === 'exclude' ? 'destructive' : 'ghost-muted'"
+          :variant="filterMode === 'exclude' ? 'filter-exclude' : 'ghost-muted'"
           size="icon-chip"
           class="filter-mode-btn rounded-none! [transition:background_0.15s,color_0.15s]"
           :disabled="filterMode !== 'exclude' && isModeToggleDisabled"
-          title="Exclude mode (≠)"
+          :title="t('search.excludeModeHint')"
           @click="setFilterMode('exclude')"
           data-test="field-values-panel-exclude-mode-btn"
         >
@@ -95,13 +95,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Scrollable values area -->
     <div class="max-h-64 overflow-y-auto">
       <!-- Loading state (only shown when there are no interim cached results) -->
-      <div v-show="fieldValues?.isLoading && !displayValues.length" class="relative h-15 py-1 pl-3">
+      <div v-show="fieldValues?.isLoading && !displayValues.length" class="relative h-15 py-1 ps-3">
         <!-- scrim off: this box is empty while loading, so there is nothing to
              dim — and the scrim is 70% of surface-base (white), which on this
              panel's grey surface just reads as a white block. -->
         <OInnerLoading
           :showing="!!fieldValues?.isLoading && !displayValues.length"
-          label="Fetching values..."
+          :label="t('search.fetchingValues')"
           size="xs"
           :scrim="false"
           data-test="field-values-panel-loading-indicator"
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- No values found -->
       <div
         v-show="!displayValues.length && !fieldValues?.isLoading"
-        class="text-o2-text-secondary py-1 pl-3 text-sm"
+        class="text-o2-text-secondary py-1 ps-3 text-sm"
         data-test="field-values-panel-no-values-msg"
       >
         <template v-if="fieldValues?.errMsg">{{ fieldValues.errMsg }}</template>
@@ -130,10 +130,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           (displayValues[0] as any)?.synthetic &&
           !fieldValues?.isLoading
         "
-        class="text-o2-text-secondary pb-1 pl-3 text-xs italic"
+        class="text-o2-text-secondary ps-3 pb-1 text-xs italic"
         data-test="field-values-panel-no-count-msg"
       >
-        No data in range — values from active filter
+        {{ t("search.noDataInRangeHint") }}
       </div>
 
       <!-- Field values list -->
@@ -158,19 +158,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
 
             <div
-              class="flex min-w-0 flex-row flex-wrap justify-between pl-1"
+              class="flex min-w-0 flex-row flex-wrap justify-between ps-1"
               :class="showMultiSelect ? 'w-[calc(100%-1.5rem)]' : 'w-full'"
             >
               <div
                 :title="value.key"
-                class="text-field-list-label-text text-3! w-[calc(100%-3.125rem)] truncate pr-1"
+                class="text-field-list-label-text text-3! w-[calc(100%-3.125rem)] pe-1 break-words whitespace-pre-wrap"
               >
                 {{ value.label ?? value.key }}
               </div>
               <div
                 v-if="value.count != null"
                 :title="String(value.count)"
-                class="text-3! contents truncate pr-0 text-right"
+                class="text-3! contents truncate pe-0 text-right"
                 :class="showMultiSelect ? 'w-[3.125rem]' : ''"
               >
                 {{ formatLargeNumber(value.count) }}
@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`log-search-subfield-load-more-${fieldName}`"
       >
         <OSpinner variant="dots" v-if="isLoadingMore" size="xs" />
-        <span v-else>View more values</span>
+        <span v-else>{{ t("search.viewMoreValues") }}</span>
       </button>
     </div>
   </div>
@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useDebounceFn, watchDebounced } from "@vueuse/core";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
@@ -231,7 +231,7 @@ interface Props {
   activeExcludeValues?: string[];
 }
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = withDefaults(defineProps<Props>(), {
   showMultiSelect: true,

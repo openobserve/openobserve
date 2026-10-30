@@ -14,15 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::pipeline::components::{Edge, Node};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait, prelude::Expr};
+use sea_orm::{
+    ColumnTrait, Condition, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set,
+    TransactionTrait, prelude::Expr, sea_query::Func,
+};
 use serde::{Deserialize, Serialize};
 
-use super::{
-    entity::{workflow_errors, workflow_run_data, workflows},
-    get_lock,
-};
+use super::entity::{workflow_drafts, workflow_errors, workflow_run_data, workflows};
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
+    errors,
     table::entity::workflow_associations,
 };
 
@@ -30,9 +31,13 @@ use crate::{
 pub struct Workflow {
     pub id: String,
     pub org_id: String,
+    /// Primary key of the owning folder (`folders.id`), never the URL slug.
+    #[serde(default)]
+    pub folder_id: String,
     pub created_at: i64,
     pub updated_at: i64,
     pub created_by: String,
+    #[serde(default)]
     pub enabled: bool,
     pub name: String,
     pub description: String,
@@ -64,10 +69,31 @@ impl TryFrom<workflows::Model> for Workflow {
         let ret = Self {
             id: value.id,
             org_id: value.org_id,
+            folder_id: value.folder_id,
             created_at: value.created_at,
             updated_at: value.updated_at,
             created_by: value.created_by,
             enabled: value.enabled,
+            name: value.name,
+            description: value.description,
+            nodes: serde_json::from_str(&value.nodes)?,
+            edges: serde_json::from_str(&value.edges)?,
+        };
+        Ok(ret)
+    }
+}
+
+impl TryFrom<workflow_drafts::Model> for Workflow {
+    type Error = anyhow::Error;
+    fn try_from(value: workflow_drafts::Model) -> Result<Self, Self::Error> {
+        let ret = Self {
+            id: value.id,
+            org_id: value.org_id,
+            folder_id: value.folder_id,
+            created_at: value.created_at,
+            updated_at: value.updated_at,
+            created_by: value.created_by,
+            enabled: true,
             name: value.name,
             description: value.description,
             nodes: serde_json::from_str(&value.nodes)?,
@@ -156,7 +182,7 @@ impl std::fmt::Display for WorkflowTriggerEntity {
 }
 
 pub async fn list_all() -> Result<Vec<Workflow>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let entities = workflows::Entity::find().all(client).await?;
     let mut ret = Vec::with_capacity(entities.len());
     for e in entities {
@@ -166,7 +192,7 @@ pub async fn list_all() -> Result<Vec<Workflow>, anyhow::Error> {
 }
 
 pub async fn list_by_org(org_id: &str) -> Result<Vec<Workflow>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let entities = workflows::Entity::find()
         .filter(workflows::Column::OrgId.eq(org_id))
         .all(client)
@@ -178,11 +204,117 @@ pub async fn list_by_org(org_id: &str) -> Result<Vec<Workflow>, anyhow::Error> {
     Ok(ret)
 }
 
+/// Lists an org's workflows, optionally restricted to one folder and/or to rows
+/// whose name or description contains `search_substring`.
+///
+/// Both columns, to match what the in-folder list filters on in the browser.
+/// `folder_pk` is the folder's primary key, not the slug from the URL.
+///
+/// The leading-wildcard LIKE cannot use an index; the scan is accepted because
+/// `workflows_org_folder_idx` bounds it to one org. Revisit with `pg_trgm` if that grows.
+pub async fn list_by_org_folder(
+    org_id: &str,
+    folder_pk: Option<&str>,
+    search_substring: Option<&str>,
+) -> Result<Vec<Workflow>, anyhow::Error> {
+    let client = get_orm_client_ro().await;
+    let mut query = workflows::Entity::find().filter(workflows::Column::OrgId.eq(org_id));
+    if let Some(pk) = folder_pk {
+        query = query.filter(workflows::Column::FolderId.eq(pk));
+    }
+    // Lowercase both sides rather than using `contains`: LIKE is case-sensitive
+    // on Postgres, and this must match however the user typed it.
+    if let Some(substring) = search_substring.map(str::trim).filter(|s| !s.is_empty()) {
+        let pattern = format!("%{}%", substring.to_lowercase());
+        query = query.filter(
+            Condition::any()
+                .add(
+                    Expr::expr(Func::lower(Expr::col(workflows::Column::Name)))
+                        .like(pattern.clone()),
+                )
+                .add(
+                    Expr::expr(Func::lower(Expr::col(workflows::Column::Description)))
+                        .like(pattern),
+                ),
+        );
+    }
+    let entities = query.all(client).await?;
+    let mut ret = Vec::with_capacity(entities.len());
+    for e in entities {
+        ret.push(e.try_into()?);
+    }
+    Ok(ret)
+}
+
+/// Counts the workflows in a folder, drafts included. Backs the folder delete
+/// guard, so it takes the folder's primary key — and it must count drafts, or
+/// deleting a drafts-only folder leaves them pointing at a folder that is gone.
+pub async fn count_by_folder(org_id: &str, folder_pk: &str) -> Result<u64, errors::Error> {
+    let client = get_orm_client_ro().await;
+    let published = workflows::Entity::find()
+        .filter(workflows::Column::OrgId.eq(org_id))
+        .filter(workflows::Column::FolderId.eq(folder_pk))
+        .count(client)
+        .await?;
+    let drafts = workflow_drafts::Entity::find()
+        .filter(workflow_drafts::Column::OrgId.eq(org_id))
+        .filter(workflow_drafts::Column::FolderId.eq(folder_pk))
+        .count(client)
+        .await?;
+    Ok(published + drafts)
+}
+
+/// Returns `(id, folder primary key)` for each of `workflow_ids` that exists.
+///
+/// Two columns rather than whole rows, so a bulk move does not deserialize
+/// every workflow's node graph.
+pub async fn folder_pks_by_ids(
+    org_id: &str,
+    workflow_ids: &[String],
+) -> Result<Vec<(String, String)>, anyhow::Error> {
+    if workflow_ids.is_empty() {
+        return Ok(vec![]);
+    }
+    let client = get_orm_client_ro().await;
+    let rows = workflows::Entity::find()
+        .select_only()
+        .column(workflows::Column::Id)
+        .column(workflows::Column::FolderId)
+        .filter(workflows::Column::OrgId.eq(org_id))
+        .filter(workflows::Column::Id.is_in(workflow_ids.to_vec()))
+        .into_tuple::<(String, String)>()
+        .all(client)
+        .await?;
+    Ok(rows)
+}
+
+/// Moves workflows into `dst_folder_pk`, which must be a folder primary key.
+pub async fn move_to_folder(
+    org_id: &str,
+    workflow_ids: &[String],
+    dst_folder_pk: &str,
+) -> Result<(), anyhow::Error> {
+    if workflow_ids.is_empty() {
+        return Ok(());
+    }
+    let client = get_orm_client_rw().await;
+    workflows::Entity::update_many()
+        .col_expr(
+            workflows::Column::FolderId,
+            Expr::value(dst_folder_pk.to_string()),
+        )
+        .filter(workflows::Column::OrgId.eq(org_id))
+        .filter(workflows::Column::Id.is_in(workflow_ids.to_vec()))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
 pub async fn get_by_org_wid(
     org_id: &str,
     workflow_id: &str,
 ) -> Result<Option<Workflow>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let res = workflows::Entity::find()
         .filter(workflows::Column::Id.eq(workflow_id))
         .filter(workflows::Column::OrgId.eq(org_id))
@@ -198,7 +330,7 @@ pub async fn get_errors_for_run(
     wid: &str,
     run_id: &str,
 ) -> Result<Option<WorkflowRunErrors>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let res = workflow_errors::Entity::find()
         .filter(workflow_errors::Column::OrgId.eq(org_id))
         .filter(workflow_errors::Column::WorkflowId.eq(wid))
@@ -216,7 +348,7 @@ pub async fn list_errors_for_workflow_run(
     wid: &str,
     run_id: &str,
 ) -> Result<Option<WorkflowRunErrors>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let res = workflow_errors::Entity::find()
         .filter(workflow_errors::Column::OrgId.eq(org_id))
         .filter(workflow_errors::Column::WorkflowId.eq(wid))
@@ -229,13 +361,13 @@ pub async fn list_errors_for_workflow_run(
 }
 
 pub async fn save_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     let now = chrono::Utc::now().timestamp_millis();
     let model = workflows::ActiveModel {
         id: Set(workflow.id),
         org_id: Set(workflow.org_id),
+        folder_id: Set(workflow.folder_id),
         created_at: Set(now),
         updated_at: Set(now),
         created_by: Set(workflow.created_by),
@@ -250,8 +382,7 @@ pub async fn save_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
 }
 
 pub async fn update_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     let now = chrono::Utc::now().timestamp_millis();
     let model = workflows::ActiveModel {
@@ -272,8 +403,7 @@ pub async fn update_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
 }
 
 pub async fn save_workflow_errors(errors: WorkflowRunErrors) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
     let model = workflow_errors::ActiveModel {
         cluster: Set(errors.cluster),
         org_id: Set(errors.org_id),
@@ -291,8 +421,7 @@ pub async fn save_workflow_errors(errors: WorkflowRunErrors) -> Result<(), anyho
 pub async fn update_error_input_file_cluster_data(
     errors: WorkflowRunErrors,
 ) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     workflow_errors::Entity::update_many()
         .filter(workflow_errors::Column::OrgId.eq(errors.org_id))
@@ -313,8 +442,7 @@ pub async fn update_error_input_file_cluster_data(
 }
 
 pub async fn delete_workflow(id: &str) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     workflows::Entity::delete_many()
         .filter(workflows::Column::Id.eq(id))
@@ -325,11 +453,36 @@ pub async fn delete_workflow(id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+pub async fn delete_by_org(org_id: &str) -> Result<(), anyhow::Error> {
+    let client = get_orm_client_rw().await;
+    workflows::Entity::delete_many()
+        .filter(workflows::Column::OrgId.eq(org_id))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
+pub async fn delete_children_by_org(org_id: &str) -> Result<(), anyhow::Error> {
+    let client = get_orm_client_rw().await;
+    workflow_associations::Entity::delete_many()
+        .filter(workflow_associations::Column::OrgId.eq(org_id))
+        .exec(client)
+        .await?;
+    workflow_errors::Entity::delete_many()
+        .filter(workflow_errors::Column::OrgId.eq(org_id))
+        .exec(client)
+        .await?;
+    workflow_run_data::Entity::delete_many()
+        .filter(workflow_run_data::Column::OrgId.eq(org_id))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
 pub async fn delete_all_errors_older_than(
     ts: i64,
 ) -> Result<Vec<WorkflowRunErrors>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     // ideally this could be delete returning, but sqlite does not
     // support that with seaorm, so transaction instead, which is still not
@@ -365,8 +518,7 @@ pub async fn delete_all_errors_older_than(
 }
 
 pub async fn delete_all_runs_older_than(ts: i64) -> Result<Vec<WorkflowRunData>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     // ideally this could be delete returning, but sqlite does not
     // support that with seaorm, so transaction instead, which is still not
@@ -408,7 +560,7 @@ pub async fn get_run_data(
     workflow_id: &str,
     run_id: &str,
 ) -> Result<Option<String>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let ret = workflow_run_data::Entity::find()
         .filter(workflow_run_data::Column::OrgId.eq(org_id))
@@ -425,8 +577,7 @@ pub async fn delete_run_data(
     workflow_id: &str,
     run_id: &str,
 ) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     workflow_run_data::Entity::delete_many()
         .filter(workflow_run_data::Column::OrgId.eq(org_id))
@@ -439,8 +590,7 @@ pub async fn delete_run_data(
 }
 
 pub async fn save_workflow_run_data(entry: WorkflowRunData) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     let model = workflow_run_data::ActiveModel {
         org_id: Set(entry.org_id),
@@ -460,7 +610,7 @@ pub async fn get_all_associations_for_workflow(
     org_id: &str,
     workflow_id: &str,
 ) -> Result<Vec<WorkflowAssociation>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let ret = workflow_associations::Entity::find()
         .filter(workflow_associations::Column::OrgId.eq(org_id))
@@ -476,7 +626,7 @@ pub async fn get_all_associations_for_entity(
     entity_id: &str,
     entity_type: &str,
 ) -> Result<Vec<WorkflowAssociation>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let ret = workflow_associations::Entity::find()
         .filter(workflow_associations::Column::OrgId.eq(org_id))
@@ -492,7 +642,7 @@ pub async fn get_all_associations_for_trigger_type(
     org_id: &str,
     trigger: &str,
 ) -> Result<Vec<WorkflowAssociation>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let ret = workflow_associations::Entity::find()
         .filter(workflow_associations::Column::OrgId.eq(org_id))
@@ -504,8 +654,7 @@ pub async fn get_all_associations_for_trigger_type(
 }
 
 pub async fn add_workflow_association(entry: WorkflowAssociation) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     let model = workflow_associations::ActiveModel {
         id: Default::default(),
@@ -527,8 +676,7 @@ pub async fn delete_workflow_association(
     workflow_id: &str,
     entity_id: &str,
 ) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     workflow_associations::Entity::delete_many()
         .filter(workflow_associations::Column::OrgId.eq(org_id))
@@ -540,8 +688,7 @@ pub async fn delete_workflow_association(
 }
 
 pub async fn delete_association_by_workflow(org_id: &str, id: &str) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     workflow_associations::Entity::delete_many()
         .filter(workflow_associations::Column::OrgId.eq(org_id))
@@ -555,8 +702,7 @@ pub async fn delete_association_by_trigger(
     org_id: &str,
     trigger: &str,
 ) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     workflow_associations::Entity::delete_many()
         .filter(workflow_associations::Column::OrgId.eq(org_id))
@@ -566,14 +712,180 @@ pub async fn delete_association_by_trigger(
     Ok(())
 }
 
+pub async fn delete_association_by_trigger_workflow(
+    org_id: &str,
+    trigger: &str,
+    workflow_id: &str,
+) -> Result<(), anyhow::Error> {
+    let client = get_orm_client_rw().await;
+
+    workflow_associations::Entity::delete_many()
+        .filter(workflow_associations::Column::OrgId.eq(org_id))
+        .filter(workflow_associations::Column::TriggerType.eq(trigger))
+        .filter(workflow_associations::Column::WorkflowId.eq(workflow_id))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
 pub async fn delete_association_by_entity(org_id: &str, entity: &str) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     workflow_associations::Entity::delete_many()
         .filter(workflow_associations::Column::OrgId.eq(org_id))
         .filter(workflow_associations::Column::EntityId.eq(entity))
         .exec(client)
         .await?;
+    Ok(())
+}
+
+/// Lists an org's drafts, optionally restricted to one folder. `folder_pk` is the
+/// folder's primary key, not the slug from the URL.
+pub async fn list_drafts_by_org(
+    org_id: &str,
+    folder_pk: Option<&str>,
+) -> Result<Vec<Workflow>, anyhow::Error> {
+    let client = get_orm_client_ro().await;
+    let mut query =
+        workflow_drafts::Entity::find().filter(workflow_drafts::Column::OrgId.eq(org_id));
+    if let Some(pk) = folder_pk {
+        query = query.filter(workflow_drafts::Column::FolderId.eq(pk));
+    }
+    let entities = query.all(client).await?;
+    let mut ret = Vec::with_capacity(entities.len());
+    for e in entities {
+        ret.push(e.try_into()?);
+    }
+    Ok(ret)
+}
+
+pub async fn get_draft_by_org_draft_id(
+    org_id: &str,
+    id: &str,
+) -> Result<Option<Workflow>, anyhow::Error> {
+    let client = get_orm_client_ro().await;
+    let res = workflow_drafts::Entity::find()
+        .filter(workflow_drafts::Column::Id.eq(id))
+        .filter(workflow_drafts::Column::OrgId.eq(org_id))
+        .one(client)
+        .await?;
+
+    let ret = res.map(|v| v.try_into()).transpose()?;
+    Ok(ret)
+}
+
+pub async fn save_draft(draft: Workflow) -> Result<(), anyhow::Error> {
+    let client = get_orm_client_rw().await;
+
+    let now = chrono::Utc::now().timestamp_millis();
+    let model = workflow_drafts::ActiveModel {
+        id: Set(draft.id),
+        org_id: Set(draft.org_id),
+        folder_id: Set(draft.folder_id),
+        created_at: Set(now),
+        updated_at: Set(now),
+        created_by: Set(draft.created_by),
+        name: Set(draft.name),
+        description: Set(draft.description),
+        nodes: Set(serde_json::to_string(&draft.nodes)?),
+        edges: Set(serde_json::to_string(&draft.edges)?),
+    };
+    workflow_drafts::Entity::insert(model).exec(client).await?;
+    Ok(())
+}
+
+pub async fn update_draft(draft: Workflow) -> Result<(), anyhow::Error> {
+    let client = get_orm_client_rw().await;
+
+    let now = chrono::Utc::now().timestamp_millis();
+    let model = workflow_drafts::ActiveModel {
+        updated_at: Set(now),
+        name: Set(draft.name),
+        description: Set(draft.description),
+        nodes: Set(serde_json::to_string(&draft.nodes)?),
+        edges: Set(serde_json::to_string(&draft.edges)?),
+        ..Default::default()
+    };
+    workflow_drafts::Entity::update_many()
+        .filter(workflow_drafts::Column::Id.eq(draft.id))
+        .set(model)
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
+pub async fn delete_draft(id: &str) -> Result<(), anyhow::Error> {
+    let client = get_orm_client_rw().await;
+
+    workflow_drafts::Entity::delete_many()
+        .filter(workflow_drafts::Column::Id.eq(id))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
+pub async fn delete_drafts_by_org(org_id: &str) -> Result<(), anyhow::Error> {
+    let client = get_orm_client_rw().await;
+    workflow_drafts::Entity::delete_many()
+        .filter(workflow_drafts::Column::OrgId.eq(org_id))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
+pub async fn promote_draft_to_workflow(org_id: &str, draft: Workflow) -> Result<(), anyhow::Error> {
+    let client = get_orm_client_rw().await;
+
+    let id = draft.id.clone();
+
+    let txn = client.begin().await?;
+    let existing = workflow_drafts::Entity::find()
+        .filter(workflow_drafts::Column::OrgId.eq(org_id))
+        .filter(workflow_drafts::Column::Id.eq(&id))
+        .one(&txn)
+        .await?;
+    if existing.is_none() {
+        txn.rollback().await?;
+        return Err(anyhow::anyhow!("could not find draft with given id"));
+    }
+
+    let now = chrono::Utc::now().timestamp_millis();
+    let model = workflows::ActiveModel {
+        id: Set(draft.id),
+        org_id: Set(draft.org_id),
+        folder_id: Set(draft.folder_id),
+        created_at: Set(now),
+        updated_at: Set(now),
+        created_by: Set(draft.created_by),
+        enabled: Set(draft.enabled),
+        name: Set(draft.name),
+        description: Set(draft.description),
+        nodes: Set(serde_json::to_string(&draft.nodes)?),
+        edges: Set(serde_json::to_string(&draft.edges)?),
+    };
+    if let Err(e) = workflows::Entity::insert(model).exec(&txn).await {
+        log::error!("error in saving draft workflow as proper workflow for {org_id}/{id} : {e}");
+        txn.rollback().await?;
+        return Err(anyhow::anyhow!(e));
+    }
+
+    if let Err(e) = workflow_drafts::Entity::delete_many()
+        .filter(workflow_drafts::Column::OrgId.eq(org_id))
+        .filter(workflow_drafts::Column::Id.eq(&id))
+        .exec(&txn)
+        .await
+    {
+        log::error!(
+            "error deleting draft workflow after saving it has proper workflow for {org_id}/{id} : {e}"
+        );
+        txn.rollback().await?;
+        return Err(anyhow::anyhow!(e));
+    }
+
+    if let Err(e) = txn.commit().await {
+        log::error!("error committing draft promotion transaction to db for {org_id}/{id} : {e}");
+        return Err(anyhow::anyhow!(e));
+    }
+
     Ok(())
 }

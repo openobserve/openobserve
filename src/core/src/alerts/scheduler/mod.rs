@@ -15,10 +15,13 @@
 
 use config::get_config;
 
+mod calibration;
 pub mod handlers;
 #[cfg(feature = "enterprise")]
 pub mod query_optimization_recommendation;
 pub mod worker;
+
+pub use calibration::{LastRun, last_run};
 
 // The main function that creates and runs the scheduler
 pub async fn run() -> Result<(), anyhow::Error> {

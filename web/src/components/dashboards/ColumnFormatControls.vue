@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="divide-y divide-[color-mix(in_srgb,var(--color-grey-500)_8%,transparent)]">
+  <div class="divide-border-strong/8 divide-y">
     <!-- Field type -->
     <div class="px-3 py-2">
       <div
@@ -106,9 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         type="button"
         class="rounded-default hover:border-accent mt-3 inline-flex cursor-pointer items-center gap-2 border px-2.5 py-1.5 text-left transition-colors"
         :class="
-          col.autoColor
-            ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_7%,transparent)]'
-            : 'border-[color-mix(in_srgb,var(--color-grey-500)_28%,transparent)] bg-transparent'
+          col.autoColor ? 'border-accent bg-accent/7' : 'border-border-strong/28 bg-transparent'
         "
         :data-test="`o2-format-unique-color-${col.field}`"
         @click="colModel.autoColor = !colModel.autoColor"
@@ -134,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(rule, ruleIdx) in col.conditions"
         :key="ruleIdx"
-        class="rounded-default mb-1.5 flex flex-col gap-2 border border-[color-mix(in_srgb,var(--color-grey-500)_10%,transparent)] bg-[color-mix(in_srgb,var(--color-grey-500)_4%,transparent)] px-2.5 py-2"
+        class="rounded-default border-border-strong/10 bg-border-strong/4 mb-1.5 flex flex-col gap-2 border px-2.5 py-2"
       >
         <div class="flex flex-wrap items-center gap-2">
           <span
@@ -158,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-xs"
             icon-left="close"
             :title="t('common.remove')"
-            class="ml-auto shrink-0"
+            class="ms-auto shrink-0"
             @click="colModel.conditions.splice(ruleIdx, 1)"
           />
         </div>
@@ -200,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { computed, defineComponent, PropType } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -211,6 +209,7 @@ import ColorSwatchPicker from "./ColorSwatchPicker.vue";
 import {
   type ColumnOverrideUI,
   emptyConditionalRule,
+  getUnitOptions,
   useColumnFormattingOptions,
   TEXT_SWATCHES,
   BG_SWATCHES,
@@ -232,12 +231,13 @@ export default defineComponent({
     isNumeric: { type: Boolean, default: false },
   },
   setup(props) {
-    const { t } = useI18n();
-    const { unitOptions, fieldTypeOptions, alignOptions, conditionOperators } =
-      useColumnFormattingOptions();
+    const { t } = useI18nTyped();
+    const { fieldTypeOptions, alignOptions, conditionOperators } = useColumnFormattingOptions();
 
     // Alias preserves the same prop reference for in-place mutation via v-model.
     const colModel = computed(() => props.col);
+
+    const unitOptions = computed(() => getUnitOptions(t, props.col.unit));
 
     // Explicit "Auto" replaces tap-to-clear: null ⇄ the "auto" sentinel item.
     const alignmentModel = computed({
@@ -263,7 +263,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 /* keep(lib-override:o2-toggle-group): OToggleGroup renders its own <button>
    children, so their intrinsic min-height can only be reset from the parent via
    :deep() — no utility on this component can reach that generated element. */

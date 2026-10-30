@@ -53,7 +53,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
@@ -66,7 +66,7 @@ const emit = defineEmits<{
   (e: "select", type: ScorerType): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 function select(type: ScorerType) {
   emit("select", type);
@@ -76,8 +76,8 @@ interface TypeOption {
   type: ScorerType;
   testKey: string;
   icon: IconName;
-  title: string;
-  description: string;
+  title: I18nText;
+  description: I18nText;
   cta: string;
 }
 

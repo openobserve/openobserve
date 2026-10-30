@@ -34,3 +34,8 @@ stats.html
 
 # Fetched AI data-source content (regenerated at build; see scripts/fetch-datasource-content.mjs)
 src/assets/ai-datasource-content/generated/
+# Dev-only local vite configs (per-machine ports/proxy); see their headers.
+# Matches both `vite.config.local-*.ts` and variants like `vite.config.dbm-demo.ts`;
+# the committed config is exactly `vite.config.ts`, which this cannot match.
+vite.config.*-*.ts
+vite.config.local-*.ts

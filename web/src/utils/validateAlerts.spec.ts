@@ -15,7 +15,7 @@
 
 import { describe, it, expect } from "vitest";
 import i18n from "@/locales";
-import { validateAlert, ValidationResult } from "./alerts/alertValidation";
+import { validateAlert } from "./alerts/alertValidation";
 
 // validateAlert's messages are i18n-driven now — the pure util has no Vue
 // context, so callers inject `t` through the validation context. Resolve through
@@ -804,11 +804,17 @@ describe("Alert Validation", () => {
       expect(result.errors).toContain("Destinations must be an array");
     });
 
-    it("should fail if destinations array is empty", () => {
+    it("should pass with an empty destinations array", () => {
       const alert = { ...validAlert, destinations: [] };
       const result = validateAlert(alert, validContext);
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain("At least one destination is required");
+      expect(result.errors).toEqual([]);
+      expect(result.isValid).toBe(true);
+    });
+
+    it("should pass with no destinations key, even when the org has none", () => {
+      const { destinations: _omit, ...alert } = validAlert;
+      const result = validateAlert(alert as any, { ...validContext, destinationsList: [] });
+      expect(result.errors).toEqual([]);
     });
 
     it("should fail for invalid destinations", () => {

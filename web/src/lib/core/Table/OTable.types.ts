@@ -1,7 +1,67 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nText } from "@/types/i18n";
+
 import type { Component, ComputedRef, InjectionKey, Ref } from "vue";
 import type { Row, Table } from "@tanstack/vue-table";
+import type { StatTone } from "@/lib/data/StatStrip/OStatStrip.types";
+import type { TooltipSide } from "@/lib/overlay/Tooltip/OTooltip.types";
+
+// ─── Row rail / row tone ─────────────────────────────────────────
+/**
+ * Colour of a row's left rail. `StatTone` so a rail matches the `OStatStrip`
+ * tile that filters to it, plus the five alert priorities, which are their own
+ * semantic ramp (`--color-priority-p*`) rather than a status tone — a P1 row is
+ * not "an error", it is a P1.
+ */
+export type RowRailTone = StatTone | "p1" | "p2" | "p3" | "p4" | "p5";
+
+/** How a row is de-emphasised. One value today; a union so it can grow. */
+export type RowTone = "muted";
+
+// ─── Body sections ───────────────────────────────────────────────
+/**
+ * One contiguous run of body rows under a shared heading.
+ *
+ * Sections are a RENDERING grouping, not a second sort: rows keep the order the
+ * active sort gave them, and are only gathered so each section is contiguous.
+ * `rows` is what survived filtering and pagination, so a section's own total
+ * belongs to the caller, which is the only side that knows the unpaginated set.
+ */
+export interface OTableSection<TData = any> {
+  key: string;
+  rows: Row<TData>[];
+}
+
+/**
+ * Tone → utility classes for the rail. The rail paints the row's FIRST cell
+ * (an extra `<td>` would add a phantom column and misalign every cell under
+ * `table-fixed`), so it is expressed as a child variant on the `<tr>`.
+ */
+export const ROW_RAIL_TONE_CLASS: Record<RowRailTone, string> = {
+  p1: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-priority-p1",
+  p2: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-priority-p2",
+  p3: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-priority-p3",
+  p4: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-priority-p4",
+  p5: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-priority-p5",
+  // Status tones use the SAME tokens as the matching OStatCard tone, so a rail
+  // and the stat tile that filters to it are provably one colour.
+  success: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-icon-chip-success-text",
+  warning: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-icon-chip-warning-text",
+  error: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-icon-chip-error-text",
+  info: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-icon-chip-info-text",
+  primary: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-icon-chip-primary-text",
+  orange: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-icon-chip-orange-text",
+  blue: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-badge-blue-soft-text",
+  teal: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-badge-teal-soft-text",
+  purple: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-badge-purple-soft-text",
+  neutral: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-border-default",
+};
+
+/** Tone → utility classes for a de-emphasised row. */
+export const ROW_TONE_CLASS: Record<RowTone, string> = {
+  muted: "bg-surface-panel text-text-secondary",
+};
 
 // ─── Cell hover-actions context ──────────────────────────────────
 /**
@@ -18,6 +78,28 @@ export interface OTableCellActionsContext {
 
 export const OTableCellActionsKey: InjectionKey<OTableCellActionsContext> =
   Symbol("OTableCellActions");
+
+// ─── Cut-off cell tooltip context ────────────────────────────────
+/** A body cell reports hover; OTable shows one shared tooltip, only when that cell's text is cut. */
+export interface OTableOverflowTooltipContext {
+  /** `toolbarSide` reports where the cell's hover toolbar sits, so the tooltip opens on the other side. */
+  enter: (cell: HTMLElement, toolbarSide?: () => TooltipSide | null) => void;
+  leave: () => void;
+}
+
+export const OTableOverflowTooltipKey: InjectionKey<OTableOverflowTooltipContext> =
+  Symbol("OTableOverflowTooltip");
+
+/** The shared tooltip's state, read only inside its own component so a change never re-renders the table. */
+export interface OTableOverflowTooltipState {
+  anchor: Ref<HTMLElement | null>;
+  text: Ref<string>;
+  side: Ref<TooltipSide>;
+  onOpenChange: (open: boolean) => void;
+}
+
+/** Marks an element inside a cell that clips its own text (slot wrapper, copy value). */
+export const TABLE_CELL_CLIP_ATTR = "data-o2-cell-clip";
 
 // ─── Shared column size constants ────────────────────────────────
 /**
@@ -90,6 +172,14 @@ export interface OTableColumnMeta {
   align?: "left" | "center" | "right" | (string & {});
   /** Additional class applied to the <th> */
   headerClass?: string;
+  /**
+   * A second, smaller line under the header label — for the technical name of a
+   * column whose label is plain English ("Slow calls" / `p95`). Non-translatable
+   * identifiers go through `raw()`.
+   */
+  headerSubLabel?: I18nText;
+  /** Hover tooltip on the header, explaining what the column measures. */
+  headerTooltip?: I18nText;
   /** Additional class applied to the <td> */
   cellClass?: string;
   /**
@@ -112,6 +202,10 @@ export interface OTableColumnMeta {
    * inside the container and ellipsis-truncates. Set alongside `autoWidth`.
    */
   fillRemaining?: boolean;
+  /** `false` keeps this column out of the table's cut-off tooltip; set it on columns that hold secrets. */
+  cellOverflowTooltip?: boolean;
+  /** Show the per-column "format this column" icon (requires `enableColumnFormat` on OTable) */
+  formattable?: boolean;
   /** Arbitrary metadata for custom cell renderers */
   [key: string]: any;
 }
@@ -119,8 +213,8 @@ export interface OTableColumnMeta {
 export interface OTableColumnDef<TData = any> {
   /** Unique column identifier (used as accessorKey when accessorKey not explicitly set) */
   id: string;
-  /** Header display text or render function */
-  header: string | Component;
+  /** Header display text or render function. `raw()` for a glyph or empty header. */
+  header: I18nText | Component;
   /** Key in the data row object */
   accessorKey?: string;
   /** Custom accessor function (receives the full row) */
@@ -133,6 +227,8 @@ export interface OTableColumnDef<TData = any> {
   maxSize?: number;
   /** Can the user sort by this column? */
   sortable?: boolean;
+  /** Where client sorting puts rows whose value is undefined; "first"/"last" hold in both directions. */
+  sortUndefined?: "first" | "last" | false | -1 | 1;
   /** Can the user filter by this column? */
   filterable?: boolean;
   /** Can the user resize this column? */
@@ -216,9 +312,6 @@ export interface OTableProps<TData = any> {
   totalCountExact?: boolean;
   /** When true, the page index is NOT reset when the data array changes (e.g. on row expand/collapse). Defaults to false. */
   keepPageOnDataChange?: boolean;
-  /** When true, the caller's `#bottom` slot IS the pagination bar and replaces
-   *  the built-in controls. Leave false when `#bottom` holds only bulk actions. */
-  customPaginationBar?: boolean;
 
   // ── Sorting ──
   sorting?: OTableSortingMode;
@@ -228,17 +321,18 @@ export interface OTableProps<TData = any> {
   sortOrder?: "asc" | "desc";
   /** Maps TanStack column id → backend field name for server-side sort */
   sortFieldMap?: Record<string, string>;
+  sortClearable?: boolean;
+  sortDisabled?: boolean;
+  sortDisabledReason?: I18nText;
 
   // ── Filtering ──
   /** Global search/filter text */
   globalFilter?: string;
   /** Placeholder for global filter input */
-  globalFilterPlaceholder?: string;
+  globalFilterPlaceholder?: I18nText;
   /** Show built-in global filter search bar (default: true) */
   showGlobalFilter?: boolean;
   filterMode?: OTableFilterMode;
-  /** Label shown bold in the footer as "N footerTitle" (e.g. "2 Dashboards") */
-  footerTitle?: string;
 
   // ── Selection ──
   selection?: OTableSelectionMode;
@@ -265,6 +359,24 @@ export interface OTableProps<TData = any> {
   /** For tree/grouping: returns sub-rows of a given row */
   getSubRows?: (row: TData) => TData[];
 
+  // ── Body sections ──
+  /**
+   * Section key for a row, or null to leave it out of every section. Setting
+   * this turns on section rendering: rows are gathered so each key is
+   * contiguous and `#group-header` is rendered above each run.
+   *
+   * Ignored under `virtualScroll` and `enableRowReorder` — a sticky heading has
+   * no fixed row to hang off in a virtualised body, and dragging a row between
+   * sections would imply a reorder the caller cannot honour.
+   */
+  rowSection?: (row: TData) => string | null;
+  /**
+   * Section order, most important first. A key this does not name renders after
+   * every key it does, in first-seen order — a new state stays visible rather
+   * than disappearing because nobody listed it.
+   */
+  sectionOrder?: readonly string[];
+
   // ── Tree mode (parent + nested children, inline chevron, optional warning row) ──
   /**
    * Enables tree mode. When true, OTable flattens parents + their children
@@ -282,6 +394,24 @@ export interface OTableProps<TData = any> {
 
   // ── Virtual Scroll ──
   virtualScroll?: boolean;
+  /**
+   * Build the TanStack row model only for the virtualizer's visible window
+   * instead of every data row. TanStack materializes a Row object per data row
+   * regardless of virtual scroll (which only bounds DOM nodes), so very large
+   * datasets (100k+ rows) freeze or OOM the tab without this. Applies only
+   * while no client-side row transform needs the full model: requires
+   * virtualScroll, pagination "none", non-client sorting, expansion "none"
+   * (or single/multiple with `measureExpandedRows`), no wrap, no tree, and
+   * deactivates while a column/global filter is set.
+   */
+  windowRowModel?: boolean;
+  /**
+   * Under virtual scroll, measure each rendered row together with its expanded
+   * detail row, so a tall detail never shifts the rows below it. Expansion state
+   * is keyed by `rowKey`, so this also lets `windowRowModel` stay on while rows
+   * expand. Opt-in: it measures every rendered row from the DOM.
+   */
+  measureExpandedRows?: boolean;
   /** Fixed row height for virtual scroll calculations (default 48) */
   virtualScrollItemSize?: number;
   /**
@@ -303,6 +433,13 @@ export interface OTableProps<TData = any> {
    * a column with id `"#"`.
    */
   showIndex?: boolean;
+  /**
+   * Render the header's select-all checkbox. Set false when selection is
+   * bounded (e.g. a comparison that accepts exactly two rows), where
+   * "select all" cannot mean anything. The header cell itself is still
+   * rendered so the body's selection gutter stays aligned.
+   */
+  showSelectAll?: boolean;
   enableColumnResize?: boolean;
   enableColumnReorder?: boolean;
   /**
@@ -314,6 +451,8 @@ export interface OTableProps<TData = any> {
   enableColumnPin?: boolean;
   /** Show the per-column value-filter dropdown on `filterable` columns (client-side) */
   enableColumnFilter?: boolean;
+  /** Show the per-column "format this column" icon on `formattable` columns */
+  enableColumnFormat?: boolean;
   /** Initial column visibility */
   columnVisibility?: Record<string, boolean>;
   /**
@@ -332,9 +471,17 @@ export interface OTableProps<TData = any> {
   /** Data is arriving incrementally (SSE/WebSocket). Shows a pulsing indicator. */
   streaming?: boolean;
   error?: string | null;
+  /**
+   * The data this table lists was denied (403). Shows the no-access state
+   * instead of the first-run empty state, which would otherwise invite the
+   * user to create something they are not allowed to create.
+   */
+  forbidden?: boolean;
   /** Text shown when data is empty and not loading */
-  emptyMessage?: string;
+  emptyMessage?: I18nText;
   dense?: boolean;
+  /** Short rows (`--table-row-height-compact`) with no cell padding, for small list dialogs; overrides `dense`. */
+  compact?: boolean;
   bordered?: boolean;
   /**
    * Draws the outer frame (border) around the whole table region. Default true.
@@ -342,11 +489,17 @@ export interface OTableProps<TData = any> {
    * (e.g. a page card) so it renders flush without a double border.
    */
   frame?: boolean;
+  /** Draws the hairline divider under the toolbar row (default true); set false when a subheader below would read as a double line. */
+  toolbarBordered?: boolean;
+  /** Draws the hairline above the built-in pager (default true); set false when the table sits flush in a dialog. */
+  paginationBordered?: boolean;
   striped?: boolean;
   stickyHeader?: boolean;
   showHeader?: boolean;
   /** Wrap cell content */
   wrap?: boolean;
+  /** Show the shared full-text tooltip on cut body cells (default true); turn off where Wrap or row expansion is the reveal. */
+  cellOverflowTooltip?: boolean;
   /**
    * When true, cells render their natural width and the table scrolls
    * horizontally if the total content overflows the container. Switches
@@ -373,8 +526,20 @@ export interface OTableProps<TData = any> {
   disableRowReorder?: (row: TData) => boolean;
 
   // ── Row Styling ──
+  /**
+   * Token-backed 4px left rail per row — the calm-signal "row state rail".
+   * Return a tone, or `null` for no rail. Replaces injecting a colour string
+   * through `getRowStyle`, which forces the call site to reach a raw `var()`.
+   */
+  rowRailTone?: (row: TData) => RowRailTone | null;
+  /**
+   * De-emphasise a row without an `!important` class override — e.g. a snoozed
+   * page that is still listed but is not currently anybody's problem.
+   */
+  rowTone?: (row: TData) => RowTone | null;
   /** Static class or dynamic function for row <tr> */
   rowClass?: string | ((row: TData) => string);
+  activeRowIndex?: number | null;
   /** Dynamic inline style for row */
   getRowStyle?: (row: TData) => Record<string, any>;
   /** Returns a CSS color for the status bar (4px left border) per row */
@@ -397,9 +562,10 @@ export interface OTableProps<TData = any> {
   pivotHeaderLevels?: any[];
   /** Pivot row field columns (for sticky headers + row-field cell merge) */
   pivotRowColumns?: any[];
-  /** Grand-total row rendered as a sticky `<tfoot>`, keyed by each column's
-   *  `accessorKey`/`id`; values run through the column's `meta.format`. */
-  stickyTotalRow?: Record<string, any> | null;
+  /** Grand-total row (or rows, one `<tr>` each) rendered as a sticky `<tfoot>`, keyed by each column's
+   *  `accessorKey`/`id`; values run through the column's `meta.format`. A row with `__labelKey` is a
+   *  calculated-totals row: that column's cell shows the calculation's name, muted, and the values bold. */
+  stickyTotalRow?: Record<string, any> | Record<string, any>[] | null;
   /** Show sticky row totals (pins the grand-total `<tfoot>` to the bottom) */
   stickyRowTotals?: boolean;
   /** Show sticky column totals */
@@ -451,6 +617,8 @@ export interface OTableEmits<TData = any> {
   "column-visibility-change": [visibility: Record<string, boolean>];
   /** A column's close ("x") affordance was clicked; the consumer decides how to remove it. */
   "close-column": [column: OTableColumnDef<TData>];
+  /** A `formattable` column's format icon was clicked (requires `enableColumnFormat`). */
+  "format-column": [columnId: string];
   "update:columnSizes": [sizes: Record<string, number>, idMap: Record<string, string>];
 
   // Row reorder
@@ -485,6 +653,8 @@ export interface OTableSlots<TData = any> {
     value: any;
     active?: boolean;
   }) => any;
+  /** Inline actions right of the built-in copy button (requires `enable-cell-copy`). */
+  "copy-actions"?: (props: { columnId: string; row: TData; value: any }) => any;
   /** Per-column cell slot (`#cell-<columnId>`) — scoped to the plain row data
    *  (`row.original`) + row index. `active` is only ever passed to the reserved
    *  `cell-hover-actions` key, which this signature has to admit. */
@@ -508,8 +678,8 @@ export interface OTableSlots<TData = any> {
   "toolbar-trailing"?: () => any;
   /** Full-width content between the toolbar and the table body (e.g. a summary-stat strip). */
   subheader?: () => any;
-  /** Content below the table (above pagination). Scoped with pagination state. */
-  bottom?: (props: {
+  /** A caller-drawn pager: replaces the built-in pagination bar and still renders with `pagination="none"`. */
+  "pagination-bar"?: (props: {
     currentPage: number;
     pageSize: number;
     totalPages: number;
@@ -522,6 +692,10 @@ export interface OTableSlots<TData = any> {
     nextPage: () => void;
     lastPage: () => void;
   }) => any;
+  /** Bulk-action buttons after the footer's "N of M selected" count while rows are selected; the built-in bar hosts them, so `pagination="none"` or `#pagination-bar` renders none. */
+  "selection-actions"?: () => any;
+  /** Footer start-side line for what the pager cannot say (a cap, partial data), yielding to the selection count; like `#selection-actions`, it needs the built-in bar. */
+  "footer-note"?: () => any;
   /** Shown when loading=true AND data exists (thin banner, not overlay) */
   "loading-banner"?: () => any;
   /** Custom loading indicator (overlay when no data) */
@@ -530,10 +704,20 @@ export interface OTableSlots<TData = any> {
   empty?: () => any;
   /** Custom error state */
   error?: (props: { message: string }) => any;
+  /** One `<tr>` (cells spanning the columns) rendered as the first row of the body, under the column header, before the first data row; not measured by virtual scrolling. */
+  "body-start"?: () => any;
   /** Expanded row content — scoped to the plain row data (`row.original`) */
   expansion?: (props: { row: TData }) => any;
   /** Tree-mode warning row — rendered between an expanded parent and its children when `getRowWarning(row)` is true. */
   "tree-warning"?: (props: { row: TData }) => any;
+  /**
+   * Heading row above each section, spanning every visible column. Scoped to
+   * the section key and the rows of that section ON THIS PAGE — a section total
+   * has to come from the caller's own unpaginated data.
+   *
+   * `sectionKey` rather than `key`, which Vue reserves on a slot outlet.
+   */
+  "group-header"?: (props: { sectionKey: string; rows: Row<TData>[] }) => any;
 }
 
 // ── Exposed (template ref) ────────────────────────────────────────

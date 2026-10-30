@@ -29,18 +29,19 @@ test.describe("ConfigPanel — Table Settings", () => {
 
     await setupTablePanelWithConfig(page, pm, dashboardName);
 
-    const wrapCellsToggle = page.locator('[data-test="dashboard-config-wrap-table-cells"]');
+    const wrapCellsToggle = pm.dashboardPanelConfigs.wrapcell;
     await expect(wrapCellsToggle).toBeVisible();
     await pm.dashboardPanelConfigs.selectWrapCell();
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     testLogger.info("Wrap cells enabled for table chart");
-    await expect(page.locator('[data-test="dashboard-panel-table"]')).toBeVisible();
+    await expect(pm.dashboardPanelActions.dashboardTable).toBeVisible();
 
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying wrap cells toggle persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-wrap-table-cells"]').locator('[data-test$="-btn"]')).toHaveAttribute("aria-checked", "true");
+    await expect(pm.dashboardPanelConfigs.wrapcell.locator('[data-test$="-btn"]')).toHaveAttribute("aria-checked", "true");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -51,18 +52,19 @@ test.describe("ConfigPanel — Table Settings", () => {
 
     await setupTablePanelWithConfig(page, pm, dashboardName);
 
-    const transposeToggle = page.locator('[data-test="dashboard-config-table_transpose"]');
+    const transposeToggle = pm.dashboardPanelConfigs.transpose;
     await expect(transposeToggle).toBeVisible();
     await pm.dashboardPanelConfigs.selectTranspose();
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     testLogger.info("Transpose enabled");
-    await expect(page.locator('[data-test="dashboard-panel-table"]')).toBeVisible();
+    await expect(pm.dashboardPanelActions.dashboardTable).toBeVisible();
 
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying transpose toggle persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-table_transpose"]').locator('[data-test$="-btn"]')).toHaveAttribute("aria-checked", "true");
+    await expect(pm.dashboardPanelConfigs.transpose.locator('[data-test$="-btn"]')).toHaveAttribute("aria-checked", "true");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -73,18 +75,19 @@ test.describe("ConfigPanel — Table Settings", () => {
 
     await setupTablePanelWithConfig(page, pm, dashboardName);
 
-    const dynamicColsToggle = page.locator('[data-test="dashboard-config-table_dynamic_columns"]');
+    const dynamicColsToggle = pm.dashboardPanelConfigs.dynamicColumn;
     await expect(dynamicColsToggle).toBeVisible();
     await pm.dashboardPanelConfigs.selectDynamicColumns();
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     testLogger.info("Dynamic columns enabled");
-    await expect(page.locator('[data-test="dashboard-panel-table"]')).toBeVisible();
+    await expect(pm.dashboardPanelActions.dashboardTable).toBeVisible();
 
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying dynamic columns toggle persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-table_dynamic_columns"]').locator('[data-test$="-btn"]')).toHaveAttribute("aria-checked", "true");
+    await expect(pm.dashboardPanelConfigs.dynamicColumn.locator('[data-test$="-btn"]')).toHaveAttribute("aria-checked", "true");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -95,8 +98,8 @@ test.describe("ConfigPanel — Table Settings", () => {
 
     await setupTablePanelWithConfig(page, pm, dashboardName);
 
-    const paginationToggle = page.locator('[data-test="dashboard-config-show-pagination"]');
-    const rowsPerPageInput = page.locator('[data-test="dashboard-config-rows-per-page"]');
+    const paginationToggle = pm.dashboardPanelConfigs.paginationToggle;
+    const rowsPerPageInput = pm.dashboardPanelConfigs.rowsPerPageWrapper;
 
     await expect(paginationToggle).toBeVisible();
     await expect(rowsPerPageInput).not.toBeVisible();
@@ -108,8 +111,9 @@ test.describe("ConfigPanel — Table Settings", () => {
     // Set rows per page to 25
     await rowsPerPageInput.locator('[data-test$="-field"]').fill("25");
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
     testLogger.info("Pagination enabled, rows per page set to 25");
-    await expect(page.locator('[data-test="dashboard-table-pagination"]')).toBeVisible();
+    await expect(pm.dashboardPanelConfigs.tablePagination).toBeVisible();
 
     // Re-open config and disable pagination → input hidden again
     await paginationToggle.click();
@@ -118,8 +122,8 @@ test.describe("ConfigPanel — Table Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying pagination disabled state persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-show-pagination"]').locator('[data-test$="-btn"]')).toHaveAttribute("aria-checked", "false");
-    await expect(page.locator('[data-test="dashboard-config-rows-per-page"]')).not.toBeVisible();
+    await expect(pm.dashboardPanelConfigs.paginationToggle.locator('[data-test$="-btn"]')).toHaveAttribute("aria-checked", "false");
+    await expect(pm.dashboardPanelConfigs.rowsPerPageWrapper).not.toBeVisible();
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });

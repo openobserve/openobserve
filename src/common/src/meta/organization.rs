@@ -30,6 +30,7 @@ pub enum OrgStatus {
     Active,
     PendingDeletion,
     Deleting,
+    Deleted,
 }
 
 use config::meta::{cluster::Node, self_reporting::usage};
@@ -167,6 +168,19 @@ pub struct OrgDetails {
     pub user_obj: OrgUser,
     #[serde(default)]
     pub plan: i32,
+    /// The org admin/owner's email — used by the frontend to disambiguate
+    /// two orgs that share a display name (e.g. two orgs both named
+    /// "default"). Empty when no admin could be resolved (e.g. root-user
+    /// view of a stale org).
+    #[serde(default)]
+    pub owner_email: String,
+    /// The org admin/owner's first name, when set; the frontend falls back
+    /// to the local part of `owner_email` when this is empty.
+    #[serde(default)]
+    pub owner_first_name: String,
+    /// When the organization was created, as a Unix timestamp in microseconds; 0 when unknown.
+    #[serde(default)]
+    pub created_at: i64,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -184,6 +198,20 @@ pub struct AllOrgListDetails {
     pub credits_used: u64,
     #[cfg(feature = "cloud")]
     pub credits_limit: u64,
+    /// Separate allowances from the AI pool, in a different unit: browser and protocol hold
+    /// independent one-time grants.
+    #[cfg(feature = "cloud")]
+    pub browser_steps_used: u64,
+    #[cfg(feature = "cloud")]
+    pub browser_steps_limit: u64,
+    #[cfg(feature = "cloud")]
+    pub protocol_steps_used: u64,
+    #[cfg(feature = "cloud")]
+    pub status_steps_used: u64,
+    #[cfg(feature = "cloud")]
+    pub protocol_steps_limit: u64,
+    #[cfg(feature = "cloud")]
+    pub status_steps_limit: u64,
     pub trial_expires_at: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub contract_end_date: Option<i64>,
@@ -217,11 +245,12 @@ pub struct ExtendTrialPeriodRequest {
     pub new_end_date: i64,
 }
 
+/// `limit` is the pool's new ceiling, not an increment (spent 40 of 50, +20 => 70).
 #[cfg(feature = "cloud")]
 #[derive(Serialize, Deserialize, ToSchema)]
-pub struct SetAiUsageLimitRequest {
+pub struct SetQuotaUsageLimitRequest {
     pub org_id: String,
-    pub credits_limit: u64,
+    pub limit: u64,
 }
 
 #[cfg(feature = "cloud")]
@@ -260,6 +289,8 @@ pub struct StreamSummary {
     pub total_storage_size: f64,
     pub total_compressed_size: f64,
     pub total_index_size: f64,
+    #[serde(default)]
+    pub total_mindex_size: f64,
 }
 
 #[derive(Clone, Serialize, Deserialize, ToSchema)]
@@ -306,11 +337,15 @@ impl TriggerStatus {
                     // is a healthy trigger; a failed delivery is not.
                     usage::RunOutcome::Firing
                     | usage::RunOutcome::Normal
-                    | usage::RunOutcome::Succeeded => status.healthy += 1,
+                    | usage::RunOutcome::Succeeded
+                    | usage::RunOutcome::Pending
+                    | usage::RunOutcome::Suppressed => status.healthy += 1,
                     usage::RunOutcome::Error | usage::RunOutcome::NotifyFailed => {
                         status.failed += 1
                     }
                     usage::RunOutcome::Skipped => status.warning += 1,
+                    // An ack event is not a run, so it says nothing about the trigger health.
+                    usage::RunOutcome::AckEvent => {}
                 }
             }
         }
@@ -359,6 +394,8 @@ pub struct OrgIngestionToken {
     pub enabled: bool,
     pub created_by: String,
     pub created_at: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub splunk_token: Option<String>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -371,11 +408,26 @@ pub struct CreateOrgIngestionTokenRequest {
     pub name: String,
     #[serde(default)]
     pub description: Option<String>,
+    /// Also mint a Splunk HEC token for this credential.
+    #[serde(default)]
+    pub splunk_token: bool,
 }
 
+/// Requested change to a Splunk HEC token.
+#[derive(Serialize, Deserialize, ToSchema, Clone, Copy, PartialEq, Eq, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum SplunkTokenAction {
+    Generate,
+    Revoke,
+}
+
+/// At least one of the two fields must be present.
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct OrgIngestionTokenEnableRequest {
-    pub enabled: bool,
+    #[serde(default)]
+    pub enabled: Option<bool>,
+    #[serde(default)]
+    pub splunk_token: Option<SplunkTokenAction>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -406,7 +458,7 @@ fn default_toggle_ingestion_logs() -> bool {
 fn default_enable_streaming_aggregation() -> bool {
     #[cfg(feature = "enterprise")]
     {
-        config::get_config().common.feature_query_streaming_aggs
+        config::get_config().search.feature_query_streaming_aggs
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -424,10 +476,6 @@ fn default_enable_streaming_search() -> bool {
 /// absent setting means the per-org `usage` stream is not written and the
 /// Usage tab shows only the billing-API cards plus an "Enable usage reporting"
 /// CTA.
-///
-/// The global `ZO_USAGE_REPORT_TO_OWN_ORG` remains the deploy-wide master
-/// switch for whether per-org self-reporting is available at all; it no longer
-/// flips the per-org default.
 fn default_usage_stream_enabled() -> bool {
     false
 }
@@ -435,6 +483,25 @@ fn default_usage_stream_enabled() -> bool {
 #[cfg(feature = "enterprise")]
 fn default_claim_parser_function() -> String {
     "".to_string()
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, ToSchema)]
+pub struct DomainOrgMapping {
+    pub domain: String,
+    pub org_id: String,
+    pub base_role: String,
+    #[serde(default)]
+    pub role_claim_name: Option<String>,
+    #[serde(default)]
+    pub create_missing_roles: bool,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, ToSchema)]
+pub struct BudgetNotificationConfiguration {
+    pub org_id: String,
+    pub total_budget_amount: f64,
+    pub warn_at_amount: f64,
+    pub paused: bool,
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
@@ -463,11 +530,19 @@ pub struct OrganizationSettingPayload {
     pub max_series_per_query: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub usage_stream_enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub red_insights_enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ai_rca_thread_tool_output: Option<bool>,
     #[cfg(feature = "enterprise")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub claim_parser_function: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cross_links: Option<Vec<config::meta::stream::CrossLink>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub domain_org_mappings: Option<Vec<DomainOrgMapping>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub budget_config: Option<Vec<BudgetNotificationConfiguration>>,
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
@@ -500,6 +575,11 @@ pub struct OrganizationSetting {
     pub max_series_per_query: Option<usize>,
     #[serde(default = "default_usage_stream_enabled")]
     pub usage_stream_enabled: bool,
+    #[serde(default)]
+    pub red_insights_enabled: bool,
+    /// Show raw tool input and output in incident investigation threads.
+    #[serde(default)]
+    pub ai_rca_thread_tool_output: bool,
     #[cfg(feature = "enterprise")]
     #[serde(default = "default_claim_parser_function")]
     pub claim_parser_function: String,
@@ -507,6 +587,12 @@ pub struct OrganizationSetting {
     pub cross_links: Vec<config::meta::stream::CrossLink>,
     #[serde(default)]
     pub org_storage_enabled: bool,
+    #[cfg(feature = "cloud")]
+    #[serde(default)]
+    pub domain_org_mappings: Vec<DomainOrgMapping>,
+    #[cfg(feature = "cloud")]
+    #[serde(default)]
+    pub budget_config: Vec<BudgetNotificationConfiguration>,
 }
 
 impl Default for OrganizationSetting {
@@ -536,10 +622,16 @@ impl Default for OrganizationSetting {
             dark_mode_theme_color,
             max_series_per_query: None,
             usage_stream_enabled: default_usage_stream_enabled(),
+            red_insights_enabled: false,
+            ai_rca_thread_tool_output: false,
             #[cfg(feature = "enterprise")]
             claim_parser_function: default_claim_parser_function(),
             cross_links: Vec::new(),
             org_storage_enabled: false,
+            #[cfg(feature = "cloud")]
+            domain_org_mappings: Vec::new(),
+            #[cfg(feature = "cloud")]
+            budget_config: Vec::new(),
         }
     }
 }
@@ -612,13 +704,6 @@ impl NodeListResponse {
 
         cluster_entry.push(node);
     }
-
-    /// Adds multiple nodes to the response structure
-    pub fn add_nodes(&mut self, nodes: Vec<(Node, String, String)>) {
-        for (node, region, cluster) in nodes {
-            self.add_node(node, region, cluster);
-        }
-    }
 }
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug, ToSchema)]
@@ -689,33 +774,6 @@ mod tests {
             .unwrap();
         assert_eq!(nodes.len(), 1);
         assert_eq!(nodes[0].name, "node-1");
-    }
-
-    #[test]
-    fn test_node_list_response_add_nodes() {
-        let node1 = Node {
-            name: "node-1".into(),
-            ..Default::default()
-        };
-        let node2 = Node {
-            name: "node-2".into(),
-            ..Default::default()
-        };
-
-        let mut response = NodeListResponse::new();
-        response.add_nodes(vec![
-            (node1.clone(), "us-west".into(), "cluster-x".into()),
-            (node2.clone(), "us-west".into(), "cluster-x".into()),
-        ]);
-
-        let nodes = &response
-            .regions
-            .get("us-west")
-            .unwrap()
-            .clusters
-            .get("cluster-x")
-            .unwrap();
-        assert_eq!(nodes.len(), 2);
     }
 
     #[test]
@@ -810,6 +868,18 @@ mod tests {
             credits_used: 125,
             #[cfg(feature = "cloud")]
             credits_limit: 1_000,
+            #[cfg(feature = "cloud")]
+            browser_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            browser_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_limit: 0,
             trial_expires_at: None,
             contract_end_date: None,
             billing_provider: String::new(),
@@ -841,6 +911,9 @@ mod tests {
             org_type: "basic".to_string(),
             user_obj: user,
             plan: 0,
+            owner_email: "admin1@example.com".to_string(),
+            owner_first_name: "Admin".to_string(),
+            created_at: 1_700_000_000_000_000,
         };
 
         let response = OrganizationResponse {
@@ -850,6 +923,8 @@ mod tests {
         assert_eq!(response.data.len(), 1);
         assert_eq!(response.data[0].identifier, "org-1");
         assert_eq!(response.data[0].ingest_threshold, THRESHOLD);
+        let json = serde_json::to_value(&response).unwrap();
+        assert_eq!(json["data"][0]["created_at"], 1_700_000_000_000_000_i64);
     }
 
     #[test]
@@ -866,6 +941,18 @@ mod tests {
             credits_used: 0,
             #[cfg(feature = "cloud")]
             credits_limit: 1_000,
+            #[cfg(feature = "cloud")]
+            browser_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            browser_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_limit: 0,
             trial_expires_at: None,
             contract_end_date: None,
             billing_provider: String::new(),
@@ -887,6 +974,18 @@ mod tests {
             credits_used: 250,
             #[cfg(feature = "cloud")]
             credits_limit: 2_500,
+            #[cfg(feature = "cloud")]
+            browser_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            browser_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_limit: 0,
             trial_expires_at: Some(1641081600),
             contract_end_date: None,
             billing_provider: String::new(),
@@ -915,17 +1014,6 @@ mod tests {
 
         assert_eq!(request.org_id, "org-trial");
         assert_eq!(request.new_end_date, 1641081600);
-    }
-
-    #[cfg(feature = "cloud")]
-    #[test]
-    fn test_set_ai_usage_limit_request_roundtrip() {
-        let json = r#"{"org_id":"org-ai","credits_limit":2500}"#;
-        let request: SetAiUsageLimitRequest = serde_json::from_str(json).unwrap();
-
-        assert_eq!(request.org_id, "org-ai");
-        assert_eq!(request.credits_limit, 2_500);
-        assert_eq!(serde_json::to_string(&request).unwrap(), json);
     }
 
     #[cfg(feature = "cloud")]
@@ -974,6 +1062,18 @@ mod tests {
             credits_used: 400,
             #[cfg(feature = "cloud")]
             credits_limit: 5_000,
+            #[cfg(feature = "cloud")]
+            browser_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            browser_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_limit: 0,
             trial_expires_at: Some(1641081600),
             contract_end_date: Some(1893456000000000),
             billing_provider: "no_op".to_string(),
@@ -1005,6 +1105,18 @@ mod tests {
             credits_used: 0,
             #[cfg(feature = "cloud")]
             credits_limit: 1_000,
+            #[cfg(feature = "cloud")]
+            browser_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            browser_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_limit: 0,
             trial_expires_at: Some(1641081600),
             contract_end_date: None,
             billing_provider: String::new(),
@@ -1357,9 +1469,13 @@ mod tests {
             dark_mode_theme_color: None,
             max_series_per_query: None,
             usage_stream_enabled: None,
+            red_insights_enabled: None,
+            ai_rca_thread_tool_output: None,
             #[cfg(feature = "enterprise")]
             claim_parser_function: None,
             cross_links: None,
+            domain_org_mappings: None,
+            budget_config: None,
         };
         let json = serde_json::to_value(&payload).unwrap();
         let obj = json.as_object().unwrap();
@@ -1374,6 +1490,7 @@ mod tests {
         assert!(!obj.contains_key("dark_mode_theme_color"));
         assert!(!obj.contains_key("max_series_per_query"));
         assert!(!obj.contains_key("usage_stream_enabled"));
+        assert!(!obj.contains_key("red_insights_enabled"));
         assert!(!obj.contains_key("cross_links"));
     }
 
@@ -1432,10 +1549,16 @@ mod tests {
             dark_mode_theme_color: None,
             max_series_per_query: None,
             usage_stream_enabled: false,
+            red_insights_enabled: false,
+            ai_rca_thread_tool_output: false,
             #[cfg(feature = "enterprise")]
             claim_parser_function: String::new(),
             cross_links: vec![],
             org_storage_enabled: false,
+            #[cfg(feature = "cloud")]
+            domain_org_mappings: vec![],
+            #[cfg(feature = "cloud")]
+            budget_config: vec![],
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();
@@ -1460,10 +1583,16 @@ mod tests {
             dark_mode_theme_color: Some("#000".to_string()),
             max_series_per_query: Some(1000),
             usage_stream_enabled: false,
+            red_insights_enabled: false,
+            ai_rca_thread_tool_output: false,
             #[cfg(feature = "enterprise")]
             claim_parser_function: String::new(),
             cross_links: vec![],
             org_storage_enabled: false,
+            #[cfg(feature = "cloud")]
+            domain_org_mappings: vec![],
+            #[cfg(feature = "cloud")]
+            budget_config: vec![],
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();
@@ -1496,9 +1625,7 @@ mod tests {
     #[cfg(feature = "cloud")]
     #[test]
     fn test_usage_stream_enabled_defaults_off_in_cloud() {
-        // Own-org usage reporting is OFF by default on cloud; orgs opt in
-        // explicitly. The global ZO_USAGE_REPORT_TO_OWN_ORG stays the master
-        // switch but no longer flips the per-org default.
+        // Own-org usage reporting is OFF by default on cloud; orgs opt in explicitly.
         assert!(!default_usage_stream_enabled());
         assert!(!OrganizationSetting::default().usage_stream_enabled);
 
@@ -1533,5 +1660,20 @@ mod tests {
         }"#;
         let parsed: OrganizationSetting = serde_json::from_str(json_false).unwrap();
         assert!(!parsed.usage_stream_enabled);
+    }
+
+    #[test]
+    fn test_red_insights_enabled_defaults_off_and_round_trips() {
+        assert!(!OrganizationSetting::default().red_insights_enabled);
+        let legacy: OrganizationSetting =
+            serde_json::from_str(r#"{"scrape_interval": 15}"#).unwrap();
+        assert!(!legacy.red_insights_enabled);
+        let on: OrganizationSetting =
+            serde_json::from_str(r#"{"scrape_interval": 15, "red_insights_enabled": true}"#)
+                .unwrap();
+        assert!(on.red_insights_enabled);
+        let payload: OrganizationSettingPayload =
+            serde_json::from_str(r#"{"red_insights_enabled": true}"#).unwrap();
+        assert_eq!(payload.red_insights_enabled, Some(true));
     }
 }

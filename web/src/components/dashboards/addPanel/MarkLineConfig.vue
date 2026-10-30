@@ -40,7 +40,7 @@
         </div>
 
         <OIcon
-          class="mr-1 cursor-pointer"
+          class="me-1 cursor-pointer"
           size="sm"
           name="close"
           @click="removeMarkLineByIndex(index)"
@@ -59,11 +59,10 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, inject } from "vue";
+import { defineComponent, inject, onBeforeMount } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
-import { onBeforeMount } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -74,7 +73,7 @@ export default defineComponent({
   components: { OButton, OSelect, OInput, OIcon },
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const markLineTypeOptions = [
       { label: t("dashboard.markLineAverage"), value: "average" },
@@ -86,7 +85,7 @@ export default defineComponent({
     ];
 
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     onBeforeMount(() => {
       // Ensure that the mark_line object is initialized in config

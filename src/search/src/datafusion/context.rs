@@ -25,6 +25,7 @@ use super::{
         context::PhysicalOptimizerContext, generate_analyzer_rules, generate_optimizer_rules,
         generate_physical_optimizer_rules,
     },
+    sort_order::FileSortOrder,
     table_provider::{catalog::StreamTypeProvider, empty_table::NewEmptyTable},
 };
 use crate::sql::Sql;
@@ -68,7 +69,7 @@ impl SearchContextBuilder {
             .analyzer_rules(analyzer_rules)
             .optimizer_rules(optimizer_rules)
             .physical_optimizer_rules(physical_optimizer_rules)
-            .sorted_by_time(sql.sorted_by_time)
+            .sort_order(FileSortOrder::from_sorted_by_time(sql.sorted_by_time))
             .build(self.target_partitions)
             .await?;
 
@@ -105,7 +106,7 @@ pub async fn register_table(ctx: &SessionContext, sql: &Sql) -> Result<()> {
         let table = Arc::new(
             NewEmptyTable::new(&stream_name, Arc::new(schema))
                 .with_partitions(ctx.state().config().target_partitions())
-                .with_sorted_by_time(sql.sorted_by_time),
+                .with_sort_order(FileSortOrder::from_sorted_by_time(sql.sorted_by_time)),
         );
         ctx.register_table(&stream_name, table)?;
     }

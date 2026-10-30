@@ -13,11 +13,15 @@ default = []
 enterprise = [
     "db/enterprise",
     "audit/enterprise",
+    "dep:jsonwebtoken",
     "dep:o2_dex",
     "dep:o2_enterprise",
     "dep:o2_openfga",
+    "dep:o2_ratelimit",
+    "dep:version-compare",
     "common/enterprise",
     "config/enterprise",
+    "enrichment-data/enterprise",
     "promql/enterprise",
     "promql-service/enterprise",
     "search/enterprise",
@@ -35,17 +39,27 @@ cloud = [
 ]
 vectorscan = [
     "db/vectorscan",
+    "enrichment-data/vectorscan",
     "o2_enterprise/vectorscan",
     "search/vectorscan",
     "search_service/vectorscan",
     "promql-service/vectorscan",
     "stream/vectorscan",
 ]
+# Lets dependants' tests install a fake stream access checker; never enabled outside dev-dependencies.
+test-utils = []
+cpu-profiling = ["dep:pprof"]
+profiling = [
+    "cpu-profiling",
+    "dep:jemalloc_pprof",
+    "dep:tikv-jemalloc-ctl",
+]
 
 [dependencies]
 db.workspace = true
-audit.workspace = true
+audit = { workspace = true, optional = true }
 common.workspace = true
+enrichment-data.workspace = true
 openobserve-node.workspace = true
 transform.workspace = true
 vector-enrichment.workspace = true
@@ -62,6 +76,7 @@ axum.workspace = true
 http.workspace = true
 http-body-util.workspace = true
 anyhow.workspace = true
+argon2.workspace = true
 async-trait.workspace = true
 aws-sdk-sns.workspace = true
 base64.workspace = true
@@ -71,33 +86,45 @@ cron.workspace = true
 dashmap.workspace = true
 datafusion.workspace = true
 arrow.workspace = true
-arrow-json.workspace = true
 arrow-schema.workspace = true
 flate2.workspace = true
 futures.workspace = true
 hashbrown.workspace = true
+itoa = "1.0"
+hmac.workspace = true
+image.workspace = true
 itertools.workspace = true
-jsonwebtoken.workspace = true
+jsonwebtoken = { workspace = true, optional = true }
 log.workspace = true
+# Direct (non-workspace) dep on purpose: already in Cargo.lock transitively, and
+# keeping it out of the root [workspace.dependencies] avoids the enterprise-CI
+# Cargo.toml.openobserve swap-manifest drift hazard.
+lru = "0.16"
 md5.workspace = true
 o2_dex = { workspace = true, optional = true }
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 o2_openfga = { workspace = true, optional = true }
+o2_ratelimit = { workspace = true, optional = true }
 opentelemetry.workspace = true
 opentelemetry-proto.workspace = true
 parking_lot.workspace = true
+plotters.workspace = true
 prometheus.workspace = true
 promql-parser.workspace = true
 prost.workspace = true
 prost-wkt-types.workspace = true
 proto.workspace = true
+pulldown-cmark.workspace = true
 rand.workspace = true
 regex.workspace = true
 reqwest.workspace = true
 sea-orm.workspace = true
 serde.workspace = true
+sha2.workspace = true
 serde_json.workspace = true
+sqlparser.workspace = true
 snap.workspace = true
+strum.workspace = true
 svix-ksuid.workspace = true
 thiserror.workspace = true
 time.workspace = true
@@ -108,13 +135,27 @@ tracing.workspace = true
 tracing-opentelemetry.workspace = true
 url.workspace = true
 utoipa.workspace = true
-version-compare.workspace = true
+version-compare = { workspace = true, optional = true }
 config.workspace = true
 infra.workspace = true
 ingester.workspace = true
+openobserve-synthetics.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
-futures-util.workspace = true
+jemalloc_pprof = { workspace = true, optional = true }
+pprof = { workspace = true, optional = true }
+tikv-jemalloc-ctl = { workspace = true, optional = true }
+zstd.workspace = true
 
 [dev-dependencies]
+infra = { workspace = true, features = ["test-utils"] }
+criterion = { version = "0.5", default-features = false, features = ["rayon"] }
 multer.workspace = true
+
+[[bench]]
+name = "db_enrich"
+harness = false
+
+[[bench]]
+name = "trace_enrich"
+harness = false

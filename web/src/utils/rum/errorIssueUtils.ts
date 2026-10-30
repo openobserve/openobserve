@@ -220,3 +220,29 @@ export const formatRelativeTime = (timestampMicros: number): string => {
     addSuffix: true,
   });
 };
+
+const AGE_UNITS: Array<{ micros: number; suffix: string }> = [
+  { micros: 86400 * 1_000_000, suffix: "d" },
+  { micros: 3600 * 1_000_000, suffix: "h" },
+  { micros: 60 * 1_000_000, suffix: "m" },
+  { micros: 1_000_000, suffix: "s" },
+];
+
+/**
+ * Age of a microsecond timestamp in one compact token ("2d", "45m", "now").
+ * The long form ("about 2 days ago") does not fit a stat tile's value slot,
+ * where the number has to stay on one line to be readable.
+ */
+export const formatCompactAge = (
+  timestampMicros: number,
+  nowMicros = Date.now() * 1000,
+): string => {
+  if (!timestampMicros) return "—";
+  const delta = Math.max(0, nowMicros - timestampMicros);
+  for (const unit of AGE_UNITS) {
+    if (delta >= unit.micros) return `${Math.floor(delta / unit.micros)}${unit.suffix}`;
+  }
+  // Units only, never a word: this string lands in a stat tile's value slot,
+  // which is not a translated surface.
+  return "0s";
+};

@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="traces-table-container flex h-auto! flex-col"
     >
       <!-- Table scroll area: no overflow here — parent handles unified scroll -->
-      <div data-test="traces-search-result-list" class="relative h-auto! w-full">
+      <div ref="listRef" data-test="traces-search-result-list" class="relative h-auto! w-full">
         <!-- Row/cell actions live in a right-click context menu, same as logs:
              anchored to the pointer, so every cell can offer actions regardless
              of how narrow it is. -->
@@ -45,10 +45,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="contents" @contextmenu.capture="handleTableContextMenu">
               <OTable
                 class="h-auto!"
+                :wrap="wrap"
                 :columns="searchObj.data.resultGrid.columns"
                 :data="hits"
                 :loading="loading"
                 :row-class="traceRowClass"
+                :active-row-index="activeRowIndex"
                 sorting="server"
                 :sort-by="props.sortBy"
                 :sort-order="props.sortOrder"
@@ -103,8 +105,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <template #cell-operation_name="{ row }">
+                  <!-- The cell clips on its own, so the table-level `wrap`
+                       is not enough: without dropping `truncate` here the name
+                       stays cut off no matter what the table does. -->
                   <span
-                    class="text-text-body truncate text-xs"
+                    class="text-text-body text-xs"
+                    :class="wrap ? '' : 'truncate'"
                     data-test="trace-row-operation-name"
                   >
                     {{ row.operation_name }}
@@ -114,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <template #cell-duration="{ row }">
                   <span class="text-text-body font-mono text-xs" data-test="trace-row-duration">
-                    {{ formatTimeWithSuffix(row.duration) || "0us" }}
+                    {{ formatTimeWithSuffix(row.duration) || raw("0us") }}
                   </span>
                 </template>
 
@@ -241,7 +247,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { nextRowTarget } from "@/utils/rowNavigation";
+import { acceptsPageLoad, type PageLoad, type PendingPageSelection } from "@/utils/pageCrossing";
+import { announceTracesRowNav as announce } from "@/plugins/traces/composables/tracesRowNav";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { copyToClipboard as qCopyToClipboard } from "@/utils/clipboard";
 import OTable from "@/lib/core/Table/OTable.vue";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
@@ -255,8 +265,8 @@ import SpanStatusPill from "./SpanStatusPill.vue";
 import SpanStatusCodeBadge from "./SpanStatusCodeBadge.vue";
 import { isLLMTrace, extractLLMData, formatCost, formatTokens } from "../../../utils/llmUtils";
 import { formatTimeWithSuffix } from "../../../utils/zincutils";
+import { escapeSingleQuotes } from "../../../utils/queryUtils";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -294,6 +304,8 @@ interface Props {
   searchMode?: TraceSearchMode;
   /** Whether to show CellActions overlay on table cells. Default: true */
   showCellActions?: boolean;
+  /** Wrap long cell content instead of clipping it. Default: false. */
+  wrap?: boolean;
   /** Whether the AI copilot is enabled — gates the "Ask AI" empty-state button. */
   aiEnabled?: boolean;
   /** Authoritative stream doc time range (µs) for the empty-state jump card. */
@@ -320,6 +332,7 @@ const props = withDefaults(defineProps<Props>(), {
   sortOrder: undefined,
   searchMode: "traces",
   showCellActions: true,
+  wrap: false,
   aiEnabled: false,
   streamDocTimeRange: undefined,
   queryWindowUs: undefined,
@@ -329,6 +342,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   "row-click": [row: any];
   "page-change": [page: number];
+  "cross-page": [page: number];
   "rows-per-page-change": [rowsPerPage: number];
   "sort-change": [sortBy: string, sortOrder: "asc" | "desc"];
   copy: [value: any];
@@ -341,6 +355,7 @@ const emit = defineEmits<{
 const copyToClipboard = (field: string, value: any) =>
   qCopyToClipboard(
     field === "span_kind" ? (SPAN_KIND_MAP[String(value)] ?? String(value)) : String(value),
+    t,
   );
 
 const addSearchTerm = (
@@ -368,7 +383,7 @@ const addSearchTerm = (
         : field === "span_kind"
           ? (SPAN_KIND_MAP[String(fieldValue)] ?? String(fieldValue))
           : String(fieldValue);
-    searchObj.data.stream.addToFilter = `${field} ${operator} '${displayValue.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
+    searchObj.data.stream.addToFilter = `${field} ${operator} '${escapeSingleQuotes(displayValue)}'`;
   }
 };
 
@@ -384,7 +399,7 @@ interface ContextCell {
   row: Record<string, any>;
 }
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const contextCell = ref<ContextCell | null>(null);
 
@@ -533,6 +548,134 @@ const noResults = computed(
 );
 
 const hasResults = computed(() => props.searchPerformed && props.hits.length > 0);
+
+const listRef = ref<HTMLElement | null>(null);
+const navigation = () => searchObj.meta.resultGrid.navigation;
+
+const totalPages = computed(() =>
+  props.total && props.rowsPerPage ? Math.max(1, Math.ceil(props.total / props.rowsPerPage)) : 1,
+);
+const canChangePage = computed(() => props.showPagination);
+const activeRowIndex = computed(() =>
+  navigation().selectionActive ? (navigation().currentRowIndex ?? null) : null,
+);
+
+const rowElement = (index: number): HTMLElement | null =>
+  listRef.value?.querySelector<HTMLElement>(`[data-test="o2-table-row-${index}"]`) ?? null;
+
+const focusedRow = (): number | null => {
+  const row = (document.activeElement as HTMLElement | null)?.closest?.<HTMLElement>(
+    '[data-test^="o2-table-row-"]',
+  );
+  if (!row || !listRef.value?.contains(row)) return null;
+  const match = /^o2-table-row-(\d+)$/.exec(row.dataset.test ?? "");
+  return match ? Number(match[1]) : null;
+};
+
+const isOtherDialogOpen = () => !!document.querySelector('[role="dialog"][data-state="open"]');
+
+const announcePosition = (index: number, count: number, page: number) =>
+  announce(
+    t(props.searchMode === "spans" ? "traces.rowNav.spanPosition" : "traces.rowNav.tracePosition", {
+      row: index + 1,
+      count,
+      page,
+    }),
+  );
+
+const selectRow = (index: number, count = props.hits.length, page = props.currentPage) => {
+  navigation().currentRowIndex = index;
+  navigation().selectionActive = true;
+  nextTick(() => {
+    const row = rowElement(index);
+    row?.scrollIntoView({ block: "nearest" });
+    row?.focus({ preventScroll: true });
+  });
+  announcePosition(index, count, page);
+};
+
+const clearSelection = () => {
+  navigation().selectionActive = false;
+  navigation().currentRowIndex = null;
+  navigation().pendingPageSelection = null;
+};
+
+const edgeMessage = (edge: "first" | "last") => {
+  return edge === "last" ? t("traces.rowNav.lastResult") : t("traces.rowNav.firstResult");
+};
+
+const stepTraceRow = (direction: 1 | -1, isRepeat = false) => {
+  if (props.loading || navigation().pendingPageSelection || isOtherDialogOpen()) return;
+  if (!props.hits.length) return;
+  const focused = focusedRow();
+  const anchor =
+    focused ?? (navigation().selectionActive ? (navigation().currentRowIndex ?? null) : null);
+  const target = nextRowTarget({
+    anchor,
+    count: props.hits.length,
+    direction,
+    page: props.currentPage,
+    pageCount: totalPages.value,
+    canChangePage: canChangePage.value,
+    isRepeat,
+  });
+  if (target.kind === "select") {
+    selectRow(target.index);
+  } else if (target.kind === "page") {
+    navigation().pendingPageSelection = {
+      page: target.page,
+      position: target.position,
+      requestId: null,
+    };
+    announce(t("traces.rowNav.loadingPage", { page: target.page }));
+    emit("cross-page", target.page);
+    if (navigation().pendingPageSelection?.requestId === null) failCrossing(target.page);
+  } else if (target.kind === "edge") {
+    announce(edgeMessage(target.edge));
+  }
+};
+
+const failCrossing = (page: number, cancelled = false) => {
+  clearSelection();
+  if (!cancelled) announce(t("traces.rowNav.pageFailed", { page }));
+};
+
+const resolveCrossing = (pending: PendingPageSelection, load: PageLoad) => {
+  if (!load.ok) {
+    failCrossing(pending.page, load.reason === "cancelled");
+    return;
+  }
+  navigation().pendingPageSelection = null;
+  const count = (searchObj.data.queryResults?.hits ?? []).length;
+  if (!count) {
+    clearSelection();
+    announce(t("traces.rowNav.pageEmpty", { page: pending.page }));
+    return;
+  }
+  selectRow(pending.position === "first" ? 0 : count - 1, count, pending.page);
+};
+
+watch(
+  () => searchObj.data.resultGrid.pageLoad,
+  (load) => {
+    const pending = navigation().pendingPageSelection ?? null;
+    if (pending && acceptsPageLoad(pending, load ?? null)) resolveCrossing(pending, load!);
+  },
+  { flush: "sync" },
+);
+
+onMounted(() => {
+  const id = navigation().lastOpenedId;
+  if (!id) return;
+  const key = props.searchMode === "spans" ? "span_id" : "trace_id";
+  const index = props.hits.findIndex((hit) => hit?.[key] === id);
+  if (index >= 0) {
+    navigation().currentRowIndex = index;
+    navigation().selectionActive = true;
+  }
+});
+
+defineExpose({ stepTraceRow });
 </script>
 
 <style scoped>
@@ -545,6 +688,6 @@ const hasResults = computed(() => props.searchPerformed && props.hits.length > 0
    `oz-table__row--error` on table-rendered <tr>s and the rule reaches their
    <td>, hence :deep. Mirrors PlayerTracesTab's `trace-row--error`. */
 .traces-table-container :deep(.oz-table__row--error td:first-child) {
-  box-shadow: inset 0.125rem 0 0 0 var(--color-status-error-text);
+  box-shadow: var(--shadow-rail-thin-geom) var(--color-status-error-text);
 }
 </style>

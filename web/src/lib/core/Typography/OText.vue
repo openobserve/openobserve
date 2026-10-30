@@ -2,11 +2,13 @@
 import type { TextProps, TextSlots } from "./OText.types";
 import { Primitive } from "reka-ui";
 import { computed } from "vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const props = withDefaults(defineProps<TextProps>(), {
   variant: "body",
   truncate: false,
   nowrap: false,
+  tooltip: undefined,
 });
 
 defineSlots<TextSlots>();
@@ -22,6 +24,8 @@ const variantDefaultAs: Record<NonNullable<TextProps["variant"]>, string> = {
   section: "h2",
   // <h3> for card and panel titles.
   "panel-title": "h3",
+  // <h3> for the heading of a section pane on a detail page.
+  "card-title": "h3",
   // <p> for block-level body paragraphs.
   body: "p",
   // <strong> carries semantic emphasis for screen readers.
@@ -54,6 +58,11 @@ const variantClasses: Record<NonNullable<TextProps["variant"]>, string> = {
   // For collapsible triggers, sidebar group headings, widget card headers.
   "panel-title": ["text-xs font-medium", "text-typography-panel-title", "leading-tight"].join(" "),
 
+  // Section-pane heading on a detail page. One step up from panel-title in both
+  // size and weight: these headings label the panes a reader scans the page by,
+  // so they have to be findable at a glance across a two-column layout.
+  "card-title": ["text-sm font-semibold", "text-typography-panel-title", "leading-tight"].join(" "),
+
   // Default body text. Most table cells, descriptions, and paragraphs.
   body: ["text-sm font-normal", "text-typography-body"].join(" "),
 
@@ -73,7 +82,7 @@ const variantClasses: Record<NonNullable<TextProps["variant"]>, string> = {
   mono: [
     "text-xs font-mono",
     // tabular figures + tight tracking for IDs/counts/timestamps.
-    "[font-feature-settings:'tnum'] tracking-[-0.2px]",
+    "[font-feature-settings:'tnum'] tracking-[-0.0125rem]",
     "text-typography-mono",
     "leading-none",
   ].join(" "),
@@ -87,7 +96,12 @@ const classes = computed(() => [
 </script>
 
 <template>
-  <Primitive :as="resolvedAs" :class="classes">
+  <Primitive
+    :as="resolvedAs"
+    :class="classes"
+    :data-o-tooltip-off="truncate && tooltip === false ? '' : undefined"
+  >
+    <OTooltip v-if="truncate && tooltip !== false" overflow-only :content="tooltip || undefined" />
     <slot />
   </Primitive>
 </template>

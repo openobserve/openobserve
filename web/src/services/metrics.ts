@@ -90,7 +90,42 @@ const metadata = ({
   return http().get(`/api/${org_identifier}/prometheus/api/v1/metadata${qs ? `?${qs}` : ""}`);
 };
 
+/** One object that uses a metric; `match` is "text" when only a name match found it. */
+export interface MetricUsageEntry {
+  id: string;
+  name?: string;
+  title?: string;
+  folder_id?: string;
+  match?: "text";
+}
+
+export interface MetricUsage {
+  dashboards: MetricUsageEntry[];
+  alerts: MetricUsageEntry[];
+  slos: MetricUsageEntry[];
+  pipelines: MetricUsageEntry[];
+  unparsed: number;
+}
+
+/** The dashboards, alerts, SLOs and scheduled pipelines the caller can read that use `metric`. */
+const getMetricUsage = ({
+  org_identifier,
+  metric,
+  signal,
+}: {
+  org_identifier: string;
+  metric: string;
+  signal?: AbortSignal;
+}): Promise<{ data: MetricUsage }> =>
+  http().get(`/api/${org_identifier}/metrics/${encodeURIComponent(metric)}/usage`, { signal });
+
+/** The backend's JSON tree of a PromQL query; a 400 carries the parser's message. */
+const parsePromqlQuery = ({ org_identifier, query }: { org_identifier: string; query: string }) =>
+  http().post(`/api/${org_identifier}/prometheus/api/v1/parse_tree`, { query });
+
 export default {
+  getMetricUsage,
+  parsePromqlQuery,
   formatPromqlQuery,
   get_promql_series,
   labels,

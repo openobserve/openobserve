@@ -1,0 +1,129 @@
+name: Auto Merge Queuer
+
+# When a PR is kicked OUT of the merge queue because its required checks failed
+# (reason CI_FAILURE) or timed out (reason CI_TIMEOUT), add it straight back to
+# the queue — up to twice. Manual removals (reason MANUAL) and every other reason
+# (MERGE_CONFLICT, QUEUE_CLEARED, BRANCH_PROTECTIONS, …) are ignored: the job `if`
+# below never runs for them.
+#
+# Attempt count lives in the labels auto-requeue-1 / auto-requeue-2. A single
+# sticky comment (marked with the hidden MARKER) is EDITED in place on each event:
+#   attempt 1 -> "re-added (1 of 2)"
+#   attempt 2 -> same comment edited to "re-added a second time (2 of 2)"
+#   3rd kick  -> same comment edited to "no-go for auto re-add" (no re-queue)
+#
+# Re-queueing uses the PAT (secrets.ORG_ADMIN_TOKEN) on purpose: an enqueue made
+# with the default GITHUB_TOKEN would not re-trigger the merge_group check
+# workflows. This is the repo's standard human-PAT secret, so the sticky comment,
+# labels and enqueue are all authored as the human (not github-actions[bot]).
+#
+# REQUIRED — secrets.ORG_ADMIN_TOKEN (fine-grained PAT) permissions:
+#   openobserve:  Pull requests: R/W (enqueuePullRequest + sticky comment)
+#                 Issues:        R/W (label create + add)
+#   NOTE: the `permissions:` block below constrains ONLY the run's GITHUB_TOKEN — it
+#   does NOT scope the PAT. Prefer a fine-grained PAT limited to this repo so its
+#   reach matches the two write scopes above rather than full org-admin.
+
+on:
+  pull_request:
+    types: [dequeued]
+
+# Applies to the run's GITHUB_TOKEN only (unused for API calls here — those use the
+# PAT); kept minimal so nothing this job doesn't need is granted to GITHUB_TOKEN.
+permissions:
+  contents: read
+
+concurrency:
+  group: auto-requeue-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  requeue:
+    # Only dequeues caused by failed/timed-out required checks.
+    if: github.event.reason == 'CI_FAILURE' || github.event.reason == 'CI_TIMEOUT'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+      REPO: ${{ github.repository }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      PR_NODE_ID: ${{ github.event.pull_request.node_id }}
+      REASON: ${{ github.event.reason }}
+      MAX_ATTEMPTS: "2"
+      MARKER: "<!-- auto-requeue-bot -->"
+    steps:
+      - name: Re-add to merge queue (up to twice) or mark no-go
+        run: |
+          set -euo pipefail
+
+          echo "PR #${PR_NUMBER} dequeued with reason: ${REASON}"
+
+          # --- current attempt count from labels -----------------------------
+          labels="$(gh pr view "$PR_NUMBER" --repo "$REPO" --json labels --jq '.labels[].name')"
+          n=0
+          for i in $(seq 1 "$MAX_ATTEMPTS"); do
+            if grep -qx "auto-requeue-$i" <<<"$labels"; then n=$i; fi
+          done
+          echo "Prior auto-requeue attempts: $n"
+
+          # --- locate the sticky comment (if any) ----------------------------
+          comment_id="$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
+            --jq "map(select(.body // \"\" | contains(\"$MARKER\"))) | last | .id // empty")"
+
+          upsert_comment() {
+            # $1 = full comment body
+            local body="$1"
+            if [ -n "$comment_id" ]; then
+              gh api -X PATCH "repos/$REPO/issues/comments/$comment_id" -f body="$body" >/dev/null
+              echo "Edited sticky comment $comment_id"
+            else
+              comment_id="$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" -f body="$body" --jq '.id')"
+              echo "Created sticky comment $comment_id"
+            fi
+          }
+
+          # --- already used both retries -> give up --------------------------
+          if [ "$n" -ge "$MAX_ATTEMPTS" ]; then
+            echo "Attempts exhausted ($n/$MAX_ATTEMPTS); not re-queueing."
+            upsert_comment "$MARKER
+          🛑 **Auto-requeue exhausted** — this PR was dequeued again (reason \`${REASON}\`) after **${MAX_ATTEMPTS} automatic re-adds**.
+
+          This is a **no-go for auto re-add**. Please investigate the failing required checks and re-queue manually once they're green."
+            exit 0
+          fi
+
+          # --- attempt n+1: enqueue via PAT ----------------------------------
+          attempt=$((n + 1))
+          echo "Re-adding to merge queue (attempt ${attempt}/${MAX_ATTEMPTS})"
+
+          if ! gh api graphql -f query='
+            mutation($id: ID!) {
+              enqueuePullRequest(input: { pullRequestId: $id }) {
+                mergeQueueEntry { state position }
+              }
+            }' -F id="$PR_NODE_ID" > enqueue.json; then
+            echo "::error::enqueuePullRequest failed"
+            cat enqueue.json || true
+            upsert_comment "$MARKER
+          ⚠️ **Auto-requeue failed** — tried to re-add this PR to the merge queue after a \`${REASON}\` dequeue but the enqueue API call failed. It has **not** been re-queued; please re-queue manually."
+            exit 1
+          fi
+          cat enqueue.json
+
+          # record the attempt so the next dequeue counts correctly
+          gh label create "auto-requeue-${attempt}" --repo "$REPO" \
+            --color BFD4F2 --description "Auto re-added to the merge queue (attempt ${attempt})" \
+            --force >/dev/null 2>&1 || true
+          gh pr edit "$PR_NUMBER" --repo "$REPO" --add-label "auto-requeue-${attempt}"
+
+          # --- sticky comment for this attempt -------------------------------
+          if [ "$attempt" -eq 1 ]; then
+            upsert_comment "$MARKER
+          🔁 **Auto-requeue** — this PR was dequeued from the merge queue (reason \`${REASON}\`) and has been **added back (attempt 1 of ${MAX_ATTEMPTS})**.
+
+          If it gets kicked out again it'll be re-added one more time, then left alone."
+          else
+            upsert_comment "$MARKER
+          🔁 **Auto-requeue** — dequeued again (reason \`${REASON}\`) and **re-added a second time (attempt ${attempt} of ${MAX_ATTEMPTS})**.
+
+          This is the **last** automatic retry. If it's kicked out once more, it won't be re-added automatically."
+          fi

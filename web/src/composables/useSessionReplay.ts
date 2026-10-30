@@ -84,6 +84,8 @@ const defaultObject = {
     selectedSession: {
       start_time: 0,
       end_time: 0,
+      // Start of the first segment with a full snapshot, where playback can begin; null when none has one.
+      replay_start: null as number | null,
       browser: "",
       os: "",
       ip: "",
@@ -95,6 +97,9 @@ const defaultObject = {
       type: "",
       time_spent: 0,
       source: "",
+      // Server receive-time bounds of the replay rows, in µs; later queries search between them.
+      min_ts: 0,
+      max_ts: 0,
     },
   },
 };

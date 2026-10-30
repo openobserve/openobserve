@@ -22,6 +22,7 @@ use config::{
 };
 use datafusion::{
     arrow::datatypes::Schema,
+    common::TableReference,
     datasource::MemTable,
     error::{DataFusionError, Result},
     physical_plan::visit_execution_plan,
@@ -29,7 +30,10 @@ use datafusion::{
 };
 use hashbrown::HashSet;
 use infra::cluster::get_cached_online_ingester_nodes;
-use promql::utils::{apply_label_selector, apply_matchers};
+use promql::{
+    ScanContext,
+    utils::{apply_label_selector, apply_matchers},
+};
 use promql_parser::label::Matchers;
 use proto::cluster_rpc::{self, IndexInfo, QueryIdentifier};
 use search::{
@@ -45,8 +49,6 @@ use search::{
 };
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::search::grpc::Context;
-
 #[tracing::instrument(name = "promql:search:grpc:wal:create_context", skip(trace_id))]
 pub(crate) async fn create_context(
     trace_id: &str,
@@ -55,7 +57,7 @@ pub(crate) async fn create_context(
     time_range: (i64, i64),
     matchers: Matchers,
     label_selector: HashSet<String>,
-) -> Result<Vec<Context>> {
+) -> Result<Vec<ScanContext>> {
     let mut resp = vec![];
     // fetch all schema versions, get latest schema
     let schema = Arc::new(
@@ -72,7 +74,7 @@ pub(crate) async fn create_context(
     }
 
     // get wal record batches
-    let (stats, batches, schema) = get_wal_batches(
+    let (stats, batches, schema, partial_err) = get_wal_batches(
         trace_id,
         org_id,
         stream_name,
@@ -82,14 +84,23 @@ pub(crate) async fn create_context(
         label_selector,
     )
     .await?;
+    let warnings = if partial_err.is_empty() {
+        vec![]
+    } else {
+        log::warn!("[trace_id {trace_id}] promql->wal->search: partial result: {partial_err}");
+        vec![partial_err]
+    };
 
     if batches.is_empty() {
-        return Ok(vec![(
-            SessionContext::new(),
-            Arc::new(Schema::empty()),
-            ScanStats::default(),
-            true,
-        )]);
+        return Ok(vec![
+            ScanContext::table(
+                SessionContext::new(),
+                Arc::new(Schema::empty()),
+                ScanStats::default(),
+                true,
+            )
+            .with_warnings(warnings),
+        ]);
     }
 
     log::info!(
@@ -105,9 +116,29 @@ pub(crate) async fn create_context(
     let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![batches])?);
     log::info!("[trace_id {trace_id}] promql->wal->search: register mem table done");
     ctx.register_table(stream_name, mem_table)?;
-    resp.push((ctx, schema, stats, true));
+    resp.push(ScanContext::table(ctx, schema, stats, true).with_warnings(warnings));
 
     Ok(resp)
+}
+
+/// Register a placeholder metrics table for a distributed WAL search.
+///
+/// The table name embedded in the physical plan must be a quoted SQL reference;
+/// otherwise DataFusion lowercases mixed-case metric names when the receiving
+/// search node parses the plan.
+fn register_remote_metric_table(
+    ctx: &SessionContext,
+    stream_name: &str,
+    schema: Arc<Schema>,
+) -> Result<TableReference> {
+    let table_ref = TableReference::bare(stream_name);
+    let plan_table_name = table_ref.to_quoted_string();
+    let table = Arc::new(
+        NewEmptyTable::new(&plan_table_name, schema)
+            .with_partitions(ctx.state().config().target_partitions()),
+    );
+    ctx.register_table(table_ref.clone(), table)?;
+    Ok(table_ref)
 }
 
 /// get file list from local cache, no need match_source, each file will be
@@ -122,42 +153,56 @@ async fn get_wal_batches(
     time_range: (i64, i64),
     matchers: Matchers,
     label_selector: HashSet<String>,
-) -> Result<(ScanStats, Vec<RecordBatch>, Arc<Schema>)> {
+) -> Result<(ScanStats, Vec<RecordBatch>, Arc<Schema>, String)> {
     let cfg = get_config();
-    let nodes = get_cached_online_ingester_nodes().await;
-    if nodes.is_none() && nodes.as_deref().unwrap().is_empty() {
-        return Ok((ScanStats::new(), vec![], Arc::new(Schema::empty())));
-    }
-    let nodes = nodes.unwrap();
+    let Some(nodes) = get_cached_online_ingester_nodes()
+        .await
+        .filter(|nodes| !nodes.is_empty())
+    else {
+        return Ok((
+            ScanStats::new(),
+            vec![],
+            Arc::new(Schema::empty()),
+            String::new(),
+        ));
+    };
 
     let ctx = DataFusionContextBuilder::new()
         .trace_id(trace_id)
         .build(cfg.limit.cpu_num)
         .await?;
-    let table = Arc::new(
-        NewEmptyTable::new(stream_name, Arc::clone(&schema))
-            .with_partitions(ctx.state().config().target_partitions()),
-    );
-    ctx.register_table(stream_name, table)?;
+    let table_ref = register_remote_metric_table(&ctx, stream_name, Arc::clone(&schema))?;
 
     // create physical plan
     let (start, end) = time_range;
-    let mut df = match ctx.table(stream_name).await {
+    let mut df = match ctx.table(table_ref).await {
         Ok(df) => df.filter(
             col(TIMESTAMP_COL_NAME)
                 .gt_eq(lit(start))
                 .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(end))),
         )?,
         Err(_) => {
-            return Ok((ScanStats::new(), vec![], Arc::new(Schema::empty())));
+            return Ok((
+                ScanStats::new(),
+                vec![],
+                Arc::new(Schema::empty()),
+                String::new(),
+            ));
         }
     };
 
-    df = apply_matchers(df, &schema, &matchers)?;
+    df = apply_matchers(df, &matchers)?;
 
     match apply_label_selector(df, &schema, &label_selector) {
         Some(dataframe) => df = dataframe,
-        None => return Ok((ScanStats::new(), vec![], Arc::new(Schema::empty()))),
+        None => {
+            return Ok((
+                ScanStats::new(),
+                vec![],
+                Arc::new(Schema::empty()),
+                String::new(),
+            ));
+        }
     }
 
     let plan = df.logical_plan();
@@ -196,7 +241,7 @@ async fn get_wal_batches(
     let ret = datafusion::physical_plan::collect(physical_plan.clone(), ctx.task_ctx()).await;
     let mut visit = ScanStatsVisitor::new();
     let _ = visit_execution_plan(physical_plan.as_ref(), &mut visit);
-    let (batches, stats, ..) = if let Err(e) = ret {
+    let (batches, stats, partial_err) = if let Err(e) = ret {
         log::error!("[trace_id {trace_id}] promql->wal->search: datafusion collect error: {e}");
         Err(e)
     } else {
@@ -205,7 +250,12 @@ async fn get_wal_batches(
     }?;
 
     if batches.is_empty() {
-        return Ok((ScanStats::new(), vec![], Arc::new(Schema::empty())));
+        return Ok((
+            ScanStats::new(),
+            vec![],
+            Arc::new(Schema::empty()),
+            partial_err,
+        ));
     }
 
     // remove the metadata
@@ -223,5 +273,44 @@ async fn get_wal_batches(
             batch.columns().to_vec(),
         )?);
     }
-    Ok((stats, new_batches, schema))
+    Ok((stats, new_batches, schema, partial_err))
+}
+
+#[cfg(test)]
+mod tests {
+    use datafusion::{
+        arrow::datatypes::{DataType, Field},
+        common::tree_node::TreeNode,
+    };
+    use search::datafusion::distributed_plan::NewEmptyExecVisitor;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_remote_metric_table_preserves_stream_name_in_physical_plan() -> Result<()> {
+        for stream_name in [
+            "node_cpu_seconds_total",
+            "node_memory_MemTotal_bytes",
+            "namespace:MixedMetric",
+        ] {
+            let ctx = SessionContext::new();
+            let schema = Arc::new(Schema::new(vec![Field::new(
+                "value",
+                DataType::Float64,
+                false,
+            )]));
+            let table_ref = register_remote_metric_table(&ctx, stream_name, schema)?;
+            let df = ctx.table(table_ref).await?;
+            let physical_plan = ctx.state().create_physical_plan(df.logical_plan()).await?;
+
+            let mut visitor = NewEmptyExecVisitor::default();
+            physical_plan.visit(&mut visitor)?;
+            assert!(visitor.has_empty_exec());
+
+            let plan_table_name = visitor.plan().name();
+            let decoded_table_ref = TableReference::from(plan_table_name);
+            assert_eq!(decoded_table_ref, TableReference::bare(stream_name));
+        }
+        Ok(())
+    }
 }

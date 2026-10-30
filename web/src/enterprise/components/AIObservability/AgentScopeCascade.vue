@@ -37,8 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   data-test on each: `${prefix}-cascade-{env|agent|version}`.
 -->
 <template>
-  <div class="flex items-center gap-2">
-    <div class="w-44 flex-shrink-0">
+  <div class="flex flex-wrap items-center gap-2 max-md:basis-full max-md:flex-nowrap">
+    <div class="w-44 flex-shrink-0 max-md:w-auto max-md:min-w-0 max-md:flex-1 max-md:shrink">
       <OSelect
         :model-value="selectedEnv"
         :label="t('aiObservability.scope.env')"
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onEnvChange"
       />
     </div>
-    <div class="w-48 flex-shrink-0">
+    <div class="w-48 flex-shrink-0 max-md:w-auto max-md:min-w-0 max-md:flex-1 max-md:shrink">
       <OSelect
         :model-value="selectedAgentName"
         :label="t('aiObservability.scope.agent')"
@@ -64,7 +64,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onAgentNameChange"
       />
     </div>
-    <div v-if="showVersion" class="w-44 flex-shrink-0">
+    <div
+      v-if="showVersion"
+      class="w-44 flex-shrink-0 max-md:w-auto max-md:min-w-0 max-md:flex-1 max-md:shrink"
+    >
       <OSelect
         :model-value="selectedVersion"
         :label="t('aiObservability.scope.version')"
@@ -81,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 
@@ -120,7 +123,7 @@ const emit = defineEmits<{
   (e: "update:selectedVersion", value: string): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const onEnvChange = (value: unknown) => {
   emit("update:selectedEnv", value as string);

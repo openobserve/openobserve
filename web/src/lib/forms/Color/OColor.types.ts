@@ -1,18 +1,20 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nText } from "@/types/i18n";
+
 export type ColorSize = "sm" | "md";
 
 export interface ColorProps {
   /** Color value in `#RRGGBB` format */
   modelValue?: string;
   /** Label rendered above the field */
-  label?: string;
+  label?: I18nText;
   /** Placeholder shown when value is empty */
-  placeholder?: string;
+  placeholder?: I18nText;
   /** Helper text below the field */
-  helpText?: string;
+  helpText?: I18nText;
   /** Error message — when provided the field shows error styling */
-  errorMessage?: string;
+  errorMessage?: I18nText;
   /** Marks the field as being in error state without a message */
   error?: boolean;
   /**

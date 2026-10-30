@@ -15,6 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <OPageLayout
+    :title="detail?.label || t('synthetics.privateLocations.detail.title')"
     icon="location-on"
     :back="{
       label: t('synthetics.privateLocations.detail.back'),
@@ -22,16 +23,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     bleed
   >
-    <template #title>
-      <span class="inline-flex min-w-0 items-center gap-2">
-        <span class="truncate">{{
-          detail?.label || t("synthetics.privateLocations.detail.title")
-        }}</span>
-        <BetaBadge />
-      </span>
-    </template>
     <template #title-trail>
-      <OBadge v-if="detail" :variant="statusVariant(detail.status)" :dot="true" size="sm">
+      <!-- "unknown" is the limit of what this region can see, not a state of
+           the location, so it carries the explanation with it. -->
+      <OTooltip
+        v-if="detail && liveStatus(detail) === 'unknown'"
+        :content="t('synthetics.privateLocations.status.unknownHint')"
+      >
+        <OBadge variant="default-outline" :dot="true" size="sm">
+          {{ t("synthetics.privateLocations.status.unknown") }}
+        </OBadge>
+      </OTooltip>
+      <OBadge v-else-if="detail" :variant="statusVariant(detail.status)" :dot="true" size="sm">
         {{ t(`synthetics.privateLocations.status.${detail.status}`) }}
       </OBadge>
     </template>
@@ -67,7 +70,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-muted text-xs">{{
               t("synthetics.privateLocations.table.agents")
             }}</span>
-            <span class="font-medium">{{ detail.live_agents }}/{{ detail.agents_total }}</span>
+            <!-- 0/0 would read as "no agents installed"; this region simply has
+                 no count to give. -->
+            <span v-if="liveStatus(detail) === 'unknown'" class="text-text-muted">—</span>
+            <span v-else class="font-medium"
+              >{{ detail.live_agents }}/{{ detail.agents_total }}</span
+            >
           </div>
           <div class="flex flex-col">
             <span class="text-text-muted text-xs">{{
@@ -79,13 +87,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-muted text-xs">{{
               t("synthetics.privateLocations.table.checksPerMin")
             }}</span>
-            <span class="font-medium">~{{ detail.checks_per_min }}</span>
+            <span class="font-medium">{{ "~" + detail.checks_per_min }}</span>
           </div>
           <div v-if="detail.version" class="flex flex-col">
             <span class="text-text-muted text-xs">{{
               t("synthetics.privateLocations.detail.version")
             }}</span>
-            <span class="font-medium">v{{ detail.version }}</span>
+            <span class="font-medium">{{ t("synthetics.versionPrefix") + detail.version }}</span>
           </div>
           <div class="flex flex-col">
             <span class="text-text-muted text-xs">{{
@@ -116,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             pagination="client"
             :page-size="10"
             :show-global-filter="false"
-            :empty-message="t('synthetics.privateLocations.detail.noAgents')"
+            :empty-message="agentsEmptyMessage"
             data-test="synthetics-private-location-agents-table"
           >
             <template #cell-live="{ row }">
@@ -189,11 +197,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :dot="true"
                 size="sm"
               >
-                {{ resolveBadge("serviceStatus", (row as any).last_check_status).label }}
+                {{ resolveBadgeLabel("serviceStatus", (row as any).last_check_status) }}
               </OBadge>
             </template>
           </OTable>
         </div>
+      </div>
+
+      <div
+        v-else-if="!loading && loadError"
+        class="flex flex-col items-center gap-3 p-6"
+        data-test="synthetics-private-location-detail-error"
+      >
+        <p class="text-status-error-text text-sm">
+          {{ t("synthetics.privateLocations.detail.loadFailed") }}
+        </p>
+        <OButton
+          variant="outline"
+          size="sm"
+          icon-left="refresh"
+          data-test="synthetics-private-location-detail-retry-btn"
+          @click="load"
+        >
+          {{ t("synthetics.privateLocations.detail.retry") }}
+        </OButton>
       </div>
 
       <div v-else-if="!loading" class="p-6">
@@ -222,7 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -230,16 +257,17 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { resolveBadge } from "@/lib/core/Badge/badgeGroups";
-import BetaBadge from "@/components/common/BetaBadge.vue";
+import { resolveBadge, resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
 import syntheticsService from "@/services/synthetics";
 import type { AgentSetup, SyntheticLocationDetail } from "@/types/synthetics";
 import { formatTimeAgoUs, formatIntervalSecs } from "@/utils/synthetics/format";
+import { locationLiveStatus as liveStatus } from "@/utils/synthetics/locationLiveStatus";
 import { syntheticsListRoute, syntheticsResultsRoute } from "@/utils/synthetics/routes";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const route = useRoute();
 const router = useRouter();
 const store = useStore();
@@ -260,6 +288,9 @@ const backTo = computed(() => syntheticsListRoute(navContext.value, { section: "
 
 const detail = ref<SyntheticLocationDetail | null>(null);
 const loading = ref(false);
+/** True after a retryable failure (network error, timeout, 5xx). 403/404 keep
+ *  the not-found/forbidden handling instead. */
+const loadError = ref(false);
 const showSetup = ref(false);
 const agentSetup = ref<AgentSetup | null>(null);
 const setupAgentName = ref<string | null>(null);
@@ -289,13 +320,25 @@ const orgIdentifier = computed(() => store.state.selectedOrganization.identifier
 const statusVariant = (status: string) =>
   status === "online" ? "success" : status === "offline" ? "error" : "default";
 
+/** "No agents registered" is only true where agents would have registered —
+ *  elsewhere the table is empty because the rows live in another region. */
+const agentsEmptyMessage = computed(() =>
+  detail.value && liveStatus(detail.value) === "unknown"
+    ? t("synthetics.privateLocations.detail.agentsUnavailable")
+    : t("synthetics.privateLocations.detail.noAgents"),
+);
+
 async function load() {
   loading.value = true;
+  loadError.value = false;
   try {
     const res = await syntheticsService.getLocation(orgIdentifier.value, String(route.params.id));
     detail.value = res.data as SyntheticLocationDetail;
   } catch (err) {
     detail.value = null;
+    const status = (err as { response?: { status?: number } })?.response?.status;
+    // No response (network/timeout) or 5xx is retryable; 403/404/other 4xx are not.
+    loadError.value = status === undefined || status >= 500;
     console.error("[synthetics] failed to load location detail", err);
   } finally {
     loading.value = false;
@@ -354,7 +397,7 @@ const agentColumns = computed<OTableColumnDef[]>(() => [
   },
   {
     id: "actions",
-    header: "",
+    header: raw(""),
     accessorKey: "id",
     size: 60,
     minSize: 60,

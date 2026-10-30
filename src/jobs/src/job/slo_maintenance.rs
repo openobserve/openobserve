@@ -33,33 +33,25 @@
 //! each other.
 
 use config::{cluster::LOCAL_NODE, get_config, spawn_pausable_job, utils::time::now_micros};
+use infra::db::get_orm_client_rw;
 
 pub fn run() {
-    if !LOCAL_NODE.is_alert_manager() {
-        log::debug!("[SLO_MAINTENANCE] not an alert_manager node, skipping");
+    if !LOCAL_NODE.is_scheduler() {
+        log::debug!("[SLO_MAINTENANCE] not a scheduler node, skipping");
         return;
     }
     let cfg = get_config();
-    if !cfg.slo.enabled {
-        log::debug!("[SLO_MAINTENANCE] SLOs are disabled, skipping");
-        return;
-    }
 
     let interval = cfg.slo.reconcile_interval_secs.max(60) as u64;
     log::info!("[SLO_MAINTENANCE] initialized with interval: {interval}s");
 
     spawn_pausable_job!("slo_maintenance", interval, {
-        let is_leader = match infra::cluster::get_cached_online_query_nodes(None).await {
-            Some(mut nodes) if !nodes.is_empty() => {
-                nodes.sort_by(|a, b| a.uuid.cmp(&b.uuid));
-                nodes[0].uuid == LOCAL_NODE.uuid
-            }
-            // Same deliberate fallback as the other sweeps: with no cluster
-            // view, assume single node and do the work rather than letting the
-            // aggregate drift indefinitely.
-            _ => true,
-        };
-        if !is_leader {
+        // Elected from the alert-manager set, which is the set the gate above
+        // admitted this node on. It used to be elected from the query nodes,
+        // where a dedicated alert manager does not appear at all — so on any
+        // role-separated deployment this was permanently false and the
+        // aggregate drifted forever. See `leader`.
+        if !crate::job::leader::is_alert_manager_leader().await {
             log::debug!("[SLO_MAINTENANCE] not leader, skipping this pass");
             continue;
         }
@@ -71,9 +63,7 @@ pub fn run() {
 }
 
 async fn sweep() -> Result<(), anyhow::Error> {
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("database not initialized"))?;
+    let db = get_orm_client_rw().await;
 
     let slos = infra::table::slos::list_enabled(db)
         .await

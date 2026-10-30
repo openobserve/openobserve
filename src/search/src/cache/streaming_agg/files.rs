@@ -208,14 +208,10 @@ pub fn get_record_batches(
         log::error!("Error getting file contents: {e}, file_path: {file_path}");
         e
     })?;
-    let reader = unsafe {
-        ArrowFileReader::try_new(Cursor::new(data), None)
-            .map_err(|e| {
-                log::error!("Error creating arrow reader: {e}, file_path: {file_path}");
-                std::io::Error::other(format!("Arrow error: {e}"))
-            })?
-            .with_skip_validation(true)
-    };
+    let reader = ArrowFileReader::try_new(Cursor::new(data), None).map_err(|e| {
+        log::error!("Error creating arrow reader: {e}, file_path: {file_path}");
+        std::io::Error::other(format!("Arrow error: {e}"))
+    })?;
     let schema_field_map = schema
         .fields()
         .iter()
@@ -451,6 +447,36 @@ mod tests {
     use arrow::array::StringArray;
 
     use super::*;
+
+    #[test]
+    fn test_get_record_batches_rejects_invalid_ipc() {
+        use arrow::{
+            array::{Array, BinaryArray},
+            datatypes::Schema,
+        };
+
+        let schema = Arc::new(Schema::new(vec![Field::new("s", DataType::Utf8, true)]));
+        let binary = BinaryArray::from_iter_values([b"ok".as_slice(), &[0xff, 0xfe, 0xfd]]);
+        // SAFETY: deliberately invalid UTF-8 to exercise the reader's validation
+        let strings = unsafe {
+            StringArray::new_unchecked(
+                binary.offsets().clone(),
+                binary.values().clone(),
+                binary.nulls().cloned(),
+            )
+        };
+        let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(strings)]).unwrap();
+        let data = serialize_record_batches(schema.clone(), vec![Arc::new(batch)]).unwrap();
+        let key = "aggregations/org_a/logs/invalid_ipc/0_1.arrow";
+        let path = disk::get_file_path(key).unwrap();
+        std::fs::create_dir_all(Path::new(&path).parent().unwrap()).unwrap();
+        std::fs::write(&path, data).unwrap();
+
+        let ret = get_record_batches("invalid_ipc", key, schema);
+
+        let _ = std::fs::remove_file(&path);
+        assert!(ret.is_err(), "invalid IPC file was accepted");
+    }
 
     #[test]
     fn test_cast_array_recursive_string_types() {

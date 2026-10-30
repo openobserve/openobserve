@@ -16,6 +16,9 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import billings from "@/services/billings";
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/services/http");
 
@@ -329,79 +332,14 @@ describe("Billings Service", () => {
   });
 
   describe("get_data_usage", () => {
-    it("should fetch data usage for specific date and type", async () => {
-      const usageDate = "2024-01-01";
-      const dataType = "logs";
-      const mockUsage = {
-        data: {
-          date: usageDate,
-          data_type: dataType,
-          usage_bytes: 1024000000,
-          usage_readable: "1.02 GB",
-          cost: 0.15,
-        },
-      };
+    it("fetches the org's metering without the query params the server ignores", async () => {
+      const mockUsage = { data: { price_details: null } };
+      mockHttp.mockReturnValue({ get: vi.fn().mockResolvedValue(mockUsage) } as any);
 
-      mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockUsage),
-      } as any);
+      const result = await billings.get_data_usage(mockOrgId, "30days");
 
-      const result = await billings.get_data_usage(mockOrgId, usageDate, dataType);
-
-      expect(mockHttp().get).toHaveBeenCalledWith(
-        `/api/${mockOrgId}/billings/data_usage/${usageDate}?data_type=${dataType}`,
-      );
+      expect(mockHttp().get).toHaveBeenCalledWith(`/api/${mockOrgId}/billings/data_usage/30days`);
       expect(result).toEqual(mockUsage);
-    });
-
-    it("should handle different data types", async () => {
-      const usageDate = "2024-01-01";
-      const dataTypes = ["logs", "metrics", "traces"];
-
-      mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue({ data: {} }),
-      } as any);
-
-      for (const dataType of dataTypes) {
-        await billings.get_data_usage(mockOrgId, usageDate, dataType);
-
-        expect(mockHttp().get).toHaveBeenCalledWith(
-          `/api/${mockOrgId}/billings/data_usage/${usageDate}?data_type=${dataType}`,
-        );
-      }
-
-      expect(mockHttp().get).toHaveBeenCalledTimes(3);
-    });
-
-    it("should append member query param when a member org is provided", async () => {
-      const usageDate = "2024-01-01";
-      const dataType = "gb";
-      const member = "child-org";
-
-      mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue({ data: {} }),
-      } as any);
-
-      await billings.get_data_usage(mockOrgId, usageDate, dataType, member);
-
-      expect(mockHttp().get).toHaveBeenCalledWith(
-        `/api/${mockOrgId}/billings/data_usage/${usageDate}?data_type=${dataType}&member=${member}`,
-      );
-    });
-
-    it("should not append member query param for empty member values", async () => {
-      const usageDate = "2024-01-01";
-      const dataType = "gb";
-
-      mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue({ data: {} }),
-      } as any);
-
-      await billings.get_data_usage(mockOrgId, usageDate, dataType, "");
-
-      expect(mockHttp().get).toHaveBeenCalledWith(
-        `/api/${mockOrgId}/billings/data_usage/${usageDate}?data_type=${dataType}`,
-      );
     });
   });
 
@@ -479,6 +417,28 @@ describe("Billings Service", () => {
       expect(mockHttp().delete).toHaveBeenCalledWith(
         `/api/${mockOrgId}/billing_group/invites/${token}/reject`,
       );
+    });
+
+    it("remove_billing_group_member should DELETE the member endpoint", async () => {
+      mockHttp.mockReturnValue({
+        delete: vi.fn().mockResolvedValue({ data: "removed" }),
+      } as any);
+
+      await billings.remove_billing_group_member(mockOrgId, "child-org");
+
+      expect(mockHttp().delete).toHaveBeenCalledWith(
+        `/api/${mockOrgId}/billing_group/members/child-org`,
+      );
+    });
+
+    it("leave_billing_group should DELETE the membership endpoint", async () => {
+      mockHttp.mockReturnValue({
+        delete: vi.fn().mockResolvedValue({ data: "left" }),
+      } as any);
+
+      await billings.leave_billing_group(mockOrgId);
+
+      expect(mockHttp().delete).toHaveBeenCalledWith(`/api/${mockOrgId}/billing_group/membership`);
     });
   });
 
@@ -647,5 +607,23 @@ describe("Billings Service", () => {
       const attributionResult = await billings.submit_new_user_info(mockOrgId, userInfo);
       expect(attributionResult.data.message).toBe("Attribution saved");
     });
+  });
+});
+
+describe("billings product analytics", () => {
+  beforeEach(() => {
+    vi.mocked(analytics.track).mockClear();
+  });
+
+  it("tracks after resume_subscription succeeds", async () => {
+    (http as any).mockImplementation(() => ({ get: vi.fn().mockResolvedValue({ data: {} }) }));
+    await billings.resume_subscription("org1");
+    expect(analytics.track).toHaveBeenCalledWith("billing_plan_subscribed");
+  });
+
+  it("does not track when resume_subscription fails and keeps the rejection", async () => {
+    (http as any).mockImplementation(() => ({ get: vi.fn().mockRejectedValue(new Error("boom")) }));
+    await expect(billings.resume_subscription("org1")).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });

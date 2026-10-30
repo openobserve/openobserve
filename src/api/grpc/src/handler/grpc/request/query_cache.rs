@@ -13,8 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use openobserve_core::public_dashboards::status;
 use proto::cluster_rpc::{
-    DeleteResultCacheRequest, DeleteResultCacheResponse, query_cache_server::QueryCache,
+    DeleteResultCacheRequest, DeleteResultCacheResponse, PublicDashboardStatusRequest,
+    PublicDashboardStatusResponse, query_cache_server::QueryCache,
 };
 use search_service::cache::cacher;
 use tonic::{Request, Response, Status};
@@ -29,12 +31,41 @@ impl QueryCache for QueryCacheServerImpl {
         request: Request<DeleteResultCacheRequest>,
     ) -> Result<Response<DeleteResultCacheResponse>, Status> {
         let req: DeleteResultCacheRequest = request.into_inner();
+        if !is_org_scoped(&req.path) {
+            return Err(Status::invalid_argument(
+                "cache path must start with an org id and must not contain '.' or '..' segments",
+            ));
+        }
         let deleted = cacher::delete_cache(&req.path, req.ts, None, None)
             .await
             .is_ok();
 
         Ok(Response::new(DeleteResultCacheResponse { deleted }))
     }
+
+    async fn public_dashboard_status(
+        &self,
+        request: Request<PublicDashboardStatusRequest>,
+    ) -> Result<Response<PublicDashboardStatusResponse>, Status> {
+        let req = request.into_inner();
+        if req.link_ids.len() > status::MAX_BATCH {
+            return Err(Status::invalid_argument("too many public links"));
+        }
+        let reports = status::local_reports(&req.org_id, &req.link_ids, req.with_sources)
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?;
+        let reports = config::utils::json::to_string(&reports)
+            .map_err(|e| Status::internal(e.to_string()))?;
+        Ok(Response::new(PublicDashboardStatusResponse { reports }))
+    }
+}
+
+// the path is a prefix under the shared cache dir, so it must name one org and never climb out
+fn is_org_scoped(path: &str) -> bool {
+    !path.split('/').next().unwrap_or_default().is_empty()
+        && !path
+            .split('/')
+            .any(|segment| segment == "." || segment == "..")
 }
 
 #[cfg(test)]
@@ -44,5 +75,44 @@ mod tests {
     #[test]
     fn test_query_cache_server_impl_default() {
         let _server = QueryCacheServerImpl;
+    }
+
+    #[tokio::test]
+    async fn test_delete_rejects_paths_outside_an_org() {
+        for path in [
+            "",
+            "/",
+            "/default",
+            "..",
+            "../default",
+            "default/../other",
+            "default/..",
+        ] {
+            let request = Request::new(DeleteResultCacheRequest {
+                path: path.to_string(),
+                ts: 0,
+            });
+            let status = QueryCacheServerImpl
+                .delete_result_cache(request)
+                .await
+                .unwrap_err();
+            assert_eq!(status.code(), tonic::Code::InvalidArgument, "{path:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_delete_accepts_org_scoped_paths() {
+        for path in ["qc-scope-test", "qc-scope-test/logs/app"] {
+            let request = Request::new(DeleteResultCacheRequest {
+                path: path.to_string(),
+                ts: 0,
+            });
+            assert!(
+                QueryCacheServerImpl
+                    .delete_result_cache(request)
+                    .await
+                    .is_ok()
+            );
+        }
     }
 }

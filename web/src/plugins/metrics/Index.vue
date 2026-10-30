@@ -34,6 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="selectedDate"
         ref="dateTimePickerRef"
         :disable="disable"
+        :hide-range-shift="isMobile"
+        calendar-presets
         class="h-8"
         data-test="metrics-date-picker"
       />
@@ -42,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="refreshInterval"
         trigger
         :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
+        :is-compact="isMobile"
         @trigger="runQuery"
         class="h-8"
         data-test="metrics-auto-refresh"
@@ -55,10 +58,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         shortcut-id="metricsCopyUrl"
         class="h-8"
       />
+      <QueryHistoryDrawer ref="historyDrawerRef" @load="onHistoryLoad" />
+      <RecentSearchesFocusDropdown
+        ref="recentDropdownRef"
+        v-model:open="recentEditor.open.value"
+        source="metrics"
+        :anchor="recentEditor.anchor.value"
+        @run="(entry, when) => historyDrawerRef?.restore(entry, when, true)"
+        @load="(entry, when) => historyDrawerRef?.restore(entry, when, false)"
+        @view-all="(status) => historyDrawerRef?.show(status)"
+      />
       <template v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)">
+        <RecentSearchesButton
+          source="metrics"
+          data-test="metrics-history-btn"
+          @run="(entry, when) => historyDrawerRef?.restore(entry, when, true)"
+          @load="(entry, when) => historyDrawerRef?.restore(entry, when, false)"
+          @view-all="(status) => historyDrawerRef?.show(status)"
+        />
         <OButton
           v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
-          variant="outline-destructive"
+          variant="cancel-query"
           size="sm-toolbar"
           data-test="metrics-cancel"
           @click="cancelAddPanelQuery"
@@ -70,15 +90,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-else
-          variant="primary"
+          :variant="isRunQueryPending ? 'pending' : 'primary'"
           size="sm-toolbar"
           data-test="metrics-apply"
+          :data-run-pending="isRunQueryPending ? 'true' : undefined"
+          :aria-label="isRunQueryPending ? t('search.runQueryPendingLabel') : undefined"
           :loading="disable"
           :disabled="disable"
-          @click="runQuery"
+          @click="onUserRun"
         >
           {{ t("metrics.runQuery") }}
-          <OTooltip :content="t('metrics.runQuery')" shortcut-id="metricsRunQuery" />
+          <OTooltip
+            :content="isRunQueryPending ? t('search.autoRunPendingDot') : t('metrics.runQuery')"
+            shortcut-id="metricsRunQuery"
+          />
         </OButton>
       </template>
     </template>
@@ -92,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :selectedDateTime="dashboardPanelData.meta.dateTime"
       @addToDashboard="addToDashboard"
       @chartApiError="handleChartApiError"
+      @renderer-error="historyRecorder.onPanelError"
       @dataZoom="onDataZoom"
     />
 
@@ -114,9 +140,11 @@ import {
   reactive,
   onMounted,
   onBeforeMount,
+  onBeforeUnmount,
   defineAsyncComponent,
+  provide,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useDashboardPanelData from "../../composables/dashboard/useDashboardPanel";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
@@ -124,28 +152,40 @@ import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
 import MetricLegends from "./MetricLegends.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { isEqual, debounce } from "lodash-es";
-import { provide } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
+import { panelPayloadSignature } from "@/composables/dashboard/usePanelLivePreview";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- PanelEditorVariablesData is used only in a template `as` cast (:variablesData), which eslint-plugin-vue cannot see; vue-tsc keeps it honest
 import { PanelEditor, type PanelEditorVariablesData } from "@/components/dashboards/PanelEditor";
 import { saveMetricsStream, restoreMetricsStream } from "@/utils/streamPersist";
 import useDefaultPanelFields from "@/composables/dashboard/useDefaultPanelFields";
 import { useRoute, useRouter } from "vue-router";
+import { useListBackNavigation } from "@/composables/useListBackNavigation";
 import ShareButton from "@/components/common/ShareButton.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import {
   getMetricsConfig,
   encodeMetricsConfig,
   applyMetricsBlob,
   applyDeepLinkOverrides,
 } from "@/composables/metrics/metricsUrlState";
+import { useQueryHistoryRecorder } from "@/composables/metrics/useQueryHistoryRecorder";
+import { pickerSavedDate } from "@/utils/metrics/queryHistory";
+import QueryHistoryDrawer from "./QueryHistoryDrawer.vue";
+import RecentSearchesButton from "@/components/queryHistory/RecentSearchesButton.vue";
+import RecentSearchesFocusDropdown from "@/components/queryHistory/RecentSearchesFocusDropdown.vue";
+import { useRecentSearchesEditorHost } from "@/composables/queryHistory/useRecentSearchesEditorHost";
+import { metricsEditorIsEmpty, metricsEditorIsEmptyWith } from "@/utils/queryHistory/metrics";
+import analytics from "@/services/product_analytics";
 import {
   queryParamsToSelectedDate,
   selectedDateToQueryParams,
   refreshLabelToInterval,
   refreshIntervalToLabel,
+  type SelectedDate,
 } from "@/utils/dashboard/urlTimeParams";
 import { hasAnyDeepLinkParam } from "@/utils/url/deepLinkParams";
 import { METRICS_PARAMS } from "@/utils/metrics/metricsParamRegistry";
@@ -157,6 +197,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { takeRecentLanding } from "@/utils/queryHistory/routes";
 
 export default defineComponent({
   name: "Metrics",
@@ -173,9 +214,13 @@ export default defineComponent({
     OButton,
     OTooltip,
     ShareButton,
+    QueryHistoryDrawer,
+    RecentSearchesButton,
+    RecentSearchesFocusDropdown,
   },
   setup() {
     provide("dashboardPanelDataPageKey", "metrics");
+    const { isMobile } = useBreakpoint();
 
     // PanelEditor ref for accessing exposed methods/properties
     const panelEditorRef = ref<InstanceType<typeof PanelEditor> | null>(null);
@@ -183,14 +228,14 @@ export default defineComponent({
     // This will be used to copy the chart data to the chart renderer component
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
     const chartData = ref();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const route = useRoute();
     const router = useRouter();
     const { showErrorNotification } = useNotifications();
     const { dashboardPanelData, resetDashboardPanelData, resetAggregationFunction, validatePanel } =
-      useDashboardPanelData("metrics");
-    const { applyDefaultPanelFields } = useDefaultPanelFields("metrics");
+      useDashboardPanelData("metrics", t);
+    const { applyDefaultPanelFields } = useDefaultPanelFields("metrics", t);
     const editMode = ref(false);
     const selectedDate: any = ref({
       valueType: "relative",
@@ -315,9 +360,12 @@ export default defineComponent({
     const isPanelConfigChanged = ref(false);
 
     // Reset before children mount so FieldList sees stream_type=metrics (avoids a spurious logs stream fetch).
+    // A restore from recent searches runs only on request, and records then; any other landing runs unrecorded.
+    let landing: { run: boolean } | null = null;
     onBeforeMount(() => {
       applyMetricsDefaults();
-      pendingAutoRun = hydrateFromUrl();
+      landing = takeRecentLanding("metrics");
+      pendingAutoRun = hydrateFromUrl() && (landing?.run ?? true);
     });
 
     onMounted(async () => {
@@ -334,7 +382,8 @@ export default defineComponent({
       if (pendingAutoRun) {
         pendingAutoRun = false;
         updateDateTime();
-        runQuery();
+        if (landing?.run) onUserRun();
+        else runQuery();
       }
     });
 
@@ -396,13 +445,19 @@ export default defineComponent({
       },
     );
 
-    const runQuery = () => {
+    // chartData is also rewritten without a run (chart-type and config watchers), so the last run is tracked by its own signature.
+    const appliedSignature = ref<string | null>(null);
+    const isRunQueryArmed = ref(false);
+
+    // Auto-refresh and deep links run here too, so only `onUserRun` writes history.
+    const runQuery = (): boolean => {
       if (!isValid(true, false)) {
-        return;
+        return false;
       }
 
       // copy the data object excluding the reactivity
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+      appliedSignature.value = panelPayloadSignature(dashboardPanelData.data);
       // refresh the date time based on current time if relative date is selected
       dateTimePickerRef.value && dateTimePickerRef.value.refresh();
       updateDateTime();
@@ -414,6 +469,44 @@ export default defineComponent({
 
       // panel -> URL (full blob + time/refresh); normalizes any inbound params.
       syncStateToUrl();
+      return true;
+    };
+
+    /** An explicit Run (button, shortcut or a history re-run): runs, then records a valid query. */
+    const onUserRun = () => {
+      if (runQuery()) historyRecorder.record(dashboardPanelData, selectedDate.value);
+    };
+
+    /** The editor hydrates only on mount, so an entry replaces the panel in place; a re-run is a user Run. */
+    const applyPanelData = (metricsData: string, timeRange: SelectedDate, run = true) => {
+      if (!applyMetricsBlob(metricsData, dashboardPanelData)) return;
+      selectedDate.value = timeRange;
+      dateTimePickerRef.value?.setSavedDate?.(pickerSavedDate(timeRange));
+      if (run) onUserRun();
+    };
+
+    const historyDrawerRef = ref<InstanceType<typeof QueryHistoryDrawer> | null>(null);
+    // One editor takes one query, so multi-query rows stay out of its clock rows.
+    const recentEditor = useRecentSearchesEditorHost("metrics", {
+      opensOnFocus: () => metricsEditorIsEmpty(dashboardPanelData),
+      emptyWith: (isBlank) => metricsEditorIsEmptyWith(dashboardPanelData, isBlank),
+      acceptsQuery: (query) => !query.includes("\n"),
+    });
+
+    const onHistoryLoad = (entry: {
+      metricsData: string;
+      timeRange: SelectedDate;
+      run?: boolean;
+    }) => {
+      applyPanelData(entry.metricsData, entry.timeRange, entry.run !== false);
+      try {
+        analytics.track("metrics_query_history_loaded", {
+          org_id: store.state.selectedOrganization?.identifier,
+          surface: "editor",
+        });
+      } catch {
+        // Telemetry must never break the page.
+      }
     };
 
     const updateDateTime = () => {
@@ -520,6 +613,9 @@ export default defineComponent({
     // provide variablesAndPanelsDataLoadingState to share data between components
     provide("variablesAndPanelsDataLoadingState", variablesAndPanelsDataLoadingState);
 
+    // The focused PromQL editor swallows Cmd+Enter, so the page shortcut never sees it; it runs this instead.
+    provide("runQuery", onUserRun);
+
     const searchRequestTraceIds = computed(() => {
       const searchIds = Object.values(
         variablesAndPanelsDataLoadingState.searchRequestTraceIds,
@@ -527,9 +623,10 @@ export default defineComponent({
 
       return searchIds.flat() as string[];
     });
-    const { traceIdRef, cancelQuery } = useCancelQuery();
+    const { traceIdRef, cancelQuery } = useCancelQuery(t);
 
     const cancelAddPanelQuery = () => {
+      historyRecorder.cancel();
       traceIdRef.value = searchRequestTraceIds.value;
       cancelQuery();
     };
@@ -539,6 +636,30 @@ export default defineComponent({
     watch(variablesAndPanelsDataLoadingState, () => {
       const panelsValues = Object.values(variablesAndPanelsDataLoadingState.panels);
       disable.value = panelsValues.some((item: any) => item === true);
+    });
+
+    const historyRecorder = useQueryHistoryRecorder(() => disable.value);
+
+    const isRunQueryPending = computed(() => {
+      if (!isRunQueryArmed.value || disable.value || appliedSignature.value === null) return false;
+      return panelPayloadSignature(dashboardPanelData.data) !== appliedSignature.value;
+    });
+
+    // Load-time seeding (stream pick, default query, builder normalisation) is not an edit, so whatever is on screen at the user's first input counts as applied.
+    const armRunQueryPending = () => {
+      if (isRunQueryArmed.value) return;
+      isRunQueryArmed.value = true;
+      if (appliedSignature.value !== null) {
+        appliedSignature.value = panelPayloadSignature(dashboardPanelData.data);
+      }
+    };
+    onMounted(() => {
+      window.addEventListener("pointerdown", armRunQueryPending, true);
+      window.addEventListener("keydown", armRunQueryPending, true);
+    });
+    onBeforeUnmount(() => {
+      window.removeEventListener("pointerdown", armRunQueryPending, true);
+      window.removeEventListener("keydown", armRunQueryPending, true);
     });
 
     const addToDashboard = () => {
@@ -560,23 +681,15 @@ export default defineComponent({
       showAddToDashboardDialog.value = false;
     };
 
-    const goBackToExplorer = () => {
-      const back = router.options?.history?.state?.back;
-      if (
-        typeof back === "string" &&
-        back.startsWith("/metrics") &&
-        !back.startsWith("/metrics/editor")
-      ) {
-        router.back();
-        return;
-      }
-      router.push({
+    const goBackToExplorer = useListBackNavigation({
+      isListPath: (path) => path.startsWith("/metrics") && !path.startsWith("/metrics/editor"),
+      fallback: () => ({
         name: "metrics",
         query: {
           org_identifier: store.state.selectedOrganization?.identifier,
         },
-      });
-    };
+      }),
+    });
 
     // [END] cancel running queries
 
@@ -584,7 +697,7 @@ export default defineComponent({
     useShortcuts([
       {
         id: "metricsRunQuery",
-        handler: () => runQuery(),
+        handler: () => onUserRun(),
       },
       {
         id: "metricsRefresh",
@@ -621,8 +734,16 @@ export default defineComponent({
 
     return {
       t,
+      isMobile,
       updateDateTime,
       runQuery,
+      onUserRun,
+      applyPanelData,
+      onHistoryLoad,
+      historyDrawerRef,
+      historyRecorder,
+      recentEditor,
+      recentDropdownRef: recentEditor.dropdownRef,
       dashboardPanelData,
       chartData,
       editMode,
@@ -637,6 +758,7 @@ export default defineComponent({
       searchRequestTraceIds,
       cancelAddPanelQuery,
       disable,
+      isRunQueryPending,
       config,
       showAddToDashboardDialog,
       addPanelToDashboard,

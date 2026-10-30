@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { gt } from "@/types/i18n";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -35,9 +36,12 @@ const { mockFieldValues } = vi.hoisted(() => ({
   mockFieldValues: vi.fn(),
 }));
 
-vi.mock("@/services/stream", () => ({
-  default: { fieldValues: mockFieldValues },
-}));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { fieldValues: mockFieldValues },
+  });
+});
 
 import useMetricsExplorer from "./useMetricsExplorer";
 
@@ -47,7 +51,7 @@ import useMetricsExplorer from "./useMetricsExplorer";
 
 /** Always get a fresh instance with reset state. */
 function getInstance() {
-  const inst = useMetricsExplorer();
+  const inst = useMetricsExplorer(gt);
   inst.resetDashboardPanelData();
   return inst;
 }
@@ -58,7 +62,7 @@ describe("useMetricsExplorer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Reset shared singleton state
-    useMetricsExplorer().resetDashboardPanelData();
+    useMetricsExplorer(gt).resetDashboardPanelData();
   });
 
   // -------------------------------------------------------------------------

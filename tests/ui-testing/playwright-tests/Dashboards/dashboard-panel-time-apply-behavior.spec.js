@@ -1,4 +1,5 @@
 const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
+const testLogger = require('../utils/test-logger.js');
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager.js";
 import {
@@ -23,7 +24,8 @@ import {
 test.describe.configure({ mode: "parallel" });
 
 test.describe("Dashboard Panel Time - Apply Button Behavior", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     await ingestion(page);
   });
@@ -297,6 +299,8 @@ test.describe("Dashboard Panel Time - Apply Button Behavior", () => {
 
   test("24-should not apply changes when Apply is not clicked in Edit Panel mode", async ({ page }) => {
     const pm = new PageManager(page);
+    // This test covers the Apply gate; Auto Run (on where auto_query_enabled) applies picks without Apply.
+    await pm.dashboardAutoRun.setStoredAutoRun("false");
     const timestamp = Date.now();
     const dashboardName = `Dashboard_NoApply_${timestamp}`;
     const panelName = `Panel_NoApply_${timestamp}`;

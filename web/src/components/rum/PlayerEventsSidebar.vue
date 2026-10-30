@@ -15,46 +15,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <!-- eslint-disable-next-line local/no-hardcoded-px -- 1-device-pixel trim off a 100% width to dodge sub-pixel overflow; a rem inset would open a visible gap -->
   <div class="relative-position flex h-full w-[calc(100%-1px)] flex-col overflow-hidden">
     <AppTabs :tabs="tabs" v-model:active-tab="activeTab" class="mx-2! mt-2! px-2 py-1" />
     <template v-if="activeTab === 'tags'">
       <div data-test="event-metadata" class="sticky top-0 flex p-2 px-3">
         <div class="flex w-full flex-col">
           <div class="w-full pb-2 text-xs">
-            <OIcon name="mail" size="sm" class="pr-1" />
-            {{ sessionDetails.user_email || "Unknown User" }}
+            <OIcon name="mail" size="sm" class="pe-1" />
+            {{ sessionDetails.user_email || t("common.unknownUser") }}
           </div>
-          <div class="mb-2 w-full truncate pr-1 text-xs">
-            <OIcon name="schedule" size="sm" class="pr-1" />
+          <OTruncatedText as="div" class="mb-2 w-full pe-1 text-xs">
+            <OIcon name="schedule" size="sm" class="pe-1" />
             {{ sessionDetails.date }}
-          </div>
-          <div class="mb-2 w-full truncate pr-1 text-xs">
-            <OIcon name="settings" size="sm" class="pr-1" />
+          </OTruncatedText>
+          <OTruncatedText as="div" class="mb-2 w-full pe-1 text-xs">
+            <OIcon name="settings" size="sm" class="pe-1" />
             {{ sessionDetails.browser }}, {{ sessionDetails.os }}
-          </div>
-          <div class="mb-2 w-full truncate text-xs">
-            <OIcon name="language" size="sm" class="pr-1" />
+          </OTruncatedText>
+          <OTruncatedText as="div" class="mb-2 w-full text-xs">
+            <OIcon name="language" size="sm" class="pe-1" />
             {{ sessionDetails.ip }}
-          </div>
-          <div class="mb-2 w-full truncate text-xs">
-            <OIcon name="location-on" size="sm" class="pr-1" />
+          </OTruncatedText>
+          <OTruncatedText as="div" class="mb-2 w-full text-xs">
+            <OIcon name="location-on" size="sm" class="pe-1" />
             {{ sessionDetails.city }}, {{ sessionDetails.country }}
-          </div>
+          </OTruncatedText>
         </div>
       </div>
     </template>
-    <template v-else-if="activeTab === 'traces'">
+    <!-- KeepAlive sits OUTSIDE the tab branch chain so toggling deactivates the
+    traces tab instead of destroying it — a remount used to refire the whole
+    fetch pipeline (rum query + stream resolution + metadata) on every
+    Breadcrumbs↔Traces switch. The sidebar dies with SessionViewer, so nothing
+    leaks across sessions. -->
+    <KeepAlive>
       <PlayerTracesTab
+        v-if="activeTab === 'traces'"
         :session-id="sessionId"
         :current-time="currentTime"
         :start-time="startTime"
         :end-time="endTime"
+        :rum-window-us="rumWindowUs"
         @event-emitted="(type, payload) => emit('event-emitted', type, payload)"
       />
-    </template>
-    <template v-else>
+    </KeepAlive>
+    <template v-if="activeTab !== 'tags' && activeTab !== 'traces'">
       <div class="flex w-full items-center justify-between px-1.5 pt-2">
-        <div class="w-[60%] pr-1">
+        <div class="w-[60%] pe-1">
           <OInput
             v-model="searchEvent"
             clearable
@@ -62,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="searchEvents"
           />
         </div>
-        <div class="event-type-selector relative-position w-[40%] pl-1">
+        <div class="event-type-selector relative-position w-[40%] ps-1">
           <OSelect
             v-model="selectedEventTypes"
             :options="eventOptions"
@@ -85,14 +93,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="handleEventClick(filteredEvent)"
             :data-test="`player-event-row-${filteredEvent.type}`"
           >
-            <div class="truncate">
-              <div class="mr-3 inline" data-test="event-display-time">
+            <div class="flex min-w-0 items-center">
+              <div class="me-3 shrink-0" data-test="event-display-time">
                 {{ filteredEvent.displayTime }}
               </div>
               <OTag
                 type="rumEventType"
                 :value="filteredEvent.type"
-                class="mr-3"
+                class="me-3 shrink-0"
                 data-test="event-type-badge"
               />
               <template
@@ -100,12 +108,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <FrustrationEventBadge
                   :frustration-types="filteredEvent.frustration_types"
-                  class="mr-1 inline"
+                  class="me-1 shrink-0"
                 />
               </template>
-              <div class="inline" :title="filteredEvent.name" data-test="event-name">
-                {{ filteredEvent.name }}
-              </div>
+              <OTruncatedText data-test="event-name">{{ filteredEvent.name }}</OTruncatedText>
+              <OTag
+                v-if="markedSet.has(filteredEvent.timestamp)"
+                :label="t('rum.analytics.viewer.stepMark')"
+                variant="primary-soft"
+                size="xs"
+                class="ms-2 shrink-0"
+                data-test="session-viewer-funnel-step-mark"
+              />
             </div>
           </div>
         </template>
@@ -115,19 +129,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, watch } from "vue";
+import { computed, ref, watch, type PropType } from "vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import AppTabs from "../common/AppTabs.vue";
 
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import FrustrationEventBadge from "./FrustrationEventBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import PlayerTracesTab from "./PlayerTracesTab.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = defineProps({
   events: {
@@ -154,11 +169,21 @@ const props = defineProps({
     type: Number,
     default: 0,
   },
+  rumWindowUs: {
+    type: Object as PropType<{ start: number; end: number } | null>,
+    default: null,
+  },
+  markedTimestamps: {
+    type: Array as PropType<number[]>,
+    default: () => [],
+  },
 });
+
+const markedSet = computed(() => new Set(props.markedTimestamps));
 
 const activeTab = ref<string>("breadcrumbs");
 const tabs: Array<{
-  label: string;
+  label: I18nText;
   value: string;
   icon: string;
   style: Record<string, string>;
@@ -203,10 +228,10 @@ const selectedEventTypes = ref<string[]>(["error", "action", "view", "frustratio
 const searchEvent = ref<string>("");
 
 const eventOptions = [
-  { label: "Error", value: "error" },
-  { label: "Action", value: "action" },
-  { label: "View", value: "view" },
-  { label: "Frustration", value: "frustration" },
+  { label: t("rum.playerEvents.error"), value: "error" },
+  { label: t("rum.playerEvents.action"), value: "action" },
+  { label: t("rum.playerEvents.view"), value: "view" },
+  { label: t("rum.playerEvents.frustration"), value: "frustration" },
 ];
 
 const searchEvents = (value: string | number | null) => {

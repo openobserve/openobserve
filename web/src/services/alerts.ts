@@ -14,6 +14,40 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
+import type {
+  AckAlertRequest,
+  AckAlertResponse,
+  AlertAcksResponse,
+  AlertActionError,
+  CompositeAlertValidationRequest,
+  CompositeAlertValidationResponse,
+  CompositeAlertReferenceResponse,
+  CompositeTimelineResponse,
+  ExtendAlertMuteRequest,
+  ExtendAlertMuteResponse,
+  MuteAlertRequest,
+  MuteAlertResponse,
+  UnackAlertRequest,
+  UnackAlertResponse,
+} from "@/ts/interfaces/alert";
+
+const alertPath = (org: string, alertId: string) =>
+  `/api/v2/${org}/alerts/${encodeURIComponent(alertId)}`;
+
+// The route permission check reads the alert folder from `?folder=`.
+const inFolder = (folder?: string) => (folder ? { params: { folder } } : {});
+
+const ALERT_ACTION_CODES = new Set<string>([
+  "ack_refused",
+  "mute_refused",
+  "not_firing",
+  "firing_changed",
+  "downtime_cap",
+  "already_muted",
+  "version_changed",
+  "not_a_quick_mute",
+]);
 
 const alerts = {
   list: (
@@ -38,21 +72,32 @@ const alerts = {
     folder_id?: string,
     query?: string,
     alert_type?: string,
+    include_dependencies?: boolean,
   ) => {
     let url = `/api/v2/${org_identifier}/alerts?sort_by=${sort_by}&desc=${desc}&name=${name}`;
     if (folder_id) {
       url += `&folder=${folder_id}`;
     }
     if (query) {
-      url += `&alert_name_substring=${query}`;
+      url += `&alert_name_substring=${encodeURIComponent(query)}`;
     }
     if (alert_type) {
       url += `&alert_type=${alert_type}`;
     }
+    // Opt in to the destinations/template fields (dependency view only) — the
+    // backend keeps them off the default list response otherwise.
+    if (include_dependencies) {
+      url += `&include_dependencies=true`;
+    }
     return http().get(url);
   },
   create: (org_identifier: string, stream_name: string, stream_type: string, data: any) => {
-    return http().post(`/api/${org_identifier}/${stream_name}/alerts?type=${stream_type}`, data);
+    return http()
+      .post(`/api/${org_identifier}/${stream_name}/alerts?type=${stream_type}`, data)
+      .then((res) => {
+        analytics.track("alert_created");
+        return res;
+      });
   },
   update: (org_identifier: string, stream_name: string, stream_type: string, data: any) => {
     return http().put(
@@ -103,21 +148,45 @@ const alerts = {
     if (folder_id) {
       url += `?folder=${folder_id}`;
     }
-    return http().post(url, data);
+    return http()
+      .post(url, data)
+      .then((res) => {
+        analytics.track("alert_created");
+        return res;
+      });
   },
   update_by_alert_id: (org_identifier: string, data: any, folder_id?: any) => {
     let url = `/api/v2/${org_identifier}/alerts/${data.id}`;
     if (folder_id) {
       url += `?folder=${folder_id}`;
     }
-    return http().put(url, data);
+    if (data.alert_type === "composite") {
+      const { id: _id, ...body } = data;
+      return http()
+        .put(url, body)
+        .then((res) => {
+          analytics.track("alert_updated");
+          return res;
+        });
+    }
+    return http()
+      .put(url, data)
+      .then((res) => {
+        analytics.track("alert_updated");
+        return res;
+      });
   },
   delete_by_alert_id: (org_identifier: string, alert_id: string, folder_id?: any) => {
     let url = `/api/v2/${org_identifier}/alerts/${alert_id}`;
     if (folder_id) {
       url += `?folder=${folder_id}`;
     }
-    return http().delete(url);
+    return http()
+      .delete(url)
+      .then((res) => {
+        analytics.track("alert_deleted", { count: 1 });
+        return res;
+      });
   },
   toggle_state_by_alert_id: (
     org_identifier: string,
@@ -129,28 +198,94 @@ const alerts = {
     if (folder_id) {
       url += `&folder=${folder_id}`;
     }
-    return http().patch(url);
+    return http()
+      .patch(url)
+      .then((res) => {
+        analytics.track(enable ? "alert_enabled" : "alert_disabled", { count: 1 });
+        return res;
+      });
   },
   bulkToggleState: (org_identifier: string, enable: boolean, data: any, folder_id?: string) => {
     let url = `/api/v2/${org_identifier}/alerts/bulk/enable?value=${enable}`;
     if (folder_id) {
       url += `&folder=${folder_id}`;
     }
-    return http().post(url, data);
+    return http()
+      .post(url, data)
+      .then((res) => {
+        const count = res.data?.successful?.length ?? 0;
+        if (count > 0) analytics.track(enable ? "alert_enabled" : "alert_disabled", { count });
+        return res;
+      });
   },
   bulkDelete: (org_identifier: string, data: any, folder_id?: string) => {
     let url = `/api/v2/${org_identifier}/alerts/bulk`;
     if (folder_id) {
       url += `?folder=${folder_id}`;
     }
-    return http().delete(url, { data });
+    return http()
+      .delete(url, { data })
+      .then((res) => {
+        const count = res.data?.successful?.length ?? 0;
+        if (count > 0) analytics.track("alert_deleted", { count });
+        return res;
+      });
+  },
+  /** Every alert attached to one SLO (Feature 5). Filters on the indexed
+   *  `slo_id` column server-side, and unlike the burn-pair lookup it includes
+   *  DISABLED alerts — the SLO page must show them so they can be re-enabled.
+   *
+   *  `alert_type=slo` is not redundant with `slo_id`. Omitted, the filter
+   *  defaults to `all`, and on enterprise builds `list_alerts` then APPENDS
+   *  every anomaly-detection config in the org to the response — those rows are
+   *  merged in after the SQL WHERE clause and so never saw the `slo_id`
+   *  predicate at all. Callers use this list to say how many alerts an SLO
+   *  delete destroys, and to show what is attached to an SLO; both would be
+   *  wrong. `AlertTypeFilter::Slo` is a real SQL predicate
+   *  (`SloId.is_not_null()`), and it also excludes the anomaly merge, which
+   *  only runs for `all` and `anomaly_detection`. */
+  list_by_slo: (org_identifier: string, slo_id: string) => {
+    return http().get(
+      `/api/v2/${org_identifier}/alerts?slo_id=${encodeURIComponent(slo_id)}&alert_type=slo`,
+    );
   },
   get_by_alert_id: (org_identifier: string, alert_id: string, folder_id?: any) => {
+    // A teardown-time watcher can reach here with no id; that must not become
+    // a GET /alerts/undefined on the wire.
+    if (!alert_id) return Promise.reject(new Error("alert_id is required"));
     let url = `/api/v2/${org_identifier}/alerts/${alert_id}`;
     if (folder_id) {
       url += `?folder=${folder_id}`;
     }
     return http().get(url);
+  },
+  validateComposite: (
+    org_identifier: string,
+    data: CompositeAlertValidationRequest,
+  ): Promise<{ data: CompositeAlertValidationResponse }> => {
+    return http().post<CompositeAlertValidationResponse>(
+      `/api/v2/${org_identifier}/alerts/composites/validate`,
+      data,
+    );
+  },
+  getCompositeReferences: (
+    org_identifier: string,
+    alert_id: string,
+  ): Promise<{ data: CompositeAlertReferenceResponse }> => {
+    return http().get<CompositeAlertReferenceResponse>(
+      `/api/v2/${org_identifier}/alerts/${encodeURIComponent(alert_id)}/composite-references`,
+    );
+  },
+  getCompositeTimeline: (
+    org_identifier: string,
+    alert_id: string,
+    from: number,
+    to: number,
+  ): Promise<{ data: CompositeTimelineResponse }> => {
+    return http().get<CompositeTimelineResponse>(
+      `/api/v2/${org_identifier}/alerts/${encodeURIComponent(alert_id)}/composite-timeline`,
+      { params: { from, to } },
+    );
   },
   //this endpoint is not used as we are using the common service to move the alerts across folders
   move_to_another_folder: (org_identifier: string, data: any, folder_id?: any) => {
@@ -167,6 +302,8 @@ const alerts = {
     if (query.alert_ids) params.append("alert_ids", query.alert_ids);
     if (query.outcome) params.append("outcome", query.outcome);
     if (query.siem) params.append("siem", "true");
+    if (query.downtime_id) params.append("downtime_id", query.downtime_id);
+    if (query.status) params.append("status", query.status);
     if (query.start_time) params.append("start_time", query.start_time);
     if (query.end_time) params.append("end_time", query.end_time);
     params.append("from", query.from || "0");
@@ -195,18 +332,6 @@ const alerts = {
     if (query.siem) params.append("siem", "true");
     return http().get(`/api/v2/${org_identifier}/alerts/history/summary?${params}`);
   },
-  getOrganizationDeduplicationConfig: (org_identifier: string) => {
-    return http().get(`/api/${org_identifier}/alerts/deduplication/config`);
-  },
-  setOrganizationDeduplicationConfig: (org_identifier: string, data: any) => {
-    return http().post(`/api/${org_identifier}/alerts/deduplication/config`, data);
-  },
-  deleteOrganizationDeduplicationConfig: (org_identifier: string) => {
-    return http().delete(`/api/${org_identifier}/alerts/deduplication/config`);
-  },
-  get_dedup_summary: (org_identifier: string) => {
-    return http().get(`/api/${org_identifier}/alerts/dedup/summary`);
-  },
   // Semantic field groups management
   getSemanticGroups: (org_identifier: string) => {
     return http().get(`/api/${org_identifier}/alerts/deduplication/semantic-groups`);
@@ -225,7 +350,12 @@ const alerts = {
     if (folder_id) {
       url += `?folder=${folder_id}`;
     }
-    return http().patch(url);
+    return http()
+      .patch(url)
+      .then((res) => {
+        analytics.track("alert_manually_triggered");
+        return res;
+      });
   },
   generate_sql: (org_identifier: string, data: any) => {
     return http().post(`/api/v2/${org_identifier}/alerts/generate_sql`, data);
@@ -241,7 +371,12 @@ const alerts = {
     if (folder_id) {
       url += `?folder=${folder_id}`;
     }
-    return http().post(url, data);
+    return http()
+      .post(url, data)
+      .then((res) => {
+        analytics.track("alert_created");
+        return res;
+      });
   },
   // POST /api/v2/{org}/alerts/{id}/export — returns config with runtime fields stripped
   export_by_id: (org_identifier: string, alert_id: string) => {
@@ -249,7 +384,12 @@ const alerts = {
   },
   // PATCH /api/v2/{org}/alerts/{id}/retrain — triggers model retrain (anomaly configs only)
   retrain_by_id: (org_identifier: string, alert_id: string) => {
-    return http().patch(`/api/v2/${org_identifier}/alerts/${alert_id}/retrain`);
+    return http()
+      .patch(`/api/v2/${org_identifier}/alerts/${alert_id}/retrain`)
+      .then((res) => {
+        analytics.track("anomaly_detection_training_started");
+        return res;
+      });
   },
   // GET /api/v2/{org}/alerts/{id}/groups — per-group states of a multi-alert,
   // most severe first, plus the PRE-cap counts the "N of M firing" chip needs.
@@ -273,6 +413,57 @@ const alerts = {
       `/api/v2/${org_identifier}/alerts/${alert_id}/groups/transitions?${params.toString()}`,
     );
   },
+  ackAlert: (org: string, alertId: string, body: AckAlertRequest, folder?: string) =>
+    http().post<AckAlertResponse>(`${alertPath(org, alertId)}/ack`, body, inFolder(folder)),
+  unackAlert: (org: string, alertId: string, body: UnackAlertRequest, folder?: string) =>
+    http().post<UnackAlertResponse>(`${alertPath(org, alertId)}/unack`, body, inFolder(folder)),
+  listAlertAcks: (org: string, alertId: string, folder?: string) =>
+    http().get<AlertAcksResponse>(`${alertPath(org, alertId)}/acks`, inFolder(folder)),
+  muteAlert: (org: string, alertId: string, body: MuteAlertRequest, folder?: string) =>
+    http().post<MuteAlertResponse>(`${alertPath(org, alertId)}/mute`, body, inFolder(folder)),
+  extendAlertMute: (
+    org: string,
+    alertId: string,
+    downtimeId: string,
+    body: ExtendAlertMuteRequest,
+    folder?: string,
+  ) =>
+    http().post<ExtendAlertMuteResponse>(
+      `${alertPath(org, alertId)}/mute/${encodeURIComponent(downtimeId)}/extend`,
+      body,
+      inFolder(folder),
+    ),
+  cancelAlertMute: (org: string, alertId: string, downtimeId: string, folder?: string) =>
+    http().post(
+      `${alertPath(org, alertId)}/mute/${encodeURIComponent(downtimeId)}/cancel`,
+      undefined,
+      inFolder(folder),
+    ),
 };
 
 export default alerts;
+
+/** The typed 403/409 body of an ack or mute call, or null for any other failure. */
+export function alertActionErrorOf(error: unknown): AlertActionError | null {
+  const response = (error as { response?: { status?: number; data?: unknown } } | null)?.response;
+  if (response?.status !== 403 && response?.status !== 409) return null;
+  const code = (response.data as { code?: unknown } | null)?.code;
+  return typeof code === "string" && ALERT_ACTION_CODES.has(code)
+    ? (response.data as AlertActionError)
+    : null;
+}
+
+export interface AlertHistoryQuery {
+  // string | number because the callers build these differently and the wrapper
+  // must not change what any of them sends.
+  start_time: string | number;
+  end_time: string | number;
+  from: string | number;
+  size: string | number;
+  alert_id?: string;
+  downtime_id?: string;
+  status?: string;
+  sort_by?: string;
+  sort_order?: string;
+  [extra: string]: unknown;
+}

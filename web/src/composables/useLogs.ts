@@ -13,12 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { reactive, onBeforeMount, nextTick } from "vue";
+import { reactive, onBeforeMount, nextTick, watch } from "vue";
+import type { TranslateFn } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep } from "lodash-es";
 
-import { b64DecodeUnicode, useLocalTimezone } from "@/utils/zincutils";
+import { b64DecodeUnicode } from "@/utils/zincutils";
+import { applyTimezone } from "@/utils/storage";
 
 import useNotifications from "@/composables/useNotifications";
 import useStreams from "@/composables/useStreams";
@@ -36,30 +38,43 @@ import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { useHistogram } from "@/composables/useLogs/useHistogram";
 import useSearchBar from "@/composables/useLogs/useSearchBar";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
-import useStreamingSearch from "@/composables/useStreamingSearch";
+import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
+import { stripCommentLines } from "@/utils/query/sqlComments";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { raw } from "@/types/i18n";
+import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
+import type { RunReason } from "@/composables/useLogs/useAutoRun";
+import { resetTransient } from "@/utils/logs/transientSearchKeys";
+import { refreshFreeTextSchemas } from "@/composables/useLogs/freeTextSearch";
+import { decodeFtScan } from "@/utils/logs/freeTextScan";
+import {
+  decodeColumns,
+  initShownSearchFromUrl,
+  parseRowsParam,
+  writeLogsUrl,
+} from "@/composables/useLogs/useLogsUrl";
+import { columnsFromUrl } from "@/composables/useLogs/useLogPermalink";
 
-const useLogs = () => {
+const useLogs = (t: TranslateFn) => {
   const store = useStore();
 
   let { searchObj, initialQueryPayload, resetFunctions, notificationMsg } = searchState();
 
-  const { getHistogramTitle } = useHistogram();
+  const { getHistogramTitle, getHistogramTitleParts } = useHistogram();
 
   const { getPaginatedData } = usePagination();
 
-  const { buildSearch } = useSearchStream();
+  const { buildSearch } = useSearchStream(t);
 
-  const { getFunctions, getActions, getQueryData } = useSearchBar();
+  const { getFunctions, getQueryData } = useSearchBar(t);
 
-  const { fnParsedSQL, fnUnparsedSQL, addTransformToQuery, isActionsEnabled } = logsUtils();
+  const { fnParsedSQL, fnUnparsedSQL, addTransformToQuery } = logsUtils();
 
   const { updateFieldValues, extractFields, updateGridColumns, filterHitsColumns, getStreamList } =
     useStreamFields();
 
   const { showErrorNotification } = useNotifications();
-  const { getStreams } = useStreams();
-  const { cancelStreamQueryBasedOnRequestId } = useStreamingSearch();
+  const { getStreams, getStream } = useStreams(t);
 
   const router = useRouter();
 
@@ -74,14 +89,15 @@ const useLogs = () => {
     searchObj = reactive(Object.assign({}, JSON.parse(JSON.stringify(DEFAULT_LOGS_CONFIG))));
   };
 
-  const getJobData = async (isPagination = false) => {
+  const getJobData = async (isPagination = false, snapshot: any = null) => {
+    const scheduling = searchObj.meta.jobId === "";
     try {
       // window will have more priority
       // if window has use_web_socket property then use that
       // else use organization settings
-      const queryReq: any = buildSearch();
-      if (queryReq == false) {
-        throw new Error(notificationMsg.value || "Something went wrong.");
+      const queryReq: any = snapshot ? cloneDeep(snapshot) : buildSearch();
+      if (!queryReq) {
+        throw new Error(notificationMsg.value || t("search.somethingWentWrongPeriod"));
       }
       if (searchObj.meta.jobId == "") {
         queryReq.query.size = parseInt(searchObj.meta.jobRecords);
@@ -119,36 +135,40 @@ const useLogs = () => {
       }
       searchObj.data.queryResults.subpage = 1;
       if (searchObj.meta.jobId == "") {
-        searchService
-          .schedule_search(
-            {
-              org_identifier: searchObj.organizationIdentifier,
-              query: queryReq,
-              page_type: searchObj.data.stream.streamType,
-            },
-            "ui",
-          )
-          .then(() => {
-            toast({
-              variant: "success",
-              message: "Job added successfully",
-              action: {
-                label: "Go To Job Scheduler",
-                handler: () => routeToSearchSchedule(),
-              },
-            });
-          });
+        await searchService.schedule_search(
+          {
+            org_identifier: searchObj.organizationIdentifier,
+            query: queryReq,
+            page_type: searchObj.data.stream.streamType,
+          },
+          "ui",
+        );
+        toast({
+          variant: "success",
+          message: t("toastMessages.composables.jobAddedSuccessfully"),
+          action: {
+            label: t("toastMessages.composables.goToJobScheduler"),
+            handler: () => routeToSearchSchedule(),
+          },
+        });
       } else {
         await getPaginatedData(queryReq);
       }
       if (searchObj.meta.jobId == "") {
         searchObj.data.histogram.chartParams.title = getHistogramTitle();
+        searchObj.data.histogram.chartParams.titleParts = getHistogramTitleParts();
       }
     } catch (e: any) {
       searchObj.loading = false;
-      showErrorNotification(notificationMsg.value || "Error occurred during the search operation.");
+      if (!scheduling) {
+        showErrorNotification(
+          raw(
+            notificationMsg.value ||
+              t("toastMessages.useLogs.errorOccurredDuringTheSearchOperation"),
+          ),
+        );
+      }
       throw e;
-      // notificationMsg.value = "";
     }
   };
 
@@ -163,6 +183,7 @@ const useLogs = () => {
 
     await filterHitsColumns();
     searchObj.data.histogram.chartParams.title = getHistogramTitle();
+    searchObj.data.histogram.chartParams.titleParts = getHistogramTitleParts();
   };
 
   const routeToSearchSchedule = () => {
@@ -173,6 +194,26 @@ const useLogs = () => {
     });
   };
 
+  const armRefreshInterval = () => {
+    clearInterval(store.state.refreshIntervalID);
+    if (!(searchObj.meta.refreshInterval > 0)) return;
+    const refreshIntervalID = setInterval(() => {
+      if (
+        searchObj.meta.logsVisualizeToggle === "logs" &&
+        searchObj.data.stream.selectedStream.length > 0
+      ) {
+        useLogsAutoRun().engine.tick();
+      }
+    }, searchObj.meta.refreshInterval * 1000);
+    store.dispatch("setRefreshIntervalID", refreshIntervalID);
+  };
+
+  useLogsAutoRun().setRearmRefresh(() => {
+    if (searchObj.meta.refreshInterval > 0 && router.currentRoute.value.name === "logs") {
+      armRefreshInterval();
+    }
+  });
+
   const refreshData = () => {
     try {
       if (
@@ -180,25 +221,15 @@ const useLogs = () => {
         router.currentRoute.value.name == "logs" &&
         enableRefreshInterval(searchObj.meta.refreshInterval)
       ) {
-        clearInterval(store.state.refreshIntervalID);
-        const refreshIntervalID = setInterval(async () => {
-          if (
-            searchObj.loading == false &&
-            searchObj.loadingHistogram == false &&
-            searchObj.meta.logsVisualizeToggle == "logs" &&
-            searchObj.data.stream.selectedStream.length > 0
-          ) {
-            searchObj.loading = true;
-            await getQueryData(false);
-          }
-        }, searchObj.meta.refreshInterval * 1000);
-        store.dispatch("setRefreshIntervalID", refreshIntervalID);
+        armRefreshInterval();
 
         // only notify if user is in logs page
         if (searchObj.meta.logsVisualizeToggle == "logs") {
           toast({
             variant: "info",
-            message: `Live mode is enabled. Only top ${searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
+            message: t("toastMessages.composables.liveModeIsEnabledOnlyTop", {
+              count: searchObj.meta.resultGrid.rowsPerPage,
+            }),
           });
         }
       } else {
@@ -219,46 +250,57 @@ const useLogs = () => {
     }
   };
 
-  const cancelInflightRequests = () => {
-    const orgId = searchObj.organizationIdentifier;
-    if (searchObj.data.lastSearchTraceId) {
-      cancelStreamQueryBasedOnRequestId({
-        trace_id: searchObj.data.lastSearchTraceId,
-        org_id: orgId,
-      });
-      searchObj.data.lastSearchTraceId = "";
-    }
-    if (searchObj.data.lastHistogramTraceId) {
-      cancelStreamQueryBasedOnRequestId({
-        trace_id: searchObj.data.lastHistogramTraceId,
-        org_id: orgId,
-      });
-      searchObj.data.lastHistogramTraceId = "";
-    }
-  };
-
-  const loadLogsData = async () => {
+  const loadLogsData = async (
+    reason: RunReason = "landing",
+    options: { ignoreUrl?: boolean; origin?: string } = {},
+  ) => {
     try {
-      cancelInflightRequests();
+      const autoRun = useLogsAutoRun();
+      const wasLoading = searchObj.loading;
+      autoRun.engine.resetScope(reason === "url" ? "url" : "org");
+      const generationAtStart = autoRun.engine.currentGeneration("grid")?.id;
+      // Sync, because a run cancelled or failed before it completes clears its pending record again.
+      const sentDuringLoad = new Set<number>();
+      const stopWatchingSends = watch(
+        () => searchObj.meta.pendingExecution?.generation,
+        (generation) => generation !== undefined && sentDuringLoad.add(generation),
+        { flush: "sync" },
+      );
+      searchObj.loading = wasLoading;
       resetFunctions();
 
-      // Create initialStreamSelected variable to handle first time load when api call for function & actions are
-      // in-progress and user select stream from dropdown in that case it loads data but it should wait for
-      // additional details from the user like filter conditions and time range selection before load data
-      // it should work in case of page refresh, navigate user from streams page or short url
-      let initialStreamSelected: boolean = searchObj.data.stream.selectedStream.length > 0;
-
-      await getStreamList();
-      await getFunctions();
-      if (isActionsEnabled.value) await getActions();
-      await extractFields();
+      const query = router.currentRoute.value.query;
+      const fromUrl = !options.ignoreUrl && (!!query.stream || query.sql_mode === "true");
+      try {
+        await getStreamList(true, { fromUrl });
+        await getFunctions();
+        await extractFields();
+      } finally {
+        stopWatchingSends();
+      }
+      const latest = autoRun.engine.currentGeneration("grid");
+      const userSearchInFlight =
+        latest?.kind === "explicit" &&
+        latest.id !== generationAtStart &&
+        searchObj.meta.pendingExecution?.generation === latest.id;
+      // A search the user sent meanwhile owns the loading state; its completion or cancel clears it.
+      if (!userSearchInFlight) searchObj.loading = false;
       if (searchObj.meta.jobId == "") {
-        if (initialStreamSelected) {
-          await getQueryData();
-        } else {
-          searchObj.loading = false;
-        }
+        // A search the user sent while the stream metadata loaded, even one cancelled since, supersedes this landing run.
+        const userSearchSent =
+          latest?.kind === "explicit" &&
+          latest.id !== generationAtStart &&
+          (sentDuringLoad.has(latest.id) ||
+            [searchObj.meta.pendingExecution, searchObj.meta.executed].some(
+              (run) => run?.generation === latest.id,
+            ));
+        const result =
+          searchObj.data.stream.selectedStream.length > 0 && !userSearchSent
+            ? autoRun.request(fromUrl ? "url" : reason, { origin: options.origin })
+            : "skipped-ineligible";
+        if (result !== "scheduled" && result !== "dispatched") showNoQueryAppliedIfIdle();
       } else {
+        autoRun.engine.resetScope("job");
         await getJobData();
       }
       refreshData();
@@ -267,12 +309,20 @@ const useLogs = () => {
     }
   };
 
+  const showNoQueryAppliedIfIdle = () => {
+    if (searchObj.loading || searchObj.meta.executed || searchObj.meta.pendingExecution) return;
+    if (searchObj.data.stream.streamLists.length) searchObj.data.errorMsg = "";
+    if (!Array.isArray(searchObj.data.queryResults?.hits)) {
+      searchObj.data.queryResults = { hits: [] };
+    }
+    if (!searchObj.data.queryResults.hits.length) searchObj.meta.searchApplied = false;
+  };
+
   const loadVisualizeData = async () => {
     try {
       resetFunctions();
       await getStreamList();
       await getFunctions();
-      if (isActionsEnabled.value) await getActions();
       await extractFields();
     } catch (e: any) {
       searchObj.loading = false;
@@ -284,7 +334,6 @@ const useLogs = () => {
       resetFunctions();
       await getStreamList();
       await getFunctions();
-      if (isActionsEnabled.value) await getActions();
       await extractFields();
     } catch (e: any) {
       searchObj.loading = false;
@@ -293,6 +342,7 @@ const useLogs = () => {
 
   const loadJobData = async () => {
     try {
+      useLogsAutoRun().engine.resetScope("job");
       resetFunctions();
       await getStreamList();
       await getFunctions();
@@ -307,11 +357,6 @@ const useLogs = () => {
 
   const handleRunQuery = async (clear_cache = false) => {
     try {
-      cancelInflightRequests();
-      searchObj.loading = true;
-      searchObj.meta.refreshHistogram = true;
-      initialQueryPayload.value = null;
-      searchObj.data.queryResults.aggs = null;
       searchObj.meta.clearCache = clear_cache;
       if (
         Object.hasOwn(router.currentRoute.value.query, "type") &&
@@ -320,10 +365,37 @@ const useLogs = () => {
       ) {
         delete router.currentRoute.value.query.type;
       }
-      await getQueryData();
+      useLogsAutoRun().engine.requestRun("run");
     } catch (e: any) {
       console.log("Error while loading logs data");
     }
+  };
+
+  const runGridSearch = async (
+    generationId: number,
+    mode: "full" | "page" | "page-size" = "full",
+    origin?: string,
+  ) => {
+    if (mode !== "page") {
+      searchObj.meta.refreshHistogram = true;
+      initialQueryPayload.value = null;
+      if (searchObj.data.queryResults) searchObj.data.queryResults.aggs = null;
+    }
+    searchObj.loading = true;
+    searchObj.loadingProgressPercentage = 0;
+    if (mode === "full") {
+      await refreshFreeTextSchemas(searchObj, store.state.zoConfig, (name) =>
+        getStream(name, searchObj.data.stream.streamType || "logs", true, true),
+      );
+      if (!useLogsAutoRun().engine.isCurrent(generationId)) return;
+    }
+    await getQueryData(mode === "page", { generationId, reuseSchema: mode !== "full", origin });
+  };
+
+  const resetRunStateForReapply = () => {
+    useLogsAutoRun().engine.resetScope("reapply");
+    resetTransient(searchObj as unknown as Record<string, unknown>);
+    searchObj.meta.freeTextScan = {};
   };
 
   const restoreUrlQueryParams = async (_dashboardPanelData: any = null) => {
@@ -374,6 +446,7 @@ const useLogs = () => {
         searchObj.meta.pendingUrlQueryRestore = true;
       }
     }
+    searchObj.meta.freeTextScan = decodeFtScan(queryParams.ft_scan);
 
     if (
       Object.prototype.hasOwnProperty.call(queryParams, "defined_schemas") &&
@@ -390,7 +463,7 @@ const useLogs = () => {
       delete queryParams.refresh;
     }
 
-    useLocalTimezone(queryParams.timezone);
+    applyTimezone(store, queryParams.timezone);
 
     if (queryParams.functionContent) {
       searchObj.data.tempFunctionContent = b64DecodeUnicode(queryParams.functionContent) || "";
@@ -415,6 +488,15 @@ const useLogs = () => {
 
     if (queryParams.show_histogram) {
       searchObj.meta.showHistogram = queryParams.show_histogram == "true" ? true : false;
+    }
+
+    const rows = parseRowsParam(queryParams.rows);
+    if (rows !== null) searchObj.meta.resultGrid.rowsPerPage = rows;
+    const columns = searchObj.meta.sqlMode ? null : decodeColumns(queryParams.columns);
+    if (columns !== null) {
+      searchObj.data.stream.selectedFields = columns;
+      searchObj.meta.isFtsDefaultColumn = false;
+      columnsFromUrl.value = true;
     }
 
     searchObj.shouldIgnoreWatcher = false;
@@ -442,13 +524,11 @@ const useLogs = () => {
       searchObj.meta.showTransformEditor = queryParams.fn_editor == "true" ? true : false;
     }
 
-    // TODO OK : Replace push with replace and test all scenarios
-    router.push({
-      query: {
-        ...queryParams,
-        sql_mode: searchObj.meta.sqlMode,
-        defined_schemas: searchObj.meta.useUserDefinedSchemas,
-      },
+    initShownSearchFromUrl(queryParams);
+    void writeLogsUrl("replace", {
+      ...queryParams,
+      sql_mode: searchObj.meta.sqlMode,
+      defined_schemas: searchObj.meta.useUserDefinedSchemas,
     });
   };
 
@@ -471,8 +551,7 @@ const useLogs = () => {
         searchObj.data.stream.streamLists.push(itemObj);
       });
     } else {
-      searchObj.loading = true;
-      loadLogsData();
+      loadLogsData("activation");
     }
   };
 
@@ -562,7 +641,7 @@ const useLogs = () => {
       let expression =
         field_value == "null"
           ? `${quotedField} ${operator} ${field_value}`
-          : `${quotedField} ${operator} '${field_value}'`;
+          : `${quotedField} ${operator} ${sqlLiteral(field_value)}`;
 
       const isNumericType = (type: string) => ["int64", "float64"].includes(type.toLowerCase());
       const isBooleanType = (type: string) => type.toLowerCase() === "boolean";
@@ -579,7 +658,7 @@ const useLogs = () => {
       console.log("Error while getting filter expression by field type", e);
       const quotedField =
         searchObj.meta.sqlMode === true ? quoteSqlIdentifierIfNeeded(String(field)) : field;
-      return `${quotedField} ${operator} '${field_value}'`;
+      return `${quotedField} ${operator} ${sqlLiteral(field_value)}`;
     }
   };
 
@@ -607,10 +686,7 @@ const useLogs = () => {
         return {};
       }
 
-      const orgQuery: string = searchObj.data.query
-        .split("\n")
-        .filter((line: string) => !line.trim().startsWith("--"))
-        .join("\n");
+      const orgQuery: string = stripCommentLines(searchObj.data.query);
       const outputQueries: any = {};
       const parsedSQL = fnParsedSQL(orgQuery);
 
@@ -739,6 +815,9 @@ const useLogs = () => {
     restoreUrlQueryParams,
     updateStreams,
     handleRunQuery,
+    runGridSearch,
+    resetRunStateForReapply,
+    armRefreshInterval,
     reorderSelectedFields,
     getFilterExpressionByFieldType,
     extractValueQuery,
@@ -751,13 +830,36 @@ const useLogs = () => {
     loadVisualizeData,
     loadPatternsData,
     getHistogramTitle,
+    getHistogramTitleParts,
   };
 };
 
 // Priority order for FTS field selection as default columns
 const FTS_PRIORITY = ["body", "body_msg", "message", "log", "msg"];
 
+// Service fields shown before the FTS column; the first one present wins
+const SERVICE_COLUMNS = ["service", "service_name"];
+
+const hasValue = (h: Record<string, unknown>, field: string) =>
+  h[field] !== undefined && h[field] !== null && h[field] !== "";
+
 export const resolveDefaultColumns = (
+  streamFields: Array<{ name: string; ftsKey: boolean }>,
+  globalFtsKeys: string[],
+  hits?: Record<string, unknown>[],
+): string[] => {
+  const fts = resolveFtsColumn(streamFields, globalFtsKeys, hits);
+  if (fts.length === 0) return [];
+  const service = SERVICE_COLUMNS.find(
+    (f) =>
+      f !== fts[0] &&
+      streamFields.some((sf) => sf.name === f) &&
+      (!hits?.length || hits.some((h) => hasValue(h, f))),
+  );
+  return service ? [service, ...fts] : fts;
+};
+
+const resolveFtsColumn = (
   streamFields: Array<{ name: string; ftsKey: boolean }>,
   globalFtsKeys: string[],
   hits?: Record<string, unknown>[],
@@ -783,9 +885,7 @@ export const resolveDefaultColumns = (
     let bestField = "";
     let bestCount = -1;
     for (const field of candidates) {
-      const count = hits.filter(
-        (h) => h[field] !== undefined && h[field] !== null && h[field] !== "",
-      ).length;
+      const count = hits.filter((h) => hasValue(h, field)).length;
       if (
         count > bestCount ||
         (count === bestCount && priorityIndex(field) < priorityIndex(bestField))

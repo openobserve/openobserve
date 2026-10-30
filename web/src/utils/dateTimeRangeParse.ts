@@ -55,10 +55,10 @@ const TIMESTAMP_RANGE_RE = /^(\d{10,16})\s*-\s*(\d{10,16})$/;
 const ABSOLUTE_SINGLE_RE = /^(\d{4}\/\d{2}\/\d{2})(?:\s+(\d{2}:\d{2}:\d{2}))?$/;
 const TIMESTAMP_SINGLE_RE = /^(\d{10,16})$/;
 const ISO_SINGLE_RE =
-  /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?(Z|[+-]\d{2}:?\d{2})?$/;
+  /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?(Z|[+-]\d{2}(?::?\d{2})?)?$/;
 // The app's own log/trace timestamp display format (src/utils/date.ts formatTimestamp).
 const HUMAN_LOG_SINGLE_RE =
-  /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),?\s+(\d{4})\s+(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(?:\s+(Z|[+-]\d{2}:?\d{2}))?$/i;
+  /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),?\s+(\d{4})\s+(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(?:\s+(Z|[+-]\d{2}(?::?\d{2})?))?$/i;
 const MONTH_INDEX: Record<string, string> = {
   jan: "01",
   feb: "02",
@@ -73,6 +73,69 @@ const MONTH_INDEX: Record<string, string> = {
   nov: "11",
   dec: "12",
 };
+
+// date-fns `X` (the app's `Z` token) renders whole-hour zones as `+HH`, with no minutes.
+function normalizeOffset(offset: string): string {
+  if (offset.toUpperCase() === "Z") return "Z";
+  const [, hours, minutes = "00"] = offset.match(/^([+-]\d{2}):?(\d{2})?$/) ?? [];
+  return `${hours}:${minutes}`;
+}
+
+function isValidDateTimeParts(
+  year: string,
+  month: string,
+  day: string,
+  hour = "00",
+  minute = "00",
+  second = "00",
+): boolean {
+  const yearValue = Number(year);
+  const monthValue = Number(month);
+  const dayValue = Number(day);
+  const hourValue = Number(hour);
+  const minuteValue = Number(minute);
+  const secondValue = Number(second);
+
+  if (
+    ![yearValue, monthValue, dayValue, hourValue, minuteValue, secondValue].every(
+      Number.isFinite,
+    ) ||
+    ![yearValue, monthValue, dayValue, hourValue, minuteValue].every(Number.isInteger) ||
+    monthValue < 1 ||
+    monthValue > 12 ||
+    dayValue < 1 ||
+    hourValue < 0 ||
+    hourValue > 23 ||
+    minuteValue < 0 ||
+    minuteValue > 59 ||
+    secondValue < 0 ||
+    secondValue >= 60
+  ) {
+    return false;
+  }
+
+  const isLeapYear = yearValue % 4 === 0 && (yearValue % 100 !== 0 || yearValue % 400 === 0);
+  const daysInMonth = [31, isLeapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][
+    monthValue - 1
+  ];
+
+  return dayValue <= (daysInMonth ?? 0);
+}
+
+function isValidAbsoluteValue(date: string, time?: string): boolean {
+  const dateParts = date.split(/[/-]/);
+  const timeParts = (time ?? "00:00:00").split(":");
+  if (dateParts.length !== 3 || timeParts.length !== 3) return false;
+
+  return isValidDateTimeParts(
+    dateParts[0],
+    dateParts[1],
+    dateParts[2],
+    timeParts[0],
+    timeParts[1],
+    timeParts[2],
+  );
+}
 
 export function parseDateRangeString(raw: string): ParsedDateRange | null {
   const s = raw.trim();
@@ -97,6 +160,8 @@ export function parseDateRangeString(raw: string): ParsedDateRange | null {
 
   const absMatch = s.match(ABSOLUTE_RANGE_RE);
   if (absMatch) {
+    if (!isValidAbsoluteValue(absMatch[1], absMatch[2])) return null;
+    if (!isValidAbsoluteValue(absMatch[3], absMatch[4])) return null;
     return {
       type: "absolute",
       startDate: absMatch[1],
@@ -126,6 +191,8 @@ export function parseSingleDateTime(raw: string): ParsedSingleDateTime | null {
 
   const absMatch = s.match(ABSOLUTE_SINGLE_RE);
   if (absMatch) {
+    const [date, time] = [absMatch[1], absMatch[2]];
+    if (!isValidAbsoluteValue(date, time)) return null;
     return { type: "absolute", date: absMatch[1], time: absMatch[2] };
   }
 
@@ -144,10 +211,11 @@ function parseIsoSingle(raw: string): IsoSingleParsed | null {
   if (!m) return null;
   const [, year, month, day, hour, minute, second, offset] = m;
 
+  if (!isValidDateTimeParts(year, month, day, hour, minute, second)) return null;
+
   if (offset) {
     // Explicit offset already IS the instant — ignores the picker's timezone.
-    const normalizedOffset =
-      offset === "Z" ? "Z" : offset.replace(/^([+-]\d{2}):?(\d{2})$/, "$1:$2");
+    const normalizedOffset = normalizeOffset(offset);
     const iso = `${year}-${month}-${day}T${hour ?? "00"}:${minute ?? "00"}:${second ?? "00"}${normalizedOffset}`;
     const ms = Date.parse(iso);
     if (Number.isNaN(ms)) return null;
@@ -169,9 +237,10 @@ function parseHumanLogSingle(raw: string): IsoSingleParsed | null {
   const dd = day.padStart(2, "0");
   const secWithMs = ms ? `${second}.${ms}` : second;
 
+  if (!isValidDateTimeParts(year, month, dd, hour, minute, secWithMs)) return null;
+
   if (offset) {
-    const normalizedOffset =
-      offset.toUpperCase() === "Z" ? "Z" : offset.replace(/^([+-]\d{2}):?(\d{2})$/, "$1:$2");
+    const normalizedOffset = normalizeOffset(offset);
     const iso = `${year}-${month}-${dd}T${hour}:${minute}:${secWithMs}${normalizedOffset}`;
     const parsedMs = Date.parse(iso);
     if (Number.isNaN(parsedMs)) return null;

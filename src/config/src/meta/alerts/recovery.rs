@@ -1,0 +1,618 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+//! Recovery is a transition, not a level — "is it Ok now?" answers yes forever, which is how
+//! on-call wrote 11,616 entries for one firing. The episode anchors it: opened by the first
+//! DELIVERED notification, cleared by the write that emits the recovery, so exactly-once is
+//! structural and a suppressed firing needs no check in any consumer.
+
+use std::collections::BTreeMap;
+
+use serde::{Deserialize, Serialize};
+
+use super::state::{AlertState, apply_outcome};
+use crate::meta::{alerts::level::AlertLevel, self_reporting::usage::RunOutcome};
+
+/// Microseconds in a second, for `keep_firing_for`.
+const MICROS_PER_SECOND: i64 = 1_000_000;
+
+/// Carries what consumers need after the state row has forgotten it: the correlation key, and who
+/// owned firing delivery.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RecoveryEvent {
+    pub org_id: String,
+    pub alert_id: String,
+    /// `""` is the per-alert rollup row; non-empty identifies one grouped series.
+    pub group_key: String,
+    pub episode_id: String,
+    /// `None` = the alert path owned firing delivery.
+    pub incident_id: Option<String>,
+    pub opened_at: i64,
+    /// When the condition cleared — not when `keep_firing_for` expired. The
+    /// hold delays the message, it does not move the recovery.
+    pub recovered_at: i64,
+    pub emitted_at: i64,
+    pub last_notified_level: Option<AlertLevel>,
+    pub group_labels: Option<String>,
+    /// The firing cycle that ended, the key of its Slack messages.
+    #[serde(default)]
+    pub firing_started_at: Option<i64>,
+    #[serde(default)]
+    pub reason: RecoveryReason,
+    /// The group's labels for `{group.*}` and the per-group downtime check; `None` on the rollup.
+    #[serde(default)]
+    pub group_label_set: Option<BTreeMap<String, String>>,
+    /// The healthy value an observed clear saw; `None` when the group was not observed.
+    #[serde(default)]
+    pub value: Option<f64>,
+}
+
+impl RecoveryEvent {
+    /// How long the episode ran, in microseconds.
+    pub fn duration_micros(&self) -> i64 {
+        self.recovered_at.saturating_sub(self.opened_at).max(0)
+    }
+
+    pub fn is_group(&self) -> bool {
+        !self.group_key.is_empty()
+    }
+}
+
+/// Why an episode closed, for `{recovery_reason}`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RecoveryReason {
+    /// An evaluation observed the condition clear.
+    #[default]
+    Cleared,
+    /// The group stopped being returned for K x frequency (M-7).
+    Disappeared,
+}
+
+impl RecoveryReason {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Cleared => "cleared",
+            Self::Disappeared => "disappeared",
+        }
+    }
+}
+
+/// What one evaluation knows about delivery, for the episode axis.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct EpisodeInput {
+    /// A notification for this evaluation actually landed somewhere.
+    pub delivered: bool,
+    /// Set when the incident path owned that delivery.
+    pub incident_id: Option<String>,
+    /// `keep_firing_for` in seconds; 0 recovers on the first clear evaluation.
+    pub keep_firing_for_secs: i64,
+    /// The key the trigger carried, so the episode stores what PagerDuty saw
+    /// rather than a second id it has never been told about.
+    pub episode_id: Option<String>,
+}
+
+impl EpisodeInput {
+    /// This evaluation delivered nothing — every path that is not a successful
+    /// send, including a suppressed or failed one.
+    pub fn undelivered(keep_firing_for_secs: i64) -> Self {
+        Self {
+            delivered: false,
+            incident_id: None,
+            keep_firing_for_secs,
+            episode_id: None,
+        }
+    }
+}
+
+/// Separate from [`RecoveryEvent`] because the state row does not know its own `org_id`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ClosedEpisode {
+    pub episode_id: String,
+    pub incident_id: Option<String>,
+    pub opened_at: i64,
+    pub recovered_at: i64,
+}
+
+/// A firing cycle (`firing_started_at` set → null) that one write ended.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FiringCycleClose {
+    pub firing_started_at: i64,
+    /// When the condition first cleared: a `keep_firing_for` hold's start, else the run's time.
+    pub cleared_at: i64,
+}
+
+/// One group episode a plan closes: the writer's guarded close, then the recovery it emits.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ClosedGroupEpisode {
+    pub group_key: String,
+    pub episode_id: String,
+    /// The `level_at` the closer read; replicas close by `episode_id` alone.
+    pub prev_level_at: Option<i64>,
+    #[serde(default)]
+    pub incident_id: Option<String>,
+    pub opened_at: i64,
+    pub recovered_at: i64,
+    #[serde(default)]
+    pub reason: RecoveryReason,
+    #[serde(default)]
+    pub value: Option<f64>,
+    #[serde(default)]
+    pub labels: BTreeMap<String, String>,
+    #[serde(default)]
+    pub group_labels: Option<String>,
+    #[serde(default)]
+    pub last_notified_level: Option<AlertLevel>,
+    /// The firing cycle the episode belonged to, the key of its Slack messages.
+    #[serde(default)]
+    pub firing_started_at: Option<i64>,
+}
+
+impl ClosedGroupEpisode {
+    /// `state` is the row as the closer read it, before the close cleared its episode.
+    pub fn new(
+        state: &AlertState,
+        closed: ClosedEpisode,
+        prev_level_at: Option<i64>,
+        reason: RecoveryReason,
+        value: Option<f64>,
+    ) -> Self {
+        Self {
+            group_key: state.group_key.clone(),
+            episode_id: closed.episode_id,
+            prev_level_at,
+            incident_id: closed.incident_id,
+            opened_at: closed.opened_at,
+            recovered_at: closed.recovered_at,
+            reason,
+            value,
+            labels: state.group_label_set.clone().unwrap_or_default(),
+            group_labels: state.group_labels.clone(),
+            last_notified_level: state.last_notified_level,
+            firing_started_at: state.firing_started_at,
+        }
+    }
+
+    pub fn recovery_event(&self, org_id: &str, alert_id: &str, emitted_at: i64) -> RecoveryEvent {
+        RecoveryEvent {
+            org_id: org_id.to_string(),
+            alert_id: alert_id.to_string(),
+            group_key: self.group_key.clone(),
+            episode_id: self.episode_id.clone(),
+            incident_id: self.incident_id.clone(),
+            opened_at: self.opened_at,
+            recovered_at: self.recovered_at,
+            emitted_at,
+            last_notified_level: self.last_notified_level,
+            group_labels: self.group_labels.clone(),
+            firing_started_at: self.firing_started_at,
+            reason: self.reason,
+            group_label_set: Some(self.labels.clone()),
+            value: self.value,
+        }
+    }
+}
+
+/// `firing` is the RECORDED level's verdict, not the raw match, so a frozen evaluation stays firing
+/// and a search outage cannot read as a recovery.
+pub fn apply_episode(
+    state: &mut AlertState,
+    firing: bool,
+    input: &EpisodeInput,
+    at: i64,
+    new_episode_id: impl FnOnce() -> String,
+) -> Option<ClosedEpisode> {
+    if firing {
+        // Same episode, so the resolve still pairs with the trigger that opened it.
+        state.recovering_since = None;
+        if input.delivered {
+            if state.episode_id.is_none() {
+                state.episode_id = Some(new_episode_id());
+                state.episode_opened_at = Some(at);
+            }
+            // Re-read every delivery, not adopted once: correlation can take an
+            // episode over, hand it back, or move it to a different incident,
+            // and the resolve has to follow whoever sent the last trigger.
+            state.episode_incident_id = input.incident_id.clone();
+        }
+        return None;
+    }
+
+    let Some(episode_id) = state.episode_id.clone() else {
+        // Nothing was ever delivered, so there is nothing to recover from.
+        state.recovering_since = None;
+        return None;
+    };
+
+    let recovered_at = *state.recovering_since.get_or_insert(at);
+    let hold_micros = input
+        .keep_firing_for_secs
+        .max(0)
+        .saturating_mul(MICROS_PER_SECOND);
+    if at < recovered_at.saturating_add(hold_micros) {
+        return None;
+    }
+
+    let closed = ClosedEpisode {
+        episode_id,
+        incident_id: state.episode_incident_id.take(),
+        opened_at: state.episode_opened_at.unwrap_or(recovered_at),
+        recovered_at,
+    };
+    state.episode_id = None;
+    state.episode_opened_at = None;
+    state.recovering_since = None;
+    Some(closed)
+}
+
+/// Build the outbound event for an episode this evaluation closed.
+pub fn recovery_event(
+    org_id: &str,
+    state: &AlertState,
+    closed: ClosedEpisode,
+    emitted_at: i64,
+) -> RecoveryEvent {
+    RecoveryEvent {
+        org_id: org_id.to_string(),
+        alert_id: state.alert_id.clone(),
+        group_key: state.group_key.clone(),
+        episode_id: closed.episode_id,
+        incident_id: closed.incident_id,
+        opened_at: closed.opened_at,
+        recovered_at: closed.recovered_at,
+        emitted_at,
+        last_notified_level: state.last_notified_level,
+        group_labels: state.group_labels.clone(),
+        firing_started_at: state.firing_started_at,
+        reason: RecoveryReason::Cleared,
+        group_label_set: state.group_label_set.clone(),
+        value: None,
+    }
+}
+
+/// `keep_firing_for` holds the firing cycle open exactly as long as it holds the episode (R-115).
+pub fn hold_firing_cycle(prev: Option<&AlertState>, state: &mut AlertState) {
+    // `apply_episode` leaves `recovering_since` set only while the hold is still open.
+    if state.recovering_since.is_some() && state.firing_started_at.is_none() {
+        state.firing_started_at = prev.and_then(|p| p.firing_started_at);
+    }
+}
+
+/// The firing cycle a write ends, if any: `prev` had one and `next` has none.
+pub fn closes_firing_cycle(
+    prev: Option<&AlertState>,
+    next: Option<&AlertState>,
+    now: i64,
+) -> Option<FiringCycleClose> {
+    let prev = prev?;
+    let firing_started_at = prev.firing_started_at?;
+    if next?.firing_started_at.is_some() {
+        return None;
+    }
+    Some(FiringCycleClose {
+        firing_started_at,
+        cleared_at: prev.recovering_since.unwrap_or(now),
+    })
+}
+
+/// What a single-row clear run closes, decided from the stored row before the run persists.
+pub fn single_row_clear(
+    prev: Option<&AlertState>,
+    level: Option<AlertLevel>,
+    keep_firing_for_secs: i64,
+    at: i64,
+) -> Option<FiringCycleClose> {
+    let prev_state = prev?;
+    let mut next = apply_outcome(
+        &prev_state.alert_id,
+        &prev_state.group_key,
+        prev,
+        RunOutcome::Normal,
+        level,
+        at,
+    )
+    .state?;
+    let firing = next.level.is_some_and(|l| l.is_firing());
+    apply_episode(
+        &mut next,
+        firing,
+        &EpisodeInput::undelivered(keep_firing_for_secs),
+        at,
+        String::new,
+    );
+    hold_firing_cycle(prev, &mut next);
+    closes_firing_cycle(prev, Some(&next), at)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn state() -> AlertState {
+        AlertState::empty("alert_1", "")
+    }
+
+    fn delivered() -> EpisodeInput {
+        EpisodeInput {
+            delivered: true,
+            incident_id: None,
+            keep_firing_for_secs: 0,
+            episode_id: None,
+        }
+    }
+
+    #[test]
+    fn a_suppressed_firing_neither_opens_an_episode_nor_disturbs_one() {
+        let mut s = state();
+        apply_episode(&mut s, true, &EpisodeInput::undelivered(0), 10, || {
+            "ep_1".into()
+        });
+        assert!(
+            s.episode_id.is_none(),
+            "nothing was delivered, so nothing paged"
+        );
+        assert!(
+            apply_episode(&mut s, false, &EpisodeInput::undelivered(0), 20, || "x"
+                .into())
+            .is_none(),
+            "there is nothing to recover from"
+        );
+
+        // The other half: a suppressed firing must not disturb the episode a
+        // delivered one already opened, or the resolve loses its dedup key.
+        apply_episode(&mut s, true, &delivered(), 30, || "ep_2".into());
+        apply_episode(&mut s, true, &EpisodeInput::undelivered(0), 40, || {
+            "ep_3".into()
+        });
+        assert_eq!(
+            s.episode_id.as_deref(),
+            Some("ep_2"),
+            "a suppressed firing must not mint a second id"
+        );
+        let closed = apply_episode(&mut s, false, &EpisodeInput::undelivered(0), 50, || {
+            "x".into()
+        })
+        .expect("the delivered episode still recovers");
+        assert_eq!(closed.episode_id, "ep_2");
+    }
+
+    #[test]
+    fn an_episode_recovers_exactly_once_however_often_it_is_evaluated() {
+        let mut s = state();
+        apply_episode(&mut s, true, &delivered(), 10, || "ep_1".into());
+        assert_eq!(s.episode_id.as_deref(), Some("ep_1"));
+
+        let closed = apply_episode(&mut s, false, &EpisodeInput::undelivered(0), 20, || {
+            "ep_2".into()
+        })
+        .expect("the first clear evaluation recovers");
+        assert_eq!(closed.episode_id, "ep_1");
+        assert_eq!(closed.opened_at, 10);
+        assert_eq!(closed.recovered_at, 20);
+
+        // The id is gone, so the question the scheduler asks every tick has
+        // nothing left to answer with.
+        for at in [30, 40, 50] {
+            assert!(
+                apply_episode(&mut s, false, &EpisodeInput::undelivered(0), at, || "ep_3"
+                    .into())
+                .is_none(),
+                "a second emit must be impossible, not merely guarded"
+            );
+        }
+    }
+
+    #[test]
+    fn keep_firing_for_holds_the_episode_open_and_keeps_the_clear_time() {
+        let hold = EpisodeInput {
+            delivered: false,
+            incident_id: None,
+            keep_firing_for_secs: 60,
+            episode_id: None,
+        };
+        let mut s = state();
+        apply_episode(&mut s, true, &delivered(), 0, || "ep_1".into());
+
+        assert!(apply_episode(&mut s, false, &hold, 1_000_000, || "x".into()).is_none());
+        assert_eq!(s.recovering_since, Some(1_000_000));
+        assert!(apply_episode(&mut s, false, &hold, 30_000_000, || "x".into()).is_none());
+
+        let closed = apply_episode(&mut s, false, &hold, 61_000_000, || "x".into())
+            .expect("the hold has expired");
+        assert_eq!(
+            closed.recovered_at, 1_000_000,
+            "the hold delays the message, it does not move the recovery"
+        );
+    }
+
+    #[test]
+    fn a_re_fire_during_the_hold_keeps_the_same_episode() {
+        let hold = EpisodeInput {
+            delivered: false,
+            incident_id: None,
+            keep_firing_for_secs: 60,
+            episode_id: None,
+        };
+        let mut s = state();
+        apply_episode(&mut s, true, &delivered(), 0, || "ep_1".into());
+        apply_episode(&mut s, false, &hold, 1_000_000, || "x".into());
+        assert_eq!(s.recovering_since, Some(1_000_000));
+
+        apply_episode(
+            &mut s,
+            true,
+            &EpisodeInput::undelivered(60),
+            2_000_000,
+            || "ep_2".into(),
+        );
+        assert_eq!(
+            s.episode_id.as_deref(),
+            Some("ep_1"),
+            "same firing, same dedup key"
+        );
+        assert!(s.recovering_since.is_none(), "it is firing again");
+    }
+
+    #[test]
+    fn the_incident_that_owned_the_firing_owns_the_recovery() {
+        let mut s = state();
+        apply_episode(&mut s, true, &EpisodeInput::undelivered(0), 0, || {
+            "x".into()
+        });
+        apply_episode(
+            &mut s,
+            true,
+            &EpisodeInput {
+                delivered: true,
+                incident_id: Some("inc_1".into()),
+                keep_firing_for_secs: 0,
+                episode_id: None,
+            },
+            10,
+            || "ep_1".into(),
+        );
+
+        let closed = apply_episode(&mut s, false, &EpisodeInput::undelivered(0), 20, || {
+            "x".into()
+        })
+        .expect("recovered");
+        assert_eq!(closed.incident_id.as_deref(), Some("inc_1"));
+    }
+
+    #[test]
+    fn a_new_firing_after_a_recovery_is_a_new_episode() {
+        let mut s = state();
+        apply_episode(&mut s, true, &delivered(), 0, || "ep_1".into());
+        apply_episode(&mut s, false, &EpisodeInput::undelivered(0), 10, || {
+            "x".into()
+        });
+        apply_episode(&mut s, true, &delivered(), 20, || "ep_2".into());
+        assert_eq!(s.episode_id.as_deref(), Some("ep_2"));
+        assert_eq!(s.episode_opened_at, Some(20));
+    }
+
+    const MIN: i64 = 60 * MICROS_PER_SECOND;
+
+    /// One single-row evaluation in the order the scheduler persists it.
+    fn evaluate(prev: Option<&AlertState>, firing: bool, hold_secs: i64, at: i64) -> AlertState {
+        let (outcome, level) = if firing {
+            (RunOutcome::Firing, AlertLevel::Critical)
+        } else {
+            (RunOutcome::Normal, AlertLevel::Ok)
+        };
+        let mut next = apply_outcome("alert_1", "", prev, outcome, Some(level), at)
+            .state
+            .unwrap();
+        let input = EpisodeInput {
+            delivered: firing,
+            keep_firing_for_secs: hold_secs,
+            ..EpisodeInput::undelivered(hold_secs)
+        };
+        apply_episode(&mut next, firing, &input, at, || "ep".into());
+        hold_firing_cycle(prev, &mut next);
+        next
+    }
+
+    /// AC-P2.1.3
+    #[test]
+    fn keep_firing_for_holds_the_firing_cycle_until_the_episode_closes() {
+        let hold = 300;
+        let mut s = evaluate(None, true, hold, 0);
+        assert_eq!(s.firing_started_at, Some(0));
+
+        // Normal for 2 minutes, then a re-fire inside the hold: the same firing.
+        for minute in [1, 2] {
+            let predicted = single_row_clear(Some(&s), Some(AlertLevel::Ok), hold, minute * MIN);
+            assert_eq!(predicted, None, "minute {minute} is inside the hold");
+            s = evaluate(Some(&s), false, hold, minute * MIN);
+            assert_eq!(s.firing_started_at, Some(0), "held at minute {minute}");
+        }
+        s = evaluate(Some(&s), true, hold, 3 * MIN);
+        assert_eq!(
+            s.firing_started_at,
+            Some(0),
+            "a re-fire inside the hold keeps it"
+        );
+
+        // Normal for 6 minutes: still set while held, cleared on the run that ends the hold.
+        for minute in 4..9 {
+            s = evaluate(Some(&s), false, hold, minute * MIN);
+            assert_eq!(s.firing_started_at, Some(0), "held at minute {minute}");
+        }
+        let predicted = single_row_clear(Some(&s), Some(AlertLevel::Ok), hold, 9 * MIN);
+        let next = evaluate(Some(&s), false, hold, 9 * MIN);
+        assert_eq!(next.firing_started_at, None);
+        let close = closes_firing_cycle(Some(&s), Some(&next), 9 * MIN);
+        assert_eq!(
+            close,
+            Some(FiringCycleClose {
+                firing_started_at: 0,
+                cleared_at: 4 * MIN,
+            }),
+            "the clear is dated to the first clear, not the end of the hold"
+        );
+        assert_eq!(
+            predicted, close,
+            "the pre-persist prediction matches the write"
+        );
+    }
+
+    #[test]
+    fn without_a_hold_the_first_normal_closes_the_cycle_at_the_run() {
+        let s = evaluate(None, true, 0, 0);
+        let next = evaluate(Some(&s), false, 0, MIN);
+        let close = Some(FiringCycleClose {
+            firing_started_at: 0,
+            cleared_at: MIN,
+        });
+        assert_eq!(closes_firing_cycle(Some(&s), Some(&next), MIN), close);
+        assert_eq!(
+            single_row_clear(Some(&s), Some(AlertLevel::Ok), 0, MIN),
+            close
+        );
+        assert_eq!(closes_firing_cycle(Some(&next), Some(&next), 2 * MIN), None);
+    }
+
+    #[test]
+    fn an_undelivered_firing_has_no_episode_to_hold_and_closes_at_once() {
+        let mut s = apply_outcome(
+            "alert_1",
+            "",
+            None,
+            RunOutcome::Firing,
+            Some(AlertLevel::Critical),
+            0,
+        )
+        .state
+        .unwrap();
+        apply_episode(&mut s, true, &EpisodeInput::undelivered(300), 0, || {
+            "x".into()
+        });
+        assert_eq!(
+            single_row_clear(Some(&s), Some(AlertLevel::Ok), 300, MIN),
+            Some(FiringCycleClose {
+                firing_started_at: 0,
+                cleared_at: MIN,
+            })
+        );
+    }
+
+    #[test]
+    fn a_frozen_clear_run_closes_nothing() {
+        let s = evaluate(None, true, 0, 0);
+        assert_eq!(single_row_clear(Some(&s), None, 0, MIN), None);
+        assert_eq!(single_row_clear(None, Some(AlertLevel::Ok), 0, MIN), None);
+    }
+}

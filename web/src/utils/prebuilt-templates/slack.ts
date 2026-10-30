@@ -12,7 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { PrebuiltConfig } from "./types";
+import { gt, raw } from "@/types/i18n";
+
+import { DestinationTile, PrebuiltConfig, PrebuiltType } from "./types";
+
+export const isValidSlackWebhookUrl = (url: string): boolean => {
+  if (url !== url.trim() || /\s/.test(url) || url.includes("?") || url.includes("#")) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(url);
+    const validHost =
+      parsed.hostname === "hooks.slack.com" || parsed.hostname === "hooks.slack-gov.com";
+
+    return (
+      parsed.protocol === "https:" &&
+      validHost &&
+      parsed.username === "" &&
+      parsed.password === "" &&
+      parsed.port === "" &&
+      parsed.search === "" &&
+      parsed.hash === "" &&
+      /^\/services\/[^/]+\/[^/]+\/[^/]+\/?$/.test(parsed.pathname)
+    );
+  } catch {
+    return false;
+  }
+};
 
 /**
  * Slack prebuilt destination configuration
@@ -21,13 +48,13 @@ import { PrebuiltConfig } from "./types";
  */
 const slackTemplateBody = JSON.stringify(
   {
-    text: "🚨 *Alert: {alert_name}*",
+    text: "[{alert_status}] *{alert_name}*",
     blocks: [
       {
         type: "header",
         text: {
           type: "plain_text",
-          text: "🚨 {alert_name}",
+          text: "[{alert_status}] {alert_name}",
         },
       },
       {
@@ -35,7 +62,7 @@ const slackTemplateBody = JSON.stringify(
         fields: [
           { type: "mrkdwn", text: "*Stream:*\n{stream_name}" },
           { type: "mrkdwn", text: "*Type:*\n{stream_type}" },
-          { type: "mrkdwn", text: "*Status:*\n🔴 Firing" },
+          { type: "mrkdwn", text: "*Status:*\n{alert_status}" },
           { type: "mrkdwn", text: "*Count:*\n{alert_count}" },
         ],
       },
@@ -76,38 +103,16 @@ export const slackConfig: PrebuiltConfig = {
     "Content-Type": "application/json",
   },
   method: "post",
-  urlValidator: (url: string) => {
-    try {
-      const parsed = new URL(url);
-      const hostname = parsed.hostname.toLowerCase();
-      return (
-        parsed.protocol === "https:" &&
-        (hostname === "hooks.slack.com" || hostname.endsWith(".hooks.slack.com"))
-      );
-    } catch {
-      return false;
-    }
-  },
   credentialFields: [
     {
       key: "webhookUrl",
       labelKey: "alerts.prebuiltDestinations.slackWebhookUrl",
       type: "text",
       required: true,
-      hint: "Get your webhook URL from Slack App settings",
+      hintKey: "alerts.prebuiltDestinations.slackWebhookUrlHelp",
       validator: (url: string) => {
         const invalid = { key: "alerts.prebuiltDestinations.invalidSlackWebhookUrl" };
-        try {
-          const parsed = new URL(url);
-          const hostname = parsed.hostname.toLowerCase();
-          return (
-            (parsed.protocol === "https:" &&
-              (hostname === "hooks.slack.com" || hostname.endsWith(".hooks.slack.com"))) ||
-            invalid
-          );
-        } catch {
-          return invalid;
-        }
+        return isValidSlackWebhookUrl(url) || invalid;
       },
     },
     {
@@ -115,19 +120,38 @@ export const slackConfig: PrebuiltConfig = {
       labelKey: "alerts.prebuiltDestinations.slackChannel",
       type: "text",
       required: false,
-      hint: "e.g., #alerts",
+      hintKey: "alerts.prebuiltDestinations.slackChannelHelp",
+      persistInMetadata: true,
     },
   ],
 };
 
 import slackLogo from "@/assets/images/alerts/destinations/slack.png";
 
-export const slackDestinationType = {
+export const slackDestinationType: PrebuiltType = {
   id: "slack",
-  name: "Slack",
-  description: "Send notifications to Slack channels",
+  get name() {
+    return gt("slackApp.destination.webhookTile", { product: raw("Slack") });
+  },
+  descriptionKey: "alert_destinations.prebuilt.slackDescription",
   icon: "slack",
   image: slackLogo,
   popular: true,
   category: "messaging",
+};
+
+export const slackAppDestinationTile: DestinationTile = {
+  id: "slack_app",
+  get name() {
+    return gt("slackApp.destination.appTile", { product: raw("Slack") });
+  },
+  descriptionKey: "alert_destinations.prebuilt.slackAppDescription",
+  icon: "slack",
+  image: slackLogo,
+  get tag() {
+    return {
+      label: gt("slackApp.destination.recommendedForAlertResponse"),
+      variant: "success-soft" as const,
+    };
+  },
 };

@@ -1,7 +1,7 @@
 ﻿<template>
   <OCard class="flex h-full flex-col">
     <!-- Top toolbar: [stream-selector] [search-input]  ···spacer···  [legends] -->
-    <div class="flex items-center gap-2 p-1.5 pb-0">
+    <div class="flex flex-wrap items-center gap-2 gap-y-1 p-1.5 pb-0">
       <!-- Stream selector (hidden when a parent drives selection, e.g. the
            Agent Graph page which selects by agent). -->
       <div
@@ -10,8 +10,8 @@
         class="w-44 flex-shrink-0"
       >
         <OSelect
-          :model-value="streamFilter"
-          :options="availableStreams.map((s) => ({ label: s, value: s }))"
+          :model-value="selectedStreamFilter"
+          :options="availableStreams.map((s) => ({ label: raw(s), value: s }))"
           labelKey="label"
           valueKey="value"
           class="rounded-default w-auto flex-shrink-0"
@@ -23,11 +23,11 @@
           :content="t('traces.serviceGraph.noStreamsDetected')"
         />
       </div>
-      <!-- Search input -->
-      <div data-test="service-graph-search-input">
+      <!-- Search input (hidden when a parent renders it in its own toolbar). -->
+      <div v-if="!hideSearchInput" data-test="service-graph-search-input">
         <OSearchInput
           v-model="searchFilter"
-          class="w-56!"
+          class="w-56! max-lg:w-40!"
           :placeholder="t('traces.serviceGraph.searchPlaceholder')"
           :debounce="300"
           @update:model-value="applyFilters"
@@ -39,21 +39,29 @@
       <!-- Legends (horizontal) -->
       <div
         data-test="service-graph-legends"
-        class="rounded-default border-card-glass-border! flex flex-row items-center gap-3 border p-[0.325rem]"
+        class="rounded-default border-card-glass-border! flex max-w-full flex-row flex-wrap items-center gap-3 gap-y-1.5 border p-[0.325rem]"
       >
-        <div data-test="sg-legend" class="flex min-w-0 flex-row items-center gap-3">
-          <!-- Border Color -->
-          <div class="text-text-label! mb-0! text-xs font-bold whitespace-nowrap">
+        <div
+          data-test="sg-legend"
+          class="flex min-w-0 flex-row flex-wrap items-center gap-3 gap-y-1"
+          :title="
+            isMobile
+              ? `${t('traces.serviceGraph.borderColor')} | ${t('traces.serviceGraph.borderColorMetric')}`
+              : undefined
+          "
+        >
+          <div class="text-text-label! mb-0! text-xs font-bold whitespace-nowrap max-md:hidden">
             {{ t("traces.serviceGraph.borderColor") }}
             <span class="font-normal opacity-55"
               >| {{ t("traces.serviceGraph.borderColorMetric") }}</span
             >
           </div>
-          <div class="flex! flex-row gap-2">
+          <div class="flex! flex-row flex-wrap gap-2 gap-y-1">
             <div
               v-for="level in healthLevels"
               :key="level.key"
               class="flex flex-none flex-row items-center gap-1.5"
+              :title="isMobile ? `${level.label} ${level.range}` : undefined"
               :data-test="`sg-legend-${level.key}`"
             >
               <span
@@ -69,12 +77,12 @@
                 <div class="text-text-secondary! text-left text-xs font-semibold">
                   {{ level.label }}
                 </div>
-                <div class="text-3xs text-left opacity-55">{{ level.range }}</div>
+                <div class="text-3xs text-left opacity-55 max-md:hidden">{{ level.range }}</div>
               </div>
             </div>
           </div>
         </div>
-        <OSeparator vertical class="mx-1 self-stretch" />
+        <OSeparator vertical class="mx-1 self-stretch max-md:hidden" />
         <!-- Inventory chip: total entity count. Click to expand the per-kind
              distribution (read-only; the show/hide toggles live in "Show types"). -->
         <ODropdown side="bottom" align="start">
@@ -86,7 +94,7 @@
               icon-right="expand-more"
             >
               <span class="text-text-secondary font-bold">{{ totalEntities }}</span>
-              <span class="text-text-body ml-1">{{ t("traces.serviceGraph.entities") }}</span>
+              <span class="text-text-body ms-1">{{ t("traces.serviceGraph.entities") }}</span>
             </OButton>
           </template>
           <div class="min-w-48" data-test="service-graph-entity-distribution">
@@ -125,7 +133,7 @@
                    dropdown below. -->
               <span
                 v-if="activeFilterCount > 0"
-                class="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-white"
+                class="ms-1.5 inline-block h-1.5 w-1.5 rounded-full bg-white"
                 data-test="service-graph-active-filter-indicator"
               />
               <OTooltip
@@ -317,9 +325,9 @@
                 v-if="selectedNode"
                 :selected-node="selectedNode"
                 :graph-data="graphData"
-                :time-range="searchObj.data.datetime"
+                :time-range="sidePanelTimeRange"
                 :visible="showSidePanel"
-                :stream-filter="streamFilter"
+                :stream-filter="selectedStreamFilter"
                 :container-el="graphContainerRef"
                 @close="handleCloseSidePanel"
                 @view-traces="$emit('view-traces', $event)"
@@ -364,8 +372,8 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
-import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
+import useBreakpoint from "@/composables/useBreakpoint";
 import serviceGraphService from "@/services/service_graph";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import ServiceGraphSidePanel from "./ServiceGraphNodeSidePanel.vue";
@@ -430,7 +438,7 @@ export default defineComponent({
   props: {
     // Optional external stream override. When set (e.g. by the standalone
     // Agent Graph page, which selects by agent → its source_stream), it seeds
-    // the internal streamFilter and keeps it in sync, instead of the component
+    // the internal selectedStreamFilter and keeps it in sync, instead of the component
     // sourcing the stream from the shared traces store.
     streamFilter: {
       type: String,
@@ -438,6 +446,13 @@ export default defineComponent({
     },
     // Hide the built-in stream dropdown when the parent owns selection.
     hideStreamSelector: {
+      type: Boolean,
+      default: false,
+    },
+    // Same idea as `hideStreamSelector`: the standalone Service Graph page
+    // renders the search box in its own subnav row beside the stream picker,
+    // so the built-in one must not render twice.
+    hideSearchInput: {
       type: Boolean,
       default: false,
     },
@@ -495,9 +510,9 @@ export default defineComponent({
   setup(props, { emit, expose }) {
     const store = useStore();
     const { isDark } = useTheme();
-    const router = useRouter();
-    const { t } = useI18n();
-    const { getStreams } = useStreams();
+    const { t } = useI18nTyped();
+    const { isMobile } = useBreakpoint();
+    const { getStreams } = useStreams(t);
     const { searchObj } = useTraces();
 
     // Resolved visualization + layout type. A parent that owns its own type
@@ -524,6 +539,22 @@ export default defineComponent({
     // Node side panel state
     const selectedNode = ref<any>(null);
     const showSidePanel = ref(false);
+    // Stored relative start/end go stale, so the panel resolves "now" when it opens or the range changes.
+    const sidePanelTimeRange = ref(getEffectiveTimeRange(searchObj.data.datetime));
+    watch(
+      () => [
+        selectedNode.value,
+        searchObj.data.datetime.type,
+        searchObj.data.datetime.relativeTimePeriod,
+        searchObj.data.datetime.startTime,
+        searchObj.data.datetime.endTime,
+      ],
+      () => {
+        if (selectedNode.value) {
+          sidePanelTimeRange.value = getEffectiveTimeRange(searchObj.data.datetime);
+        }
+      },
+    );
 
     const chartRendererRef = ref<any>(null);
     const graphContainerRef = ref<HTMLElement | null>(null);
@@ -534,7 +565,9 @@ export default defineComponent({
     // otherwise sync from the traces page selected stream / localStorage.
     const tracesStream = searchObj.data.stream?.selectedStream?.value || "";
     const storedStreamFilter = localStorage.getItem("serviceGraph_streamFilter");
-    const streamFilter = ref(props.streamFilter || tracesStream || storedStreamFilter || "default");
+    const selectedStreamFilter = ref(
+      props.streamFilter || tracesStream || storedStreamFilter || "default",
+    );
     // Keep the internal ref in sync when the parent drives the stream (e.g. the
     // Agent Graph page selecting by agent → its source_stream) AND reload the
     // graph. The built-in dropdown delegates reload to its parent via
@@ -544,8 +577,8 @@ export default defineComponent({
     watch(
       () => props.streamFilter,
       (next) => {
-        if (next && next !== streamFilter.value) {
-          streamFilter.value = next;
+        if (next && next !== selectedStreamFilter.value) {
+          selectedStreamFilter.value = next;
           loadServiceGraph();
         }
       },
@@ -949,7 +982,7 @@ export default defineComponent({
 
     // Watch for stream filter changes and restore chart viewport
     watch(
-      () => streamFilter.value,
+      () => selectedStreamFilter.value,
       async () => {
         // Wait for chart to update with new data
         await nextTick();
@@ -1032,17 +1065,19 @@ export default defineComponent({
       // Custom tooltip element — node tooltips use innerHTML, edge tooltips use an ECharts mini chart
       const tooltipEl = document.createElement("div");
       const isDarkInit = isDark.value;
+      /* eslint-disable local/no-hardcoded-px -- raw cssText string for the ECharts tooltip chrome: backdrop blur, hairline border and drop shadow are optical effects, not text-relative lengths */
       tooltipEl.style.cssText = `
         position: absolute; pointer-events: none; z-index: 9999;
         background: ${isDarkInit ? "rgba(22, 22, 26, 0.90)" : "rgba(255, 255, 255, 0.88)"};
         backdrop-filter: blur(24px) saturate(180%);
         -webkit-backdrop-filter: blur(24px) saturate(180%);
         border: 1px solid ${isDarkInit ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.06)"};
-        border-radius: 14px;
+        border-radius: 0.875rem;
         display: none;
         box-shadow: 0 12px 40px rgba(0,0,0,${isDarkInit ? "0.5" : "0.14"}), 0 1px 0 rgba(255,255,255,${isDarkInit ? "0.04" : "0"}) inset;
         overflow: hidden;
       `;
+      /* eslint-enable local/no-hardcoded-px */
       const chartDom = chart.getDom();
       if (!chartDom.style.position || chartDom.style.position === "static") {
         chartDom.style.position = "relative";
@@ -1248,8 +1283,8 @@ export default defineComponent({
         tooltipEl.style.pointerEvents = "none";
         tooltipEl.style.width = "";
         tooltipEl.style.height = "";
-        tooltipEl.style.padding = "9px 13px";
-        tooltipEl.style.fontSize = "12px";
+        tooltipEl.style.padding = "0.5625rem 0.8125rem";
+        tooltipEl.style.fontSize = "0.75rem";
         tooltipEl.style.lineHeight = "1.5";
         tooltipEl.style.fontFamily = '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif';
         tooltipEl.style.letterSpacing = "0.01em";
@@ -1586,15 +1621,11 @@ export default defineComponent({
             ? props.timeRange
             : getEffectiveTimeRange(searchObj.data.datetime);
 
-        // Topology, node kinds, edges and latency all come from the
-        // pre-aggregated _o2_service_graph stream via /topology/current. The
-        // backend hourly job (processor + build_topology) computes the complete,
-        // classified topology — queue consumers, collision handling, GenAI
-        // agent/tool/model edges — incrementally per window, so reading it here
-        // is a cheap small-stream read that scales to TB-level trace volumes
-        // (we do NOT re-scan raw traces per load). The UI is a thin renderer.
+        // /topology/current reads the rollup metrics, so a load never re-scans raw traces.
         const streamName =
-          streamFilter.value && streamFilter.value !== "all" ? streamFilter.value : undefined;
+          selectedStreamFilter.value && selectedStreamFilter.value !== "all"
+            ? selectedStreamFilter.value
+            : undefined;
         const response = await serviceGraphService.getCurrentTopology(orgId, {
           streamName,
           startTime,
@@ -1768,12 +1799,12 @@ export default defineComponent({
       { deep: true },
     );
 
-    // Keep streamFilter in sync when Traces/Spans tab changes the global stream
+    // Keep selectedStreamFilter in sync when Traces/Spans tab changes the global stream
     watch(
       () => searchObj.data.stream.selectedStream.value,
       (newStream) => {
-        if (newStream && newStream !== streamFilter.value) {
-          streamFilter.value = newStream;
+        if (newStream && newStream !== selectedStreamFilter.value) {
+          selectedStreamFilter.value = newStream;
           localStorage.setItem("serviceGraph_streamFilter", newStream);
           loadServiceGraph();
         }
@@ -1865,10 +1896,24 @@ export default defineComponent({
       loadServiceGraph();
     });
 
-    // Public API for parent pages (e.g. Agent Graph page's header refresh).
-    expose({ refresh: loadServiceGraph, loading, lastRunAt });
+    // Public API for parent pages (e.g. Agent Graph page's header refresh, and
+    // the standalone Service Graph page, whose subnav-row stream picker calls
+    // `onStreamFilterChange` — it owns its own stream list because `expose()`
+    // unwraps refs, which would hand the parent a non-reactive snapshot).
+    expose({
+      refresh: loadServiceGraph,
+      loading,
+      lastRunAt,
+      onStreamFilterChange,
+      setSearchFilter: (v: string) => {
+        searchFilter.value = v;
+        applyFilters();
+      },
+    });
 
     return {
+      isMobile,
+      raw,
       t,
       loading,
       error,
@@ -1883,7 +1928,7 @@ export default defineComponent({
       showSettings,
       lastUpdated,
       searchFilter,
-      streamFilter,
+      selectedStreamFilter,
       availableStreams,
       chartData,
       chartKey,
@@ -1911,6 +1956,7 @@ export default defineComponent({
       // Node side panel
       selectedNode,
       showSidePanel,
+      sidePanelTimeRange,
       handleNodeClick,
       handleCloseSidePanel,
     };

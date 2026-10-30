@@ -30,7 +30,10 @@ test.describe("Job Search for schedule query", { tag: '@enterprise' }, () => {
         await logsPage.navigateToLogs();
         await logsPageEP.selectStreamDropDown();
         await logsPage.selectStreamAndStreamTypeForLogs(stream);
+        // Auto-detect can lag the typed SELECT, and in filter mode the job wraps it as `WHERE SELECT ...` (400).
+        await logsPage.enableSqlModeIfNeeded();
         await logsPageEP.queryJobSearch();
+        await logsPage.expectSqlModeActive();
         await logsPage.selectRunQuery();
         await logsPageEP.searchSchedulerDropdown();
         await logsPageEP.searchSchedulerCreate();

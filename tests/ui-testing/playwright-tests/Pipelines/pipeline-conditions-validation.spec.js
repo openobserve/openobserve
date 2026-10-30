@@ -58,8 +58,8 @@ test.describe("Pipeline Conditions - Data Filtering Validation", () => {
   test.afterEach(async ({ page }) => {
     // Lightweight pipeline cleanup
     try {
-      if (currentPipelineName) {
-        await pageManager.apiCleanup.deletePipeline(currentPipelineName).catch(() => {});
+      if (currentSourceStream) {
+        await pageManager.apiCleanup.cleanupPipelines([currentSourceStream]).catch(() => {});
         testLogger.info('Cleaned up pipeline', { currentPipelineName });
       }
     } catch (error) {
@@ -265,7 +265,7 @@ test.describe("Pipeline Conditions - Data Filtering Validation", () => {
 
     } finally {
       // Cleanup
-      await pageManager.apiCleanup.deletePipeline(pipelineName);
+      await pageManager.apiCleanup.cleanupPipelines([sourceStream]);
     }
   });
 
@@ -411,7 +411,7 @@ test.describe("Pipeline Conditions - Data Filtering Validation", () => {
       testLogger.info('✅ Multiple flat OR conditions validation PASSED');
 
     } finally {
-      await pageManager.apiCleanup.deletePipeline(pipelineName);
+      await pageManager.apiCleanup.cleanupPipelines([sourceStream]);
     }
   });
 
@@ -549,7 +549,7 @@ test.describe("Pipeline Conditions - Data Filtering Validation", () => {
       testLogger.info('✅ Nested OR group validation PASSED');
 
     } finally {
-      await pageManager.apiCleanup.deletePipeline(pipelineName);
+      await pageManager.apiCleanup.cleanupPipelines([sourceStream]);
     }
   });
 
@@ -662,7 +662,7 @@ test.describe("Pipeline Conditions - Data Filtering Validation", () => {
       testLogger.info('✅ Numeric comparison validation PASSED');
 
     } finally {
-      await pageManager.apiCleanup.deletePipeline(pipelineName);
+      await pageManager.apiCleanup.cleanupPipelines([sourceStream]);
     }
   });
 
@@ -802,7 +802,7 @@ test.describe("Pipeline Conditions - Data Filtering Validation", () => {
       testLogger.info('✅ Multiple AND conditions validation PASSED');
 
     } finally {
-      await pageManager.apiCleanup.deletePipeline(pipelineName);
+      await pageManager.apiCleanup.cleanupPipelines([sourceStream]);
     }
   });
 
@@ -933,7 +933,7 @@ test.describe("Pipeline Conditions - Data Filtering Validation", () => {
       testLogger.info('✅ Deeply nested group validation PASSED');
 
     } finally {
-      await pageManager.apiCleanup.deletePipeline(pipelineName);
+      await pageManager.apiCleanup.cleanupPipelines([sourceStream]);
     }
   });
 
@@ -1053,7 +1053,7 @@ test.describe("Pipeline Conditions - Data Filtering Validation", () => {
       testLogger.info('✅ NOT operator validation PASSED');
 
     } finally {
-      await pageManager.apiCleanup.deletePipeline(pipelineName);
+      await pageManager.apiCleanup.cleanupPipelines([sourceStream]);
     }
   });
 
@@ -1155,7 +1155,7 @@ test.describe("Pipeline Conditions - Data Filtering Validation", () => {
       testLogger.info('✅ Negative test with impossible condition PASSED');
 
     } finally {
-      await pageManager.apiCleanup.deletePipeline(pipelineName);
+      await pageManager.apiCleanup.cleanupPipelines([sourceStream]);
     }
   });
 
@@ -1261,7 +1261,7 @@ test.describe("Pipeline Conditions - Data Filtering Validation", () => {
       testLogger.info('✅ Universal condition validation PASSED');
 
     } finally {
-      await pageManager.apiCleanup.deletePipeline(pipelineName);
+      await pageManager.apiCleanup.cleanupPipelines([sourceStream]);
     }
   });
 
@@ -1422,7 +1422,7 @@ test.describe("Pipeline Conditions - Data Filtering Validation", () => {
       testLogger.info('✅ Maximum nesting depth validation PASSED');
 
     } finally {
-      await pageManager.apiCleanup.deletePipeline(pipelineName);
+      await pageManager.apiCleanup.cleanupPipelines([sourceStream]);
     }
   });
 });

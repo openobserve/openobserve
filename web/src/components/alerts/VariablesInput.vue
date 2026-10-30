@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex items-center gap-2 pb-2"
         :data-test="`alert-variables-${index + 1}`"
       >
-        <div class="ml-0">
+        <div class="ms-0">
           <OFormInput
             data-test="alert-variables-key-input"
             :name="`${namePrefix}[${index}].key`"
@@ -67,19 +67,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             tabindex="0"
           />
         </div>
-        <div class="ml-0">
+        <div class="ms-0">
           <OFormInput
             data-test="alert-variables-value-input"
             :name="`${namePrefix}[${index}].value`"
             :placeholder="t('common.value')"
             tabindex="0"
-            style="min-width: 250px"
+            style="min-width: 15.625rem"
           />
         </div>
-        <div class="ml-0 w-1/6">
+        <div class="ms-0 w-1/6">
           <OButton
             data-test="alert-variables-delete-variable-btn"
-            class="ml-1"
+            class="ms-1"
             variant="ghost"
             size="icon-circle-sm"
             :title="t('alert_templates.edit')"
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             data-test="alert-variables-add-variable-btn"
             v-if="index === formRows.length - 1"
-            class="ml-1"
+            class="ms-1"
             variant="ghost"
             size="icon-circle-sm"
             :title="t('alert_templates.edit')"
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { inject, ref } from "vue";
 import type { Ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -133,7 +133,7 @@ const props = defineProps({
   },
 });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // The injected OForm — rows are name-bound to it; add/remove go through its
 // field-array API below.

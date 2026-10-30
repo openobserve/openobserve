@@ -31,14 +31,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon-toolbar"
         @click="scheduledPipelineRef?.toggleAIChat()"
         data-test="menu-link-ai-item"
-        class="bg-[image:var(--color-gradient-ai-subtle)]! transition-[background,box-shadow] duration-300 hover:bg-[image:var(--color-gradient-ai)]! hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)]"
-        :class="
-          store.state.isAiChatEnabled
-            ? 'ai-btn-active bg-[image:var(--color-gradient-ai-subtle)]!'
-            : ''
-        "
+        :aria-label="t('menu.aiAssistant')"
+        class="bg-gradient-ai-subtle! hover:bg-gradient-ai! hover:shadow-ai-accent/35 transition-[background,box-shadow] duration-300 hover:shadow-md"
+        :class="store.state.isAiChatEnabled ? 'ai-btn-active bg-gradient-ai-subtle!' : ''"
       >
         <img
+          alt=""
           :src="scheduledPipelineRef?.getBtnLogo"
           class="header-icon ai-icon opacity-70 transition-[transform] duration-[0.6s] ease-[ease]"
           :class="store.state.isAiChatEnabled ? 'opacity-100!' : ''"
@@ -54,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <DateTime
-        style="height: 34px !important; border-radius: 3px"
+        class="h-8.5"
         menu-align="end"
         @on:date-change="(d) => scheduledPipelineRef?.updateDateChange(d)"
       />
@@ -74,6 +72,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </OButton>
       <OButton
+        :aria-label="
+          scheduledPipelineRef?.isFullscreen ? t('common.exitFullscreen') : t('common.fullscreen')
+        "
         data-test="add-function-fullscreen-btn"
         variant="ghost"
         size="icon-xs-sq"
@@ -137,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { computed, onMounted, ref, watch, type Ref, onActivated, provide } from "vue";
 import { rangesFromServerError, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { getTimezoneOffset, getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import useStreams from "@/composables/useStreams";
@@ -193,7 +194,7 @@ interface StreamRoute {
   };
   delay: number;
   context_attributes: any;
-  description: string;
+  description: I18nText;
   enabled: boolean;
 }
 
@@ -222,11 +223,11 @@ const props = defineProps({
   },
 });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const store = useStore();
 
-const { getStream } = useStreams();
+const { getStream } = useStreams(t);
 
 const { buildQueryPayload } = useQuery();
 
@@ -279,12 +280,13 @@ const originalStreamFields: Ref<any[]> = ref([]);
 // `isAggregationEnabled` is a reactive view of the form-owned flag. The
 // aggregation toggle in ScheduledPipeline writes it via the form, so this read
 // stays in sync (single source of truth — no mirror).
-const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
+const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop(t);
 
 const dialog = ref({
   show: false,
-  title: "",
-  message: "",
+  // raw("") is only the empty placeholder — the real values are assigned from t().
+  title: raw(""),
+  message: raw(""),
   okCallback: () => {},
 });
 
@@ -423,8 +425,8 @@ const openCancelDialog = () => {
   }
 
   dialog.value.show = true;
-  dialog.value.title = "Discard Changes";
-  dialog.value.message = "Are you sure you want to cancel routing changes?";
+  dialog.value.title = t("common.discardChanges");
+  dialog.value.message = t("pipeline.cancelRoutingChangesConfirm");
   dialog.value.okCallback = () => {
     // Restore original data onto the form (single source of truth).
     form.reset(JSON.parse(JSON.stringify(originalStreamRouting.value)) as QueryForm);
@@ -510,8 +512,8 @@ const saveQueryData = async () => {
 
 const openDeleteDialog = () => {
   dialog.value.show = true;
-  dialog.value.title = "Delete Node";
-  dialog.value.message = "Are you sure you want to delete stream routing?";
+  dialog.value.title = t("pipeline.deleteNodeTitle");
+  dialog.value.message = t("pipeline.deleteStreamRoutingConfirm");
   dialog.value.okCallback = deleteRoute;
 };
 
@@ -543,10 +545,13 @@ const validateSqlQuery = async () => {
     validatingSqlQuery.value = false;
     return;
   }
-  const query = buildQueryPayload({
-    sqlMode: true,
-    streamName: streamRoute.value.name as string,
-  });
+  const query = buildQueryPayload(
+    {
+      sqlMode: true,
+      streamName: streamRoute.value.name as string,
+    },
+    t,
+  );
 
   delete query.aggs;
 
@@ -585,11 +590,13 @@ const validateSqlQuery = async () => {
         if (err) {
           isValidSqlQuery.value = false;
           const message = err?.response?.data?.message
-            ? `Invalid SQL Query: ${err?.response?.data?.message}`
-            : "Invalid SQL Query";
+            ? t("toastMessages.NodeForm.invalidSqlQueryDetail", {
+                error: err.response.data.message,
+              })
+            : t("toastMessages.NodeForm.invalidSqlQuery");
           toast({
             variant: "error",
-            message: `${message}`,
+            message,
           });
 
           // Locate the offending token in the SQL and squiggle it in the editor.

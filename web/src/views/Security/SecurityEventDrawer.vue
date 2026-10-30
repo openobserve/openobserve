@@ -5,7 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
      evaluated server-side. -->
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -54,7 +54,7 @@ const emit = defineEmits<{
   (e: "add-filter", field: string, value: string, op?: string): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // ── Header ───────────────────────────────────────────────────────────────────
 const tone = computed(() => toneOfSeverityId(props.normalized.severityId));

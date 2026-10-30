@@ -35,14 +35,7 @@
 
 /** The kind an entity is classified into. RPC is a first-class dependency. */
 export type EntityKind =
-  | "service"
-  | "datastore"
-  | "queue"
-  | "external"
-  | "rpc"
-  | "agent"
-  | "tool"
-  | "model";
+  "service" | "datastore" | "queue" | "external" | "rpc" | "agent" | "tool" | "model";
 
 /** The inferred types we branch on explicitly. */
 export type KnownInferType = "database" | "queue" | "external" | "rpc";

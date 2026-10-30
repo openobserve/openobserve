@@ -22,26 +22,12 @@ use std::ops::Range;
 
 use arrow::{error::ArrowError, record_batch::RecordBatch};
 use bytes::Bytes;
-use config::{FileFormat, utils::parquet::RecordBatchStream};
 
 pub(super) type RecordBatchIter = Box<dyn Iterator<Item = Result<RecordBatch, ArrowError>>>;
 
 pub(super) enum ChunkSelector {
     Parquet(usize),     // row_group id
     Vortex(Range<u64>), // row range
-}
-
-/// Read a whole file as a record batch stream restricted to `projection`
-/// columns. `None` reads every column.
-pub(super) async fn file_stream(
-    file_format: FileFormat,
-    data: Bytes,
-    projection: Option<&[String]>,
-) -> Result<RecordBatchStream, anyhow::Error> {
-    match file_format {
-        FileFormat::Parquet => parquet::scan_parquet_async(data, projection).await,
-        FileFormat::Vortex => vortex::scan_vortex_async(data, projection).await,
-    }
 }
 
 /// Sync chunk reader. Returns a sync `Iterator`.

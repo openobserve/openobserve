@@ -21,8 +21,8 @@
 //! placeholder translation ($N → ?) automatically per backend.
 
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, DbErr, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
-    Statement, Value, sea_query::Expr,
+    ColumnTrait, ConnectionTrait, DatabaseBackend, DbErr, EntityTrait, QueryFilter, QueryOrder,
+    QuerySelect, Statement, Value, sea_query::Expr,
 };
 use serde::Serialize;
 use svix_ksuid::KsuidLike as _;
@@ -37,6 +37,8 @@ pub struct EnqueueParams<'a> {
     pub synthetics_name: &'a str,
     pub org_id: &'a str,
     pub location: &'a str,
+    /// Environment this job runs against, or None for an unscoped check.
+    pub env: Option<&'a str>,
     pub pool: &'a str,
     pub scheduled_ts: i64,
     pub valid_until: i64,
@@ -45,6 +47,10 @@ pub struct EnqueueParams<'a> {
     /// JSON array of `{execution_id, engine, device}` — browser checks only. `None` for
     /// protocol checks.
     pub browser_devices: Option<&'a str>,
+    /// Steps the journey defined at enqueue time — 1 for protocol checks. Frozen
+    /// onto the row: the ack clamps the probe's count at `steps_configured x
+    /// (retries + 1)`, so a live read would let an in-flight edit reprice work.
+    pub steps_configured: i32,
     /// Serialized `JobMetadata` — check-level context copied at enqueue time.
     pub metadata: &'a str,
 }
@@ -69,6 +75,7 @@ pub struct LeasedRow {
     pub synthetics_name: String,
     pub org_id: String,
     pub location: String,
+    pub env: Option<String>,
     pub pool: String,
     pub scheduled_ts: i64,
     pub valid_until: i64,
@@ -76,6 +83,9 @@ pub struct LeasedRow {
     pub dispatch_attempts: i32,
     pub run_id: String,
     pub browser_devices: Option<String>,
+    /// Steps frozen at enqueue (1 for protocol checks). The ack's clamp ceiling
+    /// comes from THIS, never the current check — see `EnqueueParams`.
+    pub steps_configured: i32,
     pub metadata: String,
 }
 
@@ -88,6 +98,13 @@ pub struct DeadLetteredRow {
     pub synthetics_name: String,
     pub org_id: String,
     pub location: String,
+    /// The SLOT this job was scheduled for, not the wall clock it died at.
+    pub scheduled_ts: i64,
+    /// Steps frozen at enqueue — the definition this job was dispatched against.
+    pub steps_configured: i32,
+    /// Engine+device combos frozen onto this job (`None` for protocol checks) —
+    /// the other half of `configured x combos`.
+    pub browser_devices: Option<String>,
     pub dispatch_attempts: i32,
     pub run_id: String,
     pub metadata: String,
@@ -136,6 +153,23 @@ pub fn dead_letter_reason(
 
 // ── Scheduler: enqueue ────────────────────────────────────────────────────────
 
+/// The unique index that makes `enqueue`'s `ON CONFLICT` target resolve.
+pub(crate) const DEDUP_UQ: &str = "synthetics_jobs_dedup_env_uq";
+
+/// The dedup key, with `env` COALESCEd.
+pub(crate) fn dedup_index_sql(backend: DatabaseBackend) -> String {
+    match backend {
+        DatabaseBackend::Postgres | DatabaseBackend::Sqlite => format!(
+            "CREATE UNIQUE INDEX IF NOT EXISTS {DEDUP_UQ} ON synthetics_jobs \
+             (synthetics_id, location, scheduled_ts, (COALESCE(env, '')))"
+        ),
+        DatabaseBackend::MySql => format!(
+            "CREATE UNIQUE INDEX {DEDUP_UQ} ON synthetics_jobs (synthetics_id, location, \
+             scheduled_ts, env)"
+        ),
+    }
+}
+
 /// Inserts one pending check row. ON CONFLICT DO NOTHING prevents double-scheduling.
 /// Returns the KSUID assigned to the new job (or empty string on conflict-skip).
 pub async fn enqueue<C: ConnectionTrait>(
@@ -145,10 +179,11 @@ pub async fn enqueue<C: ConnectionTrait>(
     let id = svix_ksuid::Ksuid::new(None, None).to_string();
     let sql = r#"
         INSERT INTO synthetics_jobs
-            (id, synthetics_id, synthetics_name, org_id, location, pool,
-             scheduled_ts, valid_until, status, dispatch_attempts, run_id, browser_devices, metadata)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, 0, $9, $10, $11)
-        ON CONFLICT (synthetics_id, location, scheduled_ts) DO NOTHING
+            (id, synthetics_id, synthetics_name, org_id, location, env, pool,
+             scheduled_ts, valid_until, status, dispatch_attempts, run_id, browser_devices,
+             steps_configured, metadata)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, 0, $10, $11, $12, $13)
+        ON CONFLICT (synthetics_id, location, scheduled_ts, COALESCE(env, '')) DO NOTHING
     "#;
 
     conn.execute(Statement::from_sql_and_values(
@@ -160,6 +195,9 @@ pub async fn enqueue<C: ConnectionTrait>(
             Value::from(p.synthetics_name),
             Value::from(p.org_id),
             Value::from(p.location),
+            p.env
+                .map(Value::from)
+                .unwrap_or(Value::from(None::<String>)),
             Value::from(p.pool),
             Value::from(p.scheduled_ts),
             Value::from(p.valid_until),
@@ -167,6 +205,7 @@ pub async fn enqueue<C: ConnectionTrait>(
             p.browser_devices
                 .map(Value::from)
                 .unwrap_or(Value::from(None::<String>)),
+            Value::from(p.steps_configured),
             Value::from(p.metadata),
         ],
     ))
@@ -181,8 +220,9 @@ pub async fn get_by_id<C: ConnectionTrait>(
     id: &str,
 ) -> Result<Option<LeasedRow>, errors::Error> {
     let sql = r#"
-        SELECT id, synthetics_id, synthetics_name, org_id, location, pool,
-               scheduled_ts, valid_until, dispatch_attempts, run_id, browser_devices, metadata
+        SELECT id, synthetics_id, synthetics_name, org_id, location, env, pool,
+               scheduled_ts, valid_until, dispatch_attempts, run_id, browser_devices,
+               steps_configured, metadata
         FROM synthetics_jobs
         WHERE id = $1
     "#;
@@ -203,12 +243,14 @@ pub async fn get_by_id<C: ConnectionTrait>(
                 synthetics_name: row.try_get("", "synthetics_name")?,
                 org_id: row.try_get("", "org_id")?,
                 location: row.try_get("", "location")?,
+                env: row.try_get("", "env").unwrap_or_default(),
                 pool: row.try_get("", "pool")?,
                 scheduled_ts: row.try_get("", "scheduled_ts")?,
                 valid_until: row.try_get("", "valid_until")?,
                 dispatch_attempts: row.try_get("", "dispatch_attempts")?,
                 run_id: row.try_get("", "run_id")?,
                 browser_devices: row.try_get("", "browser_devices")?,
+                steps_configured: row.try_get("", "steps_configured")?,
                 metadata: row.try_get("", "metadata").unwrap_or_default(),
             })
         })
@@ -219,14 +261,15 @@ pub async fn get_by_id<C: ConnectionTrait>(
 /// Deletes all pending checks for a synthetic (called on check delete).
 pub async fn drain_check<C: ConnectionTrait>(
     conn: &C,
+    org_id: &str,
     synthetics_id: &str,
 ) -> Result<u64, errors::Error> {
-    let sql = "DELETE FROM synthetics_jobs WHERE synthetics_id = $1";
+    let sql = "DELETE FROM synthetics_jobs WHERE synthetics_id = $1 and org_id = $2";
     let res = conn
         .execute(Statement::from_sql_and_values(
             conn.get_database_backend(),
             sql,
-            [Value::from(synthetics_id)],
+            [Value::from(synthetics_id), Value::from(org_id)],
         ))
         .await?;
     Ok(res.rows_affected())
@@ -264,7 +307,7 @@ pub async fn lease_batch<C: ConnectionTrait>(
     lease_secs: i64,
     browser: Option<bool>,
 ) -> Result<Vec<LeasedRow>, errors::Error> {
-    let lease_secs = lease_secs.max(config::meta::synthetics::limits().job_lease_secs);
+    let lease_secs = lease_secs.max(config::get_config().synthetics.job_lease_secs);
     let lease_expires_at = now_us + lease_secs * 1_000_000;
 
     // `limit` arrives from a client and is cast to u64 below, where a negative
@@ -273,6 +316,8 @@ pub async fn lease_batch<C: ConnectionTrait>(
     // Reachable from a single mistyped env var, so it is clamped here rather than
     // trusted: a probe does not get to decide how much of the queue it may take.
     let limit = limit.clamp(1, MAX_LEASE_BATCH);
+
+    // read-back, which only reads rows pinned by our own stamp.
 
     // Step 1: pick candidate IDs.
     //
@@ -348,12 +393,14 @@ pub async fn lease_batch<C: ConnectionTrait>(
             synthetics_name: m.synthetics_name,
             org_id: m.org_id,
             location: m.location,
+            env: m.env,
             pool: m.pool,
             scheduled_ts: m.scheduled_ts,
             valid_until: m.valid_until,
             dispatch_attempts: m.dispatch_attempts,
             run_id: m.run_id,
             browser_devices: m.browser_devices,
+            steps_configured: m.steps_configured,
             metadata: m.metadata,
         })
         .collect())
@@ -434,6 +481,7 @@ pub async fn ack_complete<C: ConnectionTrait>(
         "UPDATE synthetics_jobs SET status = $1, result = $2, completed_at = $3 \
          WHERE id = $4 AND status = 1{owner_clause}"
     );
+
     let applied = conn
         .execute(Statement::from_sql_and_values(
             conn.get_database_backend(),
@@ -491,6 +539,7 @@ pub async fn requeue_expired<C: ConnectionTrait>(
           AND valid_until >= $1
           AND dispatch_attempts < $2
     "#;
+
     let res = conn
         .execute(Statement::from_sql_and_values(
             conn.get_database_backend(),
@@ -515,7 +564,7 @@ pub async fn requeue_expired<C: ConnectionTrait>(
 ///
 /// The caller **must** complete the run for every row returned. The per-row
 /// compare-and-swap below is what makes that safe to do exactly once: the reaper
-/// runs on every alert_manager node, and a bulk `UPDATE ... WHERE id IN (...)`
+/// runs on every scheduler node, and a bulk `UPDATE ... WHERE id IN (...)`
 /// after a separate SELECT lets two nodes both believe they terminated the same
 /// job. That was harmless while the caller only wrote to a stream; it is not
 /// harmless now that the caller increments a run counter, because a double
@@ -526,19 +575,32 @@ pub async fn dead_letter_expired<C: ConnectionTrait>(
     now_us: i64,
     max_attempts: i32,
 ) -> Result<Vec<DeadLetteredRow>, errors::Error> {
+    // Bounds one reaper pass so the global write lock below is never held
+    // across an unbounded backlog; the reaper runs periodically and picks up
+    // the remainder on its next tick.
+    const MAX_DEAD_LETTER_BATCH: i64 = 500;
+
+    // at fn end.
+
     // Step 1: find candidates before marking them dead. `status` comes back so
     // the CAS can require the row not to have moved under us.
     let select_sql = r#"
-        SELECT id, synthetics_id, synthetics_name, org_id, location, dispatch_attempts, run_id, metadata, status
+        SELECT id, synthetics_id, synthetics_name, org_id, location, scheduled_ts,
+               steps_configured, browser_devices, dispatch_attempts, run_id, metadata, status
         FROM synthetics_jobs
         WHERE (status = 1 AND lease_expires_at < $1 AND (dispatch_attempts >= $2 OR valid_until < $1))
            OR (status = 0 AND valid_until < $1)
+        LIMIT $3
     "#;
     let rows = conn
         .query_all(Statement::from_sql_and_values(
             conn.get_database_backend(),
             select_sql,
-            [Value::from(now_us), Value::from(max_attempts)],
+            [
+                Value::from(now_us),
+                Value::from(max_attempts),
+                Value::from(MAX_DEAD_LETTER_BATCH),
+            ],
         ))
         .await?;
 
@@ -559,6 +621,10 @@ pub async fn dead_letter_expired<C: ConnectionTrait>(
                     synthetics_name: row.try_get("", "synthetics_name").ok()?,
                     org_id: row.try_get("", "org_id").ok()?,
                     location: row.try_get("", "location").ok()?,
+                    scheduled_ts: row.try_get("", "scheduled_ts").ok()?,
+                    // Degradable: a dead-lettered job never acks, so nothing bills off these two.
+                    steps_configured: row.try_get("", "steps_configured").unwrap_or_default(),
+                    browser_devices: row.try_get("", "browser_devices").unwrap_or_default(),
                     dispatch_attempts,
                     run_id: row.try_get("", "run_id").ok()?,
                     metadata: row.try_get("", "metadata").unwrap_or_default(),
@@ -719,9 +785,7 @@ pub async fn run_location_outcomes<C: ConnectionTrait>(
     conn: &C,
     run_id: &str,
 ) -> Result<RunLocationOutcomes, errors::Error> {
-    const STATUS_PASSED: i32 = 3;
-
-    let mut rows = Entity::find()
+    let rows = Entity::find()
         .select_only()
         .column(Column::Location)
         .column(Column::Status)
@@ -729,30 +793,27 @@ pub async fn run_location_outcomes<C: ConnectionTrait>(
         .into_tuple::<(String, i32)>()
         .all(conn)
         .await?;
+    Ok(split_by_outcome(rows))
+}
 
-    // Worst first: Error(6) > Warning(5) > Failed(4). A reader scanning the first
-    // line of a message should see the most severe location, not the
-    // alphabetically first. Passing rows sort last and are split out below.
-    rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-
-    let mut out = RunLocationOutcomes::default();
-    for (loc, status) in rows {
-        // A location runs once per run, but dedupe anyway: a requeued job can
-        // leave two rows for one location, and naming it twice in a message
-        // reads as two separate outages.
-        let bucket = if status == STATUS_PASSED {
-            &mut out.passing
-        } else {
-            &mut out.failing
-        };
-        if !bucket.contains(&loc) {
-            bucket.push(loc);
-        }
-    }
-    // Failing is severity-ordered; passing has no severity, so alphabetical is
-    // the only stable order a reader can predict.
-    out.passing.sort();
-    Ok(out)
+/// Environments of a run that did not pass, worst first.
+pub async fn failing_environments<C: ConnectionTrait>(
+    conn: &C,
+    run_id: &str,
+) -> Result<Vec<String>, errors::Error> {
+    let rows = Entity::find()
+        .select_only()
+        .column(Column::Env)
+        .column(Column::Status)
+        .filter(Column::RunId.eq(run_id))
+        .into_tuple::<(Option<String>, i32)>()
+        .all(conn)
+        .await?;
+    let named = rows
+        .into_iter()
+        .filter_map(|(env, status)| env.map(|env| (env, status)))
+        .collect();
+    Ok(split_by_outcome(named).failing)
 }
 
 /// One location+pool's share of the pending queue.
@@ -842,9 +903,45 @@ pub async fn prune_stale<C: ConnectionTrait>(conn: &C, now_us: i64) -> Result<u6
     Ok(res.rows_affected())
 }
 
+/// Splits `(key, status)` rows into failing, worst first, and passing, each key once.
+fn split_by_outcome(mut rows: Vec<(String, i32)>) -> RunLocationOutcomes {
+    const STATUS_PASSED: i32 = 3;
+
+    // Error(6) > Warning(5) > Failed(4): a message's first line names the most severe.
+    rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+
+    let mut out = RunLocationOutcomes::default();
+    for (key, status) in rows {
+        // A requeued job can leave two rows for one key, and naming it twice reads as two outages.
+        let bucket = if status == STATUS_PASSED {
+            &mut out.passing
+        } else {
+            &mut out.failing
+        };
+        if !bucket.contains(&key) {
+            bucket.push(key);
+        }
+    }
+    out.passing.sort();
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_dedup_key_coalesces_a_null_environment() {
+        for backend in [DatabaseBackend::Postgres, DatabaseBackend::Sqlite] {
+            let sql = dedup_index_sql(backend);
+            assert!(sql.contains("COALESCE(env, '')"), "{backend:?}: {sql}");
+            assert!(sql.contains("UNIQUE INDEX"), "{backend:?}: {sql}");
+            // The three original columns still have to be part of the key.
+            for col in ["synthetics_id", "location", "scheduled_ts"] {
+                assert!(sql.contains(col), "{backend:?} lost {col}: {sql}");
+            }
+        }
+    }
 
     #[test]
     fn test_enqueue_params_fields() {
@@ -853,6 +950,7 @@ mod tests {
             synthetics_name: "Login Flow",
             org_id: "org1",
             location: "aws-us-east-1",
+            env: Some("env-prod"),
             pool: "aws-browser",
             scheduled_ts: 1750000000000000,
             valid_until: 1750000300000000,
@@ -860,12 +958,15 @@ mod tests {
             browser_devices: Some(
                 r#"[{"execution_id":"3Fze001XX","engine":"chromium","device":"desktop"}]"#,
             ),
+            steps_configured: 14,
             metadata: r#"{"tags":["prod","checkout"]}"#,
         };
         assert_eq!(p.synthetics_id, "mon-1");
         assert_eq!(p.synthetics_name, "Login Flow");
         assert_eq!(p.run_id, "3Fzn001XXXXXXXXXXXXXXXX");
         assert!(p.browser_devices.is_some());
+        assert_eq!(p.steps_configured, 14);
+        assert_eq!(p.env, Some("env-prod"));
     }
 
     #[test]
@@ -876,18 +977,302 @@ mod tests {
             synthetics_name: "Login Flow".to_string(),
             org_id: "org1".to_string(),
             location: "aws-us-east-1".to_string(),
+            env: None,
             pool: "aws-browser".to_string(),
             scheduled_ts: 1750000000000000,
             valid_until: 1750000300000000,
             dispatch_attempts: 1,
             run_id: "3Fzn001XXXXXXXXXXXXXXXX".to_string(),
             browser_devices: None,
+            steps_configured: 1,
             metadata: "{}".to_string(),
         };
         assert_eq!(row.id, "2MNfNTxePfZ1pnY5gKVLkwsVRXv");
         assert_eq!(row.synthetics_id, "mon-1");
         assert_eq!(row.run_id, "3Fzn001XXXXXXXXXXXXXXXX");
         assert_eq!(row.dispatch_attempts, 1);
+        assert_eq!(row.steps_configured, 1);
+    }
+
+    const SCHEDULED_TS: i64 = 1_750_000_000_000_000;
+
+    /// A real sqlite: `get_by_id` names its columns in a raw SELECT, so a column
+    /// forgotten there is a runtime "column not found" no mock reproduces. One
+    /// connection — separate connections to `sqlite::memory:` are separate DBs.
+    async fn jobs_db() -> sea_orm::DatabaseConnection {
+        use sea_orm::{ConnectOptions, Database, Schema};
+
+        let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let db = Database::connect(opts).await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        db.execute(backend.build(&schema.create_table_from_entity(Entity)))
+            .await
+            .unwrap();
+        // The FK to `synthetics_runs` is absent on purpose: sqlite ignores FKs without the pragma.
+        db.execute_unprepared(&dedup_index_sql(backend))
+            .await
+            .unwrap();
+        db
+    }
+
+    fn browser_params(steps_configured: i32) -> EnqueueParams<'static> {
+        EnqueueParams {
+            synthetics_id: "mon-1",
+            synthetics_name: "Login Flow",
+            org_id: "org1",
+            location: "aws-us-east-1",
+            env: None,
+            pool: "aws-browser",
+            scheduled_ts: SCHEDULED_TS,
+            valid_until: i64::MAX,
+            run_id: "3Fzn001XXXXXXXXXXXXXXXX",
+            browser_devices: Some(
+                r#"[{"execution_id":"3Fze001XX","engine":"chromium","device":"desktop"}]"#,
+            ),
+            steps_configured,
+            metadata: r#"{"tags":["prod"],"synthetic_type":"browser"}"#,
+        }
+    }
+
+    #[tokio::test]
+    async fn one_tick_against_two_environments_enqueues_two_jobs() {
+        let db = jobs_db().await;
+
+        for env in [Some("prod"), Some("staging"), None] {
+            let params = EnqueueParams {
+                env,
+                ..browser_params(1)
+            };
+            enqueue(&db, params).await.unwrap();
+        }
+
+        // Same environment, same tick: still one job.
+        let repeat = EnqueueParams {
+            env: Some("prod"),
+            ..browser_params(1)
+        };
+        enqueue(&db, repeat).await.unwrap();
+
+        let rows = Entity::find().all(&db).await.unwrap();
+        assert_eq!(
+            rows.len(),
+            3,
+            "prod, staging and unscoped — no more, no less"
+        );
+    }
+
+    /// The missed-SELECT-column catcher: adding a field to `LeasedRow` without
+    /// adding it to `get_by_id`'s raw SELECT compiles and fails in production.
+    #[tokio::test]
+    async fn enqueue_then_get_by_id_round_trips_the_frozen_step_count() {
+        let db = jobs_db().await;
+
+        let job_id = enqueue(&db, browser_params(14)).await.unwrap();
+        assert!(
+            !job_id.is_empty(),
+            "the insert must not have conflict-skipped"
+        );
+
+        let row = get_by_id(&db, &job_id)
+            .await
+            .unwrap()
+            .expect("the enqueued job must be readable");
+        assert_eq!(row.steps_configured, 14);
+        assert_eq!(row.synthetics_id, "mon-1");
+        assert!(
+            row.browser_devices.is_some(),
+            "the neighbouring column must still survive the widened INSERT"
+        );
+    }
+
+    /// **The missed-SELECT-column catcher, run against a real database.** The
+    /// source scan above cannot tell a column read from the row apart from one
+    /// the SELECT list never asked for, and a reaped job never acks, so nothing
+    /// else ever reads these values back.
+    #[tokio::test]
+    async fn dead_letter_expired_returns_a_fully_populated_row_once_per_job() {
+        let db = jobs_db().await;
+        let mut p = browser_params(14);
+        // Pending and already past its window: nothing ever leased it.
+        p.valid_until = SCHEDULED_TS;
+        let job_id = enqueue(&db, p).await.unwrap();
+
+        let dead = dead_letter_expired(&db, SCHEDULED_TS + 1, 3).await.unwrap();
+        assert_eq!(dead.len(), 1);
+        let row = &dead[0];
+        assert_eq!(row.id, job_id);
+        assert_eq!(
+            row.scheduled_ts, SCHEDULED_TS,
+            "this must be the SLOT the job was scheduled for, not the wall clock it died at",
+        );
+        assert_eq!(row.steps_configured, 14);
+        assert!(
+            row.browser_devices.is_some(),
+            "a browser job must still read as a browser job, or its combos vanish",
+        );
+        assert_eq!(row.reason, DeadLetterReason::NeverDispatched);
+
+        // The CAS: a second pass finds nothing, so one accounting per job however
+        // many reaper nodes run.
+        assert!(
+            dead_letter_expired(&db, SCHEDULED_TS + 1, 3)
+                .await
+                .unwrap()
+                .is_empty(),
+            "only the pass that WON the compare-and-swap may account for a job",
+        );
+    }
+
+    /// **A job that acked normally is never handed to the reaper.** Not a check
+    /// in the reaper: its row is simply no longer in a status
+    /// `dead_letter_expired`'s compare-and-swap will claim. The ack already
+    /// accounted for the job; a dead letter on top would count it twice.
+    #[tokio::test]
+    async fn a_job_that_acked_is_never_dead_lettered() {
+        let db = jobs_db().await;
+        let mut p = browser_params(14);
+        p.valid_until = SCHEDULED_TS + 1;
+        enqueue(&db, p).await.unwrap();
+
+        let leased = lease_batch(
+            &db,
+            "aws-browser",
+            "agent-1",
+            10,
+            SCHEDULED_TS,
+            300,
+            Some(true),
+        )
+        .await
+        .unwrap();
+        assert_eq!(leased.len(), 1);
+        assert!(
+            ack_complete(&db, &leased[0].id, 3, None, SCHEDULED_TS, Some("agent-1"))
+                .await
+                .unwrap()
+                .is_some(),
+            "the probe's ack must apply",
+        );
+
+        // Past the lease AND the validity window — every dead-letter predicate
+        // is satisfied except the status.
+        assert!(
+            dead_letter_expired(&db, SCHEDULED_TS + 10_000_000_000, 3)
+                .await
+                .unwrap()
+                .is_empty(),
+            "a completed job must never reach the reaper",
+        );
+    }
+
+    /// The other order: once the reaper has claimed a job, a late ack applies
+    /// nothing — `ack_complete` returns `None`, read as "touch no run
+    /// accounting". So neither path can settle the job twice.
+    #[tokio::test]
+    async fn a_late_ack_for_a_dead_lettered_job_applies_nothing() {
+        let db = jobs_db().await;
+        let mut p = browser_params(14);
+        p.valid_until = SCHEDULED_TS + 1;
+        enqueue(&db, p).await.unwrap();
+
+        let leased = lease_batch(
+            &db,
+            "aws-browser",
+            "agent-1",
+            10,
+            SCHEDULED_TS,
+            300,
+            Some(true),
+        )
+        .await
+        .unwrap();
+        let job_id = leased[0].id.clone();
+
+        let dead = dead_letter_expired(&db, SCHEDULED_TS + 10_000_000_000, 3)
+            .await
+            .unwrap();
+        assert_eq!(dead.len(), 1);
+        assert_eq!(dead[0].id, job_id);
+        assert_eq!(dead[0].reason, DeadLetterReason::Expired);
+
+        assert!(
+            ack_complete(
+                &db,
+                &job_id,
+                3,
+                None,
+                SCHEDULED_TS + 10_000_000_001,
+                Some("agent-1")
+            )
+            .await
+            .unwrap()
+            .is_none(),
+            "an ack that lost the race must report `None` so the caller bills nothing",
+        );
+    }
+
+    /// `lease_batch` is the OTHER row that becomes a `LeasedRow`. It builds from
+    /// the sea-orm entity rather than a hand-written SELECT, so it cannot miss a
+    /// column — but only while it keeps doing so, which is what this pins.
+    #[tokio::test]
+    async fn lease_batch_carries_the_frozen_step_count() {
+        let db = jobs_db().await;
+        enqueue(&db, browser_params(14)).await.unwrap();
+
+        let leased = lease_batch(
+            &db,
+            "aws-browser",
+            "agent-1",
+            10,
+            SCHEDULED_TS,
+            300,
+            Some(true),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(leased.len(), 1);
+        assert_eq!(leased[0].steps_configured, 14);
+    }
+
+    /// An edit from 14 steps to 8 must not reprice dispatched work: 14 executed
+    /// steps would clamp to 8, and the reverse edit would raise the ceiling on a
+    /// run that never had them. Uses the real `DueCheck::try_from`.
+    #[tokio::test]
+    async fn a_journey_edited_mid_flight_does_not_move_the_frozen_ceiling() {
+        use crate::table::synthetics_checks::{
+            DueCheck,
+            tests::{make_model, with_steps},
+        };
+
+        let db = jobs_db().await;
+
+        let at_enqueue = DueCheck::try_from(with_steps(make_model(), 14)).unwrap();
+        assert_eq!(at_enqueue.steps_configured, 14);
+        let job_id = enqueue(&db, browser_params(at_enqueue.steps_configured))
+            .await
+            .unwrap();
+
+        let after_edit = DueCheck::try_from(with_steps(make_model(), 8)).unwrap();
+        assert_eq!(
+            after_edit.steps_configured, 8,
+            "the edit must actually have changed the live check"
+        );
+
+        let row = get_by_id(&db, &job_id).await.unwrap().unwrap();
+        assert_eq!(
+            row.steps_configured, 14,
+            "the in-flight job must keep the count it was enqueued with"
+        );
+
+        const RETRIES: i32 = 1;
+        assert_eq!(
+            row.steps_configured * (RETRIES + 1),
+            28,
+            "the ceiling must be 14 x (retries + 1), not the edited 8 x"
+        );
     }
 
     const MAX: i32 = 3;
@@ -959,5 +1344,18 @@ mod tests {
             dead_letter_reason(1, MAX - 1, MAX),
             DeadLetterReason::Expired
         );
+    }
+
+    #[test]
+    fn outcomes_put_the_worst_failure_first_and_name_each_key_once() {
+        let out = split_by_outcome(vec![
+            ("eu".to_string(), 4),
+            ("us".to_string(), 6),
+            ("eu".to_string(), 4),
+            ("ap".to_string(), 3),
+            ("ca".to_string(), 3),
+        ]);
+        assert_eq!(out.failing, ["us", "eu"]);
+        assert_eq!(out.passing, ["ap", "ca"]);
     }
 }

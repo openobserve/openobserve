@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { decodeFtScan } from "@/utils/logs/freeTextScan";
 import { ref, reactive } from "vue";
+import i18n from "@/locales";
+
+const t = (i18n.global as any).t;
 
 // Create mock searchObj that will be used by logsUtils
 const mockSearchObj = reactive({
@@ -64,7 +68,6 @@ const mockStore = {
     },
     zoConfig: {
       timestamp_column: "_timestamp",
-      actions_enabled: false,
       super_cluster_enabled: false,
     },
     theme: "light",
@@ -196,6 +199,16 @@ describe("logsUtils", () => {
 
       // The call should have the comment filtered out
       expect(mockParserInstance.astify).toHaveBeenCalledWith("SELECT * FROM logs");
+    });
+
+    it("should keep a -- line inside a string literal", () => {
+      mockParserInstance.astify.mockReturnValue({ columns: [], from: [] });
+
+      utils.fnParsedSQL("-- note\nSELECT * FROM logs WHERE msg = 'a\n-- b'\n-- tail");
+
+      expect(mockParserInstance.astify).toHaveBeenCalledWith(
+        "SELECT * FROM logs WHERE msg = 'a\n-- b'",
+      );
     });
 
     it("should use searchObj.data.query when no query provided", () => {
@@ -561,6 +574,26 @@ describe("logsUtils", () => {
       mockParserInstance.astify.mockReturnValue({ columns: null });
       expect(utils.checkTimestampAlias("SELECT * FROM logs")).toBe(true);
     });
+
+    it("should return false for AS `_timestamp` (backtick) pattern in query", () => {
+      expect(utils.checkTimestampAlias("SELECT field1 AS `_timestamp` FROM logs")).toBe(false);
+    });
+
+    it("returns true and never parses when _timestamp appears only in the WHERE clause", () => {
+      mockParserInstance.astify.mockClear();
+      expect(utils.checkTimestampAlias("SELECT field1 FROM logs WHERE _timestamp > 0")).toBe(true);
+      expect(mockParserInstance.astify).not.toHaveBeenCalled();
+    });
+
+    it("never calls astify() regardless of query size (regex-only, no main-thread block)", () => {
+      mockParserInstance.astify.mockClear();
+      const bigWhere = Array.from({ length: 150 }, (_, i) => `column_name_${i} = ${i}`).join(
+        " AND ",
+      );
+      const largeQuery = `SELECT field1 AS '_timestamp' FROM logs WHERE ${bigWhere}`;
+      expect(utils.checkTimestampAlias(largeQuery)).toBe(false);
+      expect(mockParserInstance.astify).not.toHaveBeenCalled();
+    });
   });
 
   describe("isNonAggregatedSQLMode", () => {
@@ -621,7 +654,7 @@ describe("logsUtils", () => {
 
   describe("showCancelSearchNotification", () => {
     it("should call toast with correct parameters", () => {
-      utils.showCancelSearchNotification();
+      utils.showCancelSearchNotification(t);
       expect(mockToast).toHaveBeenCalledWith({
         variant: "info",
         message: "Running query cancelled successfully",
@@ -686,6 +719,17 @@ describe("logsUtils", () => {
       expect(query.query).toBeDefined();
     });
 
+    it("writes ft_scan in the same call as query, and omits it without consent (item 1)", () => {
+      mockSearchObj.meta.freeTextScan = { default: { fields: ["msg_text"] } };
+      const query = utils.generateURLQuery();
+      expect(query.query).toBeDefined();
+      expect(decodeFtScan(query.ft_scan)).toEqual({ default: { fields: ["msg_text"] } });
+
+      mockSearchObj.meta.freeTextScan = {};
+      expect(utils.generateURLQuery().ft_scan).toBeUndefined();
+      delete mockSearchObj.meta.freeTextScan;
+    });
+
     it("should include quick_mode setting", () => {
       const query = utils.generateURLQuery();
       expect(query.quick_mode).toBe(true);
@@ -745,16 +789,6 @@ describe("logsUtils", () => {
       expect(queryReq.query).toHaveProperty("query_fn");
     });
 
-    it("should add action_id when transform type is action", () => {
-      mockSearchObj.data.transformType = "action";
-      mockSearchObj.data.selectedTransform = { id: "action-123" };
-
-      const queryReq = { query: {} };
-      utils.addTransformToQuery(queryReq);
-
-      expect(queryReq.query).toHaveProperty("action_id", "action-123");
-    });
-
     it("should not modify query when no transform to add", () => {
       mockSearchObj.data.tempFunctionContent = "";
       mockSearchObj.data.transformType = "";
@@ -764,7 +798,6 @@ describe("logsUtils", () => {
       utils.addTransformToQuery(queryReq);
 
       expect(queryReq.query).not.toHaveProperty("query_fn");
-      expect(queryReq.query).not.toHaveProperty("action_id");
     });
   });
 });

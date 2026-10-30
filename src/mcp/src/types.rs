@@ -262,10 +262,6 @@ pub struct ServerInfo {
 }
 
 // Ping Response
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PingResult {
-    // Empty object per spec
-}
 
 // Tools List Response
 #[derive(Debug, Clone, Serialize, Deserialize)]

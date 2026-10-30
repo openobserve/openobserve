@@ -56,6 +56,18 @@ describe("OTimelineItem", () => {
     expect(wrapper.find(".timeline-connector").exists()).toBe(true);
   });
 
+  /// The rail's last line used to be hidden by a scoped rule on OTimeline,
+  /// which never matched: slotted markup carries the CONSUMER's scope id, so
+  /// the final rung's connector hung out below the card. The item hides its
+  /// own, the way OStep does.
+  it("hides its connector when it is the last item, without help from OTimeline", () => {
+    const wrapper = mount(OTimelineItem);
+    expect(wrapper.classes()).toContain("o-timeline-item");
+    expect(wrapper.find(".timeline-connector").classes()).toContain(
+      "[.o-timeline-item:last-child_&]:hidden",
+    );
+  });
+
   it.each([["primary"], ["success"], ["destructive"], ["info"], ["muted"]] as const)(
     "accepts variant=%s without throwing",
     (variant) => {

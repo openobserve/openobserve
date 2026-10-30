@@ -24,15 +24,7 @@ import { chartColor } from "../../../chartTheme";
  * Mutates `ctx.options` in place.
  */
 export function applyStackedChart(ctx: SQLContext): void {
-  const {
-    options,
-    panelSchema,
-    store,
-    xAxisKeys,
-    hasTimestampField,
-    getSeries,
-    getAxisDataFromKey,
-  } = ctx;
+  const { options, panelSchema, xAxisKeys, hasTimestampField, getSeries, getAxisDataFromKey } = ctx;
 
   options.xAxis[0].data = Array.from(new Set(getAxisDataFromKey(xAxisKeys[0])));
   options.xAxis = options.xAxis.slice(0, 1);

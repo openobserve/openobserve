@@ -23,6 +23,10 @@
 import { computed, nextTick, ref, useAttrs, watch } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTemplateOverlay from "../TemplateInput/OTemplateOverlay.vue";
+import { useTemplateSuggest } from "../TemplateInput/useTemplateSuggest";
+import type { TemplateSuggestEmits } from "../TemplateInput/OTemplateInput.types";
 import type { InlineEditProps, InlineEditEmits, InlineEditSlots } from "./OInlineEdit.types";
 
 defineOptions({ inheritAttrs: false });
@@ -34,6 +38,7 @@ const props = withDefaults(defineProps<InlineEditProps>(), {
   disabled: false,
   readonly: false,
   error: false,
+  submitOnEnter: true,
 });
 
 const emit = defineEmits<InlineEditEmits>();
@@ -52,6 +57,7 @@ const valueAtEditStart = ref("");
 const dirty = ref(false);
 const inputRef = ref<HTMLInputElement | null>(null);
 const triggerRef = ref<HTMLButtonElement | null>(null);
+const editRootEl = ref<HTMLElement | null>(null);
 
 const displayValue = computed(() => (props.modelValue ?? "").trim());
 const isEmpty = computed(() => displayValue.value === "");
@@ -119,15 +125,39 @@ const cancel = () => {
   emit("cancel", valueAtEditStart.value);
 };
 
-const onInput = (event: Event) => {
+const writeDraft = (value: string) => {
   // First keystroke: re-baseline the Escape restore point to the value the field
   // holds RIGHT NOW. An auto-name may have re-derived into the editor while it
   // sat open (see the modelValue watch); restoring the open-time value would put
   // a stale name back and, via onCommit, freeze auto-naming.
   if (!dirty.value) valueAtEditStart.value = props.modelValue ?? "";
   dirty.value = true;
-  draft.value = (event.target as HTMLInputElement).value;
-  emit("update:modelValue", draft.value);
+  draft.value = value;
+  emit("update:modelValue", value);
+};
+
+const hasSuggestions = computed(() => (props.suggestions?.length ?? 0) > 0);
+
+// An accepted suggestion is typed text, so it goes through the same draft path as a keystroke.
+const suggestEmit = ((event: string, value?: unknown) => {
+  if (event === "update:modelValue" && typeof value === "string") writeDraft(value);
+}) as TemplateSuggestEmits;
+
+const suggest = useTemplateSuggest({
+  suggestions: () => props.suggestions,
+  values: () => undefined,
+  delimiter: () => props.delimiter,
+  emit: suggestEmit,
+});
+
+const onInput = (event: Event) => {
+  writeDraft((event.target as HTMLInputElement).value);
+  if (hasSuggestions.value) suggest.onInput(draft.value);
+};
+
+const onBlur = () => {
+  suggest.onBlur();
+  commit();
 };
 
 // Closing the editor unmounts the input, which would drop focus to <body> and
@@ -148,8 +178,10 @@ const restoreTriggerFocus = async () => {
 // submission can't carry it: closing the editor unmounts the input before the
 // keypress that would have triggered it, so ask the form directly. A title with
 // no form owner (a workflow name, an incident title) submits nothing.
-const onEnter = () => {
-  const owner = inputRef.value?.form ?? null;
+const onEnter = (event: KeyboardEvent) => {
+  // Without the submit, the browser's implicit submission must not fire either.
+  if (!props.submitOnEnter) event.preventDefault();
+  const owner = props.submitOnEnter ? (inputRef.value?.form ?? null) : null;
   // Swallow the re-activation this same Enter would fire on the trigger once
   // focus returns to it (see startEdit); cleared after the key event settles.
   ignoreNextActivation = true;
@@ -165,6 +197,21 @@ const onEnter = () => {
 const onEscape = () => {
   cancel();
   restoreTriggerFocus();
+};
+
+// An open suggestion list owns Enter and Escape, so picking a token neither commits nor cancels.
+const onInputKeydown = (event: KeyboardEvent) => {
+  if (suggest.listOpen.value) {
+    suggest.onKeydown(event);
+    if (event.defaultPrevented) return;
+  }
+  const key = event.key?.toLowerCase();
+  if (key === "enter") onEnter(event);
+  else if (key === "escape" || key === "esc") {
+    event.stopPropagation();
+    event.preventDefault();
+    onEscape();
+  }
 };
 
 // F2 is the platform convention for "rename the focused thing"; Enter matches
@@ -225,7 +272,11 @@ defineExpose({ focus: startEdit });
          past the header and painted the input over the action buttons. A 0
          minimum lets the track stop at whatever width the header can spare,
          while the max-content ceiling keeps the grow-with-the-text behaviour. -->
-    <div v-if="isEditing" class="grid max-w-full grid-cols-[minmax(0,max-content)] items-center">
+    <div
+      v-if="isEditing"
+      ref="editRootEl"
+      class="grid max-w-full grid-cols-[minmax(0,max-content)] items-center"
+    >
       <span
         aria-hidden="true"
         :class="[
@@ -257,26 +308,31 @@ defineExpose({ focus: startEdit });
             : 'ring-input-border focus:ring-input-border-focus focus:ring-2',
         ]"
         @input="onInput"
-        @blur="commit"
-        @keydown.enter="onEnter"
-        @keydown.esc.stop.prevent="onEscape"
+        @focus="suggest.onFocus"
+        @blur="onBlur"
+        @keydown="onInputKeydown"
+      />
+      <OTemplateOverlay
+        v-if="hasSuggestions"
+        :suggest="suggest"
+        :boundary="editRootEl"
+        :data-test="dataTest"
       />
     </div>
 
     <!-- DISPLAY MODE — a button so Enter/Space and focus rings come for free.
          Readonly drops the button entirely: no affordance, no hover, no tab stop. -->
     <template v-else>
-      <span
+      <OTruncatedText
         v-if="readonly"
         :class="[
-          'min-w-0 truncate ring-transparent',
+          'ring-transparent',
           BOX_CLASSES,
           textClasses,
           isEmpty ? 'text-text-placeholder' : valueToneClass,
         ]"
-        :title="displayValue || placeholder"
         :data-test="dataTest ? `${dataTest}-value` : undefined"
-        >{{ displayValue || placeholder }}</span
+        >{{ displayValue || placeholder }}</OTruncatedText
       >
       <button
         v-else
@@ -306,15 +362,13 @@ defineExpose({ focus: startEdit });
         <!-- An empty field shows the placeholder in its normal muted colour even
              in the error state — the red ring alone signals the error. A non-empty
              value that is invalid still reads red. -->
-        <span
+        <OTruncatedText
           :class="[
-            'min-w-0 truncate',
             textClasses,
             isEmpty ? 'text-text-placeholder' : error ? 'text-input-error-text' : valueToneClass,
           ]"
-          :title="displayValue || undefined"
           :data-test="dataTest ? `${dataTest}-value` : undefined"
-          >{{ displayValue || placeholder }}</span
+          >{{ displayValue || placeholder }}</OTruncatedText
         >
         <!-- Always rendered, never hover-revealed: a pencil that only appears on
              hover cannot tell you the name is editable BEFORE you hover it. It

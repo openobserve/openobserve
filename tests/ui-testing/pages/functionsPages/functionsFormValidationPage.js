@@ -29,8 +29,8 @@ class FunctionsFormValidationPage {
 
     // ==================== AddEnrichmentTable locators ====================
 
-    // Add form root
-    this.enrichmentPage = page.locator('[data-test="add-enrichment-table-page"]');
+    // Add form dialog root
+    this.enrichmentPage = page.locator('[data-test="add-enrichment-table-dialog"]');
 
     // Name field (OInput)
     this.enrichmentNameField = page.locator('[data-test="add-enrichment-table-name-field"]');
@@ -47,10 +47,9 @@ class FunctionsFormValidationPage {
     // Source toggle (OOptionGroup — file vs url)
     this.enrichmentSourceGroup = page.locator('[data-test="add-enrichment-table-source"]');
 
-    // Footer buttons
-    this.enrichmentSaveButton = page.locator('[data-test="add-enrichment-table-save-btn"]');
-    this.enrichmentCancelButton = page.locator('[data-test="add-enrichment-table-cancel-btn"]');
-    this.enrichmentBackButton = page.locator('[data-test="add-enrichment-table-back-btn"]');
+    // Dialog footer buttons
+    this.enrichmentSaveButton = page.locator('[data-test="add-enrichment-table-dialog"] [data-test="o-dialog-primary-btn"]');
+    this.enrichmentCancelButton = page.locator('[data-test="add-enrichment-table-dialog"] [data-test="o-dialog-secondary-btn"]');
 
     // Add enrichment button on list page
     this.enrichmentAddButton = page.locator('[data-test="enrichment-tables-add-btn"]');
@@ -63,9 +62,9 @@ class FunctionsFormValidationPage {
 
     // ==================== FunctionsToolbar locators ====================
 
-    // VRL / JS transform type radios
-    this.vrlRadio = page.locator('[data-test="function-transform-type-vrl-radio"]');
-    this.jsRadio = page.locator('[data-test="function-transform-type-js-radio"]');
+    // VRL / JS language toggle (OToggleGroup items)
+    this.vrlOption = page.locator('[data-test="function-transform-type-vrl-option"]');
+    this.jsOption = page.locator('[data-test="function-transform-type-js-option"]');
 
     // ==================== StreamRouting locators ====================
 
@@ -253,14 +252,11 @@ class FunctionsFormValidationPage {
   // ==================== FunctionsToolbar assertion helpers ====================
 
   async assertVrlRadioSelected() {
-    testLogger.info('Asserting VRL radio is checked');
-    await this.vrlRadio.waitFor({ state: 'visible', timeout: 10000 });
-    // ORadio renders a native input — check aria-checked or checked attribute
-    const checked = await this.vrlRadio.evaluate(el => {
-      const input = el.querySelector('input[type="radio"]') || el.closest('[role="radio"]') || el;
-      return input.checked || el.getAttribute('aria-checked') === 'true' || el.getAttribute('data-state') === 'checked';
-    });
-    expect(checked).toBe(true);
+    testLogger.info('Asserting the VRL language option is selected');
+    await this.vrlOption.waitFor({ state: 'visible', timeout: 10000 });
+    // OToggleGroupItem exposes selection via Reka-UI's `data-state="on|off"`
+    // (and mirrors it on aria-pressed).
+    await expect(this.vrlOption).toHaveAttribute('data-state', 'on');
   }
 
   // ==================== StreamRouting actions ====================

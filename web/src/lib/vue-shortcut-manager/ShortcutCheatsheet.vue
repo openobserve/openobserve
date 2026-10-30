@@ -14,7 +14,7 @@
         <div class="flex items-center gap-3">
           <div class="flex shrink-0 items-center gap-2.5">
             <div
-              class="rounded-default flex h-8 w-8 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-accent)_12%,transparent)]"
+              class="rounded-default bg-accent/12 flex h-8 w-8 shrink-0 items-center justify-center"
             >
               <OIcon name="key" class="text-accent h-4 w-4" />
             </div>
@@ -43,6 +43,7 @@
             icon-left="close"
             size="icon"
             class="shrink-0"
+            :aria-label="t('common.close')"
             data-test="shortcut-cheatsheet-close-btn"
             @click="open = false"
           />
@@ -116,17 +117,17 @@
                   class="rounded-default hover:bg-surface-base flex items-center justify-between px-2 py-1.5 transition-colors duration-100"
                   :data-test="`shortcut-cheatsheet-row-${entry.id}`"
                 >
-                  <span class="text-compact text-text-body truncate leading-snug">{{
+                  <OTruncatedText class="text-compact text-text-body leading-snug">{{
                     entry.label
-                  }}</span>
-                  <div class="ml-4 flex shrink-0 items-center gap-1">
+                  }}</OTruncatedText>
+                  <div class="ms-4 flex shrink-0 items-center gap-1">
                     <template v-for="(part, idx) in formatKey(entry.display)" :key="idx">
-                      <span v-if="part === 'then'" class="text-3xs text-text-secondary mx-0.5"
-                        >then</span
-                      >
+                      <span v-if="part === 'then'" class="text-3xs text-text-secondary mx-0.5">{{
+                        t("shortcuts.then")
+                      }}</span>
                       <kbd
                         v-else
-                        class="bg-surface-base border-border-default rounded-default text-2xs text-text-secondary inline-flex h-6 min-w-6 items-center justify-center border px-1.5 font-mono font-medium whitespace-nowrap shadow-[0_1px_0_0_var(--color-border-default)]"
+                        class="bg-surface-base border-border-default rounded-default text-2xs text-text-secondary border-border-default inline-flex h-6 min-w-6 items-center justify-center border border-b px-1.5 font-mono font-medium whitespace-nowrap"
                         >{{ part }}</kbd
                       >
                     </template>
@@ -138,7 +139,7 @@
         </div>
 
         <!-- Right column -->
-        <div class="border-border-default flex flex-col border-l pl-8">
+        <div class="border-border-default flex flex-col border-s ps-8">
           <div
             v-for="(m, idx) in filteredColumns[1]"
             :key="m.title"
@@ -173,17 +174,17 @@
                   class="rounded-default hover:bg-surface-base flex items-center justify-between px-2 py-1.5 transition-colors duration-100"
                   :data-test="`shortcut-cheatsheet-row-${entry.id}`"
                 >
-                  <span class="text-compact text-text-body truncate leading-snug">{{
+                  <OTruncatedText class="text-compact text-text-body leading-snug">{{
                     entry.label
-                  }}</span>
-                  <div class="ml-4 flex shrink-0 items-center gap-1">
+                  }}</OTruncatedText>
+                  <div class="ms-4 flex shrink-0 items-center gap-1">
                     <template v-for="(part, idx) in formatKey(entry.display)" :key="idx">
-                      <span v-if="part === 'then'" class="text-3xs text-text-secondary mx-0.5"
-                        >then</span
-                      >
+                      <span v-if="part === 'then'" class="text-3xs text-text-secondary mx-0.5">{{
+                        t("shortcuts.then")
+                      }}</span>
                       <kbd
                         v-else
-                        class="bg-surface-base border-border-default rounded-default text-2xs text-text-secondary inline-flex h-6 min-w-6 items-center justify-center border px-1.5 font-mono font-medium whitespace-nowrap shadow-[0_1px_0_0_var(--color-border-default)]"
+                        class="bg-surface-base border-border-default rounded-default text-2xs text-text-secondary border-border-default inline-flex h-6 min-w-6 items-center justify-center border border-b px-1.5 font-mono font-medium whitespace-nowrap"
                         >{{ part }}</kbd
                       >
                     </template>
@@ -201,13 +202,13 @@
       <div class="text-2xs text-text-secondary flex items-center justify-between">
         <div class="flex flex-wrap items-center gap-1.5">
           <kbd
-            class="bg-surface-base border-border-default rounded-default text-2xs inline-flex h-5 items-center justify-center border px-1.5 font-mono shadow-[0_1px_0_0_var(--color-border-default)]"
-            >Esc</kbd
+            class="bg-surface-base border-border-default rounded-default text-2xs border-border-default inline-flex h-5 items-center justify-center border border-b px-1.5 font-mono"
+            >{{ t("shortcuts.escKey") }}</kbd
           >
           <span>{{ t("shortcuts.footerClose") }}</span>
           <span class="opacity-40">·</span>
           <kbd
-            class="bg-surface-base border-border-default rounded-default text-2xs inline-flex h-5 items-center justify-center border px-1.5 font-mono shadow-[0_1px_0_0_var(--color-border-default)]"
+            class="bg-surface-base border-border-default rounded-default text-2xs border-border-default inline-flex h-5 items-center justify-center border border-b px-1.5 font-mono"
             >?</kbd
           >
           <span>{{ t("shortcuts.footerReopen") }}</span>
@@ -220,15 +221,18 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, onUnmounted } from "vue";
-import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useShortcut } from "./composables";
 import { SHORTCUT_REGISTRY, SHORTCUT_MODULES } from "./shortcutRegistry";
-import type { ShortcutEntry } from "./shortcutRegistry";
+import type { ShortcutEntry, ShortcutCapabilities } from "./shortcutRegistry";
 import { isMacOS } from "@/utils/keyboardShortcuts";
+import config from "@/aws-exports";
 
 const props = withDefaults(
   defineProps<{
@@ -245,7 +249,23 @@ const emit = defineEmits<{
   "update:open": [value: boolean];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
+const store = useStore();
+
+// Edition + `/config` flags that decide which feature pages the build can reach.
+const capabilities = computed<ShortcutCapabilities>(() => ({
+  isEnterprise: config.isEnterprise === "true",
+  isCloud: config.isCloud === "true",
+  isMetaOrg:
+    !!store.state.zoConfig?.meta_org &&
+    store.state.selectedOrganization?.identifier === store.state.zoConfig.meta_org,
+  onlineEvalsEnabled: Boolean(store.state.zoConfig?.online_evals_enabled),
+  incidentsEnabled: Boolean(store.state.zoConfig?.incidents_enabled),
+  modelPricingEnabled: Boolean(store.state.zoConfig?.model_pricing_enabled),
+  rbacEnabled: Boolean(store.state.zoConfig?.rbac_enabled),
+  aiEnabled: Boolean(store.state.zoConfig?.ai_enabled),
+  downtimesEnabled: store.state.zoConfig?.downtimes_enabled === true,
+}));
 
 const open = computed({
   get: () => props.open,
@@ -259,18 +279,27 @@ interface DisplayEntry {
   id: string;
   /** Combo string rendered as keycaps (e.g. "ctrl+enter", "del / ⌫"). */
   display: string;
-  label: string;
+  label: I18nText;
 }
 interface DisplaySection {
-  title: string;
+  title: I18nText;
   entries: DisplayEntry[];
 }
 interface DisplayModule {
-  title: string;
+  title: I18nText;
   sections: DisplaySection[];
 }
 
 const groupByPage = new Map(SHORTCUT_REGISTRY.map((g) => [g.pageKey, g]));
+
+/**
+ * Product names inside a page title, supplied from code so translators cannot
+ * touch them (the same reason `ShortcutModule.title` exists — "RUM" came back
+ * as "RON"/"RHUM"). Keyed by `pageKey`; pages absent here take no parameters.
+ */
+const PAGE_TITLE_PARAMS: Partial<Record<string, Record<string, I18nText>>> = {
+  "shortcuts.pages.rumSessions": { product: raw("RUM") },
+};
 
 /**
  * Cheatsheet display combo. Always the Windows/common form — `sym()` renders
@@ -281,23 +310,28 @@ function entryDisplay(e: ShortcutEntry): string {
 }
 
 const allModules = computed<DisplayModule[]>(() => {
+  const caps = capabilities.value;
   return SHORTCUT_MODULES.map((m) => ({
-    title: t(m.titleKey),
+    title: m.title ? raw(m.title) : t(m.titleKey),
     sections: m.pages.flatMap((pageKey) => {
       const group = groupByPage.get(pageKey);
-      if (!group) return [];
+      if (!group || (group.visible && !group.visible(caps))) return [];
       return [
         {
-          title: t(group.pageKey),
-          entries: group.shortcuts.map((s) => ({
-            id: s.id,
-            display: entryDisplay(s),
-            label: t(s.descriptionKey),
-          })),
+          title: t(group.pageKey, PAGE_TITLE_PARAMS[group.pageKey] ?? {}),
+          entries: group.shortcuts
+            // Entry-level gate mirrors the feature's real availability (e.g. the AI chat shortcut only works on enterprise with ai_enabled).
+            .filter((s) => !s.visible || s.visible(caps))
+            .map((s) => ({
+              id: s.id,
+              display: entryDisplay(s),
+              label: t(s.descriptionKey),
+            })),
         },
       ];
     }),
-  }));
+    // A module whose every page is gated off (e.g. Settings on OSS) drops its chip entirely.
+  })).filter((m) => m.sections.length > 0);
 });
 
 const filteredModules = computed<DisplayModule[]>(() => {
@@ -414,7 +448,7 @@ useShortcut(
     open.value = !open.value;
   },
   {
-    description: "shortcuts.actions.openCheatsheet",
+    description: raw("shortcuts.actions.openCheatsheet"),
     scope: "global",
   },
 );

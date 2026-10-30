@@ -67,7 +67,7 @@ fn swap_join_order(plan: Arc<dyn ExecutionPlan>) -> Result<Transformed<Arc<dyn E
 
         // If right table is enrichment table and left table is not, swap them
         if config::get_config()
-            .common
+            .search
             .feature_enrichment_broadcast_join_enabled
             && !is_enrichment_table(left)
             && is_enrichment_table(right)
@@ -98,6 +98,7 @@ mod tests {
     use std::sync::Arc;
 
     use arrow_schema::{DataType, Field, Schema};
+    use config::meta::stream::StreamType;
     use datafusion::{
         common::Result,
         execution::{runtime_env::RuntimeEnvBuilder, session_state::SessionStateBuilder},
@@ -133,7 +134,15 @@ mod tests {
         ]));
 
         let state = SessionStateBuilder::new()
-            .with_config(SessionConfig::new().with_target_partitions(12))
+            .with_config(
+                SessionConfig::new()
+                    .with_target_partitions(12)
+                    // Match production: runtime join filters cannot cross the Flight boundary.
+                    .set_bool(
+                        "datafusion.optimizer.enable_join_dynamic_filter_pushdown",
+                        false,
+                    ),
+            )
             .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
             .with_default_features()
             .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()))
@@ -173,7 +182,15 @@ mod tests {
         ]));
 
         let state = SessionStateBuilder::new()
-            .with_config(SessionConfig::new().with_target_partitions(12))
+            .with_config(
+                SessionConfig::new()
+                    .with_target_partitions(12)
+                    // Match production: runtime join filters cannot cross the Flight boundary.
+                    .set_bool(
+                        "datafusion.optimizer.enable_join_dynamic_filter_pushdown",
+                        false,
+                    ),
+            )
             .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
             .with_default_features()
             .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()))
@@ -211,7 +228,15 @@ mod tests {
         ]));
 
         let state = SessionStateBuilder::new()
-            .with_config(SessionConfig::new().with_target_partitions(12))
+            .with_config(
+                SessionConfig::new()
+                    .with_target_partitions(12)
+                    // Match production: runtime join filters cannot cross the Flight boundary.
+                    .set_bool(
+                        "datafusion.optimizer.enable_join_dynamic_filter_pushdown",
+                        false,
+                    ),
+            )
             .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
             .with_default_features()
             .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()))
@@ -248,10 +273,18 @@ mod tests {
         ]));
 
         let state = SessionStateBuilder::new()
-            .with_config(SessionConfig::new().with_target_partitions(12))
+            .with_config(
+                SessionConfig::new()
+                    .with_target_partitions(12)
+                    // Match production: runtime join filters cannot cross the Flight boundary.
+                    .set_bool(
+                        "datafusion.optimizer.enable_join_dynamic_filter_pushdown",
+                        false,
+                    ),
+            )
             .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
             .with_default_features()
-            .with_optimizer_rule(Arc::new(LimitJoinRightSide::new(50_000)))
+            .with_optimizer_rule(Arc::new(LimitJoinRightSide::new(50_000, StreamType::Logs)))
             .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()))
             .with_query_planner(Arc::new(OpenobserveQueryPlanner::new()))
             .build();
@@ -293,10 +326,18 @@ mod tests {
         ]));
 
         let state = SessionStateBuilder::new()
-            .with_config(SessionConfig::new().with_target_partitions(12))
+            .with_config(
+                SessionConfig::new()
+                    .with_target_partitions(12)
+                    // Match production: runtime join filters cannot cross the Flight boundary.
+                    .set_bool(
+                        "datafusion.optimizer.enable_join_dynamic_filter_pushdown",
+                        false,
+                    ),
+            )
             .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
             .with_default_features()
-            .with_optimizer_rule(Arc::new(LimitJoinRightSide::new(50_000)))
+            .with_optimizer_rule(Arc::new(LimitJoinRightSide::new(50_000, StreamType::Logs)))
             .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()))
             .with_query_planner(Arc::new(OpenobserveQueryPlanner::new()))
             .build();
@@ -315,7 +356,7 @@ mod tests {
             "      SortExec: expr=[name@1 DESC NULLS LAST, _timestamp@0 DESC NULLS LAST], preserve_partitioning=[false]",
             "        SortPreservingMergeExec: [_timestamp@0 DESC NULLS LAST], fetch=50000",
             "          FilterExec: _timestamp@0 < 2000, fetch=50000",
-            "            NewEmptyExec: name=\"t\", projection=[\"_timestamp\", \"name\"], filters=[\"_timestamp < Int64(2000)\"], sorted_by_time=true",
+            "            NewEmptyExec: name=\"t\", projection=[\"_timestamp\", \"name\"], filters=[\"_timestamp < Int64(2000)\"], sort_order=timestamp_desc",
             "  AggregateExec: mode=FinalPartitioned, gby=[name@0 as name], aggr=[]",
             "    RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
             "      AggregateExec: mode=Partial, gby=[name@0 as name], aggr=[]",
@@ -336,10 +377,18 @@ mod tests {
         ]));
 
         let state = SessionStateBuilder::new()
-            .with_config(SessionConfig::new().with_target_partitions(12))
+            .with_config(
+                SessionConfig::new()
+                    .with_target_partitions(12)
+                    // Match production: runtime join filters cannot cross the Flight boundary.
+                    .set_bool(
+                        "datafusion.optimizer.enable_join_dynamic_filter_pushdown",
+                        false,
+                    ),
+            )
             .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
             .with_default_features()
-            .with_optimizer_rule(Arc::new(LimitJoinRightSide::new(50_000)))
+            .with_optimizer_rule(Arc::new(LimitJoinRightSide::new(50_000, StreamType::Logs)))
             .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()))
             .with_query_planner(Arc::new(OpenobserveQueryPlanner::new()))
             .build();
@@ -358,7 +407,7 @@ mod tests {
             "      SortExec: expr=[name@1 DESC NULLS LAST, _timestamp@0 DESC NULLS LAST], preserve_partitioning=[false]",
             "        SortPreservingMergeExec: [_timestamp@0 DESC NULLS LAST], fetch=50000",
             "          FilterExec: _timestamp@0 < 2000, fetch=50000",
-            "            NewEmptyExec: name=\"t\", projection=[\"_timestamp\", \"name\"], filters=[\"_timestamp < Int64(2000)\"], sorted_by_time=true",
+            "            NewEmptyExec: name=\"t\", projection=[\"_timestamp\", \"name\"], filters=[\"_timestamp < Int64(2000)\"], sort_order=timestamp_desc",
             "  AggregateExec: mode=FinalPartitioned, gby=[name@0 as name], aggr=[]",
             "    RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
             "      AggregateExec: mode=Partial, gby=[name@0 as name], aggr=[]",

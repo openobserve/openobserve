@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import { gt } from "@/types/i18n";
+
 /**
  * Convert the canonical scalar rate, or the legacy `{ rate }` shape, into the
  * text value used by the job form.
@@ -39,7 +41,8 @@ export function parseSamplingRate(value: string | number, label: string): number
   const rate = Number(input);
 
   if (!input || !Number.isFinite(rate) || rate < 0 || rate > 1) {
-    throw new Error(`${label} must be a number between 0 and 1`);
+    // Module scope, no setup context — `gt` resolves against the active locale.
+    throw new Error(gt("onlineEvals.validation.mustBeNumberBetweenZeroAndOne", { label }));
   }
 
   return rate;

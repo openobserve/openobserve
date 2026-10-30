@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::utils::json;
+use db::organization::ORG_KEY_PREFIX;
 use infra::{
     db::{delete_from_db_coordinator, put_into_db_coordinator},
     errors::{Error, Result},
@@ -89,20 +90,36 @@ async fn rename(msg: Message) -> Result<()> {
 }
 
 async fn delete(msg: Message) -> Result<()> {
-    let keys = msg.key.split('/').collect::<Vec<_>>();
-    if keys.len() != 3 {
+    let Some(org_id) = org_id_from_key(&msg.key) else {
         log::error!(
-            "[SUPER_CLUSTER:sync] Invalid key: {}, expected 3 parts, got {}",
-            msg.key,
-            keys.len()
+            "[SUPER_CLUSTER:sync] Invalid key: {}, expected {ORG_KEY_PREFIX}<org_id>",
+            msg.key
         );
         return Err(Error::Message("Invalid key".to_string()));
-    }
-    let org_id = keys[2];
+    };
     if let Err(e) = organizations::remove(org_id).await {
         log::error!("[SUPER_CLUSTER:sync] Failed to delete scheduler: {org_id}, error: {e}");
         return Err(e);
     }
     let _ = delete_from_db_coordinator(&msg.key, false, msg.need_watch, None).await;
     Ok(())
+}
+
+/// The org id of a `{ORG_KEY_PREFIX}{org_id}` key, which has four `/` parts, not three.
+fn org_id_from_key(key: &str) -> Option<&str> {
+    key.strip_prefix(ORG_KEY_PREFIX)
+        .filter(|id| !id.is_empty() && !id.contains('/'))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_org_id_from_key_strips_prefix() {
+        assert_eq!(org_id_from_key("/organization/org/t1"), Some("t1"));
+        assert_eq!(org_id_from_key("/organization/org/"), None);
+        assert_eq!(org_id_from_key("/organization/setting/t1"), None);
+        assert_eq!(org_id_from_key("/organization/org/t1/x"), None);
+    }
 }

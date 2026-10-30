@@ -1,10 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
-import { createI18n } from "vue-i18n";
 import { createRouter, createWebHistory } from "vue-router";
 import Jumpcloud from "./Jumpcloud.vue";
-import CopyContent from "@/components/CopyContent.vue";
+import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 
 vi.mock("../../../aws-exports", () => ({
   default: { API_ENDPOINT: "http://localhost:5080", region: "us-east-1" },
@@ -44,9 +43,9 @@ vi.mock("@/composables/useIngestion", () => ({
   })),
 }));
 
-vi.mock("@/components/CopyContent.vue", () => ({
+vi.mock("@/components/ingestion/CredentialCodeBlock.vue", () => ({
   default: {
-    name: "CopyContent",
+    name: "CredentialCodeBlock",
     template: '<div data-test="copy-content">{{ content }}</div>',
     props: ["content"],
   },
@@ -58,8 +57,6 @@ const mockStore = createStore({
     userInfo: { email: "test@example.com" },
   },
 });
-
-const mockI18n = createI18n({ locale: "en", messages: { en: {} } });
 
 const mockRouter = createRouter({
   history: createWebHistory(),
@@ -85,17 +82,17 @@ describe("Jumpcloud.vue Comprehensive Coverage", () => {
     return mount(Jumpcloud, {
       props: { ...defaultProps, ...props },
       global: {
-        plugins: [mockI18n, mockRouter],
+        plugins: [mockRouter],
         provide: { store: mockStore },
-        components: { CopyContent },
+        components: { CredentialCodeBlock },
       },
     });
   };
 
   describe("Component Rendering Tests", () => {
-    it("should render CopyContent component", () => {
+    it("should render CredentialCodeBlock component", () => {
       wrapper = createWrapper();
-      const copyContent = wrapper.findComponent(CopyContent);
+      const copyContent = wrapper.findComponent(CredentialCodeBlock);
       expect(copyContent.exists()).toBe(true);
     });
 
@@ -192,9 +189,9 @@ describe("Jumpcloud.vue Comprehensive Coverage", () => {
   });
 
   describe("Component Props Passing Tests", () => {
-    it("should pass content prop to CopyContent that is defined", () => {
+    it("should pass content prop to CredentialCodeBlock that is defined", () => {
       wrapper = createWrapper();
-      const copyContent = wrapper.findComponent(CopyContent);
+      const copyContent = wrapper.findComponent(CredentialCodeBlock);
       expect(copyContent.props("content")).toBeDefined();
     });
 

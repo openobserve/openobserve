@@ -155,7 +155,7 @@ describe("LabelFilterEditor", () => {
     it("should display layout name", () => {
       wrapper = createWrapper();
       expect(wrapper.find('[data-test="promql-labelfilter-editor-label"]').text()).toBe(
-        "Label Filters",
+        "Label filters",
       );
     });
 
@@ -380,15 +380,6 @@ describe("LabelFilterEditor", () => {
       operators.forEach((op) => {
         expect(wrapper.vm.operatorOptions).toContain(op);
       });
-    });
-
-    it("should provide operator hints", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.getOperatorHint("=")).toBe("Exact match");
-      expect(wrapper.vm.getOperatorHint("!=")).toBe("Not equal to");
-      expect(wrapper.vm.getOperatorHint("=~")).toContain("Regex");
-      expect(wrapper.vm.getOperatorHint("!~")).toContain("not matching");
     });
   });
 

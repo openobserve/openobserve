@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
 
 const organizations = {
   os_list: (
@@ -34,10 +35,22 @@ const organizations = {
     );
   },
   create: (data: any) => {
-    return http().post("/api/organizations", data);
+    return http()
+      .post("/api/organizations", data)
+      .then((res) => {
+        analytics.track("organization_created");
+        return res;
+      });
   },
   add_members: (data: any, orgIdentifier: string) => {
-    return http().post(`api/${orgIdentifier}/invites`, data);
+    return http()
+      .post(`api/${orgIdentifier}/invites`, data)
+      .then((res) => {
+        const invited = data?.invites?.length ?? 0;
+        const count = invited - (res.data?.data?.invalid_members?.length ?? 0);
+        if (count > 0) analytics.track("user_invited", { count });
+        return res;
+      });
   },
   revoke_invite: (orgIdentifier: string, token: string) => {
     return http().delete(`api/${orgIdentifier}/invites/${token}`);
@@ -61,7 +74,12 @@ const organizations = {
     return http().get(`/api/${orgIdentifier}/passcode`);
   },
   update_organization_passcode: (orgIdentifier: string) => {
-    return http().put(`api/${orgIdentifier}/passcode`, {});
+    return http()
+      .put(`api/${orgIdentifier}/passcode`, {})
+      .then((res) => {
+        analytics.track("ingestion_passcode_regenerated");
+        return res;
+      });
   },
   get_organization_summary: (orgIdentifier: string) => {
     return http().get(`/api/${orgIdentifier}/summary`);
@@ -78,8 +96,15 @@ const organizations = {
   extend_trial_period: (orgIdentifier: string, data: any) => {
     return http().put(`/api/${orgIdentifier}/extend_trial_period`, data);
   },
-  set_ai_usage_limit: (orgIdentifier: string, data: { org_id: string; credits_limit: number }) => {
-    return http().put(`/api/${orgIdentifier}/ai/usage_limit`, data);
+  // `limit` is the pool's new ceiling, not an increment. `pool` is a
+  // TrialQuotaPool key: "ai_credits" | "synthetics_browser_steps" |
+  // "synthetics_protocol_steps".
+  set_quota_usage_limit: (
+    orgIdentifier: string,
+    pool: string,
+    data: { org_id: string; limit: number },
+  ) => {
+    return http().put(`/api/${orgIdentifier}/quota/${pool}/usage_limit`, data);
   },
   rename_organization: (orgIdentifier: string, newOrgName: string) => {
     return http().put(`/api/${orgIdentifier}/rename`, {
@@ -96,8 +121,8 @@ const organizations = {
     return http().delete(`/api/${orgIdentifier}/external_contract/${targetOrgId}`);
   },
 
-  get_cleanup_tasks: (targetOrgId: string) => {
-    return http().get(`/api/_meta/org_cleanup_tasks/${targetOrgId}`);
+  get_cleanup_tasks: (metaOrg: string, targetOrgId: string) => {
+    return http().get(`/api/${metaOrg}/org_cleanup_tasks/${targetOrgId}`);
   },
   delete_org: (orgIdentifier: string) => {
     return http().delete(`/api/${orgIdentifier}/organizations`);
@@ -112,13 +137,27 @@ const organizations = {
   },
   create_org_ingestion_token: (
     orgIdentifier: string,
-    data: { name: string; description?: string },
+    data: { name: string; description?: string; splunk_token?: boolean },
   ) => {
-    return http().post(`/api/${orgIdentifier}/ingestion-tokens`, data);
+    return http()
+      .post(`/api/${orgIdentifier}/ingestion-tokens`, data)
+      .then((res) => {
+        analytics.track("ingestion_token_created");
+        return res;
+      });
   },
   enable_disable_org_ingestion_token: (orgIdentifier: string, name: string, enabled: boolean) => {
     return http().patch(`/api/${orgIdentifier}/ingestion-tokens/${encodeURIComponent(name)}`, {
       enabled,
+    });
+  },
+  set_org_ingestion_splunk_token: (
+    orgIdentifier: string,
+    name: string,
+    action: "generate" | "revoke",
+  ) => {
+    return http().patch(`/api/${orgIdentifier}/ingestion-tokens/${encodeURIComponent(name)}`, {
+      splunk_token: action,
     });
   },
 };

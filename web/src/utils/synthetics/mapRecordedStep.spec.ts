@@ -22,7 +22,9 @@ import {
   journeyToWireSteps,
   mapWireStep,
   mapWireSteps,
+  substituteVariables,
 } from "./mapRecordedStep";
+import { buildV2Step } from "./buildV2Steps";
 
 describe("mapRecordedStep", () => {
   it("should map a navigate wire step using the url as value", () => {
@@ -89,6 +91,20 @@ describe("mapRecordedStep", () => {
     it("should map a manual click step preserving its selector", () => {
       const w = buildWireFromStep(lean({ action: "click", selector: "#go" }));
       expect(w).toMatchObject({ action: "click", selector: "#go" });
+    });
+
+    // A saved step carries no `wire`, so this shape is the only thing the
+    // extension player sees. Dropping the two fields replayed every stored right
+    // or double click as a plain left one.
+    it("carries the click button and count onto a saved step's replay wire", () => {
+      const w = buildWireFromStep(lean({ action: "click", button: "right", clickCount: 2 }));
+      expect(w).toMatchObject({ action: "click", button: "right", clickCount: 2 });
+    });
+
+    it("leaves both absent on a click that carries neither", () => {
+      const w = buildWireFromStep(lean({ action: "click" }));
+      expect(w?.button).toBeUndefined();
+      expect(w?.clickCount).toBeUndefined();
     });
 
     it("should map a manual type step value to wire value", () => {
@@ -355,6 +371,10 @@ describe("mapRecordedStep", () => {
   });
 
   it("applyValueToWire should preserve the extension metadata it does not own", () => {
+    // A non-empty framePath is a legacy shape. Playwright 1.62 folds the frame
+    // path into the selector at capture time, so live capture emits `[]` from
+    // extension 0.2.0 onward. This still asserts pass-through, which is what
+    // journeys recorded before that need.
     const wire: WireStep = {
       id: "s1",
       action: "navigate",
@@ -428,5 +448,144 @@ describe("preserveWire", () => {
     const [step] = mapWireSteps([recorded], { preserveWire: true });
     const [wire] = journeyToWireSteps([step]);
     expect(wire.options).toEqual(["Blue"]);
+  });
+});
+
+// The one field whose name differs across the boundary buildV2Step writes.
+// `mapWireStep` maps both shapes — a live recording (camelCase, from the
+// extension) and a stored step being loaded back (snake_case, from storage) —
+// so reading only the extension's spelling lost every saved double click on the
+// way back into the editor.
+describe("click fidelity survives the storage round trip", () => {
+  const stored: WireStep = {
+    id: "s1",
+    action: "click",
+    name: "Open menu",
+    button: "right",
+    click_count: 2,
+  };
+
+  it("reads the storage spelling when a saved monitor is loaded", () => {
+    const step = mapWireStep(stored);
+    expect(step.button).toBe("right");
+    expect(step.clickCount).toBe(2);
+  });
+
+  it("still prefers the extension's spelling during live capture", () => {
+    const step = mapWireStep({ ...stored, clickCount: 3 });
+    expect(step.clickCount).toBe(3);
+  });
+
+  it("leaves a legacy click carrying neither", () => {
+    const step = mapWireStep({ id: "s2", action: "click", name: "Go" });
+    expect(step.button).toBeUndefined();
+    expect(step.clickCount).toBeUndefined();
+  });
+});
+
+describe("stored journeys with mid-journey navigates", () => {
+  // The recorder used to emit runs of navigate steps, and stored journeys carrying
+  // them are in production. Nothing in the loading path may merge, reorder or drop
+  // one: a step an author has seen and saved is their data, however it got there.
+  //
+  // This is the real path a saved journey takes - mapResponseToBrowserCheck loads
+  // `config.steps` straight through mapWireSteps (buildPayload.ts).
+  const stored: WireStep[] = [
+    { id: "s1", action: "navigate", name: "open", url: "https://app.test/login" },
+    { id: "s2", action: "navigate", name: "redirect", url: "https://app.test/" },
+    { id: "s3", action: "navigate", name: "landing", url: "https://app.test/home" },
+    { id: "s4", action: "click", name: "menu" },
+  ] as unknown as WireStep[];
+
+  it("loads every navigate step, in order", () => {
+    const loaded = mapWireSteps(stored);
+
+    expect(loaded).toHaveLength(4);
+    expect(loaded.map((s) => s.action)).toEqual(["navigate", "navigate", "navigate", "click"]);
+  });
+
+  it("keeps each navigate's URL", () => {
+    // A navigate carries its URL in `value` on the UI side - mapWireStep reads
+    // `wire.url ?? wire.value` and buildWireFromStep writes `url: step.value` back.
+    const loaded = mapWireSteps(stored);
+
+    expect(loaded.slice(0, 3).map((s) => s.value)).toEqual([
+      "https://app.test/login",
+      "https://app.test/",
+      "https://app.test/home",
+    ]);
+  });
+
+  it("sends every navigate back to the wire with its URL intact", () => {
+    const wires = journeyToWireSteps(mapWireSteps(stored));
+
+    expect(wires).toHaveLength(4);
+    expect(wires.map((w) => w.action)).toEqual(["navigate", "navigate", "navigate", "click"]);
+    expect(wires.slice(0, 3).map((w) => w.url)).toEqual([
+      "https://app.test/login",
+      "https://app.test/",
+      "https://app.test/home",
+    ]);
+  });
+});
+
+describe("substituteVariables", () => {
+  const step = (over: Partial<WireStep>): WireStep => ({ action: "fill", ...over }) as WireStep;
+
+  it("substitutes a bound placeholder in every string field", () => {
+    const out = substituteVariables(
+      step({ value: "{{USER}}", url: "https://app.test/{{PATH}}", key: "{{KEY}}" }),
+      { USER: "alice", PATH: "home", KEY: "Enter" },
+    );
+
+    expect(out.value).toBe("alice");
+    expect(out.url).toBe("https://app.test/home");
+    expect(out.key).toBe("Enter");
+  });
+
+  it("leaves an unbound placeholder verbatim", () => {
+    const out = substituteVariables(step({ value: "{{TYPO}}" }), { USER: "alice" });
+
+    expect(out.value).toBe("{{TYPO}}");
+  });
+
+  it("substitutes a bound name alongside an unbound one in the same string", () => {
+    const out = substituteVariables(step({ value: "{{USER}}/{{TYPO}}" }), { USER: "alice" });
+
+    expect(out.value).toBe("alice/{{TYPO}}");
+  });
+
+  it("still substitutes a bound name whose value is empty", () => {
+    // Distinct from unbound: the author set it, the value is just blank.
+    const out = substituteVariables(step({ value: "{{BLANK}}" }), { BLANK: "" });
+
+    expect(out.value).toBe("");
+  });
+
+  it("never reads a name off the object prototype", () => {
+    const out = substituteVariables(step({ value: "{{constructor}}" }), { USER: "alice" });
+
+    expect(out.value).toBe("{{constructor}}");
+  });
+});
+
+describe("subtest steps", () => {
+  it("survives a save-and-reload round trip with the reference intact", () => {
+    const journey: BrowserStep[] = [
+      { id: "s1", action: "navigate", name: "Open", value: "https://example.com" },
+      { id: "s2", action: "subtest", name: "Log in (shared)", subtest: { id: "login-test" } },
+    ];
+    // buildV2Step is what we store; mapWireStep is what the editor loads back.
+    const reloaded = mapWireSteps(journey.map(buildV2Step) as unknown as WireStep[]);
+    expect(reloaded[1].action).toBe("subtest");
+    expect(reloaded[1].subtest).toEqual({ id: "login-test" });
+  });
+
+  it("refuses to build wire steps from an unexpanded subtest", () => {
+    const steps: BrowserStep[] = [
+      { id: "s1", action: "navigate", name: "Open", value: "https://example.com" },
+      { id: "s2", action: "subtest", name: "Log in (shared)", subtest: { id: "login-test" } },
+    ];
+    expect(() => journeyToWireSteps(steps)).toThrow(/expanded before replay/);
   });
 });

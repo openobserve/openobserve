@@ -17,26 +17,71 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   OCodeBlock — a syntax-highlighted block of code with a copy button, optional
   secret masking (Reveal/Hide), optional window chrome (terminal / editor), and
-  a slot for extra toolbar actions. Copy always copies the raw `code` prop, never
-  the highlighted markup or the masked variant.
+  a slot for extra toolbar actions. The Copy button copies the raw `code` prop;
+  a text selection copies only what is shown, so a masked token stays masked.
 
   For inline / simple code chips without highlighting, use OCode.
 -->
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import hljs from "highlight.js";
+import { computed, ref, type CSSProperties } from "vue";
+import hljs from "./highlighter";
 import { copyToClipboard } from "@/utils/clipboard";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useI18nTyped } from "@/types/i18n";
 import type { CodeBlockProps, CodeBlockEmits, CodeBlockSlots } from "./OCodeBlock.types";
 
+const { t } = useI18nTyped();
+
+/**
+ * Single source of truth for the code line-height: the stylesheet reads it via
+ * the custom property below, and the max-height maths multiplies it. Declaring
+ * it twice would let the visible line count drift from the actual leading.
+ */
+const CODE_LINE_HEIGHT = 1.55;
+
+const CODE_INSET = "0.75rem";
+
+const MASK_CHAR = "\u2022";
+
 const props = withDefaults(defineProps<CodeBlockProps>(), {
+  wrap: false,
   copyable: true,
-  copyMessage: "Copied to clipboard!",
-  revealTooltip: "Reveal",
-  hideTooltip: "Hide",
+  lineNumbers: false,
+  padded: false,
+  inset: false,
   dataTest: "code-block",
+});
+
+// Not `withDefaults` defaults: those are evaluated once at module scope, which
+// would freeze these tooltips in the boot locale.
+const revealTooltipText = computed(() => props.revealTooltip ?? t("common.reveal"));
+const hideTooltipText = computed(() => props.hideTooltip ?? t("common.hide"));
+
+/**
+ * The line-height is published as a custom property so the stylesheet and the
+ * max-height maths below share one number, and the cap is expressed in `em` so
+ * it tracks the code font size rather than assuming a pixel value.
+ */
+const preStyle = computed(() => {
+  // Record<string, string> widens CSSProperties enough to carry the custom
+  // property, which Vue's typing does not model.
+  const style: CSSProperties & Record<string, string> = {
+    "--code-line-height": String(CODE_LINE_HEIGHT),
+  };
+
+  if (props.inset) style.padding = CODE_INSET;
+
+  if (props.maxLines) {
+    // The inset sits inside the capped box, so it is added on top of the line budget.
+    const inset = props.inset ? ` + 2 * ${CODE_INSET}` : "";
+    style.maxHeight = `calc(${props.maxLines} * ${CODE_LINE_HEIGHT}em${inset})`;
+    style.overflowY = "auto";
+  }
+
+  return style;
 });
 
 const emit = defineEmits<CodeBlockEmits>();
@@ -72,23 +117,60 @@ const highlightOne = (code: string, lang?: string): string => {
 // Highlights the DISPLAYED code (masked or real) — copy still uses the real `code`.
 const highlighted = computed(() => highlightOne(displayCode.value, props.lang));
 
+// Wrapping breaks the one-number-per-row assumption a gutter rests on, so the
+// two features are exclusive rather than quietly misaligned.
+const showLineNumbers = computed(() => props.lineNumbers && !props.wrap);
+
+// One number per visible line, as a single pre-formatted string: the gutter is
+// then one text node the browser lays out on the same leading as the code, with
+// no per-line wrapper elements to keep in sync with the highlighted markup.
+// A trailing newline gets no number — it is the end of the last line, not a line.
+const lineNumberText = computed(() => {
+  if (!showLineNumbers.value) return "";
+  const lines = displayCode.value.replace(/\n$/, "").split("\n").length;
+  return Array.from({ length: lines }, (_, i) => String(i + 1)).join("\n");
+});
+
+const copySuccessMessage = computed(() =>
+  props.tokenName
+    ? t("components.codeBlock.copiedWithToken", { name: props.tokenName })
+    : (props.copyMessage ?? t("common.copySuccess")),
+);
+
 const onCopy = () => {
-  copyToClipboard(props.code, {
-    successMessage: props.copyMessage,
-    errorMessage: "Error while copying content.",
+  copyToClipboard(props.code, t, {
+    successMessage: copySuccessMessage.value,
+    errorMessage: t("common.copyContentError"),
+  }).then((copied) => {
+    if (copied) emit("copy", { partial: false });
   });
-  emit("copy");
+};
+
+const codeEl = ref<HTMLElement | null>(null);
+const onNativeCopy = () => {
+  const root = codeEl.value;
+  const selection = window.getSelection();
+  if (!root || !selection || selection.rangeCount === 0 || selection.isCollapsed) return;
+  const range = selection.getRangeAt(0);
+  const inside = root.contains(range.startContainer) && root.contains(range.endContainer);
+  if (!inside) return;
+  // a selection over the hidden token pastes as dots, so it is not a usable copy of the command
+  if (props.codeMasked && !revealed.value && selection.toString().includes(MASK_CHAR)) {
+    toast({ variant: "warning", message: t("components.codeBlock.maskedSelectionWarning") });
+    return;
+  }
+  emit("copy", { partial: true });
 };
 </script>
 
 <template>
   <div
-    class="o2-code-block rounded-default border-border-default my-3 overflow-hidden border"
+    class="o2-code-block rounded-default border-border-default bg-syntax-bg my-3 overflow-hidden border"
     :class="chrome ? `o2-chrome-${chrome}` : ''"
     :data-test="dataTest"
   >
     <div
-      class="o2-code-toolbar border-border-default flex items-center justify-between border-b py-1 pr-1.5 pl-3"
+      class="o2-code-toolbar border-border-default flex items-center justify-between border-b py-1 ps-3 pe-1.5"
     >
       <span
         v-if="chrome === 'terminal'"
@@ -99,23 +181,34 @@ const onCopy = () => {
           <i class="bg-warning block size-2.5 rounded-full" />
           <i class="bg-status-positive block size-2.5 rounded-full" />
         </span>
-        <span class="o2-code-lang text-2xs font-mono tracking-wider uppercase opacity-55"
-          >Terminal</span
-        >
+        <span class="o2-code-lang text-2xs font-mono opacity-55">{{
+          t("components.codeBlock.terminal")
+        }}</span>
       </span>
       <span
         v-else-if="chrome === 'editor'"
-        class="o2-code-head inline-flex min-w-0 items-center gap-2"
+        class="o2-code-head bg-theme-tab-bg inline-flex min-w-0 items-center gap-2"
       >
         <OIcon name="code" size="xs" class="opacity-60" />
         <span class="font-mono text-xs font-semibold tracking-[0.01em] opacity-75">{{
-          filename || lang || "text"
+          filename || lang || t("common.plainText")
         }}</span>
       </span>
-      <span v-else class="o2-code-lang text-2xs font-mono tracking-wider uppercase opacity-55">{{
-        lang || "text"
+      <span v-else class="o2-code-lang text-2xs font-mono opacity-55">{{
+        lang || t("common.plainText")
       }}</span>
       <div class="flex items-center gap-1">
+        <OButton
+          v-if="tokenName"
+          :data-test="`${dataTest}-token-link`"
+          variant="ghost-primary"
+          size="xs"
+          icon-left="key"
+          @click="emit('token-click')"
+        >
+          {{ t("components.codeBlock.tokenLink", { name: tokenName }) }}
+          <OTooltip :content="t('components.codeBlock.tokenLinkTooltip')" side="top" />
+        </OButton>
         <OButton
           v-if="codeMasked"
           :data-test="`${dataTest}-reveal-btn`"
@@ -124,7 +217,7 @@ const onCopy = () => {
           @click="revealed = !revealed"
         >
           <OIcon :name="revealed ? 'visibility-off' : 'visibility'" size="sm" />
-          <OTooltip :content="revealed ? hideTooltip : revealTooltip" side="top" />
+          <OTooltip :content="revealed ? hideTooltipText : revealTooltipText" side="top" />
         </OButton>
         <!-- Extra toolbar actions (e.g. a download button) -->
         <slot name="actions" />
@@ -136,27 +229,43 @@ const onCopy = () => {
           @click="onCopy"
         >
           <OIcon name="content-copy" size="sm" />
-          <OTooltip content="Copy" side="top" />
+          <OTooltip :content="t('common.copy')" side="top" />
         </OButton>
       </div>
     </div>
-    <pre class="o2-code-pre"><code class="hljs" v-html="highlighted"></code></pre>
+    <!-- `text-syntax-text!` — the `!` is load-bearing.
+         `highlight.js/styles/github-dark.css` is imported globally (by O2AIChat)
+         and its unlayered `.hljs { color }` beats anything in @layer utilities,
+         so without it every token hljs leaves unclassed renders in the dark
+         theme's pale grey, unreadable on the light syntax surface.
+         Tag and content stay on one line: Vue preserves whitespace inside
+         <pre>, so a newline here would indent the first line of code. -->
+    <pre
+      class="o2-code-pre"
+      :class="[
+        wrap ? 'o2-code-pre--wrap' : '',
+        showLineNumbers ? 'o2-code-pre--numbered' : '',
+        padded ? 'px-3 py-2' : '',
+      ]"
+      :style="preStyle"
+      :data-test="`${dataTest}-pre`"
+      @copy="onNativeCopy"
+    ><span
+      v-if="showLineNumbers"
+      class="o2-code-gutter bg-syntax-bg text-syntax-comment sticky left-0 tabular-nums select-none"
+      aria-hidden="true"
+      :data-test="`${dataTest}-line-numbers`"
+    >{{ lineNumberText }}</span><code ref="codeEl" class="hljs text-syntax-text!" v-html="highlighted"></code></pre>
   </div>
 </template>
 
-<style scoped lang="scss">
+<style scoped>
 /* keep(generated-content): the `:deep(.hljs-*)` rules below colour highlight.js
    markup injected via v-html — those class names never appear in this template,
    so Tailwind cannot see them and no utility can reach them. The few non-:deep
    rules here are the ones whose values are unregistered tokens
    (--color-syntax-bg / --color-syntax-text have no @theme entry, so `bg-syntax-bg`
    would compile to nothing) or need color-mix over one. */
-.o2-code-block {
-  /* --color-syntax-* are :root-only (no @theme registration) → no utility exists.
-     They flip light→dark in dark.css, so one rule set covers both themes. */
-  background: var(--color-syntax-bg);
-}
-
 .o2-code-toolbar {
   background: color-mix(in srgb, var(--color-syntax-text) 4%, transparent);
 }
@@ -166,7 +275,6 @@ const onCopy = () => {
   padding: 0.18rem 0.6rem;
   margin: -0.05rem 0;
   border-radius: 0.375rem;
-  background: var(--color-theme-tab-bg);
 }
 /* Dark keeps a neutral white wash rather than the accent-tinted token, so the
    tab reads as a highlight on the near-black syntax surface. `.dark` is set on
@@ -179,15 +287,45 @@ const onCopy = () => {
   margin: 0;
   overflow-x: auto;
   background: transparent;
+  /* Font size lives here as well as on `code` so an em-based max-height set on
+     this element resolves against the code's own type size. */
+  font-size: var(--text-compact);
+  line-height: var(--code-line-height, 1.55);
 }
 
 .o2-code-pre code {
   background: transparent;
   white-space: pre;
-  font-size: var(--text-compact);
-  line-height: 1.55;
+  font-size: inherit;
+  line-height: inherit;
   padding: 0;
-  color: var(--color-syntax-text);
+}
+
+/* Line-number gutter. A flex row rather than a floated or absolutely-placed
+   column, so the numbers cannot overlap the code at any width, and `sticky` keeps
+   them in view while a long line scrolls sideways underneath — which is also why
+   the gutter carries the block's own background. */
+.o2-code-pre--numbered {
+  display: flex;
+}
+
+.o2-code-gutter {
+  flex: none;
+  padding-right: 1rem;
+  text-align: right;
+  /* Muted rather than hidden: the numbers are for reference, not for reading. */
+  opacity: 0.65;
+}
+
+/* Wrapped mode: break anywhere, because a long SQL string can be one
+   unbroken token and would otherwise still overflow sideways. */
+.o2-code-pre--wrap {
+  overflow-x: hidden;
+}
+
+.o2-code-pre--wrap code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* ============ CODE THEME (token-driven; tokens flip via dark.css,

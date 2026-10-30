@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { nextTick, reactive } from "vue";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 
@@ -21,7 +22,8 @@ import i18n from "@/locales";
 
 const mockPush = vi.fn();
 const mockRouteQuery: Record<string, string | string[] | undefined> = {};
-const mockRouteParams: Record<string, string | string[] | undefined> = {};
+// Reactive so a param-only navigation (parent → child editor) is observable by the view.
+const mockRouteParams = reactive<Record<string, string | string[] | undefined>>({});
 
 vi.mock("vue-router", () => ({
   useRoute: () => ({ query: mockRouteQuery, params: mockRouteParams }),
@@ -29,7 +31,10 @@ vi.mock("vue-router", () => ({
   RouterLink: { name: "RouterLinkStub", template: "<a><slot /></a>" },
 }));
 
-vi.mock("vuex", () => ({
+// Partial: the overlaid synthetics service loads `@/stores`, which needs the real
+// `createStore` — a wholesale vuex mock leaves it undefined at import time.
+vi.mock("vuex", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("vuex")>()),
   useStore: () => ({
     state: {
       timezone: "UTC",
@@ -39,20 +44,23 @@ vi.mock("vuex", () => ({
 }));
 
 // syntheticsService mock — get() is called in edit mode
-vi.mock("@/services/synthetics", () => ({
-  default: {
-    get: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    list: vi.fn(),
-    delete: vi.fn(),
-    enable: vi.fn(),
-    run: vi.fn(),
-    getRuns: vi.fn(),
-    getRun: vi.fn(),
-    getLocations: vi.fn(),
-  },
-}));
+vi.mock("@/services/synthetics", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      list: vi.fn(),
+      delete: vi.fn(),
+      enable: vi.fn(),
+      run: vi.fn(),
+      getRuns: vi.fn(),
+      getRun: vi.fn(),
+      getLocations: vi.fn(),
+    },
+  });
+});
 
 // ── After mocks are hoisted, import the component ──────────────────────────
 
@@ -225,6 +233,41 @@ describe("CreateCheck", () => {
       await flushPromises();
 
       expect(wrapper.find('[data-test="protocol-edit-id"]').text()).toBe("proto-http-1");
+    });
+  });
+
+  // A child opens as a param-only push on the same route, so the editor must be keyed on the id.
+  describe("edit mode — id change", () => {
+    it("remounts the browser editor when the edit id changes", async () => {
+      mockedService.get.mockResolvedValue({ data: { type: "browser" } });
+      let setups = 0;
+      mockRouteParams.id = "parent";
+      wrapper = mount(CreateCheck, {
+        global: {
+          plugins: [i18n],
+          stubs: {
+            CreateBrowserTestSkeleton: { template: "<div />", props: ["rows"] },
+            CreateProtocolCheck: { template: "<div />", props: ["checkType", "editId"] },
+            CreateBrowserTest: {
+              props: ["editId"],
+              setup() {
+                setups += 1;
+              },
+              template: '<div data-test="create-browser-test">{{ editId }}</div>',
+            },
+          },
+        },
+      });
+      await flushPromises();
+      expect(setups).toBe(1);
+      expect(wrapper.find('[data-test="create-browser-test"]').text()).toBe("parent");
+
+      mockRouteParams.id = "child";
+      await nextTick();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="create-browser-test"]').text()).toBe("child");
+      expect(setups).toBe(2);
     });
   });
 });

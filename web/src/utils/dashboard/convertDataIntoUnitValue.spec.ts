@@ -28,11 +28,11 @@ import {
   calculateWidthText,
 } from "@/utils/dashboard/chartDimensionUtils";
 import {
-  findFirstValidMappedValue,
   validatePanel,
   validateDashboardJson,
   validateSQLPanelFields,
 } from "@/utils/dashboard/panelValidation";
+import { gt } from "@/types/i18n";
 
 // Mock vuex store for logsUtils
 const mockVuexStore = {
@@ -90,9 +90,16 @@ vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
 }));
 
 const mockGetNumberLocale = vi.fn(() => "en-GB");
-vi.mock("@/locales/numberFormat", () => ({
-  getNumberLocale: () => mockGetNumberLocale(),
-}));
+vi.mock("@/locales/numberFormat", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/locales/numberFormat")>();
+  return {
+    ...actual,
+    getNumberLocale: () => mockGetNumberLocale(),
+    // The real resolveNumberLocale calls the unmocked getNumberLocale internally.
+    resolveNumberLocale: (tag?: string | null) =>
+      actual.toSupportedNumberLocale(tag) ?? mockGetNumberLocale(),
+  };
+});
 
 describe("Dashboard Data Conversion Utils", () => {
   // Use actual checkTimestampAlias from logsUtils
@@ -209,8 +216,30 @@ describe("Dashboard Data Conversion Utils", () => {
 
       expect(getUnitValue(0, "seconds")).toEqual({
         value: "0.00",
-        unit: "ns",
+        unit: "s",
       });
+    });
+
+    it("should keep zero in the panel's own unit", () => {
+      // zero used to fall to the smallest unit in the table, so a KB axis started at 0.00B
+      const panelUnits: [string, string][] = [
+        ["kilobytes", "KB"],
+        ["megabytes", "MB"],
+        ["milliseconds", "ms"],
+        ["microseconds", "μs"],
+      ];
+      for (const [unit, expected] of panelUnits) {
+        expect(getUnitValue(0, unit)).toEqual({ value: "0.00", unit: expected });
+      }
+      expect(getUnitValue(-0, "kilobytes")).toEqual({ value: "0.00", unit: "KB" });
+      expect(getUnitValue("0", "megabytes")).toEqual({ value: "0.00", unit: "MB" });
+      expect(getUnitValue(null, "kilobytes")).toEqual({ value: "0.00", unit: "KB" });
+    });
+
+    it("should still scale non-zero time values below 1 down", () => {
+      // only zero stays in the panel's unit
+      expect(getUnitValue(0.5, "seconds")).toEqual({ value: "500.00", unit: "ms" });
+      expect(getUnitValue(0.5, "microseconds")).toEqual({ value: "500.00", unit: "ns" });
     });
 
     it("should handle negative values", () => {
@@ -299,6 +328,29 @@ describe("Dashboard Data Conversion Utils", () => {
         const result = getUnitValue(NaN, "locale", "", 2);
         expect(Number.isNaN(result.value)).toBe(true);
         expect(result.unit).toBe("");
+      });
+
+      it("should use a pinned locale unit over the viewer's language", () => {
+        expect(getUnitValue(14158, "locale:cs-CZ", "", 2)).toEqual({
+          value: "14\u00a0158,00",
+          unit: "",
+        });
+        expect(getUnitValue(14158, "locale:de-DE", "", 2).value).toBe("14.158,00");
+      });
+
+      it("should respect decimals for a pinned locale unit", () => {
+        expect(getUnitValue(1234.5, "locale:de-DE", "", 0).value).toBe("1.235");
+      });
+
+      it.each(["locale:", "locale:xx-ZZ", "locale:not a locale!!"])(
+        "should treat the unusable pinned unit %j as Auto",
+        (unit) => {
+          expect(getUnitValue(1234567.89, unit, "", 2).value).toBe("1,234,567.89");
+        },
+      );
+
+      it("should not read the locale from the custom unit", () => {
+        expect(getUnitValue(1234567.89, "locale", "de-DE", 2).value).toBe("1,234,567.89");
       });
     });
 
@@ -851,106 +903,6 @@ describe("Dashboard Data Conversion Utils", () => {
     });
   });
 
-  describe("findFirstValidMappedValue", () => {
-    const sampleMappings = [
-      { type: "value", value: "error", color: "#FF0000", text: "Error" },
-      { type: "range", from: "10", to: "20", color: "#FFFF00", text: "Warning" },
-      { type: "regex", pattern: "test.*", color: "#00FF00", text: "Success" },
-      { type: "value", value: "info", color: "#0000FF" }, // No text field
-    ];
-
-    it("should find value type mapping", () => {
-      const result = findFirstValidMappedValue("error", sampleMappings, "color");
-      expect(result).toEqual(sampleMappings[0]);
-    });
-
-    it("should find range type mapping", () => {
-      const result = findFirstValidMappedValue("15", sampleMappings, "color");
-      expect(result).toEqual(sampleMappings[1]);
-    });
-
-    it("should find regex type mapping", () => {
-      const result = findFirstValidMappedValue("testing123", sampleMappings, "color");
-      expect(result).toEqual(sampleMappings[2]);
-    });
-
-    it("should return undefined for no match", () => {
-      const result = findFirstValidMappedValue("nomatch", sampleMappings, "color");
-      expect(result).toBeUndefined();
-    });
-
-    it("should return undefined when required field is missing", () => {
-      const result = findFirstValidMappedValue("info", sampleMappings, "text");
-      expect(result).toBeUndefined();
-    });
-
-    it("should handle range type with invalid from/to values", () => {
-      const mappings = [
-        { type: "range", from: "invalid", to: "20", color: "#FFFF00" },
-        { type: "range", from: "10", to: "invalid", color: "#FFFF00" },
-        { type: "range", from: null, to: "20", color: "#FFFF00" },
-      ];
-
-      expect(findFirstValidMappedValue("15", mappings, "color")).toBeUndefined();
-    });
-
-    it("should handle regex type with invalid patterns", () => {
-      const mappings = [
-        { type: "regex", pattern: null, color: "#00FF00" },
-        { type: "regex", pattern: "", color: "#00FF00" },
-      ];
-
-      const result1 = findFirstValidMappedValue("test", mappings, "color");
-      expect(result1).toEqual(mappings[0]); // null pattern creates empty regex
-
-      const result2 = findFirstValidMappedValue("test", [mappings[1]], "color");
-      expect(result2).toEqual(mappings[1]); // empty pattern creates empty regex
-    });
-
-    it("should handle empty mappings array", () => {
-      const result = findFirstValidMappedValue("test", [], "color");
-      expect(result).toBeUndefined();
-    });
-
-    it("should handle null/undefined mappings", () => {
-      const result1 = findFirstValidMappedValue("test", null as any, "color");
-      expect(result1).toBeUndefined();
-
-      const result2 = findFirstValidMappedValue("test", undefined as any, "color");
-      expect(result2).toBeUndefined();
-    });
-
-    it("should handle numeric values in range comparison", () => {
-      const mappings = [{ type: "range", from: "10.5", to: "20.5", color: "#FFFF00" }];
-
-      const result1 = findFirstValidMappedValue("15.7", mappings, "color");
-      expect(result1).toEqual(mappings[0]);
-
-      const result2 = findFirstValidMappedValue("5", mappings, "color");
-      expect(result2).toBeUndefined();
-    });
-
-    it("should handle boundary values in range", () => {
-      const mappings = [{ type: "range", from: "10", to: "20", color: "#FFFF00" }];
-
-      const result1 = findFirstValidMappedValue("10", mappings, "color");
-      expect(result1).toEqual(mappings[0]); // Should include from boundary
-
-      const result2 = findFirstValidMappedValue("20", mappings, "color");
-      expect(result2).toEqual(mappings[0]); // Should include to boundary
-    });
-
-    it("should return first valid mapping when multiple match", () => {
-      const mappings = [
-        { type: "value", value: "test", color: "#FF0000" },
-        { type: "regex", pattern: "test", color: "#00FF00" },
-      ];
-
-      const result = findFirstValidMappedValue("test", mappings, "color");
-      expect(result).toEqual(mappings[0]); // Should return first match
-    });
-  });
-
   describe("validateDashboardJson", () => {
     const validDashboard = {
       dashboardId: "test-dashboard",
@@ -973,55 +925,55 @@ describe("Dashboard Data Conversion Utils", () => {
     };
 
     it("should validate a correct dashboard", () => {
-      const errors = validateDashboardJson(validDashboard);
+      const errors = validateDashboardJson(gt, validDashboard);
       expect(errors).toHaveLength(0);
     });
 
     it("should return error for missing dashboardId", () => {
       const dashboard = { ...validDashboard };
       delete dashboard.dashboardId;
-      const errors = validateDashboardJson(dashboard);
+      const errors = validateDashboardJson(gt, dashboard);
       expect(errors).toContain("Dashboard ID is required");
     });
 
     it("should return error for missing title", () => {
       const dashboard = { ...validDashboard };
       delete dashboard.title;
-      const errors = validateDashboardJson(dashboard);
+      const errors = validateDashboardJson(gt, dashboard);
       expect(errors).toContain("Dashboard title is required");
     });
 
     it("should return error for missing version", () => {
       const dashboard = { ...validDashboard };
       delete dashboard.version;
-      const errors = validateDashboardJson(dashboard);
+      const errors = validateDashboardJson(gt, dashboard);
       expect(errors).toContain("Dashboard version is required");
     });
 
     it("should return error for incorrect version", () => {
       const dashboard = { ...validDashboard, version: "v2" };
-      const errors = validateDashboardJson(dashboard);
+      const errors = validateDashboardJson(gt, dashboard);
       expect(errors).toContain("Dashboard version must be v3.");
     });
 
     it("should return error for missing tabs", () => {
       const dashboard = { ...validDashboard };
       delete dashboard.tabs;
-      const errors = validateDashboardJson(dashboard);
+      const errors = validateDashboardJson(gt, dashboard);
       expect(errors).toContain("Dashboard must have at least one tab");
     });
 
     it("should return error for empty tabs array", () => {
       const dashboard = { ...validDashboard, tabs: [] };
-      const errors = validateDashboardJson(dashboard);
+      const errors = validateDashboardJson(gt, dashboard);
       expect(errors).toContain("Dashboard must have at least one tab");
     });
 
     it("should return error for null/undefined dashboard", () => {
-      const errors1 = validateDashboardJson(null);
+      const errors1 = validateDashboardJson(gt, null);
       expect(errors1).toContain("Dashboard JSON is empty or invalid");
 
-      const errors2 = validateDashboardJson(undefined);
+      const errors2 = validateDashboardJson(gt, undefined);
       expect(errors2).toContain("Dashboard JSON is empty or invalid");
     });
 
@@ -1033,7 +985,7 @@ describe("Dashboard Data Conversion Utils", () => {
           { tabId: "tab1", name: "Tab 2", panels: [] },
         ],
       };
-      const errors = validateDashboardJson(dashboard);
+      const errors = validateDashboardJson(gt, dashboard);
       expect(errors).toContain("Duplicate tab ID found: tab1");
     });
 
@@ -1042,7 +994,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ...validDashboard,
         tabs: [{ tabId: "tab1", panels: [] }],
       };
-      const errors = validateDashboardJson(dashboard);
+      const errors = validateDashboardJson(gt, dashboard);
       expect(errors).toContain("Tab tab1 must have a name");
     });
 
@@ -1070,7 +1022,7 @@ describe("Dashboard Data Conversion Utils", () => {
           },
         ],
       };
-      const errors = validateDashboardJson(dashboard);
+      const errors = validateDashboardJson(gt, dashboard);
       expect(errors).toContain("Duplicate panel ID found: panel1");
     });
 
@@ -1092,7 +1044,7 @@ describe("Dashboard Data Conversion Utils", () => {
           },
         ],
       };
-      const errors = validateDashboardJson(dashboard);
+      const errors = validateDashboardJson(gt, dashboard);
       expect(errors).toContain('Panel panel1: Chart type "unsupported" is not supported.');
     });
 
@@ -1109,7 +1061,7 @@ describe("Dashboard Data Conversion Utils", () => {
           },
         ],
       };
-      const errors = validateDashboardJson(dashboard);
+      const errors = validateDashboardJson(gt, dashboard);
       expect(errors).toContain("Panel in tab tab1 is missing an ID");
     });
   });
@@ -1142,7 +1094,7 @@ describe("Dashboard Data Conversion Utils", () => {
 
     it("should validate a correct panel", () => {
       const errors = [];
-      validatePanel(validPanelData, errors, true, [{ name: "timestamp" }, { name: "value" }]);
+      validatePanel(gt, validPanelData, errors, true, [{ name: "timestamp" }, { name: "value" }]);
       expect(errors).toHaveLength(0);
     });
 
@@ -1163,6 +1115,7 @@ describe("Dashboard Data Conversion Utils", () => {
       };
       const errors = [];
       validatePanel(
+        gt,
         panelData,
         errors,
         true,
@@ -1191,6 +1144,7 @@ describe("Dashboard Data Conversion Utils", () => {
       };
       const errors = [];
       validatePanel(
+        gt,
         panelData,
         errors,
         true,
@@ -1199,7 +1153,7 @@ describe("Dashboard Data Conversion Utils", () => {
         mockStore,
         checkTimestampAlias,
       );
-      expect(errors).toContain("Add one fields for the X-Axis");
+      expect(errors).toContain("Add one field for the X-Axis");
     });
 
     it("should validate metric chart requirements", () => {
@@ -1220,6 +1174,7 @@ describe("Dashboard Data Conversion Utils", () => {
       };
       const errors = [];
       validatePanel(
+        gt,
         panelData,
         errors,
         true,
@@ -1249,6 +1204,7 @@ describe("Dashboard Data Conversion Utils", () => {
       };
       const errors = [];
       validatePanel(
+        gt,
         panelData,
         errors,
         true,
@@ -1278,7 +1234,7 @@ describe("Dashboard Data Conversion Utils", () => {
         },
       };
       const errors = [];
-      validatePanel(panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
+      validatePanel(gt, panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
       expect(errors).toContain(
         "X-Axis is not supported for PromQL. Remove anything added to the X-Axis.",
       );
@@ -1294,7 +1250,7 @@ describe("Dashboard Data Conversion Utils", () => {
         layout: { currentQueryIndex: 0 },
       };
       const errors = [];
-      validatePanel(panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
+      validatePanel(gt, panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
       expect(errors).toContain("Please enter your HTML code");
     });
 
@@ -1308,7 +1264,7 @@ describe("Dashboard Data Conversion Utils", () => {
         layout: { currentQueryIndex: 0 },
       };
       const errors = [];
-      validatePanel(panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
+      validatePanel(gt, panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
       expect(errors).toContain("Please enter your markdown code");
     });
 
@@ -1322,7 +1278,7 @@ describe("Dashboard Data Conversion Utils", () => {
         layout: { currentQueryIndex: 0 },
       };
       const errors = [];
-      validatePanel(panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
+      validatePanel(gt, panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
       // Check that it generates an error mentioning X-Axis (proving the ternary was hit)
       expect(errors.some((error) => error.includes("X-Axis"))).toBe(true);
     });
@@ -1359,6 +1315,7 @@ describe("Dashboard Data Conversion Utils", () => {
       const errors = [];
       const streamFields = [{ name: "valid_stream_field" }];
       validatePanel(
+        gt,
         panelData,
         errors,
         true,
@@ -1387,7 +1344,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true);
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true);
       expect(errors).toContain("Add one value field for donut and pie charts");
     });
 
@@ -1405,7 +1362,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true);
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true);
       expect(errors).toContain("Add one field for the X-Axis");
       expect(errors).toContain("Add one field for the Z-Axis");
     });
@@ -1424,7 +1381,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true);
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true);
       expect(errors).toContain(
         "Add exactly one field on the X-Axis and breakdown for stacked and h-stacked charts",
       );
@@ -1443,7 +1400,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true);
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true);
       expect(errors).toContain("Add one field for the latitude");
       expect(errors).toContain("Add one field for the longitude");
     });
@@ -1462,7 +1419,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true);
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true);
       expect(errors).toContain("Add one field for the source");
       expect(errors).toContain("Add one field for the target");
       expect(errors).toContain("Add one field for the value");
@@ -1481,7 +1438,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, false);
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, false);
       expect(errors).toHaveLength(0);
     });
 
@@ -1521,7 +1478,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true);
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true);
       // Filter validation still works - check for any filter-related errors
       expect(errors.length).toBeGreaterThanOrEqual(0);
       // At least one filter error should be present
@@ -1616,6 +1573,7 @@ describe("Dashboard Data Conversion Utils", () => {
       };
       const errors = [];
       validatePanel(
+        gt,
         panelData,
         errors,
         true,
@@ -1645,6 +1603,7 @@ describe("Dashboard Data Conversion Utils", () => {
       };
       const errors = [];
       validatePanel(
+        gt,
         panelData,
         errors,
         true,
@@ -1653,7 +1612,7 @@ describe("Dashboard Data Conversion Utils", () => {
         mockStore,
         checkTimestampAlias,
       );
-      expect(errors).toContain("Add one fields for the X-Axis");
+      expect(errors).toContain("Add one field for the X-Axis");
     });
 
     it("should handle line chart with missing fields", () => {
@@ -1674,6 +1633,7 @@ describe("Dashboard Data Conversion Utils", () => {
       };
       const errors = [];
       validatePanel(
+        gt,
         panelData,
         errors,
         true,
@@ -1700,7 +1660,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true);
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true);
       expect(errors).toContain("Add one field for the target");
     });
 
@@ -1718,7 +1678,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true);
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true);
       expect(errors).toContain("Add one field for the longitude");
     });
   });
@@ -1868,7 +1828,7 @@ describe("Dashboard Data Conversion Utils", () => {
           { name: "Tab 1", panels: [] }, // Missing tabId
         ],
       };
-      const errors = validateDashboardJson(dashboard);
+      const errors = validateDashboardJson(gt, dashboard);
       expect(errors).toContain("Each tab must have a tabId");
     });
 
@@ -1893,7 +1853,7 @@ describe("Dashboard Data Conversion Utils", () => {
           },
         ],
       };
-      const errors = validateDashboardJson(dashboard);
+      const errors = validateDashboardJson(gt, dashboard);
       expect(errors).toContain("Panel panel1 is missing a layout.i value");
     });
 
@@ -1924,7 +1884,7 @@ describe("Dashboard Data Conversion Utils", () => {
           },
         ],
       };
-      const errors = validateDashboardJson(dashboard);
+      const errors = validateDashboardJson(gt, dashboard);
       expect(errors).toContain("Duplicate layout.i value found in tab tab1: same");
     });
 
@@ -1942,7 +1902,7 @@ describe("Dashboard Data Conversion Utils", () => {
           },
         ],
       };
-      const errors = validateDashboardJson(dashboard);
+      const errors = validateDashboardJson(gt, dashboard);
       expect(errors).toContain("Tab tab1 must have a panels array");
     });
 
@@ -1984,7 +1944,7 @@ describe("Dashboard Data Conversion Utils", () => {
         },
       };
       const errors = [];
-      validatePanel(panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
+      validatePanel(gt, panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
       // Custom query mode validation works with new field structure
       expect(errors.length).toBeGreaterThanOrEqual(0);
     });
@@ -2004,7 +1964,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true);
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true);
       expect(errors).toContain("Add exactly one field on Y-Axis for area-stacked charts");
       expect(errors).toContain(
         "Add exactly one field on the X-Axis and breakdown for area-stacked charts",
@@ -2025,7 +1985,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true);
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true);
       expect(errors).toContain("Add one field for the name");
       expect(errors).toContain("Add one field for the value");
     });
@@ -2044,7 +2004,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(panelData, 0, "First Column", "Other Columns", errors, true);
+      validateSQLPanelFields(gt, panelData, 0, "First Column", "Other Columns", errors, true);
       expect(errors).toContain("Add at least one field on First Column or Other Columns");
     });
 
@@ -2087,7 +2047,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true);
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true);
       // Group filter validation still works
       expect(errors.length).toBeGreaterThanOrEqual(0);
       const hasFilterError = errors.some(
@@ -2130,7 +2090,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true);
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true);
       // Should not generate errors for Is Null/Is Not Null operators
       expect(errors.filter((e) => e.includes("Condition value required"))).toHaveLength(0);
     });
@@ -2150,7 +2110,7 @@ describe("Dashboard Data Conversion Utils", () => {
         layout: { currentQueryIndex: 0 },
       };
       const errors = [];
-      validatePanel(panelData, errors, false, []); // Skip field validation to avoid errors
+      validatePanel(gt, panelData, errors, false, []); // Skip field validation to avoid errors
       expect(errors).toContain("Query-1 is empty");
     });
 
@@ -2169,7 +2129,7 @@ describe("Dashboard Data Conversion Utils", () => {
         layout: { currentQueryIndex: 0 },
       };
       const errors = [];
-      validatePanel(panelData, errors, false, []); // Skip field validation to avoid errors
+      validatePanel(gt, panelData, errors, false, []); // Skip field validation to avoid errors
       expect(errors).toContain("Please enter query for custom chart");
     });
 
@@ -2190,7 +2150,7 @@ describe("Dashboard Data Conversion Utils", () => {
         layout: { currentQueryIndex: 0 },
       };
       const errors = [];
-      validatePanel(panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
+      validatePanel(gt, panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
       // Should use "First Column" as label
       expect(errors).toContain("Add at least one field on First Column or Other Columns");
     });
@@ -2212,7 +2172,7 @@ describe("Dashboard Data Conversion Utils", () => {
         layout: { currentQueryIndex: 0 },
       };
       const errors = [];
-      validatePanel(panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
+      validatePanel(gt, panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
       // Should use "Other Columns" as label - this is covered by the error message
       expect(errors).toContain("Add at least one field on First Column or Other Columns");
     });
@@ -2240,7 +2200,7 @@ describe("Dashboard Data Conversion Utils", () => {
           },
         ],
       };
-      const errors = validateDashboardJson(dashboard);
+      const errors = validateDashboardJson(gt, dashboard);
       // Since we're validating dashboard structure, there should be some error
       // The function validates panel fields for non-html/markdown panels
       expect(errors.length).toBeGreaterThanOrEqual(0);
@@ -2261,7 +2221,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true);
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true);
       expect(errors).toContain(
         "Add exactly one field on the X-Axis and breakdown for stacked and h-stacked charts",
       );
@@ -2281,8 +2241,8 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true);
-      expect(errors).toContain("Add one fields for the X-Axis");
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true);
+      expect(errors).toContain("Add one field for the X-Axis");
     });
 
     it("should handle pie chart with multiple x fields", () => {
@@ -2299,7 +2259,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true);
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true);
       expect(errors).toContain("Add one label field for donut and pie charts");
     });
 
@@ -2325,7 +2285,7 @@ describe("Dashboard Data Conversion Utils", () => {
           },
         ],
       };
-      const errors = validateDashboardJson(dashboard);
+      const errors = validateDashboardJson(gt, dashboard);
       expect(errors.some((error) => error.includes("Panel unknown:"))).toBe(true);
     });
 
@@ -2359,7 +2319,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
       expect(errors).toContain("Unable to extract value field from the query.");
       expect(errors).toContain("Unable to extract label field from the query.");
     });
@@ -2379,7 +2339,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
       expect(errors).toContain("Unable to extract grouping field from the query.");
     });
 
@@ -2397,7 +2357,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
       expect(errors).toContain("Unable to extract latitude field from the query.");
     });
 
@@ -2415,7 +2375,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
       expect(errors).toContain("Unable to extract longitude field from the query.");
     });
 
@@ -2434,7 +2394,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
       expect(errors).toContain("Unable to extract source field from the query.");
     });
 
@@ -2453,7 +2413,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
       expect(errors).toContain("Unable to extract target field from the query.");
     });
 
@@ -2472,7 +2432,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
       expect(errors).toContain("Unable to extract value field from the query.");
     });
 
@@ -2490,7 +2450,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
       expect(errors).toContain("Unable to extract name field from the query.");
     });
 
@@ -2508,7 +2468,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
       expect(errors).toContain("Unable to extract value field from the query.");
     });
 
@@ -2520,7 +2480,7 @@ describe("Dashboard Data Conversion Utils", () => {
         title: "Panel 1",
         layout: { x: 0, y: 0, w: 12, h: 6 },
       };
-      const errors = validateDashboardJson({
+      const errors = validateDashboardJson(gt, {
         dashboardId: "test",
         title: "Test",
         version: "v3",
@@ -2543,7 +2503,7 @@ describe("Dashboard Data Conversion Utils", () => {
         // Missing title field
         layout: { x: 0, y: 0, w: 12, h: 6, i: "panel1" },
       };
-      const errors = validateDashboardJson({
+      const errors = validateDashboardJson(gt, {
         dashboardId: "test",
         title: "Test",
         version: "v3",
@@ -2566,7 +2526,7 @@ describe("Dashboard Data Conversion Utils", () => {
         title: "Panel 1",
         // Missing layout field
       };
-      const errors = validateDashboardJson({
+      const errors = validateDashboardJson(gt, {
         dashboardId: "test",
         title: "Test",
         version: "v3",
@@ -2599,7 +2559,7 @@ describe("Dashboard Data Conversion Utils", () => {
         layout: { currentQueryIndex: 0 },
       };
       const errors = [];
-      validatePanel(panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
+      validatePanel(gt, panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
       expect(errors).toContain(
         "Y-Axis is not supported for PromQL. Remove anything added to the Y-Axis.",
       );
@@ -2626,7 +2586,7 @@ describe("Dashboard Data Conversion Utils", () => {
         layout: { currentQueryIndex: 0 },
       };
       const errors = [];
-      validatePanel(panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
+      validatePanel(gt, panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
       expect(errors).toContain(
         "Filters are not supported for PromQL. Remove anything added to the Filters.",
       );
@@ -2656,7 +2616,7 @@ describe("Dashboard Data Conversion Utils", () => {
       };
 
       // This should execute normally, testing the function's error handling path
-      const errors = validateDashboardJson(dashboard);
+      const errors = validateDashboardJson(gt, dashboard);
       expect(Array.isArray(errors)).toBe(true);
     });
 
@@ -2675,7 +2635,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
       expect(errors).toContain("Unable to extract value field from the query.");
     });
 
@@ -2694,7 +2654,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
       expect(errors).toContain("Unable to extract value field from the query.");
     });
 
@@ -2713,7 +2673,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
       expect(errors).toContain("Unable to extract grouping field from the query.");
     });
 
@@ -2741,6 +2701,7 @@ describe("Dashboard Data Conversion Utils", () => {
       };
       const errors = [];
       validatePanel(
+        gt,
         panelData,
         errors,
         true,
@@ -2776,6 +2737,7 @@ describe("Dashboard Data Conversion Utils", () => {
       };
       const errors = [];
       validatePanel(
+        gt,
         panelData,
         errors,
         true,
@@ -2809,6 +2771,7 @@ describe("Dashboard Data Conversion Utils", () => {
       };
       const errors = [];
       validatePanel(
+        gt,
         panelData,
         errors,
         true,
@@ -2848,6 +2811,7 @@ describe("Dashboard Data Conversion Utils", () => {
       };
       const errors = [];
       validatePanel(
+        gt,
         panelData,
         errors,
         true,
@@ -2887,6 +2851,7 @@ describe("Dashboard Data Conversion Utils", () => {
       };
       const errors = [];
       validatePanel(
+        gt,
         panelData,
         errors,
         true,
@@ -2926,6 +2891,7 @@ describe("Dashboard Data Conversion Utils", () => {
       };
       const errors = [];
       validatePanel(
+        gt,
         panelData,
         errors,
         true,
@@ -2968,6 +2934,7 @@ describe("Dashboard Data Conversion Utils", () => {
       };
       const errors = [];
       validatePanel(
+        gt,
         panelData,
         errors,
         true,
@@ -3008,7 +2975,7 @@ describe("Dashboard Data Conversion Utils", () => {
           },
         ],
       };
-      const errors = validateDashboardJson({
+      const errors = validateDashboardJson(gt, {
         dashboardId: "test",
         title: "Test",
         version: "v3",
@@ -3058,7 +3025,7 @@ describe("Dashboard Data Conversion Utils", () => {
         layout: { currentQueryIndex: 0 },
       };
       const errors = [];
-      validatePanel(panelData, errors, false, [], "dashboard", mockStore, checkTimestampAlias);
+      validatePanel(gt, panelData, errors, false, [], "dashboard", mockStore, checkTimestampAlias);
       expect(errors).toContain("Alias '_timestamp' is not allowed.");
     });
 
@@ -3079,7 +3046,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
 
-      const errors = validateDashboardJson({
+      const errors = validateDashboardJson(gt, {
         dashboardId: "test",
         title: "Test",
         version: "v3",
@@ -3157,6 +3124,7 @@ describe("Dashboard Data Conversion Utils", () => {
 
       // Call with undefined chartType
       validateSQLPanelFields(
+        gt,
         { type: undefined, queries: [{ fields: { x: [], y: [] } }] },
         0,
         "X-Axis",
@@ -3168,6 +3136,7 @@ describe("Dashboard Data Conversion Utils", () => {
 
       // Call with null fields
       validateSQLPanelFields(
+        gt,
         { type: "line", queries: [{ fields: null }] },
         0,
         "X-Axis",
@@ -3191,7 +3160,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors: string[] = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
       expect(errors).toContain("Unable to extract value field from the query.");
     });
 
@@ -3208,7 +3177,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors: string[] = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
       expect(errors).toContain("Grouping field is not allowed for Metric chart");
     });
 
@@ -3225,7 +3194,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors: string[] = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
       expect(errors).toContain("Unable to extract value field from the query.");
     });
 
@@ -3242,7 +3211,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors: string[] = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
       expect(errors).toContain("Unable to extract grouping field from the query.");
     });
 
@@ -3259,7 +3228,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors: string[] = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
       expect(errors).toContain("Unable to extract value field from the query.");
     });
 
@@ -3276,7 +3245,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors: string[] = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
       expect(errors).toContain("Unable to extract grouping field from the query.");
     });
 
@@ -3293,7 +3262,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors: string[] = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
       expect(errors).toContain("Unable to extract fields from the query.");
     });
 
@@ -3311,7 +3280,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors: string[] = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
       expect(errors).toContain("Unable to extract grouping field from the query.");
     });
 
@@ -3329,7 +3298,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors: string[] = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
       expect(errors).toContain("Unable to extract second level grouping field from the query.");
     });
 
@@ -3347,7 +3316,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors: string[] = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
       expect(errors).toContain("Unable to extract value field from the query.");
     });
 
@@ -3365,7 +3334,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors: string[] = [];
-      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      validateSQLPanelFields(gt, panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
       expect(errors).toContain("Unable to extract value field from the query.");
     });
 
@@ -3385,7 +3354,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
 
-      const errors = validateDashboardJson({
+      const errors = validateDashboardJson(gt, {
         dashboardId: "test",
         title: "Test",
         version: "v3",

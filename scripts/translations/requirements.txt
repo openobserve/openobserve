@@ -1,1 +1,4 @@
-openai>=1.40.0
+# Upper bound is deliberate: CI installs this file from the *PR head* and runs it
+# with an API key in the environment, so an unbounded range would let a major
+# version land without review. Bump it consciously.
+openai>=1.40.0,<2

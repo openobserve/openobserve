@@ -5,6 +5,7 @@
 // page.evaluate — they never touch the .suggest-widget DOM.
 
 const testLogger = require("../../playwright-tests/utils/test-logger.js");
+import { settlePanelLeave } from "./panel-leave-dialog.js";
 
 export default class DashboardSqlAutocomplete {
   constructor(page) {
@@ -162,6 +163,39 @@ export default class DashboardSqlAutocomplete {
     }).catch(() => []);
   }
 
+  // Poll until the suggest controller reports items, returning whether it opened.
+  //
+  // isAutocompleteOpen() below is a single point-in-time read, so gating
+  // assertions on it means a list that is merely slow reads as "not open" and the
+  // test skips its checks while still reporting PASSED. Use this wherever the
+  // suggestions are EXPECTED; keep isAutocompleteOpen() for asserting they are
+  // absent, where waiting would be pointless.
+  //
+  // @param {number} [timeout=8000] - ms to wait for the suggestion list
+  async waitForAutocompleteOpen(timeout = 8000) {
+    return this.page
+      .waitForFunction(
+        () => {
+          const m = (window).monaco;
+          const editors = m?.editor?.getEditors?.() || [];
+          const editor =
+            editors.find((e) => e.hasTextFocus && e.hasTextFocus()) ||
+            editors[editors.length - 1];
+          if (!editor) return false;
+          const ctrl = editor.getContribution(
+            "editor.contrib.suggestController"
+          );
+          const items =
+            ctrl?.model?._completionModel?.items ?? ctrl?.model?.items ?? [];
+          return Array.isArray(items) && items.length > 0;
+        },
+        undefined,
+        { timeout }
+      )
+      .then(() => true)
+      .catch(() => false);
+  }
+
   // True when the editor's suggest controller has items available
   // (i.e. the suggestion list is currently being shown). Reads the
   // completion model length rather than the SuggestModel state enum
@@ -198,12 +232,24 @@ export default class DashboardSqlAutocomplete {
   // Discard the in-progress panel edit. Safe to call when the discard button
   // isn't rendered (returns silently).
   async discardPanelIfVisible() {
+    // waitFor, not isVisible: isVisible() samples the current DOM and its
+    // `timeout` option is documented as ignored, so this could miss a button
+    // that was about to render.
     const visible = await this.discardPanelBtn
-      .isVisible({ timeout: 2000 })
+      .waitFor({ state: "visible", timeout: 2000 })
+      .then(() => true)
       .catch(() => false);
-    if (visible) {
+    if (!visible) return;
+
+    // A panel with edits opens the in-app leave dialog; unanswered, the page stays on
+    // /add_panel and cleanup leaks the dashboard. Same handling as discardPanel().
+    const dialogHandler = (dialog) => dialog.accept();
+    this.page.on("dialog", dialogHandler);
+    try {
       await this.discardPanelBtn.click();
-      await this.page.waitForTimeout(500);
+      await settlePanelLeave(this.page);
+    } finally {
+      this.page.off("dialog", dialogHandler);
     }
   }
 }

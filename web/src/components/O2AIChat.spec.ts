@@ -21,7 +21,7 @@ import i18n from "@/locales";
 
 // ── Module mocks (hoisted) ───────────────────────────────────────────────────
 
-vi.mock("highlight.js", () => ({
+vi.mock("@/lib/core/Code/highlighter", () => ({
   default: {
     highlight: vi.fn(() => ({ value: "" })),
     highlightAuto: vi.fn(() => ({ value: "" })),
@@ -57,14 +57,34 @@ vi.mock("@/composables/useChatHistory", () => ({
   })),
 }));
 
+// vi.hoisted, not a plain const: O2AIChat.vue destructures useAiChat() at module
+// scope, so the factory runs during import.
+const { mockFetchAiChat } = vi.hoisted(() => ({ mockFetchAiChat: vi.fn() }));
+const mockPromptForConsent = vi.hoisted(() => vi.fn());
+
 vi.mock("@/composables/useAiChat", () => ({
   default: vi.fn(() => ({
-    fetchAiChat: vi.fn(),
+    fetchAiChat: mockFetchAiChat,
     submitFeedback: vi.fn().mockResolvedValue(true),
     registerAiChatHandler: vi.fn(),
     removeAiChatHandler: vi.fn(),
     getStructuredContext: vi.fn().mockResolvedValue(null),
+    // Server-side chat persistence off: history stays in IndexedDB.
+    chatHistoryServer: vi.fn(() => ({ enabled: () => false })),
   })),
+}));
+
+const { ref: vueRef } = await vi.importActual<typeof import("vue")>("vue");
+
+vi.mock("@/composables/usePaidOverageConsent", () => ({
+  isPaidOverageConsentError: (status: number, body: unknown) =>
+    status === 412 &&
+    typeof body === "object" &&
+    body !== null &&
+    "error_type" in body &&
+    body.error_type === "paid_overage_consent_required",
+  usePaidOverageConsent: () => ({ promptForConsent: mockPromptForConsent }),
+  useChatConsentSurface: () => ({ showInChat: vueRef(false) }),
 }));
 
 vi.mock("@/utils/zincutils", async (importOriginal) => {
@@ -109,6 +129,7 @@ vi.mock("@/composables/contextProviders", () => ({
 
 // Component import must come after all vi.mock() declarations.
 import O2AIChat from "./O2AIChat.vue";
+import { getManager, resetManager } from "@/lib/vue-shortcut-manager";
 
 // ── Stub definitions ─────────────────────────────────────────────────────────
 
@@ -119,8 +140,9 @@ const stubs = {
     emits: ["update:modelValue", "keydown", "submit", "update:references"],
   },
   ConfirmDialog: {
+    name: "ConfirmDialog",
     template: '<div data-test="confirm-dialog" />',
-    props: ["modelValue", "title", "message"],
+    props: ["modelValue", "title", "message", "okVariant"],
     emits: ["update:ok", "update:cancel", "update:modelValue"],
   },
   O2AIConfirmDialog: {
@@ -234,6 +256,23 @@ describe("O2AIChat", () => {
       await flushPromises();
       const welcomeSection = wrapper.find(".welcome-section");
       expect(welcomeSection.exists()).toBe(true);
+    });
+  });
+
+  describe("Ctrl+B ownership", () => {
+    beforeEach(() => resetManager());
+    afterEach(() => resetManager());
+
+    // A second ctrl+b here overwrites MainLayout's gated aiChatToggle (same key + scope).
+    it("should not register ctrl+b, leaving the gated global binding in place", () => {
+      wrapper = mountO2AIChat({ isOpen: false });
+
+      const keys = getManager()!
+        .getAll()
+        .map((s) => s.key);
+      expect(keys).not.toContain("ctrl+b");
+      expect(keys).not.toContain("meta+b");
+      expect(keys).toContain("escape");
     });
   });
 
@@ -369,6 +408,46 @@ describe("O2AIChat", () => {
     });
   });
 
+  describe("delete chat dialog", () => {
+    beforeEach(() => {
+      wrapper = mountO2AIChat({ isOpen: true });
+    });
+
+    const deleteDialog = () =>
+      wrapper
+        .findAllComponents({ name: "ODialog" })
+        .find((d) => d.props("title") === "Delete Chat")!;
+
+    it("names the chat in bold behind a destructive Delete", async () => {
+      (wrapper.vm as any).chatHistory = [{ id: 42, title: "Latency review", serverBacked: false }];
+      await (wrapper.vm as any).requestDeleteChat(42);
+      await nextTick();
+
+      const dialog = deleteDialog();
+      expect(dialog.props("open")).toBe(true);
+      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+      expect(dialog.props("primaryButtonLabel")).toBe("Delete");
+      const name = wrapper.find('[data-test="o2-ai-chat-delete-chat-name"]');
+      expect(name.text()).toBe("Latency review");
+      expect(name.classes()).toContain("font-semibold");
+      expect(wrapper.find('[data-test="o-dialog-body"]').text()).toBe(
+        "Are you sure you want to delete the Latency review chat? This action cannot be undone.",
+      );
+    });
+
+    it("closes at once on Delete and deletes the chat it was opened for", async () => {
+      (wrapper.vm as any).chatHistory = [{ id: 42, title: "Latency review", serverBacked: false }];
+      await (wrapper.vm as any).requestDeleteChat(42);
+      await nextTick();
+      mockDeleteChatById.mockResolvedValueOnce(true);
+
+      await wrapper.find('[data-test="o-dialog-primary"]').trigger("click");
+      expect((wrapper.vm as any).showDeleteChatConfirmDialog).toBe(false);
+      await flushPromises();
+      expect(mockDeleteChatById).toHaveBeenCalledWith(42);
+    });
+  });
+
   describe("confirmDeleteChat", () => {
     beforeEach(() => {
       wrapper = mountO2AIChat({ isOpen: false });
@@ -432,6 +511,15 @@ describe("O2AIChat", () => {
       await nextTick();
 
       expect((wrapper.vm as any).showClearAllConfirmDialog).toBe(true);
+    });
+
+    it("uses a destructive OK button in the clear-all confirm", async () => {
+      wrapper.unmount();
+      wrapper = mountO2AIChat({ isOpen: true });
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "ConfirmDialog" }).props("okVariant")).toBe(
+        "destructive",
+      );
     });
   });
 
@@ -733,6 +821,409 @@ describe("O2AIChat", () => {
         identifier: "default",
         user_email: "example@gmail.com",
         subscription_type: "",
+      });
+    });
+  });
+  describe("session restore (HA)", () => {
+    // A session lives on one o2-ai replica. When that replica can no longer serve
+    // it, the UI restores the transcript into a fresh session.
+
+    describe("isSessionOwnerUnavailable", () => {
+      it("should detect the code nested under detail (FastAPI shape)", () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        const fn = (wrapper.vm as any).isSessionOwnerUnavailable;
+        expect(fn({ detail: { code: "session_owner_unavailable" } })).toBe(true);
+      });
+
+      it("should detect the code at the top level", () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        const fn = (wrapper.vm as any).isSessionOwnerUnavailable;
+        expect(fn({ code: "session_owner_unavailable" })).toBe(true);
+      });
+
+      it("should NOT treat other failures as a lost session", () => {
+        // Restoring abandons the current session, so anything short of the
+        // explicit server code must not trigger it.
+        wrapper = mountO2AIChat({ isOpen: true });
+        const fn = (wrapper.vm as any).isSessionOwnerUnavailable;
+        expect(fn({ detail: { code: "some_other_error" } })).toBe(false);
+        expect(fn({ message: "Server error (503)" })).toBe(false);
+        expect(fn({})).toBe(false);
+        expect(fn(null)).toBe(false);
+        expect(fn(undefined)).toBe(false);
+      });
+    });
+
+    describe("sendConfirmation", () => {
+      it("should report success when the confirmation is accepted", async () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+
+        const ok = await (wrapper.vm as any).sendConfirmation("sess-1", true);
+
+        expect(ok).toBe(true);
+        expect((wrapper.vm as any).chatMessages).toHaveLength(0);
+      });
+
+      it("should surface a 404 instead of silently reporting success", async () => {
+        // The bug the .ok check exists for: a dropped confirmation looked
+        // identical to an accepted one while the agent auto-denied.
+        wrapper = mountO2AIChat({ isOpen: true });
+        global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 404 });
+
+        const ok = await (wrapper.vm as any).sendConfirmation("sess-1", true);
+
+        expect(ok).toBe(false);
+        const msgs = (wrapper.vm as any).chatMessages;
+        expect(msgs.length).toBeGreaterThan(0);
+        expect(msgs[msgs.length - 1].contentBlocks[0].type).toBe("error");
+      });
+
+      it("should surface a network failure", async () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        global.fetch = vi.fn().mockRejectedValue(new Error("network down"));
+
+        const ok = await (wrapper.vm as any).sendConfirmation("sess-1", false);
+
+        expect(ok).toBe(false);
+        expect((wrapper.vm as any).chatMessages.length).toBeGreaterThan(0);
+      });
+    });
+
+    describe("paid usage consent retry", () => {
+      const denialBody = {
+        error_type: "paid_overage_consent_required",
+        consent: {
+          feature: "ai_credits",
+          organization: { org_id: "default", enabled: false, can_manage: true },
+          payer: null,
+          effective: false,
+          billing_status: "eligible",
+        },
+      };
+      const completedStream = {
+        ok: true,
+        body: {
+          getReader: () => ({
+            read: () => Promise.resolve({ done: true, value: undefined }),
+            releaseLock: () => {},
+            cancel: () => Promise.resolve(),
+          }),
+        },
+      };
+
+      it("retries the active turn exactly once after consent", async () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        const vm = wrapper.vm as unknown as {
+          inputMessage: string;
+          sendMessage: () => Promise<void>;
+        };
+        mockPromptForConsent.mockResolvedValue(true);
+        mockFetchAiChat
+          .mockResolvedValueOnce({
+            ok: false,
+            status: 412,
+            json: vi.fn().mockResolvedValue(denialBody),
+          })
+          .mockResolvedValueOnce(completedStream);
+        vm.inputMessage = "count errors";
+
+        await vm.sendMessage();
+        await flushPromises();
+
+        expect(mockPromptForConsent).toHaveBeenCalledTimes(1);
+        expect(mockFetchAiChat).toHaveBeenCalledTimes(2);
+        expect(mockFetchAiChat.mock.calls[1]).toEqual(mockFetchAiChat.mock.calls[0]);
+      });
+
+      it("shows a neutral notice and does not retry after decline", async () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        const vm = wrapper.vm as unknown as {
+          inputMessage: string;
+          chatMessages: Array<{ content: string }>;
+          sendMessage: () => Promise<void>;
+        };
+        mockPromptForConsent.mockResolvedValue(false);
+        mockFetchAiChat.mockResolvedValueOnce({
+          ok: false,
+          status: 412,
+          json: vi.fn().mockResolvedValue(denialBody),
+        });
+        vm.inputMessage = "count errors";
+
+        await vm.sendMessage();
+        await flushPromises();
+
+        expect(mockFetchAiChat).toHaveBeenCalledTimes(1);
+        // The refactored stream reports notices as an error contentBlock, not message content.
+        const last = vm.chatMessages.at(-1) as unknown as {
+          contentBlocks?: Array<{ message: string }>;
+        };
+        expect(last?.contentBlocks?.at(-1)?.message).toBe(
+          "Paid AI usage is off, so this request wasn't sent.",
+        );
+      });
+    });
+
+    describe("AI credits exhausted (402)", () => {
+      const sendAndGetLast = async (remedy?: string) => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        // The new-chat reset runs on the next tick; sending before it would wipe the prompt.
+        await flushPromises();
+        const vm = wrapper.vm as any;
+        mockFetchAiChat.mockResolvedValueOnce({
+          ok: false,
+          status: 402,
+          json: vi.fn().mockResolvedValue({
+            code: 402,
+            message: "Free trial quota exhausted (1000/1000 used).",
+            error_type: "ai_credits_exhausted",
+            remedy,
+          }),
+        });
+        vm.inputMessage = "count errors";
+        await vm.sendMessage();
+        await flushPromises();
+        return vm.chatMessages.at(-1).contentBlocks.at(-1);
+      };
+
+      it("offers Plans when the org can subscribe, and keeps the notice out of history", async () => {
+        const block = await sendAndGetLast("subscribe");
+
+        expect(block).toMatchObject({
+          type: "error",
+          ephemeral: true,
+          suggestion:
+            "Subscribe to keep using AI. Further usage is billed on this organization's invoice.",
+          navigationAction: { action: "navigate_direct", target: { path: "/billings/plans" } },
+        });
+      });
+
+      it("points contract orgs to their account manager, with no Plans button", async () => {
+        const block = await sendAndGetLast("contact_account_manager");
+
+        expect(block.suggestion).toBe("Contact your account manager to add more AI credits");
+        expect(block.navigationAction).toBeUndefined();
+      });
+
+      it("keeps the server wording when the remedy is unknown", async () => {
+        const block = await sendAndGetLast();
+
+        expect(block.suggestion).toBe("Free trial quota exhausted (1000/1000 used).");
+        expect(block.navigationAction).toBeUndefined();
+        expect(block.recoverable).toBe(false);
+      });
+
+      it("marks a mid-request exhaustion as retryable", async () => {
+        const block = await sendAndGetLast("retry");
+
+        expect(block.recoverable).toBe(true);
+        expect(block.navigationAction).toBeUndefined();
+      });
+
+      it("restores the draft so it can be resent", async () => {
+        await sendAndGetLast("subscribe");
+
+        expect((wrapper.vm as any).inputMessage).toBe("count errors");
+      });
+
+      it("gives back the attached images with the draft", async () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        const vm = wrapper.vm as any;
+        const image = { data: "aGVsbG8=", mimeType: "image/png", filename: "chart.png" };
+        vm.pendingImages = [image];
+        vm.inputMessage = "what does this chart show";
+        mockFetchAiChat.mockResolvedValueOnce({
+          ok: false,
+          status: 402,
+          json: vi
+            .fn()
+            .mockResolvedValue({ error_type: "ai_credits_exhausted", remedy: "subscribe" }),
+        });
+
+        await vm.sendMessage();
+        await flushPromises();
+
+        expect(vm.inputMessage).toBe("what does this chart show");
+        expect(vm.pendingImages).toEqual([image]);
+      });
+
+      it("keeps the refused prompt in the chat when the draft is resent", async () => {
+        await sendAndGetLast("subscribe");
+        const vm = wrapper.vm as any;
+        mockFetchAiChat.mockResolvedValueOnce({
+          ok: false,
+          status: 402,
+          json: vi
+            .fn()
+            .mockResolvedValue({ error_type: "ai_credits_exhausted", remedy: "subscribe" }),
+        });
+
+        await vm.sendMessage();
+        await flushPromises();
+
+        expect(vm.chatMessages.map((m: any) => m.role)).toEqual([
+          "user",
+          "assistant",
+          "user",
+          "assistant",
+        ]);
+      });
+    });
+
+    describe("streamOwnerUnavailable lifecycle", () => {
+      // A turn that throws or is aborted skips the clear at the end of the try
+      // block, so sendMessage clears the flag on entry instead.
+
+      it("should clear a stale flag on entry, even when the turn fails early", async () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        const vm = wrapper.vm as any;
+
+        // Left over from a previous turn that threw after an owner-unavailable.
+        vm.streamOwnerUnavailable = true;
+
+        // Fail before the stream opens — fetchAiChat returns null on a network
+        // error, the earliest realistic exit.
+        mockFetchAiChat.mockResolvedValueOnce(null);
+        vm.inputMessage = "how many errors today";
+
+        await vm.sendMessage();
+        await flushPromises();
+
+        expect(vm.streamOwnerUnavailable).toBe(false);
+      });
+
+      it("should not restore a healthy session because of a previous turn's flag", async () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        const vm = wrapper.vm as any;
+
+        const sessionId = "11111111-1111-7111-8111-111111111111";
+        vm.currentSessionId = sessionId;
+        vm.streamOwnerUnavailable = true;
+
+        // Immediately-closed but clean, so the turn reaches the restore check.
+        // An early failure would exit first and pass for the wrong reason.
+        mockFetchAiChat.mockResolvedValueOnce({
+          ok: true,
+          body: {
+            getReader: () => ({
+              read: () => Promise.resolve({ done: true, value: undefined }),
+              releaseLock: () => {},
+              cancel: () => Promise.resolve(),
+            }),
+          },
+        });
+        vm.inputMessage = "follow-up question";
+
+        await vm.sendMessage();
+        await flushPromises();
+
+        // Exactly one request: the stale flag must not trigger a restoring
+        // second one, which would also have replaced the session id.
+        expect(mockFetchAiChat).toHaveBeenCalledTimes(1);
+        expect(vm.currentSessionId).toBe(sessionId);
+      });
+    });
+
+    describe("restore and detached streams", () => {
+      // A detached turn keeps writing to the array it captured, but must not
+      // restore — chatMessages.value now points at a different conversation.
+
+      /** A reader that reports an owner-unavailable stream, then closes. */
+      const ownerLostReader = (vm: any, onRead?: () => void) => ({
+        getReader: () => ({
+          read: () => {
+            vm.streamOwnerUnavailable = true;
+            onRead?.();
+            return Promise.resolve({ done: true, value: undefined });
+          },
+          releaseLock: () => {},
+          cancel: () => Promise.resolve(),
+        }),
+      });
+
+      it("should restore when the turn is still the one on screen", async () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        const vm = wrapper.vm as any;
+        const original = "11111111-1111-7111-8111-111111111111";
+        vm.currentSessionId = original;
+
+        mockFetchAiChat
+          .mockResolvedValueOnce({ ok: true, body: ownerLostReader(vm) })
+          .mockResolvedValueOnce({
+            ok: true,
+            body: {
+              getReader: () => ({
+                read: () => Promise.resolve({ done: true, value: undefined }),
+                releaseLock: () => {},
+                cancel: () => Promise.resolve(),
+              }),
+            },
+          });
+        vm.inputMessage = "keep going";
+
+        await vm.sendMessage();
+        await flushPromises();
+
+        // Resent under a fresh id.
+        expect(mockFetchAiChat).toHaveBeenCalledTimes(2);
+        expect(vm.currentSessionId).not.toBe(original);
+      });
+
+      it("should NOT restore into whichever chat the user switched to", async () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        const vm = wrapper.vm as any;
+        const original = "11111111-1111-7111-8111-111111111111";
+        vm.currentSessionId = original;
+
+        // Mid-stream the user opens another chat: loadChat replaces the array,
+        // which is how the component detects detachment elsewhere.
+        const otherChat = [{ role: "user", content: "a different conversation" }];
+        mockFetchAiChat.mockResolvedValueOnce({
+          ok: true,
+          body: ownerLostReader(vm, () => {
+            vm.chatMessages = otherChat;
+          }),
+        });
+        vm.inputMessage = "keep going";
+
+        await vm.sendMessage();
+        await flushPromises();
+
+        // No resend, and the chat now on screen keeps its session id and
+        // transcript.
+        expect(mockFetchAiChat).toHaveBeenCalledTimes(1);
+        expect(vm.currentSessionId).toBe(original);
+        expect(otherChat).toHaveLength(1);
+      });
+    });
+
+    describe("appendErrorBlock", () => {
+      it("should attach to the trailing assistant message", () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        (wrapper.vm as any).chatMessages = [
+          { role: "user", content: "hi" },
+          { role: "assistant", content: "hello", contentBlocks: [] },
+        ];
+
+        (wrapper.vm as any).appendErrorBlock("something went wrong");
+
+        const msgs = (wrapper.vm as any).chatMessages;
+        expect(msgs).toHaveLength(2);
+        expect(msgs[1].contentBlocks).toHaveLength(1);
+        expect(msgs[1].contentBlocks[0].message).toBe("something went wrong");
+      });
+
+      it("should start a new assistant message when the last is from the user", () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        (wrapper.vm as any).chatMessages = [{ role: "user", content: "hi" }];
+
+        (wrapper.vm as any).appendErrorBlock("restored", true);
+
+        const msgs = (wrapper.vm as any).chatMessages;
+        expect(msgs).toHaveLength(2);
+        expect(msgs[1].role).toBe("assistant");
+        expect(msgs[1].contentBlocks[0].recoverable).toBe(true);
       });
     });
   });

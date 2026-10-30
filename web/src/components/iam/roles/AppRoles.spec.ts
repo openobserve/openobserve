@@ -1,5 +1,6 @@
-import { describe, it, expect, afterEach, vi } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -8,14 +9,26 @@ vi.mock("@/aws-exports", () => ({
   default: { isCloud: "false", isEnterprise: "true" },
 }));
 
-vi.mock("@/services/iam", () => ({
-  getRoles: vi.fn(async () => ({ data: ["Admin", "Viewer", "Editor"] })),
-  deleteRole: vi.fn(async () => ({})),
-  bulkDeleteRoles: vi.fn(async () => ({
-    data: { successful: ["Admin", "Viewer"], unsuccessful: [] },
-  })),
-  getRoleUsers: vi.fn(async () => ({ data: ["user1@o2.ai", "user2@o2.ai"] })),
-}));
+vi.mock("@/services/iam", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  const getRoles = vi.fn(async () => ({ data: ["Admin", "Viewer", "Editor"] }));
+  return overlayServiceMock(await importOriginal(), {
+    getRoles,
+    deleteRole: vi.fn(async () => ({})),
+    bulkDeleteRoles: vi.fn(async () => ({
+      data: { successful: ["Admin", "Viewer"], unsuccessful: [] },
+    })),
+    getRoleUsers: vi.fn(async () => ({ data: ["user1@o2.ai", "user2@o2.ai"] })),
+    updateRole: vi.fn(async () => ({ data: {} })),
+  });
+});
+
+vi.mock("@/services/users", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock((await importOriginal()) as any, {
+    default: { getUserRoles: vi.fn(async () => ({ data: [] })) },
+  });
+});
 
 vi.mock("@/services/reodotdev_analytics", () => ({
   useReo: () => ({ track: vi.fn() }),
@@ -26,13 +39,16 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 import AppRoles from "@/components/iam/roles/AppRoles.vue";
-import { getRoles, deleteRole, bulkDeleteRoles, getRoleUsers } from "@/services/iam";
+import { getRoles, deleteRole, bulkDeleteRoles, getRoleUsers, updateRole } from "@/services/iam";
+import users from "@/services/users";
+import { readEditorDraft, writeEditorDraft } from "@/utils/drafts/editorDraftStore";
+import { clickIn } from "@/test/unit/helpers/draftDom";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app-roles-test");
 document.body.appendChild(node);
 
-async function mountAppRoles() {
+async function mountAppRoles({ realConfirm = false } = {}) {
   const wrapper = mount(AppRoles, {
     attachTo: node,
     global: {
@@ -44,11 +60,21 @@ async function mountAppRoles() {
           template: `<div data-test="iam-roles-table-section"><slot name="actions" v-bind="{column:{row:rows&&rows[0]?rows[0]:{role_name:'Admin'}}}"/><slot name="bottom-actions"/></div>`,
         },
         AddRole: { template: '<div data-test="add-role-stub" />' },
-        ConfirmDialog: {
-          props: ["modelValue", "title", "message"],
-          emits: ["update:ok", "update:cancel", "update:modelValue"],
-          template: '<div data-test="confirm-dialog-stub"></div>',
-        },
+        ConfirmDialog: realConfirm
+          ? false
+          : {
+              name: "ConfirmDialog",
+              props: [
+                "modelValue",
+                "title",
+                "message",
+                "messageKeypath",
+                "messageName",
+                "okVariant",
+              ],
+              emits: ["update:ok", "update:cancel", "update:modelValue"],
+              template: '<div data-test="confirm-dialog-stub"></div>',
+            },
       },
     },
   });
@@ -61,6 +87,8 @@ afterEach(() => {
 });
 
 // 1. Rendering
+beforeEach(() => resetListViewState());
+
 describe("AppRoles - rendering", () => {
   it("renders the section title", async () => {
     const wrapper = await mountAppRoles();
@@ -208,6 +236,47 @@ describe("AppRoles - onRoleAdded", () => {
     );
   });
 
+  it("forwards the dbm preset in the query", async () => {
+    const wrapper = await mountAppRoles();
+    const spy = vi.spyOn(router, "push");
+    (wrapper.vm as any).onRoleAdded({ role_name: "DBM", startFrom: "dbm" });
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        query: expect.objectContaining({ preset: "dbm" }),
+      }),
+    );
+  });
+
+  it("forwards the k8s preset in the query", async () => {
+    const wrapper = await mountAppRoles();
+    const spy = vi.spyOn(router, "push");
+    (wrapper.vm as any).onRoleAdded({ role_name: "K8s", startFrom: "k8s" });
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "editRole",
+        params: { role_name: "K8s" },
+        query: expect.objectContaining({ tab: "permissions", preset: "k8s" }),
+      }),
+    );
+  });
+
+  it.each(["rum_viewer", "rum_editor"])("forwards the %s preset in the query", async (preset) => {
+    const wrapper = await mountAppRoles();
+    const spy = vi.spyOn(router, "push");
+    (wrapper.vm as any).onRoleAdded({ role_name: "RUM", startFrom: preset });
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({ query: expect.objectContaining({ preset }) }),
+    );
+  });
+
+  it("does not set a preset when startFrom is omitted", async () => {
+    const wrapper = await mountAppRoles();
+    const spy = vi.spyOn(router, "push");
+    (wrapper.vm as any).onRoleAdded({ role_name: "NoPreset" });
+    const call = spy.mock.calls[0][0] as any;
+    expect(call.query.preset).toBeUndefined();
+  });
+
   it("does not set a preset for the custom start option", async () => {
     const wrapper = await mountAppRoles();
     const spy = vi.spyOn(router, "push");
@@ -239,6 +308,16 @@ describe("AppRoles - showConfirmDialog", () => {
     const row = { role_name: "Viewer" };
     (wrapper.vm as any).showConfirmDialog(row);
     expect((wrapper.vm as any).deleteConformDialog.data).toEqual(row);
+  });
+
+  it("names the role and uses a destructive OK button", async () => {
+    const wrapper = await mountAppRoles();
+    (wrapper.vm as any).showConfirmDialog({ role_name: "Viewer" });
+    await flushPromises();
+    const dialog = wrapper.findAllComponents({ name: "ConfirmDialog" })[0];
+    expect(dialog.props("messageKeypath")).toBe("iam.appRoles.deleteConfirm");
+    expect(dialog.props("messageName")).toBe("Viewer");
+    expect(dialog.props("okVariant")).toBe("destructive");
   });
 
   it("builds a blast-radius warning with the live user count", async () => {
@@ -316,6 +395,10 @@ describe("AppRoles - openBulkDeleteDialog", () => {
     const wrapper = await mountAppRoles();
     (wrapper.vm as any).openBulkDeleteDialog();
     expect((wrapper.vm as any).confirmBulkDelete).toBe(true);
+    const dialog = wrapper
+      .findAllComponents({ name: "ConfirmDialog" })
+      .find((c: any) => c.props("title") === i18n.global.t("iam.appRoles.bulkDeleteRoles"));
+    expect(dialog!.props("okVariant")).toBe("destructive");
   });
 });
 
@@ -516,5 +599,180 @@ describe("AppRoles - ODialog/ODrawer Migration", () => {
 
     expect(getRoles).toHaveBeenCalledTimes(1);
     expect(getRoles).toHaveBeenCalledWith(store.state.selectedOrganization.identifier);
+  });
+});
+
+// Quick-assign: arriving via the service-account token popup's
+// "Assign a role" link (?member=<email>), which used to just redirect here
+// with no way to actually add the account to a role.
+describe("AppRoles - quick-assign via ?member=", () => {
+  // Earlier tests leave real navigations in flight; one awaited navigation cancels them first.
+  beforeEach(async () => {
+    await router.replace({
+      name: "roles",
+      query: { org_identifier: store.state.selectedOrganization.identifier },
+    });
+  });
+
+  afterEach(() => {
+    router.currentRoute.value.query = {};
+  });
+
+  it("shows the assign banner and passes assignTarget through to RoleTable when ?member= is present", async () => {
+    router.currentRoute.value.query = { member: "svc.o2.ai@sa.internal" };
+    const wrapper = await mountAppRoles();
+
+    expect(wrapper.find('[data-test="iam-roles-assign-banner"]').exists()).toBe(true);
+    const roleTable = wrapper.findComponent({ name: "RoleTable" });
+    expect(roleTable.props("assignTarget")).toBe("svc.o2.ai@sa.internal");
+  });
+
+  it("does not show the assign banner without ?member=", async () => {
+    const wrapper = await mountAppRoles();
+    expect(wrapper.find('[data-test="iam-roles-assign-banner"]').exists()).toBe(false);
+    const roleTable = wrapper.findComponent({ name: "RoleTable" });
+    expect(roleTable.props("assignTarget")).toBe("");
+  });
+
+  it("assignMemberToRole calls updateRole with the member as add_users", async () => {
+    router.currentRoute.value.query = { member: "svc.o2.ai@sa.internal" };
+    const wrapper = await mountAppRoles();
+
+    await (wrapper.vm as any).assignMemberToRole({ role_name: "Admin" });
+    await flushPromises();
+
+    expect(updateRole).toHaveBeenCalledWith({
+      role_id: "Admin",
+      org_identifier: store.state.selectedOrganization.identifier,
+      payload: { add: [], remove: [], add_users: ["svc.o2.ai@sa.internal"], remove_users: [] },
+    });
+  });
+
+  it("marks a role Assigned after a successful assign, and pre-loads existing memberships", async () => {
+    vi.mocked(users.getUserRoles).mockResolvedValueOnce({ data: ["Viewer"] } as any);
+    router.currentRoute.value.query = { member: "svc.o2.ai@sa.internal" };
+    const wrapper = await mountAppRoles();
+    await flushPromises();
+
+    // Pre-existing membership loaded from getUserRoles.
+    expect((wrapper.vm as any).assignedRoleNames).toContain("Viewer");
+
+    await (wrapper.vm as any).assignMemberToRole({ role_name: "Admin" });
+    await flushPromises();
+
+    expect((wrapper.vm as any).assignedRoleNames).toContain("Admin");
+  });
+
+  it("dismissing the banner clears ?member= from the route", async () => {
+    router.currentRoute.value.query = {
+      org_identifier: store.state.selectedOrganization.identifier,
+      member: "svc.o2.ai@sa.internal",
+    };
+    const wrapper = await mountAppRoles();
+
+    await wrapper.find('[data-test="iam-roles-assign-banner-dismiss"]').trigger("click");
+    await flushPromises();
+
+    expect(router.currentRoute.value.query.member).toBeUndefined();
+  });
+});
+
+describe("list view state", () => {
+  it("restores search, page size, page and sort from the saved view", async () => {
+    Object.assign(useListViewState("iam-roles", {}), {
+      filterQuery: "abc",
+      pageSize: 50,
+      currentPage: 2,
+      sortBy: "role_name",
+      sortOrder: "desc",
+    });
+    const w: any = await mountAppRoles();
+    await flushPromises();
+    expect(w.vm.filterQuery).toBe("abc");
+    expect(w.vm.pageSize).toBe(50);
+    expect(w.vm.currentPage).toBe(2);
+    expect(w.vm.sortBy).toBe("role_name");
+    expect(w.vm.sortOrder).toBe("desc");
+    w.unmount();
+  });
+
+  it("saves list state so it survives unmount", async () => {
+    const w: any = await mountAppRoles();
+    await flushPromises();
+    w.vm.filterQuery = "xyz";
+    w.vm.pageSize = 100;
+    w.vm.sortBy = "role_name";
+    w.vm.sortOrder = "desc";
+    await flushPromises();
+    w.unmount();
+    expect(useListViewState("iam-roles", {})).toMatchObject({
+      filterQuery: "xyz",
+      pageSize: 100,
+      sortBy: "role_name",
+      sortOrder: "desc",
+    });
+  });
+});
+
+describe("AppRoles - editor drafts", () => {
+  const draftOf = (entityId: string) => ({
+    kind: "iam_role" as const,
+    org: store.state.selectedOrganization.identifier,
+    entityId,
+    userEmail: store.state.userInfo.email,
+  });
+
+  beforeEach(() => localStorage.clear());
+
+  it("dots the row of a role with an unsaved draft, and only that row", async () => {
+    writeEditorDraft(draftOf("Viewer"), { data: { added: [] } });
+    const wrapper = await mountAppRoles();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="iam-roles-Viewer-draft-dot"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="iam-roles-Admin-draft-dot"]').exists()).toBe(false);
+  });
+
+  const deleteFromRow = async (wrapper: VueWrapper, role: string) => {
+    await wrapper.get(`[data-test="iam-roles-delete-${role}-role-icon"]`).trigger("click");
+    await flushPromises();
+    clickIn("confirm-dialog", "o-dialog-primary-btn");
+    await flushPromises();
+  };
+
+  it("drops a deleted role's draft", async () => {
+    writeEditorDraft(draftOf("Admin"), { data: { added: [] } });
+    const wrapper = await mountAppRoles({ realConfirm: true });
+    await deleteFromRow(wrapper, "Admin");
+
+    expect(deleteRole).toHaveBeenCalledTimes(1);
+    expect(readEditorDraft(draftOf("Admin"))).toBeNull();
+    wrapper.unmount();
+  });
+
+  it("drops the drafts of the roles a bulk delete removed, and keeps the rest", async () => {
+    writeEditorDraft(draftOf("Admin"), { data: { added: [] } });
+    writeEditorDraft(draftOf("Editor"), { data: { added: [] } });
+    const wrapper = await mountAppRoles();
+    const vm = wrapper.vm as unknown as {
+      selectedRoleNames: string[];
+      bulkDeleteUserRoles: () => Promise<void>;
+    };
+    vm.selectedRoleNames = ["Admin", "Viewer"];
+    await vm.bulkDeleteUserRoles();
+
+    expect(readEditorDraft(draftOf("Admin"))).toBeNull();
+    expect(readEditorDraft(draftOf("Editor"))).not.toBeNull();
+  });
+
+  it("keeps the draft when the delete fails", async () => {
+    writeEditorDraft(draftOf("Admin"), { data: { added: [] } });
+    vi.mocked(deleteRole).mockRejectedValueOnce({ response: { status: 500 } });
+    const wrapper = await mountAppRoles({ realConfirm: true });
+    await deleteFromRow(wrapper, "Admin");
+
+    expect(deleteRole).toHaveBeenCalledTimes(1);
+    expect(readEditorDraft(draftOf("Admin"))).not.toBeNull();
+    wrapper.unmount();
   });
 });

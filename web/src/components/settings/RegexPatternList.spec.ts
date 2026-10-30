@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ref, nextTick } from "vue";
 import { mount, flushPromises } from "@vue/test-utils";
@@ -21,12 +22,15 @@ import regexPatternsService from "@/services/regex_pattern";
 import { convertUnixToDateFormat } from "@/utils/zincutils";
 
 // Mock dependencies
-vi.mock("@/services/regex_pattern", () => ({
-  default: {
-    list: vi.fn(),
-    delete: vi.fn(),
-  },
-}));
+vi.mock("@/services/regex_pattern", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+      delete: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/utils/zincutils", async (importOriginal) => {
   // Preserve all real exports (the mounted component pulls in modules that
@@ -136,6 +140,8 @@ const mockNotify = {
   notify: vi.fn(),
 };
 
+beforeEach(() => resetListViewState());
+
 describe("RegexPatternList.vue Component Logic", () => {
   const mockRegexPatterns = [
     {
@@ -208,9 +214,8 @@ describe("RegexPatternList.vue Component Logic", () => {
     });
     const deleteDialog = ref({
       show: false,
-      title: "Delete Regex Pattern",
-      message: "Are you sure you want to delete this regex pattern?",
       data: "",
+      name: "",
     });
 
     const columns = ref([
@@ -647,9 +652,8 @@ describe("RegexPatternList.vue Component Logic", () => {
     const deleteDialog = setup.deleteDialog.value;
 
     expect(deleteDialog.show).toBe(false);
-    expect(deleteDialog.title).toBe("Delete Regex Pattern");
-    expect(deleteDialog.message).toBe("Are you sure you want to delete this regex pattern?");
     expect(deleteDialog.data).toBe("");
+    expect(deleteDialog.name).toBe("");
   });
 
   // Test 20: Per page options are set correctly
@@ -1289,5 +1293,44 @@ describe("RegexPatternList.vue - ODrawer Migration", () => {
     await child.vm.$emit("update:open", false);
     await flushPromises();
     expect(w.vm.showAddRegexPatternDialog.show).toBe(false);
+  });
+
+  it("names the pattern picked at open time and uses a destructive OK button", async () => {
+    w.vm.confirmDeleteRegexPattern({ id: "p1", name: "email-mask" });
+    await nextTick();
+    const dialog = w.findAllComponents({ name: "ConfirmDialog" })[0];
+    expect(dialog.props("messageKeypath")).toBe("settings.regexPatternList.deleteMessage");
+    expect(dialog.props("messageName")).toBe("email-mask");
+    expect(dialog.props("okVariant")).toBe("destructive");
+    expect(w.findAllComponents({ name: "ConfirmDialog" })[1].props("okVariant")).toBe(
+      "destructive",
+    );
+
+    w.vm.confirmDeleteRegexPattern({ id: "p2", name: "ip-mask" });
+    await nextTick();
+    expect(w.findAllComponents({ name: "ConfirmDialog" })[0].props("messageName")).toBe("ip-mask");
+  });
+
+  it("restores saved list state and writes changes back", async () => {
+    Object.assign(useListViewState("regex-patterns", {}), {
+      filterQuery: "abc",
+      pageSize: 50,
+      currentPage: 2,
+      sortBy: "name",
+      sortOrder: "desc",
+    });
+    const { wrapper } = await mountComponent();
+    const vm: any = wrapper.vm;
+    expect([vm.filterQuery, vm.pageSize, vm.currentPage, vm.sortBy, vm.sortOrder]).toEqual([
+      "abc",
+      50,
+      2,
+      "name",
+      "desc",
+    ]);
+    vm.pageSize = 100;
+    await vm.$nextTick();
+    expect(useListViewState("regex-patterns", {}).pageSize).toBe(100);
+    wrapper.unmount();
   });
 });

@@ -22,22 +22,34 @@
 use config::meta::{
     alerts::{
         dispatch::DeliveryEpisode,
-        grouping::GroupPlan,
+        grouping::{GroupPlan, ReapedGroup},
         level::AlertLevel,
-        state::{AlertState, ROLLUP_GROUP_KEY, StateTransition, StateUpdate},
+        recovery::ClosedGroupEpisode,
+        state::{AlertState, EvalLedgerWrite, ROLLUP_GROUP_KEY, StateTransition, StateUpdate},
     },
     self_reporting::usage::RunOutcome,
 };
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
-    TransactionTrait,
+    ActiveModelTrait, ColumnTrait, EntityTrait, FromQueryResult, QueryFilter, QueryOrder,
+    QuerySelect, Set, TransactionTrait,
 };
 
 use super::entity::{alert_state_transitions, alert_states, alerts};
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors,
 };
+
+/// What [`persist_group_plan`] wrote, so callers replicate, emit and clear only that.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct GroupPlanWrite {
+    /// False when the opt-out gate, or a sweep's refused close, dropped the plan.
+    pub written: bool,
+    /// `(group_key, firing_started_at)` of each evicted row that was mid-firing.
+    pub evicted_firing: Vec<(String, i64)>,
+    pub closed: Vec<ClosedGroupEpisode>,
+    pub reaped: Vec<ReapedGroup>,
+}
 
 /// Convert a stored row into the domain type. An unrecognised `last_outcome`
 /// integer degrades to `None` ("never evaluated") rather than failing the read —
@@ -63,13 +75,21 @@ impl From<alert_states::Model> for AlertState {
             groups_firing_is_lower_bound: m.groups_firing_is_lower_bound,
             silenced_until: m.silenced_until,
             last_notified_level: m.last_notified_level.and_then(AlertLevel::from_i32),
+            episode_id: m.episode_id,
+            episode_opened_at: m.episode_opened_at,
+            episode_incident_id: m.episode_incident_id,
+            recovering_since: m.recovering_since,
+            firing_started_at: m.firing_started_at,
+            group_label_set: m
+                .group_label_set
+                .and_then(|raw| config::utils::json::from_str(&raw).ok()),
         }
     }
 }
 
 /// Fetch the state row for one `(alert_id, group_key)`.
 pub async fn get(alert_id: &str, group_key: &str) -> Result<Option<AlertState>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     get_with(client, alert_id, group_key).await
 }
 
@@ -98,7 +118,7 @@ pub async fn get_rollups(alert_ids: &[String]) -> Result<Vec<AlertState>, errors
     if alert_ids.is_empty() {
         return Ok(vec![]);
     }
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     Ok(alert_states::Entity::find()
         .filter(alert_states::Column::AlertId.is_in(alert_ids.to_vec()))
         .filter(alert_states::Column::GroupKey.eq(ROLLUP_GROUP_KEY))
@@ -109,9 +129,119 @@ pub async fn get_rollups(alert_ids: &[String]) -> Result<Vec<AlertState>, errors
         .collect())
 }
 
+/// Records on the rollup row which downtime suppressed the latest firing run, or clears it.
+pub async fn set_last_downtime_id(
+    alert_id: &str,
+    downtime_id: Option<&str>,
+) -> Result<u64, errors::Error> {
+    let client = get_orm_client_rw().await;
+    set_last_downtime_id_with(client, alert_id, downtime_id).await
+}
+
+/// [`set_last_downtime_id`] against a caller-supplied connection.
+pub async fn set_last_downtime_id_with<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    alert_id: &str,
+    downtime_id: Option<&str>,
+) -> Result<u64, errors::Error> {
+    let Some(downtime_id) = downtime_id else {
+        let res = alert_states::Entity::update_many()
+            .col_expr(
+                alert_states::Column::LastDowntimeId,
+                sea_orm::sea_query::Expr::value(Option::<String>::None),
+            )
+            .filter(alert_states::Column::AlertId.eq(alert_id))
+            .filter(alert_states::Column::GroupKey.eq(ROLLUP_GROUP_KEY))
+            .filter(alert_states::Column::LastDowntimeId.is_not_null())
+            .exec(conn)
+            .await?;
+        return Ok(res.rows_affected);
+    };
+    // A real-time alert never runs through the scheduler, so its rollup row may not exist yet.
+    let row = alert_states::ActiveModel {
+        alert_id: Set(alert_id.to_string()),
+        group_key: Set(ROLLUP_GROUP_KEY.to_string()),
+        last_downtime_id: Set(Some(downtime_id.to_string())),
+        ..Default::default()
+    };
+    let res = alert_states::Entity::insert(row)
+        .on_conflict(
+            sea_orm::sea_query::OnConflict::columns([
+                alert_states::Column::AlertId,
+                alert_states::Column::GroupKey,
+            ])
+            .update_column(alert_states::Column::LastDowntimeId)
+            .to_owned(),
+        )
+        .exec_without_returning(conn)
+        .await?;
+    Ok(res)
+}
+
+/// Forgets a downtime every alert recorded; returns those alerts, whose mute the caller closes.
+pub async fn clear_last_downtime_id(downtime_id: &str) -> Result<Vec<String>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    clear_last_downtime_id_with(client, downtime_id).await
+}
+
+/// [`clear_last_downtime_id`] against a caller-supplied connection.
+pub async fn clear_last_downtime_id_with<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    downtime_id: &str,
+) -> Result<Vec<String>, errors::Error> {
+    let mut alert_ids: Vec<String> = alert_states::Entity::find()
+        .select_only()
+        .column(alert_states::Column::AlertId)
+        .filter(alert_states::Column::LastDowntimeId.eq(downtime_id))
+        .into_tuple()
+        .all(conn)
+        .await?;
+    alert_ids.sort();
+    alert_ids.dedup();
+    if alert_ids.is_empty() {
+        return Ok(alert_ids);
+    }
+    alert_states::Entity::update_many()
+        .col_expr(
+            alert_states::Column::LastDowntimeId,
+            sea_orm::sea_query::Expr::value(Option::<String>::None),
+        )
+        .filter(alert_states::Column::LastDowntimeId.eq(downtime_id))
+        .exec(conn)
+        .await?;
+    Ok(alert_ids)
+}
+
+/// `alert_id -> last_downtime_id` for the alerts of a list page that carry one.
+pub async fn last_downtime_ids(
+    alert_ids: &[String],
+) -> Result<std::collections::HashMap<String, String>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    last_downtime_ids_with(client, alert_ids).await
+}
+
+/// [`last_downtime_ids`] against a caller-supplied connection.
+pub async fn last_downtime_ids_with<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    alert_ids: &[String],
+) -> Result<std::collections::HashMap<String, String>, errors::Error> {
+    if alert_ids.is_empty() {
+        return Ok(Default::default());
+    }
+    Ok(alert_states::Entity::find()
+        .filter(alert_states::Column::AlertId.is_in(alert_ids.to_vec()))
+        .filter(alert_states::Column::GroupKey.eq(ROLLUP_GROUP_KEY))
+        .filter(alert_states::Column::LastDowntimeId.is_not_null())
+        .all(conn)
+        .await?
+        .into_iter()
+        .filter_map(|m| m.last_downtime_id.map(|id| (m.alert_id, id)))
+        .collect())
+}
+
 /// All per-group rows for one alert.
 pub async fn list_groups(alert_id: &str) -> Result<Vec<AlertState>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     list_groups_with(client, alert_id).await
 }
 
@@ -131,30 +261,42 @@ pub async fn list_groups_with<C: sea_orm::ConnectionTrait>(
 }
 
 /// Persist a [`StateUpdate`] produced by
-/// `config::meta::alerts::state::apply_outcome`.
+/// `config::meta::alerts::state::apply_outcome`, plus this evaluation's
+/// contribution to the availability ledger (S-16) when it has one.
 ///
-/// The state upsert and its transition insert go in one transaction: a
-/// transition that is not reflected in current state (or vice versa) would make
-/// recovery pairing unreliable, which is the whole reason this is not on the
-/// lossy stream path.
-pub async fn persist(update: &StateUpdate) -> Result<(), errors::Error> {
-    if update.state.is_none() {
+/// The state upsert, its transition insert and the ledger extension go in one
+/// transaction: a transition that is not reflected in current state (or vice
+/// versa) would make recovery pairing unreliable, which is the whole reason
+/// this is not on the lossy stream path — and a ledger that disagreed with the
+/// state row about whether an evaluation happened would put fabricated coverage
+/// and lost coverage one crash apart. A failure loses both together, and the
+/// ledger consequence of that is a gap, which is the safe direction (D34).
+pub async fn persist(
+    update: &StateUpdate,
+    ledger: Option<&EvalLedgerWrite>,
+) -> Result<(), errors::Error> {
+    if update.state.is_none() && ledger.is_none() {
         return Ok(());
     }
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    persist_with(client, update).await
+    let client = get_orm_client_rw().await;
+    persist_with(client, update, ledger).await
 }
 
 /// [`persist`] against a caller-supplied connection.
 pub async fn persist_with<C: sea_orm::ConnectionTrait + TransactionTrait>(
     conn: &C,
     update: &StateUpdate,
+    ledger: Option<&EvalLedgerWrite>,
 ) -> Result<(), errors::Error> {
-    if update.state.is_none() {
+    if update.state.is_none() && ledger.is_none() {
         return Ok(());
     }
+
     let txn = conn.begin().await?;
     write_update(&txn, update).await?;
+    if let Some(write) = ledger {
+        crate::table::alert_eval_intervals::record_evaluation_with(&txn, write).await?;
+    }
     txn.commit().await?;
     Ok(())
 }
@@ -167,9 +309,21 @@ pub async fn persist_with<C: sea_orm::ConnectionTrait + TransactionTrait>(
 /// state that never existed. The evictions go in the same transaction for the
 /// same reason — a cap overflow that upserted the winners but failed to delete
 /// the displaced rows would leave stored rows above the cap.
-pub async fn persist_group_plan(plan: &GroupPlan, alert_id: &str) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    persist_group_plan_with(client, plan, alert_id).await
+///
+/// `written` is false when the opt-out gate below, or a sweep resolve whose
+/// guarded close missed, dropped the plan. The caller needs to be able to tell
+/// the two apart: the super-cluster wrapper must not broadcast a plan this
+/// region refused, or a region that has not yet seen the opt-out would
+/// materialise exactly the rows the toggle promised to remove. `closed` and
+/// `reaped` list only the closes and reaps whose guards matched, so callers emit
+/// and replicate exactly those.
+pub async fn persist_group_plan(
+    plan: &GroupPlan,
+    alert_id: &str,
+    mode: PlanApply,
+) -> Result<GroupPlanWrite, errors::Error> {
+    let client = get_orm_client_rw().await;
+    persist_group_plan_with(client, plan, alert_id, mode).await
 }
 
 /// [`persist_group_plan`] against a caller-supplied connection.
@@ -177,7 +331,8 @@ pub async fn persist_group_plan_with<C: sea_orm::ConnectionTrait + TransactionTr
     conn: &C,
     plan: &GroupPlan,
     alert_id: &str,
-) -> Result<(), errors::Error> {
+    mode: PlanApply,
+) -> Result<GroupPlanWrite, errors::Error> {
     let txn = conn.begin().await?;
 
     // §5.3 opt-out race: this evaluation may have read the alert BEFORE a save
@@ -192,7 +347,18 @@ pub async fn persist_group_plan_with<C: sea_orm::ConnectionTrait + TransactionTr
             "alert {alert_id}: per-group alerting was turned off mid-evaluation; dropping this \
              evaluation's group writes"
         );
-        return Ok(());
+        return Ok(GroupPlanWrite::default());
+    }
+
+    // Before the upserts: they move `level_at`, which is the close's version guard.
+    let mut closed = Vec::with_capacity(plan.closed_episodes.len());
+    for close in &plan.closed_episodes {
+        if close_group_episode(&txn, alert_id, close, mode != PlanApply::Replica).await? {
+            closed.push(close.clone());
+        } else if mode == PlanApply::Sweep {
+            txn.rollback().await?;
+            return Ok(GroupPlanWrite::default());
+        }
     }
 
     for update in &plan.updates {
@@ -202,7 +368,9 @@ pub async fn persist_group_plan_with<C: sea_orm::ConnectionTrait + TransactionTr
     // Evicted rows are deleted outright with NO transition (M-6): an eviction
     // is bookkeeping, not a level change — the group may well still be firing,
     // so a recovery row would be a lie.
+    let mut evicted_firing = Vec::new();
     if !plan.evicted.is_empty() {
+        evicted_firing = firing_groups_with(&txn, alert_id, Some(&plan.evicted)).await?;
         alert_states::Entity::delete_many()
             .filter(alert_states::Column::AlertId.eq(alert_id))
             .filter(alert_states::Column::GroupKey.is_in(plan.evicted.clone()))
@@ -210,8 +378,60 @@ pub async fn persist_group_plan_with<C: sea_orm::ConnectionTrait + TransactionTr
             .await?;
     }
 
+    let mut reaped = Vec::new();
+    for reap in &plan.reaped {
+        if reap_group(&txn, alert_id, reap).await? {
+            reaped.push(reap.clone());
+        }
+    }
+
+    if mode == PlanApply::Replica {
+        converge_episodes(&txn, alert_id, plan).await?;
+    }
+
     txn.commit().await?;
-    Ok(())
+    Ok(GroupPlanWrite {
+        written: true,
+        evicted_firing,
+        closed,
+        reaped,
+    })
+}
+
+/// `(group_key, firing_started_at)` of the alert's group rows mid-firing, optionally only `keys`.
+pub async fn firing_groups(
+    alert_id: &str,
+    keys: Option<&[String]>,
+) -> Result<Vec<(String, i64)>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    firing_groups_with(client, alert_id, keys).await
+}
+
+/// [`firing_groups`] against a caller-supplied connection.
+pub async fn firing_groups_with<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    alert_id: &str,
+    keys: Option<&[String]>,
+) -> Result<Vec<(String, i64)>, errors::Error> {
+    let mut query = alert_states::Entity::find()
+        .select_only()
+        .column(alert_states::Column::GroupKey)
+        .column(alert_states::Column::FiringStartedAt)
+        .filter(alert_states::Column::AlertId.eq(alert_id))
+        .filter(alert_states::Column::GroupKey.ne(ROLLUP_GROUP_KEY))
+        .filter(alert_states::Column::FiringStartedAt.is_not_null());
+    if let Some(keys) = keys {
+        query = query.filter(alert_states::Column::GroupKey.is_in(keys.to_vec()));
+    }
+    let rows = query
+        .order_by_asc(alert_states::Column::GroupKey)
+        .into_tuple::<(String, Option<i64>)>()
+        .all(conn)
+        .await?;
+    Ok(rows
+        .into_iter()
+        .filter_map(|(key, started)| started.map(|s| (key, s)))
+        .collect())
 }
 
 /// Record a per-group delivery outcome (§5.5 MN-6/MN-7), conditionally.
@@ -223,16 +443,16 @@ pub async fn persist_group_plan_with<C: sea_orm::ConnectionTrait + TransactionTr
 /// split above exists to remove, and would also let a callback echo back
 /// observation fields it read before the latest evaluation.
 ///
-/// Returns `true` when the row was updated, `false` when the episode had moved
-/// on and the callback was correctly dropped as stale.
+/// `mint` is the episode key a landed send carried; it is recorded even when the guard refuses.
 pub async fn advance_delivery_state(
     alert_id: &str,
     group_key: &str,
     episode: DeliveryEpisode,
     outcome: DeliveryOutcome,
-) -> Result<bool, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    advance_delivery_state_with(client, alert_id, group_key, episode, outcome).await
+    mint: Option<&str>,
+) -> Result<DeliveryAdvance, errors::Error> {
+    let client = get_orm_client_rw().await;
+    advance_delivery_state_with(client, alert_id, group_key, episode, outcome, mint).await
 }
 
 /// [`advance_delivery_state`] against a caller-supplied connection.
@@ -242,7 +462,8 @@ pub async fn advance_delivery_state_with<C: sea_orm::ConnectionTrait + Transacti
     group_key: &str,
     episode: DeliveryEpisode,
     outcome: DeliveryOutcome,
-) -> Result<bool, errors::Error> {
+    mint: Option<&str>,
+) -> Result<DeliveryAdvance, errors::Error> {
     let txn = conn.begin().await?;
 
     let Some(current) =
@@ -252,126 +473,81 @@ pub async fn advance_delivery_state_with<C: sea_orm::ConnectionTrait + Transacti
             .map(AlertState::from)
     else {
         txn.rollback().await?;
-        return Ok(false);
+        return Ok(DeliveryAdvance {
+            applied: false,
+            mint: mint.map_or(MintOutcome::NotRequested, |_| MintOutcome::Orphaned),
+        });
     };
 
-    // The DECISION comes from the pure contract — staleness guards, the
-    // silence-window floor, the outcome-axis invariants all live in `dispatch`
-    // and are unit-tested there rather than restated as SET clauses.
-    //
-    // The WRITE still carries the same guards in its `WHERE`, and every arm
-    // checks `rows_affected`. Validating in Rust alone would leave a window
-    // between the read and the write in which a concurrent evaluation can
-    // commit a recovery or a new level — and the stale callback would then
-    // silence (or resurrect) an episode that no longer exists.
-    let guarded = || {
-        alert_states::Entity::update_many()
-            .filter(alert_states::Column::AlertId.eq(alert_id))
-            .filter(alert_states::Column::GroupKey.eq(group_key))
-            .filter(alert_states::Column::Level.eq(episode.level.to_i32()))
-            .filter(alert_states::Column::LevelSince.eq(episode.level_since))
-    };
-    // TEMP
-
-    let affected = match outcome {
-        DeliveryOutcome::Delivered {
-            silence_minutes,
-            at,
-        } => {
-            let Some(next) = config::meta::alerts::dispatch::delivery_success_update(
-                &current,
-                episode,
-                silence_minutes,
-                at,
-            ) else {
-                txn.rollback().await?;
-                return Ok(false);
-            };
-
-            // Targeted columns, NOT `write_update`: the upsert's conflict
-            // clause deliberately excludes the delivery columns (one-writer
-            // rule, §5.5 MN-2), so routing this through it would write nothing.
-            guarded()
-                .col_expr(
-                    alert_states::Column::LastNotifiedLevel,
-                    sea_orm::sea_query::Expr::value(next.last_notified_level.map(|l| l.to_i32())),
-                )
-                .col_expr(
-                    alert_states::Column::SilencedUntil,
-                    sea_orm::sea_query::Expr::value(next.silenced_until),
-                )
-                .exec(&txn)
-                .await?
-                .rows_affected
-        }
-
-        DeliveryOutcome::Failed { at } => {
-            let Some(update) =
-                config::meta::alerts::dispatch::delivery_failure_update(&current, episode, at)
-            else {
-                txn.rollback().await?;
-                return Ok(false);
-            };
-            let Some(next) = update.state.as_ref() else {
-                txn.rollback().await?;
-                return Ok(false);
-            };
-
-            // A failure also carries the ATTEMPT anchor into the predicates: a
-            // newer success in this episode has already moved delivery state,
-            // and `eq(NULL)` is never true, so a never-delivered anchor must be
-            // matched with IS NULL.
-            let (notified_level, silenced_until) = episode.notified_at_enqueue;
-            let mut stmt = match notified_level {
-                Some(l) => guarded().filter(alert_states::Column::LastNotifiedLevel.eq(l.to_i32())),
-                None => guarded().filter(alert_states::Column::LastNotifiedLevel.is_null()),
-            };
-            stmt = match silenced_until {
-                Some(t) => stmt.filter(alert_states::Column::SilencedUntil.eq(t)),
-                None => stmt.filter(alert_states::Column::SilencedUntil.is_null()),
-            };
-
-            let affected = stmt
-                .col_expr(
-                    alert_states::Column::LastOutcome,
-                    sea_orm::sea_query::Expr::value(RunOutcome::NotifyFailed.to_i32()),
-                )
-                .col_expr(
-                    alert_states::Column::LastOutcomeAt,
-                    sea_orm::sea_query::Expr::value(next.last_outcome_at),
-                )
-                .col_expr(
-                    alert_states::Column::Since,
-                    sea_orm::sea_query::Expr::value(next.since),
-                )
-                .exec(&txn)
-                .await?
-                .rows_affected;
-
-            // The transition only goes in if the state write actually landed,
-            // and in the same transaction — history must never describe a
-            // change that was not applied (MN-9).
-            if affected > 0
-                && let Some(t) = update.transition.as_ref()
-            {
-                write_transition(&txn, t).await?;
+    // First, and on its own: the vendor holds a ticket under this key whatever the guard decides.
+    let mint = match (mint, outcome) {
+        (Some(id), DeliveryOutcome::Delivered { at, .. }) => {
+            if mint_episode(&txn, alert_id, group_key, id, Some(at)).await? {
+                MintOutcome::Minted
+            } else if current.episode_id.as_deref() == Some(id) {
+                MintOutcome::Held
+            } else {
+                MintOutcome::Orphaned
             }
-            affected
         }
+        _ => MintOutcome::NotRequested,
     };
 
-    if affected == 0 {
-        // The guard matched nothing: the episode moved on between the read and
-        // the write. Correctly dropped rather than applied.
+    let applied =
+        apply_delivery_outcome(&txn, &current, alert_id, group_key, episode, outcome).await?;
+    // A refused delivery write still commits the mint; with neither there is nothing to keep.
+    if applied || mint == MintOutcome::Minted {
+        txn.commit().await?;
+    } else {
         txn.rollback().await?;
-        return Ok(false);
     }
-    txn.commit().await?;
-    Ok(true)
+    Ok(DeliveryAdvance { applied, mint })
+}
+
+/// After an unack, repeats wait out one silence window from the unack (§5.5).
+pub async fn set_silence_after_unack(
+    alert_id: &str,
+    group_key: &str,
+    firing_started_at: i64,
+    until: i64,
+) -> Result<bool, errors::Error> {
+    let client = get_orm_client_rw().await;
+    set_silence_after_unack_with(client, alert_id, group_key, firing_started_at, until).await
+}
+
+/// [`set_silence_after_unack`] against a caller-supplied connection; false when nothing moved.
+pub async fn set_silence_after_unack_with<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    alert_id: &str,
+    group_key: &str,
+    firing_started_at: i64,
+    until: i64,
+) -> Result<bool, errors::Error> {
+    // Only the silence column: the delivered level stays the escalation baseline (one-writer rule).
+    let affected = alert_states::Entity::update_many()
+        .col_expr(
+            alert_states::Column::SilencedUntil,
+            sea_orm::sea_query::Expr::value(until),
+        )
+        .filter(alert_states::Column::AlertId.eq(alert_id))
+        .filter(alert_states::Column::GroupKey.eq(group_key))
+        .filter(alert_states::Column::FiringStartedAt.eq(firing_started_at))
+        .filter(
+            sea_orm::Condition::any()
+                .add(alert_states::Column::SilencedUntil.is_null())
+                .add(alert_states::Column::SilencedUntil.lt(until)),
+        )
+        .exec(conn)
+        .await?
+        .rows_affected;
+    Ok(affected > 0)
 }
 
 /// Which delivery outcome [`advance_delivery_state`] should record.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+///
+/// Serializable because the advance replicates across a super cluster by
+/// re-running the same guarded write in every other region.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DeliveryOutcome {
     Delivered {
         /// The alert's configured silence, in minutes. The window itself is
@@ -385,6 +561,38 @@ pub enum DeliveryOutcome {
     },
 }
 
+/// What one delivery callback recorded.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct DeliveryAdvance {
+    /// The guarded delivery-columns write landed.
+    pub applied: bool,
+    pub mint: MintOutcome,
+}
+
+/// What became of the episode key a landed send carried.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MintOutcome {
+    #[default]
+    NotRequested,
+    /// The row had no episode and now holds the key.
+    Minted,
+    /// The row already holds the key: a re-notification inside its episode.
+    Held,
+    /// The row is gone or holds another id, so the ticket under this key can never be resolved.
+    Orphaned,
+}
+
+/// How a plan treats a close its version guard refused.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PlanApply {
+    /// An evaluation: the upserts still land and the next evaluation decides again.
+    Evaluation,
+    /// A sweep resolve: the plan is abandoned rather than writing `Ok` over an unseen observation.
+    Sweep,
+    /// A replica: closes by `episode_id` alone, then repairs dropped mints from the plan's rows.
+    Replica,
+}
+
 /// Every alert that currently has at least one per-group state row.
 ///
 /// The M-7 sweep's entry point. Distinct alert ids rather than all rows: the
@@ -392,7 +600,7 @@ pub enum DeliveryOutcome {
 /// completeness gate, so a cluster full of frozen alerts costs one query
 /// instead of a full table read every tick.
 pub async fn list_alert_ids_with_groups() -> Result<Vec<String>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     Ok(alert_states::Entity::find()
         .select_only()
         .column(alert_states::Column::AlertId)
@@ -412,7 +620,7 @@ pub async fn delete_groups(alert_id: &str, group_keys: &[String]) -> Result<(), 
     if group_keys.is_empty() {
         return Ok(());
     }
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     delete_groups_with(client, alert_id, group_keys).await
 }
 
@@ -425,6 +633,7 @@ pub async fn delete_groups_with<C: sea_orm::ConnectionTrait>(
     if group_keys.is_empty() {
         return Ok(());
     }
+
     alert_states::Entity::delete_many()
         .filter(alert_states::Column::AlertId.eq(alert_id))
         .filter(alert_states::Column::GroupKey.is_in(group_keys.to_vec()))
@@ -483,7 +692,7 @@ async fn multi_alert_still_enabled<C: sea_orm::ConnectionTrait>(
 /// stale firing rows visible for K x interval plus the grace period, which is
 /// the opposite of the immediate rollback the toggle promises.
 pub async fn delete_all_groups(alert_id: &str) -> Result<u64, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     delete_all_groups_with(client, alert_id).await
 }
 
@@ -498,6 +707,233 @@ pub async fn delete_all_groups_with<C: sea_orm::ConnectionTrait>(
         .exec(conn)
         .await?;
     Ok(res.rows_affected)
+}
+
+/// The guarded close: exactly-once by `episode_id`, and correct by the `level_at` the closer read.
+async fn close_group_episode<C: sea_orm::ConnectionTrait>(
+    txn: &C,
+    alert_id: &str,
+    close: &ClosedGroupEpisode,
+    versioned: bool,
+) -> Result<bool, errors::Error> {
+    use sea_orm::sea_query::Expr;
+
+    let mut stmt = alert_states::Entity::update_many()
+        .col_expr(
+            alert_states::Column::EpisodeId,
+            Expr::value(Option::<String>::None),
+        )
+        .col_expr(
+            alert_states::Column::EpisodeOpenedAt,
+            Expr::value(Option::<i64>::None),
+        )
+        .col_expr(
+            alert_states::Column::EpisodeIncidentId,
+            Expr::value(Option::<String>::None),
+        )
+        .col_expr(
+            alert_states::Column::RecoveringSince,
+            Expr::value(Option::<i64>::None),
+        )
+        // A re-fire after a recovery must page even inside the old silence window (D8).
+        .col_expr(
+            alert_states::Column::LastNotifiedLevel,
+            Expr::value(Option::<i32>::None),
+        )
+        .col_expr(
+            alert_states::Column::SilencedUntil,
+            Expr::value(Option::<i64>::None),
+        )
+        .filter(alert_states::Column::AlertId.eq(alert_id))
+        .filter(alert_states::Column::GroupKey.eq(close.group_key.as_str()))
+        .filter(alert_states::Column::EpisodeId.eq(close.episode_id.as_str()));
+    if versioned {
+        stmt = match close.prev_level_at {
+            Some(at) => stmt.filter(alert_states::Column::LevelAt.eq(at)),
+            None => stmt.filter(alert_states::Column::LevelAt.is_null()),
+        };
+    }
+    Ok(stmt.exec(txn).await?.rows_affected > 0)
+}
+
+/// Deletes a reaped row only if nothing observed it since the sweep read it and no episode is open.
+async fn reap_group<C: sea_orm::ConnectionTrait>(
+    txn: &C,
+    alert_id: &str,
+    reap: &ReapedGroup,
+) -> Result<bool, errors::Error> {
+    let stmt = alert_states::Entity::delete_many()
+        .filter(alert_states::Column::AlertId.eq(alert_id))
+        .filter(alert_states::Column::GroupKey.eq(reap.group_key.as_str()))
+        .filter(alert_states::Column::EpisodeId.is_null());
+    let stmt = match reap.prev_level_at {
+        Some(at) => stmt.filter(alert_states::Column::LevelAt.eq(at)),
+        None => stmt.filter(alert_states::Column::LevelAt.is_null()),
+    };
+    Ok(stmt.exec(txn).await?.rows_affected > 0)
+}
+
+/// Records a delivered key on a group row that holds none; a row with an id keeps it.
+async fn mint_episode<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    alert_id: &str,
+    group_key: &str,
+    episode_id: &str,
+    opened_at: Option<i64>,
+) -> Result<bool, errors::Error> {
+    use sea_orm::sea_query::Expr;
+
+    Ok(alert_states::Entity::update_many()
+        .col_expr(
+            alert_states::Column::EpisodeId,
+            Expr::value(Some(episode_id.to_string())),
+        )
+        .col_expr(
+            alert_states::Column::EpisodeOpenedAt,
+            Expr::value(opened_at),
+        )
+        .filter(alert_states::Column::AlertId.eq(alert_id))
+        .filter(alert_states::Column::GroupKey.eq(group_key))
+        .filter(alert_states::Column::EpisodeId.is_null())
+        .exec(conn)
+        .await?
+        .rows_affected
+        > 0)
+}
+
+/// A replica repairs a dropped delivery mint from the episode ids the plan's group rows carry.
+async fn converge_episodes<C: sea_orm::ConnectionTrait>(
+    txn: &C,
+    alert_id: &str,
+    plan: &GroupPlan,
+) -> Result<(), errors::Error> {
+    for state in plan.updates.iter().filter_map(|u| u.state.as_ref()) {
+        if state.group_key == ROLLUP_GROUP_KEY
+            || plan
+                .closed_episodes
+                .iter()
+                .any(|c| c.group_key == state.group_key)
+        {
+            continue;
+        }
+        if let Some(id) = state.episode_id.as_deref() {
+            mint_episode(txn, alert_id, &state.group_key, id, state.episode_opened_at).await?;
+        }
+    }
+    Ok(())
+}
+
+/// The guarded delivery-columns write; `false` when the episode had moved on and it was dropped.
+async fn apply_delivery_outcome<C: sea_orm::ConnectionTrait>(
+    txn: &C,
+    current: &AlertState,
+    alert_id: &str,
+    group_key: &str,
+    episode: DeliveryEpisode,
+    outcome: DeliveryOutcome,
+) -> Result<bool, errors::Error> {
+    // The DECISION comes from the pure contract — staleness guards, the
+    // silence-window floor, the outcome-axis invariants all live in `dispatch`
+    // and are unit-tested there rather than restated as SET clauses.
+    //
+    // The WRITE still carries the same guards in its `WHERE`, and every arm
+    // checks `rows_affected`. Validating in Rust alone would leave a window
+    // between the read and the write in which a concurrent evaluation can
+    // commit a recovery or a new level — and the stale callback would then
+    // silence (or resurrect) an episode that no longer exists.
+    let guarded = || {
+        alert_states::Entity::update_many()
+            .filter(alert_states::Column::AlertId.eq(alert_id))
+            .filter(alert_states::Column::GroupKey.eq(group_key))
+            .filter(alert_states::Column::Level.eq(episode.level.to_i32()))
+            .filter(alert_states::Column::LevelSince.eq(episode.level_since))
+    };
+
+    let affected = match outcome {
+        DeliveryOutcome::Delivered {
+            silence_minutes,
+            at,
+        } => {
+            let Some(next) = config::meta::alerts::dispatch::delivery_success_update(
+                current,
+                episode,
+                silence_minutes,
+                at,
+            ) else {
+                return Ok(false);
+            };
+
+            // Targeted columns, NOT `write_update`: the upsert's conflict
+            // clause deliberately excludes the delivery columns (one-writer
+            // rule, §5.5 MN-2), so routing this through it would write nothing.
+            guarded()
+                .col_expr(
+                    alert_states::Column::LastNotifiedLevel,
+                    sea_orm::sea_query::Expr::value(next.last_notified_level.map(|l| l.to_i32())),
+                )
+                .col_expr(
+                    alert_states::Column::SilencedUntil,
+                    sea_orm::sea_query::Expr::value(next.silenced_until),
+                )
+                .exec(txn)
+                .await?
+                .rows_affected
+        }
+
+        DeliveryOutcome::Failed { at } => {
+            let Some(update) =
+                config::meta::alerts::dispatch::delivery_failure_update(current, episode, at)
+            else {
+                return Ok(false);
+            };
+            let Some(next) = update.state.as_ref() else {
+                return Ok(false);
+            };
+
+            // A failure also carries the ATTEMPT anchor into the predicates: a
+            // newer success in this episode has already moved delivery state,
+            // and `eq(NULL)` is never true, so a never-delivered anchor must be
+            // matched with IS NULL.
+            let (notified_level, silenced_until) = episode.notified_at_enqueue;
+            let mut stmt = match notified_level {
+                Some(l) => guarded().filter(alert_states::Column::LastNotifiedLevel.eq(l.to_i32())),
+                None => guarded().filter(alert_states::Column::LastNotifiedLevel.is_null()),
+            };
+            stmt = match silenced_until {
+                Some(t) => stmt.filter(alert_states::Column::SilencedUntil.eq(t)),
+                None => stmt.filter(alert_states::Column::SilencedUntil.is_null()),
+            };
+
+            let affected = stmt
+                .col_expr(
+                    alert_states::Column::LastOutcome,
+                    sea_orm::sea_query::Expr::value(RunOutcome::NotifyFailed.to_i32()),
+                )
+                .col_expr(
+                    alert_states::Column::LastOutcomeAt,
+                    sea_orm::sea_query::Expr::value(next.last_outcome_at),
+                )
+                .col_expr(
+                    alert_states::Column::Since,
+                    sea_orm::sea_query::Expr::value(next.since),
+                )
+                .exec(txn)
+                .await?
+                .rows_affected;
+
+            // The transition only goes in if the state write actually landed,
+            // and in the same transaction — history must never describe a
+            // change that was not applied (MN-9).
+            if affected > 0
+                && let Some(t) = update.transition.as_ref()
+            {
+                write_transition(txn, t).await?;
+            }
+            affected
+        }
+    };
+
+    Ok(affected > 0)
 }
 
 /// One state upsert plus its optional transition, inside a caller-owned
@@ -527,7 +963,43 @@ where
         groups_firing_is_lower_bound: Set(state.groups_firing_is_lower_bound),
         silenced_until: Set(state.silenced_until),
         last_notified_level: Set(state.last_notified_level.map(|l| l.to_i32())),
+        episode_id: Set(state.episode_id.clone()),
+        episode_opened_at: Set(state.episode_opened_at),
+        episode_incident_id: Set(state.episode_incident_id.clone()),
+        recovering_since: Set(state.recovering_since),
+        last_downtime_id: sea_orm::ActiveValue::NotSet,
+        firing_started_at: Set(state.firing_started_at),
+        group_label_set: Set(state
+            .group_label_set
+            .as_ref()
+            .map(|labels| config::utils::json::to_string(labels).unwrap_or_default())),
     };
+
+    let mut columns = vec![
+        alert_states::Column::LastOutcome,
+        alert_states::Column::LastOutcomeAt,
+        alert_states::Column::Since,
+        alert_states::Column::Level,
+        alert_states::Column::LevelSince,
+        alert_states::Column::LevelAt,
+        alert_states::Column::LastSeen,
+        alert_states::Column::GroupLabels,
+        alert_states::Column::GroupsObserved,
+        alert_states::Column::GroupsFiring,
+        alert_states::Column::GroupsObservedIsLowerBound,
+        alert_states::Column::GroupsFiringIsLowerBound,
+        alert_states::Column::RecoveringSince,
+        alert_states::Column::FiringStartedAt,
+        alert_states::Column::GroupLabelSet,
+    ];
+    // A group row's episode is minted by the delivery callback, so a stale plan must not erase it.
+    if state.group_key == ROLLUP_GROUP_KEY {
+        columns.extend([
+            alert_states::Column::EpisodeId,
+            alert_states::Column::EpisodeOpenedAt,
+            alert_states::Column::EpisodeIncidentId,
+        ]);
+    }
 
     // Upsert on the composite primary key — rows are created lazily on an
     // alert's first evaluation, so there is no backfill.
@@ -537,30 +1009,8 @@ where
                 alert_states::Column::AlertId,
                 alert_states::Column::GroupKey,
             ])
-            .update_columns([
-                alert_states::Column::LastOutcome,
-                alert_states::Column::LastOutcomeAt,
-                alert_states::Column::Since,
-                alert_states::Column::Level,
-                alert_states::Column::LevelSince,
-                alert_states::Column::LevelAt,
-                alert_states::Column::LastSeen,
-                alert_states::Column::GroupLabels,
-                alert_states::Column::GroupsObserved,
-                alert_states::Column::GroupsFiring,
-                alert_states::Column::GroupsObservedIsLowerBound,
-                alert_states::Column::GroupsFiringIsLowerBound,
-                // `silenced_until` / `last_notified_level` are DELIBERATELY
-                // absent (§5.5 MN-2, one-writer rule). An evaluation carries
-                // stale copies — it read them before it ran — so listing them
-                // here would let a slow evaluation overwrite a delivery
-                // callback that landed in between, erasing a silence window
-                // and re-paging the group. Only `advance_delivery_state`
-                // writes those two columns, and only conditionally.
-                //
-                // They still appear in the INSERT above, which is correct: a
-                // brand-new row has no delivery state to protect.
-            ])
+            // Never the delivery columns (§5.5 MN-2): an evaluation's copies are stale by then.
+            .update_columns(columns)
             .to_owned(),
         )
         .exec(txn)
@@ -573,15 +1023,50 @@ where
     Ok(())
 }
 
+/// Writes one state/transition update inside a caller-owned metadata
+/// transaction. Composite evaluation uses this after renewing and fencing its
+/// scheduler claim in the same transaction.
+pub async fn persist_update_in_transaction<C>(
+    txn: &C,
+    update: &StateUpdate,
+) -> Result<(), errors::Error>
+where
+    C: sea_orm::ConnectionTrait,
+{
+    write_update(txn, update).await
+}
+
 /// Append one transition row, inside a caller-owned transaction.
 ///
 /// Split out so the delivery callbacks can write a transition alongside their
 /// own guarded state update without going through the state upsert, whose
 /// conflict clause deliberately excludes the delivery columns.
+///
+/// **Identified by `(alert_id, group_key, at)`**, and skipped if that identity
+/// is already stored. The log is append-only with a surrogate key, so nothing
+/// else stops a redelivered super-cluster message from writing the same change
+/// twice — and a duplicated transition is not a cosmetic problem: M-8 history
+/// would show the same recovery repeatedly, once per redelivery. One evaluation
+/// emits at most one transition per group, so the triple cannot collide with a
+/// genuinely different change. The check runs inside the caller's transaction
+/// rather than as a database constraint: there is no unique index on those
+/// columns, and adding one to a live table that may already hold duplicates is
+/// a migration this change deliberately does not make.
 async fn write_transition<C>(txn: &C, t: &StateTransition) -> Result<(), errors::Error>
 where
     C: sea_orm::ConnectionTrait,
 {
+    if alert_state_transitions::Entity::find()
+        .filter(alert_state_transitions::Column::AlertId.eq(t.alert_id.as_str()))
+        .filter(alert_state_transitions::Column::GroupKey.eq(t.group_key.as_str()))
+        .filter(alert_state_transitions::Column::At.eq(t.at))
+        .one(txn)
+        .await?
+        .is_some()
+    {
+        return Ok(());
+    }
+
     alert_state_transitions::ActiveModel {
         alert_id: Set(t.alert_id.clone()),
         group_key: Set(t.group_key.clone()),
@@ -591,12 +1076,29 @@ where
         to_level: Set(t.to_level.map(|l| l.to_i32())),
         at: Set(t.at),
         value: Set(t.value),
+        rule_value: Set(t.rule_value.clone()),
         group_labels: Set(t.group_labels.clone()),
         ..Default::default()
     }
     .insert(txn)
     .await?;
     Ok(())
+}
+
+/// `None` for a row whose outcome this build does not know.
+fn transition_from_model(m: alert_state_transitions::Model) -> Option<StateTransition> {
+    Some(StateTransition {
+        alert_id: m.alert_id,
+        group_key: m.group_key,
+        from_outcome: m.from_outcome.and_then(RunOutcome::from_i32),
+        to_outcome: RunOutcome::from_i32(m.to_outcome)?,
+        from_level: m.from_level.and_then(AlertLevel::from_i32),
+        to_level: m.to_level.and_then(AlertLevel::from_i32),
+        at: m.at,
+        value: m.value,
+        rule_value: m.rule_value,
+        group_labels: m.group_labels,
+    })
 }
 
 /// Transitions for one alert, newest first.
@@ -618,7 +1120,7 @@ pub async fn list_transitions_filtered(
     group_key: Option<&str>,
     limit: u64,
 ) -> Result<Vec<StateTransition>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let mut query = alert_state_transitions::Entity::find()
         .filter(alert_state_transitions::Column::AlertId.eq(alert_id));
     if let Some(key) = group_key {
@@ -630,27 +1132,132 @@ pub async fn list_transitions_filtered(
         .all(client)
         .await?
         .into_iter()
-        .filter_map(|m| {
-            Some(StateTransition {
-                alert_id: m.alert_id,
-                group_key: m.group_key,
-                from_outcome: m.from_outcome.and_then(RunOutcome::from_i32),
-                to_outcome: RunOutcome::from_i32(m.to_outcome)?,
-                from_level: m.from_level.and_then(AlertLevel::from_i32),
-                to_level: m.to_level.and_then(AlertLevel::from_i32),
-                at: m.at,
-                value: m.value,
-                group_labels: m.group_labels,
-            })
-        })
+        .filter_map(transition_from_model)
         .collect())
+}
+
+/// Transitions for one alert inside a time window, oldest first — the shape a
+/// status-lane renderer needs (each row's `to_level` is in effect from `at` to
+/// the next row). Unlike [`list_transitions_filtered`] this is bounded by `at`
+/// and ordered ascending so the caller can paint forward in time.
+pub async fn list_transitions_between(
+    alert_id: &str,
+    group_key: Option<&str>,
+    from: i64,
+    to: i64,
+    limit: u64,
+) -> Result<Vec<StateTransition>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    list_transitions_between_with(client, alert_id, group_key, from, to, limit).await
+}
+
+/// [`list_transitions_between`] against a caller-supplied connection.
+pub async fn list_transitions_between_with<C: sea_orm::ConnectionTrait>(
+    client: &C,
+    alert_id: &str,
+    group_key: Option<&str>,
+    from: i64,
+    to: i64,
+    limit: u64,
+) -> Result<Vec<StateTransition>, errors::Error> {
+    let mut query = alert_state_transitions::Entity::find()
+        .filter(alert_state_transitions::Column::AlertId.eq(alert_id))
+        .filter(alert_state_transitions::Column::At.gte(from))
+        .filter(alert_state_transitions::Column::At.lte(to));
+    if let Some(key) = group_key {
+        query = query.filter(alert_state_transitions::Column::GroupKey.eq(key));
+    }
+    Ok(query
+        .order_by_asc(alert_state_transitions::Column::At)
+        .limit(limit)
+        .all(client)
+        .await?
+        .into_iter()
+        .filter_map(transition_from_model)
+        .collect())
+}
+
+/// Each alert's transitions in a window, oldest first, at most `per_alert_limit` per alert.
+pub async fn list_transitions_between_many(
+    alert_ids: &[String],
+    group_key: Option<&str>,
+    from: i64,
+    to: i64,
+    per_alert_limit: u64,
+) -> Result<std::collections::HashMap<String, Vec<StateTransition>>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    list_transitions_between_many_with(client, alert_ids, group_key, from, to, per_alert_limit)
+        .await
+}
+
+/// [`list_transitions_between_many`] against a caller-supplied connection.
+pub async fn list_transitions_between_many_with<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    alert_ids: &[String],
+    group_key: Option<&str>,
+    from: i64,
+    to: i64,
+    per_alert_limit: u64,
+) -> Result<std::collections::HashMap<String, Vec<StateTransition>>, errors::Error> {
+    use alert_state_transitions::Column;
+    use sea_orm::sea_query::{Alias, Asterisk, Expr, Func, Order, Query, WindowStatement};
+
+    let mut grouped: std::collections::HashMap<String, Vec<StateTransition>> =
+        std::collections::HashMap::new();
+    if alert_ids.is_empty() {
+        return Ok(grouped);
+    }
+    // Ranked per alert, so one flapping alert cannot use up the other alerts' share of the rows.
+    let rank = Alias::new("lane_rank");
+    let lane = WindowStatement::partition_by(Column::AlertId)
+        .order_by(Column::At, Order::Asc)
+        .order_by(Column::Id, Order::Asc)
+        .to_owned();
+    let mut ranked = Query::select();
+    ranked
+        .column(Asterisk)
+        .expr_window_as(Func::cust(Alias::new("ROW_NUMBER")), lane, rank.clone())
+        .from(alert_state_transitions::Entity)
+        .and_where(Column::AlertId.is_in(alert_ids.iter().cloned()))
+        .and_where(Column::At.gte(from))
+        .and_where(Column::At.lte(to));
+    if let Some(key) = group_key {
+        ranked.and_where(Column::GroupKey.eq(key));
+    }
+    let query = Query::select()
+        .column(Asterisk)
+        .from_subquery(ranked, Alias::new("ranked"))
+        .and_where(Expr::col(rank).lte(per_alert_limit))
+        .order_by(Column::AlertId, Order::Asc)
+        .order_by(Column::At, Order::Asc)
+        .order_by(Column::Id, Order::Asc)
+        .to_owned();
+    let statement = conn.get_database_backend().build(&query);
+    let rows = alert_state_transitions::Model::find_by_statement(statement)
+        .all(conn)
+        .await?;
+    for transition in rows.into_iter().filter_map(transition_from_model) {
+        grouped
+            .entry(transition.alert_id.clone())
+            .or_default()
+            .push(transition);
+    }
+    Ok(grouped)
 }
 
 /// Remove all state for an alert. Called when the alert itself is deleted —
 /// unlike `scheduled_jobs`, these rows are owned by the alert's lifecycle.
 pub async fn delete_by_alert(alert_id: &str) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let txn = client.begin().await?;
+    let client = get_orm_client_rw().await;
+    delete_by_alert_with(client, alert_id).await
+}
+
+/// [`delete_by_alert`] against a caller-supplied connection.
+pub async fn delete_by_alert_with<C: sea_orm::ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    alert_id: &str,
+) -> Result<(), errors::Error> {
+    let txn = conn.begin().await?;
     alert_states::Entity::delete_many()
         .filter(alert_states::Column::AlertId.eq(alert_id))
         .exec(&txn)
@@ -666,7 +1273,7 @@ pub async fn delete_by_alert(alert_id: &str) -> Result<(), errors::Error> {
 /// Retention for the append-only transition log. Governed by audit needs, set
 /// independently of the `triggers` stream retention.
 pub async fn delete_transitions_before(cutoff: i64) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     alert_state_transitions::Entity::delete_many()
         .filter(alert_state_transitions::Column::At.lt(cutoff))
         .exec(client)
@@ -676,6 +1283,8 @@ pub async fn delete_transitions_before(cutoff: i64) -> Result<(), errors::Error>
 
 #[cfg(test)]
 mod tests {
+    use sea_orm::PaginatorTrait;
+
     use super::*;
 
     fn model(last_outcome: Option<i32>) -> alert_states::Model {
@@ -696,6 +1305,13 @@ mod tests {
             groups_firing_is_lower_bound: None,
             silenced_until: None,
             last_notified_level: None,
+            episode_id: None,
+            episode_opened_at: None,
+            episode_incident_id: None,
+            recovering_since: None,
+            group_label_set: None,
+            last_downtime_id: None,
+            firing_started_at: None,
         }
     }
 
@@ -824,6 +1440,671 @@ mod tests {
         );
     }
 
+    // ── Replicated apply (PR 0) ─────────────────────────────────────────────
+    // These tables now replicate across a super cluster. Publishing lives one
+    // layer up in `db` — this module cannot reach the enterprise crate — so the
+    // queue processor applies through the functions below and nothing it writes
+    // is broadcast again. A queue redelivers, so every apply runs at least once
+    // and may run again: the state upsert is last-write-wins by primary key,
+    // and the transition insert is made replay-idempotent by the
+    // `(alert_id, group_key, at)` identity.
+
+    /// The three tables the write path touches, built straight from their
+    /// entities so a column the code writes but the fixture lacks fails loudly
+    /// here rather than passing against a hand-rolled subset.
+    ///
+    /// Columns and primary keys only — `create_table_from_entity` emits no
+    /// secondary indexes, and neither state entity declares one. That is
+    /// faithful for the transition log, whose only key IS its autoincrement id:
+    /// there is no unique constraint on `(alert_id, group_key, at)` in the real
+    /// schema either, so replay identity cannot be delegated to the database.
+    async fn db() -> sea_orm::DatabaseConnection {
+        use sea_orm::{ConnectionTrait, Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for stmt in [
+            schema.create_table_from_entity(alert_states::Entity),
+            schema.create_table_from_entity(alert_state_transitions::Entity),
+            // The group-plan write re-reads the alert's `multi_alert` opt-in
+            // inside its own transaction (§5.3), so the plan tests need the
+            // alert row — and `folders` before it, because the alert entity's
+            // FK is emitted and sqlx turns `PRAGMA foreign_keys` on.
+            schema.create_table_from_entity(crate::table::entity::folders::Entity),
+            schema.create_table_from_entity(alerts::Entity),
+            // The availability ledger shares this write's transaction (S-16).
+            schema.create_table_from_entity(crate::table::entity::alert_eval_intervals::Entity),
+        ] {
+            db.execute(backend.build(&stmt)).await.unwrap();
+        }
+        db
+    }
+
+    /// The same fixture without the ledger table, so a ledger write is
+    /// guaranteed to fail. The only way to prove the two writes really share
+    /// one transaction is to break one of them.
+    async fn db_without_the_ledger_table() -> sea_orm::DatabaseConnection {
+        use sea_orm::{ConnectionTrait, Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for stmt in [
+            schema.create_table_from_entity(alert_states::Entity),
+            schema.create_table_from_entity(alert_state_transitions::Entity),
+        ] {
+            db.execute(backend.build(&stmt)).await.unwrap();
+        }
+        db
+    }
+
+    fn ledger_write_at(at: i64) -> EvalLedgerWrite {
+        EvalLedgerWrite {
+            org: "myorg".to_string(),
+            alert_id: "alert-1".to_string(),
+            level: AlertLevel::Critical,
+            frequency_secs: 60,
+            tolerance_secs: 0,
+            at,
+        }
+    }
+
+    async fn count_intervals<C: sea_orm::ConnectionTrait>(conn: &C) -> u64 {
+        crate::table::entity::alert_eval_intervals::Entity::find()
+            .count(conn)
+            .await
+            .unwrap()
+    }
+
+    /// Insert the alert row the group-plan gate reads. Only the columns the
+    /// schema requires plus the opt-in itself — everything else is nullable and
+    /// irrelevant to `multi_alert_still_enabled`.
+    async fn insert_alert<C: sea_orm::ConnectionTrait>(conn: &C, alert_id: &str, multi: bool) {
+        use crate::table::entity::folders;
+
+        folders::ActiveModel {
+            id: Set("folder-1".to_string()),
+            org: Set("myorg".to_string()),
+            folder_id: Set("default".to_string()),
+            name: Set("default".to_string()),
+            description: Set(None),
+            r#type: Set(0),
+            icon: Set(None),
+        }
+        .insert(conn)
+        .await
+        .unwrap();
+
+        alerts::ActiveModel {
+            id: Set(alert_id.to_string()),
+            org: Set("myorg".to_string()),
+            folder_id: Set("folder-1".to_string()),
+            name: Set("Test Alert".to_string()),
+            stream_type: Set("logs".to_string()),
+            stream_name: Set("default".to_string()),
+            is_real_time: Set(false),
+            destinations: Set(serde_json::json!([])),
+            row_template_type: Set(0),
+            enabled: Set(true),
+            tz_offset: Set(0),
+            query_type: Set(0),
+            query_promql_multi_alert: Set(Some(multi)),
+            trigger_threshold_operator: Set(">".to_string()),
+            trigger_period_seconds: Set(900),
+            trigger_threshold_count: Set(1),
+            trigger_frequency_type: Set(0),
+            trigger_frequency_seconds: Set(60),
+            trigger_silence_seconds: Set(0),
+            align_time: Set(false),
+            dedup_enabled: Set(false),
+            creates_incident: Set(false),
+            workflows: Set(serde_json::json!([])),
+            pending_period_sec: Set(0),
+            ..Default::default()
+        }
+        .insert(conn)
+        .await
+        .unwrap();
+    }
+
+    async fn count_states<C: sea_orm::ConnectionTrait>(conn: &C) -> u64 {
+        alert_states::Entity::find().count(conn).await.unwrap()
+    }
+
+    async fn count_transitions<C: sea_orm::ConnectionTrait>(conn: &C) -> u64 {
+        alert_state_transitions::Entity::find()
+            .count(conn)
+            .await
+            .unwrap()
+    }
+
+    fn state_row(alert_id: &str, group_key: &str, at: i64) -> AlertState {
+        let mut s = AlertState::empty(alert_id, group_key);
+        s.last_outcome = Some(RunOutcome::Firing);
+        s.last_outcome_at = Some(at);
+        s.since = Some(at);
+        s.level = Some(AlertLevel::Critical);
+        s.level_since = Some(at);
+        s.level_at = Some(at);
+        s.last_seen = Some(at);
+        s
+    }
+
+    fn update_at(group_key: &str, at: i64) -> StateUpdate {
+        update_for("alert-1", group_key, at)
+    }
+
+    fn update_for(alert_id: &str, group_key: &str, at: i64) -> StateUpdate {
+        StateUpdate {
+            state: Some(state_row(alert_id, group_key, at)),
+            transition: Some(StateTransition {
+                alert_id: alert_id.to_string(),
+                group_key: group_key.to_string(),
+                from_outcome: None,
+                to_outcome: RunOutcome::Firing,
+                from_level: None,
+                to_level: Some(AlertLevel::Critical),
+                at,
+                value: Some(9.5),
+                rule_value: None,
+                group_labels: None,
+            }),
+        }
+    }
+
+    #[tokio::test]
+    async fn a_replayed_state_update_writes_exactly_one_transition() {
+        let db = db().await;
+        let update = update_at("host=web-1", 1_000);
+
+        persist_with(&db, &update, None).await.unwrap();
+        persist_with(&db, &update, None).await.unwrap();
+
+        assert_eq!(count_states(&db).await, 1);
+        assert_eq!(
+            count_transitions(&db).await,
+            1,
+            "a redelivered message must not append the same transition twice"
+        );
+    }
+
+    #[tokio::test]
+    async fn apply_is_last_write_wins_by_primary_key() {
+        let db = db().await;
+
+        persist_with(&db, &update_at("host=web-1", 1_000), None)
+            .await
+            .unwrap();
+        persist_with(&db, &update_at("host=web-1", 2_000), None)
+            .await
+            .unwrap();
+        // The older message redelivered after the newer one has landed.
+        persist_with(&db, &update_at("host=web-1", 1_000), None)
+            .await
+            .unwrap();
+
+        assert_eq!(count_states(&db).await, 1);
+        let stored = get_with(&db, "alert-1", "host=web-1")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            stored.last_outcome_at,
+            Some(1_000),
+            "apply is last-write-wins by primary key, not merge-by-timestamp"
+        );
+    }
+
+    /// The dedup must key on the instant, not on the alert: real history is two
+    /// changes at two times, and swallowing the second would erase it.
+    #[tokio::test]
+    async fn transitions_at_different_instants_both_land() {
+        let db = db().await;
+        persist_with(&db, &update_at("host=web-1", 1_000), None)
+            .await
+            .unwrap();
+        persist_with(&db, &update_at("host=web-1", 2_000), None)
+            .await
+            .unwrap();
+        assert_eq!(count_transitions(&db).await, 2);
+    }
+
+    #[tokio::test]
+    async fn last_downtime_id_is_kept_by_state_writes_and_cleared_on_demand() {
+        let db = db().await;
+        persist_with(&db, &update_for("alert-1", ROLLUP_GROUP_KEY, 1_000), None)
+            .await
+            .unwrap();
+        persist_with(&db, &update_for("alert-2", ROLLUP_GROUP_KEY, 1_000), None)
+            .await
+            .unwrap();
+        let ids = vec!["alert-1".to_string(), "alert-2".to_string()];
+
+        assert_eq!(
+            set_last_downtime_id_with(&db, "alert-1", Some("dt-1"))
+                .await
+                .unwrap(),
+            1
+        );
+        persist_with(&db, &update_for("alert-1", ROLLUP_GROUP_KEY, 2_000), None)
+            .await
+            .unwrap();
+        let found = last_downtime_ids_with(&db, &ids).await.unwrap();
+        assert_eq!(found.len(), 1);
+        assert_eq!(found.get("alert-1").map(String::as_str), Some("dt-1"));
+
+        set_last_downtime_id_with(&db, "alert-1", None)
+            .await
+            .unwrap();
+        assert!(last_downtime_ids_with(&db, &ids).await.unwrap().is_empty());
+    }
+
+    /// ...and on the group. One evaluation writes every group's transition at
+    /// the same `at`; collapsing them by `(alert_id, at)` would keep one group's
+    /// history and drop the rest.
+    #[tokio::test]
+    async fn transitions_for_different_groups_at_one_instant_all_land() {
+        let db = db().await;
+        persist_with(&db, &update_at("host=web-1", 1_000), None)
+            .await
+            .unwrap();
+        persist_with(&db, &update_at("host=web-2", 1_000), None)
+            .await
+            .unwrap();
+        assert_eq!(count_transitions(&db).await, 2);
+    }
+
+    /// ...and on the alert. Every alert's rollup transition carries the SAME
+    /// group key — the empty string — so an identity that dropped `alert_id`
+    /// would let the first alert to transition in a given microsecond swallow
+    /// every other alert's rollup history.
+    #[tokio::test]
+    async fn transitions_for_different_alerts_at_one_instant_all_land() {
+        let db = db().await;
+        persist_with(&db, &update_for("alert-1", ROLLUP_GROUP_KEY, 1_000), None)
+            .await
+            .unwrap();
+        persist_with(&db, &update_for("alert-2", ROLLUP_GROUP_KEY, 1_000), None)
+            .await
+            .unwrap();
+        assert_eq!(count_transitions(&db).await, 2);
+    }
+
+    #[tokio::test]
+    async fn an_unack_opens_a_silence_window_only_on_its_own_firing_and_never_shortens_one() {
+        let db = db().await;
+        let mut update = update_at("host=web-1", 1_000);
+        if let Some(state) = update.state.as_mut() {
+            state.firing_started_at = Some(1_000);
+            state.silenced_until = Some(1_500);
+        }
+        persist_with(&db, &update, None).await.unwrap();
+        async fn silence(db: &sea_orm::DatabaseConnection) -> Option<i64> {
+            get_with(db, "alert-1", "host=web-1")
+                .await
+                .unwrap()
+                .unwrap()
+                .silenced_until
+        }
+
+        assert!(
+            !set_silence_after_unack_with(&db, "alert-1", "host=web-1", 999, 9_000)
+                .await
+                .unwrap(),
+            "an unack of an older firing must not silence the current one"
+        );
+        assert!(
+            set_silence_after_unack_with(&db, "alert-1", "host=web-1", 1_000, 9_000)
+                .await
+                .unwrap()
+        );
+        assert_eq!(silence(&db).await, Some(9_000));
+        assert!(
+            !set_silence_after_unack_with(&db, "alert-1", "host=web-1", 1_000, 5_000)
+                .await
+                .unwrap()
+        );
+        assert_eq!(silence(&db).await, Some(9_000), "a later window holds");
+    }
+
+    #[tokio::test]
+    async fn a_replayed_delivery_advance_does_not_move_the_silence_window() {
+        let db = db().await;
+        persist_with(&db, &update_at("host=web-1", 1_000), None)
+            .await
+            .unwrap();
+
+        let episode = DeliveryEpisode {
+            level: AlertLevel::Critical,
+            level_since: 1_000,
+            notified_at_enqueue: (None, None),
+        };
+        let outcome = DeliveryOutcome::Delivered {
+            silence_minutes: 10,
+            at: 2_000,
+        };
+
+        assert!(
+            advance_delivery_state_with(&db, "alert-1", "host=web-1", episode, outcome, None)
+                .await
+                .unwrap()
+                .applied
+        );
+        let after_first = get_with(&db, "alert-1", "host=web-1")
+            .await
+            .unwrap()
+            .unwrap();
+
+        // The replay must still be *applied*, not rejected as stale: a guard
+        // that its own success invalidates would mean the advance lands on
+        // exactly one cluster and every other one silently keeps paging.
+        assert!(
+            advance_delivery_state_with(&db, "alert-1", "host=web-1", episode, outcome, None)
+                .await
+                .unwrap()
+                .applied,
+            "the delivery guard must stay satisfiable after the write it guards"
+        );
+        let after_replay = get_with(&db, "alert-1", "host=web-1")
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(
+            after_first.silenced_until,
+            Some(2_000 + 10 * 60 * 1_000_000)
+        );
+        assert_eq!(after_replay.silenced_until, after_first.silenced_until);
+        assert_eq!(after_replay.last_notified_level, Some(AlertLevel::Critical));
+    }
+
+    #[tokio::test]
+    async fn a_replayed_failed_delivery_appends_exactly_one_transition() {
+        let db = db().await;
+        persist_with(&db, &update_at("host=web-1", 1_000), None)
+            .await
+            .unwrap();
+        assert_eq!(count_transitions(&db).await, 1);
+
+        let episode = DeliveryEpisode {
+            level: AlertLevel::Critical,
+            level_since: 1_000,
+            notified_at_enqueue: (None, None),
+        };
+        let outcome = DeliveryOutcome::Failed { at: 3_000 };
+
+        advance_delivery_state_with(&db, "alert-1", "host=web-1", episode, outcome, None)
+            .await
+            .unwrap();
+        advance_delivery_state_with(&db, "alert-1", "host=web-1", episode, outcome, None)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            count_transitions(&db).await,
+            2,
+            "the failure adds one transition; the replay adds none — the outcome \
+             has already moved, so no second transition is even proposed"
+        );
+        let stored = get_with(&db, "alert-1", "host=web-1")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored.last_outcome, Some(RunOutcome::NotifyFailed));
+    }
+
+    #[tokio::test]
+    async fn a_replayed_group_delete_is_a_no_op_and_spares_the_rollup() {
+        let db = db().await;
+        persist_with(&db, &update_at(ROLLUP_GROUP_KEY, 1_000), None)
+            .await
+            .unwrap();
+        persist_with(&db, &update_at("host=web-1", 1_000), None)
+            .await
+            .unwrap();
+
+        let keys = vec!["host=web-1".to_string()];
+        delete_groups_with(&db, "alert-1", &keys).await.unwrap();
+        delete_groups_with(&db, "alert-1", &keys).await.unwrap();
+
+        assert_eq!(count_states(&db).await, 1);
+        assert!(
+            get_with(&db, "alert-1", ROLLUP_GROUP_KEY)
+                .await
+                .unwrap()
+                .is_some(),
+            "reaping groups must never take the rollup row with it"
+        );
+        assert_eq!(
+            count_transitions(&db).await,
+            2,
+            "deleting group rows retains their history (M-8)"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_replayed_opt_out_cleanup_is_a_no_op_and_spares_the_rollup() {
+        let db = db().await;
+        persist_with(&db, &update_at(ROLLUP_GROUP_KEY, 1_000), None)
+            .await
+            .unwrap();
+        persist_with(&db, &update_at("host=web-1", 1_000), None)
+            .await
+            .unwrap();
+        persist_with(&db, &update_at("host=web-2", 1_000), None)
+            .await
+            .unwrap();
+
+        assert_eq!(delete_all_groups_with(&db, "alert-1").await.unwrap(), 2);
+        assert_eq!(
+            delete_all_groups_with(&db, "alert-1").await.unwrap(),
+            0,
+            "the replay finds nothing left to delete"
+        );
+        assert_eq!(count_states(&db).await, 1);
+        assert!(
+            get_with(&db, "alert-1", ROLLUP_GROUP_KEY)
+                .await
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_replayed_group_plan_lands_once_with_its_evictions() {
+        let db = db().await;
+        insert_alert(&db, "alert-1", true).await;
+        // The row the plan evicts, written by an earlier evaluation.
+        persist_with(&db, &update_at("host=web-9", 500), None)
+            .await
+            .unwrap();
+
+        let plan = GroupPlan {
+            updates: vec![update_at("host=web-1", 1_000)],
+            evicted: vec!["host=web-9".to_string()],
+            ..Default::default()
+        };
+        persist_group_plan_with(&db, &plan, "alert-1", PlanApply::Evaluation)
+            .await
+            .unwrap();
+        persist_group_plan_with(&db, &plan, "alert-1", PlanApply::Evaluation)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            list_groups_with(&db, "alert-1").await.unwrap().len(),
+            1,
+            "the plan's row lands, the evicted one stays gone on replay"
+        );
+        assert!(
+            get_with(&db, "alert-1", "host=web-9")
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(
+            count_transitions(&db).await,
+            2,
+            "the evicted row's earlier transition, plus the plan's — the replay adds none"
+        );
+    }
+
+    fn firing_update(group_key: &str, at: i64, started: Option<i64>) -> StateUpdate {
+        let mut update = update_at(group_key, at);
+        update.state.as_mut().unwrap().firing_started_at = started;
+        update
+    }
+
+    #[tokio::test]
+    async fn the_firing_cycle_is_written_cleared_and_left_alone_by_delivery_callbacks() {
+        let db = db().await;
+        persist_with(
+            &db,
+            &firing_update(ROLLUP_GROUP_KEY, 1_000, Some(1_000)),
+            None,
+        )
+        .await
+        .unwrap();
+        let stored = get_with(&db, "alert-1", ROLLUP_GROUP_KEY)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored.firing_started_at, Some(1_000));
+
+        let episode = DeliveryEpisode {
+            level: AlertLevel::Critical,
+            level_since: 1_000,
+            notified_at_enqueue: (None, None),
+        };
+        assert!(
+            advance_delivery_state_with(
+                &db,
+                "alert-1",
+                ROLLUP_GROUP_KEY,
+                episode,
+                DeliveryOutcome::Failed { at: 1_500 },
+                None,
+            )
+            .await
+            .unwrap()
+            .applied
+        );
+        let failed = get_with(&db, "alert-1", ROLLUP_GROUP_KEY)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(failed.last_outcome, Some(RunOutcome::NotifyFailed));
+        assert_eq!(
+            failed.firing_started_at,
+            Some(1_000),
+            "a delivery write never moves it"
+        );
+
+        persist_with(&db, &firing_update(ROLLUP_GROUP_KEY, 2_000, None), None)
+            .await
+            .unwrap();
+        let cleared = get_with(&db, "alert-1", ROLLUP_GROUP_KEY)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            cleared.firing_started_at, None,
+            "the upsert must clear it, not keep it"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_eviction_reports_the_firing_groups_it_deleted() {
+        let db = db().await;
+        insert_alert(&db, "alert-1", true).await;
+        persist_with(&db, &firing_update("host=web-8", 500, Some(400)), None)
+            .await
+            .unwrap();
+        persist_with(&db, &firing_update("host=web-9", 500, None), None)
+            .await
+            .unwrap();
+
+        let plan = GroupPlan {
+            updates: vec![firing_update("host=web-1", 1_000, Some(1_000))],
+            evicted: vec!["host=web-8".to_string(), "host=web-9".to_string()],
+            ..Default::default()
+        };
+        let write = persist_group_plan_with(&db, &plan, "alert-1", PlanApply::Evaluation)
+            .await
+            .unwrap();
+        assert!(write.written);
+        assert_eq!(write.evicted_firing, vec![("host=web-8".to_string(), 400)]);
+        assert_eq!(
+            firing_groups_with(&db, "alert-1", None).await.unwrap(),
+            vec![("host=web-1".to_string(), 1_000)]
+        );
+    }
+
+    /// The forward-only consequence, recorded deliberately: the gate re-reads
+    /// the alert on the *receiving* cluster, so a plan that outruns its alert
+    /// row is dropped rather than stranding group rows under an alert that
+    /// cluster has never heard of. It converges on the next evaluation.
+    #[tokio::test]
+    async fn a_group_plan_for_an_unknown_alert_writes_nothing() {
+        let db = db().await;
+        let plan = GroupPlan {
+            updates: vec![update_at("host=web-1", 1_000)],
+            ..Default::default()
+        };
+        assert!(
+            !persist_group_plan_with(&db, &plan, "alert-1", PlanApply::Evaluation)
+                .await
+                .unwrap()
+                .written,
+            "the drop must be reported, not silently reported as a write — the \
+             super-cluster wrapper decides whether to broadcast on this"
+        );
+        assert_eq!(count_states(&db).await, 0);
+        assert_eq!(count_transitions(&db).await, 0);
+    }
+
+    /// Alert deletion runs on whichever cluster served the API, so this is the
+    /// one replicated write the job cluster does not originate. It must be
+    /// safe to apply on a cluster that has already deleted the rows itself.
+    #[tokio::test]
+    async fn a_replayed_alert_delete_is_a_no_op() {
+        let db = db().await;
+        persist_with(&db, &update_at(ROLLUP_GROUP_KEY, 1_000), None)
+            .await
+            .unwrap();
+        persist_with(&db, &update_at("host=web-1", 1_000), None)
+            .await
+            .unwrap();
+
+        delete_by_alert_with(&db, "alert-1").await.unwrap();
+        delete_by_alert_with(&db, "alert-1").await.unwrap();
+
+        assert_eq!(count_states(&db).await, 0);
+        assert_eq!(
+            count_transitions(&db).await,
+            0,
+            "an alert's deletion takes its history with it, unlike a group reap"
+        );
+    }
+
+    #[test]
+    fn a_delivery_outcome_survives_the_super_cluster_round_trip() {
+        // The advance replicates by re-running the same guarded write, so the
+        // outcome it carries decides which columns move on every cluster.
+        for outcome in [
+            DeliveryOutcome::Delivered {
+                silence_minutes: 10,
+                at: 2_000,
+            },
+            DeliveryOutcome::Failed { at: 3_000 },
+        ] {
+            let bytes = config::utils::json::to_vec(&outcome).unwrap();
+            let back: DeliveryOutcome = config::utils::json::from_slice(&bytes).unwrap();
+            assert_eq!(back, outcome);
+        }
+    }
+
     #[test]
     fn test_legacy_rows_read_back_as_unknown_not_as_false() {
         // NULL on these columns means "written before the column existed". It
@@ -837,5 +2118,612 @@ mod tests {
         assert_eq!(s.groups_observed_is_lower_bound, None);
         assert_eq!(s.groups_firing_is_lower_bound, None);
         assert_eq!(s.group_labels, None);
+    }
+
+    // ── The availability ledger rides this transaction (S-16, PR 1) ─────────
+
+    #[tokio::test]
+    async fn a_ledger_write_lands_alongside_the_state_row() {
+        let db = db().await;
+
+        persist_with(
+            &db,
+            &update_at(ROLLUP_GROUP_KEY, 1_000),
+            Some(&ledger_write_at(1_000)),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(count_states(&db).await, 1);
+        assert_eq!(count_intervals(&db).await, 1);
+    }
+
+    /// Most evaluations carry no ledger write at all — every grouped alert, and
+    /// every unmeasured run. Those must leave the ledger untouched rather than
+    /// writing a zero-width interval.
+    #[tokio::test]
+    async fn a_state_write_without_a_ledger_write_leaves_the_ledger_empty() {
+        let db = db().await;
+
+        persist_with(&db, &update_at(ROLLUP_GROUP_KEY, 1_000), None)
+            .await
+            .unwrap();
+
+        assert_eq!(count_states(&db).await, 1);
+        assert_eq!(count_intervals(&db).await, 0);
+    }
+
+    /// One transaction, not two calls in a row: a ledger failure must take the
+    /// state write down with it. The alternative — state committed, ledger lost
+    /// — is an evaluation the SLI can never see, and the reverse is coverage
+    /// with no state behind it.
+    #[tokio::test]
+    async fn a_failing_ledger_write_rolls_the_state_write_back() {
+        let db = db_without_the_ledger_table().await;
+
+        let err = persist_with(
+            &db,
+            &update_at(ROLLUP_GROUP_KEY, 1_000),
+            Some(&ledger_write_at(1_000)),
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            err.to_string()
+                .to_lowercase()
+                .contains("alert_eval_intervals"),
+            "expected the ledger write to be what failed, got: {err}"
+        );
+
+        assert_eq!(
+            count_states(&db).await,
+            0,
+            "the state row must not survive a failed ledger write"
+        );
+        assert_eq!(count_transitions(&db).await, 0);
+    }
+
+    /// The queue redelivers, so the bundled apply runs at least once and may run
+    /// again. Neither half may double up.
+    #[tokio::test]
+    async fn a_redelivered_persist_writes_neither_a_second_transition_nor_a_second_interval() {
+        let db = db().await;
+        let update = update_at(ROLLUP_GROUP_KEY, 1_000);
+        let ledger = ledger_write_at(1_000);
+
+        persist_with(&db, &update, Some(&ledger)).await.unwrap();
+        persist_with(&db, &update, Some(&ledger)).await.unwrap();
+
+        assert_eq!(count_states(&db).await, 1);
+        assert_eq!(count_transitions(&db).await, 1);
+        assert_eq!(count_intervals(&db).await, 1);
+    }
+
+    async fn recorded(db: &sea_orm::DatabaseConnection, alert_id: &str, downtime_id: &str) {
+        use sea_orm::IntoActiveModel;
+
+        alert_states::Model {
+            alert_id: alert_id.to_string(),
+            last_downtime_id: Some(downtime_id.to_string()),
+            ..model(Some(RunOutcome::Suppressed.to_i32()))
+        }
+        .into_active_model()
+        .insert(db)
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn an_edited_downtime_is_forgotten_by_every_alert_that_recorded_it() {
+        let db = db().await;
+        recorded(&db, "alert-1", "dt-1").await;
+        recorded(&db, "alert-2", "dt-1").await;
+        recorded(&db, "alert-3", "dt-2").await;
+        assert_eq!(
+            clear_last_downtime_id_with(&db, "dt-1").await.unwrap(),
+            ["alert-1", "alert-2"]
+        );
+        assert!(
+            clear_last_downtime_id_with(&db, "dt-1")
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        let ids: Vec<String> = ["alert-1", "alert-2", "alert-3"].map(String::from).to_vec();
+        let left = last_downtime_ids_with(&db, &ids).await.unwrap();
+        assert_eq!(left.len(), 1);
+        assert_eq!(left.get("alert-3").map(String::as_str), Some("dt-2"));
+    }
+
+    #[tokio::test]
+    async fn an_unsuppressed_firing_clears_the_recorded_downtime_once() {
+        let db = db().await;
+        recorded(&db, "alert-1", "dt-1").await;
+        assert_eq!(
+            set_last_downtime_id_with(&db, "alert-1", None)
+                .await
+                .unwrap(),
+            1
+        );
+        assert_eq!(
+            set_last_downtime_id_with(&db, "alert-1", None)
+                .await
+                .unwrap(),
+            0,
+            "a row with nothing recorded is not rewritten"
+        );
+        let ids = vec!["alert-1".to_string()];
+        assert!(last_downtime_ids_with(&db, &ids).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_mute_of_an_alert_with_no_state_row_creates_its_rollup_row() {
+        let db = db().await;
+        set_last_downtime_id_with(&db, "realtime-1", Some("dt"))
+            .await
+            .unwrap();
+        let ids = vec!["realtime-1".to_string()];
+        let found = last_downtime_ids_with(&db, &ids).await.unwrap();
+        assert_eq!(found.get("realtime-1").map(String::as_str), Some("dt"));
+        let row = get_with(&db, "realtime-1", ROLLUP_GROUP_KEY)
+            .await
+            .unwrap()
+            .expect("the rollup row is inserted");
+        assert_eq!(
+            row.last_outcome, None,
+            "the other columns keep their defaults"
+        );
+        assert_eq!(row.level, None);
+
+        // A second mute updates the row it made, and a clear leaves no record.
+        set_last_downtime_id_with(&db, "realtime-1", Some("dt-2"))
+            .await
+            .unwrap();
+        let found = last_downtime_ids_with(&db, &ids).await.unwrap();
+        assert_eq!(found.get("realtime-1").map(String::as_str), Some("dt-2"));
+        assert_eq!(
+            set_last_downtime_id_with(&db, "realtime-1", None)
+                .await
+                .unwrap(),
+            1
+        );
+        assert!(last_downtime_ids_with(&db, &ids).await.unwrap().is_empty());
+        // A clear of an alert with no row inserts nothing.
+        set_last_downtime_id_with(&db, "never-ran", None)
+            .await
+            .unwrap();
+        assert!(
+            get_with(&db, "never-ran", ROLLUP_GROUP_KEY)
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    /// The episode axis has to survive the UPDATE half of the upsert, not only
+    /// the INSERT.
+    ///
+    /// Every alert in a running cluster already has a state row, so evaluation
+    /// always takes the conflict path. Leaving the episode columns out of
+    /// `update_columns` made the whole feature inert there — and on a row that
+    /// did carry an episode, the clearing write was dropped too, so the
+    /// recovery re-emitted on every evaluation for ever. That is the exact bug
+    /// the episode exists to make impossible, so it is pinned here.
+    #[tokio::test]
+    async fn an_episode_survives_the_upsert_and_is_cleared_by_the_recovery() {
+        let db = db().await;
+
+        // First evaluation: the row is created and the episode opens.
+        let mut opened = update_at(ROLLUP_GROUP_KEY, 1_000);
+        if let Some(state) = opened.state.as_mut() {
+            state.episode_id = Some("ep_1".to_string());
+            state.episode_opened_at = Some(1_000);
+            state.episode_incident_id = Some("inc_1".to_string());
+        }
+        persist_with(&db, &opened, None).await.unwrap();
+
+        let stored = get_with(&db, "alert-1", ROLLUP_GROUP_KEY).await.unwrap();
+        assert_eq!(
+            stored.as_ref().and_then(|s| s.episode_id.as_deref()),
+            Some("ep_1"),
+            "the INSERT half stores the episode"
+        );
+
+        // Second evaluation, same row: still firing, and the episode must not
+        // be lost by the conflict path.
+        let mut still_firing = update_at(ROLLUP_GROUP_KEY, 2_000);
+        if let Some(state) = still_firing.state.as_mut() {
+            state.episode_id = Some("ep_1".to_string());
+            state.episode_opened_at = Some(1_000);
+            state.episode_incident_id = Some("inc_1".to_string());
+        }
+        persist_with(&db, &still_firing, None).await.unwrap();
+        let stored = get_with(&db, "alert-1", ROLLUP_GROUP_KEY).await.unwrap();
+        assert_eq!(
+            stored.as_ref().and_then(|s| s.episode_id.as_deref()),
+            Some("ep_1"),
+            "the UPDATE half keeps the episode"
+        );
+
+        // The recovery clears it, on the same conflict path.
+        let mut recovered = update_at(ROLLUP_GROUP_KEY, 3_000);
+        if let Some(state) = recovered.state.as_mut() {
+            state.episode_id = None;
+            state.episode_opened_at = None;
+            state.episode_incident_id = None;
+            state.recovering_since = None;
+        }
+        persist_with(&db, &recovered, None).await.unwrap();
+
+        let stored = get_with(&db, "alert-1", ROLLUP_GROUP_KEY)
+            .await
+            .unwrap()
+            .expect("the row is still there");
+        assert!(
+            stored.episode_id.is_none(),
+            "a cleared episode must reach the database, or the recovery repeats for ever"
+        );
+        assert!(stored.episode_opened_at.is_none());
+        assert!(stored.episode_incident_id.is_none());
+    }
+    #[tokio::test]
+    async fn rule_value_transition_is_stored_as_text() {
+        let db = db().await;
+        for (i, value) in ["NaN", "+Inf", "-Inf", "0.25"].iter().enumerate() {
+            let mut update = update_at("host=a", 1_750_000_000_000_000 + i as i64);
+            let t = update.transition.as_mut().unwrap();
+            t.rule_value = Some((*value).into());
+            t.value = None;
+            write_transition(&db, t).await.unwrap();
+        }
+        let rows = alert_state_transitions::Entity::find()
+            .order_by_asc(alert_state_transitions::Column::At)
+            .all(&db)
+            .await
+            .unwrap();
+        assert_eq!(
+            rows.iter()
+                .map(|r| r.rule_value.as_deref().unwrap())
+                .collect::<Vec<_>>(),
+            ["NaN", "+Inf", "-Inf", "0.25"]
+        );
+        assert!(rows.iter().all(|r| r.value.is_none()));
+    }
+
+    async fn insert_transition(
+        db: &sea_orm::DatabaseConnection,
+        alert_id: &str,
+        group_key: &str,
+        at: i64,
+    ) {
+        let update = update_for(alert_id, group_key, at);
+        write_transition(db, update.transition.as_ref().unwrap())
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_flapping_alert_cannot_crowd_another_out_of_its_transitions() {
+        let db = db().await;
+        for at in 1..=10 {
+            insert_transition(&db, "noisy", "g", at).await;
+        }
+        insert_transition(&db, "quiet", "g", 200).await;
+        insert_transition(&db, "quiet", "other", 19).await;
+        insert_transition(&db, "quiet", "g", 20).await;
+        insert_transition(&db, "quiet", "g", 21).await;
+        let ids = ["noisy".to_string(), "quiet".to_string()];
+        let lanes = list_transitions_between_many_with(&db, &ids, Some("g"), 5, 100, 3)
+            .await
+            .unwrap();
+        let ats = |id: &str| lanes[id].iter().map(|t| t.at).collect::<Vec<_>>();
+        assert_eq!(ats("noisy"), [5, 6, 7]);
+        assert_eq!(ats("quiet"), [20, 21]);
+    }
+
+    // ── Per-group recovery episodes (openobserve#15178) ─────────────────────
+
+    const G: &str = "host=web-1";
+
+    fn critical_episode(level_since: i64) -> DeliveryEpisode {
+        DeliveryEpisode {
+            level: AlertLevel::Critical,
+            level_since,
+            notified_at_enqueue: (None, None),
+        }
+    }
+
+    fn delivered(at: i64) -> DeliveryOutcome {
+        DeliveryOutcome::Delivered {
+            silence_minutes: 60,
+            at,
+        }
+    }
+
+    fn close_of(episode_id: &str, prev_level_at: i64) -> ClosedGroupEpisode {
+        ClosedGroupEpisode {
+            group_key: G.to_string(),
+            episode_id: episode_id.to_string(),
+            prev_level_at: Some(prev_level_at),
+            incident_id: None,
+            opened_at: 0,
+            recovered_at: prev_level_at,
+            reason: Default::default(),
+            value: None,
+            labels: Default::default(),
+            group_labels: None,
+            last_notified_level: None,
+            firing_started_at: None,
+        }
+    }
+
+    fn close_plan(close: ClosedGroupEpisode) -> GroupPlan {
+        GroupPlan {
+            closed_episodes: vec![close],
+            ..Default::default()
+        }
+    }
+
+    async fn group_db_with_episode(episode_id: &str) -> sea_orm::DatabaseConnection {
+        let db = db().await;
+        insert_alert(&db, "alert-1", true).await;
+        persist_with(&db, &update_at(G, 1_000), None).await.unwrap();
+        let advance = advance_delivery_state_with(
+            &db,
+            "alert-1",
+            G,
+            critical_episode(1_000),
+            delivered(1_500),
+            Some(episode_id),
+        )
+        .await
+        .unwrap();
+        assert_eq!(advance.mint, MintOutcome::Minted);
+        db
+    }
+
+    async fn row(db: &sea_orm::DatabaseConnection) -> AlertState {
+        get_with(db, "alert-1", G).await.unwrap().unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_stale_plan_does_not_erase_a_minted_episode() {
+        let db = group_db_with_episode("ep-1").await;
+        let stale = GroupPlan {
+            updates: vec![update_at(G, 2_000)],
+            ..Default::default()
+        };
+        persist_group_plan_with(&db, &stale, "alert-1", PlanApply::Evaluation)
+            .await
+            .unwrap();
+        assert_eq!(row(&db).await.episode_id.as_deref(), Some("ep-1"));
+        assert_eq!(row(&db).await.episode_opened_at, Some(1_500));
+    }
+
+    #[tokio::test]
+    async fn a_landed_send_keeps_its_key_when_the_delivery_guard_refuses() {
+        let db = db().await;
+        persist_with(&db, &update_at(G, 1_000), None).await.unwrap();
+        let advance = advance_delivery_state_with(
+            &db,
+            "alert-1",
+            G,
+            critical_episode(999),
+            delivered(1_500),
+            Some("ep-1"),
+        )
+        .await
+        .unwrap();
+        assert!(
+            !advance.applied,
+            "the level-episode moved, so the guard refuses"
+        );
+        assert_eq!(advance.mint, MintOutcome::Minted);
+        assert_eq!(row(&db).await.episode_id.as_deref(), Some("ep-1"));
+        assert!(row(&db).await.silenced_until.is_none());
+    }
+
+    #[tokio::test]
+    async fn a_mint_onto_a_row_with_an_id_keeps_the_id() {
+        let db = group_db_with_episode("ep-1").await;
+        let again = |id: &'static str| {
+            let db = &db;
+            async move {
+                advance_delivery_state_with(
+                    db,
+                    "alert-1",
+                    G,
+                    critical_episode(1_000),
+                    delivered(1_600),
+                    Some(id),
+                )
+                .await
+                .unwrap()
+                .mint
+            }
+        };
+        assert_eq!(again("ep-1").await, MintOutcome::Held);
+        assert_eq!(again("ep-2").await, MintOutcome::Orphaned);
+        assert_eq!(row(&db).await.episode_id.as_deref(), Some("ep-1"));
+        let gone = advance_delivery_state_with(
+            &db,
+            "alert-1",
+            "host=gone",
+            critical_episode(1_000),
+            delivered(1_600),
+            Some("ep-3"),
+        )
+        .await
+        .unwrap();
+        assert_eq!(gone.mint, MintOutcome::Orphaned);
+    }
+
+    #[tokio::test]
+    async fn racing_closes_match_once_and_clear_delivery_state() {
+        let db = group_db_with_episode("ep-1").await;
+        assert!(row(&db).await.silenced_until.is_some());
+        let plan = close_plan(close_of("ep-1", 1_000));
+        let first = persist_group_plan_with(&db, &plan, "alert-1", PlanApply::Evaluation)
+            .await
+            .unwrap();
+        let second = persist_group_plan_with(&db, &plan, "alert-1", PlanApply::Sweep)
+            .await
+            .unwrap();
+        assert_eq!(first.closed.len(), 1);
+        assert!(second.closed.is_empty() && !second.written, "one emit only");
+        let closed = row(&db).await;
+        assert!(closed.episode_id.is_none());
+        assert!(closed.silenced_until.is_none() && closed.last_notified_level.is_none());
+
+        // A late Delivered callback for the closed episode is refused, but re-opens its key.
+        let mut moved = update_at(G, 2_000);
+        moved.state.as_mut().unwrap().level = Some(AlertLevel::Ok);
+        persist_with(&db, &moved, None).await.unwrap();
+        let late = advance_delivery_state_with(
+            &db,
+            "alert-1",
+            G,
+            critical_episode(1_000),
+            delivered(2_100),
+            Some("ep-1"),
+        )
+        .await
+        .unwrap();
+        assert!(!late.applied);
+        assert_eq!(row(&db).await.episode_id.as_deref(), Some("ep-1"));
+        assert!(
+            row(&db).await.silenced_until.is_none(),
+            "delivery state stays cleared"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_close_against_a_newer_observation_matches_nothing() {
+        let db = group_db_with_episode("ep-1").await;
+        persist_with(&db, &update_at(G, 2_000), None).await.unwrap();
+        let resolve = GroupPlan {
+            updates: vec![update_at(G, 3_000)],
+            closed_episodes: vec![close_of("ep-1", 1_000)],
+            ..Default::default()
+        };
+        let write = persist_group_plan_with(&db, &resolve, "alert-1", PlanApply::Sweep)
+            .await
+            .unwrap();
+        assert!(!write.written && write.closed.is_empty());
+        assert_eq!(
+            row(&db).await.level_at,
+            Some(2_000),
+            "the sweep's resolve was abandoned"
+        );
+        assert_eq!(row(&db).await.episode_id.as_deref(), Some("ep-1"));
+    }
+
+    #[tokio::test]
+    async fn the_reap_delete_spares_a_reobserved_or_reopened_row() {
+        let db = db().await;
+        insert_alert(&db, "alert-1", true).await;
+        persist_with(&db, &update_at(G, 1_000), None).await.unwrap();
+        let reap = |level_at: i64| GroupPlan {
+            reaped: vec![ReapedGroup {
+                group_key: G.to_string(),
+                prev_level_at: Some(level_at),
+            }],
+            ..Default::default()
+        };
+
+        persist_with(&db, &update_at(G, 2_000), None).await.unwrap();
+        let write = persist_group_plan_with(&db, &reap(1_000), "alert-1", PlanApply::Evaluation)
+            .await
+            .unwrap();
+        assert!(
+            write.reaped.is_empty(),
+            "re-observed since the sweep read it"
+        );
+
+        advance_delivery_state_with(
+            &db,
+            "alert-1",
+            G,
+            critical_episode(2_000),
+            delivered(2_100),
+            Some("ep-y"),
+        )
+        .await
+        .unwrap();
+        let write = persist_group_plan_with(&db, &reap(2_000), "alert-1", PlanApply::Evaluation)
+            .await
+            .unwrap();
+        assert!(write.reaped.is_empty(), "a new episode keeps its row");
+        assert_eq!(row(&db).await.episode_id.as_deref(), Some("ep-y"));
+
+        let write = persist_group_plan_with(
+            &db,
+            &GroupPlan {
+                closed_episodes: vec![close_of("ep-y", 2_000)],
+                reaped: reap(2_000).reaped,
+                ..Default::default()
+            },
+            "alert-1",
+            PlanApply::Evaluation,
+        )
+        .await
+        .unwrap();
+        assert_eq!((write.closed.len(), write.reaped.len()), (1, 1));
+        assert!(get_with(&db, "alert-1", G).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn a_replica_repairs_a_dropped_mint_from_the_next_plan() {
+        let db = db().await;
+        insert_alert(&db, "alert-1", true).await;
+        let mut carried = update_at(G, 1_000);
+        let state = carried.state.as_mut().unwrap();
+        state.episode_id = Some("ep-1".into());
+        state.episode_opened_at = Some(900);
+        let plan = GroupPlan {
+            updates: vec![carried],
+            ..Default::default()
+        };
+        persist_group_plan_with(&db, &plan, "alert-1", PlanApply::Evaluation)
+            .await
+            .unwrap();
+        persist_with(&db, &update_at(G, 1_000), None).await.unwrap();
+        alert_states::Entity::update_many()
+            .col_expr(
+                alert_states::Column::EpisodeId,
+                sea_orm::sea_query::Expr::value(Option::<String>::None),
+            )
+            .exec(&db)
+            .await
+            .unwrap();
+
+        persist_group_plan_with(&db, &plan, "alert-1", PlanApply::Replica)
+            .await
+            .unwrap();
+        assert_eq!(row(&db).await.episode_id.as_deref(), Some("ep-1"));
+
+        // A replica closes by id alone: the writer's guard already decided.
+        let write = persist_group_plan_with(
+            &db,
+            &close_plan(close_of("ep-1", 42)),
+            "alert-1",
+            PlanApply::Replica,
+        )
+        .await
+        .unwrap();
+        assert_eq!(write.closed.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn the_group_label_map_round_trips_through_its_text_column() {
+        let db = db().await;
+        let mut update = update_at(G, 1_000);
+        let labels = std::collections::BTreeMap::from([
+            ("host".to_string(), "web,1=a".to_string()),
+            ("service".to_string(), "api".to_string()),
+        ]);
+        update.state.as_mut().unwrap().group_label_set = Some(labels.clone());
+        persist_with(&db, &update, None).await.unwrap();
+        assert_eq!(row(&db).await.group_label_set, Some(labels));
     }
 }

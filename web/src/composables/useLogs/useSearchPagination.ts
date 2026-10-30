@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { searchState } from "@/composables/useLogs/searchState";
+import type { TranslateFn } from "@/types/i18n";
 
 // Sorting types and interfaces
 interface OrderByField {
@@ -27,7 +28,7 @@ interface RecordObject {
   [key: string]: any;
 }
 
-export const useSearchPagination = () => {
+export const useSearchPagination = (t: TranslateFn) => {
   const { searchObj, notificationMsg } = searchState();
 
   const getAggsTotal = () => {
@@ -70,7 +71,7 @@ export const useSearchPagination = () => {
       }
     } catch (e: any) {
       console.log("Error while refreshing partition pagination", e);
-      notificationMsg.value = "Error while refreshing partition pagination.";
+      notificationMsg.value = t("search.errorWhileRefreshingPartitionPagination");
       return false;
     }
     return;

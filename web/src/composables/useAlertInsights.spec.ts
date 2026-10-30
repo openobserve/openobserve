@@ -188,7 +188,7 @@ describe("useAlertInsights", () => {
     it("builds timestamp filter for Alert Volume Over Time with start and end", () => {
       const { addRangeFilter, getBaseFilters } = useAlertInsights();
       addRangeFilter({
-        panelId: "p1",
+        panelId: "Panel_Alert_Volume",
         panelTitle: "Alert Volume Over Time",
         start: 1000,
         end: 2000,
@@ -200,7 +200,7 @@ describe("useAlertInsights", () => {
     it("does not add timestamp filter for Alert Volume Over Time when start or end is null", () => {
       const { addRangeFilter, getBaseFilters } = useAlertInsights();
       addRangeFilter({
-        panelId: "p1",
+        panelId: "Panel_Alert_Volume",
         panelTitle: "Alert Volume Over Time",
         start: null,
         end: 2000,
@@ -211,7 +211,7 @@ describe("useAlertInsights", () => {
     it("builds frequency subquery filter for Alert Frequency (Dedup Candidates) when start is set", () => {
       const { addRangeFilter, getBaseFilters } = useAlertInsights();
       addRangeFilter({
-        panelId: "p2",
+        panelId: "Panel_Alert_Frequency",
         panelTitle: "Alert Frequency (Dedup Candidates)",
         start: 5,
         end: null,
@@ -224,7 +224,7 @@ describe("useAlertInsights", () => {
     it("does not add frequency filter when start is null", () => {
       const { addRangeFilter, getBaseFilters } = useAlertInsights();
       addRangeFilter({
-        panelId: "p2",
+        panelId: "Panel_Alert_Frequency",
         panelTitle: "Alert Frequency (Dedup Candidates)",
         start: null,
         end: null,
@@ -289,7 +289,7 @@ describe("useAlertInsights", () => {
       const { addRangeFilter, showFailedOnly, selectedAlertName, getBaseFilters } =
         useAlertInsights();
       addRangeFilter({
-        panelId: "p1",
+        panelId: "Panel_Alert_Volume",
         panelTitle: "Alert Volume Over Time",
         start: 1000,
         end: 2000,

@@ -24,12 +24,21 @@ vi.mock("vue-i18n", () => ({
   })),
 }));
 
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import { VARIABLES_SPLITTER_LIMITS } from "@/composables/synthetics/useCheckWizardUi";
 import CheckConfigure from "./CheckConfigure.vue";
-import type { BrowserCheck } from "@/types/synthetics";
 
 // ── Child Component Stubs ─────────────────────────────────────────────────
 const CheckDetailsStub = {
-  props: ["check", "folders", "validationErrors", "targetLabel", "targetPlaceholder"],
+  props: [
+    "check",
+    "folders",
+    "validationErrors",
+    "targetLabel",
+    "targetPlaceholder",
+    "targetHint",
+    "variableSuggestions",
+  ],
   emits: ["update:check"],
   template:
     '<div class="check-details-stub" :data-test="$attrs[\'data-test\']" :data-url="check.url"><slot /></div>',
@@ -69,6 +78,12 @@ const CheckCaptureStub = {
   emits: ["update:check"],
   template: '<div class="check-capture-stub" :data-test="$attrs[\'data-test\']" />',
 };
+const CheckVariablesPanelStub = {
+  props: ["check"],
+  emits: ["update:check", "close"],
+  template:
+    '<div class="check-variables-panel-stub" data-test="synthetics-check-variables-panel" />',
+};
 
 const STUBS = {
   CheckDetails: CheckDetailsStub,
@@ -79,6 +94,7 @@ const STUBS = {
   CheckBrowserDevices: CheckBrowserDevicesStub,
   CheckRUM: CheckRUMStub,
   CheckCapture: CheckCaptureStub,
+  CheckVariablesPanel: CheckVariablesPanelStub,
 };
 
 function mountConfigure(props: Record<string, unknown> = {}) {
@@ -219,11 +235,25 @@ describe("CheckConfigure", () => {
       expect(capture.exists()).toBe(false);
     });
 
-    it("should show CheckAuthNetwork for api check type", () => {
-      wrapper = mountConfigure({ checkType: "api", check: { ...mockMonitorHttp } });
+    it("should show CheckAuthNetwork for http check type", () => {
+      wrapper = mountConfigure({ checkType: "http", check: { ...mockMonitorHttp } });
 
       const authNetwork = wrapper.find('[data-test="synthetics-check-configure-auth-network"]');
       expect(authNetwork.exists()).toBe(true);
+    });
+
+    it("should show the variables panel for browser check type", () => {
+      wrapper = mountConfigure({ checkType: "browser", check: { ...mockMonitorHttp } });
+
+      const panel = wrapper.find('[data-test="synthetics-check-variables-panel"]');
+      expect(panel.exists()).toBe(true);
+    });
+
+    it("should hide the variables panel for tcp check type", () => {
+      wrapper = mountConfigure({ checkType: "tcp", check: { ...mockMonitorHttp } });
+
+      const panel = wrapper.find('[data-test="synthetics-check-variables-panel"]');
+      expect(panel.exists()).toBe(false);
     });
   });
 
@@ -243,6 +273,20 @@ describe("CheckConfigure", () => {
 
       const alerts = wrapper.findComponent(CheckAlertsStub);
       expect(alerts.props("destinations")).toEqual(destinations);
+    });
+
+    it("should pass variableSuggestions to CheckDetails, and nothing when absent", () => {
+      wrapper = mountConfigure();
+      expect(wrapper.findComponent(CheckDetailsStub).props("variableSuggestions")).toBeUndefined();
+      wrapper.unmount();
+
+      const variableSuggestions = [
+        { name: "BASE_URL", envs: ["prod"], global: false, secret: false, gap: [] },
+      ];
+      wrapper = mountConfigure({ variableSuggestions });
+      expect(wrapper.findComponent(CheckDetailsStub).props("variableSuggestions")).toEqual(
+        variableSuggestions,
+      );
     });
 
     it("should accept and pass validationErrors to CheckDetails", () => {
@@ -275,6 +319,73 @@ describe("CheckConfigure", () => {
 
       const details = wrapper.findComponent(CheckDetailsStub);
       expect(details.props("targetLabel")).toBeUndefined();
+    });
+  });
+
+  // The host decides whether the Starting URL is opened; Configure only passes the word along.
+  describe("target hint forwarding", () => {
+    it("should forward targetHint to CheckDetails", () => {
+      wrapper = mountConfigure({
+        checkType: "browser",
+        check: { ...mockMonitorHttp },
+        targetHint: "synthetics.checkDetails.startingUrlNotOpened",
+      });
+
+      const details = wrapper.findComponent(CheckDetailsStub);
+      expect(details.props("targetHint")).toBe("synthetics.checkDetails.startingUrlNotOpened");
+    });
+
+    it("should pass undefined targetHint when the host gives none", () => {
+      wrapper = mountConfigure({ checkType: "browser", check: { ...mockMonitorHttp } });
+
+      expect(wrapper.findComponent(CheckDetailsStub).props("targetHint")).toBeUndefined();
+    });
+  });
+
+  // A host with its own toggle drives the panel; every other host keeps it always open.
+  describe("host-controlled variables panel", () => {
+    const PANEL = '[data-test="synthetics-check-variables-panel"]';
+    const splitter = (w: VueWrapper) => w.findComponent(OSplitter);
+
+    it("keeps the panel open and the splitter live when the prop is omitted", () => {
+      wrapper = mountConfigure({ checkType: "http", check: { ...mockMonitorHttp } });
+
+      expect(wrapper.find(PANEL).exists()).toBe(true);
+      expect(splitter(wrapper).props("separator")).toBe(true);
+      expect(splitter(wrapper).props("disable")).toBe(false);
+      expect(splitter(wrapper).props("limits")).toEqual(VARIABLES_SPLITTER_LIMITS);
+    });
+
+    it("hides the panel and hands the form the full width when the host closes it", () => {
+      wrapper = mountConfigure({ checkType: "browser", variablesPanelOpen: false });
+
+      expect(wrapper.find(PANEL).exists()).toBe(false);
+      expect(splitter(wrapper).props("modelValue")).toBe(100);
+      expect(splitter(wrapper).props("limits")).toEqual([100, 100]);
+      expect(splitter(wrapper).props("separator")).toBe(false);
+      expect(splitter(wrapper).props("disable")).toBe(true);
+    });
+
+    it("shows the panel with the shared limits when the host opens it", () => {
+      wrapper = mountConfigure({ checkType: "browser", variablesPanelOpen: true });
+
+      expect(wrapper.find(PANEL).exists()).toBe(true);
+      expect(splitter(wrapper).props("limits")).toEqual(VARIABLES_SPLITTER_LIMITS);
+      expect(splitter(wrapper).props("separator")).toBe(true);
+    });
+
+    it("never shows the panel for a check type with no variables, even when opened", () => {
+      wrapper = mountConfigure({ checkType: "tcp", variablesPanelOpen: true });
+
+      expect(wrapper.find(PANEL).exists()).toBe(false);
+    });
+
+    it("asks the host to close the panel when the panel closes itself", async () => {
+      wrapper = mountConfigure({ checkType: "browser", variablesPanelOpen: true });
+
+      await wrapper.findComponent(CheckVariablesPanelStub).vm.$emit("close");
+
+      expect(wrapper.emitted("close-variables-panel")).toHaveLength(1);
     });
   });
 });

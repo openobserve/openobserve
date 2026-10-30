@@ -45,6 +45,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="showLabelOnTop mt-2"
         />
 
+        <!-- Read-only: the identifier is the Basic-auth username, immutable after creation. -->
+        <div v-if="beingUpdated" class="mt-2">
+          <label class="text-text-secondary mb-1 block text-xs font-medium">
+            {{ t("serviceAccounts.form.identifier.label") }}
+          </label>
+          <div
+            data-test="iam-add-service-account-identifier-display"
+            class="border-border-default bg-surface-subtle text-text-secondary rounded-default border px-3 py-2 text-sm"
+          >
+            {{ modelValue?.email }}
+          </div>
+        </div>
+
         <OFormInput
           name="first_name"
           :label="t('user.description')"
@@ -52,39 +65,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="showLabelOnTop mt-2"
         />
 
-        <!-- Access grants happen in the same flow (enterprise/cloud only — OSS
-             has no roles/groups). Both pickers are optional; assignments are
-             applied after the account is created, and failures surface in the
-             token-reveal screen without blocking it. -->
-        <template v-if="!beingUpdated && showAccessPickers">
-          <OFormSelect
-            name="roles"
-            multiple
-            :options="roleOptions"
-            :label="t('serviceAccounts.form.roles.label')"
-            data-test="iam-add-service-account-roles-select"
-            class="showLabelOnTop mt-2"
-          />
-          <div class="mt-1 flex justify-end">
-            <OButton
-              variant="ghost"
-              size="sm"
-              icon-left="add"
-              type="button"
-              data-test="iam-add-service-account-create-role-btn"
-              @click="showAddRoleDialog = true"
-            >
-              {{ t("serviceAccounts.form.roles.create") }}
-            </OButton>
-          </div>
-          <OFormSelect
-            name="groups"
-            multiple
-            :options="groupOptions"
-            :label="t('serviceAccounts.form.groups.label')"
-            data-test="iam-add-service-account-groups-select"
-            class="showLabelOnTop mt-2"
-          />
+        <!-- Access grants happen in the same flow. Roles/groups are locked
+             (not hidden) when rbac isn't allowed — see rbacAccess — so OSS
+             shows what it's missing instead of pretending it doesn't exist.
+             Both pickers are optional; assignments are applied after the
+             account is created, and failures surface in the token-reveal
+             screen without blocking it. -->
+        <template v-if="!beingUpdated">
+          <!-- RBAC not allowed: the select would write to form state and the
+               button would open AddRole on click, so a locked click is caught
+               on this wrapper BEFORE it reaches either — removing `disabled`
+               there would let the "real" action fire alongside the dialog. -->
+          <span
+            class="contents"
+            @click.capture="!rbacAccess.allowed ? onLockedRbacClick($event) : undefined"
+          >
+            <OFormSelect
+              name="roles"
+              multiple
+              :options="roleOptions"
+              :label="t('serviceAccounts.form.roles.label')"
+              data-test="iam-add-service-account-roles-select"
+              class="showLabelOnTop mt-2"
+            />
+            <div class="mt-1 flex justify-end">
+              <OButton
+                variant="ghost"
+                size="sm"
+                type="button"
+                data-test="iam-add-service-account-create-role-btn"
+                @click="!rbacAccess.allowed ? undefined : (showAddRoleDialog = true)"
+              >
+                <template v-if="!rbacAccess.allowed" #icon-left>
+                  <OIcon name="lock" size="sm" class="text-warning-600" />
+                </template>
+                <template v-else #icon-left><OIcon name="add" size="sm" /></template>
+                {{ t("serviceAccounts.form.roles.create") }}
+              </OButton>
+            </div>
+            <OFormSelect
+              name="groups"
+              multiple
+              :options="groupOptions"
+              :label="t('serviceAccounts.form.groups.label')"
+              data-test="iam-add-service-account-groups-select"
+              class="showLabelOnTop mt-2"
+            />
+          </span>
         </template>
       </OForm>
     </div>
@@ -101,18 +128,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { groupsQuery } from "@/services/iam.queries";
+import { rolesQuery } from "@/services/iam.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { saveServiceAccountMutation } from "@/services/service_accounts.queries";
+import analytics from "@/services/product_analytics";
+import { useMutation } from "@tanstack/vue-query";
 import { defineComponent, computed, ref, watch } from "vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import AddRole from "@/components/iam/roles/AddRole.vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-import config from "@/aws-exports";
 import service_accounts from "@/services/service_accounts";
-import { getRoles, getGroups, updateRole, updateGroup } from "@/services/iam";
+import { useLockedAffordance } from "@/composables/useLockedAffordance";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { updateRole, updateGroup } from "@/services/iam";
 import { seedReadonlyRolePermissions } from "@/components/iam/roles/readonlyPreset";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -135,7 +170,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
-  components: { ODialog, OForm, OFormInput, OFormSelect, OButton, AddRole },
+  components: { ODialog, OForm, OFormInput, OFormSelect, OButton, OIcon, AddRole },
   props: {
     open: {
       type: Boolean,
@@ -153,7 +188,7 @@ export default defineComponent({
   emits: ["update:modelValue", "updated", "update:open"],
   setup(props) {
     const store: any = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { track } = useReo();
 
     // Form-base: the OForm owns the only editable fields (name + first_name +
@@ -162,6 +197,10 @@ export default defineComponent({
     const beingUpdated = computed(() => !!props.modelValue?.email || props.isUpdated);
 
     const orgId = computed(() => store.state.selectedOrganization.identifier as string);
+
+    const saveServiceAccount = useMutation(() =>
+      saveServiceAccountMutation(orgId.value, () => beingUpdated.value),
+    );
 
     // The stored identifier is `<name>.<org_id>@sa.internal` — shown in the
     // name field's help text so the user knows what they are creating.
@@ -177,19 +216,23 @@ export default defineComponent({
 
     // The OForm owns all editable fields. Name/roles/groups are always blank on
     // create; the description prefills from modelValue in update mode.
-    const addServiceAccountDefaults = computed(
-      (): AddServiceAccountForm => ({
-        name: "",
-        first_name: props.modelValue?.first_name ?? "",
-        roles: [],
-        groups: [],
-      }),
-    );
+    const addServiceAccountDefaults = computed((): AddServiceAccountForm => ({
+      name: "",
+      first_name: props.modelValue?.first_name ?? "",
+      roles: [],
+      groups: [],
+    }));
 
-    // Roles/groups exist only on enterprise/cloud (OSS has no RBAC UI).
-    const showAccessPickers = computed(
-      () => config.isEnterprise === "true" || config.isCloud === "true",
-    );
+    // Same rbac gate IdentityAccessManagement.vue uses for the Groups/Roles
+    // rail items — reused here so the pickers lock instead of vanish in OSS.
+    const rbacAccess = useLockedAffordance("rbac");
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+
+    function onLockedRbacClick(event: MouseEvent) {
+      event.preventDefault();
+      event.stopPropagation();
+      openUpgradeDialog();
+    }
 
     const roleOptions = ref<SelectOption[]>([]);
     const groupOptions = ref<SelectOption[]>([]);
@@ -198,20 +241,21 @@ export default defineComponent({
     // Both list APIs return plain string arrays. A load failure leaves the
     // pickers empty but never blocks account creation.
     const loadAccessOptions = async () => {
-      if (!showAccessPickers.value) return;
+      if (!rbacAccess.value.allowed) return;
       try {
         const [rolesRes, groupsRes] = await Promise.all([
-          getRoles(orgId.value),
-          getGroups(orgId.value),
+          queryClient.fetchQuery(rolesQuery(orgId.value)),
+          queryClient.fetchQuery(groupsQuery(orgId.value)),
         ]);
-        roleOptions.value = (rolesRes.data ?? []).map((role: string) => ({
-          label: role,
-          value: role,
-        }));
-        groupOptions.value = (groupsRes.data ?? []).map((group: string) => ({
-          label: group,
-          value: group,
-        }));
+        // Merged, not replaced: a role created inline while this load is still
+        // in flight would otherwise be wiped from the picker when it lands.
+        const merge = (existing: any[], names: string[]) => {
+          const fromServer = names.map((name: string) => ({ label: name, value: name }));
+          const seen = new Set(fromServer.map((o) => o.value));
+          return [...fromServer, ...existing.filter((o: any) => !seen.has(o.value))];
+        };
+        roleOptions.value = merge(roleOptions.value, rolesRes ?? []);
+        groupOptions.value = merge(groupOptions.value, groupsRes ?? []);
       } catch (err) {
         console.error("Failed to load roles/groups for service account form", err);
       }
@@ -229,10 +273,12 @@ export default defineComponent({
       t,
       store,
       beingUpdated,
+      saveServiceAccount,
       identifierSuffix,
       addServiceAccountSchema,
       addServiceAccountDefaults,
-      showAccessPickers,
+      rbacAccess,
+      onLockedRbacClick,
       roleOptions,
       groupOptions,
       showAddRoleDialog,
@@ -252,7 +298,7 @@ export default defineComponent({
     // still selected; only its permissions need to be granted manually.
     async onRoleAdded({ role_name, startFrom }: { role_name: string; startFrom?: string }) {
       if (!this.roleOptions.some((o: any) => o.value === role_name)) {
-        this.roleOptions.push({ label: role_name, value: role_name });
+        this.roleOptions.push({ label: raw(role_name), value: role_name });
       }
       const form = (this.$refs.saForm as any)?.form;
       if (form) {
@@ -310,7 +356,7 @@ export default defineComponent({
         const { email: userEmail, ...rest } = this.modelValue ?? {};
         const payload: any = { ...rest, organization, first_name: value.first_name };
         try {
-          const res = await service_accounts.update(payload, organization, userEmail);
+          const res = await this.saveServiceAccount.mutateAsync({ payload, email: userEmail });
           this.$emit("updated", res.data, { ...payload, email: userEmail }, "updated");
           this.$emit("update:open", false);
         } catch (err: any) {
@@ -332,10 +378,10 @@ export default defineComponent({
         // still receives a regular email payload.
         const email = buildServiceAccountEmail(value.name, organization);
         try {
-          const res = await service_accounts.create(
-            { email, first_name: value.first_name },
-            organization,
-          );
+          const res = await this.saveServiceAccount.mutateAsync({
+            payload: { email, first_name: value.first_name },
+          });
+          analytics.track("service_account_created");
 
           // Fan out access grants AFTER the account exists — but do NOT await
           // them here: the show-once token must never be held hostage by a

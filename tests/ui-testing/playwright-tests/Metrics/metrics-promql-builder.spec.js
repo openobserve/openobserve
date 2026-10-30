@@ -3,7 +3,17 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
 const { waitForDashboardPage, deleteDashboard } = require('../Dashboards/utils/dashCreation.js');
+const { settlePanelLeave } = require('../../pages/dashboardPages/panel-leave-dialog.js');
 
+
+/**
+ * A metric ensureMetricsIngested() seeds, so it always has points in the last
+ * 15 minutes and label values to filter on. The tests that assert the chart
+ * renders DATA pin themselves to it: the metric the page auto-selects is
+ * whichever stream sorts first in the org, which is routinely one another suite
+ * left behind — present in the schema, empty in the window.
+ */
+const SEEDED_METRIC = 'cpu_usage';
 
 test.describe("Metrics PromQL Builder Mode testcases", () => {
   test.beforeAll(async () => {
@@ -537,44 +547,25 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     testLogger.info('Default line chart query executed');
 
     // 2. Switch to table chart type
-    const tableSelected = await builder.selectChartType('table');
-    if (tableSelected) {
-      testLogger.info('Switched to table chart type');
+    await builder.selectChartType('table');
+    testLogger.info('Switched to table chart type');
 
-      // 3. Run query again with table chart
-      const respPromise2 = builder.waitForQueryResponse(15000);
-      await builder.clickRunQuery();
-      await respPromise2;
+    // 3. Run query again with table chart; the chart switch fires its own run, so settle before and after
+    await builder.waitForPromqlIdle();
+    await builder.clickRunQuery();
+    await builder.waitForPromqlIdle();
 
-      // 4. Verify no errors
-      expect(await pm.metricsPage.isErrorNotificationVisible()).toBe(false);
-      testLogger.info('Table chart query executed without errors');
+    // 4. Verify no errors
+    expect(await pm.metricsPage.isErrorNotificationVisible()).toBe(false);
+    testLogger.info('Table chart query executed without errors');
 
-      // 5. Verify table or chart rendered
-      const rendered = await builder.isChartRendered();
-      expect(rendered).toBe(true);
-      testLogger.info('Table/chart rendered successfully');
+    // 5. Verify the table rendered
+    await builder.expectTableRendered();
+    testLogger.info('Table rendered successfully');
 
-      // 6. Switch back to line chart
-      await builder.selectChartType('line');
-      testLogger.info('Switched back to line chart');
-    } else {
-      // Chart type selector might not be visible on metrics page
-      // (it may only appear in dashboard panel editor context)
-      testLogger.info('Table chart type not available on metrics page - checking area chart');
-
-      // Try area chart instead
-      const areaSelected = await builder.selectChartType('area');
-      if (areaSelected) {
-        const respPromise3 = builder.waitForQueryResponse(15000);
-        await builder.clickRunQuery();
-        await respPromise3;
-        expect(await pm.metricsPage.isErrorNotificationVisible()).toBe(false);
-        testLogger.info('Area chart query executed without errors');
-      } else {
-        testLogger.info('Chart type selector not available on metrics page (expected in dashboard context)');
-      }
-    }
+    // 6. Switch back to line chart
+    await builder.selectChartType('line');
+    testLogger.info('Switched back to line chart');
   });
 
   // =========================================================================
@@ -764,10 +755,14 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     const pm = await setupTest(page, testInfo);
     const builder = pm.metricsBuilderPage;
 
-    // 1. Verify builder mode active with metric pre-selected
+    // 1. Verify builder mode, then pin to the seeded metric — see SEEDED_METRIC.
     expect(await builder.isModeSelected('builder')).toBe(true);
+    expect(await builder.selectMetric(SEEDED_METRIC)).toBe(true);
+    // Picking a metric re-seeds its default operations; start from an empty list
+    // again, exactly as setupTest does.
+    expect(await builder.clearOperations()).toBe(0);
     const metricName = await builder.getStreamSelectedValue();
-    expect(metricName.length).toBeGreaterThan(0);
+    expect(metricName).toBe(SEEDED_METRIC);
     testLogger.info(`Metric: ${metricName}`);
 
     // 2. Set time range
@@ -803,19 +798,10 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
       selectedOperator = operatorText.trim();
       testLogger.info(`Operator: ${selectedOperator}`);
 
-      // Select a value
-      const isDisabled = await builder.isValueSelectDisabled();
-      if (!isDisabled) {
-        await builder.valueSelectLast.click();
-        await builder.valuePopover.waitFor({ state: 'visible', timeout: 5000 });
-
-        const valueCount = await builder.valueOptions.count();
-        if (valueCount > 0) {
-          selectedValue = (await builder.valueOptions.first().textContent()).trim();
-          await builder.valueOptions.first().click();
-          await builder.valuePopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-          testLogger.info(`Selected value: ${selectedValue}`);
-        }
+      // Select a value (gates on the async values fetch so the filter isn't left empty)
+      selectedValue = await builder.selectFirstLabelValue();
+      if (selectedValue) {
+        testLogger.info(`Selected value: ${selectedValue}`);
       }
 
       // Close the filter menu — LabelFilterEditor chip menu is ODropdown post-migration
@@ -899,8 +885,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     testLogger.info('Builder state verified: metric, filter, operation, options all correct');
 
     // 8. Switch to Table chart type
-    const tableSelected = await builder.selectChartType('table');
-    expect(tableSelected).toBe(true);
+    await builder.selectChartType('table');
     testLogger.info('Switched to table chart type');
 
     // 9. Run query and intercept API request to verify PromQL query string
@@ -968,10 +953,14 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     const pm = await setupTest(page, testInfo);
     const builder = pm.metricsBuilderPage;
 
-    // 1. Verify builder mode and pre-selected metric
+    // 1. Verify builder mode, then pin to the seeded metric — see SEEDED_METRIC.
     expect(await builder.isModeSelected('builder')).toBe(true);
+    expect(await builder.selectMetric(SEEDED_METRIC)).toBe(true);
+    // Picking a metric re-seeds its default operations; start from an empty list
+    // again, exactly as setupTest does.
+    expect(await builder.clearOperations()).toBe(0);
     const metricName = await builder.getStreamSelectedValue();
-    expect(metricName.length).toBeGreaterThan(0);
+    expect(metricName).toBe(SEEDED_METRIC);
     testLogger.info(`Metric: ${metricName}`);
 
     // 2. Set time range
@@ -1001,17 +990,10 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
       const operatorText = await builder.operatorSelectLast.textContent().catch(() => '');
       expect(operatorText).toContain('=');
 
-      // Select value
-      const isDisabled = await builder.isValueSelectDisabled();
-      if (!isDisabled) {
-        await builder.valueSelectLast.click();
-        await builder.valuePopover.waitFor({ state: 'visible', timeout: 5000 });
-        if (await builder.valueOptions.count() > 0) {
-          selectedValue = (await builder.valueOptions.first().textContent()).trim();
-          await builder.valueOptions.first().click();
-          await builder.valuePopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-          testLogger.info(`Value: ${selectedValue}`);
-        }
+      // Select value (gates on the async values fetch so the filter isn't left empty)
+      selectedValue = await builder.selectFirstLabelValue();
+      if (selectedValue) {
+        testLogger.info(`Value: ${selectedValue}`);
       }
 
       await page.keyboard.press('Escape');
@@ -1082,8 +1064,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     testLogger.info('Builder state verified');
 
     // 7. Switch to table chart
-    const tableSelected = await builder.selectChartType('table');
-    expect(tableSelected).toBe(true);
+    await builder.selectChartType('table');
     testLogger.info('Table chart selected');
 
     // 8. Run query and capture API request
@@ -1180,17 +1161,10 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
       await builder.labelPopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
       testLogger.info(`Label: ${selectedLabel}`);
 
-      // Select value
-      const isDisabled = await builder.isValueSelectDisabled();
-      if (!isDisabled) {
-        await builder.valueSelectLast.click();
-        await builder.valuePopover.waitFor({ state: 'visible', timeout: 5000 });
-        if (await builder.valueOptions.count() > 0) {
-          selectedValue = (await builder.valueOptions.first().textContent()).trim();
-          await builder.valueOptions.first().click();
-          await builder.valuePopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-          testLogger.info(`Value: ${selectedValue}`);
-        }
+      // Select value (gates on the async values fetch so the filter isn't left empty)
+      selectedValue = await builder.selectFirstLabelValue();
+      if (selectedValue) {
+        testLogger.info(`Value: ${selectedValue}`);
       }
       await page.keyboard.press('Escape');
       // LabelFilterEditor chip menu = ODropdown post-migration
@@ -1378,12 +1352,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     const discardBtn = builder.getDashboardDiscardBtn();
     if (await discardBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
       await discardBtn.click();
-      // Handle confirmation dialog if appears
-      const confirmBtn = builder.getDashboardConfirmPrimaryBtn();
-      if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await confirmBtn.click();
-        await confirmBtn.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-      }
+      // An edited panel opens the in-app leave dialog; answer it with Discard
+      await settlePanelLeave(page, { timeout: 15000 }).catch(() => {});
     }
     testLogger.info('Discarded panel editor');
 

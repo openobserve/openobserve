@@ -20,13 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="iam-users-selection-filters"
       class="bg-card-glass-bg flex flex-shrink-0 justify-start px-3 py-2"
     >
-      <div data-test="iam-users-selection-show-toggle" class="mr-3">
+      <div data-test="iam-users-selection-show-toggle" class="me-3">
         <div class="flex items-center">
           <span data-test="iam-users-selection-show-text" style="font-size: var(--text-sm)">
             {{ t("iam.groupUsers.show") }}
           </span>
           <OToggleGroup
-            class="ml-1"
+            class="ms-1"
             :model-value="usersDisplay"
             @update:model-value="(v) => updateUserTable(v as string)"
           >
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroup>
         </div>
       </div>
-      <div data-test="iam-users-selection-search-input" class="mr-3">
+      <div data-test="iam-users-selection-search-input" class="me-3">
         <OSearchInput
           data-test="alert-list-search-input"
           v-model="userSearchKey"
@@ -84,7 +84,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :persist-columns="true"
         table-id="iam-group-users"
         :show-global-filter="false"
-        :footer-title="t('iam.basicUsers')"
         dense
       >
         <template #cell-select="{ row }">
@@ -102,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 name="info"
                 size="sm"
-                class="ml-1 cursor-pointer"
+                class="ms-1 cursor-pointer"
                 :data-test="`iam-external-user-warning-icon-${row.email}`"
               />
               <template #content>
@@ -142,10 +141,9 @@ import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import usePermissions from "@/composables/iam/usePermissions";
 import { cloneDeep } from "lodash-es";
-import { computed, watch } from "vue";
+import { computed, watch, ref, onBeforeMount } from "vue";
 import type { Ref } from "vue";
-import { ref, onBeforeMount } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { TABLE_CHECKBOX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
@@ -185,11 +183,11 @@ const rows: Ref<any[]> = ref([]);
 const usersDisplay = ref("selected");
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 // Org option rows: the "All" entry carries a `value`; real-org entries carry
 // identifier/id and other metadata, so every non-label field is optional.
 interface OrgOption {
-  label: string;
+  label: I18nText;
   value?: string;
   id?: string;
   identifier?: string;
@@ -211,7 +209,6 @@ const selectedOrgValue = computed<SelectModelValue>({
     if (match) selectedOrg.value = match;
   },
 });
-const orgList = ref<OrgOption[]>([...orgOptions.value]);
 const usersDisplayOptions = [
   {
     label: t("iam.groupUsers.all"),
@@ -222,14 +219,6 @@ const usersDisplayOptions = [
     value: "selected",
   },
 ];
-const filterOrganizations = (val: string, update: (fn: () => void) => void) => {
-  // Filter logic
-  update(() => {
-    const needle = val.toLowerCase();
-    orgList.value = orgOptions.value.filter((org) => org.label.toLowerCase().includes(needle));
-  });
-};
-
 const userSearchKey = ref("");
 
 const hasFetchedOrgUsers = ref(false);
@@ -242,7 +231,7 @@ const columns = computed<OTableColumnDef[]>(() => {
   const baseColumns: OTableColumnDef[] = [
     {
       id: "select",
-      header: "",
+      header: raw(""),
       accessorKey: "isInGroup",
       cell: (info: any) => info.getValue(),
       size: TABLE_CHECKBOX_COL_SIZE,
@@ -331,7 +320,7 @@ const updateUserTable = async (value: string) => {
   if (usersDisplay.value === "all") {
     rows.value = users.value;
   } else {
-    rows.value = users.value.filter((user: any) => user.isInGroup);
+    rows.value = users.value.filter(isListedAsSelected);
   }
 };
 
@@ -339,7 +328,7 @@ const updateOrganization = () => {
   if (selectedOrg.value.value === "all") {
     // Show all users when "All" is selected
     rows.value =
-      usersDisplay.value === "all" ? users.value : users.value.filter((user) => user.isInGroup);
+      usersDisplay.value === "all" ? users.value : users.value.filter(isListedAsSelected);
   } else {
     // Filter users based on selected organization or root role
     rows.value = users.value.filter((user) => {
@@ -349,6 +338,14 @@ const updateOrganization = () => {
     });
   }
 };
+
+// Staged picks count too, so a member list mounted over restored changes shows them ticked.
+const isSelected = (email: string) =>
+  props.addedUsers.has(email) || (groupUsersMap.value.has(email) && !props.removedUsers.has(email));
+
+// A member staged for removal stays listed under Selected, so a restored removal can be undone.
+const isListedAsSelected = (user: { email: string; isInGroup: boolean }) =>
+  user.isInGroup || props.removedUsers.has(user.email);
 
 const getchOrgUsers = async () => {
   // fetch group users
@@ -363,7 +360,7 @@ const getchOrgUsers = async () => {
         data.map((user: any) => {
           return {
             email: user.email,
-            isInGroup: groupUsersMap.value.has(user.email),
+            isInGroup: isSelected(user.email),
             org:
               user.orgs?.length > 0
                 ? user.orgs.map((org: { org_name: string }) => org.org_name).join(", ")
@@ -377,7 +374,7 @@ const getchOrgUsers = async () => {
       users.value = cloneDeep(usersState.users).map((user: any) => {
         return {
           email: user.email,
-          isInGroup: groupUsersMap.value.has(user.email),
+          isInGroup: isSelected(user.email),
           org: user.org,
           role: user.role,
           is_external: user.is_external || false,

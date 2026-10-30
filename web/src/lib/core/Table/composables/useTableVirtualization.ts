@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { computed, toValue, type Ref, type MaybeRefOrGetter } from "vue";
+import { computed, toValue, watchEffect, type Ref, type MaybeRefOrGetter } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import type { Row } from "@tanstack/vue-table";
 
@@ -25,6 +25,25 @@ export interface VirtualizationOptions {
    * reactive `wrap` state.
    */
   dynamicRowHeight?: MaybeRefOrGetter<boolean>;
+  /**
+   * In variable-height mode, add the height of the row's expanded detail row
+   * (the next sibling marked `data-row-expansion`) to the row's measured size.
+   */
+  includeExpansionRow?: MaybeRefOrGetter<boolean>;
+  /**
+   * Keep the scroll element's raw offset stable while measured row heights
+   * change. Delegated tables need this because their scroll element can also
+   * contain content above the virtual list; applying the list's measurement
+   * deltas to that shared element makes it jump during result refreshes.
+   */
+  preserveScrollOffsetOnRowResize?: MaybeRefOrGetter<boolean>;
+  /**
+   * Virtualize this many rows instead of `rows.length`. Lets the caller feed a
+   * windowed row model (only the visible slice materialized) while the
+   * scrollbar and spacers still span the full dataset. Return undefined to
+   * fall back to `rows.length`.
+   */
+  totalCount?: MaybeRefOrGetter<number | undefined>;
 }
 
 /**
@@ -42,6 +61,9 @@ export function useTableVirtualization(options: VirtualizationOptions) {
     expandedRowHeights,
     overscan = 100,
     dynamicRowHeight,
+    includeExpansionRow,
+    preserveScrollOffsetOnRowResize,
+    totalCount,
   } = options;
 
   const isFirefox = computed(() => {
@@ -59,8 +81,10 @@ export function useTableVirtualization(options: VirtualizationOptions) {
     // from null to real after mount, the virtualizer rebinds its scroll listener.
     const resolvedScrollEl = (toValue(scrollEl) as HTMLElement | null) ?? parentRef.value;
     return {
-      count: rows.value.length,
+      count: toValue(totalCount) ?? rows.value.length,
       getScrollElement: () => resolvedScrollEl,
+      // At height 0 the virtualizer returns no rows and the body renders every row, so start from the window height.
+      initialRect: { width: 0, height: typeof window !== "undefined" ? window.innerHeight : 0 },
       scrollMargin,
       estimateSize: (index: number) => {
         const row = rows.value[index];
@@ -81,7 +105,11 @@ export function useTableVirtualization(options: VirtualizationOptions) {
               const isExpandedRow = (row?.original as any)?.isExpandedRow;
               const dyn = !!toValue(dynamicRowHeight);
               if (isExpandedRow || dyn) {
-                const height = element.getBoundingClientRect().height;
+                let height = element.getBoundingClientRect().height;
+                const detail = element.nextElementSibling;
+                if (toValue(includeExpansionRow) && detail?.hasAttribute?.("data-row-expansion")) {
+                  height += detail.getBoundingClientRect().height;
+                }
                 if (isExpandedRow && expandedRowHeights?.value) {
                   expandedRowHeights.value[idx] = height;
                 }
@@ -94,6 +122,20 @@ export function useTableVirtualization(options: VirtualizationOptions) {
   });
 
   const rowVirtualizer = useVirtualizer(rowVirtualizerOptions);
+
+  // TanStack normally compensates scrollTop when a measured item above the
+  // viewport differs from its estimate. That is useful for a self-contained
+  // list, but wrong for a delegated scroller that also owns a histogram or
+  // other content above the table: wrapped rows are remeasured when query data
+  // changes and their deltas otherwise push the whole Logs view downward.
+  watchEffect(() => {
+    rowVirtualizer.value.shouldAdjustScrollPositionOnItemSizeChange = toValue(
+      preserveScrollOffsetOnRowResize,
+    )
+      ? () => false
+      : undefined;
+  });
+
   const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
   const totalSize = computed(() => rowVirtualizer.value.getTotalSize() + 24);
 

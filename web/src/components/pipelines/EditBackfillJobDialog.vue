@@ -18,9 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     v-model:open="show"
     size="sm"
-    title="Edit Backfill Job"
-    secondary-button-label="Cancel"
-    primary-button-label="Update Job"
+    :title="t('pipeline.editBackfillJobTitle')"
+    :secondary-button-label="t('common.cancel')"
+    :primary-button-label="t('pipeline.updateJob')"
     form-id="edit-backfill-form"
     @click:secondary="onCancel"
     data-test="edit-backfill-job-dialog"
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div>
           <div class="flex items-center gap-4">
             <div class="text-sm font-medium whitespace-nowrap">
-              Time Range <span class="text-status-error-text">*</span>
+              {{ t("pipeline.timeRange") }} <span class="text-status-error-text">*</span>
             </div>
             <OFormDateTimeRange
               name="timerange"
@@ -54,21 +54,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="mt-2"
           v-model="showAdvanced"
           icon="settings"
-          label="Advanced Options"
+          :label="t('pipeline.advancedOptions')"
           data-test="advanced-options-expansion"
         >
           <div class="mt-2 space-y-2 p-3">
             <!-- Chunk Period -->
             <div>
               <div class="mb-1 text-xs">
-                Chunk Period (minutes)
+                {{ t("pipeline.chunkPeriodMinutesLabel") }}
                 <OIcon name="info-outline" size="sm" />
-                <OTooltip content="Size of each processing chunk in minutes. Default: 60" />
+                <OTooltip :content="t('pipeline.chunkPeriodDefaultTooltip')" />
               </div>
               <OFormInput
                 name="chunkPeriodMinutes"
                 type="number"
-                placeholder="60"
+                :placeholder="t('pipeline.chunkPeriodDefaultPlaceholder')"
                 data-test="chunk-period-input"
               />
             </div>
@@ -76,14 +76,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Delay Between Chunks -->
             <div>
               <div class="mb-1 text-xs">
-                Delay Between Chunks (seconds)
+                {{ t("pipeline.delayBetweenChunksLabel") }}
                 <OIcon name="info-outline" size="sm" />
-                <OTooltip content="Delay between processing chunks in seconds. Default: 5" />
+                <OTooltip :content="t('pipeline.chunkDelayTooltip')" />
               </div>
               <OFormInput
                 name="delayBetweenChunks"
                 type="number"
-                placeholder="5"
+                :placeholder="t('pipeline.defaultDelaySecondsPlaceholder')"
                 data-test="delay-between-chunks-input"
               />
             </div>
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <OFormCheckbox
                 name="deleteBeforeBackfill"
-                label="Delete existing data before backfill"
+                :label="t('pipeline.deleteDataBeforeBackfill')"
                 data-test="delete-before-backfill-checkbox"
               />
               <div
@@ -100,23 +100,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="rounded-default bg-banner-warning-bg border-banner-warning-border mt-2 border p-3"
               >
                 <div class="flex items-start">
-                  <OIcon name="warning" size="sm" class="mt-0.5 mr-2" />
+                  <OIcon name="warning" size="sm" class="me-2 mt-0.5" />
                   <div class="text-banner-warning-text text-xs">
-                    <div class="mb-1 font-semibold">Warning: Irreversible Data Deletion</div>
-                    <div class="mb-2">
-                      This will permanently delete all data in the destination stream for the
-                      specified time range before running the backfill. This action cannot be
-                      undone.
+                    <div class="mb-1 font-semibold">
+                      {{ t("pipeline.irreversibleDeletionWarning") }}
                     </div>
-                    <div class="mb-1 text-xs font-semibold">Time Alignment Requirements (UTC):</div>
-                    <ul class="ml-5 list-disc space-y-0.5 text-xs">
+                    <div class="mb-2">
+                      {{ t("pipeline.deleteBackfillWarningMessage") }}
+                    </div>
+                    <div class="mb-1 text-xs font-semibold">
+                      {{ t("pipeline.timeAlignmentRequirements") }}
+                    </div>
+                    <ul class="ms-5 list-disc space-y-0.5 text-xs">
                       <li>
-                        <strong>Logs</strong> streams: Times must align to hour boundaries in UTC
-                        (e.g., 10:00:00, not 10:15:00)
+                        <strong>{{ t("common.logs") }}</strong>
+                        {{ t("pipeline.logsHourBoundaryNote") }}
                       </li>
                       <li>
-                        <strong>Metrics/Traces</strong> streams: Times must align to day boundaries
-                        in UTC (e.g., 00:00:00)
+                        <strong>{{ t("pipeline.metricsTracesLabel") }}</strong>
+                        {{ t("pipeline.dayBoundaryNote") }}
                       </li>
                     </ul>
                   </div>
@@ -128,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Error Message -->
         <div v-if="errorMessage" class="text-status-error-text">
-          <OIcon name="error" size="sm" class="mr-2" />
+          <OIcon name="error" size="sm" class="me-2" />
           {{ errorMessage }}
         </div>
       </OForm>
@@ -139,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -169,7 +171,7 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const { confirm } = useConfirmDialog();
 
@@ -184,18 +186,16 @@ const errorMessage = ref("");
 // Typed dynamic defaults for the form-owned fields (seeded from props.job). The
 // time range is an absolute range carrying the job's start/end (forces the
 // picker to absolute mode + pre-fills it).
-const backfillDefaults = computed(
-  (): BackfillForm => ({
-    timerange: {
-      type: "absolute",
-      from: props.job?.start_time,
-      to: props.job?.end_time,
-    },
-    chunkPeriodMinutes: props.job?.chunk_period_minutes || null,
-    delayBetweenChunks: props.job?.delay_between_chunks_secs || null,
-    deleteBeforeBackfill: props.job?.delete_before_backfill || false,
-  }),
-);
+const backfillDefaults = computed((): BackfillForm => ({
+  timerange: {
+    type: "absolute",
+    from: props.job?.start_time,
+    to: props.job?.end_time,
+  },
+  chunkPeriodMinutes: props.job?.chunk_period_minutes || null,
+  delayBetweenChunks: props.job?.delay_between_chunks_secs || null,
+  deleteBeforeBackfill: props.job?.delete_before_backfill || false,
+}));
 
 // Blank defaults used by cancel/reset (the open-watch re-seeds from props.job).
 const blankDefaults = (): BackfillForm => ({
@@ -256,18 +256,17 @@ const onSubmit = async (value: BackfillForm) => {
   errorMessage.value = "";
 
   if (!props.job) {
-    errorMessage.value = "No job selected";
+    errorMessage.value = t("pipeline.noJobSelected");
     return;
   }
 
   // Show confirmation dialog if delete_before_backfill is enabled
   if (value.deleteBeforeBackfill) {
     const ok = await confirm({
-      title: "Confirm Data Deletion",
-      message:
-        "You have selected to delete existing data before backfill. This will permanently delete all data in the destination stream for the specified time range. This action CANNOT be undone or cancelled once the job is updated. Are you sure you want to proceed?",
-      confirmLabel: "Yes, Delete and Backfill",
-      cancelLabel: "Cancel",
+      title: t("pipeline.confirmDataDeletion"),
+      message: t("pipeline.editBackfillDeleteConfirmMessage"),
+      confirmLabel: t("pipeline.yesDeleteAndBackfill"),
+      confirmVariant: "destructive",
     });
     if (ok) {
       await updateBackfillJobRequest(value);
@@ -302,7 +301,7 @@ const updateBackfillJobRequest = async (value: BackfillForm) => {
 
     toast({
       variant: "success",
-      message: "Backfill job updated successfully",
+      message: t("toastMessages.pipelines.backfillJobUpdatedSuccessfully"),
     });
 
     emit("job-updated");
@@ -311,7 +310,7 @@ const updateBackfillJobRequest = async (value: BackfillForm) => {
   } catch (error: any) {
     console.error("Error updating backfill job:", error);
     errorMessage.value =
-      error?.response?.data?.error || error?.message || "Failed to update backfill job";
+      error?.response?.data?.error || error?.message || t("pipeline.updateBackfillJobFailed");
   }
 };
 </script>

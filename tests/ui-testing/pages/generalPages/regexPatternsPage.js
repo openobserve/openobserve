@@ -219,12 +219,13 @@ export class RegexPatternsPage {
   async getTotalPatternsCount() {
     testLogger.info('Getting total patterns count from UI');
 
-    // The count text is in format "Showing 1 - 20 of 37 Pattern(s)"
-    const countText = this.page.getByText('Pattern(s)');
-    const text = await countText.textContent().catch(() => '');
+    // The OTable #bottom slot renders the i18n-pluralised total, e.g.
+    // "1 Pattern" or "37 Patterns".
+    const countText = this.page.getByText(/\d+\s+Patterns?\b/);
+    const text = (await countText.first().textContent().catch(() => '')) || '';
 
-    // Extract the total number from "Showing X - Y of Z Pattern(s)"
-    const match = text.match(/of\s+(\d+)\s+Pattern/);
+    // Extract the total number from "Z Pattern(s)"
+    const match = text.match(/(\d+)\s+Patterns?\b/);
     if (match && match[1]) {
       const count = parseInt(match[1], 10);
       testLogger.info(`Total patterns count: ${count}`);

@@ -31,7 +31,8 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             }
         }
         MessageType::EvalScorerDelete => {
-            let (org_id, entity_id) = parse_org_entity_key(&msg.key, "scorers")?;
+            let (org_id, entity_id) =
+                crate::parse_eval_key(&msg.key, "scorers", "Invalid eval scorers key")?;
             scorers::delete(&entity_id, &org_id).await?;
         }
         _ => {
@@ -44,37 +45,4 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
         }
     }
     Ok(())
-}
-
-fn parse_org_entity_key(key: &str, module: &str) -> Result<(String, String)> {
-    let key_columns: Vec<&str> = key.split('/').collect();
-    if key_columns.len() != 5
-        || key_columns[1] != "eval"
-        || key_columns[2] != module
-        || key_columns[3].is_empty()
-        || key_columns[4].is_empty()
-    {
-        return Err(Error::Message(format!("Invalid eval {module} key")));
-    }
-    Ok((key_columns[3].to_string(), key_columns[4].to_string()))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parse_org_entity_key_valid() {
-        assert_eq!(
-            parse_org_entity_key("/eval/scorers/org-1/entity-1", "scorers").unwrap(),
-            ("org-1".to_string(), "entity-1".to_string())
-        );
-    }
-
-    #[test]
-    fn test_parse_org_entity_key_invalid() {
-        assert!(parse_org_entity_key("/eval/scorers/org-1/", "scorers").is_err());
-        assert!(parse_org_entity_key("/eval/scorers/org-1/entity-1/x", "scorers").is_err());
-        assert!(parse_org_entity_key("/eval/score_configs/org-1/entity-1", "scorers").is_err());
-    }
 }

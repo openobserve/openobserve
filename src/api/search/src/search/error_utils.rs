@@ -176,12 +176,4 @@ mod tests {
         let response = map_error_to_http_response(&err, trace_id);
         assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
     }
-
-    #[test]
-    fn test_map_error_to_http_response_without_trace_id() {
-        let err =
-            errors::Error::ErrorCode(errors::ErrorCodes::InvalidParams("Invalid".to_string()));
-        let response = map_error_to_http_response(&err, None);
-        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-    }
 }

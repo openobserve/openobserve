@@ -13,26 +13,61 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import router from "src/router";
 import * as acorn from "acorn";
 import * as walk from "acorn-walk";
 import { ref } from "vue";
 
-export const panelIdToBeRefreshed = ref<string | null>(null);
+import { gt } from "@/types/i18n";
+import echartsUrl from "echarts/dist/echarts.min.js?url";
+import dompurifyUrl from "dompurify/dist/purify.min.js?url";
 
-/**
- * Converts SQL data into a format suitable for rendering a chart.
- *
- * @param {any} panelSchema - the panel schema object
- * @param {any} searchQueryData - the search query data
- * @param {any} store - the store object
- * @return {Object} - the options object for rendering the chart
- */
+// Single-panel refresh targets, each mapped to whether its load has settled; emptied once all have.
+export const panelRefreshTargets = new Map<string, boolean>();
 
-export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
+// Bumped when a single-panel refresh ends, so charts that skipped a run meanwhile can replay it.
+export const panelRefreshEpoch = ref(0);
+
+// import.meta.url is this chunk's URL, so relative ?url paths resolve to the correct assets directory.
+const sandboxEchartsUrl = new URL(echartsUrl, import.meta.url).href;
+const sandboxDompurifyUrl = new URL(dompurifyUrl, import.meta.url).href;
+
+// Exact first-party chart code allowed to run its callbacks in the app origin; stored dashboard code never is.
+const trustedCustomChartCode = new Set<string>();
+
+/** Read-only dashboard state handed to custom chart code as `context`. */
+export interface CustomChartContext {
+  variables: Record<string, unknown>;
+  timeRange: { start: number; end: number };
+  timezone: string;
+  theme: "light" | "dark";
+}
+
+/** Rejects a run skipped because another panel is being refreshed; the caller keeps its current chart. */
+export class CustomChartSkippedError extends Error {}
+
+/** True while a single-panel refresh is in flight that did not target this panel. */
+export const isSkippedByPanelRefresh = (panelId: string | undefined) =>
+  panelRefreshTargets.size > 0 && !(panelId && panelRefreshTargets.has(panelId));
+
+/** Marks a target's load as settled; the refresh ends once every target has settled. */
+export const settlePanelRefresh = (panelId: string | undefined) => {
+  if (!panelId || !panelRefreshTargets.has(panelId)) return;
+  panelRefreshTargets.set(panelId, true);
+  if ([...panelRefreshTargets.values()].every(Boolean)) {
+    panelRefreshTargets.clear();
+    panelRefreshEpoch.value++;
+  }
+};
+
+/** Runs the panel's chart code in a sandboxed iframe and resolves with its ECharts option. */
+export const runJavaScriptCode = (
+  panelSchema: any,
+  searchQueryData: any,
+  context?: CustomChartContext,
+) => {
   return new Promise((resolve, reject) => {
-    // Skip if this panel is not the one to be refreshed
-    if (panelIdToBeRefreshed.value && panelIdToBeRefreshed.value !== panelSchema.id) {
+    if (isSkippedByPanelRefresh(panelSchema.id)) {
+      reject(new CustomChartSkippedError());
       return;
     }
 
@@ -41,25 +76,30 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
     iframe.setAttribute("sandbox", "allow-scripts");
     document.body.appendChild(iframe);
 
-    let staticEchartsRef = "/web/src/assets/dashboard/echarts.min.js";
-    let staticPurifierRef = "/web/src/assets/dashboard/purify.min.js";
-
-    if (!window.location.pathname.includes("web")) {
-      staticEchartsRef = "/src/assets/dashboard/echarts.min.js";
-      staticPurifierRef = "/src/assets/dashboard/purify.min.js";
-    }
     let userCode = panelSchema.customChartContent;
 
     // **Validation before execution**
     const validationError = validateUserCode(userCode);
     if (validationError) {
-      reject(new Error(`Unsafe code detected: ${validationError}`));
+      reject(new Error(gt("dashboard.utils.unsafeCodeDetected", { error: validationError })));
       document.body.removeChild(iframe);
       return;
     }
 
     // Generate a nonce
     const nonce = Math.random().toString(36).substring(2);
+    const fnTag = `__o2_fn_${randomHex()}`;
+    const readyToken = randomHex();
+    const trusted = trustedCustomChartCode.has(userCode);
+
+    // The sandbox iframe has no access to the app's i18n instance, so the messages it
+    // posts back are translated here and injected as a frozen JSON literal.
+    const sandboxMessages = JSON.stringify({
+      cspViolationPrefix: gt("dashboard.utils.cspViolationPrefix"),
+      executionTimeout: gt("dashboard.utils.executionTimeout"),
+      executionErrorPrefix: gt("dashboard.utils.executionErrorPrefix"),
+      cspViolationBlocked: gt("dashboard.utils.cspViolationBlocked"),
+    });
 
     const scriptContent = `
   <meta http-equiv="Content-Security-Policy" content="
@@ -70,9 +110,10 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
     connect-src 'none';
   ">
 
-  <script src="${staticEchartsRef}" nonce="${nonce}"></script>
-  <script src="${staticPurifierRef}" nonce="${nonce}"></script>
+  <script src="${sandboxEchartsUrl}" nonce="${nonce}"></script>
+  <script src="${sandboxDompurifyUrl}" nonce="${nonce}"></script>
   <script nonce="${nonce}">
+    const i18nMessages = ${sandboxMessages};
     let securityPolicyError = false;
     let cspViolationDetected = false;
 
@@ -86,24 +127,45 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
       cspViolationDetected = true;
       parent.postMessage({ 
         type: 'error', 
-        message: 'CSP Violation: ' + event.violatedDirective + ' blocked ' + event.blockedURI 
+        message: i18nMessages.cspViolationPrefix + event.violatedDirective + ' blocked ' + event.blockedURI
       }, '*');
     });
 
     // Handle script execution with a timeout
+    let executed = false;
     window.addEventListener('message', (event) => {
-      if (event.data.type === 'execute') {
+      // A sibling custom-chart frame can post here too; only the parent may hand over code.
+      if (event.source !== parent || executed) return;
+      if (event.data && event.data.type === 'connect' && event.ports && event.ports[0]) {
+        executed = true;
+        const port = event.ports[0];
+        port.onmessage = (portEvent) => {
+          port.close();
+          execute(portEvent.data);
+        };
+      }
+    });
+
+    function execute(payload) {
+      if (payload && payload.type === 'execute') {
         try {
-          const data = JSON.parse(event.data.data);
-          const userCode = event.data.code.trim();
+          const data = JSON.parse(payload.data);
+          const deepFreeze = (obj) => {
+            if (typeof obj === 'object' && obj !== null) {
+              Object.values(obj).forEach(deepFreeze);
+              Object.freeze(obj);
+            }
+            return obj;
+          };
+          const context = deepFreeze(JSON.parse(payload.context || '{}'));
+          const fnTag = payload.fnTag;
 
           const convertFunctionsToString = (obj) => {
             if (typeof obj === 'function') {
               try {
-                const functionString = obj.toString();
-                return DOMPurify.sanitize(functionString); // Sanitize function string
+                return { [fnTag]: DOMPurify.sanitize(obj.toString()) };
               } catch (e) {
-                return 'Error sanitizing function';
+                return undefined;
               }
             }
             if (Array.isArray(obj)) return obj.map(convertFunctionsToString);
@@ -118,14 +180,14 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
 
           // Execution timeout to prevent infinite loops
           const timeout = setTimeout(() => {
-            parent.postMessage({ type: 'error', message: 'Execution Timeout: Script took too long to run' }, '*');
+            parent.postMessage({ type: 'error', message: i18nMessages.executionTimeout }, '*');
           }, 2000);
 
-          (function(data, echarts) {
+          (function(data, echarts, context) {
             try {
               ${userCode};
             } catch (err) {
-              parent.postMessage({ type: 'error', message: 'Execution Error: ' + err.message }, '*');
+              parent.postMessage({ type: 'error', message: i18nMessages.executionErrorPrefix + err.message }, '*');
               return;
             }
 
@@ -135,61 +197,83 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
             setTimeout(() => {
               
               if (securityPolicyError || cspViolationDetected) {
-                parent.postMessage({ type: 'error', message: 'CSP Violation Detected. Execution blocked.' }, '*');
+                parent.postMessage({ type: 'error', message: i18nMessages.cspViolationBlocked }, '*');
               } else {
                 parent.postMessage({ type: 'success', result: JSON.stringify(convertFunctionsToString(option)) }, '*');
               }
             }, 0); // Delay to ensure CSP events have time to process
 
-          })(data, window.echarts);
+          })(data, window.echarts, context);
 
         } catch (error) {
           parent.postMessage({ type: 'error', message: error.message }, '*');
         }
       }
-    });
+    }
+
+    parent.postMessage({ type: 'ready', token: '${readyToken}' }, '*');
   </script>
     `;
 
     iframe.srcdoc = scriptContent;
 
+    const channel = new MessageChannel();
+    let connected = false;
+
     window.addEventListener("message", function handler(event) {
       if (event.source !== iframe.contentWindow) return;
+      const type = event.data?.type;
 
-      // Double check if this is still the panel to be refreshed
-      if (panelIdToBeRefreshed.value && panelIdToBeRefreshed.value !== panelSchema.id) {
-        window.removeEventListener("message", handler);
-        document.body.removeChild(iframe);
+      if (type === "ready") {
+        // The token is known only to the srcdoc written above, which sends it before any chart code runs.
+        if (connected || event.data.token !== readyToken) return;
+        connected = true;
+        // An opaque-origin frame only accepts "*", so the payload goes over a port bound to this document.
+        iframe.contentWindow?.postMessage({ type: "connect" }, "*", [channel.port2]);
+        channel.port1.postMessage({
+          type: "execute",
+          code: userCode,
+          fnTag,
+          data: JSON.stringify(searchQueryData),
+          context: JSON.stringify(context ?? {}),
+        });
         return;
       }
+      if (type !== "error" && (type !== "success" || !connected)) return;
 
       window.removeEventListener("message", handler);
+      channel.port1.close();
       setTimeout(() => {
         document.body.removeChild(iframe);
       }, 2000);
 
-      if (event.data.type === "success") {
-        resolve(JSON.parse(event.data.result));
-        // Clear the panelIdToBeRefreshed after success
-        if (panelIdToBeRefreshed.value === panelSchema.id) {
-          panelIdToBeRefreshed.value = null;
+      if (type === "success") {
+        try {
+          const dropped = { count: 0 };
+          const options = rehydrateFunctions(
+            JSON.parse(event.data.result),
+            fnTag,
+            trusted,
+            dropped,
+          );
+          if (dropped.count) {
+            console.warn(
+              gt(
+                "dashboard.utils.customChartCallbacksDropped",
+                { count: dropped.count },
+                dropped.count,
+              ),
+            );
+          }
+          resolve(options);
+        } catch (error) {
+          reject(error);
         }
-      } else if (event.data.type === "error") {
+      } else {
         console.error("Error executing code", event.data.message);
         reject(new Error(event.data.message));
       }
     });
-
-    iframe.onload = () => {
-      iframe?.contentWindow?.postMessage(
-        {
-          type: "execute",
-          code: userCode,
-          data: JSON.stringify(searchQueryData),
-        },
-        "*",
-      );
-    };
   });
 };
 
@@ -225,7 +309,7 @@ export const validateUserCode = (code: string): string | null => {
       CallExpression(node: acorn.Node & { callee: any; arguments: any[] }) {
         // **Direct function call check (eval(), fetch(), etc.)**
         if (node.callee.type === "Identifier" && forbiddenFunctions.includes(node.callee.name)) {
-          errorMessage = `Use of '${node.callee.name}()' is not allowed.`;
+          errorMessage = gt("dashboard.utils.forbiddenFunctionCall", { name: node.callee.name });
         }
 
         // **Detect setTimeout() misuse**
@@ -237,10 +321,10 @@ export const validateUserCode = (code: string): string | null => {
           ) {
             const delay = node.arguments[1].value;
             if (delay < 100) {
-              errorMessage = "Use of 'setTimeout()' with delay < 100ms is not allowed.";
+              errorMessage = gt("dashboard.utils.unsafeSetTimeoutDelay");
             }
           } else {
-            errorMessage = "Invalid usage of 'setTimeout()'.";
+            errorMessage = gt("dashboard.utils.invalidSetTimeoutUsage");
           }
 
           // Block setTimeout(() => eval(...))
@@ -251,7 +335,9 @@ export const validateUserCode = (code: string): string | null => {
             (node.arguments[0].callee.name === "eval" ||
               node.arguments[0].callee.name === "Function")
           ) {
-            errorMessage = `Use of ${node.arguments[0].callee.name} inside 'setTimeout()' is not allowed.`;
+            errorMessage = gt("dashboard.utils.forbiddenInsideSetTimeout", {
+              name: node.arguments[0].callee.name,
+            });
           }
         }
 
@@ -264,14 +350,16 @@ export const validateUserCode = (code: string): string | null => {
           node.arguments[0].type === "Literal" &&
           node.arguments[0].value === ""
         ) {
-          errorMessage = "Obfuscated function call detected.";
+          errorMessage = gt("dashboard.utils.obfuscatedFunctionCall");
         }
       },
 
       MemberExpression(node: acorn.Node & { object: any; property: any }) {
         // **Detect direct access to forbidden objects (e.g., document.cookie, localStorage.setItem)**
         if (node.object.type === "Identifier" && forbiddenIdentifiers.includes(node.object.name)) {
-          errorMessage = `Access to '${node.object.name}' is not allowed.`;
+          errorMessage = gt("dashboard.utils.forbiddenIdentifierAccess", {
+            name: node.object.name,
+          });
         }
 
         // **Detect obfuscated method calls like this[x] where x is created using .join("")**
@@ -280,32 +368,75 @@ export const validateUserCode = (code: string): string | null => {
           node.property.callee.type === "MemberExpression" &&
           node.property.callee.property.name === "join"
         ) {
-          errorMessage = "Obfuscated method/property access detected.";
+          errorMessage = gt("dashboard.utils.obfuscatedAccessDetected");
         }
       },
 
       WhileStatement(node: acorn.Node & { test: any }) {
         // **Detect `while (true)`**
         if (node.test.type === "Literal" && node.test.value === true) {
-          errorMessage = "Infinite loop using 'while(true)' is not allowed.";
+          errorMessage = gt("dashboard.utils.infiniteWhileLoop");
         }
       },
 
       ForStatement(node: acorn.Node & acorn.ForStatement) {
         // **Detect `for(;;)` which means infinite loop**
         if (!node.test) {
-          errorMessage = "Infinite loop using 'for(;;)' is not allowed.";
+          errorMessage = gt("dashboard.utils.infiniteForLoop");
         }
       },
       NewExpression(node: acorn.Node & { callee: any }) {
         if (node.callee.type === "Identifier" && node.callee.name === "Function") {
-          errorMessage = "Use of 'new Function()' is not allowed.";
+          errorMessage = gt("dashboard.utils.newFunctionNotAllowed");
         }
       },
     });
 
     return errorMessage;
   } catch (error) {
-    return "Invalid JavaScript syntax.";
+    return gt("dashboard.utils.invalidJavaScriptSyntax");
   }
 };
+
+/** Marks first-party chart code (curated packs, bundled templates) whose function callbacks may run in the app. */
+export const trustCustomChartCode = (code: string): string => {
+  trustedCustomChartCode.add(code);
+  return code;
+};
+
+export const isTrustedCustomChartCode = (code: string): boolean => trustedCustomChartCode.has(code);
+
+/** Turns sandbox-tagged functions back into callables for trusted code; drops them otherwise, counting each in `dropped`. */
+export const rehydrateFunctions = (
+  value: unknown,
+  fnTag: string,
+  trusted: boolean,
+  dropped: { count: number } = { count: 0 },
+): unknown => {
+  if (Array.isArray(value)) {
+    return value.map((item) => rehydrateFunctions(item, fnTag, trusted, dropped));
+  }
+  if (typeof value !== "object" || value === null) {
+    return value;
+  }
+  if (Object.prototype.hasOwnProperty.call(value, fnTag)) {
+    const source = (value as Record<string, unknown>)[fnTag];
+    if (!trusted || typeof source !== "string") {
+      dropped.count++;
+      return undefined;
+    }
+    return new Function(`return ${source}`)();
+  }
+  return Object.fromEntries(
+    Object.entries(value).map(([key, child]) => [
+      key,
+      rehydrateFunctions(child, fnTag, trusted, dropped),
+    ]),
+  );
+};
+
+// crypto.randomUUID needs a secure context; plain-http deployments still need an unguessable tag.
+const randomHex = (): string =>
+  Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>
+    b.toString(16).padStart(2, "0"),
+  ).join("");

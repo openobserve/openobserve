@@ -32,7 +32,7 @@
       </div>
       <div v-else class="indexDetailsContainer h-screen w-full p-5">
         <div
-          class="titleContainer items-flex-start bg-surface-subtle border-input-border rounded-default flex flex-col gap-5 border p-4"
+          class="titleContainer items-flex-start bg-surface-subtle border-border-default rounded-default flex flex-col gap-5 border p-4"
         >
           <div
             data-test="stream-details-container"
@@ -40,26 +40,26 @@
           >
             <div data-test="schema-stream-title-text">
               {{ t("alerts.stream_name") }}
-              <span class="title mb-4 pl-1 font-bold"> {{ schemaData.name }}</span>
+              <span class="title mb-4 ps-1 font-bold"> {{ schemaData.name }}</span>
             </div>
             <div
               v-if="store.state.zoConfig.show_stream_stats_doc_num"
               data-test="schema-stream-title-text"
             >
               {{ t("logStream.docsCount") }}
-              <span class="title mb-4 pl-1 font-bold">
+              <span class="title mb-4 ps-1 font-bold">
                 {{ parseInt(schemaData.stats.doc_num).toLocaleString("en-US") }}
               </span>
             </div>
             <div data-test="schema-stream-title-text">
               {{ t("logStream.storageSize") }}
-              <span class="title mb-4 pl-1 font-bold">
+              <span class="title mb-4 ps-1 font-bold">
                 {{ formatSizeFromMB(schemaData.stats.storage_size) }}</span
               >
             </div>
             <div v-if="isCloud !== 'true'" data-test="schema-stream-title-text">
               {{ t("logStream.compressedSize") }}
-              <span class="title mb-4 pl-1 font-bold">
+              <span class="title mb-4 ps-1 font-bold">
                 {{ formatSizeFromMB(schemaData.stats.compressed_size) }}</span
               >
             </div>
@@ -70,7 +70,7 @@
             data-test="enrichment-schema-total-fields"
             class="rounded-default bg-theme-accent text-text-inverse flex h-7.5 w-28.75 items-center justify-center text-sm"
           >
-            All Fields ({{ schemaData.schema.length }})
+            {{ t("logStream.allFieldsCount", { count: schemaData.schema.length }) }}
           </div>
           <OSearchInput
             data-test="schema-field-search-input"
@@ -81,7 +81,7 @@
           />
         </div>
         <div>
-          <div style="margin-bottom: 30px" class="mt-4">
+          <div style="margin-bottom: 1.875rem" class="mt-4">
             <OTable
               data-test="schema-log-stream-field-mapping-table"
               :data="schemaData.schema"
@@ -104,7 +104,7 @@
 <script lang="ts">
 // @ts-nocheck
 import { defineComponent, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { formatSizeFromMB } from "@/utils/zincutils";
 import config from "@/aws-exports";
@@ -146,9 +146,9 @@ export default defineComponent({
   },
   emits: ["update:open"],
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
-    const { getStream } = useStreams();
+    const { getStream } = useStreams(t);
     const columns = [
       {
         id: "name",

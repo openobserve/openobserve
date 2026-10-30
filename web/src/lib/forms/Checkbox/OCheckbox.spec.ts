@@ -16,9 +16,35 @@ describe("OCheckbox", () => {
     expect(wrapper.exists()).toBe(true);
   });
 
+  // The label re-clicks the box when a click's target leaves the page mid-click, re-checking it.
+  it.each([
+    [true, "checked"],
+    ["indeterminate", "indeterminate"],
+  ] as const)("lets a click on the %s mark reach the box itself", (modelValue) => {
+    wrapper = mount(OCheckbox, { props: { modelValue } });
+    const mark = wrapper.find('[role="checkbox"] > span');
+    expect(mark.exists()).toBe(true);
+    expect(mark.classes()).toContain("pointer-events-none");
+  });
+
   it("renders a label when provided via prop", () => {
     wrapper = mount(OCheckbox, { props: { label: "Accept terms" } });
     expect(wrapper.text()).toContain("Accept terms");
+  });
+
+  it("names the control with ariaLabel when there is no visible label", () => {
+    // A checkbox on a card cannot carry visible text, and the wrapping <label>
+    // does not name a `button[role=checkbox]` — only an explicit aria-label on
+    // that button does.
+    wrapper = mount(OCheckbox, { props: { ariaLabel: "Select Pod OOM Killed" } });
+    expect(wrapper.find('[role="checkbox"]').attributes("aria-label")).toBe(
+      "Select Pod OOM Killed",
+    );
+  });
+
+  it("leaves the control unnamed by aria when a visible label is used instead", () => {
+    wrapper = mount(OCheckbox, { props: { label: "Accept terms" } });
+    expect(wrapper.find('[role="checkbox"]').attributes("aria-label")).toBeUndefined();
   });
 
   it("renders a label slot when provided", () => {

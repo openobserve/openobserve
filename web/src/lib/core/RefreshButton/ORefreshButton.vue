@@ -1,15 +1,21 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "../Button/OButton.vue";
+import OTooltip from "../../overlay/Tooltip/OTooltip.vue";
 import type { RefreshButtonProps, RefreshButtonEmits } from "./ORefreshButton.types";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = withDefaults(defineProps<RefreshButtonProps>(), {
   lastRunAt: null,
   loading: false,
   disabled: false,
+  variant: "ghost",
+  layout: "split",
+  dataTest: "refresh-button",
+  shortcutId: undefined,
+  size: "toolbar",
 });
 
 const emit = defineEmits<RefreshButtonEmits>();
@@ -57,6 +63,13 @@ const dotTitle = computed(() => {
   return t("refreshButton.dataStale");
 });
 
+// The age alone is the inline label, so the name leads with the action a screen reader should announce.
+const buttonName = computed(() =>
+  props.lastRunAt
+    ? t("refreshButton.refreshWithAge", { age: relativeTime.value || t("refreshButton.justNow") })
+    : t("refreshButton.refresh"),
+);
+
 const exactTime = computed(() => {
   if (!props.lastRunAt) return t("refreshButton.notYetRefreshed");
   return t("refreshButton.lastRefreshed", {
@@ -82,48 +95,60 @@ function handleClick(e: MouseEvent) {
 </script>
 
 <template>
-  <div class="inline-flex items-center gap-1.5">
-    <!-- staleness dot -->
-    <span
-      :class="['size-2 shrink-0 rounded-full transition-colors duration-700', dotColor]"
-      :title="dotTitle"
-    />
-    <!-- relative timestamp -->
+  <!-- `h-8!` beats sm-toolbar's own 30px, so this matches the 32px icon-sm buttons beside it. -->
+  <OButton
+    v-if="layout === 'inline'"
+    :variant="variant"
+    size="sm-toolbar"
+    class="h-8!"
+    icon-left="refresh"
+    :loading="loading"
+    :disabled="disabled"
+    :data-test="dataTest"
+    :aria-label="buttonName"
+    @click="handleClick"
+  >
+    <!-- The age drops below md so a toolbar keeps search, columns and refresh on one phone row. -->
     <span
       v-if="lastRunAt"
-      class="text-text-secondary text-xs whitespace-nowrap tabular-nums select-none"
-      :title="exactTime"
+      class="bg-border-default h-4 w-px shrink-0 max-md:hidden"
+      aria-hidden="true"
+    />
+    <!-- No colour class: here the age is the button's label, not the loose caption `split` renders. -->
+    <span
+      v-if="lastRunAt"
+      class="inline-block min-w-12 text-left text-xs tabular-nums max-md:hidden"
     >
       {{ relativeTime || t("refreshButton.justNow") }}
     </span>
-    <!-- refresh icon button -->
+    <OTooltip :content="exactTime" :shortcut-id="shortcutId" />
+  </OButton>
+
+  <div v-else class="inline-flex items-center gap-1.5">
+    <!-- staleness dot -->
+    <span :class="['size-2 shrink-0 rounded-full transition-colors duration-700', dotColor]">
+      <OTooltip :content="dotTitle" />
+    </span>
+    <!-- relative timestamp -->
+    <span
+      v-if="lastRunAt"
+      class="text-text-secondary text-xs whitespace-nowrap tabular-nums select-none max-md:hidden"
+    >
+      {{ relativeTime || t("refreshButton.justNow") }}
+      <OTooltip :content="exactTime" />
+    </span>
     <OButton
-      variant="ghost"
-      size="icon"
+      :variant="variant"
+      :size="size === 'inset' ? 'icon' : 'icon-toolbar'"
+      :class="size === 'inset' ? 'size-5.5!' : undefined"
+      icon-left="refresh"
       :loading="loading"
       :disabled="disabled"
-      :title="exactTime"
-      data-test="refresh-button"
-      class="size-7"
+      :data-test="dataTest"
+      :aria-label="buttonName"
       @click="handleClick"
     >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="15"
-        height="15"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        :class="{ 'animate-spin': loading }"
-      >
-        <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-        <path d="M21 3v5h-5" />
-        <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-        <path d="M8 16H3v5" />
-      </svg>
+      <OTooltip :content="exactTime" :shortcut-id="shortcutId" />
     </OButton>
   </div>
 </template>

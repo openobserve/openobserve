@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :stream-name="streamName"
       :start-time="timeRange.startTime"
       :end-time="timeRange.endTime"
-      detail-route-name="aiSessionDetails"
+      :detail-route-name="detailRouteName"
       class="min-h-0 flex-1"
     />
   </AiPageShell>
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, onMounted, nextTick } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import AiPageShell from "@/enterprise/components/AIObservability/AiPageShell.vue";
 import SessionsList from "@/plugins/traces/SessionsList.vue";
 import { useAiDateController } from "@/enterprise/composables/useAiDateController";
@@ -47,7 +47,16 @@ import { useChildRefresh } from "@/enterprise/composables/useChildRefresh";
 
 defineOptions({ name: "AISessionsPage" });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
+
+// `aiSessionDetails` is registered by every edition (see
+// useAIObservabilityExtraRoutes in composables/shared/useAIObservabilityRoutes.ts,
+// consumed by both the OSS and enterprise routers) — it used to exist only on
+// the enterprise/cloud router, which forced this page to fall back to the
+// Traces module's plain `sessionDetails` route name in OSS. Sessions itself
+// ships in OSS, so its drill-down should too, under the SAME name, without an
+// edition check.
+const detailRouteName = "aiSessionDetails";
 
 // Shared with LLM Insights + Quality — see useAiDateRange.ts. Sessions syncs its
 // date to the URL (urlSync:true) so deep-links reproduce the exact view.

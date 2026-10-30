@@ -41,6 +41,7 @@
   ::-webkit-scrollbar-thumb {
     background: var(--color-scrollbar-thumb);
     border-radius: 0.375rem;
+    /* eslint-disable-next-line local/no-hardcoded-px -- transparent border + background-clip: content-box insets the thumb inside the fixed-width native scrollbar track — a paint gutter, not text-driven layout */
     border: 2px solid transparent;
     background-clip: content-box;
   }
@@ -70,6 +71,7 @@
 @layer base {
   @media print {
     .h-full,
+    /* eslint-disable-next-line local/no-hardcoded-px -- selector text, not a rendered length: it must spell the escaped Tailwind class name h-[calc(100vh-105px)] literally */
     .h-\[calc\(100vh-105px\)\],
     .overflow-y-auto,
     .overflow-auto,
@@ -121,6 +123,8 @@ body {
   font-size: var(--text-compact);
   font-weight: var(--font-normal);
   line-height: var(--leading-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /*
@@ -145,35 +149,35 @@ body {
     font-size: var(--text-2xl);
     font-weight: var(--font-semibold);
     line-height: var(--leading-2xl);
-    letter-spacing: var(--tracking-tight);
+    letter-spacing: var(--tracking-heading-display);
   }
 
   h2 {
     font-size: var(--text-xl);
     font-weight: var(--font-medium);
     line-height: var(--leading-xl);
-    letter-spacing: var(--tracking-normal);
+    letter-spacing: var(--tracking-heading);
   }
 
   h3 {
     font-size: var(--text-lg);
     font-weight: var(--font-medium);
     line-height: var(--leading-lg);
-    letter-spacing: var(--tracking-normal);
+    letter-spacing: var(--tracking-heading);
   }
 
   h4 {
     font-size: var(--text-base);
     font-weight: var(--font-medium);
     line-height: var(--leading-md);
-    letter-spacing: var(--tracking-normal);
+    letter-spacing: var(--tracking-heading);
   }
 
   h5 {
     font-size: var(--text-sm);
     font-weight: var(--font-medium);
     line-height: var(--leading-base);
-    letter-spacing: var(--tracking-normal);
+    letter-spacing: var(--tracking-heading);
   }
 
   h6 {
@@ -218,7 +222,7 @@ body {
     font-size: var(--text-compact);
     color: var(--color-text-code);
     font-feature-settings: "tnum";
-    letter-spacing: -0.2px;
+    letter-spacing: -0.0125rem;
   }
 
   pre,

@@ -13,10 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { RE2JS } from "re2js";
 import {
   OVERRIDE_CONFIG_TYPES,
   parseRegexPattern,
+  valueMappingPatternError,
   buildValueMappingCache,
   lookupValueMapping,
   lookupValueMappingFull,
@@ -25,6 +27,7 @@ import {
   applyColumnOverrides,
   formatNumericValue,
   resolveIsNumber,
+  resolveMetricValueStyle,
 } from "./tableConfigUtils";
 
 describe("tableConfigUtils", () => {
@@ -177,6 +180,115 @@ describe("tableConfigUtils", () => {
       ]);
       expect(lookupValueMapping(5, cache)).toBe("low"); // finds the text
       expect(lookupValueMappingFull(5, cache, "color")?.color).toBe("#ff0000");
+    });
+  });
+
+  describe("value-mapping regex safety", () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("matches a backtracking-prone pattern on a 1024-character value in linear time", () => {
+      const cache = buildValueMappingCache([
+        { type: "regex", pattern: "(a|aa)+$", text: "alt" },
+        { type: "regex", pattern: "(.*){12}!", text: "fixed" },
+        { type: "regex", pattern: "^(a+)+$", text: "nested" },
+      ]);
+      const start = performance.now();
+
+      expect(lookupValueMappingFull("a".repeat(1023) + "!", cache)?.text).toBe("fixed");
+      expect(lookupValueMappingFull("b".repeat(1024), cache)).toBeNull();
+      expect(performance.now() - start).toBeLessThan(500);
+    });
+
+    it("accepts and matches common email, host, version, path and pod-name patterns", () => {
+      const cases: [string, string, string][] = [
+        ["^[\\w.+-]+@([\\w-]+\\.)+[a-z]{2,}$", "ops@mail.example.com", "ops@example"],
+        ["^[a-z0-9-]+(\\.[a-z0-9-]+)*$", "api.eu-1.example.com", "api..example"],
+        ["^v?\\d+(\\.\\d+)*$", "v1.20.3", "v1.x"],
+        ["^(/[^/]+)+$", "/api/v1/logs", "/api//logs"],
+        ["^([a-z0-9]+-)+[a-z0-9]{5}$", "ingester-7f9c4-abcde", "ingester"],
+        ["^(\\d{1,3}\\.){3}\\d{1,3}$", "10.0.12.7", "10.0.12"],
+      ];
+      for (const [pattern, hit, miss] of cases) {
+        const cache = buildValueMappingCache([{ type: "regex", pattern, text: "hit" }]);
+        expect(lookupValueMapping(hit, cache)).toBe("hit");
+        expect(lookupValueMapping(miss, cache)).toBeNull();
+        expect(valueMappingPatternError(pattern)).toBeNull();
+      }
+    });
+
+    it("refuses lookaround and backreferences, which the linear-time engine cannot run", () => {
+      for (const pattern of ["^(?=.*err).*$", "(?<!x)err", "err(?!or)", "(a)\\1", "/(?=a)a/i"]) {
+        expect(valueMappingPatternError(pattern)).toBe("unsupported");
+      }
+    });
+
+    it("never matches an unsupported pattern at render and warns once per pattern", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const mappings = [{ type: "regex", pattern: "^(?=.*err).*$", text: "lookahead" }];
+
+      for (let i = 0; i < 3; i++) {
+        expect(lookupValueMapping("server error", buildValueMappingCache(mappings))).toBeNull();
+      }
+      expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps legacy /pattern/flags mappings working", () => {
+      expect(valueMappingPatternError("/^err/i")).toBeNull();
+      const cache = buildValueMappingCache([
+        { type: "regex", pattern: "/^ERR/i", text: "error" },
+        { type: "regex", pattern: "/^warn.end$/s", text: "warn" },
+        { type: "regex", pattern: "/^line2$/m", text: "multi" },
+        { type: "regex", pattern: "/\\/api\\/(?<ver>v\\d)/", text: "api" },
+      ]);
+
+      expect(lookupValueMapping("err_500", cache)).toBe("error");
+      expect(lookupValueMapping("warn\nend", cache)).toBe("warn");
+      expect(lookupValueMapping("line1\nline2", cache)).toBe("multi");
+      expect(lookupValueMapping("GET /api/v2/x", cache)).toBe("api");
+    });
+
+    it("rejects a pattern longer than 256 characters at save and skips it at render", () => {
+      const long = `${"a".repeat(300)}|^err`;
+
+      expect(valueMappingPatternError("a".repeat(256))).toBeNull();
+      expect(valueMappingPatternError(long)).toBe("tooLong");
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      expect(
+        lookupValueMapping(
+          "err_500",
+          buildValueMappingCache([{ type: "regex", pattern: long, text: "long" }]),
+        ),
+      ).toBeNull();
+    });
+
+    it("does not run a regex against a value longer than 1024 characters", () => {
+      const cache = buildValueMappingCache([{ type: "regex", pattern: "^a", text: "a-prefixed" }]);
+
+      expect(lookupValueMapping("a".repeat(1024), cache)).toBe("a-prefixed");
+      expect(lookupValueMapping("a".repeat(1025), cache)).toBeNull();
+    });
+
+    it("compiles each pattern when the cache is built, not per lookup", () => {
+      const compile = vi.spyOn(RE2JS, "compile");
+      const cache = buildValueMappingCache([{ type: "regex", pattern: "^err", text: "error" }]);
+      const afterBuild = compile.mock.calls.length;
+
+      for (let i = 0; i < 50; i++) lookupValueMapping(`err_${i}`, cache);
+
+      expect(afterBuild).toBe(1);
+      expect(compile.mock.calls.length).toBe(afterBuild);
+    });
+
+    it("gives the same answer on every lookup for a pattern with the g flag", () => {
+      const cache = buildValueMappingCache([{ type: "regex", pattern: "/err/g", text: "error" }]);
+
+      expect([1, 2, 3].map(() => lookupValueMapping("err", cache))).toEqual([
+        "error",
+        "error",
+        "error",
+      ]);
     });
   });
 
@@ -353,6 +465,167 @@ describe("tableConfigUtils", () => {
         },
       ]);
       expect(maps.fieldTypeMap.amount).toBe("text");
+    });
+  });
+
+  describe("value mapping — threshold ops + colors", () => {
+    it("matches gt/lt/gte/lte threshold mappings", () => {
+      const cache = buildValueMappingCache([
+        { type: "gt", value: "90", text: "High", color: "#f00" },
+      ]);
+      expect(lookupValueMapping(95, cache)).toBe("High");
+      expect(lookupValueMapping(50, cache)).toBeNull();
+      expect(lookupValueMappingFull(95, cache)?.color).toBe("#f00");
+    });
+    it("caches a mapping that only has a text color (no text/color)", () => {
+      const cache = buildValueMappingCache([{ type: "value", value: "1", textColor: "#0f0" }]);
+      expect(cache).not.toBeNull();
+      expect(lookupValueMappingFull(1, cache)?.textColor).toBe("#0f0");
+    });
+    it("resolves overlapping thresholds with last-match-wins (column-formatting parity)", () => {
+      // Both `>400` and `>1000` match 2301; the later mapping must win.
+      const cache = buildValueMappingCache([
+        { type: "gt", value: "400", text: "Warn", color: "#fa0" },
+        { type: "gt", value: "1000", text: "Critical", color: "#f00" },
+      ]);
+      expect(lookupValueMapping(2301, cache)).toBe("Critical");
+      expect(lookupValueMappingFull(2301, cache)?.color).toBe("#f00");
+      // Only the first threshold matches 500 → it wins by default.
+      expect(lookupValueMapping(500, cache)).toBe("Warn");
+    });
+  });
+
+  describe("resolveMetricValueStyle (mappings)", () => {
+    const base = {
+      mappings: undefined as any,
+      unit: "",
+      customUnit: "",
+      decimals: 2,
+      panelBackground: "",
+    };
+
+    it("falls back to formatted value, no text color, panel background", () => {
+      const r = resolveMetricValueStyle(100, { ...base, panelBackground: "#eee" });
+      expect(r.text).toContain("100");
+      expect(r.textColor).toBeUndefined();
+      expect(r.bgColor).toBe("#eee");
+    });
+
+    it("maps a value to a string with text color + background (color)", () => {
+      const r = resolveMetricValueStyle(1, {
+        ...base,
+        mappings: [{ type: "value", value: "1", text: "Up", textColor: "#fff", color: "#0f0" }],
+      });
+      expect(r.text).toBe("Up");
+      expect(r.textColor).toBe("#fff");
+      expect(r.bgColor).toBe("#0f0");
+    });
+
+    it("applies a threshold mapping's background (color) to a metric value", () => {
+      const r = resolveMetricValueStyle(95, {
+        ...base,
+        mappings: [{ type: "gte", value: "90", text: "High", color: "#900" }],
+      });
+      expect(r.text).toBe("High");
+      expect(r.bgColor).toBe("#900");
+    });
+
+    it("matches an exact mapping written against the displayed (rounded) value", () => {
+      // User sees "54.83" (decimals: 2) and maps Equals 54.83; raw value keeps
+      // full precision. The display-precision retry must bridge the gap.
+      const r = resolveMetricValueStyle(54.8347391, {
+        ...base,
+        mappings: [{ type: "value", value: "54.83", text: "Mapped", color: "#0a0" }],
+      });
+      expect(r.text).toBe("Mapped");
+      expect(r.bgColor).toBe("#0a0");
+    });
+
+    it("matches the padded displayed spelling (48.40) for a raw 48.4", () => {
+      const r = resolveMetricValueStyle(48.4, {
+        ...base,
+        mappings: [{ type: "value", value: "48.40", text: "Padded" }],
+      });
+      expect(r.text).toBe("Padded");
+    });
+
+    it("matches the normalized spelling (48.4) for a raw 48.4000001", () => {
+      const r = resolveMetricValueStyle(48.4000001, {
+        ...base,
+        mappings: [{ type: "value", value: "48.4", text: "Normalized" }],
+      });
+      expect(r.text).toBe("Normalized");
+    });
+
+    it("does not false-positive when the rounded value still differs", () => {
+      const r = resolveMetricValueStyle(54.9, {
+        ...base,
+        mappings: [{ type: "value", value: "54.83", text: "Mapped" }],
+      });
+      expect(r.text).not.toBe("Mapped");
+      expect(r.text).toContain("54.9");
+    });
+
+    it("prefers the raw exact match over the rounded retry", () => {
+      const r = resolveMetricValueStyle(100, {
+        ...base,
+        mappings: [
+          { type: "value", value: "100", text: "RawHit" },
+          { type: "value", value: "100.00", text: "RoundedHit" },
+        ],
+      });
+      expect(r.text).toBe("RawHit");
+    });
+  });
+
+  describe("backward compatibility (legacy mappings)", () => {
+    it("caches and matches a legacy value+color mapping (old requireField 'color')", () => {
+      const cache = buildValueMappingCache([
+        { type: "value", value: "1", text: "Up", color: "#16a34a" },
+      ]);
+      expect(cache).not.toBeNull();
+      expect(lookupValueMapping(1, cache)).toBe("Up");
+      // The pre-existing call shape (requireField: "color") still resolves.
+      expect(lookupValueMappingFull(1, cache, "color")?.color).toBe("#16a34a");
+    });
+
+    it("still matches legacy range and regex mappings", () => {
+      const range = buildValueMappingCache([{ type: "range", from: "0", to: "10", text: "Low" }]);
+      expect(lookupValueMapping(5, range)).toBe("Low");
+      const regex = buildValueMappingCache([{ type: "regex", pattern: "/err/i", text: "Error" }]);
+      expect(lookupValueMapping("server error", regex)).toBe("Error");
+    });
+
+    it("resolveMetricValueStyle with no mappings reproduces legacy metric output", () => {
+      // Old metric: unit-formatted value, background = panel background, no explicit
+      // text color (caller applies auto-contrast).
+      const r = resolveMetricValueStyle(7, {
+        mappings: undefined,
+        unit: "",
+        customUnit: "",
+        decimals: 2,
+        panelBackground: "#123456",
+      });
+      expect(r.text).toContain("7");
+      expect(r.textColor).toBeUndefined();
+      expect(r.bgColor).toBe("#123456");
+    });
+
+    it("resolveMetricValueStyle applies a legacy color mapping as background, no text color", () => {
+      const r = resolveMetricValueStyle(1, {
+        mappings: [{ type: "value", value: "1", text: "Up", color: "#16a34a" }],
+        unit: "",
+        customUnit: "",
+        decimals: 2,
+        panelBackground: "",
+      });
+      expect(r.text).toBe("Up");
+      expect(r.bgColor).toBe("#16a34a");
+      expect(r.textColor).toBeUndefined();
+    });
+
+    it("ignores a mapping that has neither text nor any color (unchanged)", () => {
+      expect(buildValueMappingCache([{ type: "value", value: "5" }])).toBeNull();
     });
   });
 });

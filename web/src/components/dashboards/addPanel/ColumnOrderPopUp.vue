@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Drag handle -->
           <div
-            class="mr-2 flex cursor-move items-center px-1"
+            class="me-2 flex cursor-move items-center px-1"
             data-test="dashboard-column-order-drag-handle"
           >
             <OIcon
@@ -84,15 +84,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Column name -->
-          <div
-            class="text-compact flex-1 overflow-hidden font-medium text-ellipsis whitespace-nowrap"
+          <OTruncatedText
+            as="div"
+            class="text-compact flex-1 font-medium"
             data-test="dashboard-column-order-column-name"
           >
             {{ column }}
-          </div>
+          </OTruncatedText>
 
           <!-- Actions -->
-          <div class="ml-2 flex gap-0.5" data-test="dashboard-column-order-column-actions">
+          <div class="ms-2 flex gap-0.5" data-test="dashboard-column-order-column-actions">
             <OButton
               variant="ghost"
               size="icon"
@@ -122,16 +123,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { VueDraggableNext } from "vue-draggable-next";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 export default defineComponent({
   name: "ColumnOrderPopUp",
   components: {
+    OTruncatedText,
     draggable: VueDraggableNext as any,
     OButton,
     ODialog,
@@ -154,7 +157,7 @@ export default defineComponent({
   },
   emits: ["cancel", "save"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const editColumnOrder = ref<string[]>([]);
 
     // Drag options

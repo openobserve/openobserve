@@ -37,6 +37,7 @@ use crate::{
     errors::*,
 };
 
+pub mod ai_sessions;
 mod scheduler;
 
 pub use scheduler::select_best_node;
@@ -425,15 +426,13 @@ pub async fn check_nodes_status(client: &reqwest::Client) -> Result<()> {
                 node.name,
                 node.http_addr
             );
-            let mut w = NODES_HEALTH_CHECK.write().await;
-            let Some(entry) = w.get_mut(&node.uuid) else {
-                // node haven't been added to the cluster yet, when the health check first succeed,
-                // it will be added to the check map
-                continue;
+            // count never-healthy peers too, or one that died during our startup is never removed
+            let times = {
+                let mut w = NODES_HEALTH_CHECK.write().await;
+                let entry = w.entry(node.uuid.clone()).or_insert(0);
+                *entry += 1;
+                *entry
             };
-            *entry += 1;
-            let times = *entry;
-            drop(w);
 
             if times >= cfg.health_check.failed_times {
                 log::error!(
@@ -542,6 +541,18 @@ pub async fn get_cached_online_querier_nodes(group: Option<RoleGroup>) -> Option
     let nodes =
         get_cached_nodes(|node| node.status == NodeStatus::Online && node.is_querier()).await;
     filter_nodes_with_group(nodes, group)
+}
+
+/// Online nodes carrying the `scheduler` role.
+///
+/// Exists because the maintenance sweeps have to elect their leader from the
+/// same set the job runs on. Electing from the querier list instead — which is
+/// what they did — is invisible on a single `all`-role node and permanently
+/// false anywhere `scheduler` is a role of its own, because such a node is
+/// never in that list and so can never be the first uuid in it.
+#[inline]
+pub async fn get_cached_online_alert_manager_nodes() -> Option<Vec<Node>> {
+    get_cached_nodes(|node| node.status == NodeStatus::Online && node.is_scheduler()).await
 }
 
 #[inline]
@@ -794,5 +805,31 @@ mod tests {
         nodes.sort();
         assert_eq!(nodes.len(), 3);
         assert_eq!(nodes, vec!["node-q-2", "node-q-5", "node-q-8"]);
+    }
+
+    #[tokio::test]
+    async fn test_check_nodes_status_removes_never_healthy_node() {
+        let uuid = "test-never-healthy-node".to_string();
+        let dead = Node {
+            uuid: uuid.clone(),
+            name: "dead-ingester".to_string(),
+            http_addr: "http://127.0.0.1:1".to_string(),
+            role: vec![Role::Ingester],
+            status: NodeStatus::Online,
+            ..LOCAL_NODE.clone()
+        };
+        add_node_to_cache(dead).await;
+        assert!(!NODES_HEALTH_CHECK.read().await.contains_key(&uuid));
+
+        let client = reqwest::Client::new();
+        let failed_times = get_config().health_check.failed_times;
+        for _ in 1..failed_times {
+            check_nodes_status(&client).await.unwrap();
+        }
+        assert!(get_node_by_uuid(&uuid).await.is_some());
+
+        check_nodes_status(&client).await.unwrap();
+        assert!(get_node_by_uuid(&uuid).await.is_none());
+        assert!(!NODES_HEALTH_CHECK.read().await.contains_key(&uuid));
     }
 }

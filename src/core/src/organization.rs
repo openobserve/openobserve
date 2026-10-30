@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    DEFAULT_ORG, ider,
+    DEFAULT_ORG, META_ORG_ID, ider,
     meta::{
         alerts::alert::ListAlertsParams,
         dashboards::ListDashboardsParams,
@@ -61,6 +61,8 @@ use crate::{
 };
 
 const MASKED_TOKEN: &str = "NOT_AVAILABLE";
+// API version and public dashboard route prefixes: such an org id makes `/api/<id>/` ambiguous.
+const RESERVED_ORG_IDS: [&str; 4] = ["v1", "v2", "v3", "public_dashboards"];
 
 /// Checks if a service account token should be masked
 /// Returns true if:
@@ -129,6 +131,7 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
             stream_summary.total_storage_size += stream.stats.storage_size;
             stream_summary.total_compressed_size += stream.stats.compressed_size;
             stream_summary.total_index_size += stream.stats.index_size;
+            stream_summary.total_mindex_size += stream.stats.mindex_size;
         }
     }
 
@@ -199,19 +202,6 @@ pub async fn get_passcode(
     user_id: &str,
 ) -> Result<IngestionPasscode, anyhow::Error> {
     get_passcode_inner(org_id, user_id, false).await
-}
-
-/// Read a service account's own API token.
-///
-/// Unlike [`get_passcode`], this never returns the org-level "default"
-/// ingestion token (`o2oi_`-prefixed). A service account authenticates as
-/// itself and is authorized by its assigned role/group — its token is its own
-/// credential, not the org-wide ingestion token.
-pub async fn get_service_account_passcode(
-    org_id: Option<&str>,
-    user_id: &str,
-) -> Result<IngestionPasscode, anyhow::Error> {
-    get_passcode_inner(org_id, user_id, true).await
 }
 
 async fn get_passcode_inner(
@@ -401,15 +391,36 @@ pub async fn list_all_orgs(limit: Option<i64>) -> Result<Vec<Organization>, anyh
     db::organization::list(limit).await
 }
 
+/// Same as [`list_all_orgs`], paired with each org's creation time in microseconds.
+pub async fn list_all_orgs_with_created_at(
+    limit: Option<i64>,
+) -> Result<Vec<(Organization, i64)>, anyhow::Error> {
+    db::organization::list_with_created_at(limit).await
+}
+
 pub async fn list_orgs_by_user(user_email: &str) -> Result<Vec<Organization>, anyhow::Error> {
+    Ok(list_orgs_by_user_with_created_at(user_email)
+        .await?
+        .into_iter()
+        .map(|(org, _)| org)
+        .collect())
+}
+
+/// Same as [`list_orgs_by_user`], paired with each org's (not the membership's) creation time.
+pub async fn list_orgs_by_user_with_created_at(
+    user_email: &str,
+) -> Result<Vec<(Organization, i64)>, anyhow::Error> {
     let records = db::org_users::list_orgs_by_user(user_email).await?;
     Ok(records
         .into_iter()
-        .map(|record| Organization {
-            identifier: record.org_id.clone(),
-            name: record.org_name.clone(),
-            org_type: record.org_type.to_string(),
-            service_account: None,
+        .map(|record| {
+            let org = Organization {
+                identifier: record.org_id,
+                name: record.org_name,
+                org_type: record.org_type.to_string(),
+                service_account: None,
+            };
+            (org, record.org_created_at)
         })
         .collect())
 }
@@ -565,8 +576,7 @@ pub async fn create_org(
                 );
             }
             if let Err(e) =
-                infra::table::synthetics_probe_tokens::create_for_org(&org.identifier, user_email)
-                    .await
+                crate::synthetics::create_default_probe_token(&org.identifier, user_email).await
             {
                 log::error!(
                     "Failed to create synthetics probe token for org '{}': {e}",
@@ -675,6 +685,21 @@ pub async fn create_org(
                         org.identifier
                     );
                 }
+                crate::alerts::alert_calibration::ensure_org_config(&org.identifier).await;
+            }
+            // Best-effort — the compiled-in fallback (design §4.4) covers the
+            // race if this fails or the backfill hasn't run yet; never block
+            // org creation on it.
+            if let Err(e) = crate::alerts::notifications::org_default::set_org_default_template(
+                &org.identifier,
+                crate::alerts::notifications::default_template::DEFAULT_CONTENT_TEMPLATE_NAME,
+            )
+            .await
+            {
+                log::warn!(
+                    "Failed to set default_alert_template for org '{}': {e}",
+                    org.identifier
+                );
             }
             #[cfg(feature = "cloud")]
             enqueue_cloud_event(CloudEvent {
@@ -737,13 +762,67 @@ pub async fn create_org(
     }
 }
 
+/// Auto-provisioned orgs take their identifier verbatim from a URL path or an IdP claim, unlike
+/// [`create_org`] which validates the name and assigns a generated identifier. The identifier then
+/// flows into object store keys, headers and log lines, so restrict it to the same character set
+/// the rest of the system can carry safely.
+fn validate_auto_created_org_id(org_id: &str) -> Result<(), anyhow::Error> {
+    if org_id.is_empty() {
+        return Err(anyhow::anyhow!("Organization identifier cannot be empty"));
+    }
+    if !org_id
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        return Err(anyhow::anyhow!(
+            "Organization identifier can only contain alphanumeric characters (A-Z, a-z, 0-9), hyphens, and underscores"
+        ));
+    }
+    if RESERVED_ORG_IDS
+        .iter()
+        .any(|reserved| org_id.eq_ignore_ascii_case(reserved))
+    {
+        return Err(anyhow::anyhow!(
+            "Organization identifier {org_id} is reserved"
+        ));
+    }
+    if let Some(violation) = infra::file_list::org_id_violation(org_id) {
+        return Err(anyhow::anyhow!(violation));
+    }
+    Ok(())
+}
+
+/// Refuses blocked or tombstoned ids, so auto-provisioning never revives a deleted org.
+async fn refuse_deleted_org(org_id: &str) -> Result<(), anyhow::Error> {
+    let tombstoned = || async {
+        table::organizations::get(org_id)
+            .await
+            .is_ok_and(|org| org.status == "deleted")
+    };
+    if db::org_status::is_blocked(org_id) || tombstoned().await {
+        return Err(anyhow::anyhow!("Organization {org_id} is deleted"));
+    }
+    Ok(())
+}
+
+/// Refuses an invite into a missing org or one that is being deleted or deleted.
+#[cfg(any(feature = "cloud", test))]
+async fn refuse_inactive_invite_org(org_id: &str) -> Result<(), anyhow::Error> {
+    if !db::org_status::is_active(org_id).await {
+        return Err(anyhow::anyhow!("Organization is not active"));
+    }
+    Ok(())
+}
+
 /// Checks if the org exists, otherwise creates the org. Does not associate any user
 /// with the org, only saves the org in the meta and creates org tuples.
 pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::Error> {
     let org_id = org_id.trim();
+    refuse_deleted_org(org_id).await?;
     if let Some(org) = get_org(org_id).await {
         return Ok(org);
     }
+    validate_auto_created_org_id(org_id)?;
 
     let org = &Organization {
         identifier: org_id.to_owned(),
@@ -758,6 +837,8 @@ pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::
     match db::organization::save_org(org).await {
         Ok(_) => {
             save_org_tuples(&org.identifier).await;
+            #[cfg(feature = "enterprise")]
+            crate::alerts::alert_calibration::ensure_org_config(&org.identifier).await;
             #[cfg(feature = "cloud")]
             enqueue_cloud_event(CloudEvent {
                 org_id: org.identifier.clone(),
@@ -778,8 +859,7 @@ pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::
                 );
             }
             if let Err(e) =
-                infra::table::synthetics_probe_tokens::create_for_org(&org.identifier, "system")
-                    .await
+                crate::synthetics::create_default_probe_token(&org.identifier, "system").await
             {
                 log::error!(
                     "Failed to create synthetics probe token for org '{}': {e}",
@@ -799,9 +879,11 @@ pub async fn check_and_create_org_without_ofga(
     org_id: &str,
 ) -> Result<Organization, anyhow::Error> {
     let org_id = org_id.trim();
+    refuse_deleted_org(org_id).await?;
     if let Some(org) = get_org(org_id).await {
         return Ok(org);
     }
+    validate_auto_created_org_id(org_id)?;
 
     let org = &Organization {
         identifier: org_id.to_owned(),
@@ -824,8 +906,7 @@ pub async fn check_and_create_org_without_ofga(
                 );
             }
             if let Err(e) =
-                infra::table::synthetics_probe_tokens::create_for_org(&org.identifier, "system")
-                    .await
+                crate::synthetics::create_default_probe_token(&org.identifier, "system").await
             {
                 log::error!(
                     "Failed to create synthetics probe token for org '{}': {e}",
@@ -885,6 +966,9 @@ pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
     if org_id.eq(DEFAULT_ORG) {
         return Err(anyhow::anyhow!("Cannot delete default organization"));
     }
+    if org_id.eq(META_ORG_ID) {
+        return Err(anyhow::anyhow!("Cannot delete meta organization"));
+    }
 
     // Snapshot the org BEFORE deleting — the cloud OrgDeleted event needs its
     // name/type, and after delete_org the record is gone. (Previously this was
@@ -895,7 +979,9 @@ pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
 
     match db::organization::delete_org(org_id).await {
         Ok(_) => {
-            delete_org_tuples(org_id).await;
+            // Returned after the event: a retry finds no row, so it would never emit it.
+            let tuples = delete_org_tuples(org_id).await;
+            crate::ingestion::rejections::clear_rejections(org_id).await;
             #[cfg(feature = "cloud")]
             if let Some(org) = org_snapshot {
                 enqueue_cloud_event(CloudEvent {
@@ -909,13 +995,43 @@ pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
                 })
                 .await;
             }
-            Ok(())
+            tuples
         }
         Err(e) => {
             log::error!("Error deleting org: {e}");
             Err(anyhow::anyhow!("Error deleting org: {}", e))
         }
     }
+}
+
+/// Final org-delete step: keeps the row as a `deleted` tombstone; true only on the flipping call.
+pub async fn tombstone_org(org_id: &str) -> Result<bool, anyhow::Error> {
+    if org_id.eq(DEFAULT_ORG) || org_id.eq(META_ORG_ID) {
+        return Err(anyhow::anyhow!("Cannot delete this organization"));
+    }
+
+    #[cfg(feature = "cloud")]
+    let org_snapshot = get_org(org_id).await;
+
+    delete_org_tuples(org_id).await?;
+    // Only the call that flips the row emits OrgDeleted, so a step 900 retry does not repeat it.
+    let flipped = db::organization::tombstone_org(org_id).await?;
+    #[cfg(feature = "cloud")]
+    if flipped && let Some(org) = org_snapshot {
+        enqueue_cloud_event(CloudEvent {
+            org_id: org.identifier.clone(),
+            org_name: org.name.clone(),
+            org_type: org.org_type.clone(),
+            user: None,
+            subscription_type: None,
+            event: EventType::OrgDeleted,
+            stream_name: None,
+        })
+        .await;
+    }
+    db::organization::evict_org(org_id).await?;
+    crate::ingestion::rejections::clear_rejections(org_id).await;
+    Ok(flipped)
 }
 
 #[cfg(feature = "cloud")]
@@ -969,6 +1085,7 @@ pub async fn generate_invitation(
             None => return Err(anyhow::anyhow!("Unauthorized access")),
         }
     }
+
     for invitee in &invites.invites {
         match get_user(Some(org_id), invitee).await {
             None => {}
@@ -1078,6 +1195,7 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
         return Err(anyhow::anyhow!("Invalid token"));
     }
     let org_id = invite.org_id.clone();
+    refuse_inactive_invite_org(&org_id).await?;
 
     let org = match get_org(&org_id).await {
         Some(org) => org,
@@ -1110,6 +1228,19 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
 
     // Check if user is already part of the org
     if get_cached_user_org(&org_id, user_email).is_some() {
+        // if already part of org, one way or other, mark as accepted
+        log::info!(
+            "user {user_email} is already part of {org_id} but tried to accept invite, marking it as accepted"
+        );
+        if let Err(e) = org_invites::update_invite_status(
+            invite_token,
+            &user_email.to_lowercase(),
+            OrgInviteStatus::Accepted,
+        )
+        .await
+        {
+            log::error!("Error updating the invite status in the db: {e}");
+        }
         return Ok(()); // User is already part of the org
     }
 
@@ -1247,6 +1378,13 @@ fn sre_agent_email(org_id: &str) -> String {
     format!("{O2_SRE_AGENT_EMAIL_PREFIX}{org_id}{O2_SRE_AGENT_EMAIL_SUFFIX}").to_lowercase()
 }
 
+/// Serializes [ensure_sys_rca_agent] on this node. Concurrent first analyses of a new org would
+/// otherwise both take the not-found branch, and one would delete the account the other was
+/// creating, failing its run with "SysRcaAgent SA not found".
+#[cfg(feature = "enterprise")]
+static ENSURE_SYS_RCA_AGENT: std::sync::LazyLock<tokio::sync::Mutex<()>> =
+    std::sync::LazyLock::new(|| tokio::sync::Mutex::new(()));
+
 /// Ensures the SysRcaAgent service account exists for the given org, creating it if needed.
 /// Idempotent: returns Ok(()) immediately if the account already exists.
 #[cfg(feature = "enterprise")]
@@ -1257,42 +1395,51 @@ pub async fn ensure_sys_rca_agent(org_id: &str) -> Result<(), anyhow::Error> {
     use crate::users::create_service_account_if_not_exists;
 
     let email = sre_agent_email(org_id);
+    // Held only while provisioning: the FGA calls below are idempotent and may be slow.
+    {
+        let _serial = ENSURE_SYS_RCA_AGENT.lock().await;
 
-    // Only create the DB record if the account doesn't exist yet.
-    match db::org_users::get(org_id, &email).await {
-        Ok(_) => {
-            // Account already exists, skip creation
-        }
-        Err(err) => {
-            // Only treat genuine "not found" errors as missing accounts
-            // Other DB errors should bubble up rather than triggering creation
-            if err.to_string().contains("User not found") {
-                // Drop any orphaned mixed-case row in `users` left over from a
-                // pre-fix run. `db::user::delete` is case-insensitive at the
-                // table layer and also fans out a cluster-wide invalidation so
-                // the in-mem user cache (and super_cluster) drop the stale row
-                // — `table::users::remove` would skip both. Safe to call
-                // unconditionally: we only reach this branch when there's no
-                // `org_users` row, meaning any matching `users` row is
-                // unreferenced.
-                db::user::delete(&email).await?;
-                create_service_account_if_not_exists(&email).await?;
+        // Only create the DB record if the account doesn't exist yet.
+        match db::org_users::get(org_id, &email).await {
+            Ok(_) => {
+                // Account already exists, skip creation
+            }
+            Err(err) => {
+                // Only treat genuine "not found" errors as missing accounts
+                // Other DB errors should bubble up rather than triggering creation
+                if err.to_string().contains("User not found") {
+                    // Drop an orphaned mixed-case row in `users` left over from a pre-fix run.
+                    // `db::user::delete` is case-insensitive at the table layer and also fans
+                    // out a cluster-wide invalidation so the in-mem user cache (and
+                    // super_cluster) drop the stale row — `table::users::remove` would skip
+                    // both. Only a row whose stored email differs in case is such an orphan:
+                    // a lowercase row is this account, possibly being created by a concurrent
+                    // call on another node, and deleting it (with its memberships) would break
+                    // that call.
+                    if db::user::get_user_record(&email)
+                        .await
+                        .is_ok_and(|user| user.email != email)
+                    {
+                        db::user::delete(&email).await?;
+                    }
+                    create_service_account_if_not_exists(&email).await?;
 
-                let token = generate_random_string(32);
-                let rum_token = format!("rum{}", generate_random_string(16));
+                    let token = generate_random_string(32);
+                    let rum_token = format!("rum{}", generate_random_string(16));
 
-                db::org_users::add_with_flags(
-                    org_id,
-                    &email,
-                    UserRole::SreAgent,
-                    &token,
-                    Some(rum_token),
-                    true,
-                )
-                .await?;
-            } else {
-                // Return the original error for non-"not found" failures
-                return Err(err);
+                    db::org_users::add_with_flags(
+                        org_id,
+                        &email,
+                        UserRole::SreAgent,
+                        &token,
+                        Some(rum_token),
+                        true,
+                    )
+                    .await?;
+                } else {
+                    // Return the original error for non-"not found" failures
+                    return Err(err);
+                }
             }
         }
     }
@@ -1465,5 +1612,96 @@ mod tests {
     fn test_should_mask_token_no_org() {
         // Without an org context, masking is never applied
         assert!(!should_mask_token(None, "user@example.com"));
+    }
+
+    #[test]
+    fn test_validate_auto_created_org_id_accepts_identifiers() {
+        for org_id in [
+            "default",
+            "_meta",
+            "acme-corp",
+            "team_1",
+            "Org2",
+            "v4",
+            "v2org",
+            "api_v2",
+        ] {
+            assert!(
+                validate_auto_created_org_id(org_id).is_ok(),
+                "expected {org_id} to be accepted"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_remove_org_refuses_meta_org() {
+        let err = remove_org(META_ORG_ID).await.unwrap_err();
+        assert_eq!(err.to_string(), "Cannot delete meta organization");
+    }
+
+    #[tokio::test]
+    async fn test_accept_invitation_rejects_non_active_org() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+
+        let org = "invitegateorg";
+        let _ = infra_db::create_table().await;
+        let _ = infra_table::create_user_tables().await;
+        check_and_create_org_without_ofga(org).await.unwrap();
+        refuse_inactive_invite_org(org).await.unwrap();
+        for status in [
+            OrgStatus::PendingDeletion,
+            OrgStatus::Deleting,
+            OrgStatus::Deleted,
+        ] {
+            ORG_STATUS_CACHE.insert(org.to_string(), status.clone());
+            let refused = refuse_inactive_invite_org(org).await;
+            ORG_STATUS_CACHE.remove(org);
+            assert!(
+                refused.is_err(),
+                "an invite into a {status:?} org was accepted"
+            );
+        }
+        assert!(
+            refuse_inactive_invite_org("invitegate-never-created")
+                .await
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn test_validate_auto_created_org_id_rejects_unsafe_identifiers() {
+        // Non-ascii, control bytes, path separators and spaces all reach object store keys,
+        // headers and log lines verbatim when an org is auto-provisioned.
+        for org_id in ["", "Q\u{b4}\u{ed}\u{cd}j", "a\u{11}b", "a/b", "a b", "a.b"] {
+            assert!(
+                validate_auto_created_org_id(org_id).is_err(),
+                "expected {org_id:?} to be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn test_validate_auto_created_org_id_follows_the_org_column_limit() {
+        let fits = "o".repeat(infra::file_list::ORG_ID_MAX_LEN);
+        assert!(validate_auto_created_org_id(&fits).is_ok());
+        let long_org = format!("{fits}o");
+        let bounded = infra::file_list::org_id_violation(&long_org).is_some();
+        assert_eq!(validate_auto_created_org_id(&long_org).is_err(), bounded);
+    }
+
+    #[test]
+    fn test_validate_auto_created_org_id_rejects_api_version_prefixes() {
+        for org_id in ["v1", "v2", "v3", "V2"] {
+            let err = validate_auto_created_org_id(org_id).unwrap_err();
+            assert!(err.to_string().contains("reserved"), "{org_id}: {err}");
+        }
+    }
+
+    #[test]
+    fn test_validate_auto_created_org_id_rejects_the_public_dashboards_prefix() {
+        for org_id in ["public_dashboards", "Public_Dashboards"] {
+            let err = validate_auto_created_org_id(org_id).unwrap_err();
+            assert!(err.to_string().contains("reserved"), "{org_id}: {err}");
+        }
     }
 }

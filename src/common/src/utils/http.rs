@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    io::Error,
-    net::{AddrParseError, IpAddr, SocketAddr},
-};
+use std::io::Error;
 
 use axum::http::header::{HeaderMap, HeaderName};
 use config::meta::{
@@ -25,7 +22,11 @@ use config::meta::{
     stream::StreamType,
 };
 use hashbrown::{HashMap, HashSet};
-use opentelemetry::{global, propagation::Extractor, trace::TraceContextExt};
+use opentelemetry::{
+    global,
+    propagation::Extractor,
+    trace::{TraceContextExt, TraceId},
+};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 #[inline(always)]
@@ -57,9 +58,32 @@ pub fn get_search_type_from_request(
 ) -> Result<Option<SearchEventType>, Error> {
     query
         .get("search_type")
-        .map(|s| SearchEventType::try_from(s.as_str()))
+        .map(|s| s.parse::<SearchEventType>())
         .transpose()
-        .map_err(Error::other)
+        .map_err(Error::other)?
+        .map(client_search_type)
+        .transpose()
+}
+
+/// The body's search type, else the URL's; either is refused when only the server may set it.
+pub fn get_client_search_type(
+    body: Option<SearchEventType>,
+    query: &HashMap<String, String>,
+) -> Result<Option<SearchEventType>, Error> {
+    match body {
+        Some(search_type) => client_search_type(search_type).map(Some),
+        None => get_search_type_from_request(query),
+    }
+}
+
+/// Only the public dashboard build runs as `public_dashboard`, which takes the build slots.
+pub fn client_search_type(search_type: SearchEventType) -> Result<SearchEventType, Error> {
+    if search_type == SearchEventType::PublicDashboard {
+        return Err(Error::other(
+            "invalid SearchEventType `public_dashboard`, it is set only by public dashboards",
+        ));
+    }
+    Ok(search_type)
 }
 
 #[inline(always)]
@@ -141,6 +165,8 @@ pub fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) -> Stri
         && trace_id_str.chars().all(|c| c.is_ascii_hexdigit())
         && !trace_id_str.chars().all(|c| c == '0')
     {
+        // the W3C propagator rejects uppercase traceparent fields, so normalize
+        let trace_id_str = trace_id_str.to_ascii_lowercase();
         // Set as parent context if tracing is enabled
         if cfg.common.should_create_span() && !span.is_none() {
             // Check for x-openobserve-span-id header (parent span ID from RUM SDK)
@@ -152,7 +178,7 @@ pub fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) -> Stri
                 && !span_id_str.chars().all(|c| c == '0')
             {
                 // Use the provided span ID from RUM SDK
-                span_id_str.to_string()
+                span_id_str.to_ascii_lowercase()
             } else {
                 // Generate a new span ID if not provided or invalid
                 config::ider::generate_span_id()
@@ -165,7 +191,7 @@ pub fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) -> Stri
             let parent_ctx = global::get_text_map_propagator(|prop| prop.extract(&headers_map));
             let _ = span.set_parent(parent_ctx);
         }
-        return trace_id_str.to_string();
+        return trace_id_str;
     }
 
     // Check for traceparent header (W3C standard)
@@ -175,7 +201,7 @@ pub fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) -> Stri
             let ctx = global::get_text_map_propagator(|propagator| {
                 propagator.extract(&RequestHeaderExtractor::new(headers))
             });
-            let trace_id = ctx.span().span_context().trace_id().to_string();
+            let trace_id = span_trace_id_or_fresh(ctx.span().span_context().trace_id());
             if !span.is_none() {
                 let _ = span.set_parent(ctx);
             }
@@ -199,29 +225,10 @@ pub fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) -> Stri
             config::ider::generate_trace_id()
         }
     } else if !span.is_none() {
-        span.context().span().span_context().trace_id().to_string()
+        span_trace_id_or_fresh(span.context().span().span_context().trace_id())
     } else {
         config::ider::generate_trace_id()
     }
-}
-
-/// This function can handle IPv4 and IPv6 addresses which may have port numbers appended
-pub fn parse_ip_addr(ip_address: &str) -> Result<(IpAddr, Option<u16>), AddrParseError> {
-    let mut port: Option<u16> = None;
-    let ip = ip_address.parse::<IpAddr>().or_else(|_| {
-        ip_address
-            .parse::<SocketAddr>()
-            .map(|sock_addr| {
-                port = Some(sock_addr.port());
-                sock_addr.ip()
-            })
-            .map_err(|e| {
-                log::error!("Error parsing IP address: {}, {}", ip_address, e);
-                e
-            })
-    })?;
-
-    Ok((ip, port))
 }
 
 // Extractor for request headers
@@ -274,6 +281,15 @@ pub fn get_dashboard_info_from_request(query: &HashMap<String, String>) -> Optio
         tab_id,
         tab_name,
     })
+}
+
+/// A span without an OpenTelemetry context reports an all-zero id that every request would share.
+fn span_trace_id_or_fresh(trace_id: TraceId) -> String {
+    if trace_id == TraceId::INVALID {
+        config::ider::generate_trace_id()
+    } else {
+        trace_id.to_string()
+    }
 }
 
 #[cfg(test)]
@@ -342,6 +358,32 @@ mod tests {
     }
 
     #[test]
+    fn a_client_cannot_name_the_public_dashboard_search_type() {
+        let mut query = HashMap::<String, String>::new();
+        for name in ["public_dashboard", "publicdashboard", "Public_Dashboard"] {
+            query.insert("search_type".to_string(), name.to_string());
+            let err = get_search_type_from_request(&query).unwrap_err();
+            assert!(
+                err.to_string().contains("public_dashboard"),
+                "{name}: {err}"
+            );
+        }
+        let body = Some(SearchEventType::PublicDashboard);
+        assert!(get_client_search_type(body, &HashMap::new()).is_err());
+
+        query.insert("search_type".to_string(), "dashboards".to_string());
+        let body = Some(SearchEventType::UI);
+        assert_eq!(
+            get_client_search_type(body, &query).unwrap(),
+            Some(SearchEventType::UI)
+        );
+        assert_eq!(
+            get_client_search_type(None, &query).unwrap(),
+            Some(SearchEventType::Dashboards)
+        );
+    }
+
+    #[test]
     fn test_get_search_event_context_from_request() {
         let f = get_search_event_context_from_request;
         let mut query = HashMap::<String, String>::new();
@@ -396,39 +438,6 @@ mod tests {
 
         let query = Query::<HashMap<String, String>>(Default::default());
         assert_eq!(get_folder(&query), config::meta::folder::DEFAULT_FOLDER);
-    }
-
-    #[test]
-    fn test_parse_ip_addr() {
-        let ip_port_exp_map = [
-            (
-                "192.168.1.1",
-                "192.168.1.1".parse::<IpAddr>().unwrap(),
-                None,
-            ),
-            (
-                "192.168.1.1:8080",
-                "192.168.1.1".parse::<IpAddr>().unwrap(),
-                Some(8080),
-            ),
-            (
-                "2001:db8::1",
-                "2001:db8::1".parse::<IpAddr>().unwrap(),
-                None,
-            ),
-            (
-                "[2001:db8::1]:8080",
-                "2001:db8::1".parse::<IpAddr>().unwrap(),
-                Some(8080),
-            ),
-        ];
-
-        for (ip, exp_ip, exp_port) in ip_port_exp_map {
-            assert_eq!(parse_ip_addr(ip).unwrap(), (exp_ip, exp_port));
-        }
-
-        // Test invalid IP
-        assert!(parse_ip_addr("invalid").is_err());
     }
 
     #[test]
@@ -555,6 +564,54 @@ mod tests {
     }
 
     #[test]
+    fn test_get_or_create_trace_id_replaces_an_unset_span_trace_id() {
+        struct EnabledSubscriber;
+        impl tracing::Subscriber for EnabledSubscriber {
+            fn enabled(&self, _: &tracing::Metadata<'_>) -> bool {
+                true
+            }
+            fn new_span(&self, _: &tracing::span::Attributes<'_>) -> tracing::span::Id {
+                tracing::span::Id::from_u64(1)
+            }
+            fn record(&self, _: &tracing::span::Id, _: &tracing::span::Record<'_>) {}
+            fn record_follows_from(&self, _: &tracing::span::Id, _: &tracing::span::Id) {}
+            fn event(&self, _: &tracing::Event<'_>) {}
+            fn enter(&self, _: &tracing::span::Id) {}
+            fn exit(&self, _: &tracing::span::Id) {}
+        }
+
+        tracing::subscriber::with_default(EnabledSubscriber, || {
+            let span = tracing::info_span!("request");
+            assert!(!span.is_none());
+            assert_eq!(
+                span.context().span().span_context().trace_id(),
+                TraceId::INVALID
+            );
+            let trace_id = get_or_create_trace_id(&HeaderMap::new(), &span);
+            assert_eq!(trace_id.len(), 32);
+            assert!(!trace_id.chars().all(|c| c == '0'), "{trace_id}");
+            assert_ne!(trace_id, get_or_create_trace_id(&HeaderMap::new(), &span));
+        });
+        let valid = TraceId::from_hex("4bf92f3577b34da6a3ce929d0e0e4736").unwrap();
+        assert_eq!(
+            span_trace_id_or_fresh(valid),
+            "4bf92f3577b34da6a3ce929d0e0e4736"
+        );
+    }
+
+    #[test]
+    fn test_get_or_create_trace_id_lowercases_rum_header() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static("x-openobserve-trace-id"),
+            HeaderValue::from_static("01A05C4446CC71AC872A7B594BCDC883"),
+        );
+        let span = tracing::Span::none();
+        let trace_id = get_or_create_trace_id(&headers, &span);
+        assert_eq!(trace_id, "01a05c4446cc71ac872a7b594bcdc883");
+    }
+
+    #[test]
     #[ignore]
     fn test_get_or_create_trace_id_manual_parse_valid() {
         // Test manual parsing of valid traceparent
@@ -597,19 +654,6 @@ mod tests {
         // Should generate new trace ID for malformed header
         assert_eq!(trace_id.len(), 32);
         assert!(trace_id.chars().all(|c| c.is_ascii_hexdigit()));
-    }
-
-    #[test]
-    fn test_get_or_create_trace_id_openobserve_header_valid() {
-        // Test x-openobserve-trace-id header with valid trace ID
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            HeaderName::from_static("x-openobserve-trace-id"),
-            HeaderValue::from_static("4bf92f3577b34da6a3ce929d0e0e4736"),
-        );
-        let span = tracing::Span::none();
-        let trace_id = get_or_create_trace_id(&headers, &span);
-        assert_eq!(trace_id, "4bf92f3577b34da6a3ce929d0e0e4736");
     }
 
     #[test]

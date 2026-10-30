@@ -21,7 +21,10 @@ use serde::{Deserialize, Deserializer, Serialize};
 use strum::Display;
 use utoipa::ToSchema;
 
-use crate::{meta::search::SearchEventType, stats::MemorySize};
+use crate::{
+    meta::search::{SearchEventContext, SearchEventType},
+    stats::MemorySize,
+};
 
 /// Custom deserializer that accepts either a comma-separated string or a string array
 fn deserialize_string_or_vec<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
@@ -66,7 +69,10 @@ where
 }
 
 pub mod grpc;
+pub mod index;
 pub mod value;
+
+pub use index::MetricsBlockScan;
 
 pub const NAME_LABEL: &str = "__name__";
 pub const TYPE_LABEL: &str = "__type__";
@@ -76,6 +82,55 @@ pub const BUCKET_LABEL: &str = "le";
 pub const QUANTILE_LABEL: &str = "quantile";
 pub const METADATA_LABEL: &str = "prom_metadata"; // for schema metadata key
 pub const EXEMPLARS_LABEL: &str = "exemplars";
+/// Prometheus' staleness-marker NaN; an ordinary NaN is not stale.
+pub const STALE_NAN_BITS: u64 = 0x7ff0_0000_0000_0002;
+/// Exemplars live in a stream of their own next to the metric, never in its sample rows.
+pub const EXEMPLARS_STREAM_SUFFIX: &str = "_exemplars";
+/// The stream a histogram's buckets degrade into; `le` on it is what marks a histogram family.
+pub const BUCKET_STREAM_SUFFIX: &str = "_bucket";
+
+/// Columns that metrics ingestion may exclude when deriving [`HASH_LABEL`].
+///
+/// Values in these columns are therefore not guaranteed to be stable within a
+/// contiguous hash run. Consumers such as the metrics sidecar index must not
+/// use them to prune a run from a query; the final PromQL filter can still
+/// evaluate them against the data rows.
+pub const METRICS_HASH_EXCLUDED_LABELS: &[&str] = &[
+    VALUE_LABEL,
+    HASH_LABEL,
+    EXEMPLARS_LABEL,
+    // OTLP per-point metadata, not dimensions: a restart moves start_time and forks the series
+    "start_time",
+    "flag",
+    "is_monotonic",
+    "trace_id",
+    "span_id",
+    crate::TIMESTAMP_COL_NAME,
+    crate::INDEX_FIELD_NAME_FOR_ALL,
+];
+
+/// The stream that holds `metric`'s exemplars.
+pub fn exemplars_stream_name(metric: &str) -> String {
+    format!("{metric}{EXEMPLARS_STREAM_SUFFIX}")
+}
+
+/// The histogram family a bucket stream name belongs to; the caller supplies the `le` evidence.
+pub fn histogram_family(bucket_stream: &str) -> Option<&str> {
+    bucket_stream
+        .strip_suffix(BUCKET_STREAM_SUFFIX)
+        .filter(|family| !family.is_empty())
+}
+
+#[inline]
+pub fn is_metrics_hash_excluded_label(name: &str) -> bool {
+    METRICS_HASH_EXCLUDED_LABELS.contains(&name)
+}
+
+/// Whether `value` is the Prometheus staleness marker; any other NaN is not one.
+#[inline]
+pub fn is_stale_marker(value: f64) -> bool {
+    value.to_bits() == STALE_NAN_BITS
+}
 
 pub fn get_metadata_from_schema(schema: &Schema) -> Option<Metadata> {
     let metadata = schema.metadata.get(METADATA_LABEL)?;
@@ -202,6 +257,8 @@ pub struct RequestQuery {
     pub time: Option<String>,
     /// Evaluation timeout.
     pub timeout: Option<String>,
+    #[serde(flatten)]
+    pub search_event_context: SearchEventContext,
 }
 
 /// Range query.
@@ -236,6 +293,8 @@ pub struct RequestRangeQuery {
         deserialize_with = "deserialize_string_or_vec"
     )]
     pub clusters: Vec<String>, // default query all clusters, local: only query local cluster
+    #[serde(flatten)]
+    pub search_event_context: SearchEventContext,
 }
 
 #[derive(Debug, Deserialize)]
@@ -320,6 +379,12 @@ pub struct RequestFormatQuery {
     pub query: String,
 }
 
+/// The PromQL query to parse into a syntax tree.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct RequestParseTree {
+    pub query: String,
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Function {
     Avg,
@@ -394,6 +459,9 @@ pub struct QueryResult {
 pub enum ApiFuncResponse<T: Serialize> {
     Success {
         data: T,
+        /// Prometheus API: non-empty when the result may be incomplete.
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        warnings: Vec<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         trace_id: Option<String>,
     },
@@ -408,7 +476,15 @@ pub enum ApiFuncResponse<T: Serialize> {
 
 impl<T: Serialize> ApiFuncResponse<T> {
     pub fn ok(data: T, trace_id: Option<String>) -> Self {
-        ApiFuncResponse::Success { data, trace_id }
+        Self::ok_with_warnings(data, vec![], trace_id)
+    }
+
+    pub fn ok_with_warnings(data: T, warnings: Vec<String>, trace_id: Option<String>) -> Self {
+        ApiFuncResponse::Success {
+            data,
+            warnings,
+            trace_id,
+        }
     }
 
     pub fn err_bad_data(error: impl ToString, trace_id: Option<String>) -> Self {
@@ -446,6 +522,24 @@ mod tests {
     use expect_test::expect;
 
     use super::*;
+
+    #[test]
+    fn test_histogram_family_is_named_by_its_bucket_stream_only() {
+        assert_eq!(
+            exemplars_stream_name("http_requests_total"),
+            "http_requests_total_exemplars"
+        );
+        assert_eq!(histogram_family("rpc_latency_bucket"), Some("rpc_latency"));
+        // count and sum names are not evidence of a family; neither is a bare suffix
+        for name in [
+            "rpc_latency_count",
+            "rpc_latency_sum",
+            "_bucket",
+            "queue_count",
+        ] {
+            assert_eq!(histogram_family(name), None, "{name}");
+        }
+    }
 
     #[test]
     fn test_metric_type_display() {
@@ -652,6 +746,15 @@ mod tests {
     }
 
     #[test]
+    fn test_api_func_response_with_warnings() {
+        let ok = ApiFuncResponse::ok_with_warnings(1, vec!["node down".to_string()], None);
+        assert_eq!(
+            serde_json::to_string(&ok).unwrap(),
+            r#"{"status":"success","data":1,"warnings":["node down"]}"#
+        );
+    }
+
+    #[test]
     fn test_metric_type_empty_serde() {
         let s = serde_json::to_string(&MetricType::Empty).unwrap();
         assert_eq!(s, "\"\"");
@@ -717,6 +820,7 @@ mod tests {
             search_type: None,
             regions: vec![],
             clusters: vec![],
+            search_event_context: Default::default(),
         };
         let json = serde_json::to_value(&q).unwrap();
         let obj = json.as_object().unwrap();
@@ -738,6 +842,7 @@ mod tests {
             search_type: Some(SearchEventType::UI),
             regions: vec!["us-east".to_string()],
             clusters: vec!["c1".to_string()],
+            search_event_context: Default::default(),
         };
         let json = serde_json::to_value(&q).unwrap();
         let obj = json.as_object().unwrap();

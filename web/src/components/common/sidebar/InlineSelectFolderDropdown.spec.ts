@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount, VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
 import InlineSelectFolderDropdown from "@/components/common/sidebar/InlineSelectFolderDropdown.vue";
@@ -29,6 +29,19 @@ vi.mock("vue-router", () => ({
 vi.mock("@/utils/commons", () => ({
   getFoldersListByType: vi.fn().mockResolvedValue([]),
 }));
+
+vi.mock("@/services/common", async (importOriginal) => {
+  const actual = await importOriginal<{ default: Record<string, unknown> }>();
+  return {
+    ...actual,
+    default: {
+      ...actual.default,
+      list_Folders: vi.fn(() =>
+        Promise.resolve({ data: { list: [{ folderId: "ops", name: "Ops" }] } }),
+      ),
+    },
+  };
+});
 
 // ─── Store setup helpers ──────────────────────────────────────────────────────
 
@@ -130,6 +143,9 @@ const globalConfig = {
     OSelect: {
       template: `
         <div class="o-select-stub" :data-disable="String(disabled)">
+          <span v-if="$slots['icon-left']" data-test="stub-icon-left">
+            <slot name="icon-left" />
+          </span>
           <select
             :value="modelValue"
             @change="$emit('update:modelValue', $event.target.value)"
@@ -254,11 +270,59 @@ describe("InlineSelectFolderDropdown.vue", () => {
     it("maps store folders to {label, value} options", () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      expect(vm.folderOptions).toEqual([
+      expect(
+        vm.folderOptions.map(({ label, value }: { label: string; value: string }) => ({
+          label,
+          value,
+        })),
+      ).toEqual([
         { label: "Default", value: "default" },
         { label: "My Alerts", value: "folder-1" },
         { label: "Production", value: "folder-2" },
       ]);
+    });
+
+    it("carries an icon component on every option, so rows keep one left inset", () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      // Folders with no chosen icon still get one — FolderIcon falls back to
+      // the folder glyph rather than leaving a gap.
+      for (const option of vm.folderOptions) {
+        expect(option.iconComponent).toBeTruthy();
+      }
+    });
+
+    // OSelect paints per-option icons in the OPEN list only; the closed trigger
+    // renders whatever #icon-left supplies. Without this the icon appeared while
+    // browsing and vanished the moment you picked a folder.
+    it("feeds the selected folder's icon to the trigger, not just the option rows", () => {
+      setStoreFolders("alerts", [{ folderId: "folder-2", name: "Production", icon: "🚀" }]);
+      wrapper = createWrapper({ modelValue: "folder-2" });
+      expect((wrapper.vm as any).selectedFolderIcon).toBe("🚀");
+    });
+
+    // With nothing selected there is no folder to stand for, so the slot must be
+    // withheld entirely — FolderIcon would otherwise paint its folder-outline
+    // fallback next to an empty field, and OSelect's icon-left wrapper carries a
+    // me-1.5 margin that would leave a gap even if the icon itself were hidden.
+    // `modelValue` defaults to "default", so this dropdown normally always has a
+    // folder — the empty case only arises when a caller passes one explicitly.
+    // The whole SLOT must go, not just the icon: OSelect wraps #icon-left in a
+    // span carrying a margin, which would leave a gap around nothing.
+    it("shows no trigger icon at all when no folder is selected", () => {
+      wrapper = createWrapper({ modelValue: "" });
+      expect(wrapper.find('[data-test="stub-icon-left"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="folder-icon"]').exists()).toBe(false);
+    });
+
+    it("shows the trigger icon for the default folder it starts on", () => {
+      wrapper = createWrapper();
+      expect(wrapper.find('[data-test="folder-icon"]').exists()).toBe(true);
+    });
+
+    it("shows the trigger icon once a folder is selected", () => {
+      wrapper = createWrapper({ modelValue: "folder-2" });
+      expect(wrapper.find('[data-test="folder-icon"]').exists()).toBe(true);
     });
 
     it("returns [] when foldersByType has no entry for the given type", () => {
@@ -281,7 +345,12 @@ describe("InlineSelectFolderDropdown.vue", () => {
       setStoreFolders("alerts", [{ folderId: "x", name: "X" }]);
       await nextTick();
       const vm = wrapper.vm as any;
-      expect(vm.folderOptions).toEqual([{ label: "X", value: "x" }]);
+      expect(
+        vm.folderOptions.map(({ label, value }: { label: string; value: string }) => ({
+          label,
+          value,
+        })),
+      ).toEqual([{ label: "X", value: "x" }]);
     });
   });
 
@@ -475,6 +544,25 @@ describe("InlineSelectFolderDropdown.vue", () => {
       wrapper = createWrapper({ type: "missing-type" });
       expect(wrapper.exists()).toBe(true);
       expect((wrapper.vm as any).folderOptions).toEqual([]);
+    });
+  });
+
+  describe("downtimes", () => {
+    it("lists the folders the server permits, without the injected default", async () => {
+      store.state.selectedOrganization = {
+        ...store.state.selectedOrganization,
+        identifier: "default",
+      } as any;
+      setStoreFolders("downtimes", [
+        { folderId: "default", name: "default" },
+        { folderId: "ops", name: "Ops" },
+      ]);
+      wrapper = createWrapper({ type: "downtimes", modelValue: "ops" });
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      await vi.waitFor(() =>
+        expect(vm.folderOptions.map((o: { value: string }) => o.value)).toEqual(["ops"]),
+      );
     });
   });
 });

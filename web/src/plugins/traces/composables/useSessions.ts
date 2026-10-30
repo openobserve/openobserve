@@ -13,9 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { gt, type I18nText } from "@/types/i18n";
+
 import { ref } from "vue";
 import { useStore } from "vuex";
-import sessionsService from "@/services/sessions";
+import sessionsService, { type SessionSortField, type SessionSortOrder } from "@/services/sessions";
 import { type GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import { useLLMStreamQuery } from "./useLLMStreamQuery";
 import { compactSql } from "../config/llmInsightsPanels";
@@ -76,7 +78,7 @@ export interface SessionTraceRow {
 /** Single message inside a turn (USER block / ASSISTANT block). */
 export interface TurnMessage {
   role: "user" | "assistant" | "system" | "tool";
-  content: string;
+  content: I18nText;
 }
 
 /** Full per-turn payload, lazy-loaded when a turn row is expanded. */
@@ -145,7 +147,7 @@ export interface SessionRow {
 // ---------------------------------------------------------------------------
 const sessions = ref<SessionRow[]>([]);
 const total = ref(0);
-const totalIsExact = ref(true);
+const hasMore = ref(false);
 const loading = ref(false);
 const error = ref<string | null>(null);
 const hasLoadedOnce = ref(false);
@@ -158,6 +160,33 @@ const loadedOrg = ref<string | null>(null);
 // unmount/remount cycle and stays in sync with the restored rows.
 const currentPage = ref(1);
 const rowsPerPage = ref(20);
+// Sort state travels with the server-paginated rows. Keeping it module-scoped
+// preserves the exact list when navigating into a session and back.
+const sortBy = ref<SessionSortField>("end_time");
+const sortOrder = ref<SessionSortOrder>("desc");
+// Active list search (the search box on the scope row) — this ref IS the
+// box's v-model directly (live, debounced), no separate draft. Module-scoped
+// like the pagination so a back-navigation from a session detail restores the
+// filtered page together with the term that produced it. Deliberately NOT
+// persisted to localStorage: the scope is remembered across visits, a search
+// is a one-time action. The backend matches it against the user id OR the
+// conversation text (whichever the stream has), so one term searches both.
+export interface SessionSearch {
+  keyword?: string;
+}
+const searchKeyword = ref("");
+/** Hard cap on a search term; longer input is truncated, never rejected. */
+export const SESSION_SEARCH_MAX_LEN = 256;
+/** Trims and caps a raw search term. Empty result = no search. */
+export function normalizeSearchTerm(raw: string): string {
+  return String(raw ?? "")
+    .trim()
+    .slice(0, SESSION_SEARCH_MAX_LEN);
+}
+// Monotonic id of the most recent `fetchPage` call. A response from an older
+// call (Enter pressed again while a search was still in flight) is dropped, so
+// a slow first run can never overwrite the newer result. Last request wins.
+let fetchSeq = 0;
 // Agent-filter list is loaded lazily by `loadSessions` (agent mode only), so it
 // lives here too — otherwise a back-navigation, which skips that load, would
 // reset `agentsLoaded` to false and strand the agent picker on its skeleton.
@@ -208,13 +237,16 @@ export function useSessions() {
     page: number,
     pageSize: number,
     filter = "",
+    search?: SessionSearch,
   ): Promise<void> {
     if (!streamName || !startTime || !endTime) return;
+    const seq = ++fetchSeq;
     loading.value = true;
     error.value = null;
 
     try {
       const orgId = store.state.selectedOrganization?.identifier || "default";
+      const keywordTerm = normalizeSearchTerm(search?.keyword ?? "");
       const res = await sessionsService.list({
         orgId,
         streamName,
@@ -223,7 +255,13 @@ export function useSessions() {
         page,
         pageSize,
         filter,
+        keyword: keywordTerm || undefined,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
       });
+      // Stale: a newer fetch has started since — its result (or error) owns
+      // the list now, so leave every piece of state to it.
+      if (seq !== fetchSeq) return;
       const body = res.data;
       sessions.value = (body.hits || []).map((h) => {
         const errorCount = Number(h.error_count) || 0;
@@ -252,23 +290,26 @@ export function useSessions() {
         };
       });
       total.value = Number(body.total) || 0;
-      totalIsExact.value = body.total_is_exact ?? true;
+      hasMore.value = body.has_more ?? false;
       hasLoadedOnce.value = true;
       // Stamp when/which-org this page was fetched — used to keep the "last
       // refreshed" label accurate and to invalidate the cache on org switch.
       lastRunAt.value = Date.now();
       loadedOrg.value = orgId;
     } catch (e: any) {
+      if (seq !== fetchSeq) return;
       // axios error shape — surface the server's message if present.
       const serverMsg =
         e?.response?.data?.message ||
         e?.response?.data?.error ||
         e?.message ||
-        "Failed to fetch sessions";
+        gt("traces.failedToFetchSessions");
       error.value = serverMsg;
       console.error("Sessions fetch error:", e?.response?.data ?? e);
     } finally {
-      loading.value = false;
+      // Only the latest call releases the skeleton — an older one settling
+      // first must not blank it while the newer request is still running.
+      if (seq === fetchSeq) loading.value = false;
     }
   }
 
@@ -390,6 +431,7 @@ export function useSessions() {
     let totalCacheReadSavings = 0;
     let totalNetCacheImpact = 0;
     let totalErrors = 0;
+    let userId: string | null = null;
     let serviceName: string | null = null;
     for (let i = 0; i < accumulated.length; i++) {
       const r = accumulated[i];
@@ -410,13 +452,19 @@ export function useSessions() {
       totalCacheReadSavings += t.cacheReadSavings;
       totalNetCacheImpact += t.netCacheImpact;
       totalErrors += t.errorCount;
+      if (!userId && Array.isArray(r.user_ids)) {
+        const firstUserId = r.user_ids.find(
+          (value: unknown) => typeof value === "string" && value.trim().length > 0,
+        );
+        if (firstUserId) userId = firstUserId;
+      }
       if (!serviceName && t.serviceName) serviceName = t.serviceName;
     }
     if (firstSeenNanos === Infinity) firstSeenNanos = 0;
 
     const detail: SessionDetail = {
       sessionId,
-      userId: null,
+      userId,
       serviceName,
       firstSeenMicros: firstSeenNanos,
       durationNanos: lastSeenNanos > firstSeenNanos ? lastSeenNanos - firstSeenNanos : 0,
@@ -443,10 +491,10 @@ export function useSessions() {
    * Fetch the message payload for a single turn (one trace). Used by
    * the SessionDetails accordion when a turn row is expanded.
    *
-   * Pulls only the LLM-turn spans for that trace (the ones carrying
-   * `gen_ai.input.messages` / `gen_ai.output.messages`), then picks
-   * the first user message and last assistant message from the
-   * normalised list — same convention used by `ThreadView`.
+   * Fetches every `gen_ai` span of the trace in one query — tool spans
+   * included, so the LLM/tool call badges can be counted client-side rather
+   * than via a second COUNT query — and hands them to `buildTurnDetail`,
+   * the same projection the session-detail turn cards use.
    */
   async function fetchTurnDetail(
     streamName: string,
@@ -487,89 +535,13 @@ export function useSessions() {
       LIMIT 50
     `);
 
-    const LLM_OPS = new Set(["chat", "text_completion", "generate_content", "embeddings"]);
-
     const hits = await executeQuery(sql, startTime, endTime);
 
-    let llmCalls = 0;
-    let toolCalls = 0;
-    let otherCalls = 0;
-    const otherOpsSet = new Set<string>();
-    for (const row of hits || []) {
-      const op = String(row.gen_ai_operation_name || "").toLowerCase();
-      if (LLM_OPS.has(op)) llmCalls += 1;
-      else if (op === "execute_tool") toolCalls += 1;
-      else {
-        otherCalls += 1;
-        otherOpsSet.add(op);
-      }
-    }
-    const otherOps = [...otherOpsSet].sort();
-    // Lazy-import the message parser so this composable stays light
-    // when only the list view is in use.
-    const { messagesFromInput, messagesFromOutput, getModel } = await import("../threadView.utils");
-
-    let userMessage: TurnMessage | null = null;
-    let assistantMessage: TurnMessage | null = null;
-    let model: string | null = null;
-
-    // First pass — forward — pick model and the user question for THIS
-    // turn. `gen_ai.input.messages` carries the FULL prompt sent to
-    // the model (system + every prior turn + the current question),
-    // so the *last* user-role entry of the *first* span is the
-    // current turn's question, not turn 1's.
-    for (const span of hits || []) {
-      if (!model) {
-        const m = getModel(span);
-        if (m) model = m;
-      }
-      if (!userMessage) {
-        const inputMsgs = messagesFromInput(span.gen_ai_input_messages);
-        let u: any = null;
-        for (let i = inputMsgs.length - 1; i >= 0; i--) {
-          if (inputMsgs[i].role === "user" && inputMsgs[i].content) {
-            u = inputMsgs[i];
-            break;
-          }
-        }
-        if (u) userMessage = { role: "user", content: u.content };
-      }
-      if (userMessage && model) break;
-    }
-
-    // Second pass — reverse — pick the FINAL assistant reply for this
-    // turn. An agent may make multiple LLM calls (LLM → tool → LLM
-    // → tool → … → final answer). The first chat span's output is
-    // usually an intermediate "I should call tool X" reply; the user
-    // wants the answer at the end, not the planning step. Walking
-    // from the latest span back gives us the final non-empty
-    // assistant message.
-    for (let s = (hits || []).length - 1; s >= 0; s--) {
-      const span = hits[s];
-      const outputMsgs = messagesFromOutput(span.gen_ai_output_messages);
-      let a: any = null;
-      for (let i = outputMsgs.length - 1; i >= 0; i--) {
-        if (outputMsgs[i].role === "assistant" && outputMsgs[i].content) {
-          a = outputMsgs[i];
-          break;
-        }
-      }
-      if (a) {
-        assistantMessage = { role: "assistant", content: a.content };
-        break;
-      }
-    }
-
-    return {
-      traceId,
-      userMessage,
-      assistantMessage,
-      model,
-      llmCalls,
-      toolCalls,
-      otherCalls,
-      otherOps,
-    };
+    // Lazy-import the projection so this composable stays light when only the
+    // list view is in use. Shared with the session-detail turn cards and
+    // ThreadView so all three classify spans identically.
+    const { buildTurnDetail } = await import("../threadView.utils");
+    return buildTurnDetail(traceId, hits || []);
   }
 
   /**
@@ -618,7 +590,7 @@ export function useSessions() {
   return {
     sessions,
     total,
-    totalIsExact,
+    hasMore,
     loading,
     error,
     hasLoadedOnce,
@@ -626,6 +598,9 @@ export function useSessions() {
     loadedOrg,
     currentPage,
     rowsPerPage,
+    searchKeyword,
+    sortBy,
+    sortOrder,
     agents,
     agentsLoaded,
     fetchPage,

@@ -7,7 +7,7 @@
     <OPageLayout
       :back="{
         label: t('onlineEvals.job.backTo'),
-        onClick: () => $emit('cancel'),
+        onClick: cancel,
         dataTest: 'job-form-back-btn',
       }"
       bleed
@@ -31,7 +31,7 @@
             data-test="job-form-details-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.detailsSection")
               }}</span>
@@ -68,7 +68,7 @@
             data-test="job-form-target-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.targetSection")
               }}</span>
@@ -109,7 +109,7 @@
             data-test="job-form-filtering-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.filteringSection")
               }}</span>
@@ -130,7 +130,7 @@
             data-test="job-form-sampling-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.stepper.sampling")
               }}</span>
@@ -159,7 +159,7 @@
                     size="sm"
                     :required="formValues.samplingMode !== 'all'"
                     :disabled="formValues.samplingMode === 'all'"
-                    :help-text="samplingValueHelp"
+                    :help-text="raw(samplingValueHelp)"
                     data-test="job-form-sampling-value-input"
                   />
                 </div>
@@ -173,7 +173,7 @@
             data-test="job-form-scorers-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.scorersSection")
               }}</span>
@@ -207,7 +207,7 @@
             data-test="job-form-completion-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.completionSection")
               }}</span>
@@ -225,7 +225,7 @@
                     :min="MIN_COMPLETION_IDLE_WINDOW_SECS"
                     :max="completionLimits?.maxIdleWindowSecs"
                     size="sm"
-                    :help-text="idleWindowHelp"
+                    :help-text="raw(idleWindowHelp)"
                     data-test="job-form-idle-window-input"
                   />
                 </div>
@@ -237,7 +237,7 @@
                     min="1"
                     :max="completionLimits?.maxAgeSecs"
                     size="sm"
-                    :help-text="maxAgeHelp"
+                    :help-text="raw(maxAgeHelp)"
                     data-test="job-form-max-age-input"
                   />
                 </div>
@@ -274,7 +274,7 @@
           variant="outline"
           size="sm-action"
           :disabled="isSubmitting"
-          @click="$emit('cancel')"
+          @click="cancel"
         >
           {{ t("onlineEvals.buttons.cancel") }}
         </OButton>
@@ -318,12 +318,13 @@
         </OButton>
       </footer>
     </OPageLayout>
+    <EditorDraftDialogs :draft="jobDraft" />
   </OForm>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -348,6 +349,7 @@ import {
   valueOf,
 } from "../utils/evalEntity";
 import { showError } from "../utils/evalFormat";
+import { leavesEvalForm } from "../utils/routeSync";
 import { parseSamplingRate, samplingRateForForm, samplingRatePercent } from "../utils/jobSampling";
 import {
   buildJobFilterConditionPayload,
@@ -358,6 +360,8 @@ import {
   normalizeJobFilterCondition,
 } from "../utils/jobFilter";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
+import type { StreamFieldsMap } from "@/utils/alerts/alertQueryBuilder";
+import { DEFAULT_JOB_STREAM_FIELDS } from "../utils/defaultStreamFields";
 import {
   buildJobInputMappingPayload,
   mappingUsesSystemProvidedSpans,
@@ -378,6 +382,9 @@ import JobFilterBuilder from "./job/JobFilterBuilder.vue";
 import JobInputMapping from "./job/JobInputMapping.vue";
 import JobPreviewPanel from "./job/JobPreviewPanel.vue";
 import { makeJobFormSchema, type JobForm } from "./JobFormPage.schema";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+import type { V2Group } from "@/utils/alerts/alertDataTransforms";
 
 const props = defineProps<{
   orgId: string;
@@ -389,9 +396,11 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "saved"): void;
   (e: "cancel"): void;
+  /** Saved from the leave dialog: the list reloads while the pending navigation closes the form. */
+  (e: "persisted"): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Co-located Zod schema (factory keeps messages i18n-driven). The form is
 // mounted fresh per create/edit action, so building it once is safe.
@@ -430,12 +439,25 @@ const activateOnSave = ref(false);
 
 // A draft has never run, so both create and draft-edit offer the same explicit
 // choice: keep it a draft, or promote it to active. Editing a job that already
-// has a run state (active/paused/degraded) shows a single Save that preserves
+// has a run state (active/paused) shows a single Save that preserves
 // that state — a config edit must never silently flip enablement.
 const isDraft = computed(() => (props.row?.status ?? "draft") === "draft");
 const showActivateChoice = computed(
   () => props.mode === "create" || (props.mode === "edit" && isDraft.value),
 );
+
+// Field types for the SQL formatter: numeric columns must not be quoted and
+// their empty checks must degrade to null checks, or the query fails. Labels
+// are field names (raw identifiers), never prose.
+const filterFieldsMap = computed<StreamFieldsMap>(() => {
+  const fields = streamFields.value.length ? streamFields.value : DEFAULT_JOB_STREAM_FIELDS;
+  return Object.fromEntries(
+    fields.map((field) => [
+      field.value,
+      { label: raw(String(field.label)), value: field.value, type: field.type },
+    ]),
+  );
+});
 
 // SQL WHERE body built from the filter builder — feeds the live "matched
 // spans" count in the preview panel. Built from the CLEANED group (incomplete
@@ -447,6 +469,7 @@ const filterWhere = computed<string>(() => {
       sqlMode: true,
       addWherePrefix: false,
       formatValues: true,
+      streamFieldsMap: filterFieldsMap.value,
     });
   } catch {
     return "";
@@ -470,16 +493,16 @@ const samplingValueHelp = computed<string>(() => {
 
 // Completion help echoes the entered window back in readable units, because a
 // bare `1800` in a seconds box says nothing about how long the user will wait.
-// Unit labels come from i18n (same `common.*` keys AutoRefreshInterval uses),
-// so the util hands back numbers and the wording is assembled here.
+// Each part is a whole `{count} unit` message rather than a number glued to a
+// translated unit — the number's position varies by language.
 function humanizeSecs(value: string | number): string | null {
   const parts = durationPartsFromSecs(value);
   if (!parts) return null;
 
   const words: string[] = [];
-  if (parts.hours) words.push(`${parts.hours} ${t("common.hr")}`);
-  if (parts.minutes) words.push(`${parts.minutes} ${t("common.min")}`);
-  if (parts.seconds) words.push(`${parts.seconds} ${t("common.sec")}`);
+  if (parts.hours) words.push(t("common.hrShort", { count: parts.hours }));
+  if (parts.minutes) words.push(t("common.minShort", { count: parts.minutes }));
+  if (parts.seconds) words.push(t("common.secShort", { count: parts.seconds }));
 
   return words.join(" ") || null;
 }
@@ -514,7 +537,7 @@ const selectedScorers = computed(() =>
     .filter((scorer): scorer is Scorer => Boolean(scorer)),
 );
 
-const { getStreams, getStream } = useStreams();
+const { getStreams, getStream } = useStreams(t);
 const traceStreams = ref<string[]>([]);
 const RESERVED_EVAL_SOURCE_STREAMS = new Set([
   "_evaluator",
@@ -525,10 +548,10 @@ const RESERVED_EVAL_SOURCE_STREAMS = new Set([
   "errors",
   "data_retention_usage",
 ]);
-const streamFields = ref<Array<{ label: string; value: string; type: string }>>([]);
+const streamFields = ref<Array<{ label: I18nText; value: string; type: string }>>([]);
 
 const streamOptions = computed(() => {
-  const opts = traceStreams.value.map((name) => ({ label: name, value: name }));
+  const opts = traceStreams.value.map((name) => ({ label: raw(name), value: name }));
   // Ensure currently selected value is always present (e.g. on edit before list loads)
   if (
     formValues.value.stream &&
@@ -536,7 +559,7 @@ const streamOptions = computed(() => {
     !opts.some((o) => o.value === formValues.value.stream)
   ) {
     opts.unshift({
-      label: formValues.value.stream,
+      label: raw(formValues.value.stream),
       value: formValues.value.stream,
     });
   }
@@ -576,24 +599,25 @@ async function loadStreamFields() {
         const name = typeof field === "string" ? field : field?.name;
         if (!name) return null;
         return {
-          label: name,
+          label: raw(name),
           value: name,
           type: typeof field === "string" ? "Utf8" : field?.type || "Utf8",
         };
       })
       .filter(
         (
-          field: { label: string; value: string; type: string } | null,
-        ): field is { label: string; value: string; type: string } => field !== null,
+          field: { label: I18nText; value: string; type: string } | null,
+        ): field is { label: I18nText; value: string; type: string } => field !== null,
       );
   } catch {
     streamFields.value = [];
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   void loadTraceStreams();
   void loadStreamFields();
+  await jobDraft.start();
 });
 
 const samplingModeOptions = computed(() => [
@@ -610,7 +634,7 @@ const targetScopeOptions = computed(() => [
 watch(
   () => formValues.value.targetScope,
   (targetScope, previousScope) => {
-    if (targetScope === previousScope) return;
+    if (targetScope === previousScope || applyingDraft) return;
     if (targetScope !== "trace") {
       spanSelectors.value = [];
       spanSelectorBindings.value = {};
@@ -717,6 +741,85 @@ function initScorerVersions(row: EvalJob | null) {
   return Object.fromEntries(
     (row.scorers || []).map((scorer) => [scorerRefId(scorer), scorerRefVersion(scorer)]),
   );
+}
+
+interface JobDraft {
+  values: JobForm;
+  endSignalGroup: V2Group;
+  inputMappings: Record<string, Record<string, string>>;
+  spanSelectors: SpanSelector[];
+  spanSelectorBindings: Record<string, string>;
+  scorerVersions: Record<string, number | null>;
+}
+
+// Set while a continued draft lands, so the scope watcher does not reset its completion window and selectors.
+let applyingDraft = false;
+// Set while the leave dialog's Save runs, so a successful save neither closes the form nor reloads the page.
+let leaveSave: { saved: boolean } | null = null;
+
+// Run state, health and timestamps change on their own; only what the form edits is hashed.
+const RUN_STATE_KEYS = new Set([
+  "status",
+  "version",
+  "health",
+  "pipelineId",
+  "pipeline_id",
+  "createdAt",
+  "created_at",
+  "updatedAt",
+  "updated_at",
+]);
+
+function jobDefinition(row: EvalJob | null) {
+  if (!row) return null;
+  return Object.fromEntries(Object.entries(row).filter(([key]) => !RUN_STATE_KEYS.has(key)));
+}
+
+const jobDraft = useEditorDraft<JobDraft>({
+  kind: "eval_job",
+  entityLabel: () => t("common.editorDraft.entities.eval_job"),
+  // "Draft" already names a job that has never been activated.
+  serverDraftItem: true,
+  entityId: () => (props.mode === "edit" ? (props.row?.id ?? null) : null),
+  snapshot: () => ({
+    values: { ...formValues.value, scorerIds: [...formValues.value.scorerIds] },
+    endSignalGroup: endSignalGroup.value,
+    inputMappings: inputMappings.value,
+    spanSelectors: spanSelectors.value,
+    spanSelectorBindings: spanSelectorBindings.value,
+    scorerVersions: scorerVersions.value,
+  }),
+  apply: async (data) => {
+    applyingDraft = true;
+    try {
+      form.reset({ ...initForm(null), ...data.values });
+      endSignalGroup.value = data.endSignalGroup;
+      inputMappings.value = data.inputMappings;
+      spanSelectors.value = data.spanSelectors;
+      spanSelectorBindings.value = data.spanSelectorBindings;
+      scorerVersions.value = data.scorerVersions;
+      await nextTick();
+    } finally {
+      applyingDraft = false;
+    }
+  },
+  base: () => (props.mode === "edit" ? jobDefinition(props.row) : undefined),
+  save: async () => {
+    const run = { saved: false };
+    leaveSave = run;
+    activateOnSave.value = false;
+    try {
+      await form.handleSubmit();
+    } finally {
+      leaveSave = null;
+    }
+    return run.saved;
+  },
+  leaveOnRouteUpdate: leavesEvalForm,
+});
+
+async function cancel() {
+  if (await jobDraft.confirmLeave()) emit("cancel");
 }
 
 function syncMappings() {
@@ -845,6 +948,12 @@ async function onSubmit(value: JobForm) {
         });
       }
     }
+    if (leaveSave) {
+      leaveSave.saved = true;
+      emit("persisted");
+      return;
+    }
+    jobDraft.markSaved();
     emit("saved");
   } catch (err: any) {
     showError(err, t("onlineEvals.job.saveError"));

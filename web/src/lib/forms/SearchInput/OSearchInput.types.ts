@@ -1,10 +1,12 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nText } from "@/types/i18n";
+
 export type SearchInputSize = "xs" | "sm" | "md";
 
 export interface SearchInputProps {
   modelValue?: string;
-  placeholder?: string;
+  placeholder?: I18nText;
   size?: SearchInputSize;
   /** Shows a × button to clear the field. Defaults to true — all search inputs are clearable by default. */
   clearable?: boolean;

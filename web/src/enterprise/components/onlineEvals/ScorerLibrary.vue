@@ -20,9 +20,11 @@ the Free Software Foundation, either version 3 of the License, or
       class="text-text-secondary flex flex-1 flex-col items-center justify-center p-8"
       data-test="scorer-library-error"
     >
-      <OIcon name="error-outline" class="mb-2" style="width: 3em; height: 3em" />
+      <OIcon name="error-outline" class="mb-2 !h-[3em] !w-[3em]" />
       <div class="text-status-error-text">{{ loadError }}</div>
-      <OButton variant="primary" size="sm" class="mt-4" @click="loadCatalog"> Retry </OButton>
+      <OButton variant="primary" size="sm" class="mt-4" @click="loadCatalog">
+        {{ t("common.retry") }}
+      </OButton>
     </div>
 
     <div
@@ -30,19 +32,19 @@ the Free Software Foundation, either version 3 of the License, or
       class="text-text-secondary flex flex-1 flex-col items-center justify-center p-8"
       data-test="scorer-library-no-providers"
     >
-      Create a Provider first before importing LLM Judge scorers.
+      {{ t("onlineEvals.scorerLibrary.noProvidersMessage") }}
     </div>
 
     <div v-else class="flex min-h-0 flex-1 flex-col">
       <div class="mb-4 flex items-end gap-3">
         <div class="flex w-60 shrink-0 items-center gap-2">
-          <label class="text-text-secondary text-xs font-semibold whitespace-nowrap"
-            >Provider</label
-          >
+          <label class="text-text-secondary text-xs font-semibold whitespace-nowrap">{{
+            t("onlineEvals.scorer.providerLabel")
+          }}</label>
           <OSelect
             v-model="selectedProviderId"
             :options="providerOptions"
-            placeholder="Select provider"
+            :placeholder="t('onlineEvals.scorer.providerPlaceholder')"
             size="md"
             class="w-full"
             data-test="scorer-library-provider-select"
@@ -50,23 +52,25 @@ the Free Software Foundation, either version 3 of the License, or
         </div>
         <OSearchInput
           v-model="searchQuery"
-          placeholder="Search Scorers..."
+          :placeholder="t('onlineEvals.scorerLibrary.searchPlaceholder')"
           clearable
           class="min-w-0 flex-1"
           data-test="scorer-library-search"
         />
       </div>
 
-      <div class="mb-2 flex items-center justify-between gap-3 pr-3 pl-4.25">
+      <div
+        class="border-border-default mb-3 flex items-center justify-between gap-3 border-b ps-4.25 pe-3 pb-2"
+      >
         <label
           v-if="filteredEntries.length > 0"
-          class="text-text-secondary inline-flex items-center gap-2 px-1 py-0.5 text-xs font-medium select-none"
+          class="text-text-body inline-flex cursor-pointer items-center gap-2 py-0.5 text-xs font-medium select-none"
           data-test="scorer-library-select-all"
         >
-          <OCheckbox :model-value="allVisibleSelected" @update:model-value="toggleSelectAll" />
-          <span>{{ allVisibleSelected ? "Clear all" : "Select all" }}</span>
+          <OCheckbox :model-value="selectAllState" @update:model-value="toggleSelectAll" />
+          <span>{{ selectAllState === true ? t("common.clearAll") : t("common.selectAll") }}</span>
         </label>
-        <span class="text-text-secondary text-xs"> {{ filteredEntries.length }} scorer(s) </span>
+        <span class="text-text-secondary text-xs tabular-nums">{{ countLabel }}</span>
       </div>
 
       <div class="min-h-0 flex-1 overflow-y-auto">
@@ -86,16 +90,12 @@ the Free Software Foundation, either version 3 of the License, or
             <li
               v-for="entry in group.entries"
               :key="entry.name"
-              class="flex cursor-pointer items-center gap-2 border-l-4 px-3 py-2 transition-colors duration-200"
-              :class="[
-                isSelected(entry.name)
-                  ? 'selected-item border-primary bg-[color-mix(in_srgb,var(--color-primary-600)_6%,transparent)]'
-                  : 'hover:bg-table-row-hover-bg border-transparent',
-              ]"
+              class="flex cursor-pointer items-center gap-2 px-3 py-2 transition-colors duration-200"
+              :class="[isSelected(entry.name) ? 'bg-accent/6' : 'hover:bg-table-row-hover-bg']"
               :data-test="`scorer-library-item-${entry.name}`"
               @click="toggle(entry)"
             >
-              <div class="shrink-0 pr-2">
+              <div class="shrink-0 pe-2">
                 <OCheckbox
                   :model-value="isSelected(entry.name)"
                   @update:model-value="toggle(entry)"
@@ -103,7 +103,13 @@ the Free Software Foundation, either version 3 of the License, or
                 />
               </div>
               <div class="flex min-w-0 flex-1 flex-col">
-                <span class="text-sm font-medium">{{ entry.displayName }}</span>
+                <span
+                  class="text-sm"
+                  :class="
+                    isSelected(entry.name) ? 'text-text-heading font-semibold' : 'font-medium'
+                  "
+                  >{{ entry.displayName }}</span
+                >
                 <span v-if="entry.description" class="text-text-secondary block text-xs">
                   {{ entry.description }}
                 </span>
@@ -117,7 +123,10 @@ the Free Software Foundation, either version 3 of the License, or
 </template>
 
 <script setup lang="ts">
+import { scoreConfigsQuery } from "@/services/online-evals.service.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { computed, onMounted, ref, watch } from "vue";
+import { useI18nTyped, raw } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -136,6 +145,8 @@ import {
 } from "@/services/online-evals-catalog.service";
 import { entityId } from "./utils/evalEntity";
 import { showError } from "./utils/evalFormat";
+
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   orgId: string;
@@ -159,7 +170,7 @@ const isImporting = ref(false);
 const selectedProviderId = ref("");
 
 const providerOptions = computed(() =>
-  props.providers.map((p) => ({ label: p.name, value: p.id })),
+  props.providers.map((p) => ({ label: raw(p.name), value: p.id })),
 );
 
 onMounted(loadCatalog);
@@ -183,7 +194,7 @@ async function loadCatalog() {
     scoreConfigEntries.value = catalog.scoreConfigs.filter((e) => e.level === "span");
     scorerEntries.value = catalog.scorers.filter((e) => e.level === "span");
   } catch (err: any) {
-    loadError.value = err?.message || "Failed to load catalog";
+    loadError.value = err?.message || t("onlineEvals.failedToLoadCatalog");
   } finally {
     isLoadingCatalog.value = false;
   }
@@ -216,6 +227,31 @@ const allVisibleSelected = computed(() => {
   return visible.every((e) => selectedNames.value.has(e.name));
 });
 
+/** Three states, not two. With a plain boolean a part-selected list renders as
+ *  an EMPTY box, which reads as "nothing is selected" — and the next click then
+ *  looks like it selected everything from scratch rather than extending. */
+const selectAllState = computed<boolean | "indeterminate">(() => {
+  if (allVisibleSelected.value) return true;
+  return filteredEntries.value.some((e) => selectedNames.value.has(e.name))
+    ? "indeterminate"
+    : false;
+});
+
+/** The count is the only place a selection is visible while the list is
+ *  scrolled past the checked rows. */
+const countLabel = computed(() => {
+  const selected = filteredEntries.value.filter((e) => selectedNames.value.has(e.name)).length;
+  if (selected === 0) {
+    return t("onlineEvals.scorerLibrary.scorerCountSuffix", {
+      count: filteredEntries.value.length,
+    });
+  }
+  return t("onlineEvals.scorerLibrary.selectedOfTotal", {
+    selected,
+    total: filteredEntries.value.length,
+  });
+});
+
 function isSelected(name: string) {
   return selectedNames.value.has(name);
 }
@@ -245,7 +281,10 @@ watch(selectedNames, (val) => emit("update:selected-count", val.size), {
 async function importSelected() {
   if (isImporting.value || selectedNames.value.size === 0) return;
   if (!selectedProviderId.value) {
-    toast({ variant: "warning", message: "Select a provider before importing scorers." });
+    toast({
+      variant: "warning",
+      message: t("toastMessages.onlineEvals.selectAProviderBeforeImportingScorers"),
+    });
     return;
   }
   isImporting.value = true;
@@ -269,7 +308,7 @@ async function importSelected() {
         continue;
       }
       failCount++;
-      if (failCount === 1) showError(err, "Failed to import scorer");
+      if (failCount === 1) showError(err, t("onlineEvals.failedToImportScorer"));
     }
   }
 
@@ -278,13 +317,15 @@ async function importSelected() {
   emit("imported");
 
   if (successCount > 0 || skipCount > 0) {
+    // Each clause is a whole translated phrase; only the list separator is
+    // assembled here, never a sentence built from translated fragments.
     const parts: string[] = [];
-    if (successCount) parts.push(`${successCount} imported`);
-    if (skipCount) parts.push(`${skipCount} skipped (already exists)`);
-    if (failCount) parts.push(`${failCount} failed`);
+    if (successCount) parts.push(t("onlineEvals.import.summaryImported", { count: successCount }));
+    if (skipCount) parts.push(t("onlineEvals.import.summarySkipped", { count: skipCount }));
+    if (failCount) parts.push(t("onlineEvals.import.summaryFailed", { count: failCount }));
     toast({
       variant: failCount > 0 && successCount === 0 ? "error" : "success",
-      message: parts.join(" · "),
+      message: raw(parts.join(" · ")),
     });
   }
 }
@@ -296,7 +337,7 @@ async function resolveRequiredScoreConfig(name: string): Promise<ScoreConfig> {
   if (existing) return existing;
 
   const catalogEntry = scoreConfigEntries.value.find((e) => e.name === name);
-  if (!catalogEntry) throw new Error(`Catalog score config not found: ${name}`);
+  if (!catalogEntry) throw new Error(t("onlineEvals.catalogScoreConfigNotFound", { name }));
 
   try {
     return await onlineEvalsService.scoreConfigs.create(
@@ -305,8 +346,14 @@ async function resolveRequiredScoreConfig(name: string): Promise<ScoreConfig> {
     );
   } catch (err: any) {
     if (err?.response?.status === 409) {
-      const refreshed = await onlineEvalsService.scoreConfigs.list(props.orgId);
-      const found = refreshed.find((row) => row.name === name);
+      const options = scoreConfigsQuery(props.orgId);
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+      const refreshed = await queryClient.fetchQuery(options);
+      const found = refreshed.find((row: any) => row.name === name);
       if (found) return found;
     }
     throw err;

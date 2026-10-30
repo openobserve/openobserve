@@ -1,10 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
-import { createI18n } from "vue-i18n";
 import { createRouter, createWebHistory } from "vue-router";
 import OtelCollector from "./OtelCollector.vue";
-import CopyContent from "@/components/CopyContent.vue";
+import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 
 vi.mock("../../../aws-exports", () => ({
   default: { API_ENDPOINT: "http://localhost:5080", region: "us-east-1", isCloud: "false" },
@@ -23,9 +22,9 @@ vi.mock("../../../utils/zincutils", () => ({
   b64EncodeStandard: vi.fn((str) => btoa(str)),
 }));
 
-vi.mock("@/components/CopyContent.vue", () => ({
+vi.mock("@/components/ingestion/CredentialCodeBlock.vue", () => ({
   default: {
-    name: "CopyContent",
+    name: "CredentialCodeBlock",
     template: '<div data-test="copy-content">{{ content }}</div>',
     props: ["content"],
   },
@@ -39,7 +38,6 @@ const mockStore = createStore({
   },
 });
 
-const mockI18n = createI18n({ locale: "en", messages: { en: {} } });
 const mockRouter = createRouter({
   history: createWebHistory(),
   routes: [{ path: "/", component: { template: "<div>Home</div>" } }],
@@ -61,9 +59,9 @@ describe("OtelCollector.vue", () => {
     return mount(OtelCollector, {
       props: { ...defaultProps, ...props },
       global: {
-        plugins: [mockI18n, mockRouter],
+        plugins: [mockRouter],
         provide: { store: mockStore },
-        components: { CopyContent },
+        components: { CredentialCodeBlock },
       },
     });
   };
@@ -79,10 +77,10 @@ describe("OtelCollector.vue", () => {
       expect(() => wrapper.unmount()).not.toThrow();
     });
 
-    it("should render two CopyContent components", () => {
+    it("should render three CredentialCodeBlock components (hostmetrics + two exporters)", () => {
       wrapper = createWrapper();
-      const copyContents = wrapper.findAllComponents(CopyContent);
-      expect(copyContents.length).toBe(2);
+      const copyContents = wrapper.findAllComponents(CredentialCodeBlock);
+      expect(copyContents.length).toBe(3);
     });
 
     it("should render OTLP HTTP label", () => {
@@ -212,29 +210,69 @@ describe("OtelCollector.vue", () => {
     });
   });
 
-  describe("CopyContent Integration", () => {
-    it("should pass getOtelHttpConfig to first CopyContent", () => {
+  // T1.4 (design 4.4/§6): the hostmetrics receiver block renders first, above the exporter blocks.
+  describe("Host metrics receiver block", () => {
+    const hostMetricsContent = () => {
       wrapper = createWrapper();
-      const copyContents = wrapper.findAllComponents(CopyContent);
-      const httpContent = copyContents[0].props("content");
+      return wrapper.findAllComponents(CredentialCodeBlock)[0].props("content") as string;
+    };
+
+    it("renders the hostmetrics receiver with the six dashboard-matching scrapers", () => {
+      const content = hostMetricsContent();
+      expect(content).toContain("hostmetrics:");
+      for (const scraper of ["cpu:", "memory:", "disk:", "filesystem:", "load:", "network:"]) {
+        expect(content).toContain(scraper);
+      }
+    });
+
+    it("includes resourcedetection/system with os hostname sources", () => {
+      // Without resourcedetection stamping host.name, hosts are nameless.
+      const content = hostMetricsContent();
+      expect(content).toContain("resourcedetection/system");
+      expect(content).toContain("detectors: [system]");
+      expect(content).toContain("hostname_sources: [os]");
+    });
+
+    it("wires the hostmetrics pipeline to the OpenObserve exporter", () => {
+      const content = hostMetricsContent();
+      expect(content).toContain("metrics/hostmetrics");
+      expect(content).toContain("receivers: [hostmetrics]");
+      expect(content).toContain("otlphttp/openobserve");
+    });
+
+    it("interpolates the org id and masks the passcode in the hostmetrics block", () => {
+      wrapper = createWrapper({ currOrgIdentifier: "my-org" });
+      const content = wrapper.findAllComponents(CredentialCodeBlock)[0].props("content") as string;
+      // Pins the NEW block: today's first block is the HTTP exporter, which lacks this.
+      expect(content).toContain("hostmetrics");
+      expect(content).toContain("my-org");
+      expect(content).toContain("[BASIC_PASSCODE]");
+    });
+  });
+
+  describe("CredentialCodeBlock Integration", () => {
+    it("should pass getOtelHttpConfig to the second CredentialCodeBlock", () => {
+      wrapper = createWrapper();
+      const copyContents = wrapper.findAllComponents(CredentialCodeBlock);
+      const httpContent = copyContents[1].props("content");
       expect(httpContent).toBeDefined();
       expect(typeof httpContent).toBe("string");
       expect(httpContent).toContain("otlphttp/openobserve");
     });
 
-    it("should pass getOtelGrpcConfig to second CopyContent", () => {
+    it("should pass getOtelGrpcConfig to the third CredentialCodeBlock", () => {
       wrapper = createWrapper();
-      const copyContents = wrapper.findAllComponents(CopyContent);
-      const grpcContent = copyContents[1].props("content");
+      const copyContents = wrapper.findAllComponents(CredentialCodeBlock);
+      const grpcContent = copyContents[2].props("content");
       expect(grpcContent).toBeDefined();
       expect(typeof grpcContent).toBe("string");
       expect(grpcContent).toContain("5081");
     });
 
-    it("should pass org identifier in HTTP config to CopyContent", () => {
+    it("should pass org identifier in HTTP config to CredentialCodeBlock", () => {
       wrapper = createWrapper({ currOrgIdentifier: "test-org" });
-      const copyContents = wrapper.findAllComponents(CopyContent);
-      expect(copyContents[0].props("content")).toContain("test-org");
+      const copyContents = wrapper.findAllComponents(CredentialCodeBlock);
+      expect(copyContents[1].props("content")).toContain("test-org");
     });
   });
 

@@ -4,7 +4,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
 // Mock services
-vi.mock("@/services/segment_analytics", () => ({
+vi.mock("@/services/product_analytics", () => ({
   default: {
     track: vi.fn(),
   },
@@ -129,8 +129,11 @@ describe("IngestLogs Component", () => {
         "curl",
         "fluentbit",
         "fluentd",
+        "kinesisfirehose",
         "vector",
+        "gcpLogs",
         "syslogNg",
+        "splunkHec",
         "loongcollector",
       ]);
     });
@@ -242,6 +245,30 @@ describe("IngestLogs Component", () => {
       tw.unmount();
     });
 
+    it("should push with org_identifier query when route is 'kinesisfirehose'", () => {
+      mockRouter.currentRoute.value.name = "kinesisfirehose";
+      const tw = mount(IngestLogs, buildMountOptions());
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        name: "kinesisfirehose",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+      tw.unmount();
+    });
+
+    it("should push with org_identifier query when route is 'gcpLogs'", () => {
+      mockRouter.currentRoute.value.name = "gcpLogs";
+      const tw = mount(IngestLogs, buildMountOptions());
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        name: "gcpLogs",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+      tw.unmount();
+    });
+
     it("should push with org_identifier query when route is 'syslogNg'", () => {
       mockRouter.currentRoute.value.name = "syslogNg";
       const tw = mount(IngestLogs, buildMountOptions());
@@ -329,17 +356,17 @@ describe("IngestLogs Component", () => {
       const mockContent = { innerText: "log ingestion snippet" };
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("log ingestion snippet", {
+      expect(copyToClipboard).toHaveBeenCalledWith("log ingestion snippet", expect.any(Function), {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
       });
     });
 
-    it("should track segment analytics on successful copy", async () => {
+    it("should track product analytics on successful copy", async () => {
       const { copyToClipboard } = await import("@/utils/clipboard");
       vi.mocked(copyToClipboard).mockResolvedValue(true);
-      const segment = await import("@/services/segment_analytics");
+      const analytics = await import("@/services/product_analytics");
 
       mockRouter.currentRoute.value.name = "curl";
       await wrapper.vm.copyToClipboardFn({ innerText: "track this" });
@@ -347,19 +374,18 @@ describe("IngestLogs Component", () => {
       // Wait for the .then() callback to fire
       await flushPromises();
 
-      expect(segment.default.track).toHaveBeenCalledWith("Button Click", {
+      expect(analytics.default.track).toHaveBeenCalledWith("Button Click", {
         button: "Copy to Clipboard",
         ingestion: "curl",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         page: "Ingestion",
       });
     });
 
-    it("should not track segment analytics when copy fails (resolves false)", async () => {
+    it("should not track product analytics when copy fails (resolves false)", async () => {
       const { copyToClipboard } = await import("@/utils/clipboard");
       vi.mocked(copyToClipboard).mockResolvedValue(false);
-      const segment = await import("@/services/segment_analytics");
+      const analytics = await import("@/services/product_analytics");
 
       mockRouter.currentRoute.value.name = "fluentbit";
       await wrapper.vm.copyToClipboardFn({ innerText: "fail track" });
@@ -367,7 +393,7 @@ describe("IngestLogs Component", () => {
       // Wait for the .then() callback to fire
       await flushPromises();
 
-      expect(segment.default.track).not.toHaveBeenCalled();
+      expect(analytics.default.track).not.toHaveBeenCalled();
     });
 
     it("should handle empty innerText gracefully", async () => {
@@ -375,7 +401,7 @@ describe("IngestLogs Component", () => {
 
       await wrapper.vm.copyToClipboardFn({ innerText: "" });
 
-      expect(copyToClipboard).toHaveBeenCalledWith("", {
+      expect(copyToClipboard).toHaveBeenCalledWith("", expect.any(Function), {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
@@ -387,7 +413,7 @@ describe("IngestLogs Component", () => {
 
       await wrapper.vm.copyToClipboardFn({});
 
-      expect(copyToClipboard).toHaveBeenCalledWith(undefined, {
+      expect(copyToClipboard).toHaveBeenCalledWith(undefined, expect.any(Function), {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
@@ -467,5 +493,39 @@ describe("IngestLogs Component", () => {
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.ingestiontabs).toBe("curl");
     });
+  });
+});
+
+describe("IngestLogs: Get started pick", () => {
+  const PICK_KEY = `o2.onboarding.firstSource.${store.state.selectedOrganization.identifier}`;
+  const ids = (wrapper: any): string[] =>
+    wrapper.findAll("[data-test]").map((el: any) => el.attributes("data-test"));
+
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it("pins the curl guide under Your pick, with the rest of the rail under Logs", () => {
+    localStorage.setItem(PICK_KEY, "http");
+    const wrapper = mount(IngestLogs, buildMountOptions());
+    const rail = ids(wrapper);
+    expect(rail.slice(0, 3)).toEqual([
+      "ingestion-logs-pick-group",
+      "ingestion-logs-pick-tab-curl",
+      "ingestion-logs-rest-group",
+    ]);
+    expect(wrapper.find('[data-test="ingestion-logs-pick-group"]').text()).toBe("Your pick");
+    expect(wrapper.find('[data-test="ingestion-logs-rest-group"]').text()).toBe("Logs");
+    expect(rail).not.toContain("ingestion-logs-tab-curl");
+    expect(rail).toContain("ingestion-logs-tab-filebeat");
+    wrapper.unmount();
+  });
+
+  it("renders today's rail for a pick in another rail or no pick", () => {
+    localStorage.setItem(PICK_KEY, "webserver");
+    const wrapper = mount(IngestLogs, buildMountOptions());
+    expect(ids(wrapper)[0]).toBe("ingestion-logs-tab-curl");
+    expect(wrapper.find('[data-test="ingestion-logs-pick-group"]').exists()).toBe(false);
+    wrapper.unmount();
   });
 });

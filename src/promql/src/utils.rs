@@ -13,48 +13,68 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::ops::Not;
+use std::ops::Range;
 
 use config::{
     TIMESTAMP_COL_NAME,
-    meta::promql::{BUCKET_LABEL, HASH_LABEL, VALUE_LABEL},
+    meta::{
+        promql::{
+            BUCKET_LABEL, BUCKET_STREAM_SUFFIX, HASH_LABEL, NAME_LABEL, STALE_NAN_BITS,
+            VALUE_LABEL, exemplars_stream_name, value::Sample,
+        },
+        stream::StreamType,
+    },
 };
 use datafusion::{
-    arrow::datatypes::Schema,
+    arrow::{
+        array::{Array, Float64Array},
+        datatypes::Schema,
+    },
     error::Result,
-    functions::regex::regexp_like,
-    prelude::{DataFrame, col, lit},
+    logical_expr::utils::disjunction,
+    prelude::{DataFrame, Expr, col, lit},
 };
 use hashbrown::HashSet;
-use promql_parser::label::{MatchOp, Matchers};
+pub use metrics_index::{matcher_predicates, matcher_residual_field};
+use promql_parser::{
+    label::{MatchOp, Matcher, Matchers},
+    parser::{Offset, VectorSelector},
+};
 
-pub fn apply_matchers(df: DataFrame, schema: &Schema, matchers: &Matchers) -> Result<DataFrame> {
+use crate::micros;
+
+const OPTIMIZATION_STEP_LOOKBACK_MULTIPLIER: i64 = 5;
+const OPTIMIZATION_MAX_STEPS: i64 = 30;
+
+/// The stream a selector reads from: the bare metric name, else an `__name__` equality matcher.
+pub fn metric_name(selector: &VectorSelector) -> Option<String> {
+    if let Some(name) = selector.name.as_ref() {
+        return Some(name.clone());
+    }
+    // only `=` resolves to one stream; a regex or negated `__name__` names a set the engine
+    // cannot read, so it must fail rather than authorize a stream no one has
+    selector
+        .matchers
+        .find_matchers(NAME_LABEL)
+        .into_iter()
+        .find(|mat| matches!(mat.op, MatchOp::Equal))
+        .map(|mat| mat.value)
+}
+
+pub fn apply_matchers(df: DataFrame, matchers: &Matchers) -> Result<DataFrame> {
+    let predicates = matcher_predicates(df.schema().as_arrow(), matchers);
     let mut df = df;
-    for mat in matchers.matchers.iter() {
-        if mat.name == TIMESTAMP_COL_NAME
-            || mat.name == VALUE_LABEL
-            || schema.field_with_name(&mat.name).is_err()
-        {
-            continue;
-        }
-        match &mat.op {
-            MatchOp::Equal => df = df.filter(col(mat.name.clone()).eq(lit(mat.value.clone())))?,
-            MatchOp::NotEqual => {
-                df = df.filter(col(mat.name.clone()).not_eq(lit(mat.value.clone())))?
-            }
-            MatchOp::Re(regex) => {
-                let regex = format!("^{}$", regex.as_str());
-                let predicate = regexp_like().call(vec![col(mat.name.clone()), lit(regex)]);
-                df = df.filter(predicate)?
-            }
-            MatchOp::NotRe(regex) => {
-                let regex = format!("^{}$", regex.as_str());
-                let predicate = regexp_like().call(vec![col(mat.name.clone()), lit(regex)]);
-                df = df.filter(predicate.not())?
-            }
-        }
+    for predicate in predicates {
+        df = df.filter(predicate)?;
     }
     Ok(df)
+}
+
+/// True when `matcher`'s label is absent from `schema` and "" (a missing label's value) fails it.
+pub fn absent_label_rejects_all(schema: &Schema, matcher: &Matcher) -> bool {
+    ![TIMESTAMP_COL_NAME, VALUE_LABEL, NAME_LABEL].contains(&matcher.name.as_str())
+        && schema.field_with_name(&matcher.name).is_err()
+        && !matcher.is_match("")
 }
 
 pub fn apply_label_selector(
@@ -67,30 +87,18 @@ pub fn apply_label_selector(
         let schema_fields = schema
             .fields()
             .iter()
-            .map(|f| f.name())
+            .map(|f| f.name().as_str())
             .collect::<HashSet<_>>();
-        let mut def_labels = vec![
-            HASH_LABEL.to_string(),
-            VALUE_LABEL.to_string(),
-            BUCKET_LABEL.to_string(),
-            TIMESTAMP_COL_NAME.to_string(),
-        ];
-        for label in label_selector.iter() {
-            if def_labels.contains(label) {
-                def_labels.retain(|x| x != label);
-            }
-        }
+        let def_labels = [HASH_LABEL, VALUE_LABEL, BUCKET_LABEL, TIMESTAMP_COL_NAME]
+            .into_iter()
+            .filter(|label| !label_selector.contains(*label));
         // include only found columns and required _timestamp, hash, value, le cols
         let selected_cols: Vec<_> = label_selector
             .iter()
-            .chain(def_labels.iter())
-            .filter_map(|label| {
-                if schema_fields.contains(label) {
-                    Some(col(label))
-                } else {
-                    None
-                }
-            })
+            .map(String::as_str)
+            .chain(def_labels)
+            .filter(|label| schema_fields.contains(label))
+            .map(col)
             .collect();
         df = match df.select(selected_cols) {
             Ok(df) => df,
@@ -103,13 +111,143 @@ pub fn apply_label_selector(
     Some(df)
 }
 
+/// The exemplar stream for `selector_name`, from cached schemas only: its own if that exists, else
+/// its histogram family's when the family's `_bucket` stream carries `le`.
+pub async fn exemplars_stream_for(org_id: &str, selector_name: &str) -> String {
+    let own = exemplars_stream_name(selector_name);
+    let Some(family) = [BUCKET_STREAM_SUFFIX, "_count", "_sum"]
+        .iter()
+        .find_map(|suffix| selector_name.strip_suffix(suffix))
+    else {
+        return own;
+    };
+    let cached = |stream: String| async move {
+        infra::schema::get_stream_schema_from_cache(org_id, &stream, StreamType::Metrics).await
+    };
+    // remote write keeps exemplars sent on a `_count`/`_sum` series in that series' own stream
+    if cached(own.clone()).await.is_some() {
+        return own;
+    }
+    let is_family = cached(format!("{family}{BUCKET_STREAM_SUFFIX}"))
+        .await
+        .is_some_and(|schema| schema.field_with_name(BUCKET_LABEL).is_ok());
+    if is_family {
+        exemplars_stream_name(family)
+    } else {
+        own
+    }
+}
+
+/// Zeroes the step of local exemplar loads only; older peers divide by the forwarded step.
+pub(crate) fn exemplar_load_step(
+    query_ctx: &config::meta::promql::value::QueryContext,
+    step: i64,
+) -> i64 {
+    if query_ctx.query_exemplars { 0 } else { step }
+}
+
+/// Restricts `df` to the rows the evaluation can observe: per-step lookback
+/// windows when the steps are sparse enough, the contiguous
+/// `[start - lookback, end]` range otherwise.
+pub(crate) fn apply_time_window(
+    df: DataFrame,
+    start: i64,
+    end: i64,
+    step: i64,
+    lookback: i64,
+) -> Result<DataFrame> {
+    // Optimization: When step > lookback, we don't need to load all data in
+    // [start-lookback, end] Instead, we only need to load data windows around
+    // each evaluation point
+    let use_optimization = start != end
+        && step > 0
+        && step >= lookback * OPTIMIZATION_STEP_LOOKBACK_MULTIPLIER
+        && (((end - start) / step) + 1) < OPTIMIZATION_MAX_STEPS;
+    if use_optimization {
+        let num_steps = ((end - start) / step) + 1;
+        let mut conditions: Vec<Expr> = Vec::new();
+        for i in 0..num_steps {
+            let eval_ts = start + (step * i);
+            let window_start = eval_ts - lookback;
+            let window_end = eval_ts;
+
+            conditions.push(
+                col(TIMESTAMP_COL_NAME)
+                    .gt_eq(lit(window_start))
+                    .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(window_end))),
+            );
+        }
+
+        let filters = disjunction(conditions).unwrap();
+        df.filter(filters)
+    } else {
+        // Need to include lookback window before start for the first evaluation point
+        let query_start = start - lookback;
+        df.filter(
+            col(TIMESTAMP_COL_NAME)
+                .gt_eq(lit(query_start))
+                .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(end))),
+        )
+    }
+}
+
+/// Length of the contiguous run of equal hashes starting at `start`.
+pub(crate) fn batch_run_len(hashes: &[u64], start: usize) -> usize {
+    let hash = hashes[start];
+    let mut end = start + 1;
+    while end < hashes.len() && hashes[end] == hash {
+        end += 1;
+    }
+    end - start
+}
+
+/// Appends `rows` as samples shifted by `offset`; a NULL value is a stale marker, or none when off.
+pub(crate) fn extend_samples(
+    samples: &mut Vec<Sample>,
+    timestamps: &[i64],
+    values: &Float64Array,
+    rows: Range<usize>,
+    offset: i64,
+    stale_markers: bool,
+) {
+    if values.null_count() == 0 {
+        samples.extend(
+            timestamps[rows.clone()]
+                .iter()
+                .zip(&values.values()[rows])
+                .map(|(&timestamp, &value)| Sample::new(timestamp + offset, value)),
+        );
+        return;
+    }
+    let stale = f64::from_bits(STALE_NAN_BITS);
+    samples.extend(rows.filter_map(|row| {
+        let value = if values.is_valid(row) {
+            values.value(row)
+        } else if stale_markers {
+            stale
+        } else {
+            return None;
+        };
+        Some(Sample::new(timestamps[row] + offset, value))
+    }));
+}
+
+/// An `offset` in microseconds, positive into the past.
+pub(crate) fn offset_micros(offset: &Option<Offset>) -> i64 {
+    match offset {
+        Some(Offset::Pos(offset)) => micros(*offset),
+        Some(Offset::Neg(offset)) => -micros(*offset),
+        None => 0,
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::{sync::Arc, time::Duration};
 
     use datafusion::{
         arrow::{
-            array::{Int32Array, StringArray},
+            array::{Int32Array, StringArray, StringViewArray},
             datatypes::{DataType, Field, Schema as ArrowSchema},
             record_batch::RecordBatch,
         },
@@ -119,6 +257,117 @@ mod tests {
     use promql_parser::label::Matchers;
 
     use super::*;
+
+    #[test]
+    fn test_exemplar_load_step_is_zero_only_for_exemplars() {
+        let ctx = |query_exemplars| config::meta::promql::value::QueryContext {
+            trace_id: "t".to_string(),
+            org_id: "o".to_string(),
+            query_exemplars,
+            query_data: false,
+            need_wal: false,
+            use_cache: false,
+            timeout: 1,
+            search_event_type: None,
+            search_event_context: None,
+            regions: vec![],
+            clusters: vec![],
+            is_super_cluster: true,
+        };
+        assert_eq!(exemplar_load_step(&ctx(true), 300_000_000), 0);
+        assert_eq!(exemplar_load_step(&ctx(false), 300_000_000), 300_000_000);
+    }
+
+    #[tokio::test]
+    async fn test_exemplars_stream_for_joins_a_family_only_through_a_bucket_stream_with_le() {
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache, insert_latest};
+
+        let seed = |name: &str, fields: Vec<Field>| {
+            let key = infra::schema::mk_key("exemplar_org", StreamType::Metrics, name);
+            let key = key
+                .strip_prefix(infra::schema::SCHEMA_KEY)
+                .unwrap()
+                .to_string();
+            let schema = SchemaCache::new(ArrowSchema::new(fields));
+            async move {
+                let mut w = STREAM_SCHEMAS_LATEST.write().await;
+                insert_latest(&mut w, key, schema);
+            }
+        };
+        let label = |name: &str| Field::new(name, DataType::Utf8, true);
+        seed("rpc_latency_bucket", vec![label("le"), label("job")]).await;
+        seed("queue_count", vec![label("job")]).await;
+        seed("plain_bucket", vec![label("job")]).await;
+        seed("plain_count", vec![label("job")]).await;
+        seed("rw_latency_bucket", vec![label("le"), label("job")]).await;
+        seed("rw_latency_sum_exemplars", vec![label("job")]).await;
+
+        for name in ["rpc_latency_bucket", "rpc_latency_count", "rpc_latency_sum"] {
+            assert_eq!(
+                exemplars_stream_for("exemplar_org", name).await,
+                "rpc_latency_exemplars",
+                "{name}"
+            );
+        }
+        assert_eq!(
+            exemplars_stream_for("exemplar_org", "rw_latency_count").await,
+            "rw_latency_exemplars"
+        );
+        for name in [
+            "queue_count",
+            "plain_bucket",
+            "plain_count",
+            "unknown_bucket",
+            "unknown_sum",
+            "up",
+            "rw_latency_sum",
+        ] {
+            assert_eq!(
+                exemplars_stream_for("exemplar_org", name).await,
+                format!("{name}_exemplars"),
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_extend_samples_reads_a_null_value_as_a_stale_marker() {
+        use config::meta::promql::is_stale_marker;
+
+        let timestamps = [10, 20, 30, 40];
+        let values = Float64Array::from(vec![Some(1.0), None, Some(3.0), None]);
+        let mut samples = vec![];
+        extend_samples(&mut samples, &timestamps, &values, 1..4, 5, true);
+        assert_eq!(samples.len(), 3);
+        assert_eq!(samples[0].timestamp, 25);
+        assert!(is_stale_marker(samples[0].value));
+        assert_eq!((samples[1].timestamp, samples[1].value), (35, 3.0));
+        assert!(is_stale_marker(samples[2].value));
+
+        let mut samples = vec![];
+        extend_samples(&mut samples, &timestamps, &values, 0..4, 0, false);
+        let kept: Vec<_> = samples.iter().map(|s| (s.timestamp, s.value)).collect();
+        assert_eq!(kept, vec![(10, 1.0), (30, 3.0)]);
+    }
+
+    #[test]
+    fn test_extend_samples_without_nulls_keeps_every_row() {
+        let values = Float64Array::from(vec![1.0, 2.0]);
+        for stale_markers in [true, false] {
+            let mut samples = vec![];
+            extend_samples(&mut samples, &[1, 2], &values, 0..2, 0, stale_markers);
+            let kept: Vec<_> = samples.iter().map(|s| (s.timestamp, s.value)).collect();
+            assert_eq!(kept, vec![(1, 1.0), (2, 2.0)]);
+        }
+    }
+
+    #[test]
+    fn test_batch_run_len() {
+        let hashes = [7u64, 7, 7, 9, 9, 1];
+        assert_eq!(batch_run_len(&hashes, 0), 3);
+        assert_eq!(batch_run_len(&hashes, 3), 2);
+        assert_eq!(batch_run_len(&hashes, 5), 1);
+    }
 
     fn make_df() -> (DataFrame, ArrowSchema) {
         let schema = Arc::new(ArrowSchema::new(vec![Field::new(
@@ -158,11 +407,29 @@ mod tests {
         )
     }
 
+    fn make_string_view_df() -> (DataFrame, ArrowSchema) {
+        let schema = Arc::new(ArrowSchema::new(vec![Field::new(
+            "service",
+            DataType::Utf8View,
+            false,
+        )]));
+        let batch = RecordBatch::try_new(
+            Arc::clone(&schema),
+            vec![Arc::new(StringViewArray::from(vec![
+                "api", "worker", "api-v2",
+            ]))],
+        )
+        .unwrap();
+        let ctx = SessionContext::new();
+        let df = ctx.read_batch(batch).unwrap();
+        (df, schema.as_ref().clone())
+    }
+
     #[test]
     fn test_apply_matchers_empty_matchers_returns_ok() {
-        let (df, schema) = make_df();
+        let (df, _) = make_df();
         let matchers = Matchers::new(vec![]);
-        let result = apply_matchers(df, &schema, &matchers);
+        let result = apply_matchers(df, &matchers);
         assert!(result.is_ok());
     }
 
@@ -194,41 +461,35 @@ mod tests {
 
     #[test]
     fn test_apply_matchers_unknown_field_is_skipped() {
-        let (df, schema) = make_df();
+        let (df, _) = make_df();
         use promql_parser::label::{MatchOp, Matcher};
         let matchers = Matchers::new(vec![Matcher {
             op: MatchOp::Equal,
             name: "unknown_col".to_string(),
             value: "x".to_string(),
         }]);
-        let result = apply_matchers(df, &schema, &matchers);
+        let result = apply_matchers(df, &matchers);
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_apply_matchers_timestamp_col_is_skipped() {
-        let (df, schema) = make_df();
+        let (df, _) = make_df();
         use promql_parser::label::{MatchOp, Matcher};
         let matchers = Matchers::new(vec![Matcher {
             op: MatchOp::Equal,
             name: "_timestamp".to_string(),
             value: "12345".to_string(),
         }]);
-        let result = apply_matchers(df, &schema, &matchers);
+        let result = apply_matchers(df, &matchers);
         assert!(result.is_ok());
     }
 
     #[tokio::test]
     async fn test_apply_matchers_regex_uses_anchored_promql_semantics() {
-        use promql_parser::label::Matcher;
-
-        let (df, schema) = make_string_df();
-        let matchers = Matchers::new(vec![Matcher {
-            op: MatchOp::Re(regex::Regex::new("api.*").unwrap()),
-            name: "service".to_string(),
-            value: "api.*".to_string(),
-        }]);
-        let batches = apply_matchers(df, &schema, &matchers)
+        let (df, _) = make_string_df();
+        let matchers = parsed_matchers(r#"m{service=~"api.*"}"#);
+        let batches = apply_matchers(df, &matchers)
             .unwrap()
             .collect()
             .await
@@ -242,15 +503,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_apply_matchers_negative_regex() {
-        use promql_parser::label::Matcher;
-
-        let (df, schema) = make_string_df();
-        let matchers = Matchers::new(vec![Matcher {
-            op: MatchOp::NotRe(regex::Regex::new("api.*").unwrap()),
-            name: "service".to_string(),
-            value: "api.*".to_string(),
-        }]);
-        let batches = apply_matchers(df, &schema, &matchers)
+        let (df, _) = make_string_df();
+        let matchers = parsed_matchers(r#"m{service!~"api.*"}"#);
+        let batches = apply_matchers(df, &matchers)
             .unwrap()
             .collect()
             .await
@@ -260,5 +515,221 @@ mod tests {
             batches.iter().map(|batch| batch.num_rows()).sum::<usize>(),
             1
         );
+    }
+
+    #[tokio::test]
+    async fn test_null_label_matches_as_empty() {
+        use promql_parser::label::Matcher;
+
+        let schema = Arc::new(ArrowSchema::new(vec![Field::new(
+            "env",
+            DataType::Utf8,
+            true,
+        )]));
+        let batch = RecordBatch::try_new(
+            schema,
+            vec![Arc::new(StringArray::from(vec![None::<&str>]))],
+        )
+        .unwrap();
+        let ctx = SessionContext::new();
+        for (matcher, expected) in [
+            (Matcher::new(MatchOp::Equal, "env", "prod"), 0),
+            (Matcher::new(MatchOp::Equal, "env", ""), 1),
+            (Matcher::new(MatchOp::NotEqual, "env", "prod"), 1),
+            (Matcher::new(MatchOp::NotEqual, "env", ""), 0),
+            (parsed_matchers(r#"m{env=~".*"}"#).matchers.remove(0), 1),
+            (parsed_matchers(r#"m{env=~"p.*"}"#).matchers.remove(0), 0),
+            (parsed_matchers(r#"m{env!~"prod"}"#).matchers.remove(0), 1),
+            (parsed_matchers(r#"m{env!~".*"}"#).matchers.remove(0), 0),
+        ] {
+            let case = format!("{matcher:?}");
+            let rows = apply_matchers(
+                ctx.read_batch(batch.clone()).unwrap(),
+                &Matchers::new(vec![matcher]),
+            )
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+            assert_eq!(
+                rows.iter().map(RecordBatch::num_rows).sum::<usize>(),
+                expected,
+                "{case}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_not_equal_empty_keeps_only_rows_carrying_the_label() {
+        let schema = Arc::new(ArrowSchema::new(vec![Field::new(
+            "trace_stream",
+            DataType::Utf8,
+            true,
+        )]));
+        let batch = RecordBatch::try_new(
+            schema,
+            vec![Arc::new(StringArray::from(vec![
+                Some("default"),
+                None,
+                Some(""),
+                Some("traces"),
+                None,
+            ]))],
+        )
+        .unwrap();
+        let df = SessionContext::new().read_batch(batch).unwrap();
+        let rows = apply_matchers(df, &parsed_matchers(r#"m{trace_stream!=""}"#))
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+        let kept: Vec<String> = rows
+            .iter()
+            .flat_map(|b| {
+                let col = b.column(0).as_any().downcast_ref::<StringArray>().unwrap();
+                (0..col.len())
+                    .map(|i| col.value(i).to_string())
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        assert_eq!(kept, ["default", "traces"]);
+    }
+
+    #[tokio::test]
+    async fn test_apply_matchers_exact_regex_supports_utf8_view() {
+        let (df, _) = make_string_view_df();
+        let matchers = parsed_matchers(r#"m{service=~"api"}"#);
+        let batches = apply_matchers(df, &matchers)
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+
+        assert_eq!(
+            batches.iter().map(|batch| batch.num_rows()).sum::<usize>(),
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn test_apply_matchers_prefix_regex_supports_utf8_view() {
+        let (df, _) = make_string_view_df();
+        let matchers = parsed_matchers(r#"m{service=~"api.*"}"#);
+        let batches = apply_matchers(df, &matchers)
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+
+        assert_eq!(
+            batches.iter().map(|batch| batch.num_rows()).sum::<usize>(),
+            2
+        );
+    }
+
+    #[tokio::test]
+    async fn test_apply_matchers_equality_supports_utf8_view() {
+        use promql_parser::label::Matcher;
+
+        let (df, _) = make_string_view_df();
+        let matchers = Matchers::new(vec![Matcher {
+            op: MatchOp::Equal,
+            name: "service".to_string(),
+            value: "api".to_string(),
+        }]);
+        let batches = apply_matchers(df, &matchers)
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+
+        assert_eq!(
+            batches.iter().map(|batch| batch.num_rows()).sum::<usize>(),
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn test_apply_matchers_name_label_is_skipped() {
+        use promql_parser::label::Matcher;
+
+        // Rows ingested before `__name__` normalization keep the original
+        // mixed-case metric name, while the selector carries the formatted
+        // stream name; the matcher must not be applied as a column filter.
+        let schema = Arc::new(ArrowSchema::new(vec![Field::new(
+            NAME_LABEL,
+            DataType::Utf8,
+            false,
+        )]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(StringArray::from(vec![
+                "ClickHouseAsyncMetrics_CPUFrequencyMHz",
+                "ClickHouseAsyncMetrics_CPUFrequencyMHz",
+            ]))],
+        )
+        .unwrap();
+        let ctx = SessionContext::new();
+        let df = ctx.read_batch(batch).unwrap();
+
+        let matchers = Matchers::new(vec![Matcher {
+            op: MatchOp::Equal,
+            name: NAME_LABEL.to_string(),
+            value: "clickhouseasyncmetrics_cpufrequencymhz".to_string(),
+        }]);
+        let batches = apply_matchers(df, &matchers)
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+
+        assert_eq!(
+            batches.iter().map(|batch| batch.num_rows()).sum::<usize>(),
+            2
+        );
+    }
+
+    #[test]
+    fn test_offset_micros() {
+        assert_eq!(offset_micros(&None), 0);
+        let past = Some(Offset::Pos(Duration::from_secs(60)));
+        assert_eq!(offset_micros(&past), 60_000_000);
+        let ahead = Some(Offset::Neg(Duration::from_secs(30)));
+        assert_eq!(offset_micros(&ahead), -30_000_000);
+    }
+
+    fn parsed_matchers(query: &str) -> Matchers {
+        let promql_parser::parser::Expr::VectorSelector(selector) =
+            promql_parser::parser::parse(query).unwrap()
+        else {
+            panic!("expected vector selector");
+        };
+        selector.matchers
+    }
+
+    #[test]
+    fn test_absent_label_reads_as_empty_string() {
+        let schema = ArrowSchema::new(vec![Field::new("job", DataType::Utf8, true)]);
+        for (query, rejects) in [
+            (r#"m{absent="x"}"#, true),
+            (r#"m{absent=~"foo.+"}"#, true),
+            (r#"m{absent!=""}"#, true),
+            (r#"m{absent=""}"#, false),
+            (r#"m{absent!="x"}"#, false),
+            (r#"m{absent=~".*"}"#, false),
+            (r#"m{absent=~"foo|"}"#, false),
+            (r#"m{absent!~"x"}"#, false),
+            (r#"m{job="x"}"#, false),
+            (r#"{__name__="m"}"#, false),
+        ] {
+            assert_eq!(
+                parsed_matchers(query)
+                    .matchers
+                    .iter()
+                    .any(|mat| absent_label_rejects_all(&schema, mat)),
+                rejects,
+                "{query}"
+            );
+        }
     }
 }

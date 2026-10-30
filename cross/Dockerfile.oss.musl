@@ -1,0 +1,16 @@
+ARG MUSL_BASE_IMAGE
+FROM $MUSL_BASE_IMAGE
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get install -y --option=Dpkg::Options::=--force-confnew \
+    libssl-dev pkg-config musl-dev musl-tools libboost-all-dev cmake patch wget unzip
+
+RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-x86_64.zip && \
+    unzip protoc-21.12-linux-x86_64.zip -d protoc && \
+    cp protoc/bin/protoc /usr/local/bin/ && \
+    cp -r protoc/include/google /usr/local/include/
+
+RUN test -n "${CROSS_SYSROOT:?CROSS_SYSROOT must be set by the base image}" && \
+    { test -d "${CROSS_SYSROOT%/}/usr/include" || \
+    { echo "Missing compiler include directory: ${CROSS_SYSROOT%/}/usr/include" >&2; exit 1; }; } && \
+    ln -s /usr/include/boost "${CROSS_SYSROOT%/}/usr/include/boost"

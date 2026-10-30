@@ -29,7 +29,7 @@ test.describe("UI Regression Bugs", () => {
    * https://github.com/openobserve/openobserve/issues/9217
    */
   test("Favicon is present and loads correctly (Bug #9217)", {
-    tag: ['@regressionBugs', '@smoke', '@P0', '@favicon', '@bug9217']
+    tag: ['@regressionBugs', '@smoke', '@P0', '@favicon', '@bug-9217']
   }, async ({ page }) => {
     testLogger.info('Test: Favicon verification (Bug #9217)');
 
@@ -69,7 +69,6 @@ test.describe("UI Regression Bugs", () => {
 
     // Click Help menu - using POM method
     await pm.enrichmentPage.clickHelpMenuItem();
-    await page.waitForTimeout(1000);
 
     testLogger.info('Help menu opened');
 

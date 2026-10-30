@@ -29,10 +29,11 @@
 
 import { describe, it, expect } from "vitest";
 import { findDoubleQuoteIssues } from "./doubleQuoteWarnings";
+import { gt } from "@/types/i18n";
 
 /** The substring each issue points at, so offsets are checked, not just counts. */
 const flagged = (sql: string) =>
-  findDoubleQuoteIssues(sql).map((i) => sql.slice(i.startOffset, i.endOffset));
+  findDoubleQuoteIssues(gt, sql).map((i) => sql.slice(i.startOffset, i.endOffset));
 
 describe("findDoubleQuoteIssues — what it must still flag", () => {
   it("flags a double-quoted value after a comparison", () => {
@@ -54,15 +55,15 @@ describe("findDoubleQuoteIssues — what it must still flag", () => {
   });
 
   it("separates the two messages", () => {
-    const [plain] = findDoubleQuoteIssues(`WHERE a = "x"`);
-    const [mixed] = findDoubleQuoteIssues(`WHERE a = "x'`);
+    const [plain] = findDoubleQuoteIssues(gt, `WHERE a = "x"`);
+    const [mixed] = findDoubleQuoteIssues(gt, `WHERE a = "x'`);
     expect(plain.message).toMatch(/single quotes/i);
     expect(mixed.message).toMatch(/mismatched/i);
   });
 
   it("reports offsets that point at the quoted token itself", () => {
     const sql = `SELECT * FROM t WHERE level = "error"`;
-    const [issue] = findDoubleQuoteIssues(sql);
+    const [issue] = findDoubleQuoteIssues(gt, sql);
     expect(sql.slice(issue.startOffset, issue.endOffset)).toBe(`"error"`);
     // The marker must not swallow the operator or the spaces before it.
     expect(sql[issue.startOffset]).toBe('"');
@@ -127,13 +128,13 @@ describe("findDoubleQuoteIssues — what it must stop flagging", () => {
 
 describe("findDoubleQuoteIssues — degenerate input", () => {
   it("returns nothing for empty or whitespace-only input", () => {
-    expect(findDoubleQuoteIssues("")).toEqual([]);
-    expect(findDoubleQuoteIssues("   \n  ")).toEqual([]);
+    expect(findDoubleQuoteIssues(gt, "")).toEqual([]);
+    expect(findDoubleQuoteIssues(gt, "   \n  ")).toEqual([]);
   });
 
   it("does not hang or throw on an unterminated string or comment", () => {
-    expect(() => findDoubleQuoteIssues(`WHERE a = 'unterminated`)).not.toThrow();
-    expect(() => findDoubleQuoteIssues(`/* unterminated`)).not.toThrow();
+    expect(() => findDoubleQuoteIssues(gt, `WHERE a = 'unterminated`)).not.toThrow();
+    expect(() => findDoubleQuoteIssues(gt, `/* unterminated`)).not.toThrow();
     expect(flagged(`/* unterminated ... level = "error"`)).toEqual([]);
   });
 });

@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use axum::{
     body::Body,
-    extract::Query,
+    extract::{Path, Query},
     http::{StatusCode, header},
     response::{IntoResponse, Response},
 };
@@ -34,6 +34,8 @@ use config::{
         cluster::{NodeStatus, Role, RoleGroup},
         function::ZoFunction,
         search::{HashFileRequest, HashFileResponse},
+        slack::DisabledReason,
+        user::UserRole,
     },
     stats::{CacheStats, CacheStatsAsync},
     utils::{base64, json},
@@ -48,7 +50,10 @@ use infra::{
     },
 };
 use openobserve_api_common::extractors::Headers;
-use openobserve_core::{auth::UserEmail, cache::STREAM_EXECUTABLE_PIPELINES};
+use openobserve_core::{
+    auth::{AuthExtractor, UserEmail},
+    cache::STREAM_EXECUTABLE_PIPELINES,
+};
 use search::{
     datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
     tantivy::cache as tantivy_result_cache,
@@ -120,6 +125,11 @@ macro_rules! enterprise_value {
     }};
 }
 
+#[cfg(feature = "enterprise")]
+const LOGIN_STATE_COOKIE: &str = "o2_login_state";
+#[cfg(feature = "enterprise")]
+const LOGIN_STATE_MAX_AGE_SECS: i64 = 600;
+
 #[derive(Serialize, serde::Deserialize, ToSchema)]
 pub struct HealthzResponse {
     status: String,
@@ -132,10 +142,10 @@ pub fn reload_enterprise_config() -> Result<(), anyhow::Error> {
         .and_then(|_| refresh_openfga_config())
 }
 
+/// Authenticated full UI configuration (`GET /api/{org_id}/config`).
 #[derive(Serialize)]
 struct ConfigResponse<'a> {
     version: String,
-    instance: String,
     commit_hash: String,
     build_date: String,
     build_type: String,
@@ -179,41 +189,76 @@ struct ConfigResponse<'a> {
     min_auto_refresh_interval: u32,
     query_default_limit: i64,
     max_dashboard_series: usize,
-    actions_enabled: bool,
+    max_dashboard_state_timeline_series: usize,
+    max_dashboard_hostmap_cells: usize,
     streaming_enabled: bool,
     histogram_enabled: bool,
     timechart_enabled: bool,
+    editor_suggest_mode: String,
     max_query_range: i64,
+    cluster_name: String,
+    /// Hours back the ingester accepts a record's timestamp.
+    ingest_allowed_upto: i64,
+    /// Hours ahead the ingester accepts a record's timestamp.
+    ingest_allowed_in_future: i64,
     ai_enabled: bool,
+    /// AI conversations are stored server-side (`/ai/chats`); IndexedDB is then only a cache.
+    ai_chat_persistence_enabled: bool,
+    /// Persisted AI chats may be shared through public links.
+    public_ai_chat_enabled: bool,
+    /// Longest expiry, in days, a public AI chat link may have.
+    public_ai_chat_max_expiry_days: u64,
+    /// The caller is root or an admin of the URL org (may list and revoke every AI chat share).
+    is_org_admin: bool,
+    /// Days a soft-deleted org stays recoverable; `0` (every OSS build) means none.
+    org_deletion_grace_period_days: i64,
     dashboard_placeholder: String,
     dashboard_show_symbol_enabled: bool,
     dashboard_show_field_as_json_enabled: bool,
     ingest_flatten_level: u32,
     #[cfg(feature = "enterprise")]
-    license_expiry: i64,
-    #[cfg(feature = "enterprise")]
-    license_server_url: String,
-    #[cfg(feature = "enterprise")]
-    ingestion_quota_used: f64,
-    #[cfg(feature = "enterprise")]
-    ingestion_history: Vec<o2_enterprise::enterprise::license::UsageResult>,
+    #[serde(flatten)]
+    license: LicenseConfig,
     log_page_default_field_list: String,
     query_values_default_num: i64,
     alert_preview_timerange_minutes: i64,
     incidents_enabled: bool,
+    incidents_rca_enabled: bool,
+    downtimes_enabled: bool,
+    fleet_enabled: bool,
+    alert_calibration_enabled: bool,
     service_streams_enabled: bool,
     model_pricing_enabled: bool,
     online_evals_enabled: bool,
     anomaly_detection_enabled: bool,
+    composite_alerts_available: bool,
     synthetics_enabled: bool,
-    /// SLO measurement (`ZO_SLO_ENABLED`). Not enterprise-gated — the SLO APIs
-    /// answer 501 while it is off, so the UI uses this to hide the menu entry
-    /// rather than offer a page that cannot work.
-    slo_enabled: bool,
+    /// Hides the publish button and the Public links view when the feature is off.
+    public_dashboards_enabled: bool,
+    /// The clamped operator refresh floor; the share form shows each range's floor from it.
+    public_dashboard_min_refresh_secs: u32,
+    oncall_enabled: bool,
+    slack_enabled: bool,
+    /// The same reason for every org, null when on.
+    slack_disabled_reason: Option<DisabledReason>,
+    /// Enterprise-only private locations; the UI gates their views on this flag.
+    synthetics_private_locations_enabled: bool,
+    /// Server-side step cap (`ZO_SYNTHETICS_BROWSER_MAX_STEPS`); the UI budget must follow it.
+    synthetics_browser_max_steps: usize,
+    /// Chrome Web Store URL of the Recorder extension (`ZO_SYNTHETICS_RECORDER_EXTENSION_URL`).
+    synthetics_recorder_extension_url: String,
+    /// The only DBM flag (`ZO_DB_MONITORING_ENABLED`): one OSS switch for every signal.
+    database_monitoring_enabled: bool,
+    /// Off hides recent searches in the UI; the server then records nothing.
+    query_history_enabled: bool,
+    /// Days unstarred recent searches are kept; 0 or less keeps them until the per-page cap.
+    query_history_retention_days: i64,
     enable_cross_linking: bool,
     show_fts_field_values: bool,
     search_inspector_enabled: bool,
     auto_query_enabled: bool,
+    profiling_enabled: bool,
+    experimental: bool,
     #[cfg(feature = "enterprise")]
     last_usage_report_ts: i64,
     #[cfg(feature = "enterprise")]
@@ -224,6 +269,60 @@ struct ConfigResponse<'a> {
     billing_group_allowed_orgs: String,
     #[cfg(feature = "enterprise")]
     workflows_enabled: bool,
+}
+
+#[cfg(feature = "enterprise")]
+#[derive(Serialize)]
+struct LicenseConfig {
+    license_expiry: i64,
+    license_server_url: String,
+    ingestion_quota_used: f64,
+    ingestion_history: Vec<o2_enterprise::enterprise::license::UsageResult>,
+    #[cfg(not(feature = "cloud"))]
+    #[serde(flatten)]
+    search: LicenseSearchConfig,
+}
+
+/// Cloud never shows the license search banner, so it does not serve these fields.
+#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+#[derive(Serialize)]
+struct LicenseSearchConfig {
+    license_search_allowed: bool,
+    license_waiver_until: Option<i64>,
+}
+
+#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+impl LicenseSearchConfig {
+    /// The flag is the gate `check_search_allowed` reads, never a follower's possibly newer status.
+    fn new(
+        gate_allowed: bool,
+        status: &o2_enterprise::enterprise::license::LicenseStatus,
+        now: i64,
+    ) -> Self {
+        Self {
+            license_search_allowed: gate_allowed,
+            license_waiver_until: status.search_unblock_until(now),
+        }
+    }
+}
+
+/// Unauthenticated `GET /config`: every field is public, so only what the login page consumes, plus
+/// `editor_suggest_mode`.
+#[derive(Serialize)]
+struct ConfigBootstrapResponse {
+    /// `enterprise` / `cloud` / `opensource`; the o2 CLI and o2-operator read it here.
+    build_type: String,
+    /// The UI's stale-build checker compares it across deploys.
+    commit_hash: String,
+    telemetry_enabled: bool,
+    sso_enabled: bool,
+    native_login_enabled: bool,
+    custom_logo_text: String,
+    custom_logo_img: Option<String>,
+    custom_logo_dark_img: Option<String>,
+    custom_hide_self_logo: bool,
+    /// The editors need it before the authenticated config lands, or `off` arrives too late.
+    editor_suggest_mode: String,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -250,7 +349,7 @@ impl Rum {
             site: cfg.rum.site.to_string(),
             service: cfg.rum.service.to_string(),
             env: cfg.rum.env.to_string(),
-            version: cfg.rum.version.to_string(),
+            version: config::VERSION.to_string(),
             organization_identifier: cfg.rum.organization_identifier.to_string(),
             api_version: cfg.rum.api_version.to_string(),
             insecure_http: cfg.rum.insecure_http,
@@ -281,8 +380,7 @@ pub async fn healthz() -> impl IntoResponse {
     })
 }
 
-/// Healthz HEAD
-/// Vector pipeline healthcheck support
+/// Healthz HEAD, for Vector pipeline healthchecks.
 pub async fn healthz_head() -> impl IntoResponse {
     StatusCode::OK
 }
@@ -326,8 +424,66 @@ pub async fn schedulez() -> impl IntoResponse {
     )
 }
 
-pub async fn zo_config() -> impl IntoResponse {
+/// Unauthenticated login-page bootstrap; the full config is served by [`zo_config`].
+pub async fn zo_config_bootstrap() -> impl IntoResponse {
     let cfg = get_config();
+    #[cfg(feature = "enterprise")]
+    let o2cfg = get_o2_config();
+    #[cfg(feature = "enterprise")]
+    let dex_cfg = get_dex_config();
+
+    #[cfg(feature = "enterprise")]
+    let block_features = block_feature_for_report_failure().await;
+
+    let sso_enabled = enterprise_value!(false, dex_cfg.dex_enabled, block_features);
+    let native_login_enabled = enterprise_value!(true, dex_cfg.native_login_enabled);
+    let custom_logo_text = enterprise_value!(
+        "".to_string(),
+        get_logo_text()
+            .await
+            .unwrap_or_else(|| o2cfg.common.custom_logo_text.clone())
+    );
+    let custom_logo_img = enterprise_value!(None, get_logo().await);
+    let custom_logo_dark_img = enterprise_value!(None, get_logo_dark().await);
+    let custom_hide_self_logo = enterprise_value!(false, o2cfg.common.custom_hide_self_logo);
+
+    #[cfg(feature = "cloud")]
+    let build_type = "cloud";
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    let build_type = "enterprise";
+    #[cfg(not(any(feature = "cloud", feature = "enterprise")))]
+    let build_type = "opensource";
+
+    axum::Json(ConfigBootstrapResponse {
+        build_type: build_type.to_string(),
+        commit_hash: config::COMMIT_HASH.to_string(),
+        telemetry_enabled: cfg.common.telemetry_enabled,
+        sso_enabled,
+        native_login_enabled,
+        custom_logo_text,
+        custom_logo_img,
+        custom_logo_dark_img,
+        custom_hide_self_logo,
+        editor_suggest_mode: cfg.limit.editor_suggest_mode.clone(),
+    })
+}
+
+/// Full UI configuration; `search_inspector_enabled` and `is_org_admin` are per caller and org.
+pub async fn zo_config(
+    Path(org_id): Path<String>,
+    user_email: Option<Headers<UserEmail>>,
+) -> impl IntoResponse {
+    let cfg = get_config();
+
+    // per-user value: false unless this caller may use the search inspector
+    let search_inspector_enabled = match &user_email {
+        Some(Headers(user)) => search_inspector_permitted(&org_id, &user.user_id).await,
+        None => false,
+    };
+    let is_org_admin = match &user_email {
+        Some(Headers(user)) => org_admin(&org_id, &user.user_id).await,
+        None => false,
+    };
     #[cfg(feature = "enterprise")]
     let o2cfg = get_o2_config();
     #[cfg(feature = "enterprise")]
@@ -341,8 +497,7 @@ pub async fn zo_config() -> impl IntoResponse {
     let sso_enabled = enterprise_value!(false, dex_cfg.dex_enabled, block_features);
     let native_login_enabled = enterprise_value!(true, dex_cfg.native_login_enabled);
     let service_account_enabled = cfg.auth.service_account_enabled;
-    let rbac_enabled = enterprise_value!(false, openfga_cfg.enabled, block_features);
-    let actions_enabled = enterprise_value!(false, o2cfg.actions.enabled);
+    let rbac_enabled = enterprise_value!(false, rbac_enabled_for_config(openfga_cfg.enabled).await);
     let super_cluster_enabled = enterprise_value!(false, o2cfg.super_cluster.enabled);
 
     #[cfg(feature = "enterprise")]
@@ -362,37 +517,54 @@ pub async fn zo_config() -> impl IntoResponse {
     let logo_dark = enterprise_value!(None, get_logo_dark().await);
     let custom_hide_menus = enterprise_value!("", &o2cfg.common.custom_hide_menus);
     let custom_hide_self_logo = enterprise_value!(false, o2cfg.common.custom_hide_self_logo);
-    let ai_enabled = enterprise_value!(false, o2cfg.ai.enabled);
+    // AI needs o2-ai to answer; with no agent target its buttons could only fail, so report it off.
+    let ai_enabled = enterprise_value!(false, o2cfg.ai.enabled && o2cfg.ai.has_agent_target());
+    let ai_chat_persistence_enabled = enterprise_value!(
+        false,
+        o2cfg.ai.enabled && o2cfg.ai.has_agent_target() && o2cfg.ai.chat_persistence_enabled
+    );
     let incidents_enabled = enterprise_value!(false, o2cfg.incidents.enabled);
+    // Incident analysis needs RCA on and an agent to answer.
+    let incidents_rca_enabled = enterprise_value!(
+        false,
+        o2cfg.incidents.enabled && o2cfg.incidents.rca_enabled && o2cfg.ai.has_agent_target()
+    );
+    let downtimes_enabled = enterprise_value!(false, o2cfg.downtimes.enabled);
+    let fleet_enabled = enterprise_value!(false, openobserve_core::fleet::enabled());
+    let alert_calibration_enabled = enterprise_value!(false, o2cfg.alert_calibration.enabled);
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
-    // Anomaly detection is on when the enterprise feature is compiled in, unless turned off at
-    // runtime via O2_ANOMALY_DETECTION_DISABLED. When disabled the UI hides the anomaly tab.
+    // Enterprise builds have it unless O2_ANOMALY_DETECTION_DISABLED turns it off.
     let anomaly_detection_enabled = enterprise_value!(false, !o2cfg.anomaly_detection.disabled);
+    // Composite alerts are not available in super-cluster mode (§18, §19.2).
+    let composite_alerts_available =
+        config::get_config().alert_composite.writes_enabled && !super_cluster_enabled;
     let online_evals_enabled = enterprise_value!(false, o2cfg.llm_eval_config.enabled);
-    let synthetics_enabled = enterprise_value!(false, o2cfg.synthetics.enabled);
+    let synthetics_enabled = cfg.synthetics.enabled;
+    // Private agents stay enterprise, so an OSS build shows synthetics without them.
+    let synthetics_private_locations_enabled = enterprise_value!(false, cfg.synthetics.enabled);
+    let synthetics_recorder_extension_url = &cfg.synthetics.recorder_extension_url;
+    let synthetics_browser_max_steps = cfg.synthetics.browser_max_steps;
+    let oncall_enabled = enterprise_value!(false, o2cfg.oncall.enabled);
+    let slack_disabled_reason = enterprise_value!(
+        Some(DisabledReason::Edition),
+        o2_enterprise::enterprise::slack::disabled_reason(&org_id)
+    );
 
-    #[cfg(all(feature = "cloud", not(feature = "enterprise")))]
+    #[cfg(feature = "cloud")]
     let build_type = "cloud";
-    #[cfg(feature = "enterprise")]
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
     let build_type = "enterprise";
     #[cfg(not(any(feature = "cloud", feature = "enterprise")))]
     let build_type = "opensource";
 
     #[cfg(feature = "enterprise")]
-    let expiry_time = o2_enterprise::enterprise::license::get_expiry_time().await;
-    #[cfg(feature = "enterprise")]
-    let license_server_url = o2cfg.common.license_server_url.to_string();
-    #[cfg(feature = "enterprise")]
-    let ingestion_quota_used = o2_enterprise::enterprise::license::ingestion_used() * 100.0;
-    #[cfg(feature = "enterprise")]
-    let ingestion_history = o2_enterprise::enterprise::license::get_ingestion_history().await;
+    let license = license_config(o2cfg.common.license_server_url.to_string()).await;
     #[cfg(feature = "enterprise")]
     let last_usage_report_ts = last_reported_timestamp().await;
 
-    let usage_enabled = enterprise_value!(cfg.common.usage_enabled, true);
+    let usage_enabled = enterprise_value!(false, true);
 
-    // max usage reporting interval can be 10 mins, because we
-    // need relatively recent data for usage calculations
+    // Usage calculations need data at most 10 minutes old.
     let usage_publish_interval = enterprise_value!(
         cfg.common.usage_publish_interval,
         (10 * 60).min(cfg.common.usage_publish_interval)
@@ -406,7 +578,6 @@ pub async fn zo_config() -> impl IntoResponse {
 
     axum::Json(ConfigResponse {
         version: config::VERSION.to_string(),
-        instance: get_instance_id(),
         commit_hash: config::COMMIT_HASH.to_string(),
         build_date: config::BUILD_DATE.to_string(),
         build_type: build_type.to_string(),
@@ -452,42 +623,63 @@ pub async fn zo_config() -> impl IntoResponse {
         ingestion_url: cfg.common.ingestion_url.to_string(),
         web_url: cfg.common.web_url.to_string(),
         #[cfg(feature = "enterprise")]
-        streaming_aggregation_enabled: cfg.common.feature_query_streaming_aggs,
+        streaming_aggregation_enabled: cfg.search.feature_query_streaming_aggs,
         min_auto_refresh_interval: cfg.common.min_auto_refresh_interval,
         query_default_limit: cfg.limit.query_default_limit,
         max_dashboard_series: cfg.limit.max_dashboard_series,
-        actions_enabled,
+        max_dashboard_state_timeline_series: cfg.limit.max_dashboard_state_timeline_series,
+        max_dashboard_hostmap_cells: cfg.limit.max_dashboard_hostmap_cells,
         streaming_enabled: cfg.http_streaming.streaming_enabled,
         histogram_enabled: cfg.limit.histogram_enabled,
         timechart_enabled: cfg.limit.timechart_enabled,
+        editor_suggest_mode: cfg.limit.editor_suggest_mode.clone(),
         max_query_range: cfg.limit.default_max_query_range_days * 24,
+        cluster_name: cfg.common.cluster_name.clone(),
+        ingest_allowed_upto: cfg.limit.ingest_allowed_upto,
+        ingest_allowed_in_future: cfg.limit.ingest_allowed_in_future,
         ai_enabled,
+        ai_chat_persistence_enabled,
+        public_ai_chat_enabled: ai_chat_persistence_enabled && cfg.public_ai_chat.enabled,
+        public_ai_chat_max_expiry_days: cfg.public_ai_chat.expiry_limit_days(),
+        is_org_admin,
+        org_deletion_grace_period_days: openobserve_core::org_cleanup::grace_period_days(),
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
         dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,
         dashboard_show_field_as_json_enabled: cfg.common.dashboard_show_field_as_json_enabled,
         ingest_flatten_level: cfg.limit.ingest_flatten_level,
-        #[cfg(feature = "enterprise")]
-        license_expiry: expiry_time,
         log_page_default_field_list: cfg.common.log_page_default_field_list.clone(),
         #[cfg(feature = "enterprise")]
-        license_server_url,
-        #[cfg(feature = "enterprise")]
-        ingestion_quota_used,
-        #[cfg(feature = "enterprise")]
-        ingestion_history,
+        license,
         query_values_default_num: cfg.limit.query_values_default_num,
         alert_preview_timerange_minutes: cfg.limit.alert_preview_timerange_minutes,
         incidents_enabled,
+        incidents_rca_enabled,
+        downtimes_enabled,
+        fleet_enabled,
+        alert_calibration_enabled,
         service_streams_enabled,
         model_pricing_enabled: cfg.common.model_pricing_enabled,
         online_evals_enabled,
         anomaly_detection_enabled,
+        composite_alerts_available,
         synthetics_enabled,
-        slo_enabled: cfg.slo.enabled,
+        public_dashboards_enabled: cfg.public_dashboards.enabled,
+        public_dashboard_min_refresh_secs: cfg.public_dashboards.min_refresh_secs,
+        oncall_enabled,
+        slack_enabled: slack_disabled_reason.is_none(),
+        slack_disabled_reason,
+        synthetics_private_locations_enabled,
+        synthetics_browser_max_steps,
+        synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),
+        database_monitoring_enabled: cfg.db_monitoring.enabled,
+        query_history_enabled: cfg.limit.query_history_enabled,
+        query_history_retention_days: cfg.limit.query_history_retention_days,
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
-        search_inspector_enabled: cfg.common.search_inspector_enabled,
+        search_inspector_enabled,
         auto_query_enabled: cfg.common.auto_query_enabled,
+        profiling_enabled: cfg.common.profiling_enabled,
+        experimental: cfg.common.experimental,
         #[cfg(feature = "enterprise")]
         last_usage_report_ts,
         #[cfg(feature = "enterprise")]
@@ -499,6 +691,66 @@ pub async fn zo_config() -> impl IntoResponse {
         #[cfg(feature = "enterprise")]
         workflows_enabled,
     })
+}
+
+#[cfg(feature = "enterprise")]
+async fn license_config(license_server_url: String) -> LicenseConfig {
+    LicenseConfig {
+        license_expiry: o2_enterprise::enterprise::license::get_expiry_time().await,
+        license_server_url,
+        ingestion_quota_used: o2_enterprise::enterprise::license::ingestion_used() * 100.0,
+        ingestion_history: o2_enterprise::enterprise::license::get_ingestion_history().await,
+        #[cfg(not(feature = "cloud"))]
+        search: LicenseSearchConfig::new(
+            o2_enterprise::enterprise::license::search_allowed(),
+            &o2_enterprise::enterprise::license::license_status().await,
+            now_micros(),
+        ),
+    }
+}
+
+/// The route check of `GET /{org}/search/profile`, so the UI hides what the caller may not use.
+async fn search_inspector_permitted(org_id: &str, user_id: &str) -> bool {
+    if !get_config().common.search_inspector_enabled {
+        return false;
+    }
+    if is_root_user(user_id) {
+        return true;
+    }
+    let Some(user) = openobserve_core::users::get_user(Some(org_id), user_id).await else {
+        return false;
+    };
+    openobserve_core::authz::check_permissions(
+        user_id,
+        AuthExtractor {
+            auth: "".to_string(),
+            method: "GET".to_string(),
+            o2_type: format!("search_inspector:{org_id}"),
+            org_id: org_id.to_string(),
+            bypass_check: false,
+            parent_id: "".to_string(),
+            // module-level grants live on `search_inspector:_all_{org}`
+            use_all_org: true,
+            use_self_context: false,
+            use_self_parent: false,
+        },
+        user.role,
+        user.is_external,
+    )
+    .await
+}
+
+/// Same rule as `check_permissions`, so the UI never hides RBAC the backend enforces.
+#[cfg(feature = "enterprise")]
+async fn rbac_enabled_for_config(openfga_enabled: bool) -> bool {
+    openfga_enabled && !openobserve_core::authz::report_failure_lifts_rbac().await
+}
+
+async fn org_admin(org_id: &str, user_id: &str) -> bool {
+    is_root_user(user_id)
+        || openobserve_core::users::get_user(Some(org_id), user_id)
+            .await
+            .is_some_and(|u| matches!(u.role, UserRole::Root | UserRole::Admin))
 }
 
 pub async fn cache_status() -> impl IntoResponse {
@@ -838,6 +1090,7 @@ pub async fn config_reload(Headers(user_email): Headers<UserEmail>) -> impl Into
             error_msg: None,
             trace_id: None,
         },
+        delegated: None,
     })
     .await;
     (
@@ -925,7 +1178,10 @@ async fn get_stream_schema_status() -> (usize, usize) {
 }
 
 #[cfg(feature = "enterprise")]
-pub async fn redirect(Query(query): Query<std::collections::HashMap<String, String>>) -> Response {
+pub async fn redirect(
+    cookies: CookieJar,
+    Query(query): Query<std::collections::HashMap<String, String>>,
+) -> Response {
     use axum_extra::extract::cookie::{Cookie, SameSite};
     use common::meta::user::AuthTokens;
     use config::meta::user::UserRole;
@@ -955,40 +1211,23 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
             error_msg: None,
             trace_id: None,
         },
+        delegated: None,
     };
 
-    match query.get("state") {
-        Some(code) => match openobserve_core::kv::get(PKCE_STATE_ORG, code).await {
-            Ok(_) => {
-                let _ = openobserve_core::kv::delete(PKCE_STATE_ORG, code).await;
-            }
-            Err(_) => {
-                // Bad Request
-                audit_message.response_meta.http_response_code = 400;
-                audit(audit_message).await;
-                return Response::builder()
-                    .status(StatusCode::BAD_REQUEST)
-                    .body(Body::from("invalid state in request"))
-                    .unwrap();
-            }
-        },
-
-        None => {
-            // Bad Request
-            audit_message.response_meta.http_response_code = 400;
-            audit(audit_message).await;
-            return Response::builder()
-                .status(StatusCode::BAD_REQUEST)
-                .body(Body::from("no state in request"))
-                .unwrap();
-        }
-    };
+    let state_cookie = cookies.get(LOGIN_STATE_COOKIE).map(|c| c.value());
+    if let Err(msg) = consume_login_state(query.get("state"), state_cookie).await {
+        audit_message.response_meta.http_response_code = 400;
+        audit(audit_message).await;
+        return Response::builder()
+            .status(StatusCode::BAD_REQUEST)
+            .body(Body::from(msg))
+            .unwrap();
+    }
 
     log::info!("entering exchange_code: {code}");
 
     match exchange_code(code).await {
         Ok(login_data) => {
-            let login_url;
             let access_token = login_data.access_token;
             let keys = get_dex_jwks().await;
             let token_ver = verify_decode_token(
@@ -999,7 +1238,7 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
                 true,
             );
             let id_token;
-            match token_ver {
+            let login_url = match token_ver {
                 Ok(res) => {
                     // check for service accounts , do not to allow login
                     if let Some(db_user) = db::user::get_user_by_email(&res.0.user_email).await
@@ -1061,13 +1300,13 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
                                 .unwrap();
                         }
                     };
-                    login_url = format!(
+                    format!(
                         "{}#id_token={}.{}{}",
                         login_data.url,
                         ID_TOKEN_HEADER,
                         base64::encode(&id_token),
                         url_params.unwrap_or_default()
-                    );
+                    )
                 }
                 Err(e) => {
                     audit_message.response_meta.http_response_code = 400;
@@ -1079,7 +1318,7 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
                         .body(Body::from(format!("\"{e}\"")))
                         .unwrap();
                 }
-            }
+            };
 
             // generate new UUID for access token & store token in DB
             let session_id = ider::uuid();
@@ -1118,7 +1357,8 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
 
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
-                time::OffsetDateTime::now_utc() + time::Duration::seconds(cfg.auth.cookie_max_age),
+                time::OffsetDateTime::now_utc()
+                    + time::Duration::seconds(db::password_policy::cookie_max_age_secs().await),
             );
             auth_cookie.set_http_only(true);
             auth_cookie.set_secure(cfg.auth.cookie_secure_only);
@@ -1136,6 +1376,10 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
                 .status(StatusCode::FOUND)
                 .header(header::LOCATION, login_url)
                 .header(header::SET_COOKIE, auth_cookie.to_string())
+                .header(
+                    header::SET_COOKIE,
+                    login_state_cookie("", 0, &cfg).to_string(),
+                )
                 .body(Body::empty())
                 .unwrap()
         }
@@ -1166,7 +1410,23 @@ pub async fn dex_login() -> impl IntoResponse {
     let state = login_data.state.clone();
     let _ = openobserve_core::kv::set(PKCE_STATE_ORG, &state, state.clone().into()).await;
 
-    common::meta::http::HttpResponse::json(login_data.url)
+    with_login_state_cookie(
+        common::meta::http::HttpResponse::json(login_data.url),
+        &state,
+    )
+}
+
+/// Binds the login `state` to this browser so `/config/redirect` rejects a code started elsewhere.
+#[cfg(feature = "enterprise")]
+pub fn with_login_state_cookie(mut resp: Response, state: &str) -> Response {
+    let cookie = login_state_cookie(state, LOGIN_STATE_MAX_AGE_SECS, &get_config());
+    match header::HeaderValue::from_str(&cookie.to_string()) {
+        Ok(v) => {
+            resp.headers_mut().append(header::SET_COOKIE, v);
+        }
+        Err(e) => log::error!("failed to set login state cookie: {e}"),
+    }
+    resp
 }
 
 #[cfg(feature = "enterprise")]
@@ -1202,6 +1462,7 @@ pub async fn refresh_token_with_dex(
             error_msg: None,
             trace_id: None,
         },
+        delegated: None,
     };
 
     let token = if let Some(cookie) = cookies.get("auth_tokens") {
@@ -1276,7 +1537,9 @@ pub async fn refresh_token_with_dex(
                     let mut auth_cookie = Cookie::new("auth_tokens", cleared);
                     auth_cookie.set_expires(
                         time::OffsetDateTime::now_utc()
-                            + time::Duration::seconds(conf.auth.cookie_max_age),
+                            + time::Duration::seconds(
+                                db::password_policy::cookie_max_age_secs().await,
+                            ),
                     );
                     auth_cookie.set_http_only(true);
                     auth_cookie.set_secure(conf.auth.cookie_secure_only);
@@ -1317,7 +1580,8 @@ pub async fn refresh_token_with_dex(
 
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
-                time::OffsetDateTime::now_utc() + time::Duration::seconds(conf.auth.cookie_max_age),
+                time::OffsetDateTime::now_utc()
+                    + time::Duration::seconds(db::password_policy::cookie_max_age_secs().await),
             );
             auth_cookie.set_http_only(true);
             auth_cookie.set_secure(conf.auth.cookie_secure_only);
@@ -1341,7 +1605,8 @@ pub async fn refresh_token_with_dex(
 
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
-                time::OffsetDateTime::now_utc() + time::Duration::seconds(conf.auth.cookie_max_age),
+                time::OffsetDateTime::now_utc()
+                    + time::Duration::seconds(db::password_policy::cookie_max_age_secs().await),
             );
             auth_cookie.set_http_only(true);
             auth_cookie.set_secure(conf.auth.cookie_secure_only);
@@ -1362,15 +1627,18 @@ pub async fn refresh_token_with_dex(
     }
 }
 
+/// `max_age_secs` is passed in rather than read here: the policy read is async and this is not, and
+/// logout builds two cookies from the one answer.
 fn prepare_empty_cookie<'a, T: Serialize + ?Sized>(
     cookie_name: &'a str,
     token_struct: &T,
     conf: &Arc<Config>,
+    max_age_secs: i64,
 ) -> Cookie<'a> {
     let tokens = json::to_string(token_struct).unwrap();
     let tokens = base64::encode(&tokens);
     let mut auth_cookie = Cookie::new(cookie_name, tokens);
-    auth_cookie.set_max_age(time::Duration::seconds(conf.auth.cookie_max_age));
+    auth_cookie.set_max_age(time::Duration::seconds(max_age_secs));
     auth_cookie.set_http_only(true);
     auth_cookie.set_secure(conf.auth.cookie_secure_only);
     auth_cookie.set_path("/");
@@ -1380,6 +1648,56 @@ fn prepare_empty_cookie<'a, T: Serialize + ?Sized>(
         auth_cookie.set_same_site(SameSite::None);
     }
     auth_cookie
+}
+
+#[cfg(feature = "enterprise")]
+fn login_state_cookie(state: &str, max_age_secs: i64, conf: &Config) -> Cookie<'static> {
+    let mut cookie = Cookie::new(LOGIN_STATE_COOKIE, state.to_string());
+    cookie.set_max_age(time::Duration::seconds(max_age_secs));
+    cookie.set_http_only(true);
+    cookie.set_secure(conf.auth.cookie_secure_only);
+    cookie.set_path("/");
+    // Must ride the top-level GET back from dex, so never Strict.
+    if conf.auth.cookie_same_site_lax {
+        cookie.set_same_site(SameSite::Lax);
+    } else {
+        cookie.set_same_site(SameSite::None);
+    }
+    cookie
+}
+
+#[cfg(feature = "enterprise")]
+fn login_state_matches(cookie: Option<&str>, state: &str) -> bool {
+    let Some(cookie) = cookie else {
+        return false;
+    };
+    if cookie.is_empty() || cookie.len() != state.len() {
+        return false;
+    }
+    cookie
+        .bytes()
+        .zip(state.bytes())
+        .fold(0u8, |acc, (a, b)| acc | (a ^ b))
+        == 0
+}
+
+#[cfg(feature = "enterprise")]
+async fn consume_login_state(
+    state: Option<&String>,
+    cookie: Option<&str>,
+) -> Result<(), &'static str> {
+    let Some(state) = state else {
+        return Err("no state in request");
+    };
+    if !login_state_matches(cookie, state)
+        || openobserve_core::kv::get(PKCE_STATE_ORG, state)
+            .await
+            .is_err()
+    {
+        return Err("invalid state in request");
+    }
+    let _ = openobserve_core::kv::delete(PKCE_STATE_ORG, state).await;
+    Ok(())
 }
 
 pub async fn logout(
@@ -1413,8 +1731,11 @@ pub async fn logout(
             .await;
         }
     };
-    let auth_cookie = prepare_empty_cookie("auth_tokens", &AuthTokens::default(), &conf);
-    let auth_ext_cookie = prepare_empty_cookie("auth_ext", &AuthTokensExt::default(), &conf);
+    let max_age_secs = db::password_policy::cookie_max_age_secs().await;
+    let auth_cookie =
+        prepare_empty_cookie("auth_tokens", &AuthTokens::default(), &conf, max_age_secs);
+    let auth_ext_cookie =
+        prepare_empty_cookie("auth_ext", &AuthTokensExt::default(), &conf, max_age_secs);
 
     #[cfg(feature = "enterprise")]
     if let Some(user_email) = user_email {
@@ -1432,6 +1753,7 @@ pub async fn logout(
                 error_msg: None,
                 trace_id: None,
             },
+            delegated: None,
         })
         .await;
     }
@@ -1590,6 +1912,7 @@ const CACHE_MODULES: &[&str] = &[
     "realtime_triggers",
     "org_users",
     "compact_retention",
+    "downtimes",
 ];
 
 // Helper function to reload cache for a specific module
@@ -1609,7 +1932,28 @@ async fn reload_module_cache(module: &str) -> Result<(), anyhow::Error> {
         "org_users" => db::org_users::cache().await,
         "org_ingestion_tokens" => db::org_ingestion_tokens::cache().await,
         "compact_retention" => db::compact::retention::cache().await,
+        "downtimes" => {
+            reload_downtimes(enterprise_value!(false, get_o2_config().downtimes.enabled)).await
+        }
         _ => Err(anyhow::anyhow!("unsupported module")),
+    }
+}
+
+/// `all` lists downtimes only with the flag on, so the reply and total match main otherwise.
+fn all_cache_modules(downtimes_enabled: bool) -> Vec<&'static str> {
+    CACHE_MODULES
+        .iter()
+        .copied()
+        .filter(|module| downtimes_enabled || *module != "downtimes")
+        .collect()
+}
+
+/// With the flag off the cache stays empty, so no evaluation or SLO pass reads a downtime.
+async fn reload_downtimes(enabled: bool) -> Result<(), anyhow::Error> {
+    if enabled {
+        db::downtimes::cache().await
+    } else {
+        Ok(())
     }
 }
 
@@ -1632,7 +1976,8 @@ pub async fn cache_reload(
 
     // Expand "all" to all available modules
     if modules.contains(&"all") {
-        modules = CACHE_MODULES.to_vec();
+        let downtimes_enabled = enterprise_value!(false, get_o2_config().downtimes.enabled);
+        modules = all_cache_modules(downtimes_enabled);
     }
 
     let total_modules = modules.len();
@@ -1685,6 +2030,28 @@ mod tests {
     use super::*;
 
     #[test]
+    fn with_downtimes_off_all_names_the_modules_main_names() {
+        assert!(!all_cache_modules(false).contains(&"downtimes"));
+        assert_eq!(all_cache_modules(false).len(), CACHE_MODULES.len() - 1);
+        assert!(all_cache_modules(true).contains(&"downtimes"));
+    }
+
+    #[tokio::test]
+    async fn with_downtimes_off_a_cache_reload_loads_no_downtime() {
+        reload_downtimes(false).await.unwrap();
+        assert!(db::downtimes::all_cached().is_empty());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_config_rbac_enabled_matches_enforcement_before_any_usage_report() {
+        assert!(block_feature_for_report_failure().await);
+        assert_eq!(last_reported_timestamp().await, 0);
+        assert!(rbac_enabled_for_config(true).await);
+        assert!(!rbac_enabled_for_config(false).await);
+    }
+
+    #[test]
     fn test_healthz_response_different_status() {
         let response = HealthzResponse {
             status: "not ok".to_string(),
@@ -1692,16 +2059,6 @@ mod tests {
 
         let json = serde_json::to_string(&response).unwrap();
         assert!(json.contains("\"status\":\"not ok\""));
-    }
-
-    #[test]
-    fn test_healthz_response_empty_status() {
-        let response = HealthzResponse {
-            status: "".to_string(),
-        };
-
-        let json = serde_json::to_string(&response).unwrap();
-        assert!(json.contains("\"status\":\"\""));
     }
 
     #[test]
@@ -1770,17 +2127,6 @@ mod tests {
     }
 
     #[test]
-    fn test_healthz_response_structure() {
-        // Test that we can create and serialize a HealthzResponse
-        let response = HealthzResponse {
-            status: "ok".to_string(),
-        };
-
-        let json = serde_json::to_string(&response).unwrap();
-        assert!(json.contains("\"status\":\"ok\""));
-    }
-
-    #[test]
     fn test_prepare_empty_cookie_basic() {
         use std::sync::Arc;
 
@@ -1796,7 +2142,12 @@ mod tests {
         };
 
         let config = Arc::new(Config::default());
-        let cookie = prepare_empty_cookie("test_cookie", &test_token, &config);
+        let cookie = prepare_empty_cookie(
+            "test_cookie",
+            &test_token,
+            &config,
+            config.auth.cookie_max_age,
+        );
         let cookie_str = cookie.to_string();
 
         assert!(cookie_str.starts_with("test_cookie="));
@@ -1815,7 +2166,12 @@ mod tests {
 
         let empty_token = EmptyToken {};
         let config = Arc::new(Config::default());
-        let cookie = prepare_empty_cookie("auth_cookie", &empty_token, &config);
+        let cookie = prepare_empty_cookie(
+            "auth_cookie",
+            &empty_token,
+            &config,
+            config.auth.cookie_max_age,
+        );
         let cookie_str = cookie.to_string();
 
         assert!(cookie_str.contains("HttpOnly"));
@@ -1837,8 +2193,10 @@ mod tests {
         let test_data = TestData { id: 42 };
         let config = Arc::new(Config::default());
 
-        let cookie1 = prepare_empty_cookie("cookie1", &test_data, &config);
-        let cookie2 = prepare_empty_cookie("cookie2", &test_data, &config);
+        let cookie1 =
+            prepare_empty_cookie("cookie1", &test_data, &config, config.auth.cookie_max_age);
+        let cookie2 =
+            prepare_empty_cookie("cookie2", &test_data, &config, config.auth.cookie_max_age);
         let cookie1_str = cookie1.to_string();
         let cookie2_str = cookie2.to_string();
 
@@ -1952,7 +2310,12 @@ mod tests {
         };
 
         let config = Arc::new(Config::default());
-        let cookie = prepare_empty_cookie("complex_cookie", &complex_data, &config);
+        let cookie = prepare_empty_cookie(
+            "complex_cookie",
+            &complex_data,
+            &config,
+            config.auth.cookie_max_age,
+        );
 
         assert_eq!(cookie.name(), "complex_cookie");
         assert!(!cookie.value().is_empty());
@@ -2036,7 +2399,12 @@ mod tests {
 
         let empty_data = EmptyStruct;
         let config = Arc::new(Config::default());
-        let cookie = prepare_empty_cookie("empty_cookie", &empty_data, &config);
+        let cookie = prepare_empty_cookie(
+            "empty_cookie",
+            &empty_data,
+            &config,
+            config.auth.cookie_max_age,
+        );
 
         assert_eq!(cookie.name(), "empty_cookie");
         assert!(!cookie.value().is_empty()); // Even empty struct gets base64 encoded
@@ -2064,7 +2432,12 @@ mod tests {
             value: "test".to_string(),
         };
         let config = Arc::new(Config::default());
-        let cookie = prepare_empty_cookie("valid_cookie", &valid_data, &config);
+        let cookie = prepare_empty_cookie(
+            "valid_cookie",
+            &valid_data,
+            &config,
+            config.auth.cookie_max_age,
+        );
 
         // Should not panic and should produce valid cookie
         assert_eq!(cookie.name(), "valid_cookie");
@@ -2099,5 +2472,207 @@ mod tests {
         assert!(!rum.version.is_empty());
         assert!(!rum.organization_identifier.is_empty());
         assert!(!rum.api_version.is_empty());
+    }
+
+    #[test]
+    fn test_rum_from_cfg_uses_build_version() {
+        let rum = Rum::from_cfg(get_config());
+        assert_eq!(rum.version, config::VERSION);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_login_state_matches() {
+        let state = "AbCdEfGhIjKlMnOpQrStUvWxYz012345";
+        assert!(login_state_matches(Some(state), state));
+        assert!(!login_state_matches(None, state));
+        assert!(!login_state_matches(Some(""), state));
+        assert!(!login_state_matches(Some(""), ""));
+        assert!(!login_state_matches(
+            Some("AbCdEfGhIjKlMnOpQrStUvWxYz012346"),
+            state
+        ));
+        assert!(!login_state_matches(Some(&state[..31]), state));
+        assert!(!login_state_matches(Some(&format!("{state}x")), state));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_login_state_cookie_attributes() {
+        let mut conf = Config::default();
+        conf.auth.cookie_secure_only = true;
+        conf.auth.cookie_same_site_lax = true;
+        let cookie = login_state_cookie("abc", LOGIN_STATE_MAX_AGE_SECS, &conf);
+        assert_eq!(cookie.name(), LOGIN_STATE_COOKIE);
+        assert_eq!(cookie.value(), "abc");
+        assert_eq!(cookie.http_only(), Some(true));
+        assert_eq!(cookie.secure(), Some(true));
+        assert_eq!(cookie.same_site(), Some(SameSite::Lax));
+        assert_eq!(cookie.path(), Some("/"));
+        assert_eq!(cookie.max_age(), Some(time::Duration::seconds(600)));
+
+        conf.auth.cookie_secure_only = false;
+        conf.auth.cookie_same_site_lax = false;
+        let cleared = login_state_cookie("", 0, &conf);
+        assert_eq!(cleared.secure(), Some(false));
+        assert_eq!(cleared.same_site(), Some(SameSite::None));
+        assert_eq!(cleared.max_age(), Some(time::Duration::ZERO));
+        assert!(cleared.to_string().contains("Max-Age=0"));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_consume_login_state_rejects_without_kv_lookup() {
+        assert_eq!(
+            consume_login_state(None, Some("abc")).await,
+            Err("no state in request")
+        );
+        let state = "abc".to_string();
+        assert_eq!(
+            consume_login_state(Some(&state), None).await,
+            Err("invalid state in request")
+        );
+        assert_eq!(
+            consume_login_state(Some(&state), Some("abd")).await,
+            Err("invalid state in request")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_zo_config_serves_the_ingest_window_and_cluster_name() {
+        let cfg = get_config();
+        let response = zo_config(Path("default".to_string()), None)
+            .await
+            .into_response();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["cluster_name"], cfg.common.cluster_name.as_str());
+        assert_eq!(json["ingest_allowed_upto"], cfg.limit.ingest_allowed_upto);
+        assert_eq!(
+            json["ingest_allowed_in_future"],
+            cfg.limit.ingest_allowed_in_future
+        );
+    }
+
+    #[tokio::test]
+    async fn test_zo_config_serves_the_public_dashboard_refresh_floor() {
+        let response = zo_config(Path("default".to_string()), None)
+            .await
+            .into_response();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["public_dashboard_min_refresh_secs"], 60);
+        assert_eq!(json["public_dashboards_enabled"], true);
+    }
+
+    #[tokio::test]
+    async fn test_zo_config_serves_query_history_settings() {
+        let cfg = get_config();
+        let json = zo_config_json().await;
+        assert_eq!(
+            json["query_history_enabled"],
+            cfg.limit.query_history_enabled
+        );
+        assert_eq!(
+            json["query_history_retention_days"],
+            cfg.limit.query_history_retention_days
+        );
+    }
+
+    #[tokio::test]
+    async fn test_zo_config_reports_slack_per_org() {
+        let reason = if cfg!(feature = "enterprise") {
+            "flag"
+        } else {
+            "edition"
+        };
+        for org in ["default", "acme_eu", "_meta"] {
+            let response = zo_config(Path(org.to_string()), None).await.into_response();
+            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            assert_eq!(json["slack_enabled"], false, "{org}: {json}");
+            assert_eq!(json["slack_disabled_reason"], reason, "{org}: {json}");
+            assert_ne!(json["slack_disabled_reason"], "allowlist", "{org}: {json}");
+            assert!(json.get("slack_home_region").is_none(), "{org}: {json}");
+        }
+    }
+
+    async fn zo_config_json() -> serde_json::Value {
+        let response = zo_config(Path("default".to_string()), None)
+            .await
+            .into_response();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        serde_json::from_slice(&body).unwrap()
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_zo_config_serves_incidents_rca_enabled() {
+        let o2cfg = o2_enterprise::enterprise::common::config::get_config();
+        let json = zo_config_json().await;
+        assert_eq!(
+            json["incidents_rca_enabled"],
+            o2cfg.incidents.enabled && o2cfg.incidents.rca_enabled && o2cfg.ai.has_agent_target()
+        );
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_zo_config_has_no_license_fields_in_oss() {
+        let json = zo_config_json().await;
+        for k in [
+            "license_search_allowed",
+            "license_waiver_until",
+            "ingestion_quota_used",
+        ] {
+            assert!(json.get(k).is_none(), "{k}");
+        }
+    }
+
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn test_zo_config_has_no_license_search_fields_on_cloud() {
+        let json = zo_config_json().await;
+        for k in ["license_search_allowed", "license_waiver_until"] {
+            assert!(json.get(k).is_none(), "{k}");
+        }
+        assert!(json.get("license_expiry").is_some());
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[test]
+    fn test_license_search_flag_follows_the_gate_not_the_status() {
+        let mut status = o2_enterprise::enterprise::license::LicenseStatus::default();
+        status.decision.search_allowed = true;
+        assert!(!LicenseSearchConfig::new(false, &status, 0).license_search_allowed);
+        status.decision.search_allowed = false;
+        assert!(LicenseSearchConfig::new(true, &status, 0).license_search_allowed);
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[tokio::test]
+    async fn test_zo_config_serves_license_search_state() {
+        let json = zo_config_json().await;
+        assert_eq!(
+            json["license_search_allowed"],
+            serde_json::Value::Bool(o2_enterprise::enterprise::license::search_allowed())
+        );
+        assert!(json.get("license_waiver_until").is_some());
+        for k in [
+            "license_expiry",
+            "license_server_url",
+            "ingestion_quota_used",
+            "ingestion_history",
+        ] {
+            assert!(json.get(k).is_some(), "flatten must keep {k}");
+        }
     }
 }

@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nText } from "@/types/i18n";
+
 import type { InjectionKey } from "vue";
 import type { FieldWidth } from "../Input/OInput.types";
 
@@ -27,7 +29,7 @@ export const SELECT_PARENT_DATA_TEST_KEY: InjectionKey<ComputedRef<string | unde
  */
 export const NULL_VALUE_SENTINEL = "__o2__null__";
 
-export type SelectSize = "sm" | "md";
+export type SelectSize = "xs" | "sm" | "md";
 
 /**
  * Trigger chrome.
@@ -47,11 +49,17 @@ export type SelectAppearance = "field" | "inline";
 // ── Option shape ──────────────────────────────────────────────────────────
 
 export interface SelectOption {
-  label: string;
+  label: I18nText;
   value?: SelectValue;
   disabled?: boolean;
   /** When true, renders the item as a non-selectable group header */
   header?: boolean;
+  /** Makes this a non-selectable row that shows or hides the options whose `parentValue` is its `value`. */
+  expandable?: boolean;
+  /** Nests this option under the `expandable` row with this value. */
+  parentValue?: SelectValue;
+  /** Extra text the search matches besides the label, e.g. a zone's legacy names. */
+  searchText?: string;
   [key: string]: unknown;
 }
 
@@ -95,17 +103,28 @@ export interface SelectProps {
    */
   collapsibleGroups?: boolean;
   /**
+   * Multi-select with group headers: on open, float the selected options to the
+   * top of their own group, as flat lists always do. Default off, so groups
+   * that lead with a fixed entry (e.g. "Current Panel") keep their order.
+   */
+  pinSelectedInGroups?: boolean;
+  /**
    * Renders a "Select All" master row at the top of the dropdown (multi-select
    * listbox mode only). Shows an indeterminate dash when only some options are
    * selected, a check when all are, and toggles the entire selection on click.
    */
   selectAll?: boolean;
+  /**
+   * Multi-select only: when every selectable option is in the model value, shows
+   * this text in the trigger instead of listing every selected label as chips.
+   */
+  allSelectedLabel?: I18nText;
   /** Allows creating new values by typing — emits @create event */
   creatable?: boolean;
   /** Optional dropdown content style passthrough */
   dropdownStyle?: string | Record<string, string | number>;
   /** Placeholder text shown in the internal search input */
-  searchPlaceholder?: string;
+  searchPlaceholder?: I18nText;
   /** Key to read label from each option object */
   labelKey?: string;
   /** Key to read value from each option object */
@@ -113,13 +132,13 @@ export interface SelectProps {
   /** Key to read a OIcon name from each option object — when set, renders an icon before the label in the dropdown list */
   iconKey?: string;
   /** Floating label rendered above the trigger */
-  label?: string;
+  label?: I18nText;
   /** Marks the field required — renders a `*` after the label (no manual ` *`). */
   required?: boolean;
   /** Placeholder text shown when no value is selected */
-  placeholder?: string;
+  placeholder?: I18nText;
   /** Error message — when truthy the field shows error styling */
-  errorMessage?: string;
+  errorMessage?: I18nText;
   /** Marks the field in error state without a message */
   error?: boolean;
   /** Shows a ✕ button to clear the selection */
@@ -135,7 +154,7 @@ export interface SelectProps {
   /** HTML name */
   name?: string;
   /** Helper text displayed below the field */
-  helpText?: string;
+  helpText?: I18nText;
   /**
    * Semantic field width — controls how wide the component renders.
    * Defaults to "full" (fills the container).
@@ -158,7 +177,11 @@ export interface SelectProps {
    *   and closes the dropdown), while clicking the checkbox still toggles it.
    */
   rowClickSingleSelect?: boolean;
-  /** When true, shows the full option label as a native tooltip on hover (useful when labels are truncated). */
+  /**
+   * @deprecated No longer needed — the trigger and option labels now show a
+   * tooltip with the full value automatically whenever they're truncated.
+   * Kept only so existing call sites don't break; has no effect.
+   */
   optionTooltip?: boolean;
 }
 
@@ -206,7 +229,7 @@ export interface SelectItemProps {
   /** The value emitted when this item is selected */
   value: SelectValue;
   /** Display label */
-  label?: string;
+  label?: I18nText;
   /** Prevents selection */
   disabled?: boolean;
 }
@@ -219,7 +242,7 @@ export interface SelectItemSlots {
 
 export interface SelectGroupProps {
   /** Visible heading above the group */
-  label?: string;
+  label?: I18nText;
 }
 
 export interface SelectGroupSlots {

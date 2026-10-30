@@ -15,6 +15,7 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { useSearchPagination } from "./useSearchPagination";
+import { gt } from "@/types/i18n";
 
 // Create a shared mock state
 const createMockState = () => ({
@@ -54,7 +55,7 @@ describe("useSearchPagination", () => {
   beforeEach(() => {
     mockState = createMockState();
     vi.clearAllMocks();
-    pagination = useSearchPagination();
+    pagination = useSearchPagination(gt);
   });
 
   describe("getAggsTotal", () => {

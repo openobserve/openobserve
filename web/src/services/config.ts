@@ -16,8 +16,13 @@
 import http from "./http";
 
 const zo_config = {
+  // Unauthenticated bootstrap: only the fields the login page needs.
   get_config: () => {
     return http().get(`/config`);
+  },
+  // Authenticated full configuration, fetched once an org is known.
+  get_config_full: (orgIdentifier: string) => {
+    return http().get(`/api/${orgIdentifier}/config`);
   },
 };
 

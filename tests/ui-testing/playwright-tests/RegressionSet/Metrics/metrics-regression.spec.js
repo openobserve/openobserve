@@ -45,7 +45,7 @@ test.describe("Metrics Regression Bugs", () => {
     testLogger.info('Test: Verify "No results found" visibility in dark mode (Bug #11061)');
 
     // Enable dark mode using the navbar theme toggle button
-    const themeToggleBtn = page.locator('[data-test="navbar-theme-toggle-btn"]');
+    const themeToggleBtn = pm.metricsPage.getThemeToggleButtonLocator();
 
     if (await themeToggleBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
       await themeToggleBtn.click();

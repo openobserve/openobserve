@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          Settings shell; this component renders only the form content. -->
     <!-- platform settings section. The page gutter is owned by the Settings
          shell's ConstrainedPage; this block adds none of its own. -->
-    <div>
+    <div v-if="!trialExpired">
       <GroupHeader :title="t('settings.platformSettings')" :showIcon="false" />
       <div class="flex w-full flex-col">
         <OForm
@@ -32,16 +32,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- scape interval section -->
           <div
-            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
+            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-lg:grid-cols-1 max-lg:gap-2"
           >
             <span class="individual-setting-title text-sm leading-5 font-medium">
               {{ t("settings.scrapintervalLabel") }}
             </span>
             <OFormInput
               name="scrape_interval"
+              :aria-label="t('settings.scrapintervalLabel')"
               type="number"
               min="0"
-              class="ml-2 w-30!"
+              class="ms-2 w-30!"
               data-test="general-settings-scrape-interval"
             />
             <span class="individual-setting-description text-compact opacity-70">
@@ -51,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Max Series Per Query section -->
           <div
-            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
+            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-lg:grid-cols-1 max-lg:gap-2"
           >
             <span class="individual-setting-title text-sm leading-5 font-medium">
               {{ t("settings.maxSeriesPerQueryLabel") }}
@@ -61,8 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="number"
               :min="1000"
               :max="1000000"
-              class="ml-2 w-45!"
-              :placeholder="'40000 (' + t('settings.systemDefault') + ')'"
+              class="ms-2 w-52!"
+              :placeholder="raw('40000 (' + t('settings.systemDefault') + ')')"
               data-test="general-settings-max-series-per-query"
             >
               <template v-slot:icon-right>
@@ -78,27 +79,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Manage Theme section -->
           <div
-            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
+            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-lg:grid-cols-1 max-lg:gap-2"
           >
             <span class="individual-setting-title text-sm leading-5 font-medium">
               {{ t("settings.manageTheme") }}
             </span>
-            <div class="-ml-15 flex items-center gap-2">
+            <div class="-ms-15 flex items-center gap-2 max-lg:ms-0 max-lg:flex-wrap">
               <!-- Light Mode Theme -->
               <div
-                class="group/chip bg-surface-subtle border-border-default hover:bg-surface-subtle-hover hover:border-accent inline-flex cursor-pointer items-center gap-2 rounded-full border py-1.5 pr-3 pl-1.5 transition-all duration-200 hover:-translate-y-px hover:shadow-md"
+                class="group/chip bg-surface-subtle border-border-default hover:bg-surface-subtle-hover hover:border-accent inline-flex cursor-pointer items-center gap-2 rounded-full border py-1.5 ps-1.5 pe-3 transition-all duration-200 hover:-translate-y-px hover:shadow-md"
                 @click="handleThemeChipClick('light')"
                 data-test="theme-light-chip"
               >
                 <div
-                  class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-[0_1px_3px_color-mix(in_srgb,var(--color-black)_20%,transparent)]"
+                  class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-sm"
                   :style="{ backgroundColor: customLightColor }"
                 >
+                  <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
                   <OIcon
                     name="palette"
                     size="xs"
-                    class="opacity-0 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] transition-opacity duration-200 group-hover/chip:opacity-90"
+                    class="opacity-0 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] transition-opacity duration-200 group-hover/chip:opacity-90 max-md:opacity-90"
                   />
+                  <!-- eslint-enable local/no-hardcoded-px -->
                 </div>
                 <span class="chip-label text-2xs font-semibold tracking-wider opacity-50">{{
                   t("settings.light")
@@ -110,19 +113,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Dark Mode Theme -->
               <div
-                class="group/chip bg-surface-subtle border-border-default hover:bg-surface-subtle-hover hover:border-accent inline-flex cursor-pointer items-center gap-2 rounded-full border py-1.5 pr-3 pl-1.5 transition-all duration-200 hover:-translate-y-px hover:shadow-md"
+                class="group/chip bg-surface-subtle border-border-default hover:bg-surface-subtle-hover hover:border-accent inline-flex cursor-pointer items-center gap-2 rounded-full border py-1.5 ps-1.5 pe-3 transition-all duration-200 hover:-translate-y-px hover:shadow-md"
                 @click="handleThemeChipClick('dark')"
                 data-test="theme-dark-chip"
               >
                 <div
-                  class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-[0_1px_3px_color-mix(in_srgb,var(--color-black)_20%,transparent)]"
+                  class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-sm"
                   :style="{ backgroundColor: customDarkColor }"
                 >
+                  <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
                   <OIcon
                     name="palette"
                     size="xs"
-                    class="opacity-0 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] transition-opacity duration-200 group-hover/chip:opacity-90"
+                    class="opacity-0 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] transition-opacity duration-200 group-hover/chip:opacity-90 max-md:opacity-90"
                   />
+                  <!-- eslint-enable local/no-hardcoded-px -->
                 </div>
                 <span class="chip-label text-2xs font-semibold tracking-wider opacity-50">{{
                   t("settings.dark")
@@ -134,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Reset Button -->
               <div
-                class="group/resetChip border-border-default hover:border-error-400 inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-dashed bg-transparent opacity-60 transition-all duration-200 hover:-translate-y-px hover:rotate-180 hover:border-solid hover:bg-[color-mix(in_srgb,var(--color-error-500)_10%,transparent)] hover:opacity-100"
+                class="group/resetChip border-border-default hover:border-error-400 hover:bg-error-500/10 inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-dashed bg-transparent opacity-60 transition-all duration-200 hover:-translate-y-px hover:rotate-180 hover:border-solid hover:opacity-100"
                 @click="resetThemeColors"
                 data-test="reset-theme-colors-btn"
               >
@@ -170,7 +175,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       id="enterpriseFeature"
       v-if="
-        config.isEnterprise == 'true' &&
+        !trialExpired &&
+        customBrandingAccess.visible &&
         store.state.zoConfig.meta_org == store.state.selectedOrganization.identifier
       "
     >
@@ -179,129 +185,161 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div>
         <div
-          class="settings-grid-item no-border-bottom border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
+          class="settings-grid-item no-border-bottom border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-lg:grid-cols-1 max-lg:gap-2"
         >
           <span class="individual-setting-title text-sm leading-5 font-medium">
             {{ t("settings.customLogoText") }}
           </span>
-          <div
-            v-if="editingText || store.state.zoConfig.custom_logo_text == ''"
-            class="flex items-center gap-2"
-          >
-            <OInput
-              class="mr-sm w-62.5"
-              data-test="settings_ent_logo_custom_text"
-              v-model="customText"
-            />
-            <div class="flex gap-x-2">
-              <OButton
-                type="button"
-                variant="outline-destructive"
-                size="icon-xs-sq"
-                @click="cancelLogoText"
-                icon-left="close"
+          <template v-if="!customBrandingAccess.allowed">
+            <div class="flex items-center gap-2" @click.capture="onLockedBrandingClick">
+              <OInput
+                class="w-62.5"
+                model-value=""
+                :placeholder="t('settings.noTextAvailable')"
+                data-test="settings_ent_logo_custom_text_locked"
+              >
+                <template v-slot:icon-right>
+                  <OIcon name="lock" size="sm" class="text-warning-600" />
+                </template>
+              </OInput>
+            </div>
+          </template>
+          <template v-else>
+            <div
+              v-if="editingText || store.state.zoConfig.custom_logo_text == ''"
+              class="flex items-center gap-2"
+            >
+              <OInput
+                class="w-62.5"
+                data-test="settings_ent_logo_custom_text"
+                v-model="customText"
               />
+              <div class="flex gap-x-2">
+                <OButton
+                  :aria-label="t('common.cancel')"
+                  type="button"
+                  variant="outline-destructive"
+                  size="icon-xs-sq"
+                  @click="cancelLogoText"
+                  icon-left="close"
+                />
+                <OButton
+                  :aria-label="t('common.save')"
+                  data-test="settings_ent_logo_custom_text_save_btn"
+                  :loading="loadingState"
+                  variant="outline"
+                  size="icon-xs-sq"
+                  type="button"
+                  @click="updateCustomText"
+                  icon-left="check"
+                />
+              </div>
+            </div>
+            <div v-else class="flex items-center">
+              <OTruncatedText class="w-47.5 text-center"
+                >{{ store.state.zoConfig.custom_logo_text || t("settings.noTextAvailable") }}
+              </OTruncatedText>
               <OButton
-                data-test="settings_ent_logo_custom_text_save_btn"
+                :aria-label="t('common.edit')"
+                data-test="settings_ent_logo_custom_text_edit_btn"
                 :loading="loadingState"
                 variant="outline"
                 size="icon-xs-sq"
+                class="ms-2"
                 type="button"
-                @click="updateCustomText"
-                icon-left="check"
+                @click="editingText = !editingText"
+                icon-left="edit"
               />
             </div>
-          </div>
-          <div v-else class="flex items-center">
-            <span class="w-47.5 truncate text-center"
-              >{{ store.state.zoConfig.custom_logo_text || t("settings.noTextAvailable") }}
-              <OTooltip
-                v-if="store.state.zoConfig.custom_logo_text.length > 20"
-                side="top"
-                align="center"
-                max-width="250px"
-                :content="store.state.zoConfig.custom_logo_text"
-              />
-            </span>
-            <OButton
-              data-test="settings_ent_logo_custom_text_edit_btn"
-              :loading="loadingState"
-              variant="outline"
-              size="icon-xs-sq"
-              class="ml-2"
-              type="button"
-              @click="editingText = !editingText"
-              icon-left="edit"
-            />
-          </div>
+          </template>
           <span class="individual-setting-description text-compact opacity-70">
             {{ t("settings.customLogoTextDescription") }}
           </span>
         </div>
         <!-- Light Mode Logo -->
         <div
-          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
+          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-lg:grid-cols-1 max-lg:gap-2"
         >
           <div class="individual-setting-title mb-5 w-full pt-2 text-sm leading-5 font-medium">
             {{ t("settings.customLogoTitle") }} ({{ t("settings.lightMode") }})
           </div>
-          <div
-            v-if="
-              store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
-              store.state.zoConfig.custom_logo_img != null
-            "
-            class="w-full"
-          >
-            <img
-              data-test="setting_ent_custom_logo_img"
-              :src="`data:image; base64, ` + store.state.zoConfig.custom_logo_img"
-              :alt="t('settings.logoLabel')"
-              class="mx-3 max-h-7.75 max-w-37.5"
-            />
-            <OButton
-              data-test="setting_ent_custom_logo_img_delete_btn"
-              variant="ghost-destructive"
-              size="icon-xs-sq"
-              class="mx-3"
-              @click="confirmDeleteLogo('light')"
-              icon-left="delete"
-            />
-          </div>
-          <div v-else class="flex items-start gap-2">
-            <OFile
-              data-test="setting_ent_custom_logo_img_file_upload"
-              v-model="filesLight"
-              :label="t('settings.dragDropUpload')"
-              counter
-              :counter-label="counterLabelFn"
-              accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
-              @rejected="onRejected"
-              :help-text="t('settings.fileFormatConstraint')"
-              class="o2-file-input mx-0"
+          <template v-if="!customBrandingAccess.allowed">
+            <div class="flex items-start gap-2" @click.capture="onLockedBrandingClick">
+              <OFile
+                data-test="setting_ent_custom_logo_img_file_upload_locked"
+                :label="t('settings.dragDropUpload')"
+                accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
+                :help-text="t('settings.fileFormatConstraint')"
+                class="o2-file-input mx-0"
+              >
+                <template v-slot:prepend>
+                  <OIcon name="lock" size="sm" class="text-warning-600" />
+                </template>
+              </OFile>
+            </div>
+          </template>
+          <template v-else>
+            <div
+              v-if="
+                store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
+                store.state.zoConfig.custom_logo_img != null
+              "
+              class="w-full"
             >
-              <template v-slot:prepend>
-                <OIcon name="attach-file" size="sm" />
-              </template>
-            </OFile>
-            <div class="flex gap-x-2 pt-5.75">
-              <OButton
-                type="button"
-                variant="outline-destructive"
-                size="icon-xs-sq"
-                @click="filesLight = null"
-                icon-left="close"
+              <img
+                data-test="setting_ent_custom_logo_img"
+                :src="`data:image; base64, ` + store.state.zoConfig.custom_logo_img"
+                :alt="t('settings.logoLabel')"
+                class="mx-3 max-h-7.75 max-w-37.5"
               />
               <OButton
-                data-test="settings_ent_logo_custom_light_save_btn"
-                :loading="loadingState"
-                variant="outline"
+                :aria-label="t('common.delete')"
+                data-test="setting_ent_custom_logo_img_delete_btn"
+                variant="ghost-destructive"
                 size="icon-xs-sq"
-                type="button"
-                @click="uploadImage(filesLight, 'light')"
-                icon-left="check"
+                class="mx-3"
+                @click="confirmDeleteLogo('light')"
+                icon-left="delete"
               />
             </div>
-          </div>
+            <div v-else class="flex items-start gap-2">
+              <OFile
+                data-test="setting_ent_custom_logo_img_file_upload"
+                v-model="filesLight"
+                :label="t('settings.dragDropUpload')"
+                counter
+                :counter-label="counterLabelFn"
+                accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
+                @rejected="onRejected"
+                :help-text="t('settings.fileFormatConstraint')"
+                class="o2-file-input mx-0"
+              >
+                <template v-slot:prepend>
+                  <OIcon name="attach-file" size="sm" />
+                </template>
+              </OFile>
+              <div class="flex gap-x-2 pt-5.75">
+                <OButton
+                  :aria-label="t('common.cancel')"
+                  type="button"
+                  variant="outline-destructive"
+                  size="icon-xs-sq"
+                  @click="filesLight = null"
+                  icon-left="close"
+                />
+                <OButton
+                  :aria-label="t('common.save')"
+                  data-test="settings_ent_logo_custom_light_save_btn"
+                  :loading="loadingState"
+                  variant="outline"
+                  size="icon-xs-sq"
+                  type="button"
+                  @click="uploadImage(filesLight, 'light')"
+                  icon-left="check"
+                />
+              </div>
+            </div>
+          </template>
           <span class="individual-setting-description text-compact -translate-y-1.25 opacity-70">
             {{ t("settings.customLogoLightDescription") }}
           </span>
@@ -309,68 +347,88 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Dark Mode Logo -->
         <div
-          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
+          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-lg:grid-cols-1 max-lg:gap-2"
         >
           <div class="individual-setting-title mb-5 w-full pt-2 text-sm leading-5 font-medium">
             {{ t("settings.customLogoTitle") }} ({{ t("settings.darkMode") }})
           </div>
-          <div
-            v-if="
-              store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
-              store.state.zoConfig.custom_logo_dark_img != null
-            "
-            class="w-full"
-          >
-            <img
-              data-test="setting_ent_custom_logo_dark_img"
-              :src="`data:image; base64, ` + store.state.zoConfig.custom_logo_dark_img"
-              :alt="t('settings.logoLabel')"
-              class="mx-3 max-h-7.75 max-w-37.5"
-            />
-            <OButton
-              data-test="setting_ent_custom_logo_dark_img_delete_btn"
-              variant="ghost-destructive"
-              size="icon-xs-sq"
-              class="mx-3"
-              @click="confirmDeleteLogo('dark')"
-              icon-left="delete"
-            />
-          </div>
-          <div v-else class="flex items-start gap-2">
-            <OFile
-              data-test="setting_ent_custom_logo_dark_img_file_upload"
-              v-model="filesDark"
-              :label="t('settings.dragDropUpload')"
-              counter
-              :counter-label="counterLabelFn"
-              accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
-              @rejected="onRejected"
-              :help-text="t('settings.fileFormatConstraint')"
-              class="o2-file-input mx-0"
+          <template v-if="!customBrandingAccess.allowed">
+            <div class="flex items-start gap-2" @click.capture="onLockedBrandingClick">
+              <OFile
+                data-test="setting_ent_custom_logo_dark_img_file_upload_locked"
+                :label="t('settings.dragDropUpload')"
+                accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
+                :help-text="t('settings.fileFormatConstraint')"
+                class="o2-file-input mx-0"
+              >
+                <template v-slot:prepend>
+                  <OIcon name="lock" size="sm" class="text-warning-600" />
+                </template>
+              </OFile>
+            </div>
+          </template>
+          <template v-else>
+            <div
+              v-if="
+                store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
+                store.state.zoConfig.custom_logo_dark_img != null
+              "
+              class="w-full"
             >
-              <template v-slot:prepend>
-                <OIcon name="attach-file" size="sm" />
-              </template>
-            </OFile>
-            <div class="flex gap-x-2 pt-5.75">
-              <OButton
-                type="button"
-                variant="outline-destructive"
-                size="icon-xs-sq"
-                @click="filesDark = null"
-                icon-left="close"
+              <img
+                data-test="setting_ent_custom_logo_dark_img"
+                :src="`data:image; base64, ` + store.state.zoConfig.custom_logo_dark_img"
+                :alt="t('settings.logoLabel')"
+                class="mx-3 max-h-7.75 max-w-37.5"
               />
               <OButton
-                data-test="settings_ent_logo_custom_dark_save_btn"
-                :loading="loadingState"
-                variant="outline"
+                :aria-label="t('common.delete')"
+                data-test="setting_ent_custom_logo_dark_img_delete_btn"
+                variant="ghost-destructive"
                 size="icon-xs-sq"
-                type="button"
-                @click="uploadImage(filesDark, 'dark')"
-                icon-left="check"
+                class="mx-3"
+                @click="confirmDeleteLogo('dark')"
+                icon-left="delete"
               />
             </div>
-          </div>
+            <div v-else class="flex items-start gap-2">
+              <OFile
+                data-test="setting_ent_custom_logo_dark_img_file_upload"
+                v-model="filesDark"
+                :label="t('settings.dragDropUpload')"
+                counter
+                :counter-label="counterLabelFn"
+                accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
+                @rejected="onRejected"
+                :help-text="t('settings.fileFormatConstraint')"
+                class="o2-file-input mx-0"
+              >
+                <template v-slot:prepend>
+                  <OIcon name="attach-file" size="sm" />
+                </template>
+              </OFile>
+              <div class="flex gap-x-2 pt-5.75">
+                <OButton
+                  :aria-label="t('common.cancel')"
+                  type="button"
+                  variant="outline-destructive"
+                  size="icon-xs-sq"
+                  @click="filesDark = null"
+                  icon-left="close"
+                />
+                <OButton
+                  :aria-label="t('common.save')"
+                  data-test="settings_ent_logo_custom_dark_save_btn"
+                  :loading="loadingState"
+                  variant="outline"
+                  size="icon-xs-sq"
+                  type="button"
+                  @click="uploadImage(filesDark, 'dark')"
+                  icon-left="check"
+                />
+              </div>
+            </div>
+          </template>
           <span class="individual-setting-description text-compact -translate-y-1.25 opacity-70">
             {{ t("settings.customLogoDarkDescription") }}
           </span>
@@ -461,10 +519,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('settings.deleteLogoTitle')"
     :secondary-button-label="t('confirmDialog.cancel')"
     :primary-button-label="t('confirmDialog.ok')"
+    primary-button-variant="destructive"
     @click:secondary="cancelConfirmDialog"
     @click:primary="confirmDialogOK"
   >
-    <p>{{ t("settings.deleteLogoMessage") }}</p>
+    <i18n-t keypath="settings.deleteLogoMessage" tag="p" data-test="general-delete-image-message">
+      <template #name
+        ><span class="text-text-heading font-semibold break-all">{{
+          logoThemeToDelete === "dark" ? t("settings.darkMode") : t("settings.lightMode")
+        }}</span></template
+      >
+    </i18n-t>
   </ODialog>
 
   <ODialog
@@ -555,6 +620,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-ignore
+import { configFullQuery, updateCustomLogoTextMutation } from "@/services/config.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { queryClient } from "@/composables/query/queryClient";
+import { orgSummaryQuery, updateOrgSettingsMutation } from "@/services/organizations.queries";
 import {
   computed,
   defineComponent,
@@ -564,24 +633,24 @@ import {
   ref,
   watch,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
 import organizations from "@/services/organizations";
 import usersService from "@/services/users";
 import settingsService from "@/services/settings";
+import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
-import configService from "@/services/config";
 import DOMPurify from "dompurify";
 import GroupHeader from "../common/GroupHeader.vue";
-import store from "@/test/unit/helpers/store";
 import { applyThemeColors, switchThemeMode } from "@/utils/theme";
-import { useLocalOrganization } from "@/utils/zincutils";
+import { isTrialExpired, useLocalOrganization } from "@/utils/zincutils";
 import { formatSizeFromMB } from "@/utils/formatters";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -591,6 +660,8 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OColor from "@/lib/forms/Color/OColor.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeGeneralSettingsSchema, type GeneralSettingsForm } from "./General.schema";
+import { useLockedAffordance } from "@/composables/useLockedAffordance";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -614,6 +685,7 @@ export default defineComponent({
     OSpinner,
     OIcon,
     OTooltip,
+    OTruncatedText,
     OInput,
     OFile,
     OForm,
@@ -621,24 +693,42 @@ export default defineComponent({
     OColor,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const store = useStore();
     const { isDark } = useTheme();
     const router: any = useRouter();
 
+    // Self-hosted-only (cloudOffers: false) — pure Cloud gets `visible: false`
+    // (hidden, matching today's real behavior), OSS gets locked-but-visible.
+    const customBrandingAccess = useLockedAffordance("customBranding");
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+    function onLockedBrandingClick(event: MouseEvent) {
+      event.preventDefault();
+      event.stopPropagation();
+      openUpgradeDialog();
+    }
+
     // Built once from the component's `t` so the messages are localized.
     const generalSettingsSchema = makeGeneralSettingsSchema(t);
     // Dynamic defaults (edit-prefill from the store) → a typed computed.
-    const generalSettingsDefaults = computed(
-      (): GeneralSettingsForm => ({
-        scrape_interval: store.state?.organizationData?.organizationSettings?.scrape_interval ?? 15,
-        max_series_per_query:
-          store.state?.organizationData?.organizationSettings?.max_series_per_query ?? null,
-      }),
-    );
+    const generalSettingsDefaults = computed((): GeneralSettingsForm => ({
+      scrape_interval: store.state?.organizationData?.organizationSettings?.scrape_interval ?? 15,
+      max_series_per_query:
+        store.state?.organizationData?.organizationSettings?.max_series_per_query ?? null,
+    }));
 
     const loadingState = ref(false);
+
+    // Branding is instance-wide, so with no org selected it is written against the default-type org.
+    const brandingOrg = () =>
+      store.state.selectedOrganization?.identifier ||
+      store.state.organizations?.find((o: any) => o.type == "default")?.identifier ||
+      "default";
+    const updateCustomLogoText = useMutation(() => updateCustomLogoTextMutation(brandingOrg()));
+    const updateOrgSettings = useMutation(() =>
+      updateOrgSettingsMutation(store.state?.selectedOrganization?.identifier),
+    );
     const customText = ref("");
     const editingText = ref(false);
     const files = ref(null);
@@ -742,6 +832,10 @@ export default defineComponent({
       () => deleteConfirmInput.value.trim() === deleteOrgName.value,
     );
 
+    const trialExpired = computed(() =>
+      isTrialExpired(store.state?.organizationData?.organizationSettings?.free_trial_expiry),
+    );
+
     // Only cloud builds expose self-service org deletion. Backend enforces the
     // real per-org RBAC check; this only governs visibility.
     const canDeleteOrg = computed(() => {
@@ -750,17 +844,39 @@ export default defineComponent({
       return role === "root" || role === "admin";
     });
 
-    // The consequence strip under the Danger Zone header. Grace period is stated
-    // without a duration on purpose: the real value lives in the enterprise config
-    // (org_deletion_grace_period_days) and is not exposed to the frontend, so any
-    // number rendered here would be a guess.
-    const deleteOrgFacts = computed(() => [
-      {
+    // Days a deleted org stays recoverable, from /config. A backend that predates the
+    // field sends nothing, and 0 is a legal value meaning no window at all — the three
+    // cases must read differently, because promising a recovery window that does not
+    // exist is the one mistake this panel cannot afford.
+    const recoveryWindowDays = computed<number | null>(() => {
+      const days = store.state.zoConfig?.org_deletion_grace_period_days;
+      return typeof days === "number" ? days : null;
+    });
+
+    const recoveryWindowFact = computed(() => {
+      const days = recoveryWindowDays.value;
+      if (days === 0) {
+        return {
+          key: "grace",
+          icon: "warning",
+          title: t("settings.deleteFactNoRecoveryWindow"),
+          detail: t("settings.deleteFactNoRecoveryWindowDetail"),
+        };
+      }
+      return {
         key: "grace",
         icon: "access-time",
         title: t("settings.deleteFactGracePeriod"),
-        detail: t("settings.deleteFactGracePeriodDetail"),
-      },
+        detail:
+          days === null
+            ? t("settings.deleteFactGracePeriodDetail")
+            : t("settings.deleteFactRecoveryWindowDetail", { n: days }, days),
+      };
+    });
+
+    // The consequence strip under the Danger Zone header.
+    const deleteOrgFacts = computed(() => [
+      recoveryWindowFact.value,
       {
         key: "scope",
         icon: "dashboard",
@@ -772,12 +888,6 @@ export default defineComponent({
         icon: "group",
         title: t("settings.deleteFactMembers", { n: memberCount.value }, memberCount.value),
         detail: t("settings.deleteFactMembersDetail"),
-      },
-      {
-        key: "owner",
-        icon: "shield",
-        title: t("settings.deleteFactOwner"),
-        detail: t("settings.deleteFactOwnerDetail"),
       },
     ]);
 
@@ -808,11 +918,11 @@ export default defineComponent({
       if (!orgId || orgScope.value || orgScopeLoading.value) return;
       orgScopeLoading.value = true;
       try {
-        const res = await organizations.get_organization_summary(orgId);
+        const data: any = await queryClient.fetchQuery(orgSummaryQuery(orgId));
         orgScope.value = t("settings.deleteOrganizationScope", {
-          dashboards: res.data?.total_dashboards ?? 0,
-          streams: res.data?.streams?.num_streams ?? 0,
-          size: formatSizeFromMB(String(res.data?.streams?.total_storage_size ?? 0)),
+          dashboards: data?.total_dashboards ?? 0,
+          streams: data?.streams?.num_streams ?? 0,
+          size: formatSizeFromMB(String(data?.streams?.total_storage_size ?? 0)),
         });
       } catch {
         // Contextual only — the delete flow stays usable without the counts.
@@ -903,22 +1013,29 @@ export default defineComponent({
           ? null
           : Number(maxSeriesRaw);
 
+      // Only the fields this form owns: the backend applies what is present, and Vuex may hold values another admin changed since.
+      const owned = {
+        scrape_interval: Number(value.scrape_interval),
+        max_series_per_query: maxSeriesNum,
+        light_mode_theme_color: customLightColor.value,
+        dark_mode_theme_color: customDarkColor.value,
+      };
+
       try {
         //set organizations settings in store
         //scrape interval will be in number
         store.dispatch("setOrganizationSettings", {
           ...store.state?.organizationData?.organizationSettings,
-          scrape_interval: Number(value.scrape_interval),
-          max_series_per_query: maxSeriesNum,
-          light_mode_theme_color: customLightColor.value,
-          dark_mode_theme_color: customDarkColor.value,
+          ...owned,
         });
 
         //update settings in backend
-        await organizations.post_organization_settings(
-          store.state?.selectedOrganization?.identifier,
-          store.state?.organizationData?.organizationSettings,
-        );
+        await updateOrgSettings.mutateAsync(owned);
+        analytics.track("org_general_settings_saved", {
+          custom_theme:
+            owned.light_mode_theme_color !== DEFAULT_LIGHT_COLOR ||
+            owned.dark_mode_theme_color !== DEFAULT_DARK_COLOR,
+        });
 
         // Apply the current mode's theme
         const currentMode = isDark.value ? "dark" : "light";
@@ -974,9 +1091,21 @@ export default defineComponent({
                 }),
               });
 
-              await configService.get_config().then((res: any) => {
-                store.dispatch("setConfig", res.data);
+              // Forced: the logo just changed, so the cached config is the one
+              // thing that must not answer here.
+              await queryClient.invalidateQueries({
+                queryKey: configFullQuery(
+                  store.state.selectedOrganization?.identifier || orgIdentifier,
+                ).queryKey,
+                exact: true,
+                refetchType: "none",
               });
+              store.dispatch(
+                "setConfig",
+                await queryClient.fetchQuery(
+                  configFullQuery(store.state.selectedOrganization?.identifier || orgIdentifier),
+                ),
+              );
 
               // Clear the appropriate file ref
               if (mode === "dark") {
@@ -1033,9 +1162,24 @@ export default defineComponent({
               }),
             });
 
-            await configService.get_config().then((res: any) => {
-              store.dispatch("setConfig", res.data);
-            });
+            // Forced: the logo just changed, so the cached config is the one
+            // thing that must not answer here.
+            store.dispatch(
+              "setConfig",
+              await queryClient
+                .invalidateQueries({
+                  queryKey: configFullQuery(
+                    store.state.selectedOrganization?.identifier || orgIdentifier,
+                  ).queryKey,
+                  exact: true,
+                  refetchType: "none",
+                })
+                .then(() =>
+                  queryClient.fetchQuery(
+                    configFullQuery(store.state.selectedOrganization?.identifier || orgIdentifier),
+                  ),
+                ),
+            );
           } else {
             toast({
               variant: "error",
@@ -1070,6 +1214,7 @@ export default defineComponent({
      */
     const handleThemeChipClick = (mode: "light" | "dark") => {
       // First, switch the theme mode if it's different from current
+      // eslint-disable-next-line no-restricted-syntax -- theme-setting guard, not a theme read: compares the current mode against the target before switching. useTheme().isDark is a boolean and cannot express "is it already this specific mode".
       if (store.state.theme !== mode) {
         toggleThemeMode(mode);
       }
@@ -1192,13 +1337,6 @@ export default defineComponent({
 
     const updateCustomText = () => {
       loadingState.value = true;
-      let orgIdentifier = "default";
-      for (let item of store.state.organizations) {
-        if (item.type == "default") {
-          orgIdentifier = item.identifier;
-        }
-      }
-
       customText.value = sanitizeInput(customText.value);
       if (customText.value.length > 100) {
         toast({
@@ -1209,12 +1347,9 @@ export default defineComponent({
         return;
       }
 
-      settingsService
-        .updateCustomText(
-          store.state.selectedOrganization?.identifier || orgIdentifier,
-          "custom_logo_text",
-          customText.value,
-        )
+      // Returned so a caller can await the write.
+      return updateCustomLogoText
+        .mutateAsync(customText.value)
         .then(async (res: any) => {
           if (res.status == 200) {
             toast({
@@ -1285,6 +1420,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       store,
       config,
       router,
@@ -1335,6 +1471,7 @@ export default defineComponent({
       updateCustomColor,
       resetThemeColors,
       currentPickerMode,
+      trialExpired,
       // Delete organization (Danger Zone)
       canDeleteOrg,
       confirmDeleteOrg,
@@ -1347,6 +1484,8 @@ export default defineComponent({
       openDeleteOrgDialog,
       orgScope,
       orgScopeLoading,
+      customBrandingAccess,
+      onLockedBrandingClick,
     };
   },
 });

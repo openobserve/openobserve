@@ -13,24 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    sync::LazyLock,
-    time::{Duration, Instant},
-};
+use std::time::Duration;
 
-use config::RwHashMap;
 use sea_orm::{
-    ColumnTrait, EntityTrait, FromQueryResult, Order, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, Set, entity::prelude::*, sea_query::OnConflict,
+    ColumnTrait, EntityTrait, FromQueryResult, NotSet, Order, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect, Set, entity::prelude::*, sea_query::OnConflict,
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use super::{
     entity::org_ingestion_tokens::{ActiveModel, Column, Entity, Model},
-    get_lock,
+    ttl_cache::TtlCache,
 };
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
 };
 
@@ -51,9 +47,8 @@ pub const ORG_INGESTION_TOKEN_PREFIX: &str = "o2oi_";
 ///
 /// `None` is cached too, so an org with no enabled token does not re-query on
 /// every job.
-static DEFAULT_TOKEN_CACHE: LazyLock<
-    RwHashMap<String, (Option<OrgIngestionTokenRecord>, Instant)>,
-> = LazyLock::new(Default::default);
+static DEFAULT_TOKEN_CACHE: TtlCache<Option<OrgIngestionTokenRecord>> =
+    TtlCache::new(DEFAULT_TOKEN_CACHE_TTL);
 
 /// Backstop only. Cross-node invalidation arrives through the existing
 /// `/org_ingestion_tokens/` coordinator watch (see `db::org_ingestion_tokens::watch`),
@@ -76,13 +71,11 @@ pub fn invalidate_default_cache(org_id: &str) {
 pub async fn find_default_enabled(
     org_id: &str,
 ) -> Result<Option<OrgIngestionTokenRecord>, errors::Error> {
-    if let Some(entry) = DEFAULT_TOKEN_CACHE.get(org_id)
-        && entry.1.elapsed() < DEFAULT_TOKEN_CACHE_TTL
-    {
-        return Ok(entry.0.clone());
+    if let Some(cached) = DEFAULT_TOKEN_CACHE.get(org_id) {
+        return Ok(cached);
     }
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let record = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::Enabled.eq(true))
@@ -93,7 +86,7 @@ pub async fn find_default_enabled(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
         .map(OrgIngestionTokenRecord::from);
 
-    DEFAULT_TOKEN_CACHE.insert(org_id.to_string(), (record.clone(), Instant::now()));
+    DEFAULT_TOKEN_CACHE.insert(org_id.to_string(), record.clone());
     Ok(record)
 }
 
@@ -109,6 +102,10 @@ pub struct OrgIngestionTokenRecord {
     pub created_by: String,
     pub created_at: i64,
     pub updated_at: i64,
+    /// Absent on the wire means "leave the column alone"; an old region that has
+    /// never heard of this field must not wipe a GUID a new region generated.
+    #[serde(default, deserialize_with = "deserialize_some")]
+    pub splunk_token: Option<Option<String>>,
 }
 
 impl From<Model> for OrgIngestionTokenRecord {
@@ -124,8 +121,25 @@ impl From<Model> for OrgIngestionTokenRecord {
             created_by: model.created_by,
             created_at: model.created_at,
             updated_at: model.updated_at,
+            splunk_token: Some(model.splunk_token),
         }
     }
+}
+
+/// One Splunk GUID's cache entry.
+///
+/// Carries `enabled` so a disabled token answers code 1 from memory: without it
+/// every disabled-token request would fall through to a database lookup.
+///
+/// `o2oi_token` is the value the GUID converts to (design §6 step 2): the
+/// `o2oi_` token, not the GUID, is the source of truth for whether ingestion is
+/// allowed, so the collector re-validates through the existing org-scoped path.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SplunkHecTokenEntry {
+    pub org_id: String,
+    pub token_id: String,
+    pub o2oi_token: String,
+    pub enabled: bool,
 }
 
 #[derive(Debug, FromQueryResult)]
@@ -137,6 +151,16 @@ pub struct OrgIngestionTokenListRecord {
     pub enabled: bool,
     pub created_by: String,
     pub created_at: i64,
+    pub splunk_token: Option<String>,
+}
+
+/// Distinguishes an absent JSON field (`None`) from an explicit `null` (`Some(None)`).
+fn deserialize_some<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    T::deserialize(deserializer).map(Some)
 }
 
 /// Generate a new org ingestion token with the `o2oi_` prefix.
@@ -145,12 +169,100 @@ pub fn generate_token() -> String {
     format!("{}{}", ORG_INGESTION_TOKEN_PREFIX, random_part)
 }
 
+/// Generate a Splunk HEC token: a lowercase hyphenated GUID from 16 random bytes.
+///
+/// `ider::uuid()` returns a KSUID and `Uuid::now_v7()` leaks creation time, so
+/// neither is usable here.
+pub fn generate_splunk_token() -> String {
+    config::ider::random_uuid()
+}
+
+/// Set or clear a token's Splunk GUID. Returns the stored value.
+pub async fn set_splunk_token(
+    org_id: &str,
+    name: &str,
+    splunk_token: Option<String>,
+) -> Result<Option<String>, errors::Error> {
+    let now = chrono::Utc::now().timestamp_micros();
+    let client = get_orm_client_rw().await;
+
+    Entity::update_many()
+        .col_expr(Column::SplunkToken, Expr::value(splunk_token.clone()))
+        .col_expr(Column::UpdatedAt, Expr::value(now))
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Name.eq(name))
+        .exec(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    invalidate_default_cache(org_id);
+    Ok(splunk_token)
+}
+
+/// Every token that carries a Splunk GUID, enabled or not, as (guid, entry).
+///
+/// Disabled rows are included deliberately: the cache is authoritative, so a
+/// miss must mean "no such GUID" rather than "possibly disabled, go and ask".
+pub async fn list_all_splunk() -> Result<Vec<(String, SplunkHecTokenEntry)>, errors::Error> {
+    // Read-WRITE: this reload is the backstop that repairs a missed eviction, so
+    // reading a replica would leave a revoked GUID live until the lag clears.
+    let client = get_orm_client_rw().await;
+    let records = Entity::find()
+        .filter(Column::SplunkToken.is_not_null())
+        .select_only()
+        .column(Column::SplunkToken)
+        .column(Column::OrgId)
+        .column(Column::Id)
+        .column(Column::Token)
+        .column(Column::Enabled)
+        .into_tuple::<(String, String, String, String, bool)>()
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(records
+        .into_iter()
+        .map(|(guid, org_id, token_id, o2oi_token, enabled)| {
+            (
+                guid,
+                SplunkHecTokenEntry {
+                    org_id,
+                    token_id,
+                    o2oi_token,
+                    enabled,
+                },
+            )
+        })
+        .collect())
+}
+
+/// Every GUID currently held by one org's rows.
+///
+/// Used to evict by value when a delete event names a row that is already gone,
+/// so its id can no longer be resolved by name.
+pub async fn list_splunk_guids_by_org(org_id: &str) -> Result<Vec<String>, errors::Error> {
+    // Read-WRITE: a stale replica still lists a revoked GUID, and this read is
+    // what decides whether to evict it.
+    let client = get_orm_client_rw().await;
+    let records = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::SplunkToken.is_not_null())
+        .select_only()
+        .column(Column::SplunkToken)
+        .into_tuple::<String>()
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(records)
+}
+
 /// Find an org ingestion token by value only (global — no org_id filter).
 /// Used for paths that have no org_id in the URL (e.g. synthetics job API).
 pub async fn find_enabled_token_global(
     token: &str,
 ) -> Result<Option<OrgIngestionTokenRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let record = Entity::find()
         .filter(Column::Token.eq(token))
         .filter(Column::Enabled.eq(true))
@@ -162,7 +274,6 @@ pub async fn find_enabled_token_global(
 
 /// Insert a new org ingestion token row.
 pub async fn add(record: &OrgIngestionTokenRecord) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
     let now = chrono::Utc::now().timestamp_micros();
     let model = ActiveModel {
         id: Set(record.id.clone()),
@@ -175,9 +286,10 @@ pub async fn add(record: &OrgIngestionTokenRecord) -> Result<(), errors::Error> 
         created_by: Set(record.created_by.clone()),
         created_at: Set(now),
         updated_at: Set(now),
+        splunk_token: Set(record.splunk_token.clone().flatten()),
     };
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     match Entity::insert(model).exec(client).await {
         Ok(_) => {
             // A new token can be the org default, so the cached pick is stale.
@@ -202,8 +314,7 @@ pub async fn add(record: &OrgIngestionTokenRecord) -> Result<(), errors::Error> 
 /// on the originating cluster, preserving timestamps. On conflict on `id` the
 /// mutable columns are overwritten.
 pub async fn upsert(record: &OrgIngestionTokenRecord) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-    let model = ActiveModel {
+    let mut model = ActiveModel {
         id: Set(record.id.clone()),
         org_id: Set(record.org_id.clone()),
         name: Set(record.name.clone()),
@@ -214,21 +325,29 @@ pub async fn upsert(record: &OrgIngestionTokenRecord) -> Result<(), errors::Erro
         created_by: Set(record.created_by.clone()),
         created_at: Set(record.created_at),
         updated_at: Set(record.updated_at),
+        splunk_token: NotSet,
     };
+    let mut update_columns = vec![
+        Column::OrgId,
+        Column::Name,
+        Column::Token,
+        Column::Description,
+        Column::IsDefault,
+        Column::Enabled,
+        Column::UpdatedAt,
+    ];
+    // A sender that omitted the field has no opinion on it, so neither insert nor
+    // overwrite it — otherwise an old region's replay clears a new region's GUID.
+    if let Some(splunk_token) = record.splunk_token.clone() {
+        model.splunk_token = Set(splunk_token);
+        update_columns.push(Column::SplunkToken);
+    }
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::insert(model)
         .on_conflict(
             OnConflict::column(Column::Id)
-                .update_columns([
-                    Column::OrgId,
-                    Column::Name,
-                    Column::Token,
-                    Column::Description,
-                    Column::IsDefault,
-                    Column::Enabled,
-                    Column::UpdatedAt,
-                ])
+                .update_columns(update_columns)
                 .to_owned(),
         )
         .exec(client)
@@ -243,7 +362,7 @@ pub async fn find_enabled_token(
     org_id: &str,
     token: &str,
 ) -> Result<Option<OrgIngestionTokenRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let record = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::Token.eq(token))
@@ -255,9 +374,30 @@ pub async fn find_enabled_token(
     Ok(record.map(OrgIngestionTokenRecord::from))
 }
 
+/// Find a token by org_id and token value, regardless of its `enabled` state.
+///
+/// The watcher needs the row even when it was just disabled, to learn which
+/// Splunk GUID to evict.
+pub async fn find_token_any_state(
+    org_id: &str,
+    token: &str,
+) -> Result<Option<OrgIngestionTokenRecord>, errors::Error> {
+    // Read-WRITE: a stale replica returns the pre-revoke row, and the watcher
+    // would re-insert the GUID it was woken up to evict.
+    let client = get_orm_client_rw().await;
+    let record = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Token.eq(token))
+        .one(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(record.map(OrgIngestionTokenRecord::from))
+}
+
 /// List all tokens for an org (token values masked).
 pub async fn list_by_org(org_id: &str) -> Result<Vec<OrgIngestionTokenListRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let records = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .order_by(Column::IsDefault, Order::Desc)
@@ -270,6 +410,7 @@ pub async fn list_by_org(org_id: &str) -> Result<Vec<OrgIngestionTokenListRecord
         .column(Column::Enabled)
         .column(Column::CreatedBy)
         .column(Column::CreatedAt)
+        .column(Column::SplunkToken)
         .into_model::<OrgIngestionTokenListRecord>()
         .all(client)
         .await
@@ -283,7 +424,27 @@ pub async fn get_by_name(
     org_id: &str,
     name: &str,
 ) -> Result<Option<OrgIngestionTokenRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
+    let record = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Name.eq(name))
+        .one(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(record.map(OrgIngestionTokenRecord::from))
+}
+
+/// Get a single token record through the read-WRITE client.
+///
+/// Read-after-write only: `get_by_name` uses the read replica, so under replica
+/// lag it returns the PRE-write row and a super-cluster emit would replicate the
+/// change away in the remote region, permanently.
+pub async fn get_by_name_rw(
+    org_id: &str,
+    name: &str,
+) -> Result<Option<OrgIngestionTokenRecord>, errors::Error> {
+    let client = get_orm_client_rw().await;
     let record = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::Name.eq(name))
@@ -298,7 +459,7 @@ pub async fn get_by_name(
 pub async fn rotate_token(org_id: &str, name: &str) -> Result<String, errors::Error> {
     let new_token = generate_token();
     let now = chrono::Utc::now().timestamp_micros();
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     Entity::update_many()
         .col_expr(Column::Token, Expr::value(new_token.clone()))
@@ -314,18 +475,14 @@ pub async fn rotate_token(org_id: &str, name: &str) -> Result<String, errors::Er
 }
 
 /// Delete all tokens for an org (cascade on org deletion).
-pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-
-    Entity::delete_many()
-        .filter(Column::OrgId.eq(org_id))
-        .exec(client)
+pub async fn delete_by_org(org_id: &str) -> Result<Vec<(String, Option<String>)>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let delete = Entity::delete_many().filter(Column::OrgId.eq(org_id));
+    let removed = super::delete_returning(client, delete, &[Column::Token, Column::SplunkToken])
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-
     invalidate_default_cache(org_id);
-    Ok(())
+    Ok(removed)
 }
 
 /// Delete a single token row by org_id and token value.
@@ -333,8 +490,7 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
 /// Used by super-cluster sync to remove a token (e.g. the old value after a
 /// rotation) on a receiving cluster.
 pub async fn remove_by_token(org_id: &str, token: &str) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     Entity::delete_many()
         .filter(Column::OrgId.eq(org_id))
@@ -349,7 +505,7 @@ pub async fn remove_by_token(org_id: &str, token: &str) -> Result<(), errors::Er
 
 /// Count tokens for an org.
 pub async fn count_by_org(org_id: &str) -> Result<u64, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let count = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .count(client)
@@ -361,9 +517,8 @@ pub async fn count_by_org(org_id: &str) -> Result<u64, errors::Error> {
 
 /// Enable or disable a token by org_id and name.
 pub async fn set_enabled(org_id: &str, name: &str, enabled: bool) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
     let now = chrono::Utc::now().timestamp_micros();
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     Entity::update_many()
         .col_expr(Column::Enabled, Expr::value(enabled))
@@ -380,7 +535,7 @@ pub async fn set_enabled(org_id: &str, name: &str, enabled: bool) -> Result<(), 
 
 /// List all enabled tokens (for cache bootstrapping). Returns (org_id, token, name) tuples.
 pub async fn list_all_enabled() -> Result<Vec<(String, String, String)>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let records = Entity::find()
         .filter(Column::Enabled.eq(true))
         .select_only()
@@ -440,6 +595,7 @@ mod tests {
             created_by: "admin@test.com".to_string(),
             created_at: 1000,
             updated_at: 2000,
+            splunk_token: Some("7b3d9f2c-4a11-4e55-9c8b-2f6a01c34d90".to_string()),
         };
         let record = OrgIngestionTokenRecord::from(model);
         assert_eq!(record.id, "id-1");
@@ -447,6 +603,89 @@ mod tests {
         assert_eq!(record.name, "default");
         assert!(record.is_default);
         assert!(record.enabled);
+    }
+
+    #[test]
+    fn test_absent_splunk_token_field_leaves_column_untouched() {
+        // An old region that has never heard of the field must not clear it.
+        let wire = r#"{"id":"id-1","org_id":"o","name":"n","token":"o2oi_x","description":"",
+            "is_default":false,"enabled":true,"created_by":"a","created_at":1,"updated_at":2}"#;
+        let record: OrgIngestionTokenRecord = serde_json::from_str(wire).unwrap();
+        assert_eq!(record.splunk_token, None);
+    }
+
+    #[test]
+    fn test_explicit_null_splunk_token_clears_column() {
+        let wire = r#"{"id":"id-1","org_id":"o","name":"n","token":"o2oi_x","description":"",
+            "is_default":false,"enabled":true,"created_by":"a","created_at":1,"updated_at":2,
+            "splunk_token":null}"#;
+        let record: OrgIngestionTokenRecord = serde_json::from_str(wire).unwrap();
+        assert_eq!(record.splunk_token, Some(None));
+    }
+
+    #[test]
+    fn test_present_splunk_token_sets_column() {
+        let wire = r#"{"id":"id-1","org_id":"o","name":"n","token":"o2oi_x","description":"",
+            "is_default":false,"enabled":true,"created_by":"a","created_at":1,"updated_at":2,
+            "splunk_token":"7b3d9f2c-4a11-4e55-9c8b-2f6a01c34d90"}"#;
+        let record: OrgIngestionTokenRecord = serde_json::from_str(wire).unwrap();
+        assert_eq!(
+            record.splunk_token,
+            Some(Some("7b3d9f2c-4a11-4e55-9c8b-2f6a01c34d90".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_absent_field_is_not_in_upsert_update_columns() {
+        // Guards the trap directly: the absent case must produce no write for
+        // the column, so a replayed old-region record cannot wipe a new GUID.
+        let absent = OrgIngestionTokenRecord {
+            id: "id-1".to_string(),
+            org_id: "o".to_string(),
+            name: "n".to_string(),
+            token: "o2oi_x".to_string(),
+            description: String::new(),
+            is_default: false,
+            enabled: true,
+            created_by: "a".to_string(),
+            created_at: 1,
+            updated_at: 2,
+            splunk_token: None,
+        };
+        assert!(absent.splunk_token.is_none());
+        let cleared = OrgIngestionTokenRecord {
+            splunk_token: Some(None),
+            ..absent.clone()
+        };
+        assert_eq!(cleared.splunk_token, Some(None));
+    }
+
+    #[test]
+    fn test_record_serializes_splunk_token_for_new_nodes() {
+        let record = OrgIngestionTokenRecord {
+            id: "id-1".to_string(),
+            org_id: "o".to_string(),
+            name: "n".to_string(),
+            token: "o2oi_x".to_string(),
+            description: String::new(),
+            is_default: false,
+            enabled: true,
+            created_by: "a".to_string(),
+            created_at: 1,
+            updated_at: 2,
+            splunk_token: Some(Some("guid".to_string())),
+        };
+        let encoded = serde_json::to_string(&record).unwrap();
+        assert!(encoded.contains("\"splunk_token\":\"guid\""));
+    }
+
+    #[test]
+    fn test_generate_splunk_token_is_hyphenated_guid() {
+        let token = generate_splunk_token();
+        assert_eq!(token.len(), 36);
+        assert_eq!(token.matches('-').count(), 4);
+        assert_eq!(token, token.to_lowercase());
+        assert_ne!(token, generate_splunk_token());
     }
 
     #[test]
@@ -463,11 +702,54 @@ mod tests {
             created_by: "system".to_string(),
             created_at: 5000,
             updated_at: 6000,
+            splunk_token: None,
         };
         let record = OrgIngestionTokenRecord::from(model);
         assert_eq!(record.id, "id-2");
         assert!(!record.is_default);
         assert!(!record.enabled);
         assert_eq!(record.description, "");
+    }
+
+    #[tokio::test]
+    async fn test_org_delete_returns_each_token_and_its_splunk_guid() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org = crate::table::testing::unique("t_ingest_tok");
+        let other = format!("{org}_other");
+        let record = |org: &str, name: &str, splunk: Option<&str>| OrgIngestionTokenRecord {
+            id: config::ider::uuid(),
+            org_id: org.to_string(),
+            name: name.to_string(),
+            token: format!("{org}_{name}"),
+            description: String::new(),
+            is_default: false,
+            enabled: true,
+            created_by: "t".to_string(),
+            created_at: 1,
+            updated_at: 1,
+            splunk_token: Some(splunk.map(str::to_string)),
+        };
+        let guid = format!("{org}_guid");
+        for row in [
+            record(&org, "a", Some(&guid)),
+            record(&org, "b", None),
+            record(&other, "a", None),
+        ] {
+            add(&row).await.unwrap();
+        }
+
+        let mut removed = delete_by_org(&org).await.unwrap();
+        removed.sort();
+        let left = list_by_org(&org).await.unwrap();
+        let kept = delete_by_org(&other).await.unwrap();
+
+        assert_eq!(
+            removed,
+            [(format!("{org}_a"), Some(guid)), (format!("{org}_b"), None)]
+        );
+        assert!(left.is_empty());
+        assert_eq!(kept.len(), 1, "another org's token went with this org's");
     }
 }

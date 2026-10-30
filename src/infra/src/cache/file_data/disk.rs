@@ -19,7 +19,7 @@ use std::{
     ops::Range,
     path::{Path, PathBuf},
     sync::{
-        LazyLock as Lazy,
+        LazyLock as Lazy, OnceLock,
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     time::SystemTime,
@@ -28,14 +28,13 @@ use std::{
 use async_recursion::async_recursion;
 use bytes::Bytes;
 use config::{
-    RwAHashMap, get_config, metrics, spawn_pausable_job,
+    RwAHashMap, RwHashMap, get_config, metrics, spawn_pausable_job,
     utils::{
         file::*,
-        hash::{Sum64, gxhash},
+        hash::{Sum64, gxhash, key_sum64},
         time::{HourFormat, get_ymdh_from_micros, now_micros},
     },
 };
-use hashbrown::HashMap;
 use object_store::{GetOptions, GetResult, GetResultPayload, ObjectMeta};
 use tokio::sync::RwLock;
 
@@ -101,10 +100,35 @@ static AGGREGATION_FILES_READER: Lazy<Vec<FileData>> = Lazy::new(|| {
     files
 });
 
+/// Metas are added under the file's bucket guard; every deletion re-verifies the other side first.
 pub static QUERY_RESULT_CACHE: Lazy<RwAHashMap<String, Vec<ResultCacheMeta>>> =
     Lazy::new(Default::default);
 
 pub static METRICS_RESULT_CACHE: Lazy<RwLock<Vec<String>>> = Lazy::new(|| RwLock::new(Vec::new()));
+
+/// File-name prefix of the current metrics result format; its `_` makes pre-v2 parsers reject it.
+pub const METRICS_RESULT_CACHE_FILE_PREFIX: &str = "v2_";
+
+const RESULT_CACHE_MAX_ENTRIES_PER_KEY: usize = 10;
+
+/// Public dashboard result files: one per key, in the result buckets and under their budget.
+pub const PUBLIC_DASHBOARDS_PREFIX: &str = "public_dashboards/";
+
+/// Incarnations of each public dashboard key with a memory copy, so a drop is a point removal.
+static PUBLIC_DASHBOARD_BODIES: Lazy<RwHashMap<String, Vec<u64>>> = Lazy::new(Default::default);
+
+static METRICS_RESULT_CACHE_EVICT_HOOK: OnceLock<fn(Vec<String>)> = OnceLock::new();
+
+static TRASH_ID: AtomicUsize = AtomicUsize::new(0);
+
+/// Temp files whose write fails partway, to drive the cleanup path in tests.
+#[cfg(test)]
+static FAIL_TMP_WRITES: Lazy<std::sync::Mutex<std::collections::HashSet<String>>> =
+    Lazy::new(Default::default);
+/// Temp files whose write panics partway, to drive the join-error cleanup in tests.
+#[cfg(test)]
+static PANIC_TMP_WRITES: Lazy<std::sync::Mutex<std::collections::HashSet<String>>> =
+    Lazy::new(Default::default);
 
 pub static LOADING_FROM_DISK_NUM: Lazy<AtomicUsize> = Lazy::new(|| AtomicUsize::new(0));
 pub static LOADING_FROM_DISK_DONE: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
@@ -113,6 +137,7 @@ pub struct FileData {
     max_size: usize,
     cur_size: usize,
     root_dir: String,
+    canonical_root: OnceLock<PathBuf>,
     multi_dir: Vec<String>,
     file_type: FileType,
     data: CacheStrategy,
@@ -124,6 +149,36 @@ pub enum FileType {
     Result,
     Aggregation,
 }
+
+/// Eviction cleanup whose Drop spawns a task, so it also runs when the gc future is cancelled.
+#[derive(Default)]
+struct EvictionCleanup {
+    metrics_files: Vec<String>,
+    trash_files: Vec<String>,
+    public_dashboards: Vec<String>,
+}
+
+/// While held, the file's disk cache bucket cannot evict, so the file stays on disk.
+pub struct IndexedFileGuard {
+    _guard: tokio::sync::RwLockReadGuard<'static, FileData>,
+}
+
+enum TrashOutcome {
+    Moved(String),
+    SourceMissing,
+    Failed,
+}
+
+enum RemoveOutcome {
+    Removed(Option<String>), // vacated; the payload is the trash file to unlink off-lock
+    NotIndexed,
+    Failed, // the path could not be vacated; the index entry was restored
+}
+
+/// A public dashboard file the result cache cannot hold, even after evicting for it.
+#[derive(Debug, thiserror::Error)]
+#[error("result larger than the result cache")]
+pub struct PublicDashboardTooLarge;
 
 impl fmt::Display for FileType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -138,6 +193,43 @@ impl fmt::Display for FileType {
 impl Default for FileData {
     fn default() -> Self {
         Self::new(FileType::Data)
+    }
+}
+
+impl Drop for EvictionCleanup {
+    fn drop(&mut self) {
+        if self.metrics_files.is_empty()
+            && self.trash_files.is_empty()
+            && self.public_dashboards.is_empty()
+        {
+            return;
+        }
+        let metrics_files = std::mem::take(&mut self.metrics_files);
+        let trash_files = std::mem::take(&mut self.trash_files);
+        let public_dashboards = std::mem::take(&mut self.public_dashboards);
+        let Ok(handle) = tokio::runtime::Handle::try_current() else {
+            log::error!(
+                "File disk cache eviction cleanup dropped outside a runtime, index entries may be stale"
+            );
+            return;
+        };
+        handle.spawn(async move {
+            if !metrics_files.is_empty()
+                && let Some(hook) = METRICS_RESULT_CACHE_EVICT_HOOK.get()
+            {
+                hook(metrics_files);
+            }
+            for trash_file in trash_files {
+                if let Err(e) = tokio::fs::remove_file(&trash_file).await
+                    && e.kind() != std::io::ErrorKind::NotFound
+                {
+                    log::error!("File disk cache remove trash file {trash_file} error: {e}");
+                }
+            }
+            for key in public_dashboards {
+                drop_public_dashboard_bodies(&key).await;
+            }
+        });
     }
 }
 
@@ -167,6 +259,7 @@ impl FileData {
                 cfg.common.data_cache_dir,
                 storage::format_key("", true),
             ),
+            canonical_root: OnceLock::new(),
             multi_dir: cfg
                 .disk_cache
                 .multi_dir
@@ -187,8 +280,49 @@ impl FileData {
         format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file)
     }
 
+    fn canonical_root(&self) -> Option<&PathBuf> {
+        if let Some(root) = self.canonical_root.get() {
+            return Some(root);
+        }
+        let root = std::fs::canonicalize(&self.root_dir).ok()?;
+        let _ = self.canonical_root.set(root);
+        self.canonical_root.get()
+    }
+
+    /// Resolve a cache key to an on-disk path, returning `None` when it would
+    /// escape `root_dir`. The cache namespace is flat, so a `..`/absolute key or
+    /// any path that canonicalizes outside the cache root is a traversal attempt.
+    fn safe_read_path(&self, file: &str) -> Option<String> {
+        if key_escapes(file) {
+            return None;
+        }
+        let path = self.get_file_path(file);
+        let resolved = std::fs::canonicalize(&path).ok()?;
+        resolved.starts_with(self.canonical_root()?).then_some(path)
+    }
+
+    /// Like `safe_read_path`, but for a file that may not exist yet.
+    fn safe_file_path(&self, file: &str) -> Option<String> {
+        if key_escapes(file) {
+            return None;
+        }
+        let path = self.get_file_path(file);
+        let Some(existing) = Path::new(&path)
+            .ancestors()
+            .find(|p| p.symlink_metadata().is_ok())
+        else {
+            return Some(path);
+        };
+        // nothing under the root exists yet, so no symlink can redirect the path
+        if !existing.starts_with(&self.root_dir) {
+            return Some(path);
+        }
+        let resolved = std::fs::canonicalize(existing).ok()?;
+        resolved.starts_with(self.canonical_root()?).then_some(path)
+    }
+
     async fn get(&self, file: &str, range: Option<Range<u64>>) -> Option<Bytes> {
-        let file_path = self.get_file_path(file);
+        let file_path = self.safe_read_path(file)?;
         tokio::task::spawn_blocking(move || match get_file_contents(&file_path, range) {
             Ok(data) => Some(Bytes::from(data)),
             Err(_) => None,
@@ -199,7 +333,7 @@ impl FileData {
     }
 
     async fn get_size(&self, file: &str) -> Option<usize> {
-        let file_path = self.get_file_path(file);
+        let file_path = self.safe_read_path(file)?;
         match get_file_size(&file_path) {
             Ok(v) => Some(v as usize),
             Err(_) => None,
@@ -212,24 +346,34 @@ impl FileData {
         tmp_file: &str,
         data_size: usize,
     ) -> Result<(), anyhow::Error> {
+        let Some(file_path) = self.safe_file_path(file) else {
+            _ = std::fs::remove_file(tmp_file);
+            return Err(anyhow::anyhow!(
+                "[CacheType:{}] File disk cache rejected key outside the cache root: {file}",
+                self.file_type,
+            ));
+        };
         if self.cur_size + data_size >= self.max_size {
             log::info!(
                 "[CacheType:{}] File disk cache is full, can't cache extra {data_size} bytes",
                 self.file_type,
             );
             // cache is full, need release some space
+            let cfg = get_config();
+            // scaled so one full-cache write cannot flush a whole result/aggregation bucket
+            let scale_factor = max(1, cfg.disk_cache.max_size / max(1, self.max_size));
             let need_release_size = min(
                 self.max_size,
-                max(get_config().disk_cache.release_size, data_size * 100),
+                max(cfg.disk_cache.release_size / scale_factor, data_size * 100),
             );
-            self.gc(need_release_size).await?;
+            self.gc(need_release_size).await;
         }
 
         // rename tmp file to real file
         let file_ops_start = std::time::Instant::now();
-        let file_path = self.get_file_path(file);
-        tokio::fs::create_dir_all(Path::new(&file_path).parent().unwrap()).await?;
-        tokio::fs::rename(tmp_file, &file_path).await.map_err(|e| {
+        std::fs::create_dir_all(Path::new(&file_path).parent().unwrap())?;
+        // sync on purpose: the rename and the set_size index insert must be one uncancellable poll
+        std::fs::rename(tmp_file, &file_path).map_err(|e| {
             anyhow::anyhow!(
                 "[CacheType:{}] File disk cache rename tmp file {tmp_file} to real file {file_path} error: {e}",
                 self.file_type,
@@ -251,32 +395,13 @@ impl FileData {
         // update size
         self.cur_size += data_size;
         self.data.insert(file.to_string(), data_size);
-        // update metrics
-        let columns = file.split('/').collect::<Vec<&str>>();
-        if columns[0] == "files" {
-            metrics::QUERY_DISK_CACHE_FILES
-                .with_label_values(&[columns[1], columns[2]])
-                .inc();
-            metrics::QUERY_DISK_CACHE_USED_BYTES
-                .with_label_values(&[columns[1], columns[2]])
-                .add(data_size as i64);
-        } else if columns[0] == "results" {
-            metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                .with_label_values(&[columns[1], columns[2], "results"])
-                .add(data_size as i64);
-        } else if columns[0] == "metrics_results" {
-            metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
-                .with_label_values(&[columns[1]])
-                .add(data_size as i64);
-        } else if columns[0] == "aggregations" && columns.len() >= 3 {
-            metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                .with_label_values(&[columns[1], columns[2], "aggregations"])
-                .add(data_size as i64);
-        };
+        update_key_metrics(file, data_size as i64);
         Ok(())
     }
 
-    async fn gc(&mut self, need_release_size: usize) -> Result<(), anyhow::Error> {
+    /// Cancellation-safe: per-item bookkeeping completes before every await; the guard finishes
+    /// cleanup.
+    async fn gc(&mut self, need_release_size: usize) {
         let start = std::time::Instant::now();
         log::info!(
             "[CacheType:{}] File disk cache start gc {}/{}, need to release {} bytes",
@@ -286,7 +411,9 @@ impl FileData {
             need_release_size
         );
         let mut release_size = 0;
-        let mut remove_result_files = vec![];
+        let mut move_failures = 0;
+        let mut remove_result_files = Vec::new();
+        let mut cleanup = EvictionCleanup::default();
         loop {
             let item = self.data.remove();
             if item.is_none() {
@@ -297,117 +424,88 @@ impl FileData {
                 break;
             }
             let (key, data_size) = item.unwrap();
-            // delete file from local disk
             let file_path = self.get_file_path(key.as_str());
             log::debug!(
                 "[CacheType:{}] File disk cache gc remove file: {key}",
                 self.file_type,
             );
-            if let Err(e) = tokio::fs::remove_file(&file_path).await {
-                log::error!(
-                    "[CacheType:{}] File disk cache gc remove file: {file_path}, error: {e}",
-                    self.file_type,
-                );
+            match self.move_to_trash(&key, &file_path) {
+                TrashOutcome::Moved(trash_path) => cleanup.trash_files.push(trash_path),
+                TrashOutcome::SourceMissing => {}
+                TrashOutcome::Failed => {
+                    // the file still occupies its path: keep the entry so accounting stays true
+                    self.data.insert(key, data_size);
+                    move_failures += 1;
+                    if move_failures >= 3 {
+                        log::error!(
+                            "[CacheType:{}] File disk cache gc stopped after repeated trash failures",
+                            self.file_type,
+                        );
+                        break;
+                    }
+                    continue;
+                }
             }
-
-            if key.starts_with("results/") {
-                let columns = key.split('/').collect::<Vec<&str>>();
-                let query_key = format!(
-                    "{}_{}_{}_{}",
-                    columns[1], columns[2], columns[3], columns[4]
-                );
-                remove_result_files.push(query_key);
-            }
-            // metrics
-            let columns = key.split('/').collect::<Vec<&str>>();
-            if columns[0] == "files" {
-                metrics::QUERY_DISK_CACHE_FILES
-                    .with_label_values(&[columns[1], columns[2]])
-                    .dec();
-                metrics::QUERY_DISK_CACHE_USED_BYTES
-                    .with_label_values(&[columns[1], columns[2]])
-                    .sub(data_size as i64);
-            } else if columns[0] == "results" {
-                metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                    .with_label_values(&[columns[1], columns[2], "results"])
-                    .sub(data_size as i64);
-            } else if columns[0] == "metrics_results" {
-                metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
-                    .with_label_values(&[columns[1]])
-                    .sub(data_size as i64);
-            } else if columns[0] == "aggregations" && columns.len() >= 3 {
-                metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                    .with_label_values(&[columns[1], columns[2], "aggregations"])
-                    .sub(data_size as i64);
-            }
-
+            self.cur_size -= data_size;
             release_size += data_size;
+
+            update_key_metrics(&key, -(data_size as i64));
+            let is_metrics_key = key.starts_with("metrics_results/");
+            let is_results_key = key.starts_with("results/");
+            if is_results_key {
+                remove_result_files.push(key);
+            } else if is_metrics_key {
+                cleanup.metrics_files.push(key);
+            } else if key.starts_with(PUBLIC_DASHBOARDS_PREFIX) {
+                cleanup.public_dashboards.push(key);
+            }
+
             if release_size >= need_release_size {
                 break;
             }
+            // the sync renames must not monopolize the worker for a whole batch
+            tokio::task::consume_budget().await;
         }
-        self.cur_size -= release_size;
 
-        if !remove_result_files.is_empty() {
-            let mut r = QUERY_RESULT_CACHE.write().await;
-            for query_key in remove_result_files {
-                r.remove(&query_key);
-            }
-            drop(r);
-        }
+        // pruned inline so the prune completes before the caller can insert a new meta
+        remove_result_cache_metas(&remove_result_files).await;
+
         log::info!(
             "[CacheType:{}] File disk cache gc done, released {release_size} bytes, took: {} ms",
             self.file_type,
             start.elapsed().as_millis()
         );
-
-        Ok(())
     }
 
-    async fn remove(&mut self, file: &str) -> Result<(), anyhow::Error> {
+    /// Returns the trash path the file was vacated to; the caller deletes it off-lock.
+    async fn remove(&mut self, file: &str) -> RemoveOutcome {
         log::debug!(
             "[CacheType:{}] File disk cache remove file {file}",
             self.file_type,
         );
 
         let Some((key, data_size)) = self.data.remove_key(file) else {
-            return Ok(());
+            log::debug!(
+                "[CacheType:{}] File disk cache remove file {file} not in the index",
+                self.file_type,
+            );
+            return RemoveOutcome::NotIndexed;
+        };
+        let file_path = self.get_file_path(key.as_str());
+        let trash_file = match self.move_to_trash(key.as_str(), &file_path) {
+            TrashOutcome::Moved(trash_path) => Some(trash_path),
+            TrashOutcome::SourceMissing => None,
+            TrashOutcome::Failed => {
+                // the file still occupies its path: keep the entry so accounting stays true
+                self.data.insert(key, data_size);
+                return RemoveOutcome::Failed;
+            }
         };
         self.cur_size -= data_size;
 
-        // delete file from local disk
-        let file_path = self.get_file_path(key.as_str());
-        if let Err(e) = tokio::fs::remove_file(&file_path).await {
-            log::error!(
-                "[CacheType:{}] File disk cache remove file: {file_path}, error: {e}",
-                self.file_type,
-            );
-        }
+        update_key_metrics(&key, -(data_size as i64));
 
-        // metrics
-        let columns = key.split('/').collect::<Vec<&str>>();
-        if columns[0] == "files" {
-            metrics::QUERY_DISK_CACHE_FILES
-                .with_label_values(&[columns[1], columns[2]])
-                .dec();
-            metrics::QUERY_DISK_CACHE_USED_BYTES
-                .with_label_values(&[columns[1], columns[2]])
-                .sub(data_size as i64);
-        } else if columns[0] == "results" {
-            metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                .with_label_values(&[columns[1], columns[2], "results"])
-                .sub(data_size as i64);
-        } else if columns[0] == "metrics_results" {
-            metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
-                .with_label_values(&[columns[1]])
-                .sub(data_size as i64);
-        } else if columns[0] == "aggregations" && columns.len() >= 3 {
-            metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                .with_label_values(&[columns[1], columns[2], "aggregations"])
-                .sub(data_size as i64);
-        }
-
-        Ok(())
+        RemoveOutcome::Removed(trash_file)
     }
 
     fn choose_multi_dir(&self, file: &str) -> String {
@@ -418,6 +516,76 @@ impl FileData {
         let h = gxhash::new().sum64(file);
         let index = h % (self.multi_dir.len() as u64);
         format!("{}/", self.multi_dir.get(index as usize).unwrap())
+    }
+
+    /// Vacates the deterministic path under the bucket lock, so same-key writers never collide.
+    fn move_to_trash(&self, key: &str, file_path: &str) -> TrashOutcome {
+        let trash_path = format!(
+            "{}{}trash/{}",
+            self.root_dir,
+            self.choose_multi_dir(key),
+            TRASH_ID.fetch_add(1, Ordering::Relaxed)
+        );
+        match std::fs::rename(file_path, &trash_path) {
+            Ok(()) => TrashOutcome::Moved(trash_path),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                if !Path::new(file_path).exists() {
+                    return TrashOutcome::SourceMissing;
+                }
+                // first eviction of a run creates the trash dir, then the rename is retried
+                let created = Path::new(&trash_path)
+                    .parent()
+                    .is_some_and(|parent| std::fs::create_dir_all(parent).is_ok());
+                if created && std::fs::rename(file_path, &trash_path).is_ok() {
+                    return TrashOutcome::Moved(trash_path);
+                }
+                log::error!(
+                    "[CacheType:{}] File disk cache move file {file_path} to trash error",
+                    self.file_type,
+                );
+                TrashOutcome::Failed
+            }
+            Err(e) => {
+                log::error!(
+                    "[CacheType:{}] File disk cache move file {file_path} to trash error: {e}",
+                    self.file_type,
+                );
+                TrashOutcome::Failed
+            }
+        }
+    }
+
+    /// Renames a temp file over `key`'s, evicting only the bytes it lacks; returns the old size.
+    async fn public_dashboards_admit(
+        &mut self,
+        key: &str,
+        tmp: &str,
+        path: &str,
+        size: usize,
+    ) -> Result<usize, anyhow::Error> {
+        let old = self.data.remove_key(key).map_or(0, |(_, old)| old);
+        self.cur_size -= old;
+        if self.cur_size + size > self.max_size && size <= self.max_size {
+            self.gc(self.cur_size + size - self.max_size).await;
+        }
+        let refused = if self.cur_size + size > self.max_size {
+            Some(anyhow::Error::from(PublicDashboardTooLarge))
+        } else {
+            std::fs::rename(tmp, path)
+                .err()
+                .map(|e| anyhow::anyhow!("rename {tmp} over {path}: {e}"))
+        };
+        if let Some(e) = refused {
+            self.cur_size += old;
+            if old > 0 {
+                self.data.insert(key.to_string(), old);
+            }
+            _ = std::fs::remove_file(tmp);
+            return Err(e);
+        }
+        self.cur_size += size;
+        self.data.insert(key.to_string(), size);
+        Ok(old)
     }
 
     fn size(&self) -> (usize, usize) {
@@ -457,14 +625,44 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move {
         log::info!("Loading disk cache start");
         let root_dir = FILES[0].read().await.root_dir.clone();
+        // clear the trash of a previous run so the scan cannot adopt half-deleted files
+        let cfg = get_config();
+        let mut trash_dirs = vec![format!("{root_dir}trash/")];
+        for dir in cfg.disk_cache.multi_dir.split(',') {
+            if !dir.trim().is_empty() {
+                trash_dirs.push(format!("{root_dir}{}/trash/", dir.trim()));
+            }
+        }
+        for dir in trash_dirs {
+            if let Err(e) = std::fs::remove_dir_all(&dir) {
+                log::debug!("clean trash dir {dir} error: {e}");
+            }
+        }
         let root_dir = tokio::fs::canonicalize(&root_dir).await.unwrap();
-        if let Err(e) = load(&root_dir, &root_dir).await {
+        let mut legacy_metrics = Vec::new();
+        if let Err(e) = load(&root_dir, &root_dir, &mut legacy_metrics).await {
             log::error!("load disk cache error: {e}");
         }
+        // off the scan path so a large legacy cache does not delay LOADING_FROM_DISK_DONE
+        tokio::spawn(remove_legacy_metrics_files(legacy_metrics));
         log::info!(
             "Loading disk cache done, total files: {}",
             LOADING_FROM_DISK_NUM.load(Ordering::Relaxed)
         );
+        // the scan can bring a bucket back far over its budget; trim once instead of thrashing
+        for files in [&*FILES, &*RESULT_FILES, &*AGGREGATION_FILES] {
+            for file in files.iter() {
+                let r = file.read().await;
+                let over_size = r.cur_size.saturating_sub(r.max_size);
+                drop(r);
+                if over_size == 0 {
+                    continue;
+                }
+                let mut w = file.write().await;
+                w.gc(over_size).await;
+                drop(w);
+            }
+        }
         LOADING_FROM_DISK_DONE.store(true, Ordering::SeqCst);
     });
 
@@ -474,6 +672,96 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
     });
     Ok(())
+}
+
+async fn drop_public_dashboard_bodies(key: &str) {
+    let Some((_, incarnations)) = PUBLIC_DASHBOARD_BODIES.remove(key) else {
+        return;
+    };
+    for incarnation in incarnations {
+        let mem_key = public_dashboards_memory_key(key, incarnation);
+        if let Err(e) = super::memory::forget(&mem_key).await {
+            log::error!("public dashboard memory copy {mem_key} remove error: {e}");
+        }
+    }
+}
+
+/// Writes and syncs a temp file; a failed write removes it, since only the startup scan would.
+fn write_public_dashboard_tmp(tmp: &str, data: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    let write = || {
+        if let Some(parent) = Path::new(tmp).parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let mut f = std::fs::File::create(tmp)?;
+        #[cfg(test)]
+        if FAIL_TMP_WRITES.lock().unwrap().contains(tmp) {
+            f.write_all(&data[..data.len() / 2])?;
+            return Err(std::io::Error::other("injected write failure"));
+        }
+        #[cfg(test)]
+        if PANIC_TMP_WRITES.lock().unwrap().contains(tmp) {
+            f.write_all(&data[..data.len() / 2])?;
+            panic!("injected write panic");
+        }
+        f.write_all(data)?;
+        f.sync_all()
+    };
+    write().inspect_err(|_| {
+        _ = std::fs::remove_file(tmp);
+    })
+}
+
+fn public_dashboards_memory_key(key: &str, incarnation: u64) -> String {
+    format!("{key}#{incarnation}")
+}
+
+fn track_public_dashboard_body(key: &str, incarnation: u64) {
+    let mut incarnations = PUBLIC_DASHBOARD_BODIES.entry(key.to_string()).or_default();
+    if !incarnations.contains(&incarnation) {
+        incarnations.push(incarnation);
+    }
+}
+
+fn key_escapes(file: &str) -> bool {
+    use std::path::Component;
+    Path::new(file)
+        .components()
+        .any(|c| !matches!(c, Component::Normal(_) | Component::CurDir))
+}
+
+/// Applies `delta` bytes (and one file for `files/` keys, by sign) to the key's cache metrics.
+fn update_key_metrics(key: &str, delta: i64) {
+    let mut columns = key.split('/');
+    let (kind, org, stream_type) = (columns.next(), columns.next(), columns.next());
+    match (kind, org, stream_type) {
+        (Some("files"), Some(org), Some(stream_type)) => {
+            let files = metrics::QUERY_DISK_CACHE_FILES.with_label_values(&[org, stream_type]);
+            if delta >= 0 {
+                files.inc()
+            } else {
+                files.dec()
+            }
+            metrics::QUERY_DISK_CACHE_USED_BYTES
+                .with_label_values(&[org, stream_type])
+                .add(delta);
+        }
+        (Some("results"), Some(org), Some(stream_type)) => {
+            metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
+                .with_label_values(&[org, stream_type, "results"])
+                .add(delta)
+        }
+        (Some("metrics_results"), Some(org), _) => metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
+            .with_label_values(&[org])
+            .add(delta),
+        (Some("aggregations"), Some(org), Some(stream_type)) => {
+            metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
+                .with_label_values(&[org, stream_type, "aggregations"])
+                .add(delta)
+        }
+        (Some("public_dashboards"), ..) => metrics::PUBLIC_DASHBOARD_FILE_CACHE_BYTES.add(delta),
+        _ => log::warn!("disk cache key {key} has no metric labels, skipping metrics"),
+    }
 }
 
 #[inline]
@@ -501,7 +789,13 @@ pub async fn get_opts(file: &str, options: GetOptions) -> object_store::Result<G
             source: Box::new(std::io::Error::other("file not found")),
         });
     };
-    let path = PathBuf::from(files.get_file_path(file));
+    let Some(safe_path) = files.safe_read_path(file) else {
+        return Err(object_store::Error::NotFound {
+            path: file.to_string(),
+            source: Box::new(std::io::Error::other("file not found")),
+        });
+    };
+    let path = PathBuf::from(safe_path);
     let (metadata, fp) = std::fs::File::open(&path)
         .and_then(|f| Ok((f.metadata()?, f)))
         .map_err(|e| object_store::Error::NotFound {
@@ -520,7 +814,12 @@ pub async fn get_opts(file: &str, options: GetOptions) -> object_store::Result<G
     options.check_preconditions(&meta)?;
 
     let range = match options.range {
-        Some(r) => r.as_range(meta.size).unwrap(),
+        Some(r) => r
+            .as_range(meta.size)
+            .map_err(|e| object_store::Error::Precondition {
+                path: file.to_string(),
+                source: Box::new(e),
+            })?,
         None => 0..meta.size,
     };
 
@@ -544,18 +843,11 @@ pub async fn get_size(file: &str) -> Option<usize> {
     files.get_size(file).await
 }
 
-/// Batched range read against the disk cache: one `File::open` followed
-/// by N `pread`s, all inside one `block_in_place`. Returns one `Bytes`
-/// per input range, in input order. This is the hot path for the search
-/// side's `.bf` block fetches — without it each range turns into a
-/// separate `File::open` and async task spawn, which dominates wall
-/// clock for queries touching many buckets.
-///
-/// Returns `Err(NotFound)` when the file isn't in the disk cache; the
-/// caller falls back to remote storage.
 #[cfg(unix)]
 pub async fn get_ranges(file: &str, ranges: &[Range<u64>]) -> object_store::Result<Vec<Bytes>> {
-    use std::os::unix::fs::FileExt;
+    if ranges.is_empty() {
+        return Ok(Vec::new());
+    }
 
     let Some(files) = get_file_reader(file) else {
         return Err(object_store::Error::NotFound {
@@ -563,31 +855,43 @@ pub async fn get_ranges(file: &str, ranges: &[Range<u64>]) -> object_store::Resu
             source: Box::new(std::io::Error::other("file not found")),
         });
     };
-    let path = PathBuf::from(files.get_file_path(file));
+    let Some(safe_path) = files.safe_read_path(file) else {
+        return Err(object_store::Error::NotFound {
+            path: file.to_string(),
+            source: Box::new(std::io::Error::other("file not found")),
+        });
+    };
+    let path = PathBuf::from(safe_path);
     let ranges_owned: Vec<Range<u64>> = ranges.to_vec();
     let file_label = file.to_string();
 
-    tokio::task::block_in_place(move || -> object_store::Result<Vec<Bytes>> {
+    let read = move || -> object_store::Result<Vec<Bytes>> {
         let f = std::fs::File::open(&path).map_err(|e| object_store::Error::NotFound {
             path: file_label.clone(),
             source: Box::new(e),
         })?;
-        let mut out = Vec::with_capacity(ranges_owned.len());
-        for r in &ranges_owned {
-            if r.start > r.end {
-                return Err(crate::storage::Error::BadRange(file_label.clone()).into());
+        crate::storage::read_ranges_from_file(&f, &ranges_owned).map_err(|error| {
+            object_store::Error::Generic {
+                store: "DiskCache",
+                source: Box::new(error),
             }
-            let len = (r.end - r.start) as usize;
-            let mut buf = vec![0u8; len];
-            f.read_exact_at(&mut buf, r.start)
-                .map_err(|e| object_store::Error::Generic {
-                    store: "DiskCache",
-                    source: Box::new(e),
-                })?;
-            out.push(Bytes::from(buf));
-        }
-        Ok(out)
-    })
+        })
+    };
+    if tokio::runtime::Handle::try_current().is_ok_and(|handle| {
+        matches!(
+            handle.runtime_flavor(),
+            tokio::runtime::RuntimeFlavor::MultiThread
+        )
+    }) {
+        tokio::task::block_in_place(read)
+    } else {
+        tokio::task::spawn_blocking(read)
+            .await
+            .map_err(|error| object_store::Error::Generic {
+                store: "DiskCache",
+                source: Box::new(error),
+            })?
+    }
 }
 
 #[cfg(not(unix))]
@@ -611,7 +915,7 @@ pub async fn get_ranges(file: &str, ranges: &[Range<u64>]) -> object_store::Resu
 #[inline]
 pub fn get_file_path(file: &str) -> Option<String> {
     let files = get_file_reader(file)?;
-    Some(files.get_file_path(file))
+    files.safe_file_path(file)
 }
 
 #[inline]
@@ -704,6 +1008,7 @@ pub async fn set(file: &str, data: Bytes) -> Result<(), anyhow::Error> {
         return Ok(());
     }
     let ret = files.set(&file, &tmp_file, data_size).await;
+    drop(files);
 
     let set_took = start.elapsed().as_millis() as usize;
     if set_took > 100 {
@@ -717,6 +1022,11 @@ pub async fn set(file: &str, data: Bytes) -> Result<(), anyhow::Error> {
 pub async fn set_size(file: &str, data_size: usize) -> Result<(), anyhow::Error> {
     if !get_config().disk_cache.enabled {
         return Ok(());
+    }
+    if key_escapes(file) {
+        return Err(anyhow::anyhow!(
+            "disk cache rejected key outside the cache root: {file}"
+        ));
     }
 
     // hash the file name and get the bucket index
@@ -753,13 +1063,237 @@ pub async fn remove(file: &str) -> Result<(), anyhow::Error> {
     } else {
         RESULT_FILES[idx].write().await
     };
-    files.remove(file).await
+    let outcome = files.remove(file).await;
+    drop(files);
+    if let RemoveOutcome::Removed(Some(trash_file)) = outcome
+        && let Err(e) = tokio::fs::remove_file(&trash_file).await
+        && e.kind() != std::io::ErrorKind::NotFound
+    {
+        log::error!("File disk cache remove trash file {trash_file} error: {e}");
+    }
+    Ok(())
+}
+
+/// Returns a guard proving the file is indexed; while held, the bucket cannot evict it.
+pub async fn indexed_file_guard(file: &str) -> Option<IndexedFileGuard> {
+    let idx = get_bucket_idx(file);
+    let files = if file.starts_with("files") {
+        FILES[idx].read().await
+    } else if file.starts_with("results") {
+        RESULT_FILES[idx].read().await
+    } else if file.starts_with("aggregations") {
+        AGGREGATION_FILES[idx].read().await
+    } else {
+        RESULT_FILES[idx].read().await
+    };
+    if !files.exist(file).await {
+        return None;
+    }
+    Some(IndexedFileGuard { _guard: files })
+}
+
+/// Atomically replaces a public dashboard file (temp, fsync, rename) if the bucket can hold it.
+pub async fn public_dashboards_replace(
+    key: &str,
+    incarnation: u64,
+    data: Bytes,
+) -> Result<(), anyhow::Error> {
+    if !key.starts_with(PUBLIC_DASHBOARDS_PREFIX) {
+        anyhow::bail!("not a public dashboard key: {key}");
+    }
+    if !get_config().disk_cache.enabled {
+        anyhow::bail!("the disk cache is disabled");
+    }
+    let idx = get_bucket_idx(key);
+    let (path, max_size) = {
+        let files = RESULT_FILES[idx].read().await;
+        (files.safe_file_path(key), files.max_size)
+    };
+    let Some(path) = path else {
+        anyhow::bail!("public dashboard key escapes the cache root: {key}");
+    };
+    let size = data.len();
+    if size > max_size {
+        return Err(PublicDashboardTooLarge.into());
+    }
+    let tmp = format!("{path}.{incarnation}.tmp");
+    let tmp_path = tmp.clone();
+    match tokio::task::spawn_blocking(move || write_public_dashboard_tmp(&tmp_path, &data)).await {
+        Ok(written) => written?,
+        Err(e) => {
+            // A panic skipped the write's own cleanup.
+            _ = tokio::fs::remove_file(&tmp).await;
+            return Err(e.into());
+        }
+    }
+    let old = RESULT_FILES[idx]
+        .write()
+        .await
+        .public_dashboards_admit(key, &tmp, &path, size)
+        .await?;
+    update_key_metrics(key, size as i64 - old as i64);
+    drop_public_dashboard_bodies(key).await;
+    Ok(())
+}
+
+/// Removes a public dashboard result file, indexed or not, and every memory copy of its body.
+pub async fn public_dashboards_evict(key: &str) -> Result<(), anyhow::Error> {
+    if !key.starts_with(PUBLIC_DASHBOARDS_PREFIX) {
+        anyhow::bail!("not a public dashboard key: {key}");
+    }
+    remove(key).await?;
+    // A file the startup scan has not indexed yet is still on disk.
+    if let Some(path) = get_file_path(key)
+        && let Err(e) = tokio::fs::remove_file(&path).await
+        && e.kind() != std::io::ErrorKind::NotFound
+    {
+        log::error!("public dashboard file {path} remove error: {e}");
+    }
+    drop_public_dashboard_bodies(key).await;
+    Ok(())
+}
+
+/// Whether the index holds this public dashboard file; a read lock, no file system access.
+pub async fn public_dashboards_indexed(key: &str) -> bool {
+    get_config().disk_cache.enabled
+        && RESULT_FILES[get_bucket_idx(key)]
+            .read()
+            .await
+            .exist(key)
+            .await
+}
+
+/// The memory copy of one written version of a public dashboard body.
+pub async fn public_dashboards_memory_get(key: &str, incarnation: u64) -> Option<Bytes> {
+    super::memory::get(&public_dashboards_memory_key(key, incarnation), None).await
+}
+
+/// Keeps a memory copy of one written version; every write or eviction of the key drops it.
+pub async fn public_dashboards_memory_put(key: &str, incarnation: u64, data: Bytes) {
+    if !get_config().memory_cache.enabled {
+        return;
+    }
+    track_public_dashboard_body(key, incarnation);
+    _ = super::memory::set(&public_dashboards_memory_key(key, incarnation), data).await;
+}
+
+/// The hook runs on a detached task and may run concurrently with held disk cache locks.
+pub fn set_metrics_result_cache_evict_hook(hook: fn(Vec<String>)) {
+    if METRICS_RESULT_CACHE_EVICT_HOOK.set(hook).is_err() {
+        log::warn!("metrics result cache evict hook is already registered");
+    }
+}
+
+/// Add the given `results/...` file to the QUERY_RESULT_CACHE index and enforce the per-key
+/// entry limit, removing evicted entries' files from disk.
+pub async fn add_result_cache_meta(file_key: &str) {
+    let Some((_, _, query_key, meta)) = parse_result_cache_key(file_key) else {
+        return;
+    };
+    let Some((dir, _)) = file_key.rsplit_once('/') else {
+        return;
+    };
+    // held across the insert so a concurrent eviction orders around the whole handoff
+    let Some(guard) = indexed_file_guard(file_key).await else {
+        return;
+    };
+    let mut w = QUERY_RESULT_CACHE.write().await;
+    let metas = w.entry(query_key).or_default();
+    // an equal meta can already exist when re-caching after clear_cache
+    if !metas.contains(&meta) {
+        metas.push(meta);
+    }
+    let evicted: Vec<_> = if metas.len() > RESULT_CACHE_MAX_ENTRIES_PER_KEY {
+        // evict the entries whose cached data range ends earliest; on a tie the narrower one
+        metas.sort_unstable_by_key(|m| (m.end_time, std::cmp::Reverse(m.start_time)));
+        metas
+            .drain(..metas.len() - RESULT_CACHE_MAX_ENTRIES_PER_KEY)
+            .collect()
+    } else {
+        Vec::new()
+    };
+    drop(w);
+    drop(guard);
+
+    for meta in evicted {
+        let file = format!("{dir}/{}", result_cache_file_name(&meta));
+        remove_unowned_result_file(&file).await;
+    }
+}
+
+/// Removes the file unless a same-name rewrite re-registered its meta since the eviction.
+async fn remove_unowned_result_file(file_key: &str) {
+    let Some((_, _, query_key, meta)) = parse_result_cache_key(file_key) else {
+        return;
+    };
+    let idx = get_bucket_idx(file_key);
+    let mut files = RESULT_FILES[idx].write().await;
+    // bucket -> QUERY_RESULT_CACHE is the established lock order; writers push under the guard
+    let owned = QUERY_RESULT_CACHE
+        .read()
+        .await
+        .get(&query_key)
+        .is_some_and(|metas| metas.contains(&meta));
+    if owned {
+        return;
+    }
+    match files.remove(file_key).await {
+        RemoveOutcome::Removed(trash_file) => {
+            drop(files);
+            if let Some(trash_file) = trash_file
+                && let Err(e) = tokio::fs::remove_file(&trash_file).await
+                && e.kind() != std::io::ErrorKind::NotFound
+            {
+                log::error!("File disk cache remove trash file {trash_file} error: {e}");
+            }
+        }
+        RemoveOutcome::NotIndexed => {}
+        RemoveOutcome::Failed => {
+            // the path could not be vacated: the file stays readable, so restore its meta
+            let mut w = QUERY_RESULT_CACHE.write().await;
+            let metas = w.entry(query_key).or_default();
+            if !metas.contains(&meta) {
+                metas.push(meta);
+            }
+        }
+    }
+}
+
+/// Remove only the index entries matching the given `results/...` file keys from
+/// QUERY_RESULT_CACHE, dropping a query key only when its entry list becomes empty.
+pub async fn remove_result_cache_metas(file_keys: &[String]) {
+    let parsed = file_keys
+        .iter()
+        .filter_map(|file_key| {
+            let (_, _, query_key, meta) = parse_result_cache_key(file_key)?;
+            Some((query_key, meta, get_file_path(file_key)?))
+        })
+        .collect::<Vec<_>>();
+    if parsed.is_empty() {
+        return;
+    }
+    let mut r = QUERY_RESULT_CACHE.write().await;
+    for (query_key, meta, abs_path) in parsed {
+        // checked under the lock: a rewrite lands its file before its meta push can take this lock
+        if std::path::Path::new(&abs_path).exists() {
+            continue;
+        }
+        if let Some(metas) = r.get_mut(&query_key) {
+            metas.retain(|m| m != &meta);
+            if metas.is_empty() {
+                r.remove(&query_key);
+            }
+        }
+    }
 }
 
 #[async_recursion]
-async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Error> {
+async fn load(
+    root_dir: &PathBuf,
+    scan_dir: &PathBuf,
+    legacy_metrics: &mut Vec<PathBuf>,
+) -> Result<(), anyhow::Error> {
     let mut entries = tokio::fs::read_dir(&scan_dir).await?;
-    let mut result_cache: HashMap<String, Vec<ResultCacheMeta>> = HashMap::new();
     let mut metrics_cache: Vec<String> = Vec::new();
     loop {
         match entries.next_entry().await {
@@ -781,7 +1315,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                     }
                 };
                 if ft.is_dir() {
-                    if let Err(e) = load(root_dir, &fp).await {
+                    if let Err(e) = load(root_dir, &fp, legacy_metrics).await {
                         log::error!("load disk cache error: {e}");
                     }
                 } else {
@@ -816,6 +1350,11 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                     if !get_config().disk_cache.multi_dir.is_empty() {
                         file_key = file_key.split('/').skip(1).collect::<Vec<_>>().join("/");
                     }
+                    // legacy names may mix organizations' results, so they are never indexed
+                    if is_legacy_metrics_result_file(&file_key) {
+                        legacy_metrics.push(fp);
+                        continue;
+                    }
                     // check file already exists
                     if exist(&file_key).await {
                         continue;
@@ -842,8 +1381,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                             .with_label_values(&[columns[1], columns[2]])
                             .add(data_size as i64);
                     } else if file_key.starts_with("results") {
-                        let Some((org_id, stream_type, query_key, meta)) =
-                            parse_result_cache_key(&file_key)
+                        let Some((org_id, stream_type, ..)) = parse_result_cache_key(&file_key)
                         else {
                             log::error!("parse result cache key error: {file_key}");
                             continue;
@@ -859,11 +1397,13 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                             .with_label_values(&[org_id.as_str(), stream_type.as_str(), "results"])
                             .add(data_size as i64);
 
-                        result_cache
-                            .entry(query_key)
-                            .or_insert_with(Vec::new)
-                            .push(meta);
+                        add_result_cache_meta(&file_key).await;
                     } else if file_key.starts_with("metrics_results") {
+                        let mut w = RESULT_FILES[idx].write().await;
+                        w.cur_size += data_size;
+                        w.data.insert(file_key.clone(), data_size);
+                        drop(w);
+
                         // metrics
                         let columns = file_key.split('/').collect::<Vec<&str>>();
                         metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
@@ -871,6 +1411,12 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                             .add(data_size as i64);
 
                         metrics_cache.push(file_key);
+                    } else if file_key.starts_with(PUBLIC_DASHBOARDS_PREFIX) {
+                        let mut w = RESULT_FILES[idx].write().await;
+                        w.cur_size += data_size;
+                        w.data.insert(file_key.clone(), data_size);
+                        drop(w);
+                        update_key_metrics(&file_key, data_size as i64);
                     } else if file_key.starts_with("aggregations") {
                         let Some((org_id, stream_type, ..)) =
                             parse_aggregation_cache_key(&file_key)
@@ -905,8 +1451,6 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
         }
     }
 
-    // write all data from result_cache to QUERY_RESULT_CACHE
-    QUERY_RESULT_CACHE.write().await.extend(result_cache);
     // write all data from metrics_cache to QUERY_METRICS_CACHE
     METRICS_RESULT_CACHE.write().await.extend(metrics_cache);
     Ok(())
@@ -925,10 +1469,13 @@ async fn gc() -> Result<(), anyhow::Error> {
         }
         drop(r);
         let mut w = file.write().await;
-        w.gc(cfg.disk_cache.gc_size).await?;
+        w.gc(cfg.disk_cache.gc_size).await;
         drop(w);
     }
-    let scale_factor = std::cmp::max(1, cfg.disk_cache.max_size / cfg.disk_cache.result_max_size);
+    let scale_factor = std::cmp::max(
+        1,
+        cfg.disk_cache.max_size / std::cmp::max(1, cfg.disk_cache.result_max_size),
+    );
     let release_size = std::cmp::max(
         10 * config::SIZE_IN_MB as usize,
         cfg.disk_cache.release_size / scale_factor,
@@ -941,12 +1488,12 @@ async fn gc() -> Result<(), anyhow::Error> {
         }
         drop(r);
         let mut w = file.write().await;
-        w.gc(cfg.disk_cache.gc_size).await?;
+        w.gc(cfg.disk_cache.gc_size).await;
         drop(w);
     }
     let scale_factor = std::cmp::max(
         1,
-        cfg.disk_cache.max_size / cfg.disk_cache.aggregation_max_size,
+        cfg.disk_cache.max_size / std::cmp::max(1, cfg.disk_cache.aggregation_max_size),
     );
     let release_size = std::cmp::max(
         10 * config::SIZE_IN_MB as usize,
@@ -960,7 +1507,7 @@ async fn gc() -> Result<(), anyhow::Error> {
         }
         drop(r);
         let mut w = file.write().await;
-        w.gc(cfg.disk_cache.gc_size).await?;
+        w.gc(cfg.disk_cache.gc_size).await;
         drop(w);
     }
     Ok(())
@@ -1008,6 +1555,19 @@ pub async fn get_dir() -> String {
     FILES[0].read().await.root_dir.clone()
 }
 
+/// Every directory a cache key can live under: the root, then each `multi_dir` subdirectory.
+pub async fn get_dirs() -> Vec<String> {
+    let files = FILES[0].read().await;
+    let mut dirs = vec![files.root_dir.clone()];
+    dirs.extend(
+        files
+            .multi_dir
+            .iter()
+            .map(|dir| format!("{}{dir}/", files.root_dir)),
+    );
+    dirs
+}
+
 pub async fn download(
     account: &str,
     file: &str,
@@ -1029,7 +1589,7 @@ fn get_bucket_idx(file: &str) -> usize {
     if cfg.disk_cache.bucket_num <= 1 {
         0
     } else {
-        let h = gxhash::new().sum64(file);
+        let h = key_sum64(file);
         (h as usize) % cfg.disk_cache.bucket_num
     }
 }
@@ -1039,28 +1599,27 @@ fn get_bucket_idx(file: &str) -> usize {
 // results/default/logs/default/16042959487540176184_30_zo_sql_key/
 // 1744081170000000_1744081170000000_1_0.json
 pub fn parse_result_cache_key(file: &str) -> Option<(String, String, String, ResultCacheMeta)> {
-    let columns = file.split('/').collect::<Vec<&str>>();
-    if columns.len() < 6 {
+    let (org_id, stream_type, query_key, filename) = split_cache_key(file, "results")?;
+    let meta = filename.split('_').collect::<Vec<&str>>();
+    if meta.len() < 4 {
         return None;
     }
-    let org_id = columns[1].to_string();
-    let stream_type = columns[2].to_string();
-    let query_key = format!(
-        "{}_{}_{}_{}",
-        columns[1], columns[2], columns[3], columns[4]
-    );
-
-    let meta = columns[5].split('_').collect::<Vec<&str>>();
-    let is_aggregate = meta[2] == "1";
-    let is_descending = meta[3] == "1";
     let meta = ResultCacheMeta {
-        start_time: meta[0].parse().unwrap(),
-        end_time: meta[1].parse().unwrap(),
-        is_aggregate,
-        is_descending,
+        start_time: meta[0].parse().ok()?,
+        end_time: meta[1].parse().ok()?,
+        is_aggregate: meta[2] == "1",
+        is_descending: meta[3] == "1",
     };
 
     Some((org_id, stream_type, query_key, meta))
+}
+
+// build the result cache file name from the meta, the inverse of parse_result_cache_key
+pub fn result_cache_file_name(meta: &ResultCacheMeta) -> String {
+    format!(
+        "{}_{}_{}_{}.json",
+        meta.start_time, meta.end_time, meta.is_aggregate as u8, meta.is_descending as u8
+    )
 }
 
 // parse the aggregation cache key from the file name
@@ -1069,38 +1628,62 @@ pub fn parse_result_cache_key(file: &str) -> Option<(String, String, String, Res
 pub fn parse_aggregation_cache_key(
     file: &str,
 ) -> Option<(String, String, String, ResultCacheMeta)> {
-    let columns = file.split('/').collect::<Vec<&str>>();
-    if columns.len() < 6 {
-        return None;
-    }
-    let org_id = columns[1].to_string();
-    let stream_type = columns[2].to_string();
-    let query_key = format!(
-        "{}_{}_{}_{}",
-        columns[1], columns[2], columns[3], columns[4]
-    );
-
-    // Remove file extension before parsing
-    let filename = columns[5];
-    let filename_without_ext = if let Some(dot_pos) = filename.rfind('.') {
-        &filename[..dot_pos]
-    } else {
-        filename
-    };
-
-    let meta = filename_without_ext.split('_').collect::<Vec<&str>>();
+    let (org_id, stream_type, query_key, filename) = split_cache_key(file, "aggregations")?;
+    let meta = filename.split('_').collect::<Vec<&str>>();
     if meta.len() < 2 {
         return None;
     }
 
     let meta = ResultCacheMeta {
-        start_time: meta[0].parse().unwrap(),
-        end_time: meta[1].parse().unwrap(),
+        start_time: meta[0].parse().ok()?,
+        end_time: meta[1].parse().ok()?,
         is_aggregate: true,
         // NOTE: aggregate record batches don't honor order by
         is_descending: false,
     };
     Some((org_id, stream_type, query_key, meta))
+}
+
+// split a `{prefix}/{org}/{stream_type}/{stream}/{hash}/{file}` cache key into
+// (org_id, stream_type, query_key, file name without extension)
+fn split_cache_key<'a>(file: &'a str, prefix: &str) -> Option<(String, String, String, &'a str)> {
+    let columns = file.split('/').collect::<Vec<&str>>();
+    if columns.len() < 6 || columns[0] != prefix {
+        return None;
+    }
+    let query_key = format!(
+        "{}_{}_{}_{}",
+        columns[1], columns[2], columns[3], columns[4]
+    );
+    let filename = columns[5]
+        .rsplit_once('.')
+        .map_or(columns[5], |(name, _)| name);
+    Some((
+        columns[1].to_string(),
+        columns[2].to_string(),
+        query_key,
+        filename,
+    ))
+}
+
+fn is_legacy_metrics_result_file(file_key: &str) -> bool {
+    file_key.starts_with("metrics_results/")
+        && !file_key
+            .rsplit('/')
+            .next()
+            .unwrap_or_default()
+            .starts_with(METRICS_RESULT_CACHE_FILE_PREFIX)
+}
+
+async fn remove_legacy_metrics_files(files: Vec<PathBuf>) {
+    for fp in files {
+        if let Err(e) = tokio::fs::remove_file(&fp).await {
+            log::warn!(
+                "Failed to remove legacy metrics cache file: {}, error: {e}",
+                fp.display()
+            );
+        }
+    }
 }
 
 fn last_modified(metadata: &std::fs::Metadata) -> chrono::DateTime<chrono::Utc> {
@@ -1151,6 +1734,232 @@ async fn write_tmp_file(file: &str, data: Bytes) -> Result<(String, String), any
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn batched_ranges_preserve_bounds_and_order() {
+        assert_batched_ranges().await;
+    }
+
+    #[cfg(unix)]
+    #[tokio::test(flavor = "current_thread")]
+    async fn batched_ranges_support_current_thread_runtime() {
+        assert_batched_ranges().await;
+    }
+
+    #[cfg(unix)]
+    async fn assert_batched_ranges() {
+        let key = format!(
+            "files/default/logs/ranges/2026/09/20/10/{}.parquet",
+            config::ider::uuid()
+        );
+        assert!(get_config().disk_cache.enabled);
+        set(&key, Bytes::from_static(b"0123456789abcdef"))
+            .await
+            .unwrap();
+        assert_eq!(
+            get_ranges(&key, &[10..14, 1..5, 3..7, 1..5, 14..20])
+                .await
+                .unwrap(),
+            vec![
+                Bytes::from_static(b"abcd"),
+                Bytes::from_static(b"1234"),
+                Bytes::from_static(b"3456"),
+                Bytes::from_static(b"1234"),
+                Bytes::from_static(b"ef")
+            ]
+        );
+        assert!(get_ranges("missing", &[]).await.unwrap().is_empty());
+        for range in [Range { start: 7, end: 3 }, 3..3, 16..17] {
+            assert!(
+                get_ranges(&key, std::slice::from_ref(&range))
+                    .await
+                    .is_err()
+            );
+        }
+        if usize::BITS == 64 {
+            assert_eq!(
+                get_ranges(&key, std::slice::from_ref(&(14..u64::MAX)))
+                    .await
+                    .unwrap(),
+                vec![Bytes::from_static(b"ef")]
+            );
+        }
+        remove(&key).await.unwrap();
+        assert!(matches!(
+            get_ranges(&key, std::slice::from_ref(&(0..1)))
+                .await
+                .unwrap_err(),
+            object_store::Error::NotFound { .. }
+        ));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn get_opts_rejects_a_range_past_a_short_cached_file() {
+        let key = format!(
+            "files/default/logs/short/2026/10/15/10/{}.parquet",
+            config::ider::uuid()
+        );
+        set(&key, Bytes::from_static(b"0123456789abcdef"))
+            .await
+            .unwrap();
+        std::fs::write(get_file_path(&key).unwrap(), b"").unwrap();
+        let options = GetOptions {
+            range: Some((8..16).into()),
+            ..Default::default()
+        };
+        assert!(matches!(
+            get_opts(&key, options).await,
+            Err(object_store::Error::Precondition { .. })
+        ));
+        remove(&key).await.unwrap();
+    }
+
+    #[test]
+    fn key_escapes_rejects_traversal_and_absolute() {
+        assert!(key_escapes("../etc/passwd"));
+        assert!(key_escapes("files/../../etc/passwd"));
+        assert!(key_escapes("/etc/passwd"));
+        assert!(!key_escapes(
+            "files/default/logs/disk/2022/10/03/10/1_1_1.parquet"
+        ));
+        assert!(!key_escapes(
+            "metrics_results/default/2022/10/03/10/x_1_2_3.pb"
+        ));
+    }
+
+    #[tokio::test]
+    async fn safe_read_path_blocks_traversal_allows_legit() {
+        let mut file_data = FileData::with_capacity_and_cache_strategy(
+            FileType::Data,
+            get_config().disk_cache.max_size,
+            "lru",
+        );
+        let file_key = "files/default/logs/disk/2022/10/03/10/traversal_guard_1.parquet";
+        let content = Bytes::from("legit-bytes");
+        let (file_key, tmp_file) = write_tmp_file(file_key, content.clone()).await.unwrap();
+        file_data
+            .set(&file_key, &tmp_file, content.len())
+            .await
+            .unwrap();
+
+        // legit cached key still reads
+        assert_eq!(file_data.get(&file_key, None).await, Some(content.clone()));
+
+        // a secret planted above the cache root must not be reachable via traversal
+        let secret = format!(
+            "{}../escape_target_{}.txt",
+            file_data.root_dir,
+            std::process::id()
+        );
+        std::fs::write(&secret, b"TOP SECRET").unwrap();
+        let escaping = format!("../escape_target_{}.txt", std::process::id());
+        assert!(file_data.get(&escaping, None).await.is_none());
+        assert!(file_data.get_size(&escaping).await.is_none());
+        assert!(file_data.get("/etc/hosts", None).await.is_none());
+        let _ = std::fs::remove_file(&secret);
+    }
+
+    #[test]
+    fn get_file_path_rejects_keys_escaping_cache_root() {
+        for escaping in [
+            "../../etc/passwd",
+            "files/../../../etc/passwd",
+            "aggregations/../../../../etc/passwd",
+            "/etc/passwd",
+        ] {
+            let resolved = get_file_path(escaping);
+            assert!(
+                resolved.is_none(),
+                "{escaping} resolved outside the cache root: {resolved:?}"
+            );
+        }
+        let legit = "aggregations/default/logs/t/hash/1000_2000.arrow";
+        let resolved = get_file_path(legit).unwrap();
+        assert!(resolved.ends_with(legit));
+    }
+
+    fn temp_root_file_data(tmp: &tempfile::TempDir) -> FileData {
+        let mut file_data = FileData::with_capacity_and_cache_strategy(FileType::Data, 1024, "lru");
+        let root = tmp.path().join("cache");
+        std::fs::create_dir_all(&root).unwrap();
+        file_data.root_dir = format!("{}/", root.display());
+        file_data.multi_dir.clear();
+        file_data
+    }
+
+    #[tokio::test]
+    async fn set_rejects_key_escaping_cache_root() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut file_data = temp_root_file_data(&tmp);
+        let (_, tmp_file) = write_tmp_file("x", Bytes::from("data")).await.unwrap();
+
+        let ret = file_data.set("files/../../x", &tmp_file, 4).await;
+
+        assert!(ret.is_err(), "escaping key was written: {ret:?}");
+        assert!(!tmp.path().join("x").exists());
+        assert!(!file_data.exist("files/../../x").await);
+        assert!(!std::path::Path::new(&tmp_file).exists());
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn set_rejects_parent_resolving_outside_cache_root() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut file_data = temp_root_file_data(&tmp);
+        let outside = tmp.path().join("outside");
+        std::fs::create_dir_all(&outside).unwrap();
+        std::os::unix::fs::symlink(&outside, tmp.path().join("cache").join("files")).unwrap();
+        let (_, tmp_file) = write_tmp_file("x", Bytes::from("data")).await.unwrap();
+
+        let ret = file_data
+            .set("files/default/logs/x.parquet", &tmp_file, 4)
+            .await;
+
+        assert!(ret.is_err(), "write followed a symlink out of the root");
+        assert!(!outside.join("default/logs/x.parquet").exists());
+        assert!(
+            file_data
+                .safe_file_path("files/default/logs/x.parquet")
+                .is_none()
+        );
+        assert!(file_data.safe_file_path("results/a/b.json").is_some());
+    }
+
+    #[tokio::test]
+    async fn set_size_rejects_key_escaping_cache_root() {
+        let key = "files/../../set_size_escape.parquet";
+
+        let ret = set_size(key, 1).await;
+
+        assert!(ret.is_err(), "escaping key was indexed: {ret:?}");
+        assert!(!FILES[get_bucket_idx(key)].read().await.exist(key).await);
+    }
+
+    #[tokio::test]
+    async fn short_keys_do_not_panic_in_metrics() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut file_data = temp_root_file_data(&tmp);
+        file_data.max_size = usize::MAX;
+        let keys = [
+            "files",
+            "files/org",
+            "results/org",
+            "metrics_results",
+            "aggregations/org",
+        ];
+        for key in keys {
+            file_data.set_size(key, 1).await.unwrap();
+        }
+
+        assert!(matches!(
+            file_data.remove("files").await,
+            RemoveOutcome::Removed(_)
+        ));
+        file_data.gc(keys.len()).await;
+        assert_eq!(file_data.size().1, 0);
+    }
 
     #[tokio::test]
     async fn test_disk_lru_cache_set_file() {
@@ -1329,6 +2138,161 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_disk_move_to_trash() {
+        let file_data = FileData::with_capacity_and_cache_strategy(FileType::Result, 1024, "lru");
+        let key = "results/trash_org/logs/default/hash/1000_2000_0_0.json";
+        let file_path = file_data.get_file_path(key);
+        tokio::fs::create_dir_all(std::path::Path::new(&file_path).parent().unwrap())
+            .await
+            .unwrap();
+        tokio::fs::write(&file_path, b"x").await.unwrap();
+
+        let TrashOutcome::Moved(trash_path) = file_data.move_to_trash(key, &file_path) else {
+            panic!("expected the file to move to trash");
+        };
+        assert!(!std::path::Path::new(&file_path).exists());
+        assert!(std::path::Path::new(&trash_path).exists());
+
+        // a missing source is not an error, just nothing to move
+        assert!(matches!(
+            file_data.move_to_trash(key, &file_path),
+            TrashOutcome::SourceMissing
+        ));
+        tokio::fs::remove_file(&trash_path).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_disk_remove_vacates_path_via_trash() {
+        let mut file_data =
+            FileData::with_capacity_and_cache_strategy(FileType::Result, 1024, "lru");
+        let key = "results/trash_rm_org/logs/default/hash/1000_2000_0_0.json";
+        let file_path = file_data.get_file_path(key);
+        tokio::fs::create_dir_all(std::path::Path::new(&file_path).parent().unwrap())
+            .await
+            .unwrap();
+        tokio::fs::write(&file_path, b"x").await.unwrap();
+        file_data.set_size(key, 1).await.unwrap();
+
+        let RemoveOutcome::Removed(Some(trash_file)) = file_data.remove(key).await else {
+            panic!("expected the file to be vacated to trash");
+        };
+        assert!(!file_data.exist(key).await);
+        assert!(!std::path::Path::new(&file_path).exists());
+        assert!(std::path::Path::new(&trash_file).exists());
+        tokio::fs::remove_file(&trash_file).await.unwrap();
+
+        // removing an unknown key vacates nothing
+        assert!(matches!(
+            file_data.remove(key).await,
+            RemoveOutcome::NotIndexed
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_cancelled_set_leaves_no_destination() {
+        let key = "metrics_results/cancelset_org/2024/01/01/00/fff_1_2_3.pb";
+        let idx = get_bucket_idx(key);
+
+        // park the write on the bucket lock, then abort it before the rename can happen
+        let w = RESULT_FILES[idx].write().await;
+        let task_key = key.to_string();
+        let handle = tokio::spawn(async move {
+            let _ = set(&task_key, Bytes::from("x")).await;
+        });
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        handle.abort();
+        let _ = handle.await;
+        drop(w);
+
+        // the destination file and the index entry either both exist or neither does
+        let indexed = RESULT_FILES[idx].read().await.exist(key).await;
+        let on_disk = get_file_path(key).is_some_and(|path| std::path::Path::new(&path).exists());
+        assert_eq!(indexed, on_disk);
+        assert!(!indexed);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_remove_unowned_restores_meta_on_failed_move() {
+        use std::os::unix::fs::PermissionsExt;
+        let file_key = "results/failmove_org/logs/default/hashkey/1000_2000_0_0.json";
+        let query_key = "failmove_org_logs_default_hashkey";
+        let meta = ResultCacheMeta {
+            start_time: 1000,
+            end_time: 2000,
+            is_aggregate: false,
+            is_descending: false,
+        };
+        let file_path = get_file_path(file_key).unwrap();
+        let parent = std::path::Path::new(&file_path)
+            .parent()
+            .unwrap()
+            .to_owned();
+        tokio::fs::create_dir_all(&parent).await.unwrap();
+        tokio::fs::write(&file_path, b"x").await.unwrap();
+        set_size(file_key, 1).await.unwrap();
+
+        // a read-only parent makes the trash rename fail, so the eviction must roll back fully
+        std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o555)).unwrap();
+        remove_unowned_result_file(file_key).await;
+        std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        assert!(indexed_file_guard(file_key).await.is_some());
+        assert!(
+            QUERY_RESULT_CACHE
+                .read()
+                .await
+                .get(query_key)
+                .is_some_and(|metas| metas.contains(&meta))
+        );
+
+        QUERY_RESULT_CACHE.write().await.remove(query_key);
+        remove(file_key).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_remove_unowned_result_file() {
+        let file_key = "results/unowned_org/logs/default/hashkey/1000_2000_0_0.json";
+        let query_key = "unowned_org_logs_default_hashkey";
+        let meta = ResultCacheMeta {
+            start_time: 1000,
+            end_time: 2000,
+            is_aggregate: false,
+            is_descending: false,
+        };
+        set_size(file_key, 1).await.unwrap();
+
+        // a rewrite re-registered the meta after the eviction: the file must survive
+        QUERY_RESULT_CACHE
+            .write()
+            .await
+            .insert(query_key.to_string(), vec![meta]);
+        remove_unowned_result_file(file_key).await;
+        assert!(indexed_file_guard(file_key).await.is_some());
+
+        // with no owning meta the file is removed
+        QUERY_RESULT_CACHE.write().await.remove(query_key);
+        remove_unowned_result_file(file_key).await;
+        assert!(indexed_file_guard(file_key).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_indexed_file_guard() {
+        let indexed_key = "metrics_results/guard_org/2024/01/01/00/aaa_1_2_3.pb";
+        let evicted_key = "metrics_results/guard_org/2024/01/01/00/bbb_1_2_3.pb";
+        let idx = get_bucket_idx(indexed_key);
+        RESULT_FILES[idx]
+            .write()
+            .await
+            .set_size(indexed_key, 1)
+            .await
+            .unwrap();
+
+        assert!(indexed_file_guard(indexed_key).await.is_some());
+        assert!(indexed_file_guard(evicted_key).await.is_none());
+    }
+
+    #[tokio::test]
     async fn test_disk_parse_result_cache_key() {
         let file_key = "results/default/logs/default/16042959487540176184_30_zo_sql_key/1744081170000000_1744081170000000_1_0.json";
         let Some((org_id, stream_type, query_key, meta)) = parse_result_cache_key(file_key) else {
@@ -1474,7 +2438,7 @@ mod tests {
         let (_file_key, tmp_file) = write_tmp_file(&file_key, content.clone()).await.unwrap();
 
         // Get the appropriate bucket for this file
-        let bucket_id = gxhash::new().sum64(&file_key);
+        let bucket_id = key_sum64(&file_key);
         let bucket_id = (bucket_id as usize) % FILES.len();
         let mut file_data = FILES[bucket_id].write().await;
         let _ = file_data.set(&file_key, &tmp_file, data_size).await;
@@ -1509,7 +2473,7 @@ mod tests {
             );
             let (_file_key, tmp_file) = write_tmp_file(&file_key, content.clone()).await.unwrap();
 
-            let bucket_id = gxhash::new().sum64(&file_key);
+            let bucket_id = key_sum64(&file_key);
             let bucket_id = (bucket_id as usize) % RESULT_FILES.len();
             let mut file_data = RESULT_FILES[bucket_id].write().await;
             let _ = file_data.set(&file_key, &tmp_file, data_size).await;
@@ -1569,12 +2533,103 @@ mod tests {
         assert_eq!(meta.start_time, 1744081170000000);
         assert_eq!(meta.end_time, 1744081180000000);
         assert!(!meta.is_aggregate);
+        assert!(meta.is_descending);
     }
 
     #[test]
     fn test_parse_result_cache_key_too_short_returns_none() {
         assert!(parse_result_cache_key("too/short").is_none());
         assert!(parse_result_cache_key("a/b/c/d/e").is_none());
+    }
+
+    #[tokio::test]
+    async fn test_remove_result_cache_metas_removes_only_matching_meta() {
+        let query_key = "rm_meta_org_logs_default_hashkey";
+        let meta1 = ResultCacheMeta {
+            start_time: 1000,
+            end_time: 2000,
+            is_aggregate: false,
+            is_descending: true,
+        };
+        let meta2 = ResultCacheMeta {
+            start_time: 3000,
+            end_time: 4000,
+            is_aggregate: false,
+            is_descending: true,
+        };
+        QUERY_RESULT_CACHE
+            .write()
+            .await
+            .insert(query_key.to_string(), vec![meta1, meta2.clone()]);
+
+        // removing one file only drops its own meta
+        let file1 = "results/rm_meta_org/logs/default/hashkey/1000_2000_0_1.json".to_string();
+        remove_result_cache_metas(&[file1]).await;
+        let metas = QUERY_RESULT_CACHE.read().await.get(query_key).cloned();
+        assert_eq!(metas, Some(vec![meta2.clone()]));
+
+        // non-results keys are ignored
+        remove_result_cache_metas(&[
+            "aggregations/rm_meta_org/logs/default/hashkey/3000_4000.arrow".to_string(),
+        ])
+        .await;
+        let metas = QUERY_RESULT_CACHE.read().await.get(query_key).cloned();
+        assert_eq!(metas, Some(vec![meta2]));
+
+        // a meta whose file was rewritten on disk survives the delayed prune
+        let file2 = "results/rm_meta_org/logs/default/hashkey/3000_4000_0_1.json".to_string();
+        let abs_path = get_file_path(&file2).unwrap();
+        tokio::fs::create_dir_all(std::path::Path::new(&abs_path).parent().unwrap())
+            .await
+            .unwrap();
+        tokio::fs::write(&abs_path, b"x").await.unwrap();
+        remove_result_cache_metas(std::slice::from_ref(&file2)).await;
+        assert!(QUERY_RESULT_CACHE.read().await.contains_key(query_key));
+
+        // removing the last file drops the query key once the file is truly gone
+        tokio::fs::remove_file(&abs_path).await.unwrap();
+        remove_result_cache_metas(&[file2]).await;
+        assert!(!QUERY_RESULT_CACHE.read().await.contains_key(query_key));
+    }
+
+    #[tokio::test]
+    async fn test_add_result_cache_meta_enforces_per_key_limit() {
+        let max_entries = RESULT_CACHE_MAX_ENTRIES_PER_KEY;
+        let query_key = "add_meta_org_logs_default_hashkey";
+        for i in 0..(max_entries as i64 + 2) {
+            let file_key = format!(
+                "results/add_meta_org/logs/default/hashkey/{}_{}_0_0.json",
+                i * 1000,
+                i * 1000 + 500
+            );
+            set_size(&file_key, 1).await.unwrap();
+            add_result_cache_meta(&file_key).await;
+        }
+        let metas = QUERY_RESULT_CACHE
+            .read()
+            .await
+            .get(query_key)
+            .cloned()
+            .unwrap();
+        assert_eq!(metas.len(), max_entries);
+        // the two entries with the oldest data ranges were evicted
+        assert!(metas.iter().all(|m| m.start_time >= 2000));
+    }
+
+    #[test]
+    fn test_result_cache_file_name_round_trips_with_parser() {
+        let meta = ResultCacheMeta {
+            start_time: 1744081170000000,
+            end_time: 1744081180000000,
+            is_aggregate: false,
+            is_descending: true,
+        };
+        let file = format!(
+            "results/org/logs/stream/hash/{}",
+            result_cache_file_name(&meta)
+        );
+        let (_, _, _, parsed) = parse_result_cache_key(&file).unwrap();
+        assert_eq!(parsed, meta);
     }
 
     #[test]
@@ -1645,10 +2700,342 @@ mod tests {
     }
 
     #[test]
-    fn test_get_bucket_idx_empty_string() {
-        let idx = get_bucket_idx("");
-        let cfg = config::get_config();
-        let max = cfg.disk_cache.bucket_num.max(1);
-        assert!(idx < max);
+    fn test_is_legacy_metrics_result_file() {
+        let dir = "metrics_results/default/2025/04/08/06";
+        let name = "17caf18281f2a17c76a803a9cd59a207_1_2_3.pb";
+        assert!(is_legacy_metrics_result_file(&format!("{dir}/{name}")));
+        assert!(!is_legacy_metrics_result_file(&format!(
+            "{dir}/{METRICS_RESULT_CACHE_FILE_PREFIX}{name}"
+        )));
+        assert!(!is_legacy_metrics_result_file(
+            "results/default/logs/default/16042959487540176184_30_zo_sql_key/1_2_1_0.json"
+        ));
+        assert!(!is_legacy_metrics_result_file(
+            "files/default/logs/disk/2025/04/08/06/7315292721030106704.parquet"
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_load_drops_legacy_metrics_result_files() {
+        // multi_dir strips the first path segment from scanned keys
+        if !get_config().disk_cache.multi_dir.is_empty() {
+            return;
+        }
+        // remove() is a no-op with the disk cache off, so the scanned key would stay indexed
+        if !get_config().disk_cache.enabled {
+            return;
+        }
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tokio::fs::canonicalize(tmp.path()).await.unwrap();
+        let dir = "metrics_results/legacy_scan_org/2025/04/08/06";
+        let name = "17caf18281f2a17c76a803a9cd59a207_1_2_3.pb";
+        let legacy_key = format!("{dir}/{name}");
+        let current_key = format!("{dir}/{METRICS_RESULT_CACHE_FILE_PREFIX}{name}");
+        std::fs::create_dir_all(root.join(dir)).unwrap();
+        std::fs::write(root.join(&legacy_key), b"x").unwrap();
+        std::fs::write(root.join(&current_key), b"x").unwrap();
+
+        let mut legacy = Vec::new();
+        load(&root, &root, &mut legacy).await.unwrap();
+        assert_eq!(legacy, vec![root.join(&legacy_key)]);
+        remove_legacy_metrics_files(legacy).await;
+
+        assert!(!root.join(&legacy_key).exists());
+        assert!(root.join(&current_key).exists());
+        let mut listed = METRICS_RESULT_CACHE.write().await;
+        assert!(listed.contains(&current_key));
+        assert!(!listed.contains(&legacy_key));
+        listed.retain(|key| key != &current_key);
+        drop(listed);
+        assert!(!exist(&legacy_key).await);
+        remove(&current_key).await.unwrap();
+    }
+
+    // Serializes the public dashboard tests; other result-cache tests still write the same buckets.
+    static PUBLIC_DASHBOARD_TESTS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+    fn public_key(range: &str) -> (String, String) {
+        let link = config::ider::uuid();
+        (
+            link.clone(),
+            format!("{PUBLIC_DASHBOARDS_PREFIX}org/{link}/{range}"),
+        )
+    }
+
+    async fn indexed_size(key: &str) -> Option<usize> {
+        let files = RESULT_FILES[get_bucket_idx(key)].read().await;
+        match &files.data {
+            CacheStrategy::Lru(cache) => cache.peek(key).copied(),
+            CacheStrategy::Fifo(queue, _) => queue.iter().find(|(k, _)| k == key).map(|e| e.1),
+            CacheStrategy::TimeLru(_, caches, _) => {
+                caches.iter().find_map(|c| c.peek(key).copied())
+            }
+        }
+    }
+
+    /// The bucket's size minus its indexed sizes, which every correct write keeps.
+    async fn unindexed_size(bucket: usize) -> i64 {
+        let files = RESULT_FILES[bucket].read().await;
+        let indexed: usize = match &files.data {
+            CacheStrategy::Lru(cache) => cache.iter().map(|(_, size)| size).sum(),
+            CacheStrategy::Fifo(queue, _) => queue.iter().map(|(_, size)| size).sum(),
+            CacheStrategy::TimeLru(_, caches, _) => caches
+                .iter()
+                .flat_map(|c| c.iter().map(|(_, size)| size))
+                .sum(),
+        };
+        files.cur_size as i64 - indexed as i64
+    }
+
+    #[tokio::test]
+    async fn public_dashboard_replace_overwrites_and_accounts_the_difference() {
+        let _serial = PUBLIC_DASHBOARD_TESTS.lock().await;
+        let (_, key) = public_key("r3600");
+        let bucket = get_bucket_idx(&key);
+        // Concurrent tests change this bucket's total, so it is checked against the index.
+        let unindexed = unindexed_size(bucket).await;
+        public_dashboards_replace(&key, 1, Bytes::from_static(b"0123456789"))
+            .await
+            .unwrap();
+        assert_eq!(
+            get(&key, None).await.unwrap(),
+            Bytes::from_static(b"0123456789")
+        );
+        assert_eq!(indexed_size(&key).await, Some(10));
+        assert_eq!(unindexed_size(bucket).await, unindexed);
+        // No skip-if-exists: the same key takes the new bytes.
+        public_dashboards_replace(&key, 2, Bytes::from(vec![7u8; 25]))
+            .await
+            .unwrap();
+        assert_eq!(get(&key, None).await.unwrap().len(), 25);
+        assert_eq!(indexed_size(&key).await, Some(25));
+        assert_eq!(unindexed_size(bucket).await, unindexed);
+        let path = get_file_path(&key).unwrap();
+        assert!(!Path::new(&format!("{path}.2.tmp")).exists());
+        public_dashboards_evict(&key).await.unwrap();
+        assert!(get(&key, None).await.is_none());
+        assert_eq!(indexed_size(&key).await, None);
+        assert_eq!(unindexed_size(bucket).await, unindexed);
+    }
+
+    #[tokio::test]
+    async fn public_dashboard_files_have_no_per_key_entry_limit_and_no_result_metas() {
+        let _serial = PUBLIC_DASHBOARD_TESTS.lock().await;
+        let link = config::ider::uuid();
+        let keys: Vec<String> = (0..RESULT_CACHE_MAX_ENTRIES_PER_KEY + 2)
+            .map(|i| format!("{PUBLIC_DASHBOARDS_PREFIX}org/{link}/r{}", (i + 1) * 60))
+            .collect();
+        for (i, key) in keys.iter().enumerate() {
+            public_dashboards_replace(key, i as u64, Bytes::from_static(b"x"))
+                .await
+                .unwrap();
+        }
+        for key in &keys {
+            assert_eq!(indexed_size(key).await, Some(1), "{key}");
+            assert!(get(key, None).await.is_some());
+        }
+        let metas = QUERY_RESULT_CACHE.read().await;
+        assert!(!metas.keys().any(|k| k.contains(&link)));
+        drop(metas);
+        for key in &keys {
+            public_dashboards_evict(key).await.unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn public_dashboard_files_are_reindexed_after_a_restart() {
+        let _serial = PUBLIC_DASHBOARD_TESTS.lock().await;
+        let (link, key) = public_key("a1-2");
+        public_dashboards_replace(&key, 9, Bytes::from_static(b"survives"))
+            .await
+            .unwrap();
+        let path = get_file_path(&key).unwrap();
+        // A crash between write and rename leaves a temp file; the scan removes it.
+        std::fs::write(format!("{path}.10.tmp"), b"torn").unwrap();
+        // Restart: the in-memory index is gone, the files are not.
+        {
+            let mut files = RESULT_FILES[get_bucket_idx(&key)].write().await;
+            let (_, size) = files.data.remove_key(&key).unwrap();
+            files.cur_size -= size;
+        }
+        assert_eq!(indexed_size(&key).await, None);
+        let root = tokio::fs::canonicalize(get_dir().await).await.unwrap();
+        let scan = root.join(format!("{PUBLIC_DASHBOARDS_PREFIX}org/{link}"));
+        load(&root, &scan, &mut Vec::new()).await.unwrap();
+        assert_eq!(indexed_size(&key).await, Some(8));
+        assert_eq!(
+            get(&key, None).await.unwrap(),
+            Bytes::from_static(b"survives")
+        );
+        assert!(!Path::new(&format!("{path}.10.tmp")).exists());
+        public_dashboards_evict(&key).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn public_dashboard_eviction_removes_a_file_the_scan_has_not_indexed() {
+        let _serial = PUBLIC_DASHBOARD_TESTS.lock().await;
+        let (_, key) = public_key("r60");
+        let path = get_file_path(&key).unwrap();
+        std::fs::create_dir_all(Path::new(&path).parent().unwrap()).unwrap();
+        std::fs::write(&path, b"unindexed").unwrap();
+        public_dashboards_evict(&key).await.unwrap();
+        assert!(!Path::new(&path).exists());
+        assert!(
+            public_dashboards_replace("results/x", 1, Bytes::new())
+                .await
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn gate06_a_write_or_eviction_drops_the_memory_copies_of_its_key() {
+        let _serial = PUBLIC_DASHBOARD_TESTS.lock().await;
+        let (_, key) = public_key("r3600");
+        let other = format!("{key}0");
+        for (k, inc) in [(&key, 1), (&key, 2), (&other, 1)] {
+            track_public_dashboard_body(k, inc);
+            super::super::memory::set_for_test(
+                &public_dashboards_memory_key(k, inc),
+                Bytes::from_static(b"body"),
+            )
+            .await;
+        }
+        public_dashboards_replace(&key, 3, Bytes::from_static(b"new"))
+            .await
+            .unwrap();
+        assert!(!super::super::memory::holds(&public_dashboards_memory_key(
+            &key, 1
+        )));
+        assert!(!super::super::memory::holds(&public_dashboards_memory_key(
+            &key, 2
+        )));
+        assert!(super::super::memory::holds(&public_dashboards_memory_key(
+            &other, 1
+        )));
+        assert!(public_dashboards_indexed(&key).await);
+        track_public_dashboard_body(&key, 3);
+        super::super::memory::set_for_test(
+            &public_dashboards_memory_key(&key, 3),
+            Bytes::from_static(b"new"),
+        )
+        .await;
+        public_dashboards_evict(&key).await.unwrap();
+        assert!(!super::super::memory::holds(&public_dashboards_memory_key(
+            &key, 3
+        )));
+        assert!(!public_dashboards_indexed(&key).await);
+        drop_public_dashboard_bodies(&other).await;
+    }
+
+    /// A private 100-byte bucket holding four indexed 20-byte search results, oldest first.
+    fn small_result_bucket(tmp: &tempfile::TempDir) -> (FileData, Vec<String>) {
+        let mut files = temp_root_file_data(tmp);
+        files.max_size = 100;
+        let org = config::ider::uuid();
+        let keys: Vec<String> = (0..4)
+            .map(|i| format!("results/{org}/logs/default/h{i}/1000_2000_0_0.json"))
+            .collect();
+        for key in &keys {
+            files.data.insert(key.clone(), 20);
+            files.cur_size += 20;
+        }
+        (files, keys)
+    }
+
+    /// A written temp file of `size` bytes and the path it would replace.
+    fn staged_public_file(files: &FileData, key: &str, size: usize) -> (String, String) {
+        let path = files.get_file_path(key);
+        std::fs::create_dir_all(Path::new(&path).parent().unwrap()).unwrap();
+        let tmp = format!("{path}.1.tmp");
+        std::fs::write(&tmp, vec![0u8; size]).unwrap();
+        (tmp, path)
+    }
+
+    #[tokio::test]
+    async fn a_public_dashboard_file_larger_than_the_bucket_is_refused_and_evicts_nothing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (mut files, keys) = small_result_bucket(&tmp);
+        let key = format!(
+            "{PUBLIC_DASHBOARDS_PREFIX}org/{}/r3600",
+            config::ider::uuid()
+        );
+        files.data.insert(key.clone(), 10);
+        files.cur_size += 10;
+        let (tmp_file, path) = staged_public_file(&files, &key, 150);
+        let err = files
+            .public_dashboards_admit(&key, &tmp_file, &path, 150)
+            .await
+            .unwrap_err();
+        assert!(err.is::<PublicDashboardTooLarge>(), "{err}");
+        assert_eq!(err.to_string(), "result larger than the result cache");
+        for k in &keys {
+            assert!(files.exist(k).await, "{k} was evicted");
+        }
+        // The previous version stays indexed under its own size.
+        assert_eq!(files.data.remove_key(&key).map(|e| e.1), Some(10));
+        assert_eq!(files.cur_size, 90);
+        assert!(!Path::new(&tmp_file).exists() && !Path::new(&path).exists());
+    }
+
+    #[tokio::test]
+    async fn a_public_dashboard_file_that_fits_after_gc_evicts_only_the_bytes_it_needs() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (mut files, keys) = small_result_bucket(&tmp);
+        let key = format!(
+            "{PUBLIC_DASHBOARDS_PREFIX}org/{}/r3600",
+            config::ider::uuid()
+        );
+        let (tmp_file, path) = staged_public_file(&files, &key, 30);
+        let old = files
+            .public_dashboards_admit(&key, &tmp_file, &path, 30)
+            .await
+            .unwrap();
+        assert_eq!(old, 0);
+        // 80 + 30 is 10 over: the oldest 20-byte entry goes and nothing else.
+        assert!(!files.exist(&keys[0]).await);
+        for k in &keys[1..] {
+            assert!(files.exist(k).await, "{k} was evicted");
+        }
+        assert!(files.exist(&key).await);
+        assert_eq!(files.cur_size, 90);
+        assert_eq!(std::fs::read(&path).unwrap().len(), 30);
+        assert!(!Path::new(&tmp_file).exists());
+    }
+
+    #[tokio::test]
+    async fn a_public_dashboard_write_that_fails_or_panics_midway_leaves_no_temp_and_the_old_file()
+    {
+        let _serial = PUBLIC_DASHBOARD_TESTS.lock().await;
+        let (_, key) = public_key("r3600");
+        public_dashboards_replace(&key, 1, Bytes::from_static(b"old contents"))
+            .await
+            .unwrap();
+        let path = get_file_path(&key).unwrap();
+        for incarnation in [2, 3] {
+            let tmp = format!("{path}.{incarnation}.tmp");
+            FAIL_TMP_WRITES.lock().unwrap().insert(tmp.clone());
+            let replaced =
+                public_dashboards_replace(&key, incarnation, Bytes::from(vec![7u8; 64])).await;
+            FAIL_TMP_WRITES.lock().unwrap().remove(&tmp);
+            assert!(replaced.is_err(), "attempt {incarnation}");
+        }
+        let tmp = format!("{path}.4.tmp");
+        PANIC_TMP_WRITES.lock().unwrap().insert(tmp.clone());
+        let replaced = public_dashboards_replace(&key, 4, Bytes::from(vec![7u8; 64])).await;
+        PANIC_TMP_WRITES.lock().unwrap().remove(&tmp);
+        assert!(replaced.is_err(), "a panicked write");
+        let dir = Path::new(&path).parent().unwrap();
+        let temps: Vec<_> = std::fs::read_dir(dir)
+            .unwrap()
+            .filter_map(|e| e.ok()?.file_name().into_string().ok())
+            .filter(|name| name.ends_with(".tmp"))
+            .collect();
+        assert!(temps.is_empty(), "temp files left: {temps:?}");
+        assert_eq!(
+            get(&key, None).await.unwrap(),
+            Bytes::from_static(b"old contents")
+        );
+        assert_eq!(indexed_size(&key).await, Some(12));
+        public_dashboards_evict(&key).await.unwrap();
     }
 }

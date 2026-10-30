@@ -15,7 +15,7 @@
 
 use std::sync::LazyLock as Lazy;
 
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 
 // SEARCHING_FILES for searching files, in use, should not move to s3
 static SEARCHING_FILES: Lazy<parking_lot::RwLock<SearchingFileLocker>> =
@@ -27,6 +27,13 @@ static SEARCHING_REQUESTS: Lazy<parking_lot::RwLock<HashMap<String, Vec<String>>
 
 struct SearchingFileLocker {
     inner: HashMap<String, usize>,
+}
+
+/// Owns the `SEARCHING_FILES` locks of one search, releasing them on drop so a cancelled
+/// search cannot pin wal files for the life of the process.
+pub struct SearchingFiles {
+    trace_id: String,
+    files: HashSet<String>,
 }
 
 impl SearchingFileLocker {
@@ -64,22 +71,69 @@ impl SearchingFileLocker {
     }
 }
 
+impl SearchingFiles {
+    /// An empty guard, for the paths that return before any lock is taken.
+    pub fn empty(trace_id: &str) -> Self {
+        Self {
+            trace_id: trace_id.to_string(),
+            files: HashSet::new(),
+        }
+    }
+
+    pub fn lock(trace_id: &str, files: &[String]) -> Self {
+        // a set, so release_one is O(1) over a file list that can run to thousands
+        let files: HashSet<String> = files.iter().cloned().collect();
+        lock_files(&files);
+        Self {
+            trace_id: trace_id.to_string(),
+            files,
+        }
+    }
+
+    /// Release one file now and stop tracking it.
+    pub fn release_one(&mut self, file: &str) {
+        if self.files.remove(file) {
+            release_files(std::iter::once(file));
+        }
+    }
+
+    /// Hand the remaining locks to the trace id; `release_request` releases them from there.
+    pub fn into_request(mut self) {
+        let files: Vec<String> = self.files.drain().collect();
+        lock_request(&self.trace_id, files);
+    }
+}
+
+impl Drop for SearchingFiles {
+    fn drop(&mut self) {
+        if self.files.is_empty() {
+            return;
+        }
+        log::debug!(
+            "[trace_id {}] wal->search: released {} file locks on drop",
+            self.trace_id,
+            self.files.len()
+        );
+        release_files(&self.files);
+    }
+}
+
 pub fn init() -> Result<(), anyhow::Error> {
     _ = SEARCHING_FILES.read().len();
     Ok(())
 }
 
-pub fn lock_files(files: &[String]) {
+fn lock_files<I: IntoIterator<Item = S>, S: AsRef<str>>(files: I) {
     let mut locker = SEARCHING_FILES.write();
-    for file in files.iter() {
-        locker.lock(file.clone());
+    for file in files {
+        locker.lock(file.as_ref().to_string());
     }
 }
 
-pub fn release_files(files: &[String]) {
+fn release_files<I: IntoIterator<Item = S>, S: AsRef<str>>(files: I) {
     let mut locker = SEARCHING_FILES.write();
-    for file in files.iter() {
-        locker.release(file);
+    for file in files {
+        locker.release(file.as_ref());
     }
 }
 
@@ -87,26 +141,28 @@ pub fn lock_files_exists(file: &str) -> bool {
     SEARCHING_FILES.read().exist(file)
 }
 
+pub fn lock_files_len() -> usize {
+    SEARCHING_FILES.read().len()
+}
+
 pub fn clean_lock_files() {
     let mut locker = SEARCHING_FILES.write();
     locker.clean();
 }
 
-pub fn lock_request(trace_id: &str, files: &[String]) {
+fn lock_request(trace_id: &str, files: Vec<String>) {
     log::info!("[trace_id: {trace_id}] lock_request for wal files");
     let mut locker = SEARCHING_REQUESTS.write();
-    locker.insert(trace_id.to_string(), files.to_vec());
+    locker
+        .entry(trace_id.to_string())
+        .or_default()
+        .extend(files);
 }
 
 pub fn release_request(trace_id: &str) {
-    if !config::cluster::LOCAL_NODE.is_ingester() {
-        return;
-    }
-    log::info!("[trace_id: {trace_id}] release_request for wal files");
-    let mut locker = SEARCHING_REQUESTS.write();
-    let files = locker.remove(trace_id);
-    drop(locker);
+    let files = SEARCHING_REQUESTS.write().remove(trace_id);
     if let Some(files) = files {
+        log::info!("[trace_id: {trace_id}] release_request for wal files");
         release_files(&files);
     }
 }
@@ -151,14 +207,11 @@ mod tests {
 
         // Lock files and record the request
         lock_files(&files);
-        lock_request(trace_id, &files);
+        lock_request(trace_id, files.clone());
         assert!(lock_files_exists(&files[0]));
         assert!(lock_files_exists(&files[1]));
 
-        // release_request returns early when node is not an ingester (test context);
-        // files remain locked until released directly.
         release_request(trace_id);
-        release_files(&files);
         assert!(!lock_files_exists(&files[0]));
         assert!(!lock_files_exists(&files[1]));
     }
@@ -200,6 +253,67 @@ mod tests {
         assert!(lock_files_exists(&files[0]));
         // second release - now free
         release_files(&files);
+        assert!(!lock_files_exists(&files[0]));
+    }
+
+    #[test]
+    fn test_searching_files_releases_on_drop() {
+        let _guard = TEST_LOCK.lock();
+        let files = vec![
+            "files/org/logs/stream/1/md5/guard_drop_a.json".to_string(),
+            "files/org/logs/stream/1/md5/guard_drop_b.json".to_string(),
+        ];
+        {
+            let _locks = SearchingFiles::lock("trace_drop", &files);
+            assert!(lock_files_exists(&files[0]));
+            assert!(lock_files_exists(&files[1]));
+        }
+        assert!(!lock_files_exists(&files[0]));
+        assert!(!lock_files_exists(&files[1]));
+    }
+
+    #[test]
+    fn test_searching_files_locks_duplicates_once() {
+        let _guard = TEST_LOCK.lock();
+        let file = "files/org/logs/stream/1/md5/guard_dup.json".to_string();
+        {
+            let _locks = SearchingFiles::lock("trace_dup", &[file.clone(), file.clone()]);
+            assert!(lock_files_exists(&file));
+        }
+        assert!(!lock_files_exists(&file));
+    }
+
+    #[test]
+    fn test_searching_files_release_one() {
+        let _guard = TEST_LOCK.lock();
+        let files = vec![
+            "files/org/logs/stream/1/md5/guard_one_a.json".to_string(),
+            "files/org/logs/stream/1/md5/guard_one_b.json".to_string(),
+        ];
+        {
+            let mut locks = SearchingFiles::lock("trace_one", &files);
+            locks.release_one(&files[0]);
+            assert!(!lock_files_exists(&files[0]));
+            assert!(lock_files_exists(&files[1]));
+            // releasing an untracked file is a no-op
+            locks.release_one(&files[0]);
+            assert!(lock_files_exists(&files[1]));
+        }
+        assert!(!lock_files_exists(&files[1]));
+    }
+
+    #[test]
+    fn test_searching_files_into_request_keeps_locks() {
+        let _guard = TEST_LOCK.lock();
+        let trace_id = "trace_into_request";
+        let files = vec!["files/org/logs/stream/1/md5/guard_into.json".to_string()];
+        {
+            let locks = SearchingFiles::lock(trace_id, &files);
+            locks.into_request();
+        }
+        // ownership moved to SEARCHING_REQUESTS, so the guard's drop released nothing
+        assert!(lock_files_exists(&files[0]));
+        release_request(trace_id);
         assert!(!lock_files_exists(&files[0]));
     }
 }

@@ -21,10 +21,7 @@ use utoipa::ToSchema;
 
 use crate::{
     meta::{
-        alerts::{
-            QueryCondition, TriggerCondition, deduplication::DeduplicationConfig,
-            priority::AlertPriority,
-        },
+        alerts::{Operator, QueryCondition, TriggerCondition, priority::AlertPriority},
         stream::StreamType,
         triggers::{ScheduledTriggerData, Trigger},
     },
@@ -93,8 +90,6 @@ pub struct Alert {
     pub updated_at: Option<DateTime<FixedOffset>>,
     #[serde(default)]
     pub last_edited_by: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub deduplication: Option<DeduplicationConfig>,
     /// When true, this alert creates/joins incidents instead of sending direct notifications.
     /// Notification is sent only when a new incident is created or a new alert type joins
     /// an existing incident. Repeated firings are suppressed.
@@ -109,7 +104,11 @@ pub struct Alert {
     ///
     /// **Mutable** configuration — editable on any update, like `name`.
     /// Display + propagation only: it must never influence evaluation,
-    /// silence, delivery or incident severity (PT-5 / D19).
+    /// silence, or delivery (PT-5 / D19). B-29 carved out one exception:
+    /// when set, it takes precedence over the eval_level default for
+    /// incident severity at creation/escalation — see
+    /// `config::meta::alerts::priority` and
+    /// `core::alerts::incidents::create_new_incident`.
     ///
     /// `value_type` is required here because the enum serializes as an
     /// integer via serde `try_from`/`into`; without it the generated OpenAPI
@@ -129,6 +128,81 @@ pub struct Alert {
     /// they did before Feature 2 (G5).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
+
+    /// On-call team this alert pages, overriding ownership discovery. `None`
+    /// means "work it out from the identity dimensions", which is the normal
+    /// case — an explicit value is for the alert whose owner the dimensions
+    /// cannot express.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oncall_team: Option<String>,
+
+    /// Where the fix for this alert is written down.
+    ///
+    /// Copied onto every on-call response record the alert opens, so the person
+    /// woken is handed the runbook in the page. Validated at save — a malformed
+    /// link is refused rather than stored, because the moment it is read is the
+    /// one moment nobody has the patience to debug a URL.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runbook_url: Option<String>,
+
+    #[serde(default)]
+    pub pending_period_sec: i64,
+
+    /// Send one notification when this alert, or each group of a multi-alert, stops firing. Off by
+    /// default: an existing template that never mentions `{alert_status}` would otherwise render
+    /// the firing wording twice.
+    #[serde(default)]
+    pub notify_on_recovery: bool,
+
+    /// Where the recovery MESSAGE goes when it should not follow the firing. Empty = the firing's
+    /// own destinations. Ticket closes are unaffected either way — a resolve has to carry the
+    /// correlation key of the trigger that opened it, so it cannot be redirected.
+    #[serde(default)]
+    pub recovery_destinations: Vec<String>,
+
+    /// Seconds the condition must stay clear before the episode recovers.
+    /// 0 recovers on the first clear evaluation, which is what every alert does
+    /// today. Named after Prometheus' `keep_firing_for`, with the same meaning.
+    #[serde(default)]
+    pub keep_firing_for: i64,
+
+    /// Notify once per state change; enterprise only, other builds ignore it.
+    #[serde(default)]
+    pub suppress_repeats: bool,
+}
+
+/// Accept a runbook link, or say why not.
+///
+/// Deliberately narrow: `http`/`https` with a host. That excludes `file:`,
+/// `javascript:` and the bare `wiki/runbooks/checkout` somebody pastes out of a
+/// browser tab — the last of which is the common case, and the one that looks
+/// like it worked right up until a responder clicks it at 3am.
+pub fn normalize_runbook_url(raw: &str) -> Result<String, String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Err("runbook_url is empty".to_string());
+    }
+    // Long enough for a real deep link, short enough that a paste accident is
+    // not persisted onto every response record the alert ever opens.
+    if trimmed.chars().count() > 2048 {
+        return Err("runbook_url is longer than 2048 characters".to_string());
+    }
+    let Some((scheme, rest)) = trimmed.split_once("://") else {
+        return Err("runbook_url must start with http:// or https://".to_string());
+    };
+    if !scheme.eq_ignore_ascii_case("http") && !scheme.eq_ignore_ascii_case("https") {
+        return Err("runbook_url must start with http:// or https://".to_string());
+    }
+    // A scheme with nothing after it is not a link, and neither is one whose
+    // authority is blank — `https:///runbooks` resolves to nothing.
+    let host = rest.split(['/', '?', '#']).next().unwrap_or("");
+    if host.trim().is_empty() {
+        return Err("runbook_url has no host".to_string());
+    }
+    if trimmed.chars().any(char::is_whitespace) {
+        return Err("runbook_url contains whitespace".to_string());
+    }
+    Ok(trimmed.to_string())
 }
 
 impl MemorySize for Alert {
@@ -148,7 +222,6 @@ impl MemorySize for Alert {
             + self.description.mem_size()
             + self.owner.mem_size()
             + self.last_edited_by.mem_size()
-            + self.deduplication.mem_size()
             + self.workflows.mem_size()
             + self.tags.mem_size()
             + std::mem::size_of::<Option<AlertPriority>>()
@@ -166,6 +239,8 @@ impl PartialEq for Alert {
 impl Default for Alert {
     fn default() -> Self {
         Self {
+            oncall_team: None,
+            runbook_url: None,
             id: None,
             name: "".to_string(),
             org_id: "".to_string(),
@@ -187,16 +262,43 @@ impl Default for Alert {
             updated_at: None,
             last_edited_by: None,
             last_satisfied_at: None,
-            deduplication: None,
             creates_incident: false,
             workflows: vec![],
             priority: None,
             tags: vec![],
+            pending_period_sec: 0,
+            notify_on_recovery: false,
+            recovery_destinations: vec![],
+            keep_firing_for: 0,
+            suppress_repeats: false,
         }
     }
 }
 
 impl Alert {
+    /// Whether repeat notifications are withheld; other builds than enterprise ignore the switch.
+    pub fn suppresses_repeats(&self) -> bool {
+        cfg!(feature = "enterprise") && self.suppress_repeats
+    }
+
+    /// Pending rule mode needs per-series state; the default count gate means any series.
+    pub fn normalize_promql_rule_mode(&mut self) {
+        if self.query_condition.query_type != super::QueryType::PromQL
+            || !self.query_condition.promql_rule_mode
+        {
+            return;
+        }
+        if self.trigger_condition.operator == Operator::EqualTo
+            && self.trigger_condition.threshold == 0
+        {
+            self.trigger_condition.operator = Operator::GreaterThanEquals;
+            self.trigger_condition.threshold = 1;
+        }
+        if self.pending_period_sec > 0 {
+            self.query_condition.promql_multi_alert = true;
+        }
+    }
+
     /// Get the unique identifier of the alert.
     /// For now it ruturns the `stream_type` and `stream_name` concatenated
     /// along with alert name. In future, once the migration to v2 alerts
@@ -213,8 +315,6 @@ impl Alert {
     /// Use this function instead of `get_last_satisfied_at_from_table` to get the actual timestamp.
     pub fn get_last_satisfied_at(&self, trigger: Option<&Trigger>) -> Option<i64> {
         if let Some(data) = trigger.map(|trigger| trigger.data.as_str()) {
-            log::info!("Trigger data: {data}");
-
             // last_satisfied_at is now supposed to be part of the trigger data
             // but it was previously stored in the alert table. So, in case the trigger
             // data is not yet updated, we fallback to the value in the alert table.
@@ -281,6 +381,8 @@ pub enum AlertTypeFilter {
     /// column, not the JSON payload, which is why it can be a SQL predicate
     /// rather than an app-side scan (D60).
     Slo,
+    /// Composite definitions are stored outside the ordinary `alerts` table.
+    Composite,
 }
 
 /// Parameters for listing alerts.
@@ -342,6 +444,14 @@ pub struct ListAlertsParams {
 
     /// Sort direction; ignored when `sort_by` is `None`.
     pub sort_desc: bool,
+
+    /// Filter to the alerts pointing at one SLO (B1). Reads the indexed
+    /// `slo_id` column, not the JSON payload — the same column D60 added for
+    /// the reverse lookup.
+    ///
+    /// Unlike the burn-pair lookup this does NOT filter on `enabled`: the SLO
+    /// page must show disabled alerts so they can be re-enabled.
+    pub slo_id: Option<String>,
 }
 
 /// Columns the alert list can be sorted by (PT-3).
@@ -369,6 +479,7 @@ impl ListAlertsParams {
             tag_alert_ids: None,
             sort_by: None,
             sort_desc: false,
+            slo_id: None,
         }
     }
 
@@ -398,12 +509,6 @@ impl ListAlertsParams {
         self
     }
 
-    /// Filter alerts by the given case-insensitive name substring.
-    pub fn with_name_substring(mut self, name_substring: &str) -> Self {
-        self.name_substring = Some(name_substring.to_string());
-        self
-    }
-
     /// Filter alerts by the given stream type and optional stream name.
     pub fn for_stream(mut self, stream_type: StreamType, stream_name: Option<&str>) -> Self {
         self.stream_type_and_name = Some((stream_type, stream_name.map(|n| n.to_string())));
@@ -426,6 +531,68 @@ mod tests {
 
     use super::*;
     use crate::ider;
+
+    #[test]
+    fn rule_pending_normalizes_multi_but_zero_keeps_the_choice() {
+        for (pending, initial, expected) in [(0, false, false), (0, true, true), (240, false, true)]
+        {
+            let mut alert = Alert {
+                query_condition: QueryCondition {
+                    query_type: crate::meta::alerts::QueryType::PromQL,
+                    promql_rule_mode: true,
+                    promql_multi_alert: initial,
+                    ..Default::default()
+                },
+                pending_period_sec: pending,
+                ..Default::default()
+            };
+            alert.normalize_promql_rule_mode();
+            assert_eq!(alert.query_condition.promql_multi_alert, expected);
+        }
+        let mut ordinary = Alert {
+            pending_period_sec: 240,
+            ..Default::default()
+        };
+        ordinary.query_condition.query_type = crate::meta::alerts::QueryType::PromQL;
+        ordinary.normalize_promql_rule_mode();
+        assert!(!ordinary.query_condition.promql_multi_alert);
+    }
+
+    #[test]
+    fn rule_default_gate_is_normalized_without_rewriting_explicit_gates() {
+        for (operator, threshold, expected_operator, expected_threshold) in [
+            (Operator::EqualTo, 0, Operator::GreaterThanEquals, 1),
+            (Operator::GreaterThan, 0, Operator::GreaterThan, 0),
+            (
+                Operator::GreaterThanEquals,
+                2,
+                Operator::GreaterThanEquals,
+                2,
+            ),
+        ] {
+            let mut alert = Alert::default();
+            alert.query_condition.query_type = super::super::QueryType::PromQL;
+            alert.query_condition.promql_rule_mode = true;
+            alert.trigger_condition.operator = operator;
+            alert.trigger_condition.threshold = threshold;
+            alert.normalize_promql_rule_mode();
+            assert_eq!(alert.trigger_condition.operator, expected_operator);
+            assert_eq!(alert.trigger_condition.threshold, expected_threshold);
+            assert_eq!(
+                crate::meta::alerts::grouping::validate_multi_alert(
+                    &alert.query_condition,
+                    &alert.trigger_condition,
+                    false,
+                )
+                .is_ok(),
+                threshold != 2,
+            );
+        }
+        let mut ordinary = Alert::default();
+        ordinary.normalize_promql_rule_mode();
+        assert_eq!(ordinary.trigger_condition.operator, Operator::EqualTo);
+        assert_eq!(ordinary.trigger_condition.threshold, 0);
+    }
 
     #[test]
     fn test_alert_default() {
@@ -676,19 +843,21 @@ mod tests {
     }
 
     #[test]
+    fn alert_type_filter_composite_has_a_stable_wire_discriminator() {
+        let encoded = serde_json::to_string(&AlertTypeFilter::Composite).unwrap();
+        assert_eq!(encoded, r#""composite""#);
+        assert_eq!(
+            serde_json::from_str::<AlertTypeFilter>(&encoded).unwrap(),
+            AlertTypeFilter::Composite
+        );
+    }
+
+    #[test]
     fn test_list_alerts_params_in_folder() {
         let params = ListAlertsParams::new("test_org").in_folder("test_folder");
 
         assert_eq!(params.org_id, "test_org");
         assert_eq!(params.folder_id, Some("test_folder".to_string()));
-    }
-
-    #[test]
-    fn test_list_alerts_params_with_name_substring() {
-        let params = ListAlertsParams::new("test_org").with_name_substring("test");
-
-        assert_eq!(params.org_id, "test_org");
-        assert_eq!(params.name_substring, Some("test".to_string()));
     }
 
     #[test]
@@ -726,13 +895,11 @@ mod tests {
     fn test_list_alerts_params_chaining() {
         let params = ListAlertsParams::new("test_org")
             .in_folder("test_folder")
-            .with_name_substring("test")
             .for_stream(StreamType::Logs, Some("test_stream"))
             .paginate(20, 1);
 
         assert_eq!(params.org_id, "test_org");
         assert_eq!(params.folder_id, Some("test_folder".to_string()));
-        assert_eq!(params.name_substring, Some("test".to_string()));
         assert_eq!(
             params.stream_type_and_name,
             Some((StreamType::Logs, Some("test_stream".to_string())))
@@ -803,7 +970,6 @@ mod tests {
             template: None,
             context_attributes: None,
             updated_at: None,
-            deduplication: None,
             ..Default::default()
         };
         let json = serde_json::to_value(&alert).unwrap();
@@ -811,14 +977,12 @@ mod tests {
         assert!(!obj.contains_key("template"));
         assert!(!obj.contains_key("context_attributes"));
         assert!(!obj.contains_key("updated_at"));
-        assert!(!obj.contains_key("deduplication"));
     }
 
     #[test]
     fn test_alert_skip_serializing_if_some_fields_present() {
         use chrono::TimeZone;
 
-        use crate::meta::alerts::deduplication::DeduplicationConfig;
         let mut ctx = HashMap::new();
         ctx.insert("env".to_string(), "prod".to_string());
         let tz = chrono::FixedOffset::east_opt(0).unwrap();
@@ -827,7 +991,6 @@ mod tests {
             template: Some("my_template".to_string()),
             context_attributes: Some(ctx),
             updated_at: Some(dt),
-            deduplication: Some(DeduplicationConfig::default()),
             ..Default::default()
         };
         let json = serde_json::to_value(&alert).unwrap();
@@ -836,7 +999,29 @@ mod tests {
         assert_eq!(obj["template"], serde_json::json!("my_template"));
         assert!(obj.contains_key("context_attributes"));
         assert!(obj.contains_key("updated_at"));
-        assert!(obj.contains_key("deduplication"));
+    }
+
+    #[test]
+    fn test_stored_deduplication_still_loads_and_is_dropped_on_save() {
+        let stored = r#"{
+            "name": "test_alert",
+            "org_id": "test_org",
+            "stream_type": "logs",
+            "stream_name": "test_stream",
+            "is_real_time": false,
+            "destinations": [],
+            "deduplication": {
+                "enabled": true,
+                "fingerprint_fields": ["host"],
+                "time_window_minutes": 30,
+                "grouping": {"enabled": true, "max_group_size": 10, "group_wait_seconds": 30}
+            }
+        }"#;
+
+        let alert: Alert = serde_json::from_str(stored).unwrap();
+        assert_eq!(alert.name, "test_alert");
+        let saved = serde_json::to_value(&alert).unwrap();
+        assert!(!saved.as_object().unwrap().contains_key("deduplication"));
     }
 
     // ── Feature 2: list params (PT-3, PT-8) ─────────────────────────────────
@@ -998,5 +1183,82 @@ mod tests {
         assert_eq!(alert.name, "old");
         assert_eq!(alert.priority, None);
         assert!(alert.tags.is_empty());
+    }
+
+    /// A runbook link is stored as typed, so a deep link with a query string and
+    /// a fragment survives — those are how wikis address a section, and
+    /// normalizing them away would point somebody at the top of a 40-page doc.
+    #[test]
+    fn test_a_real_runbook_link_is_accepted_unchanged() {
+        for good in [
+            "https://wiki.example.com/runbooks/checkout",
+            "http://internal/runbook",
+            "https://wiki.example.com/rb?id=7#rollback",
+            "https://192.168.1.10:8080/rb",
+            "  https://wiki/rb  ",
+        ] {
+            assert_eq!(
+                normalize_runbook_url(good).unwrap(),
+                good.trim(),
+                "{good:?}"
+            );
+        }
+    }
+
+    /// What is refused is the paste that looks like it worked. `wiki/runbooks`
+    /// out of a browser tab is the common one, and it fails at exactly the
+    /// moment nobody has the patience to debug a URL.
+    #[test]
+    fn test_a_link_that_goes_nowhere_is_refused_at_save() {
+        for bad in [
+            "",
+            "   ",
+            "wiki/runbooks/checkout",
+            "www.example.com/rb",
+            "ftp://example.com/rb",
+            "file:///etc/passwd",
+            "javascript:alert(1)",
+            "https://",
+            "https:///runbooks",
+            "https://wiki example.com/rb",
+        ] {
+            assert!(
+                normalize_runbook_url(bad).is_err(),
+                "{bad:?} must be refused"
+            );
+        }
+        assert!(
+            normalize_runbook_url(&format!("https://x/{}", "a".repeat(3000))).is_err(),
+            "a paste accident must not be copied onto every response record"
+        );
+    }
+
+    /// Additive, like `priority` and `tags` before it: an alert saved before
+    /// the field existed must still load.
+    #[test]
+    fn test_an_alert_without_a_runbook_still_deserializes() {
+        let legacy = serde_json::json!({ "name": "old", "org_id": "o" });
+        let alert: Alert = serde_json::from_value(legacy).unwrap();
+        assert_eq!(alert.runbook_url, None);
+        let json = serde_json::to_value(&alert).unwrap();
+        assert!(json.get("runbook_url").is_none());
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[test]
+    fn repeat_suppression_is_ignored_outside_enterprise() {
+        let alert = Alert {
+            suppress_repeats: true,
+            ..Default::default()
+        };
+        assert!(!alert.suppresses_repeats());
+    }
+
+    #[test]
+    fn an_alert_saved_before_repeat_suppression_reads_with_it_off() {
+        let mut stored = serde_json::to_value(Alert::default()).unwrap();
+        stored.as_object_mut().unwrap().remove("suppress_repeats");
+        let alert: Alert = serde_json::from_value(stored).unwrap();
+        assert!(!alert.suppress_repeats);
     }
 }

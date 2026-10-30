@@ -14,14 +14,273 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
+import type { TranslateFn } from "@/types/i18n";
 import {
   emptyColumnOverride,
   emptyConditionalRule,
+  getUnitOptions,
   serializeColumnOverride,
   serializeOverrides,
   loadAllFromRaw,
   type ColumnOverrideUI,
 } from "./useColumnFormatting";
+
+describe("getUnitOptions", () => {
+  const t = ((key: string) => key) as unknown as TranslateFn;
+  const pinned = (current?: string | null) =>
+    getUnitOptions(t, current).filter((o) => o.parentValue === "other-locale");
+
+  it("keeps Locale Format as the plain Auto option", () => {
+    expect(getUnitOptions(t)).toContainEqual({ label: "dashboard.localeFormat", value: "locale" });
+  });
+
+  it("follows Auto with the expandable Other Locale row, its locales, then the Data group", () => {
+    const options = getUnitOptions(t);
+    const values = options.map((o) => o.value);
+    const rowIndex = values.indexOf("other-locale");
+    const pinnedCount = pinned().length;
+    expect(options[rowIndex]).toEqual({
+      label: "dashboard.otherLocale",
+      value: "other-locale",
+      expandable: true,
+    });
+    expect(values[rowIndex - 1]).toBe("locale");
+    expect(values.slice(rowIndex + 1, rowIndex + 1 + pinnedCount)).toEqual(
+      pinned().map((o) => o.value),
+    );
+    expect(options[rowIndex + 1 + pinnedCount]).toEqual({
+      label: "dashboard.unitGroupData",
+      header: true,
+    });
+    expect(values[rowIndex + 2 + pinnedCount]).toBe("bytes");
+    expect(values.at(-1)).toBe("custom");
+    expect(options.filter((o) => o.expandable)).toHaveLength(1);
+  });
+});
+
+describe("getUnitOptions groups", () => {
+  const t = ((key: string) => key) as unknown as TranslateFn;
+  const options = getUnitOptions(t);
+  const units = options.filter((o) => !o.header && !o.expandable && !o.parentValue);
+
+  const EXISTING_ORDER = [
+    null,
+    "numbers",
+    "locale",
+    "bytes",
+    "kilobytes",
+    "megabytes",
+    "bps",
+    "seconds",
+    "milliseconds",
+    "microseconds",
+    "nanoseconds",
+    "percent-1",
+    "percent",
+    "currency-dollar",
+    "currency-euro",
+    "currency-pound",
+    "currency-yen",
+    "currency-rupee",
+    "custom",
+  ];
+
+  const EXISTING_LABELS: Record<string, string> = {
+    null: "dashboard.default",
+    numbers: "dashboard.numbers",
+    locale: "dashboard.localeFormat",
+    bytes: "dashboard.bytesBinary",
+    kilobytes: "dashboard.kilobytesBinary",
+    megabytes: "dashboard.megabytesBinary",
+    bps: "dashboard.bytesPerSecondBinary",
+    seconds: "dashboard.seconds",
+    milliseconds: "dashboard.milliseconds",
+    microseconds: "dashboard.microseconds",
+    nanoseconds: "dashboard.nanoseconds",
+    "percent-1": "dashboard.percent1",
+    percent: "dashboard.percent",
+    "currency-dollar": "dashboard.currencyDollar",
+    "currency-euro": "dashboard.currencyEuro",
+    "currency-pound": "dashboard.currencyPound",
+    "currency-yen": "dashboard.currencyYen",
+    "currency-rupee": "dashboard.currencyRupees",
+    custom: "dashboard.custom",
+  };
+
+  const GROUPS: [header: string, values: (string | null)[]][] = [
+    ["dashboard.unitGroupNumber", [null, "numbers", "locale"]],
+    [
+      "dashboard.unitGroupData",
+      ["bytes", "kilobytes", "megabytes", "bytes-si", "kilobytes-si", "megabytes-si", "bits"],
+    ],
+    ["dashboard.unitGroupDataRate", ["bps", "bps-si", "bits-per-sec", "bytes-per-sec"]],
+    [
+      "dashboard.unitGroupThroughput",
+      [
+        "req-per-sec",
+        "ops-per-sec",
+        "events-per-sec",
+        "req-per-min",
+        "ops-per-min",
+        "events-per-min",
+        "per-sec",
+        "per-min",
+      ],
+    ],
+    [
+      "dashboard.unitGroupTime",
+      [
+        "seconds",
+        "milliseconds",
+        "microseconds",
+        "nanoseconds",
+        "minutes",
+        "hours",
+        "days",
+        "datetime",
+        "from-now",
+      ],
+    ],
+    ["dashboard.unitGroupTemperature", ["celsius", "fahrenheit"]],
+    ["dashboard.unitGroupFrequency", ["hertz"]],
+    ["dashboard.unitGroupPercent", ["percent-1", "percent"]],
+    [
+      "dashboard.unitGroupCurrency",
+      [
+        "currency-dollar",
+        "currency-euro",
+        "currency-pound",
+        "currency-yen",
+        "currency-rupee",
+        "currency-yuan",
+        "currency-won",
+      ],
+    ],
+    ["dashboard.unitGroupOther", ["boolean"]],
+    ["dashboard.unitGroupCustom", ["custom"]],
+  ];
+
+  const NEW_KEYS = [
+    "bytes-si",
+    "kilobytes-si",
+    "megabytes-si",
+    "bits",
+    "bps-si",
+    "bits-per-sec",
+    "req-per-sec",
+    "ops-per-sec",
+    "events-per-sec",
+    "req-per-min",
+    "ops-per-min",
+    "events-per-min",
+    "per-sec",
+    "per-min",
+    "minutes",
+    "hours",
+    "days",
+    "bytes-per-sec",
+    "datetime",
+    "from-now",
+    "celsius",
+    "fahrenheit",
+    "hertz",
+    "currency-yuan",
+    "currency-won",
+    "boolean",
+  ];
+
+  it("lists the group headers in order, each a label with no unit value", () => {
+    const headers = options.filter((o) => o.header);
+    expect(headers.map((o) => o.label)).toEqual(GROUPS.map(([header]) => header));
+    for (const header of headers) expect(header).toEqual({ label: header.label, header: true });
+  });
+
+  it("opens with the Number header", () => {
+    expect(options[0]).toEqual({ label: "dashboard.unitGroupNumber", header: true });
+  });
+
+  it.each(GROUPS)("lists the units of %s under it", (header, values) => {
+    const start = options.findIndex((o) => o.header && o.label === header);
+    const next = options.findIndex((o, i) => i > start && o.header);
+    const members = options
+      .slice(start + 1, next === -1 ? undefined : next)
+      .filter((o) => !o.expandable && !o.parentValue)
+      .map((o) => o.value);
+    expect(members).toEqual(values);
+  });
+
+  it("keeps every existing unit, its label and its order relative to the others", () => {
+    const existing = units.filter((o) => EXISTING_ORDER.includes(o.value ?? null));
+    expect(existing.map((o) => o.value ?? null)).toEqual(EXISTING_ORDER);
+    for (const option of existing) {
+      expect(option.label).toBe(EXISTING_LABELS[String(option.value ?? null)]);
+    }
+  });
+
+  it("lists every new unit key exactly once", () => {
+    for (const key of NEW_KEYS) {
+      expect(
+        options.filter((o) => o.value === key),
+        key,
+      ).toHaveLength(1);
+    }
+    expect(units).toHaveLength(EXISTING_ORDER.length + NEW_KEYS.length);
+  });
+
+  it("names the 1024 scale in the label and renders no inline hint", () => {
+    const binary = options.filter((o) => String(o.label).endsWith("Binary"));
+    expect(binary.map((o) => o.value)).toEqual(["bytes", "kilobytes", "megabytes", "bps"]);
+    for (const option of options) {
+      expect(option).not.toHaveProperty("subLabel");
+      expect(option).not.toHaveProperty("subLabelInline");
+    }
+  });
+
+  it("gives every selectable row a value and no header row a value", () => {
+    for (const option of options) {
+      if (option.header) expect("value" in option).toBe(false);
+      else expect("value" in option).toBe(true);
+    }
+  });
+});
+
+describe("getUnitOptions pinned locales", () => {
+  const t = ((key: string) => key) as unknown as TranslateFn;
+  const pinned = (current?: string | null) =>
+    getUnitOptions(t, current).filter((o) => o.parentValue === "other-locale");
+
+  it("pins each nested locale in the unit value, named as language - country (code)", () => {
+    const czech = pinned().find((o) => o.value === "locale:cs-CZ");
+    expect(czech?.label).toBe("Czech - CZ (cs_CZ)");
+    expect(pinned().some((o) => o.value === "locale:hi-IN")).toBe(true);
+    expect(pinned().every((o) => String(o.value).startsWith("locale:"))).toBe(true);
+  });
+
+  it("names the Arabic UI locale despite its Unicode extension", () => {
+    expect(pinned().find((o) => o.value === "locale:ar-SA-u-nu-latn")?.label).toBe(
+      "Arabic - SA (ar_SA)",
+    );
+  });
+
+  it("gives every nested locale a distinct name", () => {
+    const labels = pinned().map((o) => o.label);
+    expect(new Set(labels).size).toBe(labels.length);
+  });
+
+  it("appends a valid pinned locale that is not in the list", () => {
+    const options = getUnitOptions(t, "locale:sl-SI");
+    expect(options.filter((o) => o.value === "locale:sl-SI")).toHaveLength(1);
+    expect(pinned("locale:sl-SI").some((o) => o.value === "locale:sl-SI")).toBe(true);
+    expect(options).toHaveLength(getUnitOptions(t).length + 1);
+  });
+
+  it.each(["locale:cs-CZ", "locale:xx-ZZ", "locale", "bytes", null])(
+    "adds no entry for the current unit %j",
+    (current) => {
+      expect(getUnitOptions(t, current)).toHaveLength(getUnitOptions(t).length);
+    },
+  );
+});
 
 describe("useColumnFormatting", () => {
   describe("empty factories", () => {
@@ -156,6 +415,15 @@ describe("useColumnFormatting", () => {
         customUnit: "req/s",
       };
       const entry = serializeColumnOverride(original);
+      expect(loadAllFromRaw([entry])[0]).toEqual(original);
+    });
+
+    it("round-trips a pinned Locale Format unit", () => {
+      const original = { ...emptyColumnOverride("c"), unit: "locale:hi-IN" };
+      const entry = serializeColumnOverride(original);
+      expect(entry.config).toEqual([
+        { type: "unit", value: { unit: "locale:hi-IN", customUnit: null } },
+      ]);
       expect(loadAllFromRaw([entry])[0]).toEqual(original);
     });
   });

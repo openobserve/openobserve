@@ -12,7 +12,7 @@
     <OPageLayout
       :back="{
         label: t('onlineEvals.scorer.backTo'),
-        onClick: () => $emit('cancel'),
+        onClick: cancel,
         dataTest: 'scorer-form-back-btn',
       }"
       bleed
@@ -26,14 +26,16 @@
         <!-- Plain scroll column, no card chrome: the sections inside are the
            cards now, so a bordered wrapper would frame them twice. Matches
            JobFormPage's left column. -->
-        <div class="scorer-form__main flex min-h-0 min-w-0 flex-col gap-2 overflow-auto p-2">
+        <div
+          class="scorer-form__main [&_label:not(.o-input-label)]:text-text-heading flex min-h-0 min-w-0 flex-col gap-2 overflow-auto p-2"
+        >
           <!-- Identity -->
           <section
             class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
             data-test="scorer-form-identity-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.identitySection")
               }}</span>
@@ -43,7 +45,7 @@
                 <OFormInput
                   name="name"
                   :label="t('onlineEvals.scorer.nameLabel')"
-                  :placeholder="t('onlineEvals.scorer.namePlaceholder')"
+                  :placeholder="raw('faithfulness_judge')"
                   size="sm"
                   required
                   :disabled="mode === 'edit'"
@@ -112,7 +114,7 @@
             data-test="scorer-form-judge-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.judgeSection")
               }}</span>
@@ -148,7 +150,7 @@
                   <span class="bg-status-info-text h-2 w-2 shrink-0 rounded-full" />
                   <span class="text-text-secondary">
                     {{ t("onlineEvals.scorer.endpointLabel") }}
-                    <span class="font-mono">{{ providerEndpoint(selectedProvider) }}</span>
+                    <span class="font-mono">{{ resolvedEndpointOf(selectedProvider) || "—" }}</span>
                   </span>
                   <span class="text-text-secondary">·</span>
                   <span class="text-text-secondary">
@@ -220,16 +222,22 @@
                  optional field in the app — not as a separate uppercase badge
                  on its own line. -->
                 <div class="flex flex-col gap-0.5">
-                  <strong class="text-xs font-semibold">{{
+                  <strong v-if="!decisionProvider" class="text-xs font-semibold">{{
                     t("onlineEvals.scorer.extraFieldsLabel")
                   }}</strong>
-                  <small class="text-2xs text-text-secondary block">{{
+                  <small
+                    v-if="decisionProvider"
+                    class="text-2xs text-text-secondary block"
+                    data-test="scorer-form-decision-provider-note"
+                    >{{ t("onlineEvals.scorer.decisionProviderNote") }}</small
+                  >
+                  <small v-else class="text-2xs text-text-secondary block">{{
                     t("onlineEvals.scorer.extraFieldsHint")
                   }}</small>
                 </div>
 
                 <div
-                  v-if="formValues.extraMetadataFields.length"
+                  v-if="!decisionProvider && formValues.extraMetadataFields.length"
                   class="border-border-default rounded-default bg-card-bg flex flex-col gap-1.5 border px-2.5 py-2"
                   data-test="scorer-form-extra-fields"
                 >
@@ -280,6 +288,7 @@
 
                 <div class="flex justify-between gap-3">
                   <OButton
+                    v-if="!decisionProvider"
                     variant="ghost-primary"
                     size="xs"
                     :disabled="formValues.extraMetadataFields.length >= MAX_EXTRA_FIELDS"
@@ -287,7 +296,7 @@
                     @click="addExtraField"
                   >
                     {{ t("onlineEvals.scorer.extraFields.addButton") }}
-                    <span class="text-text-secondary ml-1 font-normal">
+                    <span class="text-text-secondary ms-1 font-normal">
                       ({{ formValues.extraMetadataFields.length }} / {{ MAX_EXTRA_FIELDS }})
                     </span>
                   </OButton>
@@ -313,7 +322,7 @@
             data-test="scorer-form-endpoint-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.endpointSection")
               }}</span>
@@ -322,7 +331,7 @@
               <div>
                 <label class="text-text-heading mb-1 flex items-center text-xs font-semibold">
                   {{ t("onlineEvals.scorer.remoteUrlLabel") }}
-                  <span class="text-status-error-text ml-0.5">*</span>
+                  <span class="text-status-error-text ms-0.5">*</span>
                 </label>
                 <div class="scorer-url-bar grid grid-cols-[6.5rem_minmax(0,1fr)] gap-0">
                   <OFormSelect
@@ -383,7 +392,7 @@
             data-test="scorer-form-auth-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.authSection")
               }}</span>
@@ -486,11 +495,11 @@
             data-test="scorer-form-headers-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.headersSection")
               }}</span>
-              <span class="text-2xs text-text-secondary ml-auto italic">
+              <span class="text-2xs text-text-secondary ms-auto italic">
                 {{ t("onlineEvals.scorer.remoteHeaders.subtitle") }}
               </span>
             </div>
@@ -557,7 +566,7 @@
             data-test="scorer-form-body-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.requestBodySection")
               }}</span>
@@ -609,7 +618,7 @@
           variant="outline"
           size="sm-action"
           :disabled="isSubmitting"
-          @click="$emit('cancel')"
+          @click="cancel"
         >
           {{ t("onlineEvals.buttons.cancel") }}
         </OButton>
@@ -639,8 +648,7 @@
         <pre
           class="rounded-default bg-card-bg border-border-default text-text-body m-0 max-h-[60vh] overflow-auto border p-3 font-mono text-xs font-normal whitespace-pre [tab-size:2]"
           v-else
-          >{{ schemaPreview }}</pre
-        >
+          >{{ schemaPreview }}</pre>
 
         <template #footer>
           <div class="flex w-full items-center justify-between gap-2">
@@ -666,12 +674,13 @@
         </template>
       </ODialog>
     </OPageLayout>
+    <EditorDraftDialogs :draft="scorerDraft" />
   </OForm>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, toRef } from "vue";
-import { useI18n } from "vue-i18n";
+import { computed, onMounted, ref, toRef, watch } from "vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -689,11 +698,21 @@ import onlineEvalsService, {
   type Scorer,
   type ScorerType,
 } from "@/services/online-evals.service";
-import { dataTypeOf, defaultModelOf, entityId, valueOf } from "../utils/evalEntity";
+import {
+  dataTypeOf,
+  defaultModelOf,
+  entityId,
+  resolvedEndpointOf,
+  valueOf,
+} from "../utils/evalEntity";
+import { isDecisionOnlyProvider } from "@/services/llm-playground.service";
 import { extractTemplateVariables, formatTemplateVariable, showError } from "../utils/evalFormat";
 import { useScorerTest } from "../composables/useScorerTest";
 import ScorerTestPanel from "./scorer/ScorerTestPanel.vue";
 import { makeScorerFormSchema, type ScorerForm } from "./ScorerFormPage.schema";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+import { leavesEvalForm } from "../utils/routeSync";
 
 const props = defineProps<{
   orgId: string;
@@ -709,11 +728,13 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "saved"): void;
   (e: "cancel"): void;
+  /** Saved from the leave dialog: the list reloads while the pending navigation closes the form. */
+  (e: "persisted"): void;
   (e: "request-versions", scoreConfigId: string): void;
   (e: "refresh-providers"): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Co-located Zod schema (factory keeps messages i18n-driven). The form is
 // mounted fresh for each create/edit action, so building it once is safe.
@@ -741,7 +762,10 @@ const {
   scorerTestResult,
   scorerTestError,
   runScorerTest,
-} = useScorerTest(toRef(() => formValues.value.template));
+} = useScorerTest(
+  toRef(() => formValues.value.template),
+  t,
+);
 
 const canRunScorerTest = computed(() => {
   if (!props.orgId) return false;
@@ -815,7 +839,7 @@ const extraFieldTypeOptions = computed(() => [
 ]);
 
 const httpMethodOptions = computed(() =>
-  ["GET", "POST", "PUT", "PATCH", "DELETE"].map((m) => ({ label: m, value: m })),
+  ["GET", "POST", "PUT", "PATCH", "DELETE"].map((m) => ({ label: raw(m), value: m })),
 );
 
 const authTypeOptions = computed(() => [
@@ -859,7 +883,14 @@ function cleanHeaders(headers: CustomHeader[]) {
     .filter((h) => h.key.length > 0);
 }
 
-function cleanExtraFields(fields: ExtraMetadataField[]): ExtraMetadataField[] {
+// A row's `description` is free text the user typed, never a translated literal.
+type ExtraMetadataFieldRow = {
+  name: string;
+  type: ExtraMetadataField["type"];
+  description?: string;
+};
+
+function cleanExtraFields(fields: ExtraMetadataFieldRow[]): ExtraMetadataField[] {
   return fields
     .map((field) => ({
       name: field.name.trim(),
@@ -870,13 +901,13 @@ function cleanExtraFields(fields: ExtraMetadataField[]): ExtraMetadataField[] {
     .map((field) => ({
       name: field.name,
       type: field.type,
-      ...(field.description ? { description: field.description } : {}),
+      ...(field.description ? { description: raw(field.description) } : {}),
     }));
 }
 
-const cleanedCustomHeaders = computed(() => cleanHeaders(formValues.value.customHeaders));
+// A decision provider fills no extra fields, whatever was set before switching to it.
 const cleanedExtraFields = computed<ExtraMetadataField[]>(() =>
-  cleanExtraFields(formValues.value.extraMetadataFields),
+  decisionProvider.value ? [] : cleanExtraFields(formValues.value.extraMetadataFields),
 );
 
 // Builds the remote `auth` / `params` from a SOURCE object — the live `form`
@@ -1001,7 +1032,7 @@ async function previewOutputSchema() {
   } catch (err: any) {
     const body = err?.response?.data ?? {};
     schemaPreviewError.value =
-      body.message || body.error || err?.message || "Failed to derive schema";
+      body.message || body.error || err?.message || t("onlineEvals.failedToDeriveSchema");
   } finally {
     isLoadingSchemaPreview.value = false;
   }
@@ -1019,14 +1050,14 @@ const titleText = computed(() => {
 
 const scoreConfigOptions = computed(() =>
   props.scoreConfigs.map((config) => ({
-    label: config.name,
+    label: raw(config.name),
     value: entityId(config),
   })),
 );
 
 const providerOptions = computed(() =>
   props.providers.map((provider) => ({
-    label: provider.name,
+    label: raw(provider.name),
     value: provider.id,
   })),
 );
@@ -1077,13 +1108,21 @@ const selectedHealthy = computed(() => {
 const selectedProvider = computed(
   () => props.providers.find((p) => p.id === formValues.value.providerId) || null,
 );
+const decisionProvider = computed(() => isDecisionOnlyProvider(selectedProvider.value));
+// Hidden rows would still be validated, so drop them when a decision provider is chosen.
+watch(decisionProvider, (isDecision) => {
+  if (isDecision && formValues.value.extraMetadataFields.length) {
+    form.setFieldValue("extraMetadataFields", [], { dontUpdateMeta: true });
+  }
+});
 
 const promptVariables = computed(() => extractTemplateVariables(formValues.value.template || ""));
 
-onMounted(() => {
+onMounted(async () => {
   if (props.mode === "edit" && formValues.value.producesScoreConfigId) {
     void prepareSelectedScoreConfigVersion(true);
   }
+  await scorerDraft.start();
 });
 
 type AuthType = "" | "bearer" | "basic" | "api_key";
@@ -1201,9 +1240,7 @@ function initForm(row: Scorer | null, scorerType: ScorerType): ScorerForm {
           .map((f) => ({
             name: String(f.name || ""),
             type: (f.type === "number" || f.type === "boolean" ? f.type : "string") as
-              | "string"
-              | "number"
-              | "boolean",
+              "string" | "number" | "boolean",
             description: String(f.description || ""),
           }))
       : [],
@@ -1214,17 +1251,6 @@ function initForm(row: Scorer | null, scorerType: ScorerType): ScorerForm {
     ...auth,
     customHeaders: readCustomHeaders(row.params?.custom_headers),
   };
-}
-
-function providerEndpoint(provider: Provider) {
-  return provider.endpoint || providerHostFallback(provider);
-}
-
-function providerHostFallback(provider: Provider) {
-  const type = String(valueOf(provider, "providerType", "provider_type") || "").toLowerCase();
-  if (type === "openai") return "api.openai.com";
-  if (type === "anthropic") return "api.anthropic.com";
-  return "—";
 }
 
 async function handleScoreConfigSelection() {
@@ -1259,6 +1285,10 @@ async function prepareSelectedScoreConfigVersion(keepSelectedVersion: boolean) {
 // Save spinner spans the save.
 async function save(value: ScorerForm) {
   if (!props.orgId) return;
+  if (scorerDraft.pendingReentries().some((path) => secretInUse(path, value))) {
+    toast({ variant: "error", message: t("common.editorDraft.reenterBeforeSave") });
+    return;
+  }
   try {
     const isLlmJudge = value.scorerType === "llm_judge";
     // producesScoreConfigVersion / pinScoreConfigVersion are set programmatically
@@ -1271,7 +1301,10 @@ async function save(value: ScorerForm) {
           ? Number(value.producesScoreConfigVersion)
           : null,
     };
-    const extraFields = cleanExtraFields(value.extraMetadataFields);
+    const valueProvider = props.providers.find((p) => p.id === value.providerId);
+    const extraFields = isDecisionOnlyProvider(valueProvider)
+      ? []
+      : cleanExtraFields(value.extraMetadataFields);
     const scorerPayload: Record<string, any> = isLlmJudge
       ? {
           type: "llm_judge",
@@ -1308,20 +1341,108 @@ async function save(value: ScorerForm) {
       variant: "success",
       message: t("onlineEvals.saved", { label: t("onlineEvals.singular.scorers") }),
     });
+    if (leaveSave) {
+      leaveSave.saved = true;
+      emit("persisted");
+      return;
+    }
+    scorerDraft.markSaved();
     emit("saved");
   } catch (err: any) {
     showError(err, t("onlineEvals.scorer.saveError"));
   }
 }
+interface ScorerDraft {
+  values: ScorerForm;
+}
+
+// Set while the leave dialog's Save runs, so a successful save neither closes the form nor reloads the page.
+let leaveSave: { saved: boolean } | null = null;
+
+const REMOTE_ENDPOINT_PATH = "/values/remoteEndpoint";
+
+const AUTH_TYPE_BY_SECRET: Record<string, AuthType> = {
+  "/values/authBearerToken": "bearer",
+  "/values/authBasicPassword": "basic",
+  "/values/authApiKeyToken": "api_key",
+};
+
+/** Whether a blanked secret is still sent: only a remote scorer sends auth and headers, and only its chosen auth. */
+function secretInUse(path: string, value: ScorerForm): boolean {
+  const auth = AUTH_TYPE_BY_SECRET[path];
+  if (auth) return value.scorerType === "remote" && value.authType === auth;
+  if (path.startsWith("/values/customHeaders/") || path === REMOTE_ENDPOINT_PATH)
+    return value.scorerType === "remote";
+  return true;
+}
+
+function secretFieldLabel(path: string, data: ScorerDraft): I18nText | null {
+  const header = /^\/values\/customHeaders\/(\d+)\/value$/.exec(path);
+  if (header) {
+    return t("common.editorDraft.headerField", {
+      name: data.values.customHeaders[Number(header[1])]?.key ?? "",
+    });
+  }
+  if (path === "/values/authBasicPassword") return t("common.editorDraft.passwordField");
+  if (path === "/values/authBearerToken" || path === "/values/authApiKeyToken") {
+    return t("common.editorDraft.tokenField");
+  }
+  if (path === REMOTE_ENDPOINT_PATH) return t("common.editorDraft.urlField");
+  return null;
+}
+
+const scorerDraft = useEditorDraft<ScorerDraft>({
+  kind: "eval_scorer",
+  entityLabel: () => t("common.editorDraft.entities.eval_scorer"),
+  entityId: () => (props.mode === "edit" && props.row ? entityId(props.row) : null),
+  newVariant: () => props.scorerType,
+  snapshot: () => ({
+    values: {
+      ...formValues.value,
+      extraMetadataFields: formValues.value.extraMetadataFields.map((field) => ({ ...field })),
+      customHeaders: formValues.value.customHeaders.map((header) => ({ ...header })),
+    },
+  }),
+  // A header name, not a secret, though its key matches the secret pattern.
+  secretExemptKeys: ["authApiKeyHeaderName"],
+  // Any custom header can carry a credential, whatever its name, so no header value is drafted.
+  secretLists: ["/values/customHeaders"],
+  secretUrls: [REMOTE_ENDPOINT_PATH],
+  apply: (data) => {
+    form.reset({ ...initForm(null, props.scorerType), ...data.values });
+    if (data.values.producesScoreConfigId) void prepareSelectedScoreConfigVersion(true);
+  },
+  // Shaped like the snapshot, so the secret pointers blank the endpoint and header values before hashing.
+  base: () =>
+    props.mode === "edit" && props.row
+      ? { values: initForm(props.row, props.scorerType) }
+      : undefined,
+  save: async () => {
+    const run = { saved: false };
+    leaveSave = run;
+    try {
+      await form.handleSubmit();
+    } finally {
+      leaveSave = null;
+    }
+    return run.saved;
+  },
+  describeRedacted: (paths, data) => paths.flatMap((path) => secretFieldLabel(path, data) ?? []),
+  leaveOnRouteUpdate: leavesEvalForm,
+});
+
+async function cancel() {
+  if (await scorerDraft.confirmLeave()) emit("cancel");
+}
 </script>
 
 <style scoped>
-/* keep(complex-state): the global `label:not(.o-input-label)` element rule
-   (unlayered) out-specifies the color/weight/size utilities on these field
-   labels, graying them out — this higher-specificity :not() selector restores
-   the primary color + weight/size. */
+/* keep(complex-state): the global `label:not(.o-input-label)` element rule sets
+   the weight/size these field labels must override, and the labels are rendered
+   by the O* form components — this file cannot put a class on each one. The
+   COLOUR is `[&_label:not(.o-input-label)]:text-text-heading` on the container
+   in the template; only the two non-colour declarations remain here. */
 .scorer-form__main label:not(.o-input-label) {
-  color: var(--color-text-heading, currentColor);
   font-weight: 600;
   font-size: var(--text-xs);
 }

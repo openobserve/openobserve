@@ -110,11 +110,6 @@ impl ContainsQuery {
         Self::new(keyword, field, false)
     }
 
-    /// Creates a new case-sensitive ContainsQuery (convenience method)
-    pub fn new_case_sensitive(keyword: &str, field: Field) -> tantivy::Result<Self> {
-        Self::new(keyword, field, true)
-    }
-
     fn specialized_weight(&self) -> AutomatonWeight<ContainsAutomaton> {
         AutomatonWeight::new(
             self.field,
@@ -312,19 +307,13 @@ mod test {
 
         // Test convenience methods
         let case_insensitive_query = ContainsQuery::new_case_insensitive("diary", field)?;
-        let case_sensitive_query = ContainsQuery::new_case_sensitive("Diary", field)?;
 
         let docs_insensitive = searcher.search(
             &case_insensitive_query,
             &TopDocs::with_limit(10).order_by_score(),
         )?;
-        let docs_sensitive = searcher.search(
-            &case_sensitive_query,
-            &TopDocs::with_limit(10).order_by_score(),
-        )?;
 
         assert_eq!(docs_insensitive.len(), 2);
-        assert_eq!(docs_sensitive.len(), 2);
 
         Ok(())
     }

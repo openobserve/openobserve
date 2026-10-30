@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <OButton
+      :aria-label="t('dashboard.newTab')"
       data-test="dashboard-tab-new-add"
       variant="outline"
       size="icon-xs-sq"
@@ -52,14 +53,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, onActivated, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, onActivated, ref, watch, onMounted } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import AddTab from "../../components/dashboards/tabs/AddTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { getDashboard } from "@/utils/commons";
-import { onMounted } from "vue";
 import { useLoading } from "@/composables/useLoading";
 
 export default defineComponent({
@@ -87,7 +87,7 @@ export default defineComponent({
 
     //dropdown selected tab id (primitive string for OSelect)
     const selectedTab = ref<string | null>(null);
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // on add tab, select added tab
     const updateTabList = async (newTab: any) => {

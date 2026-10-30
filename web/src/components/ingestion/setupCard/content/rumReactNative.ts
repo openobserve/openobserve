@@ -26,16 +26,21 @@
 //   POST /rum/v1/{org}/replay   session replay segments
 //
 // The core SDK appends the feature segment (`/rum`, `/logs`) to its
-// customEndpoint, so it takes the BASE `/rum/v1/{org}`. Session Replay does
-// NOT — it is configured separately and takes the FULL `/replay` URL. That
-// asymmetry is the single most common reason RUM events arrive while session
-// replay silently does not, so it gets its own step and its own FAQ entry.
+// customEndpoint, so it takes the BASE `/rum/v1/{org}`. Session Replay is
+// configured separately and, as of SDK 0.1.2, the bridge appends its own
+// `/replay` segment too — same shape as RUM/Logs, so it also takes the BASE
+// URL. Appending `/replay` yourself double-appends it (`/replay/replay`),
+// which the backend 401s regardless of token validity — that's now the
+// single most common reason RUM events arrive while session replay
+// silently does not, so it still gets its own step and its own FAQ entry.
+
+import { raw, type TranslateFn } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { RichCardContent, RichCardStepVariant } from "../types";
 
 /** Published React Native SDK release these snippets are written against. */
-export const RUM_RN_SDK_VERSION = "0.1.0-alpha.4";
+export const RUM_RN_SDK_VERSION = "0.1.2";
 
 const PKG_CORE = "@openobserve/mobile-react-native";
 const PKG_REPLAY = "@openobserve/mobile-react-native-session-replay";
@@ -58,8 +63,12 @@ export interface RumReactNativeCardSubs {
 /** Base URL the core SDK appends `/rum` and `/logs` to. */
 export const rumBaseUrl = (subs: RumReactNativeCardSubs) => `${subs.endpoint}/rum/v1/${subs.org}`;
 
-/** Full URL Session Replay posts to verbatim. */
-export const replayUrl = (subs: RumReactNativeCardSubs) => `${rumBaseUrl(subs)}/replay`;
+/**
+ * Base URL Session Replay's customEndpoint takes. Same value as rumBaseUrl —
+ * as of SDK 0.1.2 the bridge appends `/replay` itself, so this is just a
+ * clearer alias at the call site (and for the FAQ copy below).
+ */
+export const replayUrl = (subs: RumReactNativeCardSubs) => rumBaseUrl(subs);
 
 // ── install ──────────────────────────────────────────────────────────────────
 
@@ -134,9 +143,10 @@ import {
     SessionReplay.enable({
       replaySampleRate: 100, // record 100% of sampled sessions
       startRecordingImmediately: true,
-      // Session Replay does NOT inherit rumConfiguration.customEndpoint and
-      // does NOT append a path — give it the FULL /replay URL or segments
-      // never reach OpenObserve.
+      // Session Replay does NOT inherit rumConfiguration.customEndpoint —
+      // give it its own base URL, same shape as the RUM/Logs one above.
+      // The bridge appends /replay itself; appending it here too
+      // double-appends the path and every upload gets rejected with 401.
       customEndpoint: '${replayUrl(subs)}',
       // Privacy defaults are MASK_ALL. Relax only as far as your policy allows.
       textAndInputPrivacyLevel: TextAndInputPrivacyLevel.MASK_SENSITIVE_INPUTS,
@@ -152,7 +162,7 @@ import {
 
 const navCode = `import { useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-import { OoRumReactNavigationTracking } from '${PKG_NAV}';
+import { O2RumReactNavigationTracking } from '${PKG_NAV}';
 
 const navigationRef = useRef(null);
 
@@ -160,7 +170,7 @@ const navigationRef = useRef(null);
   ref={navigationRef}
   onReady={() => {
     // Every route change becomes a RUM view.
-    OoRumReactNavigationTracking.startTrackingViews(navigationRef.current);
+    O2RumReactNavigationTracking.startTrackingViews(navigationRef.current);
   }}
 >
   {/* your screens */}
@@ -168,47 +178,55 @@ const navigationRef = useRef(null);
 
 // ── card ─────────────────────────────────────────────────────────────────────
 
-export default function rumReactNativeCard(subs: RumReactNativeCardSubs): RichCardContent {
+export default function rumReactNativeCard(
+  subs: RumReactNativeCardSubs,
+  t: TranslateFn,
+): RichCardContent {
   const nodeIcon = getImageURL("images/ingestion/nodejs.svg");
 
   const installVariants: RichCardStepVariant[] = [
     {
       id: "npm",
-      label: "npm",
+      label: raw("npm"),
       icon: nodeIcon,
       code: { lang: "bash", raw: installCmd("npm install") },
-      note: "The session-replay and navigation packages are optional — drop either line if you do not need screen recording or automatic view tracking.",
+      note: t("ingestion.setupCard.rnInstallNote"),
     },
     {
       id: "yarn",
-      label: "Yarn",
+      label: raw("Yarn"),
       icon: nodeIcon,
       code: { lang: "bash", raw: installCmd("yarn add") },
-      note: "The session-replay and navigation packages are optional — drop either line if you do not need screen recording or automatic view tracking.",
+      note: t("ingestion.setupCard.rnInstallNote"),
     },
   ];
 
   return {
     provider: {
+      id: "rumReactNative",
       // Same title as the browser card by design — the platform switch sitting
       // next to it already says which guide you are on, so the heading stays
       // stable across platforms instead of rewriting itself on every click.
-      name: "Real User Monitoring",
-      tagline:
-        "Capture sessions, views, user actions, crashes and session replay from your React Native app — your RUM token is already filled in below.",
+      name: t("ingestion.setupCard.providerNameRum"),
+      tagline: t("ingestion.setupCard.rumReactNativeTagline"),
       logo: getImageURL("images/common/monitoring.svg"),
       tone: "#3f7994",
-      runtime: "iOS / Android",
-      setupTime: "~5 min",
-      metaBadges: ["Sessions", "Views", "Errors", "Crashes", "Session Replay"],
+      runtime: raw("iOS / Android"),
+      setupTime: t("ingestion.setupCard.setupTime5Min"),
+      metaBadges: [
+        t("rum.sessions"),
+        t("ingestion.setupCard.pillViews"),
+        t("rum.errors"),
+        t("ingestion.setupCard.pillCrashes"),
+        t("rum.sessionReplay"),
+      ],
     },
     steps: [
       {
         id: "install",
-        title: "Install the React Native SDK",
-        description:
-          "Add the core SDK plus the optional session-replay and navigation packages. On iOS, run `npx pod-install` afterwards so the native modules are linked.",
-        chip: { kind: "terminal", label: "Install" },
+        titleKey: "ingestion.setupCard.installReactNativeSdkTitle",
+        descriptionKey: "ingestion.setupCard.installReactNativeSdkDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipInstall" },
         completeOn: "copy",
         required: true,
         variantGroup: "pkg",
@@ -216,10 +234,9 @@ export default function rumReactNativeCard(subs: RumReactNativeCardSubs): RichCa
       },
       {
         id: "init",
-        title: "Initialize RUM + Logs",
-        description:
-          "Wrap your app in `OpenObserveProvider`. The endpoints below are this org's — the SDK appends `/rum` and `/logs` to them. Adjust `applicationId`, `service` and `env` to describe your app. The `clientToken` ships inside your app bundle by design; it can only write RUM events and you can rotate it from this page's header.",
-        chip: { kind: "editor", label: "App.tsx" },
+        titleKey: "ingestion.setupCard.rumInitTitle",
+        descriptionKey: "ingestion.setupCard.initRumLogsDesc",
+        chip: { kind: "editor", label: raw("App.tsx") },
         completeOn: "copy",
         required: true,
         code: {
@@ -228,46 +245,53 @@ export default function rumReactNativeCard(subs: RumReactNativeCardSubs): RichCa
           raw: initCode(subs, subs.rumToken),
           masked: initCode(subs, subs.rumTokenMasked),
         },
-        note: "Initialize as early as possible — the provider must mount before the screens you want measured.",
+        note: t("ingestion.setupCard.rnInitNote"),
       },
       {
         id: "session-replay",
-        title: "Enable Session Replay",
-        description:
-          "Session Replay is configured **separately** from RUM and does **not** inherit `rumConfiguration.customEndpoint`. It also does not append a path, so it needs the full `/replay` URL below. Getting this wrong is the usual reason RUM events arrive but replays never do.",
-        chip: { kind: "editor", label: "App.tsx" },
+        titleKey: "ingestion.setupCard.enableSessionReplayTitle",
+        descriptionKey: "ingestion.setupCard.enableSessionReplayDesc",
+        chip: { kind: "editor", label: raw("App.tsx") },
         completeOn: "copy",
         code: {
           lang: "tsx",
           filename: "App.tsx",
           raw: replayCode(subs),
         },
-        pills: ["Wireframe capture", "Privacy masking", "Android verified"],
-        note: "Session Replay on React Native is currently verified on Android. On iOS the SDK appends its own path to this URL, so replay uploads do not yet reach OpenObserve — RUM, logs and crashes are unaffected.",
+        pills: [
+          t("ingestion.setupCard.pillWireframeCapture"),
+          t("ingestion.setupCard.pillPrivacyMasking"),
+        ],
+        note: t("ingestion.setupCard.rnSessionReplayNote"),
       },
       {
         id: "navigation",
-        title: "Track Screens Automatically (Optional)",
-        description:
-          "If you use React Navigation, hand the SDK your navigation ref and every route change is recorded as a RUM view — no per-screen code.",
-        chip: { kind: "editor", label: "Editor" },
+        titleKey: "ingestion.setupCard.trackScreensTitle",
+        descriptionKey: "ingestion.setupCard.trackScreensDesc",
+        chip: { kind: "editor", labelKey: "ingestion.setupCard.chipEditor" },
         completeOn: "copy",
         code: {
           lang: "tsx",
           filename: "App.tsx",
           raw: navCode,
         },
-        note: "Without this you can still record views manually with `OoRum.startView()` / `OoRum.stopView()`.",
+        note: t("ingestion.setupCard.rnNavigationNote"),
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description:
-          "Run the app on a simulator, emulator or device, move between a few screens, then hit Test — React Native events land in the `_rumdata` stream.",
-        chip: { kind: "traces", label: "RUM" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyReactNativeRumDesc",
+        chip: { kind: "traces", label: raw("RUM") },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Sessions", "Views", "User Actions", "Errors", "Crashes", "Session Replay"],
+        pills: [
+          t("rum.sessions"),
+          t("ingestion.setupCard.pillViews"),
+          t("ingestion.setupCard.pillUserActions"),
+          t("rum.errors"),
+          t("ingestion.setupCard.pillCrashes"),
+          t("rum.sessionReplay"),
+        ],
       },
     ],
     // The SDK stamps `source` on every event, so filtering on it confirms the
@@ -279,9 +303,8 @@ export default function rumReactNativeCard(subs: RumReactNativeCardSubs): RichCa
     },
     extras: {
       installs: [PKG_CORE, PKG_REPLAY, PKG_NAV],
-      fixTitle: "Point The SDK At A Host Your Device Can Actually Reach",
-      fixBody:
-        "`localhost` inside an emulator or on a physical device is the device itself, not your machine — the most common reason nothing arrives at all. Use the right host for where the app runs:",
+      fixTitle: t("ingestion.setupCard.rnFixTitle"),
+      fixBody: t("ingestion.setupCard.rnFixBody"),
       fixLang: "bash",
       fixSnippet: `# Android emulator  → your machine is 10.0.2.2
 ${rumBaseUrl(subs).replace(/\/\/(localhost|127\.0\.0\.1)/, "//10.0.2.2")}
@@ -293,38 +316,34 @@ ${rumBaseUrl(subs)}
 http://192.168.1.10:5080/rum/v1/${subs.org}`,
       troubleshooting: [
         {
-          q: "RUM events arrive but there is no session replay",
-          a: `Almost always the endpoint. Session Replay is configured separately and does **not** inherit \`rumConfiguration.customEndpoint\`; left unset it defaults to an empty string and uploads go nowhere you can see. Pass the full URL explicitly: \`customEndpoint: '${replayUrl(
-            subs,
-          )}'\` — note the trailing \`/replay\`, which the core SDK's base URL does not have.`,
+          q: t("ingestion.setupCard.rnTroubleNoReplayQ"),
+          a: t("ingestion.setupCard.rnTroubleNoReplayA", { replayUrl: replayUrl(subs) }),
         },
         {
-          q: "Session replay works on Android but not iOS",
-          a: "Known limitation of the current React Native SDK: on iOS it appends its own path to the session-replay `customEndpoint`, so uploads miss OpenObserve's `/replay` route. Android uses the URL verbatim and works. RUM events, logs and crash reporting are unaffected on both platforms.",
+          q: t("ingestion.setupCard.rnTroubleNothingArrivesQ"),
+          a: t("ingestion.setupCard.rnTroubleNothingArrivesA"),
         },
         {
-          q: "Nothing arrives at all from an emulator or device",
-          a: "Check the host first — see the fix box above. `localhost` resolves to the device, not your machine: use `10.0.2.2` on the Android emulator, `localhost` on the iOS simulator, and your machine's LAN IP on a physical device.",
+          q: t("ingestion.setupCard.rnTroubleCleartextQ"),
+          a: t("ingestion.setupCard.rnTroubleCleartextA", {
+            config: "{ '_dd.needsClearTextHttp': true }",
+          }),
         },
         {
-          q: "Android release/debug build sends nothing over plain HTTP",
-          a: "Android blocks cleartext traffic by default. For an `http://` endpoint set `additionalConfiguration: { '_dd.needsClearTextHttp': true }` in the SDK config, and allow cleartext for your host in the app's network security config. Prefer HTTPS outside local development.",
+          q: t("ingestion.setupCard.rnTroubleIosBuildQ"),
+          a: t("ingestion.setupCard.rnTroubleIosBuildA"),
         },
         {
-          q: "The iOS build fails or the native module is missing",
-          a: "Run `npx pod-install` (or `cd ios && pod install`) after adding the packages, then rebuild from Xcode or `npx react-native run-ios`. A Metro-only reload will not pick up new native modules.",
+          q: t("ingestion.setupCard.rnTroubleMaskedQ"),
+          a: t("ingestion.setupCard.rnTroubleMaskedA"),
         },
         {
-          q: "Replays render but everything is masked",
-          a: "That is the default. `textAndInputPrivacyLevel`, `imagePrivacyLevel` and `touchPrivacyLevel` all default to their strictest setting (`MASK_ALL`). Relax them only as far as your privacy policy allows — `MASK_SENSITIVE_INPUTS` keeps passwords and card fields hidden while showing the rest.",
+          q: t("ingestion.setupCard.rnTrouble401Q"),
+          a: t("ingestion.setupCard.rnTrouble401A"),
         },
         {
-          q: "Requests return 401 or 403",
-          a: "The `clientToken` is this org's **RUM token**, not the ingestion passcode. If it was rotated, regenerate it from this page's header and rebuild the app.",
-        },
-        {
-          q: "Sessions appear but screens are all named the same",
-          a: "View tracking is not wired up. Either pass your navigation ref to `OoRumReactNavigationTracking.startTrackingViews()` (see the optional step above), or call `OoRum.startView()` / `OoRum.stopView()` yourself on each screen.",
+          q: t("ingestion.setupCard.rnTroubleScreenNamesQ"),
+          a: t("ingestion.setupCard.rnTroubleScreenNamesA"),
         },
       ],
     },

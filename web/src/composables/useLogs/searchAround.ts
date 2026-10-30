@@ -21,6 +21,13 @@ import searchService from "@/services/search";
 import useNotifications from "@/composables/useNotifications";
 import useHistogram from "@/composables/useLogs/useHistogram";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
+import { raw, useI18nTyped } from "@/types/i18n";
+import { STREAM_NAME_FIELD } from "@/utils/logs/streamNameColumn";
+import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
+import {
+  bindSeverityRequest,
+  type SeverityRequestSnapshot,
+} from "@/composables/useLogs/useLogSeverity";
 import {
   SearchAroundParams,
   StreamField,
@@ -30,6 +37,8 @@ import {
 } from "@/ts/interfaces";
 
 export const useSearchAround = () => {
+  // Safe only because useSearchAround() runs inside component setup (SearchResult.vue).
+  const { t } = useI18nTyped();
   const { searchObj, notificationMsg } = searchState();
   const { showErrorNotification } = useNotifications();
 
@@ -37,6 +46,7 @@ export const useSearchAround = () => {
   const { generateHistogramData, generateHistogramSkeleton } = useHistogram();
   const { fnParsedSQL, fnUnparsedSQL, addTraceId, removeTraceId, shouldAddFunctionToSearch } =
     logsUtils();
+  const autoRun = useLogsAutoRun();
 
   /**
    * Performs a search around operation to fetch logs data around a specific timestamp or log entry.
@@ -60,6 +70,15 @@ export const useSearchAround = () => {
    * ```
    */
   const searchAroundData = (params: SearchAroundParams): void => {
+    const generation = autoRun.engine.newGeneration({
+      lane: "grid",
+      kind: "explicit",
+      reason: "explicit",
+      op: "full",
+      signature: autoRun.readSignature(),
+    });
+    autoRun.invalidateExecuted("search-around");
+    const isCurrent = () => autoRun.engine.isCurrent(generation.id);
     try {
       searchObj.loading = true;
       searchObj.loadingProgressPercentage = 0;
@@ -69,7 +88,22 @@ export const useSearchAround = () => {
       let queryContext = "";
       const query: string = searchObj.data.query;
 
-      if (searchObj.meta.sqlMode === true) {
+      // The _around endpoint is single-stream, so multi-stream hits use their own _stream_name.
+      const isMultiStream = searchObj.data.stream.selectedStream.length > 1;
+      const hitStreamName: string = isMultiStream ? (params.body?.[STREAM_NAME_FIELD] ?? "") : "";
+      const severityRequest: SeverityRequestSnapshot = {
+        sqlMode: true,
+        quickMode: false,
+        interestingFields: [],
+        sqlColumns: "all",
+        selectedStreams: hitStreamName
+          ? [hitStreamName]
+          : [...searchObj.data.stream.selectedStream],
+      };
+
+      if (hitStreamName && searchObj.meta.sqlMode === true) {
+        sqlContext.push(b64EncodeUnicode(`SELECT * FROM "${hitStreamName}"`) ?? "");
+      } else if (searchObj.meta.sqlMode === true) {
         const parsedSQL = fnParsedSQL(query);
         parsedSQL.where = null;
         sqlContext.push(b64EncodeUnicode(fnUnparsedSQL(parsedSQL).replace(/`/g, '"')) ?? "");
@@ -85,10 +119,12 @@ export const useSearchAround = () => {
           queryContext = queryContext.replace("[FIELD_LIST]", "*");
         }
 
-        const streamsData: string[] = searchObj.data.stream.selectedStream.filter(
-          (streamName: string) =>
-            !searchObj.data.stream.missingStreamMultiStreamFilter.includes(streamName),
-        );
+        const streamsData: string[] = hitStreamName
+          ? [hitStreamName]
+          : searchObj.data.stream.selectedStream.filter(
+              (streamName: string) =>
+                !searchObj.data.stream.missingStreamMultiStreamFilter.includes(streamName),
+            );
 
         let finalQuery = "";
         streamsData.forEach((streamName: string) => {
@@ -122,13 +158,10 @@ export const useSearchAround = () => {
         queryFunction = b64EncodeUnicode(searchObj.data.tempFunctionContent) ?? "";
       }
 
-      let actionId = "";
-      if (searchObj.data.transformType === "action" && searchObj.data.selectedTransform?.id) {
-        actionId = searchObj.data.selectedTransform.id;
-      }
-
       let streamName = "";
-      if (searchObj.data.stream.selectedStream.length > 1) {
+      if (hitStreamName) {
+        streamName = hitStreamName;
+      } else if (isMultiStream) {
         streamName = b64EncodeUnicode(searchObj.data.stream.selectedStream.join(",")) || "";
       } else {
         streamName = searchObj.data.stream.selectedStream[0];
@@ -136,6 +169,10 @@ export const useSearchAround = () => {
 
       const { traceparent, traceId }: TraceContext = generateTraceContext();
       addTraceId(traceId);
+      autoRun.engine.registerTrace(generation.id, traceId, "hits");
+      autoRun.engine.beginHits(traceId);
+      const controller = new AbortController();
+      autoRun.engine.registerAbort(generation.id, controller);
 
       searchService
         .search_around({
@@ -153,13 +190,21 @@ export const useSearchAround = () => {
           clusters: Object.prototype.hasOwnProperty.call(searchObj.meta, "clusters")
             ? searchObj.meta.clusters.join(",")
             : "",
-          action_id: actionId,
-          is_multistream: searchObj.data.stream.selectedStream.length > 1,
+          is_multistream: isMultiStream && !hitStreamName,
           traceparent,
+          signal: controller.signal,
         })
         .then(async (res: { data: SearchAroundResponse }) => {
+          if (!isCurrent()) return;
           searchObj.loading = false;
-          searchObj.data.histogram.chartParams.title = "";
+          searchObj.data.histogram.chartParams.title = raw("");
+          searchObj.data.histogram.chartParams.titleParts = null;
+          if (hitStreamName) {
+            // _around returns SELECT * hits; keep the stream-name column populated.
+            res.data.hits.forEach((hit: any) => {
+              hit[STREAM_NAME_FIELD] = hitStreamName;
+            });
+          }
           if (res.data.from > 0) {
             searchObj.data.queryResults.from = res.data.from;
             searchObj.data.queryResults.scan_size += res.data.scan_size;
@@ -168,6 +213,7 @@ export const useSearchAround = () => {
           } else {
             searchObj.data.queryResults = res.data;
           }
+          bindSeverityRequest(searchObj.data.queryResults.hits, severityRequest);
           await extractFields();
           generateHistogramSkeleton();
           generateHistogramData();
@@ -179,11 +225,13 @@ export const useSearchAround = () => {
             searchObj.data.searchAround.histogramHide = true;
           }
 
-          searchObj.data.histogram.chartParams.title = "";
+          searchObj.data.histogram.chartParams.title = raw("");
+          searchObj.data.histogram.chartParams.titleParts = null;
         })
         .catch((error: SearchAroundError) => {
+          if (!isCurrent()) return;
           let traceId = "";
-          searchObj.data.errorMsg = "Error while processing search request.";
+          searchObj.data.errorMsg = t("search.errorWhileProcessingSearchRequest");
 
           if (error.response !== undefined) {
             searchObj.data.errorMsg = error.response.data.error;
@@ -201,7 +249,9 @@ export const useSearchAround = () => {
           const customMessage = logsErrorMessage(error.response?.data?.code || 0);
           searchObj.data.errorCode = error.response?.data?.code || 0;
           if (customMessage !== "") {
-            searchObj.data.errorMsg = customMessage;
+            // `logsErrorMessage()` returns an i18n KEY, not text — the sibling call
+            // sites (usePagination, useSearchResponseHandler) resolve it the same way.
+            searchObj.data.errorMsg = t(customMessage);
           }
 
           const status = error?.request?.status;
@@ -218,12 +268,19 @@ export const useSearchAround = () => {
         })
         .finally(() => {
           removeTraceId(traceId);
+          autoRun.engine.settleHits(traceId);
+          if (!isCurrent()) return;
           searchObj.loading = false;
+          autoRun.engine.settleGeneration(generation.id);
         });
     } catch (error: unknown) {
+      autoRun.engine.settleGeneration(generation.id);
       searchObj.loading = false;
-      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-      showErrorNotification(`Error while fetching data: ${errorMessage}`);
+      const errorMessage =
+        error instanceof Error ? error.message : t("search.unknownErrorOccurred");
+      showErrorNotification(
+        t("toastMessages.useLogs.errorWhileFetchingData", { error: errorMessage }),
+      );
     }
   };
 

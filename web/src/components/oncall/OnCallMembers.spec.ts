@@ -1,0 +1,1113 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { flushPromises, mount } from "@vue/test-utils";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import OnCallMembers from "@/components/oncall/OnCallMembers.vue";
+import { queryClient } from "@/composables/query/queryClient";
+import i18n from "@/locales";
+import oncallService from "@/services/oncall";
+import usersService from "@/services/users";
+import store from "@/test/unit/helpers/store";
+import type { ChannelReadiness, OnCallTeamMember } from "@/ts/interfaces/oncall";
+
+vi.mock("@/services/oncall", () => ({
+  default: {
+    addMembers: vi.fn(),
+    setSchedule: vi.fn(),
+    removeMember: vi.fn(),
+    whoIsOnCall: vi.fn(),
+    listUnavailability: vi.fn(),
+    createUnavailability: vi.fn(),
+    deleteUnavailability: vi.fn(),
+    resolvedSchedule: vi.fn(),
+    getSchedule: vi.fn(),
+  },
+}));
+const toast = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast }));
+vi.mock("@/services/users", () => ({ default: { orgUsers: vi.fn() } }));
+
+const push = vi.fn();
+vi.mock("vue-router", () => ({ useRouter: () => ({ push }) }));
+
+const users = vi.mocked(usersService);
+const oncall = vi.mocked(oncallService);
+
+const ORG_USERS = [
+  { email: "ana@o2.ai", first_name: "Ana", last_name: "Sharma" },
+  { email: "bob@o2.ai", first_name: "Bob", last_name: "" },
+  { email: "cara@o2.ai" },
+];
+
+// Referenced directly rather than through `wrapper.vm.focus` — Vue's public
+// instance proxy rebinds methods, so a stub method read back off `vm` no
+// longer satisfies `toHaveBeenCalled()` against the same mock.
+const memberPickerFocus = vi.fn();
+
+const stubs = {
+  // Renders the real cell slots, so the tests exercise what the page draws.
+  OTable: {
+    name: "OTable",
+    props: ["data", "columns"],
+    template: `<div>
+      <slot name='toolbar' />
+      <div v-for="(row, i) in (data || [])" :key="i" data-test="row">
+        <slot v-for="c in (columns || [])" :key="c.id" :name="'cell-' + c.id" :row="row" />
+      </div>
+      <slot name='empty' />
+    </div>`,
+  },
+  OEmptyState: {
+    name: "OEmptyState",
+    props: ["description"],
+    emits: ["action"],
+    template: "<button @click=\"$emit('action')\" />",
+  },
+  // `open`, not `modelValue` — ODialog has no `modelValue`, and a stub that
+  // invents one lets a dialog that can never open test green.
+  ODialog: {
+    name: "ODialog",
+    props: ["open"],
+    template: "<div v-if='open'><slot /><slot name='footer' /></div>",
+  },
+  OUserCell: { name: "OUserCell", props: ["value"], template: "<span>{{ value }}</span>" },
+  OCard: { name: "OCard", template: "<div><slot /></div>" },
+  OCardSection: { name: "OCardSection", template: "<div><slot /></div>" },
+  OTag: { name: "OTag", template: "<span><slot /></span>" },
+  OTooltip: {
+    name: "OTooltip",
+    props: ["content"],
+    template: "<span data-test='tip'>{{ content }}</span>",
+  },
+  OButton: {
+    name: "OButton",
+    props: ["disabled"],
+    // No `@click="$emit('click')"`: the parent's handler already falls through
+    // to the native button, and re-emitting fires it twice.
+    template: `<button :disabled="disabled"><slot /></button>`,
+  },
+  OInput: {
+    name: "OInput",
+    props: ["modelValue"],
+    template: `<input :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" />`,
+  },
+  ODate: {
+    name: "ODate",
+    props: ["modelValue"],
+    template: `<div :data-test="$attrs['data-test']"><input type="date" :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" /></div>`,
+  },
+  OTime: {
+    name: "OTime",
+    props: ["modelValue"],
+    template: `<div :data-test="$attrs['data-test']"><input type="time" :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" /></div>`,
+  },
+  // `multiple` mode emits an ARRAY, so the stub mirrors that rather than a
+  // scalar — a scalar stub would let a broken payload shape pass.
+  OSelect: {
+    name: "OSelect",
+    props: ["modelValue", "options", "multiple"],
+    template: `<select multiple @change="$emit('update:modelValue', pick($event))">
+      <option v-for="o in options" :key="String(o.value)" :value="o.value">{{ o.label }}</option>
+    </select>`,
+    methods: {
+      pick(e: any) {
+        return Array.from(e.target.selectedOptions).map((o: any) => o.value);
+      },
+      // The real OSelect exposes `focus()` (and opens its dropdown); the
+      // empty state's action calls it via a template ref, so the stub needs
+      // it or that call throws.
+      focus: memberPickerFocus,
+    },
+  },
+};
+
+interface RenderOpts {
+  members?: OnCallTeamMember[];
+  rotations?: any[];
+  onCallNow?: any[];
+  reachability?: any;
+  load?: any;
+  timezone?: string;
+}
+
+function render(arg: OnCallTeamMember[] | RenderOpts = []) {
+  const opts: RenderOpts = Array.isArray(arg) ? { members: arg } : arg;
+  return mount(OnCallMembers, {
+    props: {
+      teamId: "team_1",
+      teamName: "Payments",
+      members: opts.members ?? [],
+      rotations: opts.rotations ?? [],
+      timezone: opts.timezone ?? "UTC",
+      onCallNow: opts.onCallNow ?? [],
+      reachability: opts.reachability ?? null,
+      load: opts.load ?? null,
+    },
+    global: { plugins: [i18n, store], stubs },
+  });
+}
+
+function member(email: string): OnCallTeamMember {
+  return { id: email, team_id: "team_1", user_email: email };
+}
+
+function ready(channel: ChannelReadiness["channel"]): ChannelReadiness {
+  return { channel, deliverable: true, configured_but_unverified: false };
+}
+
+function reach(email: string, lands: boolean, channels: ChannelReadiness[]) {
+  return {
+    user_email: email,
+    is_org_user: true,
+    mailbox_shaped: true,
+    deliverable_channels: channels.filter((c) => c.deliverable).map((c) => c.channel),
+    configured_but_unverified: [],
+    would_a_page_land: lands,
+    channels,
+  };
+}
+
+function reachability(members: ReturnType<typeof reach>[]) {
+  return {
+    team_id: "team_1",
+    team_name: "T",
+    smtp_configured: true,
+    reachable: members.filter((m) => m.would_a_page_land).length,
+    total: members.length,
+    unreachable_members: [],
+    members,
+  };
+}
+
+describe("OnCallMembers", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    oncall.listUnavailability.mockResolvedValue({ data: [] } as any);
+    oncall.resolvedSchedule.mockResolvedValue({ data: [] } as any);
+    users.orgUsers.mockResolvedValue({ data: { data: ORG_USERS } } as any);
+    oncall.addMembers.mockResolvedValue({ data: [] } as any);
+    oncall.getSchedule.mockResolvedValue({ data: null } as any);
+  });
+
+  // An empty roster with no way back to the picker reads as a dead end — the
+  // action has to actually land the reader in the field, not just describe it.
+  it("lands the cursor in the member picker from the empty state's action", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    const wrapper = render([]);
+    await flushPromises();
+
+    await wrapper.findComponent({ name: "OEmptyState" }).vm.$emit("action");
+
+    expect(memberPickerFocus).toHaveBeenCalled();
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+  });
+
+  // Typing an email means a typo silently creates a member nobody can log in
+  // as, and the page goes nowhere.
+  it("offers the org's users instead of a free-text email", async () => {
+    const wrapper = render();
+    await flushPromises();
+
+    const picker = wrapper.find('[data-test="oncall-members-user-select"]');
+    expect(picker.exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-members-email-input"]').exists()).toBe(false);
+    expect(picker.text()).toContain("Ana Sharma (ana@o2.ai)");
+  });
+
+  // A name is what a person recognises; the email disambiguates. A user with
+  // neither name field still has to be selectable.
+  it("falls back to the bare email when a user has no name", async () => {
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-members-user-select"]').text()).toContain("cara@o2.ai");
+  });
+
+  it("names the member picker for a screen reader", async () => {
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-members-user-select"]').attributes("aria-label")).toBe(
+      "People to add",
+    );
+  });
+
+  // Losing the picker must not lose the ability to add anybody.
+  it("degrades to a free-text field when the user list cannot be loaded", async () => {
+    users.orgUsers.mockRejectedValue(new Error("boom"));
+    const wrapper = render();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-members-user-select"]').exists()).toBe(false);
+    const input = wrapper.find('[data-test="oncall-members-email-input"]');
+    expect(input.exists()).toBe(true);
+    expect(input.attributes("aria-label")).toBe("People to add");
+  });
+
+  // Already on the team means nothing left to add.
+  it("hides people already on the team", async () => {
+    const wrapper = render([member("ana@o2.ai")]);
+    await flushPromises();
+
+    const picker = wrapper.find('[data-test="oncall-members-user-select"]');
+    expect(picker.text()).not.toContain("Ana Sharma");
+    expect(picker.text()).toContain("Bob");
+  });
+
+  // The whole point of the change: adding six people is one action, not six.
+  it("adds several people in a single request", async () => {
+    const wrapper = render();
+    await flushPromises();
+
+    const picker = wrapper.find('[data-test="oncall-members-user-select"]');
+    const options = picker.findAll("option");
+    options[0].element.selected = true;
+    options[1].element.selected = true;
+    await picker.trigger("change");
+    await wrapper.find('[data-test="oncall-members-add-btn"]').trigger("click");
+    await flushPromises();
+
+    expect(oncall.addMembers).toHaveBeenCalledTimes(1);
+    expect(oncall.addMembers).toHaveBeenCalledWith(
+      expect.objectContaining({
+        team_id: "team_1",
+        data: { user_emails: ["ana@o2.ai", "bob@o2.ai"] },
+      }),
+    );
+  });
+
+  // S2: an add says where the person went, and that the current shift did not move.
+  describe("after adding people", () => {
+    const WEEK = 604_800_000_000;
+    const rotation = (id: string, name: string, members: string[]) => ({
+      id,
+      name,
+      shift_rules: [{ name: "Base", members, shift_micros: WEEK, anchor_micros: 0 }],
+    });
+
+    async function addBob(before: any[], after: any[]) {
+      oncall.getSchedule.mockResolvedValue({ data: { timezone: "UTC", rotations: after } } as any);
+      const wrapper = render({ members: [member("ana@o2.ai")], rotations: before });
+      await flushPromises();
+      const picker = wrapper.find('[data-test="oncall-members-user-select"]');
+      const bob = picker.findAll("option").find((o) => o.element.value === "bob@o2.ai")!;
+      bob.element.selected = true;
+      await picker.trigger("change");
+      await wrapper.find('[data-test="oncall-members-add-btn"]').trigger("click");
+      await flushPromises();
+      return wrapper;
+    }
+
+    it("names the rotations they joined the end of, from the refreshed schedule", async () => {
+      const wrapper = await addBob(
+        [rotation("r1", "Primary", ["ana@o2.ai"]), rotation("r2", "Secondary", ["ana@o2.ai"])],
+        [
+          rotation("r1", "Primary", ["ana@o2.ai", "bob@o2.ai"]),
+          rotation("r2", "Secondary", ["ana@o2.ai", "bob@o2.ai"]),
+        ],
+      );
+
+      expect(oncall.getSchedule).toHaveBeenCalled();
+      const shown = toast.mock.calls.at(-1)![0];
+      expect(shown.variant).toBe("success");
+      // A natural "and" join, no Oxford comma.
+      expect(shown.message).toBe(
+        "Bob joins the end of Primary and Secondary. Who is on call now is unchanged.",
+      );
+      expect(shown.action.label).toBe("Open schedule");
+      shown.action.handler();
+      expect(wrapper.emitted("open-schedule")).toHaveLength(1);
+    });
+
+    // A team whose rotations the server cannot extend leaves the person on no rotation; say so and where to fix it.
+    it("warns when the refreshed schedule has them on no rotation", async () => {
+      const restricted = rotation("r1", "Primary", ["ana@o2.ai"]);
+      await addBob([restricted], [restricted]);
+
+      const shown = toast.mock.calls.at(-1)![0];
+      expect(shown.variant).toBe("warning");
+      expect(shown.message).toBe(
+        "Bob added to the team, but not to a rotation yet. Add them in Schedule.",
+      );
+      expect(shown.action.label).toBe("Open schedule");
+    });
+
+    it("claims nothing about placement when the schedule cannot be re-read", async () => {
+      oncall.getSchedule.mockRejectedValue(new Error("boom"));
+      const wrapper = render({ members: [member("ana@o2.ai")], rotations: [] });
+      await flushPromises();
+      const picker = wrapper.find('[data-test="oncall-members-user-select"]');
+      picker.findAll("option").find((o) => o.element.value === "bob@o2.ai")!.element.selected =
+        true;
+      await picker.trigger("change");
+      await wrapper.find('[data-test="oncall-members-add-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(toast.mock.calls.at(-1)![0]).toEqual(
+        expect.objectContaining({ variant: "success", message: "Bob added." }),
+      );
+    });
+
+    it("does not claim a shift stayed put when no existing rotation took them", async () => {
+      await addBob([], [rotation("r1", "Primary", ["ana@o2.ai", "bob@o2.ai"])]);
+
+      expect(toast.mock.calls.at(-1)![0].message).toBe("Bob added.");
+    });
+  });
+
+  // S2: removing the holder says who takes the shift they were holding.
+  describe("removing the person on call", () => {
+    const now = [
+      {
+        rotation_id: "r1",
+        rotation_name: "Primary",
+        rule: "Base",
+        user_email: "ana@o2.ai",
+        next_user_email: "bob@o2.ai",
+      },
+    ];
+
+    async function confirmFor(email: string, onCallNow = now) {
+      const wrapper = render({
+        members: [member("ana@o2.ai"), member("bob@o2.ai")],
+        onCallNow,
+      });
+      await flushPromises();
+      await wrapper.find(`[data-test="oncall-members-remove-${email}"]`).trigger("click");
+      await flushPromises();
+      return wrapper.find('[data-test="dialog-box"]').text();
+    }
+
+    it("names who takes over the current shift", async () => {
+      expect(await confirmFor("ana@o2.ai")).toBe(
+        "They will no longer be paged for this team. Bob takes over Ana Sharma's current shift in Primary.",
+      );
+    });
+
+    // Before the team name loads, the title names the person alone rather than "from ?".
+    it("names only the person while the team name is unknown", async () => {
+      const wrapper = render({ members: [member("ana@o2.ai")], onCallNow: now });
+      await wrapper.setProps({ teamName: "" });
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-members-remove-ana@o2.ai"]').trigger("click");
+
+      expect(wrapper.findComponent({ name: "ConfirmDialog" }).props("title")).toBe(
+        "Remove Ana Sharma?",
+      );
+    });
+
+    // The title names the person and the team.
+    it("names the person and the team in the title", async () => {
+      const wrapper = render({ members: [member("ana@o2.ai")], onCallNow: now });
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-members-remove-ana@o2.ai"]').trigger("click");
+
+      expect(wrapper.findComponent({ name: "ConfirmDialog" }).props("title")).toBe(
+        "Remove Ana Sharma from Payments?",
+      );
+    });
+
+    // The button says what it does.
+    it("confirms with a destructive Remove", async () => {
+      const wrapper = render({ members: [member("ana@o2.ai")], onCallNow: now });
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-members-remove-ana@o2.ai"]').trigger("click");
+      const confirm = wrapper.findComponent({ name: "ConfirmDialog" });
+
+      expect(confirm.props("okLabel")).toBe("Remove");
+      expect(confirm.props("okVariant")).toBe("destructive");
+    });
+
+    // After the remove, who is on call now per rotation, read back from the server.
+    it("reports who is on call per rotation after the remove", async () => {
+      oncall.removeMember.mockResolvedValue({ data: {} } as any);
+      oncall.whoIsOnCall.mockResolvedValue({
+        data: [
+          { rotation_id: "r1", rotation_name: "Primary", rule: "Base", user_email: "bob@o2.ai" },
+          { rotation_id: "r2", rotation_name: "Secondary", rule: "Base", user_email: "cara@o2.ai" },
+        ],
+      } as any);
+      const wrapper = render({
+        members: [member("ana@o2.ai"), member("bob@o2.ai")],
+        onCallNow: now,
+      });
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-members-remove-ana@o2.ai"]').trigger("click");
+      wrapper.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:ok");
+      await flushPromises();
+
+      expect(oncall.whoIsOnCall).toHaveBeenCalled();
+      expect(toast.mock.calls.at(-1)![0]).toEqual(
+        expect.objectContaining({
+          variant: "success",
+          message: "Ana Sharma removed. On call now: Bob (Primary), cara@o2.ai (Secondary).",
+        }),
+      );
+    });
+
+    // A rotation the remove left empty is named, as a warning.
+    it("names a rotation left with nobody on call", async () => {
+      oncall.removeMember.mockResolvedValue({ data: {} } as any);
+      oncall.whoIsOnCall.mockResolvedValue({
+        data: [
+          { rotation_id: "r1", rotation_name: "Primary", rule: "Base", user_email: "bob@o2.ai" },
+        ],
+      } as any);
+      const rule = {
+        name: "Base",
+        members: ["bob@o2.ai"],
+        shift_micros: 604_800_000_000,
+        anchor_micros: 0,
+      };
+      const wrapper = render({
+        members: [member("ana@o2.ai"), member("bob@o2.ai")],
+        onCallNow: now,
+        rotations: [
+          { id: "r1", name: "Primary", shift_rules: [rule] },
+          { id: "r2", name: "Secondary", shift_rules: [rule] },
+        ],
+      });
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-members-remove-ana@o2.ai"]').trigger("click");
+      wrapper.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:ok");
+      await flushPromises();
+
+      expect(toast.mock.calls.at(-1)![0]).toEqual(
+        expect.objectContaining({
+          variant: "warning",
+          message:
+            "Ana Sharma removed. On call now: Bob (Primary). Nobody is on call in Secondary.",
+        }),
+      );
+    });
+
+    // A failed re-read makes no claim about who is on call.
+    it("says only that the person was removed when the re-read fails", async () => {
+      oncall.removeMember.mockResolvedValue({ data: {} } as any);
+      oncall.whoIsOnCall.mockRejectedValue(new Error("boom"));
+      const wrapper = render({ members: [member("ana@o2.ai")], onCallNow: now });
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-members-remove-ana@o2.ai"]').trigger("click");
+      wrapper.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:ok");
+      await flushPromises();
+
+      expect(toast.mock.calls.at(-1)![0]).toEqual(
+        expect.objectContaining({ variant: "success", message: "Ana Sharma removed." }),
+      );
+    });
+
+    it("warns when nobody is on call after the remove", async () => {
+      oncall.removeMember.mockResolvedValue({ data: {} } as any);
+      oncall.whoIsOnCall.mockResolvedValue({ data: [] } as any);
+      const wrapper = render({ members: [member("ana@o2.ai")], onCallNow: now });
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-members-remove-ana@o2.ai"]').trigger("click");
+      wrapper.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:ok");
+      await flushPromises();
+
+      expect(toast.mock.calls.at(-1)![0]).toEqual(
+        expect.objectContaining({
+          variant: "warning",
+          message: "Ana Sharma removed. Nobody is on call now.",
+        }),
+      );
+    });
+
+    it("says nothing about a shift the person does not hold", async () => {
+      expect(await confirmFor("bob@o2.ai")).not.toContain("takes over");
+    });
+
+    it("says the shift goes uncovered when nobody is next", async () => {
+      const text = await confirmFor("ana@o2.ai", [{ ...now[0], next_user_email: null }]);
+      expect(text).toContain("Nobody takes over Ana Sharma's current shift in Primary.");
+    });
+  });
+
+  // Membership answers "who is on the team". Which rung they cover is a
+  // property of the rotation, so no level is chosen here.
+  it("asks for no level", async () => {
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-members-level-select"]').exists()).toBe(false);
+  });
+
+  it("cannot submit with nobody selected", async () => {
+    const wrapper = render();
+    await flushPromises();
+    expect(
+      wrapper.find('[data-test="oncall-members-add-btn"]').attributes("disabled"),
+    ).toBeDefined();
+  });
+
+  // A pasted list is the realistic fallback input, so it must not require
+  // one-per-line discipline.
+  it("splits a pasted list when the picker is unavailable", async () => {
+    users.orgUsers.mockRejectedValue(new Error("boom"));
+    const wrapper = render();
+    await flushPromises();
+
+    await wrapper
+      .find('[data-test="oncall-members-email-input"]')
+      .setValue("ana@o2.ai, bob@o2.ai;cara@o2.ai");
+    await wrapper.find('[data-test="oncall-members-add-btn"]').trigger("click");
+    await flushPromises();
+
+    expect(oncall.addMembers).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { user_emails: ["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"] },
+      }),
+    );
+  });
+
+  /// Both reads span the whole org, and the tab is reopened every time somebody
+  /// switches away and back — a revisit that repeats them pays for an answer
+  /// nothing has changed. A write is the one thing that has.
+  ///
+  /// The clock is pinned because the absence and schedule keys bucket their
+  /// `Date.now()` window: a minute rolling over mid-test would fork the key and
+  /// fail a component that is behaving.
+  it("serves a revisit from the cache and re-reads after an absence is written", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-18T10:30:00Z"));
+    oncall.createUnavailability.mockResolvedValue({ data: {} } as any);
+
+    // One rotation: the schedule is resolved per rotation, and a team with none has nothing to resolve.
+    const opts = {
+      members: [member("ana@o2.ai")],
+      rotations: [
+        {
+          id: "r1",
+          name: "Primary",
+          shift_rules: [
+            {
+              name: "Base",
+              members: ["ana@o2.ai"],
+              shift_micros: 604_800_000_000,
+              anchor_micros: 0,
+            },
+          ],
+        },
+      ],
+    };
+    const first = render(opts);
+    await flushPromises();
+    expect(oncall.listUnavailability).toHaveBeenCalledTimes(1);
+    expect(oncall.resolvedSchedule).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    const second = render(opts);
+    await flushPromises();
+    expect(oncall.listUnavailability).toHaveBeenCalledTimes(1);
+    expect(oncall.resolvedSchedule).toHaveBeenCalledTimes(1);
+
+    await second.find('[data-test="oncall-members-mark-away-ana@o2.ai"]').trigger("click");
+    await second.find('[data-test="oncall-members-away-from-date"] input').setValue("2026-09-20");
+    await second.find('[data-test="oncall-members-away-from-time"] input').setValue("09:00");
+    await second.find('[data-test="oncall-members-away-to-date"] input').setValue("2026-09-27");
+    await second.find('[data-test="oncall-members-away-to-time"] input').setValue("09:00");
+    await second.find('[data-test="oncall-members-away-save"]').trigger("click");
+    await flushPromises();
+
+    expect(oncall.listUnavailability).toHaveBeenCalledTimes(2);
+    expect(oncall.resolvedSchedule).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
+
+  // The org's users are the IAM list's own cache entry, so a revisit of this tab costs nothing.
+  it("serves the org's users to a remount from the cache", async () => {
+    render([]).unmount();
+    await flushPromises();
+    const second = render([]);
+    await flushPromises();
+
+    expect(users.orgUsers).toHaveBeenCalledTimes(1);
+    expect(second.find('[data-test="oncall-members-user-select"]').text()).toContain("Ana Sharma");
+  });
+
+  /// C5/C6: the rota already SKIPS an away member; the table says so where
+  /// the people are listed, before somebody asks why the order changed.
+  it("names the member in the remove confirm, with a destructive button", async () => {
+    const wrapper = render([member("ana@o2.ai")]);
+    await flushPromises();
+    await wrapper.find('[data-test="oncall-members-remove-ana@o2.ai"]').trigger("click");
+    await flushPromises();
+
+    const confirm = wrapper.findComponent({ name: "ConfirmDialog" });
+    expect(confirm.props("modelValue")).toBe(true);
+    expect(confirm.props("title")).toBe("Remove Ana Sharma from Payments?");
+    expect(confirm.props("okVariant")).toBe("destructive");
+
+    confirm.vm.$emit("update:cancel");
+    await flushPromises();
+    expect(confirm.props("modelValue")).toBe(false);
+    // The real ConfirmDialog keeps what it showed while open, so the fade-out still reads right.
+    expect((confirm.vm as any).shown.title).toBe("Remove Ana Sharma from Payments?");
+  });
+
+  describe("absences", () => {
+    const member = { id: "m1", team_id: "team_1", user_email: "ana@o2.ai" };
+
+    it("chips a member whose absence overlaps the window", async () => {
+      const now = Date.now() * 1000;
+      oncall.listUnavailability.mockResolvedValue({
+        data: [
+          {
+            id: "u1",
+            org_id: "default",
+            user_email: "ana@o2.ai",
+            start_at: now - 1,
+            end_at: now + 86_400_000_000,
+            created_by: "ana@o2.ai",
+            created_at: now,
+          },
+        ],
+      } as any);
+      const wrapper = render([member]);
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-members-away-m1"]').exists()).toBe(true);
+    });
+
+    it("records an absence for the chosen person and tells the schedule", async () => {
+      oncall.createUnavailability.mockResolvedValue({ data: {} } as any);
+      const wrapper = render([member]);
+      await flushPromises();
+
+      await wrapper.find('[data-test="oncall-members-mark-away-m1"]').trigger("click");
+      await wrapper
+        .find('[data-test="oncall-members-away-from-date"] input')
+        .setValue("2026-09-01");
+      await wrapper.find('[data-test="oncall-members-away-from-time"] input').setValue("09:00");
+      await wrapper.find('[data-test="oncall-members-away-to-date"] input').setValue("2026-09-08");
+      await wrapper.find('[data-test="oncall-members-away-to-time"] input').setValue("09:00");
+      await wrapper.find('[data-test="oncall-members-away-save"]').trigger("click");
+      await flushPromises();
+
+      expect(oncall.createUnavailability).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ user_email: "ana@o2.ai" }),
+        }),
+      );
+      // The rota moves the away person's turn — the schedule tab's answer
+      // changed with it.
+      expect(wrapper.emitted("changed")).toBeTruthy();
+    });
+
+    // #3149-2: an absence is entered and shown on the team's clock, whatever the browser's zone (tests pin UTC).
+    it("stores the times as the team's wall clock and says which zone they are in", async () => {
+      oncall.createUnavailability.mockResolvedValue({ data: {} } as any);
+      const wrapper = render({ members: [member], timezone: "Asia/Kolkata" });
+      await flushPromises();
+
+      await wrapper.find('[data-test="oncall-members-mark-away-m1"]').trigger("click");
+      expect(wrapper.find('[data-test="oncall-members-away-zone"]').text()).toContain(
+        "times in Asia/Kolkata",
+      );
+      await wrapper
+        .find('[data-test="oncall-members-away-from-date"] input')
+        .setValue("2026-11-02");
+      await wrapper.find('[data-test="oncall-members-away-from-time"] input').setValue("00:00");
+      await wrapper.find('[data-test="oncall-members-away-to-date"] input').setValue("2026-11-03");
+      await wrapper.find('[data-test="oncall-members-away-to-time"] input').setValue("00:00");
+      await wrapper.find('[data-test="oncall-members-away-save"]').trigger("click");
+      await flushPromises();
+
+      const sent = (oncall.createUnavailability.mock.calls[0][0] as any).data;
+      expect(sent.start_at).toBe(Date.UTC(2026, 10, 1, 18, 30) * 1000);
+      expect(sent.end_at).toBe(Date.UTC(2026, 10, 2, 18, 30) * 1000);
+    });
+
+    it("labels the absence with the team-zone date", async () => {
+      const now = Date.now() * 1000;
+      // 20:00 UTC is already the next day in Kolkata (01:30).
+      const endsAt = Date.UTC(2026, 10, 2, 20, 0) * 1000;
+      oncall.listUnavailability.mockResolvedValue({
+        data: [
+          {
+            id: "u1",
+            org_id: "default",
+            user_email: "ana@o2.ai",
+            start_at: now - 1,
+            end_at: Math.max(endsAt, now + 1),
+            created_by: "ana@o2.ai",
+            created_at: now,
+          },
+        ],
+      } as any);
+      const wrapper = render({ members: [member], timezone: "Asia/Kolkata" });
+      await flushPromises();
+
+      const label = wrapper.find('[data-test="oncall-members-away-m1"]').text();
+      const expected = new Intl.DateTimeFormat(undefined, {
+        day: "numeric",
+        month: "short",
+        timeZone: "Asia/Kolkata",
+      }).format(new Date(Math.max(endsAt, now + 1) / 1000));
+      expect(label).toBe(`Away until ${expected}`);
+    });
+  });
+
+  /// The roster answers three questions per person. Each is a column fed by a
+  /// different endpoint, and a missing endpoint must cost only its own column.
+  describe("the roster columns", () => {
+    const ana = member("ana@o2.ai");
+    const bob = member("bob@o2.ai");
+
+    it("badges the person actually holding the pager", async () => {
+      const wrapper = render({
+        members: [ana, bob],
+        onCallNow: [{ rotation: "Primary", user_email: "ana@o2.ai", next_user_email: "bob@o2.ai" }],
+      });
+      await flushPromises();
+
+      const rows = wrapper.findAll('[data-test="row"]');
+      // On call first, next up second — the tab's first question is who is
+      // holding it, not whose name starts with A.
+      expect(rows[0].text()).toContain("On call now");
+      expect(rows[1].text()).toContain("Next up");
+    });
+
+    it("draws a chip per channel the server evaluated", async () => {
+      const wrapper = render({
+        members: [ana],
+        reachability: reachability([reach("ana@o2.ai", true, [ready("email")])]),
+      });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-channel-ana@o2.ai-email"]').exists()).toBe(true);
+    });
+
+    // S5: the earliest shift across every rotation, named by its own rotation.
+    // A roster edit keeps the rotation ids, so the next-shift column must follow the contents, not the ids.
+    it("re-reads the next shifts when a rotation's roster changes under the same id", async () => {
+      const rule = (members: string[]) => ({
+        name: "Base",
+        members,
+        shift_micros: 604_800_000_000,
+        anchor_micros: 0,
+      });
+      const wrapper = render({
+        members: [ana],
+        rotations: [{ id: "r1", name: "Primary", shift_rules: [rule(["ana@o2.ai"])] }],
+      });
+      await flushPromises();
+      const before = oncall.resolvedSchedule.mock.calls.length;
+      // What the roster write does: it expires the team's reads.
+      await queryClient.invalidateQueries();
+
+      await wrapper.setProps({
+        rotations: [{ id: "r1", name: "Primary", shift_rules: [rule(["ana@o2.ai", "bob@o2.ai"])] }],
+      });
+      await flushPromises();
+
+      expect(oncall.resolvedSchedule.mock.calls.length).toBeGreaterThan(before);
+    });
+
+    it("shows the earliest next shift across all rotations, with that rotation's name", async () => {
+      const DAY = 86_400_000_000;
+      const nowMicros = Date.now() * 1000;
+      oncall.resolvedSchedule.mockImplementation((async (args: any) => ({
+        data:
+          args.rotation_id === "r2"
+            ? [
+                {
+                  rotation_id: "r2",
+                  from: nowMicros + DAY,
+                  to: nowMicros + 2 * DAY,
+                  user_email: "ana@o2.ai",
+                },
+              ]
+            : [
+                {
+                  rotation_id: "r1",
+                  from: nowMicros + 3 * DAY,
+                  to: nowMicros + 4 * DAY,
+                  user_email: "ana@o2.ai",
+                },
+              ],
+      })) as any);
+      const rule = {
+        name: "Base",
+        members: ["ana@o2.ai"],
+        shift_micros: 7 * DAY,
+        anchor_micros: 0,
+      };
+      const wrapper = render({
+        members: [ana],
+        rotations: [
+          { id: "r1", name: "Primary", shift_rules: [rule] },
+          { id: "r2", name: "Secondary", shift_rules: [rule] },
+        ],
+      });
+      await flushPromises();
+
+      const asked = oncall.resolvedSchedule.mock.calls.map((c: any) => c[0].rotation_id).sort();
+      expect(asked).toEqual(["r1", "r2"]);
+      const cell = wrapper.find('[data-test="oncall-members-shift-ana@o2.ai"]');
+      expect(cell.text()).toContain("From");
+      expect(wrapper.find('[data-test="oncall-members-shift-rotation-ana@o2.ai"]').text()).toBe(
+        "Secondary",
+      );
+    });
+
+    /// A failed schedule fetch must cost the shift column, not the table.
+    it("still names the rotation when the schedule cannot be resolved", async () => {
+      oncall.resolvedSchedule.mockRejectedValue(new Error("boom"));
+      const wrapper = render({
+        members: [ana],
+        rotations: [
+          {
+            id: "rot_primary",
+            name: "Primary",
+            shift_rules: [
+              {
+                name: "Primary",
+                members: ["ana@o2.ai"],
+                shift_micros: 604_800_000_000,
+                anchor_micros: 0,
+              },
+            ],
+          },
+        ],
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-members-shift-ana@o2.ai"]').text()).toContain(
+        "In the rotation",
+      );
+    });
+  });
+
+  /// U2, U5, S1: three person chips per row, the server's reason on each, and red only when nothing lands.
+  describe("the reach chips", () => {
+    const SELF = String(store.state.userInfo.email);
+    const blocked = (channel: "sms" | "voice", why: string): ChannelReadiness => ({
+      channel,
+      deliverable: false,
+      configured_but_unverified: false,
+      blocked_because: why,
+    });
+    const noPhone = [
+      ready("email"),
+      blocked("sms", "no phone on file"),
+      blocked("voice", "no phone on file"),
+    ];
+
+    function chipsOf(wrapper: ReturnType<typeof render>, email: string) {
+      return wrapper
+        .find(`[data-test="oncall-channels-${email}"]`)
+        .findAll("[data-test]")
+        .map((el) => el.attributes("data-test"));
+    }
+
+    function tipsOf(wrapper: ReturnType<typeof render>, email: string) {
+      return wrapper
+        .find(`[data-test="oncall-channels-${email}"]`)
+        .findAll('[data-test="tip"]')
+        .map((el) => el.text());
+    }
+
+    function renderReach(rows: ReturnType<typeof reach>[]) {
+      return render({
+        members: rows.map((r) => member(r.user_email)),
+        reachability: reachability(rows),
+      });
+    }
+
+    it("orders the chips Email, SMS, Voice whatever order the server sent", async () => {
+      const wrapper = renderReach([
+        reach("bob@o2.ai", true, [
+          blocked("voice", "no phone on file"),
+          ready("email"),
+          blocked("sms", "no phone on file"),
+        ]),
+      ]);
+      await flushPromises();
+
+      expect(chipsOf(wrapper, "bob@o2.ai")).toEqual([
+        "oncall-channel-bob@o2.ai-email",
+        "tip",
+        "oncall-channel-bob@o2.ai-sms",
+        "tip",
+        "oncall-channel-bob@o2.ai-voice",
+        "tip",
+        "oncall-channels-word-bob@o2.ai",
+      ]);
+    });
+
+    it("tips a blocked chip with the server's reason and a deliverable one with the delivers line", async () => {
+      const wrapper = renderReach([
+        reach("bob@o2.ai", true, [
+          ready("email"),
+          ready("sms"),
+          blocked("voice", "the last 3 Voice attempts failed"),
+        ]),
+      ]);
+      await flushPromises();
+
+      expect(tipsOf(wrapper, "bob@o2.ai")).toEqual([
+        "Email — verified, a page lands here",
+        "SMS — verified, a page lands here",
+        "the last 3 Voice attempts failed",
+      ]);
+    });
+
+    it("links only the caller's own blocked phone chips to My on-call", async () => {
+      const own = SELF.toUpperCase();
+      const wrapper = renderReach([reach(own, true, noPhone), reach("bob@o2.ai", true, noPhone)]);
+      await flushPromises();
+
+      expect(chipsOf(wrapper, own)).toEqual([
+        `oncall-channel-${own}-email`,
+        "tip",
+        `oncall-channel-${own}-sms-link`,
+        "tip",
+        `oncall-channel-${own}-voice-link`,
+        "tip",
+        `oncall-channels-word-${own}`,
+      ]);
+      expect(tipsOf(wrapper, own).slice(1)).toEqual([
+        "no phone on file. Add your phone on My on-call",
+        "no phone on file. Add your phone on My on-call",
+      ]);
+      expect(tipsOf(wrapper, "bob@o2.ai").slice(1)).toEqual([
+        "no phone on file",
+        "no phone on file",
+      ]);
+      expect(wrapper.find('[data-test="oncall-channel-bob@o2.ai-sms-link"]').exists()).toBe(false);
+
+      await wrapper.find(`[data-test="oncall-channel-${own}-voice-link"]`).trigger("click");
+      expect(push).toHaveBeenCalledWith({
+        name: "onCallMine",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
+    });
+
+    // S8: one muted word after the icons, only when something is blocked.
+    it.each([
+      ["no phone", noPhone, "No phone"],
+      [
+        "an unverified phone",
+        [
+          ready("email"),
+          { ...blocked("sms", "phone not verified"), configured_but_unverified: true },
+          { ...blocked("voice", "phone not verified"), configured_but_unverified: true },
+        ],
+        "Not verified",
+      ],
+      [
+        "email that cannot land",
+        [
+          {
+            channel: "email" as const,
+            deliverable: false,
+            configured_but_unverified: false,
+            blocked_because: "SMTP is not configured",
+          },
+          ready("sms"),
+          ready("voice"),
+        ],
+        "Email won't arrive",
+      ],
+    ])("says %s in one word", async (_case, channels, word) => {
+      const wrapper = renderReach([reach("bob@o2.ai", true, channels as ChannelReadiness[])]);
+      await flushPromises();
+
+      const shown = wrapper.find('[data-test="oncall-channels-word-bob@o2.ai"]');
+      expect(shown.text()).toBe(word);
+      // The word takes its own line under the icons, so a narrow column cannot cut it.
+      expect(shown.classes()).toContain("basis-full");
+      expect(shown.classes()).not.toContain("whitespace-nowrap");
+    });
+
+    it("stays quiet on a healthy row and on a cause it cannot name in one word", async () => {
+      const wrapper = renderReach([
+        reach("bob@o2.ai", true, [ready("email"), ready("sms"), ready("voice")]),
+        reach("cara@o2.ai", true, [
+          ready("email"),
+          blocked("sms", "no phone provider for this organisation"),
+          blocked("voice", "no phone provider for this organisation"),
+        ]),
+      ]);
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-channels-word-bob@o2.ai"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-channels-word-cara@o2.ai"]').exists()).toBe(false);
+    });
+
+    it("never turns a member red for a missing phone while email lands", async () => {
+      const wrapper = renderReach([
+        reach("bob@o2.ai", true, noPhone),
+        reach("cara@o2.ai", false, [
+          blocked("sms", "no phone on file"),
+          blocked("voice", "no phone on file"),
+        ]),
+      ]);
+      await flushPromises();
+
+      const rows = wrapper.findAll('[data-test="row"]');
+      const bob = rows.find((r) => r.text().includes("bob@o2.ai"))!;
+      const cara = rows.find((r) => r.text().includes("cara@o2.ai"))!;
+      expect(bob.text()).not.toContain("Unreachable");
+      expect(wrapper.find('[data-test="oncall-channel-bob@o2.ai-sms"]').classes()).toContain(
+        "border-dashed",
+      );
+      expect(cara.text()).toContain("Unreachable");
+      expect(wrapper.find('[data-test="oncall-channel-cara@o2.ai-sms"]').classes()).toContain(
+        "bg-icon-chip-error-bg",
+      );
+    });
+  });
+
+  /// A phone's action column holds one control, so both row actions are mirrored in a menu that must act the same.
+  describe("the phone row menu", () => {
+    const menuStubs = {
+      ...stubs,
+      ODropdown: { name: "ODropdown", template: "<div><slot name='trigger' /><slot /></div>" },
+      ODropdownItem: {
+        name: "ODropdownItem",
+        emits: ["select"],
+        template: `<button @click="$emit('select')"><slot /></button>`,
+      },
+    };
+
+    function renderWithMenu() {
+      return mount(OnCallMembers, {
+        props: { teamId: "team_1", members: [member("ana@o2.ai")], timezone: "UTC" },
+        global: { plugins: [i18n, store], stubs: menuStubs },
+      });
+    }
+
+    it("shows the buttons from md up and the menu below it, never both", async () => {
+      const wrapper = renderWithMenu();
+      await flushPromises();
+
+      for (const action of ["mark-away", "remove"]) {
+        expect(
+          wrapper.find(`[data-test="oncall-members-${action}-ana@o2.ai"]`).classes(),
+        ).toContain("max-md:hidden");
+      }
+      expect(wrapper.find('[data-test="oncall-members-row-more-actions"]').classes()).toContain(
+        "md:hidden",
+      );
+    });
+
+    it("opens the away dialog for the row's member", async () => {
+      const wrapper = renderWithMenu();
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-members-mark-away-ana@o2.ai-menu"]').trigger("click");
+
+      expect(wrapper.find('[data-test="oncall-members-away-save"]').exists()).toBe(true);
+    });
+  });
+});

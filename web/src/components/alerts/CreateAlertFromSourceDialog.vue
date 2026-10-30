@@ -1,0 +1,377 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<!--
+  The confirmation step shared by EVERY "create an alert from here" entry point.
+
+  It exists because two of the conversions are lossy in ways the user must see
+  before landing in the form: a surface with several streams has to pick one
+  (alerts are single-stream), and an absolute time range becomes a rolling
+  window. Showing the resolved query alongside them also settles the "why does
+  my alert query differ from my search?" question at the point it arises.
+
+  Every section renders off the prefill, so a single-stream source with no
+  warnings sees a minimal dialog rather than ceremony.
+-->
+
+<template>
+  <ODialog
+    v-model:open="isOpen"
+    size="md"
+    :title="t('alerts.prefill.dialog.title')"
+    :sub-title="raw(prefill?.sourceLabel)"
+    :secondary-button-label="t('confirmDialog.cancel')"
+    :primary-button-label="t('alerts.prefill.dialog.continue')"
+    :primary-button-disabled="isBlocked"
+    data-test="create-alert-from-source-dialog"
+    @click:secondary="onCancel"
+    @click:primary="onConfirm"
+  >
+    <div v-if="prefill" class="flex flex-col gap-5">
+      <div v-if="queryOptions.length > 1" class="flex flex-col gap-2">
+        <label
+          v-if="pickQueryOnly"
+          :for="queryPickerId"
+          class="text-text-body text-sm"
+          data-test="create-alert-query-picker-intro"
+        >
+          {{ t("alerts.prefill.dialog.pickQueryIntro") }}
+        </label>
+        <OSelect
+          :id="queryPickerId"
+          :model-value="prefill.queryIndex"
+          :options="queryOptions"
+          :label="pickQueryOnly ? undefined : t('alerts.prefill.dialog.queryChoiceLabel')"
+          :searchable="false"
+          :dropdown-style="QUERY_PICKER_DROPDOWN"
+          data-test="create-alert-query-picker"
+          @update:model-value="onQueryChange"
+        />
+      </div>
+
+      <div v-if="pickQueryOnly && pickedQuery" data-test="create-alert-picked-query">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold tracking-wider">
+            {{ t("alerts.prefill.dialog.queryLabel") }}
+          </span>
+          <OButton
+            variant="ghost-primary"
+            size="sm"
+            icon-left="content-copy"
+            data-test="create-alert-picked-query-copy"
+            @click="copyToClipboard(pickedQuery, t)"
+          >
+            {{ t("common.copy") }}
+          </OButton>
+        </div>
+        <div
+          class="rounded-default bg-theme-body-bg-primary border-card-glass-border [&::-webkit-scrollbar-thumb]:bg-border-default [&::-webkit-scrollbar-thumb:hover]:bg-border-strong mt-1 max-h-40 [scrollbar-width:thin] [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] overflow-y-auto border p-2 font-mono text-sm break-all whitespace-pre-wrap [&::-webkit-scrollbar]:size-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
+          data-test="create-alert-picked-query-text"
+          v-html="pickedQueryHtml"
+        ></div>
+      </div>
+
+      <!-- Stream picker — only when the surface offered a choice. Alerts are
+           single-stream; silently taking the first one is a trap. -->
+      <div v-if="hasStreamChoice" class="flex flex-col gap-2">
+        <span class="text-text-secondary text-xs font-medium">
+          {{ t("alerts.prefill.dialog.streamLabel") }}
+        </span>
+        <ORadioGroup
+          v-model="selectedStream"
+          orientation="horizontal"
+          :label="t('alerts.prefill.dialog.streamLabel')"
+          data-test="create-alert-stream-picker"
+        >
+          <ORadio
+            v-for="candidate in prefill.streamCandidates"
+            :key="candidate.name"
+            :value="candidate.name"
+            :label="raw(candidate.name)"
+            :data-test="`create-alert-stream-option-${candidate.name}`"
+          />
+        </ORadioGroup>
+      </div>
+
+      <!-- Patterns. Shown only when the surface declares it can fold patterns
+           into the query. The dialog never touches SQL itself — it asks the
+           surface to rebuild with the chosen mode, which is what lets this stay
+           ignorant of what a pattern actually is. -->
+      <div v-if="prefill.patternFilter" class="flex flex-col gap-2">
+        <span class="text-text-secondary text-xs font-medium">
+          {{ t("alerts.prefill.dialog.patternsLabel") }}
+        </span>
+        <OToggleGroup
+          :model-value="patternMode"
+          type="single"
+          data-test="create-alert-pattern-mode"
+          @update:model-value="onPatternModeChange"
+        >
+          <OToggleGroupItem value="none" size="xs" data-test="create-alert-patterns-none">
+            {{ t("alerts.prefill.dialog.patternsNone") }}
+          </OToggleGroupItem>
+          <OToggleGroupItem value="include" size="xs" data-test="create-alert-patterns-include">
+            {{ t("alerts.prefill.dialog.patternsIncludeAll") }}
+          </OToggleGroupItem>
+          <OToggleGroupItem value="exclude" size="xs" data-test="create-alert-patterns-exclude">
+            {{ t("alerts.prefill.dialog.patternsExcludeAll") }}
+          </OToggleGroupItem>
+        </OToggleGroup>
+
+        <!-- The severity chips narrow which patterns are used. Stating it here
+             keeps the alert from depending on a view filter invisibly. -->
+        <span class="text-text-secondary text-xs" data-test="create-alert-pattern-scope">
+          {{
+            prefill.patternFilter.filtered
+              ? t("alerts.prefill.dialog.patternsScopeFiltered", {
+                  visible: prefill.patternFilter.visibleCount,
+                  total: prefill.patternFilter.totalCount,
+                })
+              : t("alerts.prefill.dialog.patternsScopeAll", {
+                  total: prefill.patternFilter.totalCount,
+                })
+          }}
+        </span>
+      </div>
+
+      <!-- How the alert counts what the query returns. -->
+      <div v-if="!pickQueryOnly" class="flex flex-col gap-2">
+        <span class="text-text-secondary text-xs font-medium">
+          {{ t("alerts.prefill.dialog.thresholdLabel") }}
+        </span>
+        <OToggleGroup
+          v-model="thresholdShape"
+          type="single"
+          class="self-start"
+          data-test="create-alert-threshold-shape"
+        >
+          <OToggleGroupItem value="matching-rows" size="sm" data-test="create-alert-threshold-rows">
+            {{ t("alerts.prefill.dialog.thresholdMatchingRows") }}
+          </OToggleGroupItem>
+          <OToggleGroupItem value="count" size="sm" data-test="create-alert-threshold-count">
+            {{ t("alerts.prefill.dialog.thresholdCount") }}
+          </OToggleGroupItem>
+        </OToggleGroup>
+      </div>
+
+      <!-- The rolling window the alert will evaluate. -->
+      <div v-if="!pickQueryOnly && prefill.periodMinutes" class="flex flex-col gap-1">
+        <span class="text-text-secondary text-xs font-medium">
+          {{ t("alerts.prefill.dialog.windowLabel") }}
+        </span>
+        <span class="text-text-body text-sm" data-test="create-alert-window">
+          {{ t("alerts.prefill.dialog.windowValue", { minutes: prefill.periodMinutes }) }}
+        </span>
+      </div>
+
+      <!-- The resolved query, so nothing about the alert is a surprise. -->
+      <div v-if="showQuery" class="flex flex-col gap-2">
+        <span class="text-text-secondary text-xs font-medium">
+          {{ t("alerts.prefill.dialog.queryLabel") }}
+        </span>
+        <OCodeBlock
+          padded
+          wrap
+          :max-lines="10"
+          :code="previewQuery"
+          :lang="prefill.queryType === 'promql' ? 'promql' : 'sql'"
+          :copy-message="t('alerts.prefill.dialog.queryCopied')"
+          data-test="create-alert-query-preview"
+        />
+      </div>
+
+      <!-- Every lossy transform the adapters performed, stated plainly. -->
+      <div v-if="shownWarnings.length" class="flex flex-col gap-2">
+        <OBanner
+          v-for="(warning, index) in shownWarnings"
+          :key="`${warning.key}-${index}`"
+          dense
+          :variant="bannerVariant(warning.level)"
+          :content="warningText(warning)"
+          :data-test="`create-alert-warning-${warning.key}`"
+        />
+      </div>
+    </div>
+  </ODialog>
+</template>
+
+<script setup lang="ts">
+import { computed, ref, useId, watch } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
+import ORadio from "@/lib/forms/Radio/ORadio.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { useColorizedQuery } from "@/composables/useColorizedQuery";
+import { copyToClipboard } from "@/utils/clipboard";
+import { escapeHtml } from "@/utils/html";
+import type {
+  AlertBuildOptions,
+  AlertPatternMode,
+  AlertPrefill,
+  AlertPrefillThresholdShape,
+  AlertPrefillWarning,
+  AlertPrefillWarningLevel,
+} from "@/ts/interfaces/alertPrefill";
+import { isPrefillBlocked } from "@/utils/alerts/alertPrefill";
+import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
+import { formatSqlForDisplay } from "@/utils/query/formatSql";
+
+const QUERY_PICKER_DROPDOWN = { width: "var(--reka-select-trigger-width)" };
+
+const props = defineProps<{
+  open: boolean;
+  prefill: AlertPrefill | null;
+}>();
+
+const emit = defineEmits<{
+  (e: "update:open", value: boolean): void;
+  /** The prefill with the user's dialog choices folded in. */
+  (e: "confirm", prefill: AlertPrefill): void;
+  (e: "cancel"): void;
+  /** Ask the source to rebuild its prefill with different options. */
+  (e: "rebuild", options: AlertBuildOptions): void;
+}>();
+
+const { t } = useI18nTyped();
+
+const selectedStream = ref("");
+const thresholdShape = ref<AlertPrefillThresholdShape>("matching-rows");
+
+const isOpen = computed({
+  get: () => props.open,
+  set: (value: boolean) => emit("update:open", value),
+});
+
+const isBlocked = computed(() => (props.prefill ? isPrefillBlocked(props.prefill) : true));
+
+const hasStreamChoice = computed(() => (props.prefill?.streamCandidates?.length ?? 0) > 1);
+
+const patternMode = computed<AlertPatternMode>(() => props.prefill?.patternFilter?.mode ?? "none");
+
+const onPatternModeChange = (value: unknown) => {
+  if (!value || value === patternMode.value) return;
+  emit("rebuild", { patternMode: value as AlertPatternMode });
+};
+
+const queryOptions = computed(() =>
+  (props.prefill?.queryChoices ?? []).map((choice) => {
+    return {
+      value: choice.index,
+      label: t("alerts.prefill.dialog.queryChoiceOption", {
+        name:
+          choice.tabName || choice.legend || choice.ref || String.fromCharCode(65 + choice.index),
+        query: choice.query.replace(/\s+/g, " ").trim(),
+      }),
+    };
+  }),
+);
+
+const queryPickerId = useId();
+
+const pickQueryOnly = computed(
+  () =>
+    !!props.prefill &&
+    !!getAlertSource(props.prefill.source).pickQueryOnly &&
+    queryOptions.value.length > 1,
+);
+
+// Non-blocking warnings still ride the prefill to the form's banner; only a blocker must stop here.
+const shownWarnings = computed(() => {
+  const warnings = props.prefill?.warnings ?? [];
+  return pickQueryOnly.value ? warnings.filter((w) => w.level === "blocking") : warnings;
+});
+
+/** The executed text of the picked query, as the option tooltip shows it but with its own line breaks. */
+const pickedQuery = computed(
+  () =>
+    props.prefill?.queryChoices?.find((choice) => choice.index === props.prefill?.queryIndex)
+      ?.query ?? "",
+);
+
+const pickedQueryColoured = useColorizedQuery(
+  () => ({
+    query: pickQueryOnly.value ? pickedQuery.value : "",
+    language: props.prefill?.queryType === "promql" ? "promql" : "sql",
+  }),
+  // Loaded on demand: the colorizer pulls in Monaco, and this dialog sits in the app shell.
+  (query, language) =>
+    import("@/utils/query/colorizeQuery").then((module) => module.colorizeQuery(query, language)),
+);
+
+const pickedQueryHtml = computed(() => pickedQueryColoured.value || escapeHtml(pickedQuery.value));
+
+const onQueryChange = (value: unknown) => {
+  if (typeof value !== "number" || value === props.prefill?.queryIndex) return;
+  emit("rebuild", { queryIndex: value });
+};
+
+const showQuery = computed(() => {
+  if (!props.prefill || pickQueryOnly.value) return false;
+  return getAlertSource(props.prefill.source).showQueryPreview && !!previewQuery.value;
+});
+
+/**
+ * Formatted for reading only — the prefill still carries the query verbatim, so
+ * what gets saved is exactly what the surface produced.
+ */
+const previewQuery = computed(() => {
+  const prefill = props.prefill;
+  if (!prefill) return "";
+
+  return prefill.queryType === "promql" ? (prefill.promql ?? "") : formatSqlForDisplay(prefill.sql);
+});
+
+// Seed the controls from the incoming prefill each time the dialog opens, so a
+// second run never inherits the previous run's answers.
+watch(
+  () => [props.open, props.prefill] as const,
+  ([open, prefill]) => {
+    if (!open || !prefill) return;
+    selectedStream.value = prefill.streamName;
+    thresholdShape.value =
+      prefill.thresholdShape ?? getAlertSource(prefill.source).defaultThreshold;
+  },
+  { immediate: true },
+);
+
+const bannerVariant = (level: AlertPrefillWarningLevel) =>
+  level === "blocking" ? "error" : level === "info" ? "info" : "warning";
+
+const warningText = (warning: AlertPrefillWarning) =>
+  t(`alerts.prefill.warnings.${warning.key}`, warning.params ?? {});
+
+const onCancel = () => {
+  emit("cancel");
+  emit("update:open", false);
+};
+
+const onConfirm = () => {
+  if (!props.prefill || isBlocked.value) return;
+
+  emit("confirm", {
+    ...props.prefill,
+    streamName: selectedStream.value || props.prefill.streamName,
+    thresholdShape: thresholdShape.value,
+  });
+  emit("update:open", false);
+};
+</script>

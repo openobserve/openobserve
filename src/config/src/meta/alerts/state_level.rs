@@ -55,6 +55,12 @@ mod tests {
             groups_firing_is_lower_bound: None,
             silenced_until: None,
             last_notified_level: None,
+            episode_id: None,
+            episode_opened_at: None,
+            episode_incident_id: None,
+            recovering_since: None,
+            firing_started_at: None,
+            group_label_set: None,
         }
     }
 

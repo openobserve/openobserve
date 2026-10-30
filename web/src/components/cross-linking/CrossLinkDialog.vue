@@ -56,11 +56,11 @@
             class="max-w-62.5"
             :data-test="`cross-link-field-chip-${idx}`"
           >
-            <span class="truncate text-xs" :title="field.name">{{ field.name }}</span>
+            <OTruncatedText class="text-xs">{{ field.name }}</OTruncatedText>
             <template #trailing>
               <button
                 type="button"
-                :aria-label="`Remove ${field.name}`"
+                :aria-label="t('common.removeField', { name: field.name })"
                 :data-test="`cross-link-field-chip-remove-${idx}`"
                 class="inline-flex cursor-pointer items-center justify-center hover:opacity-70"
                 @click="removeField(idx)"
@@ -97,6 +97,7 @@
             data-test="cross-link-field-input"
           />
           <OButton
+            :aria-label="t('common.add')"
             variant="ghost"
             size="icon-sm"
             icon-left="add"
@@ -112,12 +113,13 @@
 <script lang="ts">
 import { defineComponent, ref, watch, computed, type PropType } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import CrossLinkUserGuide from "./CrossLinkUserGuide.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -141,6 +143,7 @@ export default defineComponent({
     OForm,
     OFormInput,
     OIcon,
+    OTruncatedText,
   },
   props: {
     modelValue: {
@@ -159,7 +162,7 @@ export default defineComponent({
   emits: ["update:modelValue", "save", "cancel"],
   setup(props, { emit }) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const dialogVisible = computed({
       get: () => props.modelValue,
       set: (val) => emit("update:modelValue", val),
@@ -175,14 +178,12 @@ export default defineComponent({
     // Dynamic (edit-prefill) defaults → a typed component computed. Seeds
     // name/url/fields/newFieldName from the current `link`; re-applied on open
     // via form.reset (the form is created here, so it persists across opens).
-    const crossLinkDefaults = computed(
-      (): CrossLinkDialogForm => ({
-        name: props.link?.name ?? "",
-        url: props.link?.url ?? "",
-        fields: props.link?.fields ? props.link.fields.map((f) => ({ name: f.name })) : [],
-        newFieldName: "",
-      }),
-    );
+    const crossLinkDefaults = computed((): CrossLinkDialogForm => ({
+      name: props.link?.name ?? "",
+      url: props.link?.url ?? "",
+      fields: props.link?.fields ? props.link.fields.map((f) => ({ name: f.name })) : [],
+      newFieldName: "",
+    }));
 
     // Owner-pattern form (Rule ③): CrossLinkDialog OWNS the <OForm> and its
     // template renders the chip list from the form-owned `fields` array. We
@@ -252,7 +253,7 @@ export default defineComponent({
       const added = new Set((formFields.value ?? []).map((f) => f.name));
       return (props.availableFields || [])
         .filter((name) => !added.has(name))
-        .map((name) => ({ label: name, value: name }));
+        .map((name) => ({ label: raw(name), value: name }));
     });
 
     function onFieldSelect(value: string) {

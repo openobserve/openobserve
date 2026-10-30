@@ -147,11 +147,11 @@
             "4"
           ],
           [
-            "ZONE-2",
+            "ZONE-1",
             "3"
           ],
           [
-            "ZONE-1",
+            "ZONE-2",
             "3"
           ],
           [
@@ -259,16 +259,16 @@
             "26.4"
           ],
           [
-            "ZONE-1",
-            "2",
-            "580.0",
-            "50.45"
-          ],
-          [
             "ZONE-2",
             "2",
             "457.5",
             "50.3"
+          ],
+          [
+            "ZONE-1",
+            "2",
+            "580.0",
+            "50.45"
           ],
           [
             "ZONE-3",
@@ -297,19 +297,19 @@
         ],
         "results": [
           [
-            "2026-06-06T07:15:00",
+            "2026-08-14T06:24:00",
             "5",
             "5",
             "100.0"
           ],
           [
-            "2026-06-06T07:16:00",
+            "2026-08-14T06:25:00",
             "5",
             "5",
             "100.0"
           ],
           [
-            "2026-06-06T07:17:00",
+            "2026-08-14T06:26:00",
             "4",
             "4",
             "100.0"
@@ -3829,22 +3829,22 @@
         ],
         "results": [
           [
-            "2026-06-06T16:51:00",
+            "2026-08-14T16:00:00",
             "2",
             "0"
           ],
           [
-            "2026-06-06T16:52:00",
+            "2026-08-14T16:01:00",
             "2",
             "0"
           ],
           [
-            "2026-06-06T16:53:00",
+            "2026-08-14T16:02:00",
             "2",
             "0"
           ],
           [
-            "2026-06-06T16:54:00",
+            "2026-08-14T16:03:00",
             "1",
             "0"
           ]
@@ -4142,19 +4142,19 @@
         ],
         "results": [
           [
-            "conveyor-driver",
-            "2"
-          ],
-          [
             "charge-checker",
             "2"
           ],
           [
-            "temp-regulator",
-            "1"
+            "conveyor-driver",
+            "2"
           ],
           [
             "zone-controller",
+            "1"
+          ],
+          [
+            "temp-regulator",
             "1"
           ],
           [
@@ -4182,7 +4182,7 @@
         ],
         "results": [
           [
-            "ZONE-1",
+            "ZONE-3",
             "0",
             "1",
             "2"
@@ -4194,7 +4194,7 @@
             "2"
           ],
           [
-            "ZONE-3",
+            "ZONE-1",
             "0",
             "1",
             "2"
@@ -4309,12 +4309,6 @@
         ],
         "results": [
           [
-            "ZONE-1",
-            "0",
-            "1",
-            "1"
-          ],
-          [
             "ZONE-3",
             "0",
             "2",
@@ -4330,6 +4324,12 @@
             "ZONE-4",
             "0",
             "2",
+            "1"
+          ],
+          [
+            "ZONE-1",
+            "0",
+            "1",
             "1"
           ]
         ],
@@ -4355,7 +4355,7 @@
         ],
         "results": [
           [
-            "ZONE-1",
+            "ZONE-3",
             "2",
             "725.0"
           ],
@@ -4365,7 +4365,7 @@
             "385.0"
           ],
           [
-            "ZONE-3",
+            "ZONE-1",
             "2",
             "725.0"
           ],
@@ -4395,9 +4395,9 @@
         ],
         "results": [
           [
-            "ZONE-1",
-            "Q798 warehouse event record 0 ACK batch batchIdList:Q798-0",
-            "Q798 warehouse event record 4",
+            "ZONE-4",
+            "Q797 warehouse event record 4",
+            "Q798 warehouse event record 3 ACK batch batchIdList:Q798-3",
             "2"
           ],
           [
@@ -4407,9 +4407,9 @@
             "2"
           ],
           [
-            "ZONE-4",
-            "Q797 warehouse event record 4",
-            "Q798 warehouse event record 3 ACK batch batchIdList:Q798-3",
+            "ZONE-1",
+            "Q798 warehouse event record 0 ACK batch batchIdList:Q798-0",
+            "Q798 warehouse event record 4",
             "2"
           ],
           [
@@ -4502,13 +4502,18 @@
         ],
         "results": [
           [
-            "zone-controller",
+            "batch-sync",
+            "2",
+            "0"
+          ],
+          [
+            "track-router",
             "1",
             "0"
           ],
           [
-            "batch-sync",
-            "2",
+            "zone-controller",
+            "1",
             "0"
           ],
           [
@@ -4518,11 +4523,6 @@
           ],
           [
             "pallet-mapper",
-            "1",
-            "0"
-          ],
-          [
-            "track-router",
             "1",
             "0"
           ]
@@ -4701,12 +4701,12 @@
             "3"
           ],
           [
-            "manual",
+            "hybrid",
             "2",
             "2"
           ],
           [
-            "hybrid",
+            "manual",
             "2",
             "2"
           ]
@@ -4740,13 +4740,13 @@
             "2"
           ],
           [
-            "US-WEST",
-            "inbound",
+            "EU-NORTH",
+            "internal",
             "1"
           ],
           [
-            "EU-NORTH",
-            "internal",
+            "US-WEST",
+            "inbound",
             "1"
           ],
           [
@@ -4879,13 +4879,13 @@
             "2"
           ],
           [
-            "ZONE-2",
-            "CC-ALPHA",
+            "ZONE-1",
+            "CC-DELTA",
             "2"
           ],
           [
-            "ZONE-1",
-            "CC-DELTA",
+            "ZONE-2",
+            "CC-ALPHA",
             "2"
           ],
           [
@@ -5137,14 +5137,14 @@
         ],
         "results": [
           [
-            "track-router",
-            "EU-NORTH",
+            "pallet-mapper",
+            "AP-EAST",
             "2",
             "0"
           ],
           [
-            "pallet-mapper",
-            "AP-EAST",
+            "track-router",
+            "EU-NORTH",
             "2",
             "0"
           ],
@@ -5188,16 +5188,12 @@
         ],
         "results": [
           [
-            "warehouse-central",
-            "2"
-          ],
-          [
             "warehouse-north",
             "2"
           ],
           [
-            "warehouse-south",
-            "1"
+            "warehouse-central",
+            "2"
           ],
           [
             "warehouse-west",
@@ -5205,6 +5201,10 @@
           ],
           [
             "warehouse-east",
+            "1"
+          ],
+          [
+            "warehouse-south",
             "1"
           ]
         ],
@@ -5333,6 +5333,3364 @@
           ]
         ],
         "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q1001",
+      "sql": "WITH parsed AS (SELECT trim(log) AS api FROM \"{stream}\" WHERE resource_path LIKE '%/logs/warehouse/%' AND match_all('warehouse')) SELECT api FROM parsed WHERE api IS NOT NULL AND api LIKE 'Q%' ORDER BY api ASC LIMIT 20",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "api"
+        ],
+        "results": [
+          [
+            "Q001 warehouse event record 3 ACK batch batchIdList:Q001-3"
+          ],
+          [
+            "Q001 warehouse event record 4"
+          ],
+          [
+            "Q002 warehouse event record 0 ACK batch batchIdList:Q002-0"
+          ],
+          [
+            "Q003 warehouse event record 1"
+          ],
+          [
+            "Q003 warehouse event record 4"
+          ],
+          [
+            "Q004 warehouse event record 1"
+          ],
+          [
+            "Q005 warehouse event record 2"
+          ],
+          [
+            "Q007 warehouse event record 2"
+          ],
+          [
+            "Q008 warehouse event record 2"
+          ],
+          [
+            "Q009 warehouse event record 0 ACK batch batchIdList:Q009-0"
+          ],
+          [
+            "Q009 warehouse event record 3 ACK batch batchIdList:Q009-3"
+          ],
+          [
+            "Q010 warehouse event record 0 ACK batch batchIdList:Q010-0"
+          ],
+          [
+            "Q011 warehouse event record 3 ACK batch batchIdList:Q011-3"
+          ],
+          [
+            "Q011 warehouse event record 4"
+          ],
+          [
+            "Q012 warehouse event record 0 ACK batch batchIdList:Q012-0"
+          ],
+          [
+            "Q013 warehouse event record 1"
+          ],
+          [
+            "Q013 warehouse event record 4"
+          ],
+          [
+            "Q014 warehouse event record 1"
+          ],
+          [
+            "Q015 warehouse event record 2"
+          ],
+          [
+            "Q017 warehouse event record 2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1002",
+      "sql": "WITH filtered AS (SELECT http_method, split_part(page_url, '?', 1) AS raw_url_no_query FROM \"{stream}\" WHERE resource_path LIKE '%/logs/warehouse/%' AND match_all('warehouse') AND page_url LIKE '%shop.example.com/%'), in_shop AS (SELECT http_method, CASE WHEN raw_url_no_query LIKE '%shop.example.com/%' THEN '/' || split_part(raw_url_no_query, 'shop.example.com/', 2) ELSE NULL END AS api_path FROM filtered), scoped AS (SELECT http_method, api_path FROM in_shop WHERE api_path IS NOT NULL AND (api_path LIKE '/item/%' OR api_path LIKE '/search%' OR api_path LIKE '/cart%')), normalized AS (SELECT http_method, regexp_replace(regexp_replace(api_path, '/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}', '/{id}'), '/[0-9]+', '/{id}') AS api FROM scoped), cleaned AS (SELECT http_method, regexp_replace(regexp_replace(api, '//', '/'), '//', '/') AS api FROM normalized) SELECT http_method, api, COUNT(*) AS hit_count FROM cleaned GROUP BY http_method, api ORDER BY hit_count DESC, http_method ASC, api ASC LIMIT 20",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "http_method",
+          "api",
+          "hit_count"
+        ],
+        "results": [
+          [
+            "DELETE",
+            "/item/{id}",
+            "30"
+          ],
+          [
+            "POST",
+            "/item/{id}",
+            "30"
+          ],
+          [
+            "PUT",
+            "/item/{id}",
+            "30"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1003",
+      "sql": "SELECT http_method, COUNT(*) AS n FROM (SELECT http_method FROM \"{stream}\" WHERE match_all('warehouse') AND resource_path LIKE '%/logs/warehouse/%') s GROUP BY http_method ORDER BY n DESC, http_method ASC LIMIT 20",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "http_method",
+          "n"
+        ],
+        "results": [
+          [
+            "PUT",
+            "60"
+          ],
+          [
+            "DELETE",
+            "30"
+          ],
+          [
+            "POST",
+            "30"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1004",
+      "sql": "SELECT facility_zone, cnt FROM (SELECT facility_zone, COUNT(*) AS cnt FROM \"{stream}\" WHERE match_all('event') GROUP BY facility_zone) s WHERE cnt > 1 ORDER BY cnt DESC, facility_zone ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt"
+        ],
+        "results": [
+          [
+            "ZONE-4",
+            "126"
+          ],
+          [
+            "ZONE-1",
+            "125"
+          ],
+          [
+            "ZONE-2",
+            "125"
+          ],
+          [
+            "ZONE-3",
+            "124"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1005",
+      "sql": "SELECT tag_a, COUNT(*) AS n FROM (SELECT tag_a FROM \"{stream}\" WHERE match_all('warehouse') AND log_message LIKE '%warehouse%') s GROUP BY tag_a ORDER BY n DESC, tag_a ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "tag_a",
+          "n"
+        ],
+        "results": [
+          [
+            "prod",
+            "100"
+          ],
+          [
+            "staging",
+            "100"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1006",
+      "sql": "SELECT component_name, avg_lat FROM (SELECT component_name, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat FROM \"{stream}\" WHERE match_all('warehouse') GROUP BY component_name) s ORDER BY avg_lat DESC, component_name ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "component_name",
+          "avg_lat"
+        ],
+        "results": [
+          [
+            "temp-regulator",
+            "3200.0"
+          ],
+          [
+            "sorter-engine",
+            "1900.0"
+          ],
+          [
+            "batch-sync",
+            "1450.0"
+          ],
+          [
+            "lane-monitor",
+            "567.0"
+          ],
+          [
+            "track-router",
+            "230.0"
+          ],
+          [
+            "pallet-mapper",
+            "89.0"
+          ],
+          [
+            "charge-checker",
+            "78.0"
+          ],
+          [
+            "scan-hub",
+            "45.0"
+          ],
+          [
+            "conveyor-driver",
+            "15.0"
+          ],
+          [
+            "zone-controller",
+            "12.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1007",
+      "sql": "SELECT region_code, COUNT(*) AS c FROM (SELECT region_code FROM \"{stream}\" WHERE match_all('record') AND resource_path LIKE '%warehouse%') s GROUP BY region_code ORDER BY c DESC, region_code ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "region_code",
+          "c"
+        ],
+        "results": [
+          [
+            "AP-SOUTH",
+            "30"
+          ],
+          [
+            "EU-CENTRAL",
+            "30"
+          ],
+          [
+            "US-CENTRAL",
+            "30"
+          ],
+          [
+            "US-WEST",
+            "30"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1008",
+      "sql": "SELECT scan_category, COUNT(DISTINCT task_id) AS unique_tasks FROM (SELECT scan_category, task_id FROM \"{stream}\" WHERE match_all('warehouse')) s GROUP BY scan_category ORDER BY unique_tasks DESC, scan_category ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "scan_category",
+          "unique_tasks"
+        ],
+        "results": [
+          [
+            "inbound",
+            "4"
+          ],
+          [
+            "internal",
+            "3"
+          ],
+          [
+            "outbound",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1009",
+      "sql": "SELECT sorter_model, SUM(throughput_rate) AS total FROM (SELECT sorter_model, throughput_rate FROM \"{stream}\" WHERE match_all('event') AND throughput_rate IS NOT NULL) s GROUP BY sorter_model ORDER BY total DESC, sorter_model ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "sorter_model",
+          "total"
+        ],
+        "results": [
+          [
+            "SORT-M3",
+            "80625.0"
+          ],
+          [
+            "SORT-X1",
+            "79785.0"
+          ],
+          [
+            "SORT-A7",
+            "46600.0"
+          ],
+          [
+            "SORT-Z9",
+            "23060.0"
+          ],
+          [
+            "SORT-Q5",
+            "22815.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1010",
+      "sql": "SELECT operation_mode, COUNT(*) AS cnt FROM (SELECT operation_mode FROM \"{stream}\" WHERE match_all('ACK') AND log LIKE '%batch%') s GROUP BY operation_mode ORDER BY cnt DESC, operation_mode ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "operation_mode",
+          "cnt"
+        ],
+        "results": [
+          [
+            "manual",
+            "77"
+          ],
+          [
+            "auto",
+            "73"
+          ],
+          [
+            "hybrid",
+            "51"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1011",
+      "sql": "SELECT conveyor_lane, COUNT(*) AS n FROM (SELECT conveyor_lane FROM \"{stream}\" WHERE match_all('warehouse') AND response_code = 200) s GROUP BY conveyor_lane ORDER BY n DESC, conveyor_lane ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "conveyor_lane",
+          "n"
+        ],
+        "results": [
+          [
+            "LANE-A",
+            "25"
+          ],
+          [
+            "LANE-B",
+            "25"
+          ],
+          [
+            "LANE-C",
+            "25"
+          ],
+          [
+            "LANE-D",
+            "25"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1012",
+      "sql": "SELECT app_label, cnt FROM (SELECT app_label, COUNT(*) AS cnt FROM \"{stream}\" WHERE match_all('event') GROUP BY app_label) s ORDER BY cnt DESC, app_label ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "app_label",
+          "cnt"
+        ],
+        "results": [
+          [
+            "warehouse-scan",
+            "101"
+          ],
+          [
+            "warehouse-merge",
+            "100"
+          ],
+          [
+            "warehouse-sort",
+            "100"
+          ],
+          [
+            "warehouse-sync",
+            "100"
+          ],
+          [
+            "warehouse-track",
+            "99"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1013",
+      "sql": "WITH combined AS (SELECT facility_zone, 'primary' AS src FROM \"{stream}\" WHERE match_all('warehouse') UNION ALL SELECT facility_zone, 'secondary' AS src FROM \"{stream}\" WHERE match_all('event')) SELECT src, facility_zone, COUNT(*) AS cnt FROM combined GROUP BY src, facility_zone ORDER BY cnt DESC, src ASC, facility_zone ASC LIMIT 20",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "src",
+          "facility_zone",
+          "cnt"
+        ],
+        "results": [
+          [
+            "primary",
+            "ZONE-4",
+            "126"
+          ],
+          [
+            "secondary",
+            "ZONE-4",
+            "126"
+          ],
+          [
+            "primary",
+            "ZONE-1",
+            "125"
+          ],
+          [
+            "primary",
+            "ZONE-2",
+            "125"
+          ],
+          [
+            "secondary",
+            "ZONE-1",
+            "125"
+          ],
+          [
+            "secondary",
+            "ZONE-2",
+            "125"
+          ],
+          [
+            "primary",
+            "ZONE-3",
+            "124"
+          ],
+          [
+            "secondary",
+            "ZONE-3",
+            "124"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1014",
+      "sql": "WITH branched AS (SELECT facility_zone, 'GET' AS m FROM \"{stream}\" WHERE match_all('warehouse') AND log_message LIKE 'GET %' UNION ALL SELECT facility_zone, 'POST' AS m FROM \"{stream}\" WHERE match_all('warehouse') AND log_message LIKE 'POST %' UNION ALL SELECT facility_zone, 'INFO' AS m FROM \"{stream}\" WHERE match_all('warehouse') AND log_message LIKE 'INFO:%') SELECT m, COUNT(*) AS cnt FROM branched GROUP BY m ORDER BY cnt DESC, m ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "m",
+          "cnt"
+        ],
+        "results": [
+          [
+            "INFO",
+            "151"
+          ],
+          [
+            "GET",
+            "50"
+          ],
+          [
+            "POST",
+            "50"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1015",
+      "sql": "WITH by_lane AS (SELECT conveyor_lane, 'A' AS bucket FROM \"{stream}\" WHERE match_all('warehouse') AND conveyor_lane = 'LANE-A' UNION ALL SELECT conveyor_lane, 'B' FROM \"{stream}\" WHERE match_all('warehouse') AND conveyor_lane = 'LANE-B' UNION ALL SELECT conveyor_lane, 'C' FROM \"{stream}\" WHERE match_all('warehouse') AND conveyor_lane = 'LANE-C' UNION ALL SELECT conveyor_lane, 'D' FROM \"{stream}\" WHERE match_all('warehouse') AND conveyor_lane = 'LANE-D') SELECT bucket, COUNT(*) AS n FROM by_lane GROUP BY bucket ORDER BY bucket ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "bucket",
+          "n"
+        ],
+        "results": [
+          [
+            "A",
+            "126"
+          ],
+          [
+            "B",
+            "125"
+          ],
+          [
+            "C",
+            "125"
+          ],
+          [
+            "D",
+            "124"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1017",
+      "sql": "WITH zones AS (SELECT facility_zone, 'z1' AS tier FROM \"{stream}\" WHERE match_all('event') AND facility_zone = 'ZONE-1' UNION ALL SELECT facility_zone, 'z2' FROM \"{stream}\" WHERE match_all('event') AND facility_zone = 'ZONE-2' UNION ALL SELECT facility_zone, 'z3' FROM \"{stream}\" WHERE match_all('event') AND facility_zone = 'ZONE-3') SELECT tier, COUNT(DISTINCT facility_zone) AS uniq FROM zones GROUP BY tier ORDER BY tier ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "tier",
+          "uniq"
+        ],
+        "results": [
+          [
+            "z1",
+            "1"
+          ],
+          [
+            "z2",
+            "1"
+          ],
+          [
+            "z3",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1018",
+      "sql": "WITH combined AS (SELECT pallet_id, region_code FROM \"{stream}\" WHERE match_all('warehouse') AND pallet_id IS NOT NULL UNION ALL SELECT pallet_id, region_code FROM \"{stream}\" WHERE match_all('event') AND pallet_id IS NOT NULL) SELECT region_code, COUNT(DISTINCT pallet_id) AS uniq FROM combined GROUP BY region_code ORDER BY uniq DESC, region_code ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "region_code",
+          "uniq"
+        ],
+        "results": [
+          [
+            "AP-CENTRAL",
+            "4"
+          ],
+          [
+            "AP-EAST",
+            "4"
+          ],
+          [
+            "AP-SOUTH",
+            "4"
+          ],
+          [
+            "EU-CENTRAL",
+            "4"
+          ],
+          [
+            "EU-NORTH",
+            "4"
+          ],
+          [
+            "EU-WEST",
+            "4"
+          ],
+          [
+            "SA-EAST",
+            "4"
+          ],
+          [
+            "US-CENTRAL",
+            "4"
+          ],
+          [
+            "US-EAST",
+            "4"
+          ],
+          [
+            "US-WEST",
+            "4"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1019",
+      "sql": "WITH src AS (SELECT http_method, response_code FROM \"{stream}\" WHERE match_all('warehouse') AND http_method = 'GET' UNION ALL SELECT http_method, response_code FROM \"{stream}\" WHERE match_all('warehouse') AND http_method = 'POST' UNION ALL SELECT http_method, response_code FROM \"{stream}\" WHERE match_all('warehouse') AND http_method = 'PUT' UNION ALL SELECT http_method, response_code FROM \"{stream}\" WHERE match_all('warehouse') AND http_method = 'DELETE') SELECT http_method, COUNT(*) AS cnt FROM src GROUP BY http_method ORDER BY cnt DESC, http_method ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "http_method",
+          "cnt"
+        ],
+        "results": [
+          [
+            "POST",
+            "151"
+          ],
+          [
+            "GET",
+            "149"
+          ],
+          [
+            "DELETE",
+            "100"
+          ],
+          [
+            "PUT",
+            "100"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1020",
+      "sql": "WITH combined AS (SELECT tag_a, 'p' AS grp FROM \"{stream}\" WHERE match_all('warehouse') AND tag_a = 'prod' UNION ALL SELECT tag_a, 's' FROM \"{stream}\" WHERE match_all('warehouse') AND tag_a = 'staging' UNION ALL SELECT tag_a, 'd' FROM \"{stream}\" WHERE match_all('warehouse') AND tag_a = 'dev') SELECT grp, COUNT(*) AS n FROM combined GROUP BY grp ORDER BY grp ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "grp",
+          "n"
+        ],
+        "results": [
+          [
+            "d",
+            "150"
+          ],
+          [
+            "p",
+            "201"
+          ],
+          [
+            "s",
+            "149"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1021",
+      "sql": "WITH combined AS (SELECT component_name, latency_ms FROM \"{stream}\" WHERE match_all('warehouse') AND latency_ms < 100 UNION ALL SELECT component_name, latency_ms FROM \"{stream}\" WHERE match_all('warehouse') AND latency_ms >= 100 AND latency_ms < 1000 UNION ALL SELECT component_name, latency_ms FROM \"{stream}\" WHERE match_all('warehouse') AND latency_ms >= 1000) SELECT component_name, COUNT(*) AS cnt FROM combined GROUP BY component_name ORDER BY cnt DESC, component_name ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "component_name",
+          "cnt"
+        ],
+        "results": [
+          [
+            "batch-sync",
+            "51"
+          ],
+          [
+            "charge-checker",
+            "50"
+          ],
+          [
+            "conveyor-driver",
+            "50"
+          ],
+          [
+            "lane-monitor",
+            "50"
+          ],
+          [
+            "scan-hub",
+            "50"
+          ],
+          [
+            "sorter-engine",
+            "50"
+          ],
+          [
+            "temp-regulator",
+            "50"
+          ],
+          [
+            "track-router",
+            "50"
+          ],
+          [
+            "zone-controller",
+            "50"
+          ],
+          [
+            "pallet-mapper",
+            "49"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1022",
+      "sql": "WITH types AS (SELECT record_type, org_name FROM \"{stream}\" WHERE match_all('warehouse') AND record_type = 'scan' UNION ALL SELECT record_type, org_name FROM \"{stream}\" WHERE match_all('warehouse') AND record_type = 'sort' UNION ALL SELECT record_type, org_name FROM \"{stream}\" WHERE match_all('warehouse') AND record_type = 'merge' UNION ALL SELECT record_type, org_name FROM \"{stream}\" WHERE match_all('warehouse') AND record_type = 'track') SELECT record_type, COUNT(DISTINCT org_name) AS orgs FROM types GROUP BY record_type ORDER BY orgs DESC, record_type ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "record_type",
+          "orgs"
+        ],
+        "results": [
+          [
+            "scan",
+            "3"
+          ],
+          [
+            "sort",
+            "3"
+          ],
+          [
+            "merge",
+            "2"
+          ],
+          [
+            "track",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1023",
+      "sql": "WITH stmts AS (SELECT filter_result FROM \"{stream}\" WHERE match_all('warehouse') AND filter_result = 'allow' UNION ALL SELECT filter_result FROM \"{stream}\" WHERE match_all('event') AND filter_result = 'block' UNION ALL SELECT filter_result FROM \"{stream}\" WHERE match_all('record') AND filter_result IS NOT NULL) SELECT filter_result, COUNT(*) AS cnt FROM stmts GROUP BY filter_result ORDER BY cnt DESC, filter_result ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "filter_result",
+          "cnt"
+        ],
+        "results": [
+          [
+            "allow",
+            "602"
+          ],
+          [
+            "block",
+            "398"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1024",
+      "sql": "WITH src AS (SELECT guard_mode FROM \"{stream}\" WHERE match_all('warehouse') AND guard_mode = 'active' UNION ALL SELECT guard_mode FROM \"{stream}\" WHERE match_all('warehouse') AND guard_mode = 'passive' UNION ALL SELECT guard_mode FROM \"{stream}\" WHERE match_all('warehouse') AND guard_mode = 'disabled') SELECT guard_mode, COUNT(*) AS cnt FROM src GROUP BY guard_mode ORDER BY cnt DESC, guard_mode ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "guard_mode",
+          "cnt"
+        ],
+        "results": [
+          [
+            "passive",
+            "200"
+          ],
+          [
+            "active",
+            "199"
+          ],
+          [
+            "disabled",
+            "101"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1025",
+      "sql": "WITH src AS (SELECT auth_result FROM \"{stream}\" WHERE match_all('warehouse') AND auth_result = 'pass' UNION ALL SELECT auth_result FROM \"{stream}\" WHERE match_all('event') AND auth_result = 'fail' UNION ALL SELECT auth_result FROM \"{stream}\" WHERE match_all('warehouse') AND auth_result = 'denied') SELECT auth_result, COUNT(*) AS n FROM src GROUP BY auth_result ORDER BY n DESC, auth_result ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "auth_result",
+          "n"
+        ],
+        "results": [
+          [
+            "pass",
+            "251"
+          ],
+          [
+            "fail",
+            "149"
+          ],
+          [
+            "denied",
+            "100"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1026",
+      "sql": "WITH branches AS (SELECT issue_type FROM \"{stream}\" WHERE match_all('warehouse') AND issue_type = 'timeout' UNION ALL SELECT issue_type FROM \"{stream}\" WHERE match_all('warehouse') AND issue_type = 'overflow' UNION ALL SELECT issue_type FROM \"{stream}\" WHERE match_all('warehouse') AND issue_type = 'mismatch' UNION ALL SELECT issue_type FROM \"{stream}\" WHERE match_all('warehouse') AND issue_type = 'jam') SELECT issue_type, COUNT(*) AS cnt FROM branches GROUP BY issue_type ORDER BY cnt DESC, issue_type ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "issue_type",
+          "cnt"
+        ],
+        "results": [
+          [
+            "timeout",
+            "151"
+          ],
+          [
+            "overflow",
+            "149"
+          ],
+          [
+            "jam",
+            "100"
+          ],
+          [
+            "mismatch",
+            "100"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1027",
+      "sql": "WITH cats AS (SELECT scan_category, entity_id FROM \"{stream}\" WHERE match_all('warehouse') AND scan_category = 'inbound' UNION ALL SELECT scan_category, entity_id FROM \"{stream}\" WHERE match_all('warehouse') AND scan_category = 'outbound' UNION ALL SELECT scan_category, entity_id FROM \"{stream}\" WHERE match_all('warehouse') AND scan_category = 'internal') SELECT scan_category, COUNT(DISTINCT entity_id) AS uniq FROM cats GROUP BY scan_category ORDER BY uniq DESC, scan_category ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "scan_category",
+          "uniq"
+        ],
+        "results": [
+          [
+            "inbound",
+            "4"
+          ],
+          [
+            "internal",
+            "3"
+          ],
+          [
+            "outbound",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1028",
+      "sql": "WITH extracted AS (SELECT upper(log) AS msg FROM \"{stream}\" WHERE resource_path LIKE '%/logs/warehouse/%' AND match_all('warehouse')) SELECT msg FROM extracted WHERE msg LIKE 'Q%' ORDER BY msg ASC LIMIT 20",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "msg"
+        ],
+        "results": [
+          [
+            "Q001 WAREHOUSE EVENT RECORD 3 ACK BATCH BATCHIDLIST:Q001-3"
+          ],
+          [
+            "Q001 WAREHOUSE EVENT RECORD 4"
+          ],
+          [
+            "Q002 WAREHOUSE EVENT RECORD 0 ACK BATCH BATCHIDLIST:Q002-0"
+          ],
+          [
+            "Q003 WAREHOUSE EVENT RECORD 1"
+          ],
+          [
+            "Q003 WAREHOUSE EVENT RECORD 4"
+          ],
+          [
+            "Q004 WAREHOUSE EVENT RECORD 1"
+          ],
+          [
+            "Q005 WAREHOUSE EVENT RECORD 2"
+          ],
+          [
+            "Q007 WAREHOUSE EVENT RECORD 2"
+          ],
+          [
+            "Q008 WAREHOUSE EVENT RECORD 2"
+          ],
+          [
+            "Q009 WAREHOUSE EVENT RECORD 0 ACK BATCH BATCHIDLIST:Q009-0"
+          ],
+          [
+            "Q009 WAREHOUSE EVENT RECORD 3 ACK BATCH BATCHIDLIST:Q009-3"
+          ],
+          [
+            "Q010 WAREHOUSE EVENT RECORD 0 ACK BATCH BATCHIDLIST:Q010-0"
+          ],
+          [
+            "Q011 WAREHOUSE EVENT RECORD 3 ACK BATCH BATCHIDLIST:Q011-3"
+          ],
+          [
+            "Q011 WAREHOUSE EVENT RECORD 4"
+          ],
+          [
+            "Q012 WAREHOUSE EVENT RECORD 0 ACK BATCH BATCHIDLIST:Q012-0"
+          ],
+          [
+            "Q013 WAREHOUSE EVENT RECORD 1"
+          ],
+          [
+            "Q013 WAREHOUSE EVENT RECORD 4"
+          ],
+          [
+            "Q014 WAREHOUSE EVENT RECORD 1"
+          ],
+          [
+            "Q015 WAREHOUSE EVENT RECORD 2"
+          ],
+          [
+            "Q017 WAREHOUSE EVENT RECORD 2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1029",
+      "sql": "WITH extracted AS (SELECT trim(log_message) AS m FROM \"{stream}\" WHERE resource_path LIKE '%/logs/%' AND match_all('warehouse')) SELECT m FROM extracted WHERE m IS NOT NULL AND m LIKE '%warehouse%' ORDER BY m ASC LIMIT 20",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "m"
+        ],
+        "results": [
+          [
+            "GET /api/v1/warehouse/status 200 OK"
+          ],
+          [
+            "GET /api/v1/warehouse/status 200 OK"
+          ],
+          [
+            "GET /api/v1/warehouse/status 200 OK"
+          ],
+          [
+            "GET /api/v1/warehouse/status 200 OK"
+          ],
+          [
+            "GET /api/v1/warehouse/status 200 OK"
+          ],
+          [
+            "GET /api/v1/warehouse/status 200 OK"
+          ],
+          [
+            "GET /api/v1/warehouse/status 200 OK"
+          ],
+          [
+            "GET /api/v1/warehouse/status 200 OK"
+          ],
+          [
+            "GET /api/v1/warehouse/status 200 OK"
+          ],
+          [
+            "GET /api/v1/warehouse/status 200 OK"
+          ],
+          [
+            "GET /api/v1/warehouse/status 200 OK"
+          ],
+          [
+            "GET /api/v1/warehouse/status 200 OK"
+          ],
+          [
+            "GET /api/v1/warehouse/status 200 OK"
+          ],
+          [
+            "GET /api/v1/warehouse/status 200 OK"
+          ],
+          [
+            "GET /api/v1/warehouse/status 200 OK"
+          ],
+          [
+            "GET /api/v1/warehouse/status 200 OK"
+          ],
+          [
+            "GET /api/v1/warehouse/status 200 OK"
+          ],
+          [
+            "GET /api/v1/warehouse/status 200 OK"
+          ],
+          [
+            "GET /api/v1/warehouse/status 200 OK"
+          ],
+          [
+            "GET /api/v1/warehouse/status 200 OK"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1030",
+      "sql": "WITH parts AS (SELECT split_part(log, ' ', 1) AS first_token FROM \"{stream}\" WHERE match_all('warehouse') AND log IS NOT NULL) SELECT first_token, COUNT(*) AS c FROM parts GROUP BY first_token ORDER BY c DESC, first_token ASC LIMIT 20",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "first_token",
+          "c"
+        ],
+        "results": [
+          [
+            "Q001",
+            "5"
+          ],
+          [
+            "Q002",
+            "5"
+          ],
+          [
+            "Q003",
+            "5"
+          ],
+          [
+            "Q004",
+            "5"
+          ],
+          [
+            "Q005",
+            "5"
+          ],
+          [
+            "Q006",
+            "5"
+          ],
+          [
+            "Q007",
+            "5"
+          ],
+          [
+            "Q008",
+            "5"
+          ],
+          [
+            "Q009",
+            "5"
+          ],
+          [
+            "Q010",
+            "5"
+          ],
+          [
+            "Q011",
+            "5"
+          ],
+          [
+            "Q012",
+            "5"
+          ],
+          [
+            "Q013",
+            "5"
+          ],
+          [
+            "Q014",
+            "5"
+          ],
+          [
+            "Q015",
+            "5"
+          ],
+          [
+            "Q016",
+            "5"
+          ],
+          [
+            "Q017",
+            "5"
+          ],
+          [
+            "Q018",
+            "5"
+          ],
+          [
+            "Q019",
+            "5"
+          ],
+          [
+            "Q020",
+            "5"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1031",
+      "sql": "WITH lower_log AS (SELECT lower(log) AS l FROM \"{stream}\" WHERE match_all('warehouse') AND resource_path LIKE '%/warehouse/%') SELECT l FROM lower_log WHERE l LIKE '%event%' ORDER BY l ASC LIMIT 20",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "l"
+        ],
+        "results": [
+          [
+            "q001 warehouse event record 3 ack batch batchidlist:q001-3"
+          ],
+          [
+            "q001 warehouse event record 4"
+          ],
+          [
+            "q002 warehouse event record 0 ack batch batchidlist:q002-0"
+          ],
+          [
+            "q003 warehouse event record 1"
+          ],
+          [
+            "q003 warehouse event record 4"
+          ],
+          [
+            "q004 warehouse event record 1"
+          ],
+          [
+            "q005 warehouse event record 2"
+          ],
+          [
+            "q007 warehouse event record 2"
+          ],
+          [
+            "q008 warehouse event record 2"
+          ],
+          [
+            "q009 warehouse event record 0 ack batch batchidlist:q009-0"
+          ],
+          [
+            "q009 warehouse event record 3 ack batch batchidlist:q009-3"
+          ],
+          [
+            "q010 warehouse event record 0 ack batch batchidlist:q010-0"
+          ],
+          [
+            "q011 warehouse event record 3 ack batch batchidlist:q011-3"
+          ],
+          [
+            "q011 warehouse event record 4"
+          ],
+          [
+            "q012 warehouse event record 0 ack batch batchidlist:q012-0"
+          ],
+          [
+            "q013 warehouse event record 1"
+          ],
+          [
+            "q013 warehouse event record 4"
+          ],
+          [
+            "q014 warehouse event record 1"
+          ],
+          [
+            "q015 warehouse event record 2"
+          ],
+          [
+            "q017 warehouse event record 2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1032",
+      "sql": "WITH sub AS (SELECT substring(log, 1, 8) AS prefix FROM \"{stream}\" WHERE match_all('warehouse')) SELECT prefix, COUNT(*) AS c FROM sub GROUP BY prefix ORDER BY c DESC, prefix ASC LIMIT 20",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "prefix",
+          "c"
+        ],
+        "results": [
+          [
+            "Q001 war",
+            "5"
+          ],
+          [
+            "Q002 war",
+            "5"
+          ],
+          [
+            "Q003 war",
+            "5"
+          ],
+          [
+            "Q004 war",
+            "5"
+          ],
+          [
+            "Q005 war",
+            "5"
+          ],
+          [
+            "Q006 war",
+            "5"
+          ],
+          [
+            "Q007 war",
+            "5"
+          ],
+          [
+            "Q008 war",
+            "5"
+          ],
+          [
+            "Q009 war",
+            "5"
+          ],
+          [
+            "Q010 war",
+            "5"
+          ],
+          [
+            "Q011 war",
+            "5"
+          ],
+          [
+            "Q012 war",
+            "5"
+          ],
+          [
+            "Q013 war",
+            "5"
+          ],
+          [
+            "Q014 war",
+            "5"
+          ],
+          [
+            "Q015 war",
+            "5"
+          ],
+          [
+            "Q016 war",
+            "5"
+          ],
+          [
+            "Q017 war",
+            "5"
+          ],
+          [
+            "Q018 war",
+            "5"
+          ],
+          [
+            "Q019 war",
+            "5"
+          ],
+          [
+            "Q020 war",
+            "5"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1033",
+      "sql": "WITH parsed AS (SELECT trim(log) AS api, http_method FROM \"{stream}\" WHERE resource_path LIKE '%/logs/warehouse/%' AND match_all('warehouse')) SELECT http_method, COUNT(*) AS c FROM parsed WHERE api LIKE 'Q%' GROUP BY http_method ORDER BY c DESC, http_method ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "http_method",
+          "c"
+        ],
+        "results": [
+          [
+            "PUT",
+            "60"
+          ],
+          [
+            "DELETE",
+            "30"
+          ],
+          [
+            "POST",
+            "30"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1034",
+      "sql": "WITH extracted AS (SELECT concat(http_method, ':', trim(log)) AS composite FROM \"{stream}\" WHERE match_all('warehouse') AND http_method IS NOT NULL) SELECT composite FROM extracted WHERE composite LIKE '%warehouse%' ORDER BY composite ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "composite"
+        ],
+        "results": [
+          [
+            "DELETE:Q001 warehouse event record 4"
+          ],
+          [
+            "DELETE:Q002 warehouse event record 1"
+          ],
+          [
+            "DELETE:Q003 warehouse event record 2"
+          ],
+          [
+            "DELETE:Q005 warehouse event record 2"
+          ],
+          [
+            "DELETE:Q006 warehouse event record 3 ACK batch batchIdList:Q006-3"
+          ],
+          [
+            "DELETE:Q007 warehouse event record 0 ACK batch batchIdList:Q007-0"
+          ],
+          [
+            "DELETE:Q008 warehouse event record 3 ACK batch batchIdList:Q008-3"
+          ],
+          [
+            "DELETE:Q009 warehouse event record 0 ACK batch batchIdList:Q009-0"
+          ],
+          [
+            "DELETE:Q009 warehouse event record 4"
+          ],
+          [
+            "DELETE:Q010 warehouse event record 1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1035",
+      "sql": "WITH built AS (SELECT length(log) AS log_len, facility_zone FROM \"{stream}\" WHERE match_all('warehouse') AND facility_zone IS NOT NULL) SELECT facility_zone, AVG(CAST(log_len AS FLOAT)) AS avg_len FROM built GROUP BY facility_zone ORDER BY avg_len DESC, facility_zone ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "avg_len"
+        ],
+        "results": [
+          [
+            "ZONE-4",
+            "40.73809523809524"
+          ],
+          [
+            "ZONE-3",
+            "40.693548387096776"
+          ],
+          [
+            "ZONE-1",
+            "40.6"
+          ],
+          [
+            "ZONE-2",
+            "40.6"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1036",
+      "sql": "WITH tokenized AS (SELECT split_part(log, ' ', 2) AS token FROM \"{stream}\" WHERE match_all('event') AND log LIKE 'Q%') SELECT token, COUNT(*) AS n FROM tokenized GROUP BY token ORDER BY n DESC, token ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "token",
+          "n"
+        ],
+        "results": [
+          [
+            "warehouse",
+            "500"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1037",
+      "sql": "WITH replaced AS (SELECT regexp_replace(log, 'Q[0-9]+', 'QID') AS masked FROM \"{stream}\" WHERE match_all('warehouse')) SELECT masked, COUNT(*) AS c FROM replaced GROUP BY masked ORDER BY c DESC, masked ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "masked",
+          "c"
+        ],
+        "results": [
+          [
+            "QID warehouse event record 1",
+            "100"
+          ],
+          [
+            "QID warehouse event record 2",
+            "100"
+          ],
+          [
+            "QID warehouse event record 4",
+            "99"
+          ],
+          [
+            "QID warehouse event record 0 ACK batch batchIdList:Q001-0",
+            "1"
+          ],
+          [
+            "QID warehouse event record 0 ACK batch batchIdList:Q002-0",
+            "1"
+          ],
+          [
+            "QID warehouse event record 0 ACK batch batchIdList:Q003-0",
+            "1"
+          ],
+          [
+            "QID warehouse event record 0 ACK batch batchIdList:Q004-0",
+            "1"
+          ],
+          [
+            "QID warehouse event record 0 ACK batch batchIdList:Q005-0",
+            "1"
+          ],
+          [
+            "QID warehouse event record 0 ACK batch batchIdList:Q006-0",
+            "1"
+          ],
+          [
+            "QID warehouse event record 0 ACK batch batchIdList:Q007-0",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1038",
+      "sql": "WITH raw_hits AS (SELECT facility_zone, log, http_method FROM \"{stream}\" WHERE match_all('warehouse')), filtered AS (SELECT facility_zone, http_method FROM raw_hits WHERE log LIKE 'Q%'), grouped AS (SELECT facility_zone, COUNT(*) AS c FROM filtered GROUP BY facility_zone) SELECT facility_zone, c FROM grouped ORDER BY c DESC, facility_zone ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "c"
+        ],
+        "results": [
+          [
+            "ZONE-4",
+            "126"
+          ],
+          [
+            "ZONE-1",
+            "125"
+          ],
+          [
+            "ZONE-2",
+            "125"
+          ],
+          [
+            "ZONE-3",
+            "124"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1039",
+      "sql": "WITH s1 AS (SELECT tag_a, log FROM \"{stream}\" WHERE match_all('warehouse')), s2 AS (SELECT tag_a FROM s1 WHERE log LIKE '%warehouse%'), s3 AS (SELECT tag_a, COUNT(*) AS n FROM s2 GROUP BY tag_a) SELECT tag_a, n FROM s3 ORDER BY n DESC, tag_a ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "tag_a",
+          "n"
+        ],
+        "results": [
+          [
+            "prod",
+            "201"
+          ],
+          [
+            "dev",
+            "150"
+          ],
+          [
+            "staging",
+            "149"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1040",
+      "sql": "WITH a AS (SELECT component_name, latency_ms FROM \"{stream}\" WHERE match_all('warehouse')), b AS (SELECT component_name, latency_ms FROM a WHERE latency_ms IS NOT NULL), c AS (SELECT component_name, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat FROM b GROUP BY component_name) SELECT component_name, avg_lat FROM c ORDER BY avg_lat DESC, component_name ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "component_name",
+          "avg_lat"
+        ],
+        "results": [
+          [
+            "temp-regulator",
+            "3200.0"
+          ],
+          [
+            "sorter-engine",
+            "1900.0"
+          ],
+          [
+            "batch-sync",
+            "1450.0"
+          ],
+          [
+            "lane-monitor",
+            "567.0"
+          ],
+          [
+            "track-router",
+            "230.0"
+          ],
+          [
+            "pallet-mapper",
+            "89.0"
+          ],
+          [
+            "charge-checker",
+            "78.0"
+          ],
+          [
+            "scan-hub",
+            "45.0"
+          ],
+          [
+            "conveyor-driver",
+            "15.0"
+          ],
+          [
+            "zone-controller",
+            "12.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1042",
+      "sql": "WITH s1 AS (SELECT region_code, org_name, pallet_id FROM \"{stream}\" WHERE match_all('warehouse')), s2 AS (SELECT region_code, org_name, pallet_id FROM s1 WHERE pallet_id IS NOT NULL AND org_name IS NOT NULL) SELECT region_code, COUNT(DISTINCT org_name) AS orgs, COUNT(DISTINCT pallet_id) AS pallets FROM s2 GROUP BY region_code ORDER BY orgs DESC, region_code ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "region_code",
+          "orgs",
+          "pallets"
+        ],
+        "results": [
+          [
+            "AP-CENTRAL",
+            "1",
+            "4"
+          ],
+          [
+            "AP-EAST",
+            "1",
+            "4"
+          ],
+          [
+            "AP-SOUTH",
+            "1",
+            "4"
+          ],
+          [
+            "EU-CENTRAL",
+            "1",
+            "4"
+          ],
+          [
+            "EU-NORTH",
+            "1",
+            "4"
+          ],
+          [
+            "EU-WEST",
+            "1",
+            "4"
+          ],
+          [
+            "SA-EAST",
+            "1",
+            "4"
+          ],
+          [
+            "US-CENTRAL",
+            "1",
+            "4"
+          ],
+          [
+            "US-EAST",
+            "1",
+            "4"
+          ],
+          [
+            "US-WEST",
+            "1",
+            "4"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1043",
+      "sql": "WITH hits AS (SELECT sorter_model, throughput_rate, load_factor FROM \"{stream}\" WHERE match_all('event') AND throughput_rate IS NOT NULL), buckets AS (SELECT sorter_model, CASE WHEN load_factor < 50.0 THEN 'low' ELSE 'high' END AS band, throughput_rate FROM hits) SELECT band, sorter_model, AVG(throughput_rate) AS avg_t FROM buckets GROUP BY band, sorter_model ORDER BY avg_t DESC, band ASC, sorter_model ASC LIMIT 20",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "band",
+          "sorter_model",
+          "avg_t"
+        ],
+        "results": [
+          [
+            "low",
+            "SORT-M3",
+            "840.0"
+          ],
+          [
+            "low",
+            "SORT-X1",
+            "840.0"
+          ],
+          [
+            "high",
+            "SORT-M3",
+            "596.25"
+          ],
+          [
+            "high",
+            "SORT-X1",
+            "596.25"
+          ],
+          [
+            "low",
+            "SORT-Q5",
+            "463.19444444444446"
+          ],
+          [
+            "low",
+            "SORT-A7",
+            "455.2631578947368"
+          ],
+          [
+            "low",
+            "SORT-Z9",
+            "441.02564102564105"
+          ],
+          [
+            "high",
+            "SORT-Z9",
+            "244.16666666666666"
+          ],
+          [
+            "high",
+            "SORT-A7",
+            "240.0"
+          ],
+          [
+            "high",
+            "SORT-Q5",
+            "236.15384615384616"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1044",
+      "sql": "WITH src AS (SELECT log, http_method FROM \"{stream}\" WHERE match_all('warehouse')), trimmed AS (SELECT trim(log) AS m, http_method FROM src), filtered AS (SELECT m, http_method FROM trimmed WHERE m LIKE 'Q%warehouse%') SELECT http_method, COUNT(*) AS c FROM filtered GROUP BY http_method ORDER BY c DESC, http_method ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "http_method",
+          "c"
+        ],
+        "results": [
+          [
+            "POST",
+            "151"
+          ],
+          [
+            "GET",
+            "149"
+          ],
+          [
+            "DELETE",
+            "100"
+          ],
+          [
+            "PUT",
+            "100"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1046",
+      "sql": "WITH lvl1 AS (SELECT api_name, http_method, latency_ms FROM \"{stream}\" WHERE match_all('warehouse')), lvl2 AS (SELECT api_name, http_method FROM lvl1 WHERE latency_ms > 50) SELECT api_name, http_method, COUNT(*) AS n FROM lvl2 GROUP BY api_name, http_method ORDER BY n DESC, api_name ASC, http_method ASC LIMIT 20",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "api_name",
+          "http_method",
+          "n"
+        ],
+        "results": [
+          [
+            "DeleteRecord",
+            "POST",
+            "51"
+          ],
+          [
+            "ArchiveLog",
+            "GET",
+            "50"
+          ],
+          [
+            "CheckThreshold",
+            "DELETE",
+            "50"
+          ],
+          [
+            "MergeBatch",
+            "PUT",
+            "50"
+          ],
+          [
+            "RerouteTrack",
+            "POST",
+            "50"
+          ],
+          [
+            "UpdateBatch",
+            "GET",
+            "50"
+          ],
+          [
+            "ScanPallet",
+            "GET",
+            "49"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1047",
+      "sql": "WITH src AS (SELECT operation_name, exception_message FROM \"{stream}\" WHERE match_all('warehouse')), errs AS (SELECT operation_name FROM src WHERE regexp_match(exception_message, 'Exception') IS NOT NULL) SELECT operation_name, COUNT(*) AS c FROM errs GROUP BY operation_name ORDER BY c DESC, operation_name ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "operation_name",
+          "c"
+        ],
+        "results": [
+          [
+            "RetryScan",
+            "51"
+          ],
+          [
+            "ArchiveLog",
+            "50"
+          ],
+          [
+            "CheckThreshold",
+            "50"
+          ],
+          [
+            "DeleteRecord",
+            "50"
+          ],
+          [
+            "MergeBatch",
+            "50"
+          ],
+          [
+            "RerouteTrack",
+            "50"
+          ],
+          [
+            "ScanPallet",
+            "50"
+          ],
+          [
+            "SearchItems",
+            "50"
+          ],
+          [
+            "UpdateBatch",
+            "50"
+          ],
+          [
+            "SyncZone",
+            "49"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1048",
+      "sql": "SELECT DISTINCT http_method, facility_zone FROM \"{stream}\" WHERE match_all('warehouse') AND http_method IN ('GET','POST','PUT') ORDER BY http_method ASC, facility_zone ASC LIMIT 20",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "http_method",
+          "facility_zone"
+        ],
+        "results": [
+          [
+            "GET",
+            "ZONE-1"
+          ],
+          [
+            "GET",
+            "ZONE-3"
+          ],
+          [
+            "POST",
+            "ZONE-2"
+          ],
+          [
+            "POST",
+            "ZONE-4"
+          ],
+          [
+            "PUT",
+            "ZONE-1"
+          ],
+          [
+            "PUT",
+            "ZONE-3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1049",
+      "sql": "WITH grouped AS (SELECT region_code, COUNT(*) AS c FROM \"{stream}\" WHERE match_all('warehouse') GROUP BY region_code) SELECT region_code, c FROM grouped WHERE c > 5 ORDER BY c DESC, region_code ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "region_code",
+          "c"
+        ],
+        "results": [
+          [
+            "AP-SOUTH",
+            "51"
+          ],
+          [
+            "AP-CENTRAL",
+            "50"
+          ],
+          [
+            "EU-CENTRAL",
+            "50"
+          ],
+          [
+            "EU-NORTH",
+            "50"
+          ],
+          [
+            "EU-WEST",
+            "50"
+          ],
+          [
+            "SA-EAST",
+            "50"
+          ],
+          [
+            "US-CENTRAL",
+            "50"
+          ],
+          [
+            "US-EAST",
+            "50"
+          ],
+          [
+            "US-WEST",
+            "50"
+          ],
+          [
+            "AP-EAST",
+            "49"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1050",
+      "sql": "WITH src AS (SELECT facility_zone, CASE WHEN response_code >= 500 THEN 'server_err' WHEN response_code >= 400 THEN 'client_err' ELSE 'ok' END AS status_class FROM \"{stream}\" WHERE match_all('warehouse')) SELECT status_class, facility_zone, COUNT(*) AS c FROM src GROUP BY status_class, facility_zone ORDER BY c DESC, status_class ASC, facility_zone ASC LIMIT 20",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "status_class",
+          "facility_zone",
+          "c"
+        ],
+        "results": [
+          [
+            "client_err",
+            "ZONE-1",
+            "50"
+          ],
+          [
+            "client_err",
+            "ZONE-2",
+            "50"
+          ],
+          [
+            "client_err",
+            "ZONE-4",
+            "50"
+          ],
+          [
+            "ok",
+            "ZONE-1",
+            "50"
+          ],
+          [
+            "ok",
+            "ZONE-2",
+            "50"
+          ],
+          [
+            "ok",
+            "ZONE-3",
+            "50"
+          ],
+          [
+            "ok",
+            "ZONE-4",
+            "50"
+          ],
+          [
+            "client_err",
+            "ZONE-3",
+            "49"
+          ],
+          [
+            "server_err",
+            "ZONE-4",
+            "26"
+          ],
+          [
+            "server_err",
+            "ZONE-1",
+            "25"
+          ],
+          [
+            "server_err",
+            "ZONE-2",
+            "25"
+          ],
+          [
+            "server_err",
+            "ZONE-3",
+            "25"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1051",
+      "sql": "SELECT sorter_model, COUNT(*) AS c FROM \"{stream}\" WHERE match_all('warehouse') AND sorter_model IN ('SORT-X1','SORT-A7','SORT-M3','SORT-Q5') GROUP BY sorter_model HAVING COUNT(*) > 2 ORDER BY c DESC, sorter_model ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "sorter_model",
+          "c"
+        ],
+        "results": [
+          [
+            "SORT-A7",
+            "126"
+          ],
+          [
+            "SORT-M3",
+            "125"
+          ],
+          [
+            "SORT-X1",
+            "124"
+          ],
+          [
+            "SORT-Q5",
+            "62"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1052",
+      "sql": "WITH raw AS (SELECT tag_b, log_message, latency_ms FROM \"{stream}\" WHERE match_all('warehouse')), classified AS (SELECT tag_b, CASE WHEN latency_ms < 100 THEN 'fast' WHEN latency_ms < 1000 THEN 'medium' ELSE 'slow' END AS bucket FROM raw WHERE latency_ms IS NOT NULL) SELECT bucket, tag_b, COUNT(*) AS c FROM classified GROUP BY bucket, tag_b ORDER BY c DESC, bucket ASC, tag_b ASC LIMIT 20",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "bucket",
+          "tag_b",
+          "c"
+        ],
+        "results": [
+          [
+            "fast",
+            "critical",
+            "100"
+          ],
+          [
+            "slow",
+            "critical",
+            "51"
+          ],
+          [
+            "fast",
+            "low",
+            "50"
+          ],
+          [
+            "fast",
+            "medium",
+            "50"
+          ],
+          [
+            "medium",
+            "high",
+            "50"
+          ],
+          [
+            "medium",
+            "medium",
+            "50"
+          ],
+          [
+            "slow",
+            "high",
+            "50"
+          ],
+          [
+            "slow",
+            "low",
+            "50"
+          ],
+          [
+            "fast",
+            "high",
+            "49"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1053",
+      "sql": "WITH a AS (SELECT facility_zone, COUNT(*) AS c FROM \"{stream}\" WHERE match_all('warehouse') GROUP BY facility_zone), b AS (SELECT facility_zone, COUNT(*) AS c FROM \"{stream}\" WHERE match_all('event') GROUP BY facility_zone) SELECT a.facility_zone, a.c AS c1, b.c AS c2 FROM a JOIN b ON a.facility_zone = b.facility_zone ORDER BY c1 DESC, a.facility_zone ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "c1",
+          "c2"
+        ],
+        "results": [
+          [
+            "ZONE-4",
+            "126",
+            "126"
+          ],
+          [
+            "ZONE-1",
+            "125",
+            "125"
+          ],
+          [
+            "ZONE-2",
+            "125",
+            "125"
+          ],
+          [
+            "ZONE-3",
+            "124",
+            "124"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1054",
+      "sql": "WITH a AS (SELECT facility_zone, COUNT(*) AS c FROM \"{stream}\" WHERE match_all('warehouse') GROUP BY facility_zone), b AS (SELECT facility_zone, COUNT(*) AS c FROM \"{stream}\" WHERE match_all('ACK') GROUP BY facility_zone) SELECT a.facility_zone, a.c AS all_c, COALESCE(b.c, 0) AS ack_c FROM a LEFT JOIN b ON a.facility_zone = b.facility_zone ORDER BY all_c DESC, a.facility_zone ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "all_c",
+          "ack_c"
+        ],
+        "results": [
+          [
+            "ZONE-4",
+            "126",
+            "51"
+          ],
+          [
+            "ZONE-1",
+            "125",
+            "50"
+          ],
+          [
+            "ZONE-2",
+            "125",
+            "50"
+          ],
+          [
+            "ZONE-3",
+            "124",
+            "50"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1056",
+      "sql": "SELECT outer_t.http_method, outer_t.n FROM (SELECT http_method, COUNT(*) AS n FROM \"{stream}\" WHERE match_all('warehouse') GROUP BY http_method) outer_t JOIN (SELECT DISTINCT http_method FROM \"{stream}\" WHERE match_all('event')) inner_t ON outer_t.http_method = inner_t.http_method ORDER BY outer_t.n DESC, outer_t.http_method ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "http_method",
+          "n"
+        ],
+        "results": [
+          [
+            "POST",
+            "151"
+          ],
+          [
+            "GET",
+            "149"
+          ],
+          [
+            "DELETE",
+            "100"
+          ],
+          [
+            "PUT",
+            "100"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1057",
+      "sql": "WITH fts AS (SELECT facility_zone, pallet_id FROM \"{stream}\" WHERE match_all('warehouse') AND pallet_id IS NOT NULL) SELECT f.facility_zone, COUNT(DISTINCT f.pallet_id) AS uniq FROM fts f JOIN fts f2 ON f.facility_zone = f2.facility_zone GROUP BY f.facility_zone ORDER BY uniq DESC, f.facility_zone ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "uniq"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "2"
+          ],
+          [
+            "ZONE-2",
+            "2"
+          ],
+          [
+            "ZONE-3",
+            "2"
+          ],
+          [
+            "ZONE-4",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1059",
+      "sql": "WITH ranked AS (SELECT facility_zone, throughput_rate, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY throughput_rate DESC, _timestamp) AS rn FROM \"{stream}\" WHERE match_all('warehouse') AND throughput_rate IS NOT NULL) SELECT facility_zone, throughput_rate FROM ranked WHERE rn = 1 ORDER BY throughput_rate DESC, facility_zone ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "throughput_rate"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "900.0"
+          ],
+          [
+            "ZONE-3",
+            "900.0"
+          ],
+          [
+            "ZONE-2",
+            "725.0"
+          ],
+          [
+            "ZONE-4",
+            "725.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1060",
+      "sql": "WITH counted AS (SELECT sorter_model, COUNT(*) OVER (PARTITION BY sorter_model) AS per_model_count FROM \"{stream}\" WHERE match_all('warehouse')) SELECT sorter_model, MAX(per_model_count) AS max_c FROM counted GROUP BY sorter_model ORDER BY max_c DESC, sorter_model ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "sorter_model",
+          "max_c"
+        ],
+        "results": [
+          [
+            "SORT-A7",
+            "126"
+          ],
+          [
+            "SORT-M3",
+            "125"
+          ],
+          [
+            "SORT-X1",
+            "124"
+          ],
+          [
+            "SORT-Z9",
+            "63"
+          ],
+          [
+            "SORT-Q5",
+            "62"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1061",
+      "sql": "WITH ranked AS (SELECT facility_zone, component_name, latency_ms, RANK() OVER (PARTITION BY facility_zone ORDER BY latency_ms DESC, _timestamp) AS r FROM \"{stream}\" WHERE match_all('warehouse') AND latency_ms IS NOT NULL) SELECT facility_zone, component_name, latency_ms FROM ranked WHERE r = 1 ORDER BY latency_ms DESC, facility_zone ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "component_name",
+          "latency_ms"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "temp-regulator",
+            "3200"
+          ],
+          [
+            "ZONE-3",
+            "temp-regulator",
+            "3200"
+          ],
+          [
+            "ZONE-2",
+            "batch-sync",
+            "1450"
+          ],
+          [
+            "ZONE-4",
+            "batch-sync",
+            "1450"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1062",
+      "sql": "WITH windowed AS (SELECT tag_a, tag_b, SUM(CAST(payload_size AS BIGINT)) OVER (PARTITION BY tag_a) AS tag_total FROM \"{stream}\" WHERE match_all('warehouse') AND payload_size IS NOT NULL) SELECT tag_a, MAX(tag_total) AS max_total FROM windowed GROUP BY tag_a ORDER BY max_total DESC, tag_a ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "tag_a",
+          "max_total"
+        ],
+        "results": [
+          [
+            "prod",
+            "4622336"
+          ],
+          [
+            "dev",
+            "1868800"
+          ],
+          [
+            "staging",
+            "121472"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1063",
+      "sql": "WITH ranked AS (SELECT region_code, org_name, DENSE_RANK() OVER (PARTITION BY region_code ORDER BY org_name) AS dr FROM \"{stream}\" WHERE match_all('warehouse')) SELECT region_code, COUNT(DISTINCT dr) AS ranks FROM ranked GROUP BY region_code ORDER BY ranks DESC, region_code ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "region_code",
+          "ranks"
+        ],
+        "results": [
+          [
+            "AP-CENTRAL",
+            "1"
+          ],
+          [
+            "AP-EAST",
+            "1"
+          ],
+          [
+            "AP-SOUTH",
+            "1"
+          ],
+          [
+            "EU-CENTRAL",
+            "1"
+          ],
+          [
+            "EU-NORTH",
+            "1"
+          ],
+          [
+            "EU-WEST",
+            "1"
+          ],
+          [
+            "SA-EAST",
+            "1"
+          ],
+          [
+            "US-CENTRAL",
+            "1"
+          ],
+          [
+            "US-EAST",
+            "1"
+          ],
+          [
+            "US-WEST",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1064",
+      "sql": "SELECT facility_zone, COUNT(*) AS cnt FROM \"{stream}\" WHERE NOT match_all('error') AND facility_zone IS NOT NULL GROUP BY facility_zone ORDER BY cnt DESC, facility_zone ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt"
+        ],
+        "results": [
+          [
+            "ZONE-4",
+            "126"
+          ],
+          [
+            "ZONE-1",
+            "125"
+          ],
+          [
+            "ZONE-2",
+            "125"
+          ],
+          [
+            "ZONE-3",
+            "124"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1065",
+      "sql": "WITH has_warehouse AS (SELECT facility_zone, log FROM \"{stream}\" WHERE match_all('warehouse') AND NOT match_all('error')) SELECT facility_zone, COUNT(*) AS c FROM has_warehouse GROUP BY facility_zone ORDER BY c DESC, facility_zone ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "c"
+        ],
+        "results": [
+          [
+            "ZONE-4",
+            "126"
+          ],
+          [
+            "ZONE-1",
+            "125"
+          ],
+          [
+            "ZONE-2",
+            "125"
+          ],
+          [
+            "ZONE-3",
+            "124"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1066",
+      "sql": "WITH pos AS (SELECT facility_zone, 'w' AS src FROM \"{stream}\" WHERE match_all('warehouse')), neg AS (SELECT facility_zone, 'n' AS src FROM \"{stream}\" WHERE NOT match_all('error')) SELECT src, COUNT(*) AS c FROM (SELECT * FROM pos UNION ALL SELECT * FROM neg) u GROUP BY src ORDER BY src ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "src",
+          "c"
+        ],
+        "results": [
+          [
+            "n",
+            "500"
+          ],
+          [
+            "w",
+            "500"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1067",
+      "sql": "SELECT facility_zone, COUNT(*) AS both_cnt FROM \"{stream}\" WHERE match_all('warehouse') AND match_all('event') GROUP BY facility_zone ORDER BY both_cnt DESC, facility_zone ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "both_cnt"
+        ],
+        "results": [
+          [
+            "ZONE-4",
+            "126"
+          ],
+          [
+            "ZONE-1",
+            "125"
+          ],
+          [
+            "ZONE-2",
+            "125"
+          ],
+          [
+            "ZONE-3",
+            "124"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1068",
+      "sql": "SELECT facility_zone, COUNT(*) AS or_cnt FROM \"{stream}\" WHERE match_all('warehouse') OR match_all('error') GROUP BY facility_zone ORDER BY or_cnt DESC, facility_zone ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "or_cnt"
+        ],
+        "results": [
+          [
+            "ZONE-4",
+            "126"
+          ],
+          [
+            "ZONE-1",
+            "125"
+          ],
+          [
+            "ZONE-2",
+            "125"
+          ],
+          [
+            "ZONE-3",
+            "124"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1055",
+      "sql": "WITH fts_a AS (SELECT facility_zone, COUNT(*) AS a_cnt FROM \"{stream}\" WHERE match_all('warehouse') AND facility_zone IS NOT NULL GROUP BY facility_zone), all_b AS (SELECT facility_zone, COUNT(*) AS b_cnt FROM \"{stream2}\" WHERE facility_zone IS NOT NULL GROUP BY facility_zone) SELECT a.facility_zone, a.a_cnt, b.b_cnt FROM fts_a a JOIN all_b b ON a.facility_zone = b.facility_zone ORDER BY a.a_cnt DESC, a.facility_zone ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "a_cnt",
+          "b_cnt"
+        ],
+        "results": [
+          [
+            "ZONE-4",
+            "126",
+            "125"
+          ],
+          [
+            "ZONE-1",
+            "125",
+            "125"
+          ],
+          [
+            "ZONE-2",
+            "125",
+            "124"
+          ],
+          [
+            "ZONE-3",
+            "124",
+            "126"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1058",
+      "sql": "WITH fts_left AS (SELECT region_code, COUNT(*) AS l_cnt FROM \"{stream}\" WHERE match_all('warehouse') AND region_code IS NOT NULL GROUP BY region_code), fts_right AS (SELECT region_code, COUNT(*) AS r_cnt FROM \"{stream2}\" WHERE match_all('event') AND region_code IS NOT NULL GROUP BY region_code) SELECT l.region_code, l.l_cnt, r.r_cnt FROM fts_left l JOIN fts_right r ON l.region_code = r.region_code ORDER BY l.l_cnt DESC, l.region_code ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "region_code",
+          "l_cnt",
+          "r_cnt"
+        ],
+        "results": [
+          [
+            "AP-SOUTH",
+            "51",
+            "50"
+          ],
+          [
+            "AP-CENTRAL",
+            "50",
+            "50"
+          ],
+          [
+            "EU-CENTRAL",
+            "50",
+            "50"
+          ],
+          [
+            "EU-NORTH",
+            "50",
+            "50"
+          ],
+          [
+            "EU-WEST",
+            "50",
+            "50"
+          ],
+          [
+            "SA-EAST",
+            "50",
+            "49"
+          ],
+          [
+            "US-CENTRAL",
+            "50",
+            "50"
+          ],
+          [
+            "US-EAST",
+            "50",
+            "50"
+          ],
+          [
+            "US-WEST",
+            "50",
+            "50"
+          ],
+          [
+            "AP-EAST",
+            "49",
+            "51"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1069",
+      "sql": "SELECT http_method, COUNT(*) AS cnt FROM \"{stream}\" WHERE (match_all('warehouse') OR match_all('event')) AND http_method IN ('GET','POST','PUT','DELETE') GROUP BY http_method ORDER BY cnt DESC, http_method ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "http_method",
+          "cnt"
+        ],
+        "results": [
+          [
+            "POST",
+            "151"
+          ],
+          [
+            "GET",
+            "149"
+          ],
+          [
+            "DELETE",
+            "100"
+          ],
+          [
+            "PUT",
+            "100"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1016",
+      "sql": "WITH filtered AS (SELECT facility_zone FROM \"{stream}\" WHERE match_all('warehouse') AND log_message LIKE 'GET %' UNION ALL SELECT facility_zone FROM \"{stream}\" WHERE match_all('warehouse') AND log_message LIKE 'POST %' UNION ALL SELECT facility_zone FROM \"{stream}\" WHERE match_all('warehouse') AND log_message LIKE 'ERROR:%') SELECT facility_zone, COUNT(*) AS cnt FROM filtered GROUP BY facility_zone ORDER BY cnt DESC, facility_zone ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt"
+        ],
+        "results": [
+          [
+            "ZONE-2",
+            "75"
+          ],
+          [
+            "ZONE-4",
+            "75"
+          ],
+          [
+            "ZONE-1",
+            "25"
+          ],
+          [
+            "ZONE-3",
+            "25"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1041",
+      "sql": "WITH src AS (SELECT facility_zone, log_message FROM \"{stream}\" WHERE match_all('warehouse')), filtered AS (SELECT facility_zone FROM src WHERE log_message LIKE 'GET %' OR log_message LIKE 'POST %' OR log_message LIKE 'PUT %') SELECT facility_zone, COUNT(*) AS cnt FROM filtered GROUP BY facility_zone ORDER BY cnt DESC, facility_zone ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "25"
+          ],
+          [
+            "ZONE-2",
+            "25"
+          ],
+          [
+            "ZONE-3",
+            "25"
+          ],
+          [
+            "ZONE-4",
+            "25"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1045",
+      "sql": "WITH raw AS (SELECT event_detail, facility_zone FROM \"{stream}\" WHERE match_all('warehouse')), extracted AS (SELECT facility_zone, event_detail FROM raw WHERE event_detail IS NOT NULL), matched AS (SELECT facility_zone FROM extracted WHERE event_detail LIKE '%batch%' OR event_detail LIKE '%segment%') SELECT facility_zone, COUNT(*) AS c FROM matched GROUP BY facility_zone ORDER BY c DESC, facility_zone ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "c"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "100"
+          ],
+          [
+            "ZONE-3",
+            "99"
+          ],
+          [
+            "ZONE-2",
+            "75"
+          ],
+          [
+            "ZONE-4",
+            "75"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1071",
+      "sql": "WITH bucketed AS (SELECT histogram(_timestamp, '10 minute') AS bucket, facility_zone FROM \"{stream}\" WHERE match_all('warehouse') AND facility_zone IS NOT NULL) SELECT bucket, facility_zone, COUNT(*) AS n FROM bucketed GROUP BY bucket, facility_zone ORDER BY bucket ASC, n DESC LIMIT 30",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "bucket",
+          "facility_zone",
+          "n"
+        ],
+        "results": [
+          [
+            "2026-08-14T05:00:00",
+            "ZONE-3",
+            "6"
+          ],
+          [
+            "2026-08-14T05:00:00",
+            "ZONE-1",
+            "6"
+          ],
+          [
+            "2026-08-14T05:00:00",
+            "ZONE-4",
+            "6"
+          ],
+          [
+            "2026-08-14T05:00:00",
+            "ZONE-2",
+            "6"
+          ],
+          [
+            "2026-08-14T05:10:00",
+            "ZONE-1",
+            "13"
+          ],
+          [
+            "2026-08-14T05:10:00",
+            "ZONE-4",
+            "13"
+          ],
+          [
+            "2026-08-14T05:10:00",
+            "ZONE-3",
+            "12"
+          ],
+          [
+            "2026-08-14T05:10:00",
+            "ZONE-2",
+            "12"
+          ],
+          [
+            "2026-08-14T05:20:00",
+            "ZONE-2",
+            "13"
+          ],
+          [
+            "2026-08-14T05:20:00",
+            "ZONE-3",
+            "13"
+          ],
+          [
+            "2026-08-14T05:20:00",
+            "ZONE-1",
+            "12"
+          ],
+          [
+            "2026-08-14T05:20:00",
+            "ZONE-4",
+            "12"
+          ],
+          [
+            "2026-08-14T05:30:00",
+            "ZONE-4",
+            "13"
+          ],
+          [
+            "2026-08-14T05:30:00",
+            "ZONE-1",
+            "13"
+          ],
+          [
+            "2026-08-14T05:30:00",
+            "ZONE-2",
+            "12"
+          ],
+          [
+            "2026-08-14T05:30:00",
+            "ZONE-3",
+            "12"
+          ],
+          [
+            "2026-08-14T05:40:00",
+            "ZONE-3",
+            "13"
+          ],
+          [
+            "2026-08-14T05:40:00",
+            "ZONE-2",
+            "13"
+          ],
+          [
+            "2026-08-14T05:40:00",
+            "ZONE-1",
+            "12"
+          ],
+          [
+            "2026-08-14T05:40:00",
+            "ZONE-4",
+            "12"
+          ],
+          [
+            "2026-08-14T05:50:00",
+            "ZONE-4",
+            "13"
+          ],
+          [
+            "2026-08-14T05:50:00",
+            "ZONE-1",
+            "13"
+          ],
+          [
+            "2026-08-14T05:50:00",
+            "ZONE-2",
+            "12"
+          ],
+          [
+            "2026-08-14T05:50:00",
+            "ZONE-3",
+            "12"
+          ],
+          [
+            "2026-08-14T06:00:00",
+            "ZONE-3",
+            "13"
+          ],
+          [
+            "2026-08-14T06:00:00",
+            "ZONE-2",
+            "13"
+          ],
+          [
+            "2026-08-14T06:00:00",
+            "ZONE-1",
+            "12"
+          ],
+          [
+            "2026-08-14T06:00:00",
+            "ZONE-4",
+            "12"
+          ],
+          [
+            "2026-08-14T06:10:00",
+            "ZONE-4",
+            "13"
+          ],
+          [
+            "2026-08-14T06:10:00",
+            "ZONE-1",
+            "13"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true,
+        "skip_column_check": true
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1072",
+      "sql": "SELECT bucket, avg_lat FROM (SELECT histogram(_timestamp, '15 minute') AS bucket, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat FROM \"{stream}\" WHERE match_all('warehouse') AND latency_ms IS NOT NULL GROUP BY bucket) s ORDER BY bucket ASC LIMIT 20",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "bucket",
+          "avg_lat"
+        ],
+        "results": [
+          [
+            "2026-08-14T05:00:00",
+            "772.265306122449"
+          ],
+          [
+            "2026-08-14T05:15:00",
+            "821.88"
+          ],
+          [
+            "2026-08-14T05:30:00",
+            "695.32"
+          ],
+          [
+            "2026-08-14T05:45:00",
+            "821.88"
+          ],
+          [
+            "2026-08-14T06:00:00",
+            "695.32"
+          ],
+          [
+            "2026-08-14T06:15:00",
+            "821.88"
+          ],
+          [
+            "2026-08-14T06:30:00",
+            "695.32"
+          ],
+          [
+            "2026-08-14T06:45:00",
+            "1450.0"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true,
+        "skip_column_check": true
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1070",
+      "sql": "SELECT histogram(_timestamp, '5 minute') AS bucket, COUNT(*) AS hits FROM \"{stream}\" WHERE match_all('warehouse') GROUP BY bucket ORDER BY bucket ASC LIMIT 20",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "bucket",
+          "hits"
+        ],
+        "results": [
+          [
+            "2026-08-14T05:05:00",
+            "24"
+          ],
+          [
+            "2026-08-14T05:10:00",
+            "25"
+          ],
+          [
+            "2026-08-14T05:15:00",
+            "25"
+          ],
+          [
+            "2026-08-14T05:20:00",
+            "25"
+          ],
+          [
+            "2026-08-14T05:25:00",
+            "25"
+          ],
+          [
+            "2026-08-14T05:30:00",
+            "25"
+          ],
+          [
+            "2026-08-14T05:35:00",
+            "25"
+          ],
+          [
+            "2026-08-14T05:40:00",
+            "25"
+          ],
+          [
+            "2026-08-14T05:45:00",
+            "25"
+          ],
+          [
+            "2026-08-14T05:50:00",
+            "25"
+          ],
+          [
+            "2026-08-14T05:55:00",
+            "25"
+          ],
+          [
+            "2026-08-14T06:00:00",
+            "25"
+          ],
+          [
+            "2026-08-14T06:05:00",
+            "25"
+          ],
+          [
+            "2026-08-14T06:10:00",
+            "25"
+          ],
+          [
+            "2026-08-14T06:15:00",
+            "25"
+          ],
+          [
+            "2026-08-14T06:20:00",
+            "25"
+          ],
+          [
+            "2026-08-14T06:25:00",
+            "25"
+          ],
+          [
+            "2026-08-14T06:30:00",
+            "25"
+          ],
+          [
+            "2026-08-14T06:35:00",
+            "25"
+          ],
+          [
+            "2026-08-14T06:40:00",
+            "25"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true,
+        "skip_column_check": true
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
       }
     }
   ],

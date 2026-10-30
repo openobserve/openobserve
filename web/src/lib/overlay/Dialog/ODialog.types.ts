@@ -2,9 +2,13 @@
  * ODialog.types.ts — public types for ODialog.
  */
 
+import type { I18nText } from "@/types/i18n";
+
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 
 export type DialogSize = "xs" | "sm" | "md" | "lg" | "xl" | "full";
+
+export type DialogInitialFocus = "primary" | "secondary";
 
 export interface DialogProps {
   /** Controlled open state — use with v-model:open */
@@ -28,7 +32,7 @@ export interface DialogProps {
    * Convenience prop: plain-text title rendered inside the header section.
    * Ignored when the `header` slot is provided.
    */
-  title?: string;
+  title?: I18nText;
 
   /**
    * Whether to render a built-in × close button in the top-right corner.
@@ -57,7 +61,7 @@ export interface DialogProps {
    * Optional subtitle rendered below the title in the header, left-aligned.
    * Ignored when the `header` slot is provided.
    */
-  subTitle?: string;
+  subTitle?: I18nText;
 
   // ── Inbuilt footer buttons ──────────────────────────────────────────────
 
@@ -68,11 +72,13 @@ export interface DialogProps {
   formId?: string;
 
   /** Label for the primary action button (right side). Omit to hide. */
-  primaryButtonLabel?: string;
+  primaryButtonLabel?: I18nText;
+  /** data-test for the primary button. @default "o-dialog-primary-btn" */
+  primaryButtonDataTest?: string;
   /** Label for the secondary action button (right of neutral, left of primary). Omit to hide. */
-  secondaryButtonLabel?: string;
+  secondaryButtonLabel?: I18nText;
   /** Label for the neutral action button (left side). Omit to hide. */
-  neutralButtonLabel?: string;
+  neutralButtonLabel?: I18nText;
 
   /** OButton variant for the primary button. @default "primary" */
   primaryButtonVariant?: ButtonVariant;
@@ -94,6 +100,9 @@ export interface DialogProps {
   secondaryButtonLoading?: boolean;
   /** Shows loading spinner on neutral button (also disables all buttons). */
   neutralButtonLoading?: boolean;
+
+  /** The footer button focused on open when the body has no field; `secondary` keeps Enter off a destructive primary. @default "primary" */
+  initialFocus?: DialogInitialFocus;
 }
 
 export interface DialogEmits {
@@ -147,4 +156,11 @@ export interface DialogSlots {
    * When omitted, no footer section is rendered.
    */
   footer?: () => unknown;
+
+  /**
+   * Optional left sub-slot in the built-in footer row.
+   * Rendered before the neutral button, left-aligned.
+   * Ignored when the `#footer` full-override slot is provided.
+   */
+  "footer-left"?: () => unknown;
 }

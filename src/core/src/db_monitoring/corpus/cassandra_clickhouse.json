@@ -1,0 +1,106 @@
+[
+  {
+    "id": "cassandra-cql-literals",
+    "dialect": "cassandra",
+    "input": {
+      "attrs": {
+        "db.system": "cassandra",
+        "db.statement": "SELECT * FROM ks.events WHERE day = '2026-08-07' AND id = 84213"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT * FROM ks.events WHERE day = ? AND id = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "cassandra",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "cql_events_by_day_id",
+    "literals": ["2026-08-07", "84213"],
+    "source": "authored"
+  },
+  {
+    "id": "cassandra-cql-prepared-placeholders",
+    "dialect": "cassandra",
+    "input": {
+      "attrs": {
+        "db.system": "cassandra",
+        "db.statement": "SELECT * FROM ks.events WHERE day = ? AND id = ?"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT * FROM ks.events WHERE day = ? AND id = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "cassandra",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "cql_events_by_day_id",
+    "literals": [],
+    "source": "authored"
+  },
+  {
+    "id": "clickhouse-nonstandard-literals-a",
+    "dialect": "clickhouse",
+    "input": {
+      "attrs": {
+        "db.system": "clickhouse",
+        "db.statement": "SELECT count() FROM hits WHERE EventDate = toDate('2026-08-05') AND UserID = 8437291"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT count() FROM hits WHERE EventDate = toDate(?) AND UserID = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "clickhouse",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "ch_hits_by_date_user",
+    "literals": ["2026-08-05", "8437291"],
+    "source": "authored"
+  },
+  {
+    "id": "clickhouse-nonstandard-literals-b",
+    "dialect": "clickhouse",
+    "input": {
+      "attrs": {
+        "db.system": "clickhouse",
+        "db.statement": "SELECT count() FROM hits WHERE EventDate = toDate('2026-07-31') AND UserID = 6650912"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT count() FROM hits WHERE EventDate = toDate(?) AND UserID = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "clickhouse",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "ch_hits_by_date_user",
+    "literals": ["2026-07-31", "6650912"],
+    "source": "authored"
+  }
+]

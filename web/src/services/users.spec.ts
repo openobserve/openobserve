@@ -16,6 +16,9 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import users from "@/services/users";
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/services/http");
 
@@ -434,5 +437,74 @@ describe("Users Service", () => {
       const deleteResult = await users.delete(mockOrgId, userData.email);
       expect(deleteResult.data.message).toBe("Deleted");
     });
+  });
+});
+
+describe("users product analytics", () => {
+  beforeEach(() => {
+    vi.mocked(analytics.track).mockClear();
+  });
+
+  it("tracks after create succeeds", async () => {
+    (http as any).mockImplementation(() => ({ post: vi.fn().mockResolvedValue({ data: {} }) }));
+    await users.create({}, "org1");
+    expect(analytics.track).toHaveBeenCalledWith("user_added", { is_new: true });
+  });
+
+  it("does not track when create fails and keeps the rejection", async () => {
+    (http as any).mockImplementation(() => ({
+      post: vi.fn().mockRejectedValue(new Error("boom")),
+    }));
+    await expect(users.create({}, "org1")).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+  it("tracks after updateexistinguser succeeds", async () => {
+    (http as any).mockImplementation(() => ({ post: vi.fn().mockResolvedValue({ data: {} }) }));
+    await users.updateexistinguser({}, "org1", "a@b.c");
+    expect(analytics.track).toHaveBeenCalledWith("user_added", { is_new: false });
+  });
+
+  it("does not track when updateexistinguser fails and keeps the rejection", async () => {
+    (http as any).mockImplementation(() => ({
+      post: vi.fn().mockRejectedValue(new Error("boom")),
+    }));
+    await expect(users.updateexistinguser({}, "org1", "a@b.c")).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+  it("tracks after delete succeeds", async () => {
+    (http as any).mockImplementation(() => ({ delete: vi.fn().mockResolvedValue({ data: {} }) }));
+    await users.delete("org1", "a@b.c");
+    expect(analytics.track).toHaveBeenCalledWith("user_removed", { count: 1 });
+  });
+
+  it("does not track when delete fails and keeps the rejection", async () => {
+    (http as any).mockImplementation(() => ({
+      delete: vi.fn().mockRejectedValue(new Error("boom")),
+    }));
+    await expect(users.delete("org1", "a@b.c")).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+  it("tracks after bulkDelete succeeds", async () => {
+    (http as any).mockImplementation(() => ({
+      delete: vi.fn().mockResolvedValue({ data: { successful: ["a", "b"], unsuccessful: [] } }),
+    }));
+    await users.bulkDelete("org1", { ids: ["a", "b"] });
+    expect(analytics.track).toHaveBeenCalledWith("user_removed", { count: 2 });
+  });
+
+  it("does not track when bulkDelete fails and keeps the rejection", async () => {
+    (http as any).mockImplementation(() => ({
+      delete: vi.fn().mockRejectedValue(new Error("boom")),
+    }));
+    await expect(users.bulkDelete("org1", { ids: ["a", "b"] })).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+
+  it("does not track when bulkDelete removed nobody", async () => {
+    (http as any).mockImplementation(() => ({
+      delete: vi.fn().mockResolvedValue({ data: { successful: [], unsuccessful: ["a"] } }),
+    }));
+    await users.bulkDelete("org1", { ids: ["a"] });
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });

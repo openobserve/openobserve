@@ -153,6 +153,20 @@ export class ThemePage {
         return !isDark;
     }
 
+    // Non-"dark" values (missing key, "DARK", "1", "") all resolve to light.
+    async getCurrentThemeFromStorage() {
+        return await this.page.evaluate(() => localStorage.getItem('theme'));
+    }
+
+    // Poll the class, never a fixed delay: the .dark toggle is async to navigation.
+    async waitForDarkModeApplied(timeout = 10000) {
+        await this.page.waitForFunction(
+            (darkClass) => document.documentElement.classList.contains(darkClass),
+            this.bodyDarkClass,
+            { timeout }
+        );
+    }
+
     async switchToLightMode() {
         if (await this.isDarkMode()) {
             await this.toggleThemeMode();
@@ -315,6 +329,10 @@ export class ThemePage {
     async expectLightMode() {
         const isLight = await this.isLightMode();
         expect(isLight).toBe(true);
+    }
+
+    async expectProfileMenuVisible() {
+        await expect(this.profileMenuBtn).toBeVisible({ timeout: 10000 });
     }
 
     async expectNotificationContains(_text) {

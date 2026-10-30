@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-text-secondary cursor-help"
           data-test="synthetics-tokens-info-icon"
         />
-        <OTooltip :content="t('synthetics.tokens.explanation')" max-width="360px" />
+        <OTooltip :content="t('synthetics.tokens.explanation')" max-width="22.5rem" />
       </span>
     </template>
     <template #subtitle>
@@ -75,10 +75,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :page-size-options="[20, 50, 100, 250, 500]"
           sorting="client"
           show-index
-          :footer-title="t('synthetics.tokens.title')"
         >
           <template #toolbar>
-            <div class="flex w-full items-center gap-2">
+            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('synthetics.tokens.searchPlaceholder')"
@@ -88,20 +87,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
-              :loading="loading"
+              :last-run-at="lastUpdatedAt"
+              :loading="fetching"
+              shortcut-id="syntheticsTokensRefresh"
               data-test="synthetics-tokens-refresh-btn"
-              @click="fetchTokens"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="syntheticsTokensRefresh"
-              />
-            </OButton>
+              @click="refreshTokens"
+            />
           </template>
           <template #empty>
             <OEmptyState
@@ -116,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-name="{ row }">
             <div class="flex min-w-0 items-center gap-2">
-              <span class="truncate font-medium">{{ row.name }}</span>
+              <OTruncatedText class="font-medium">{{ row.name }}</OTruncatedText>
               <OTag v-if="row.is_default" variant="primary-soft" size="xs" shape="rounded">
                 {{ t("synthetics.tokens.default") }}
               </OTag>
@@ -224,8 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <pre
             class="bg-surface-subtle border-border-default rounded-default overflow-x-auto border p-3 font-mono text-xs whitespace-pre"
             data-test="synthetics-token-install-cmd"
-            >{{ installCommand }}</pre
-          >
+            >{{ installCommand }}</pre>
           <OButton
             variant="ghost"
             size="icon-sm"
@@ -270,14 +263,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { ref, computed, defineComponent, onBeforeMount } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import {
+  createAgentTokenMutation,
+  rotateAgentTokenMutation,
+  setAgentTokenEnabledMutation,
+} from "@/services/synthetics.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
+import { agentTokensQuery } from "@/services/synthetics.queries";
+import { ref, computed, defineComponent, onBeforeMount, watch } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -317,6 +321,8 @@ export default defineComponent({
     OIcon,
     OSearchInput,
     OTooltip,
+    OTruncatedText,
+    ORefreshButton,
     ODialog,
     OForm,
     OFormInput,
@@ -326,12 +332,27 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const createTokenSchema = makeCreateTokenSchema(t);
 
-    const tokens = ref<AgentToken[]>([]);
-    const loading = ref(false);
+    const orgIdForList = useOrgId();
+    const tokensList = useQuery(() =>
+      Object.assign(agentTokensQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
+    );
+
+    // The table is the query, not a copy of it: a token write invalidates the
+    // scope and these rows repaint with no wiring here.
+    const tokens = computed(() => {
+      const data = tokensList.data.value;
+      return (data as any)?.tokens ?? [];
+    });
+    const loading = tokensList.isPending;
+    // A request is in flight while rows stay on screen — the refresh button's
+    // spinner. `loading` is the skeleton, which only a cold read wants.
+    const fetching = tokensList.isFetching;
+    // Epoch ms of the last successful read — drives the button's "1m ago" label.
+    const lastUpdatedAt = tokensList.dataUpdatedAt;
     const filterQuery = ref("");
     const showCreateForm = ref(false);
     const showRevealedDialog = ref(false);
@@ -378,7 +399,7 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: 240,
-        meta: { align: "left" },
+        meta: { align: "left", cellOverflowTooltip: false },
       },
       {
         id: "status",
@@ -419,23 +440,26 @@ export default defineComponent({
       },
     ];
 
-    const fetchTokens = async () => {
-      loading.value = true;
-      try {
-        const res = await syntheticsService.listAgentTokens(
-          store.state.selectedOrganization.identifier,
-        );
-        tokens.value = res.data.tokens ?? [];
-      } catch (e: any) {
-        toast({
-          variant: "error",
-          message: e.response?.data?.message || t("synthetics.tokens.fetchError"),
-          timeout: 5000,
-        });
-      } finally {
-        loading.value = false;
-      }
+    // The query owns its failure now, so this reports it once per error however
+    // the read was triggered.
+    watch(tokensList.error, (e: any) => {
+      if (!e) return;
+      toast({
+        variant: "error",
+        message: e.response?.data?.message || t("synthetics.tokens.fetchError"),
+        timeout: 5000,
+      });
+    });
+
+    // Only an explicit call reads: refresh, post-write reload, search. Mount and
+    // invalidation-driven repaints come from the query itself.
+    const fetchTokens = async (force = false) => {
+      if (force) await tokensList.refetch();
     };
+
+    // Named handler: binding fetchTokens straight to @click puts the DOM event
+    // in `force`, and without it the button is a no-op while the entry is fresh.
+    const refreshTokens = () => fetchTokens(true);
 
     const reveal = (name: string, token: string) => {
       revealedToken.value = { name, token };
@@ -445,10 +469,7 @@ export default defineComponent({
     const createToken = async (value: CreateTokenForm) => {
       loading.value = true;
       try {
-        const res = await syntheticsService.createAgentToken(
-          store.state.selectedOrganization.identifier,
-          value.name.trim(),
-        );
+        const res = await createAgentToken.mutateAsync(value.name.trim());
         showCreateForm.value = false;
         reveal(res.data.name, res.data.token);
         await fetchTokens();
@@ -464,12 +485,17 @@ export default defineComponent({
       }
     };
 
+    const orgIdForWrites = useOrgId();
+    const createAgentToken = useMutation(() => createAgentTokenMutation(orgIdForWrites.value));
+    const rotateAgentToken = useMutation(() => rotateAgentTokenMutation(orgIdForWrites.value));
+    const setAgentTokenEnabled = useMutation(() =>
+      setAgentTokenEnabledMutation(orgIdForWrites.value),
+    );
+
     const rotateDefault = async () => {
       loading.value = true;
       try {
-        const res = await syntheticsService.rotateAgentToken(
-          store.state.selectedOrganization.identifier,
-        );
+        const res = await rotateAgentToken.mutateAsync(undefined);
         reveal(res.data.name, res.data.token);
         await fetchTokens();
         toast({ variant: "success", message: t("synthetics.tokens.rotateSuccess"), timeout: 4000 });
@@ -487,11 +513,7 @@ export default defineComponent({
     const toggleEnabled = async (name: string, enabled: boolean) => {
       loading.value = true;
       try {
-        await syntheticsService.setAgentTokenEnabled(
-          store.state.selectedOrganization.identifier,
-          name,
-          enabled,
-        );
+        await setAgentTokenEnabled.mutateAsync({ name, enabled });
         await fetchTokens();
         toast({
           variant: "success",
@@ -515,11 +537,11 @@ export default defineComponent({
       if (!token) return;
       // Single toast: let the clipboard util own the notification with the
       // token-specific message, instead of firing a second generic one.
-      copyToClipboard(token, { successMessage: t("synthetics.tokens.copiedToast") });
+      copyToClipboard(token, t, { successMessage: t("synthetics.tokens.copiedToast") });
     };
 
     const copyCommand = () => {
-      if (installCommand.value) copyToClipboard(installCommand.value);
+      if (installCommand.value) copyToClipboard(installCommand.value, t);
     };
 
     const fetchAgentSetup = async () => {
@@ -550,7 +572,7 @@ export default defineComponent({
       {
         id: "syntheticsTokensRefresh",
         handler: () => {
-          if (!isInputFocused()) fetchTokens();
+          if (!isInputFocused()) refreshTokens();
         },
       },
       {
@@ -565,6 +587,8 @@ export default defineComponent({
       t,
       tokens,
       loading,
+      fetching,
+      lastUpdatedAt,
       filterQuery,
       columns,
       showCreateForm,
@@ -573,6 +597,7 @@ export default defineComponent({
       installCommand,
       copyCommand,
       fetchTokens,
+      refreshTokens,
       createToken,
       createTokenSchema,
       createTokenDefaults,

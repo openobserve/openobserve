@@ -18,15 +18,39 @@ import {
   PREBUILT_CONFIGS,
   getPrebuiltConfig,
   isPrebuiltType,
-  detectPrebuiltTypeFromUrl,
   generateDestinationUrl,
   generateDestinationHeaders,
   generatePrebuiltMetadata,
   getPopularPrebuiltTypes,
   getPrebuiltTypesByCategory,
+  destinationTypeTiles,
 } from "@/utils/prebuilt-templates";
 
 describe("Prebuilt Templates Index", () => {
+  describe("destinationTypeTiles (MK-7)", () => {
+    it("puts the Slack app tile first, tagged for alert response, then the relabelled webhook tile", () => {
+      const tiles = destinationTypeTiles(true);
+      expect(tiles.map((tile) => tile.id).slice(0, 3)).toEqual(["slack_app", "slack", "discord"]);
+      expect(tiles[0].name).toBe("Slack app");
+      expect(tiles[0].tag).toEqual({
+        label: "Recommended for alert response",
+        variant: "success-soft",
+      });
+      expect(tiles[1].name).toBe("Slack webhook");
+      expect(tiles[1].tag).toEqual({ label: "Post only", variant: "default-soft" });
+    });
+
+    it("keeps the unavailable Slack app disabled and the webhook selectable", () => {
+      const tiles = destinationTypeTiles(false);
+      expect(tiles.map((tile) => tile.id)).toEqual([
+        "slack_app",
+        ...PREBUILT_DESTINATION_TYPES.map((p) => p.id),
+      ]);
+      expect(tiles[0].disabled).toBe(true);
+      expect(tiles[1].disabled).not.toBe(true);
+    });
+  });
+
   describe("PREBUILT_DESTINATION_TYPES", () => {
     it("should contain all expected destination types", () => {
       const expectedTypes = [
@@ -51,12 +75,12 @@ describe("Prebuilt Templates Index", () => {
       PREBUILT_DESTINATION_TYPES.forEach((type) => {
         expect(type).toHaveProperty("id");
         expect(type).toHaveProperty("name");
-        expect(type).toHaveProperty("description");
+        expect(type).toHaveProperty("descriptionKey");
         expect(type).toHaveProperty("icon");
         expect(type).toHaveProperty("category");
         expect(typeof type.popular).toBe("boolean");
         expect(typeof type.name).toBe("string");
-        expect(typeof type.description).toBe("string");
+        expect(typeof type.descriptionKey).toBe("string");
         expect(["messaging", "incident", "email", "custom"]).toContain(type.category);
       });
     });
@@ -78,14 +102,12 @@ describe("Prebuilt Templates Index", () => {
         expect(config).toHaveProperty("templateBody");
         expect(config).toHaveProperty("headers");
         expect(config).toHaveProperty("method");
-        expect(config).toHaveProperty("urlValidator");
         expect(config).toHaveProperty("credentialFields");
 
         expect(typeof config.templateName).toBe("string");
         expect(typeof config.templateBody).toBe("string");
         expect(typeof config.headers).toBe("object");
         expect(["get", "post", "put"]).toContain(config.method);
-        expect(typeof config.urlValidator).toBe("function");
         expect(Array.isArray(config.credentialFields)).toBe(true);
       });
     });
@@ -123,58 +145,6 @@ describe("Prebuilt Templates Index", () => {
       expect(isPrebuiltType("custom")).toBe(false);
       expect(isPrebuiltType("invalid")).toBe(false);
       expect(isPrebuiltType("")).toBe(false);
-    });
-  });
-
-  describe("detectPrebuiltTypeFromUrl", () => {
-    it("should detect Slack URLs", () => {
-      const slackUrl = "https://hooks.slack.com/services/T1234/B5678/xyz";
-      expect(detectPrebuiltTypeFromUrl(slackUrl)).toBe("slack");
-    });
-
-    it("should detect Microsoft Teams URLs", () => {
-      const teamsUrl = "https://outlook.office.com/webhook/abc/IncomingWebhook/def";
-      expect(detectPrebuiltTypeFromUrl(teamsUrl)).toBe("msteams");
-
-      const teamsUrl2 = "https://webhook.office.com/webhookb2/abc";
-      expect(detectPrebuiltTypeFromUrl(teamsUrl2)).toBe("msteams");
-
-      const teamsWorkflowUrl =
-        "https://prod-10.westus.logic.azure.com/workflows/abc/triggerS/manual/paths/invoke?api-version=2016-06-01&sig=xyz";
-      expect(detectPrebuiltTypeFromUrl(teamsWorkflowUrl)).toBe("msteams");
-    });
-
-    it("should detect PagerDuty URLs", () => {
-      const pagerdutyUrl = "https://events.pagerduty.com/v2/enqueue";
-      expect(detectPrebuiltTypeFromUrl(pagerdutyUrl)).toBe("pagerduty");
-    });
-
-    it("should detect ServiceNow URLs", () => {
-      const servicenowUrl = "https://dev123.service-now.com/api/now/table/incident";
-      expect(detectPrebuiltTypeFromUrl(servicenowUrl)).toBe("servicenow");
-    });
-
-    it("should detect Opsgenie URLs", () => {
-      const opsgenieUrl = "https://api.opsgenie.com/v2/alerts";
-      expect(detectPrebuiltTypeFromUrl(opsgenieUrl)).toBe("opsgenie");
-
-      const opsgenieEuUrl = "https://api.eu.opsgenie.com/v2/alerts";
-      expect(detectPrebuiltTypeFromUrl(opsgenieEuUrl)).toBe("opsgenie");
-    });
-
-    it("should detect Discord URLs", () => {
-      const discordUrl = "https://discord.com/api/webhooks/123456789/abcdef";
-      expect(detectPrebuiltTypeFromUrl(discordUrl)).toBe("discord");
-    });
-
-    it("should return null for custom URLs", () => {
-      const customUrl = "https://custom-webhook.example.com/webhook";
-      expect(detectPrebuiltTypeFromUrl(customUrl)).toBeNull();
-    });
-
-    it("should return null for invalid URLs", () => {
-      expect(detectPrebuiltTypeFromUrl("not-a-url")).toBeNull();
-      expect(detectPrebuiltTypeFromUrl("")).toBeNull();
     });
   });
 
@@ -411,7 +381,9 @@ describe("Prebuilt Templates Index", () => {
 
           expect(typeof field.key).toBe("string");
           expect(typeof field.labelKey).toBe("string");
-          expect(["text", "password", "email", "select", "toggle"]).toContain(field.type);
+          expect(["text", "password", "email", "email-multi", "select", "toggle"]).toContain(
+            field.type,
+          );
           expect(typeof field.required).toBe("boolean");
         });
       });
@@ -434,5 +406,30 @@ describe("Prebuilt Templates Index", () => {
         });
       });
     });
+  });
+});
+
+// These bodies are a THIRD copy of the shipped templates, after
+// config/prebuilt-destinations.json and the Rust builtin in prebuilt_loader.rs.
+// They are the fallback the destination preview and its copy action render when
+// the backend's cached template is not loaded, so a user reads them and pastes
+// them into their own template. A body with no {alert_status} renders a
+// recovery byte-identical to the firing it answers, and the alert save then
+// refuses it — for a template the user copied from us.
+describe("prebuilt template bodies can announce a recovery", () => {
+  const bodies = Object.entries(PREBUILT_CONFIGS).map(
+    ([name, cfg]) => [name, cfg.templateBody] as [string, string],
+  );
+
+  it("covers every prebuilt type", () => {
+    expect(bodies.length).toBe(PREBUILT_DESTINATION_TYPES.length);
+  });
+
+  it.each(bodies)("%s carries {alert_status}", (_name, body) => {
+    expect(body).toContain("{alert_status}");
+  });
+
+  it.each(bodies)("%s hardcodes no status that would lie on recovery", (_name, body) => {
+    expect(body.toLowerCase()).not.toContain("firing");
   });
 });

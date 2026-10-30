@@ -35,7 +35,7 @@ pub async fn emit_put_event(
     cluster_coordinator
         .put(
             &key,
-            bytes::Bytes::from(folder_id.unwrap_or("default".to_string())),
+            bytes::Bytes::from(folder_id.unwrap_or_else(|| "default".to_string())),
             true,
             None,
         )
@@ -47,8 +47,7 @@ pub async fn emit_put_event(
 /// deleted from the database.
 pub async fn emit_delete_event(org: &str, alert_id: &str) -> Result<(), Error> {
     let key = alert_key(org, alert_id);
-    let cluster_coordinator = super::get_coordinator().await;
-    cluster_coordinator.delete(&key, false, true, None).await
+    super::emit_delete(&key).await
 }
 
 /// Watch for alert events published to the cluster coordinator.

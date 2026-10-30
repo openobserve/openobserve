@@ -27,7 +27,9 @@ use config::{
 };
 use datafusion::{
     common::{TableReference, tree_node::TreeNode},
-    physical_plan::{ExecutionPlan, aggregates::AggregateExec},
+    physical_plan::{
+        ChildrenPropertiesMode, ExecutionPlan, ReplaceChildrenOptions, aggregates::AggregateExec,
+    },
     prelude::SessionContext,
 };
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
@@ -38,7 +40,7 @@ use infra::{
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
-    SEARCH_SERVER,
+    QueryTracker,
     cluster::flight::{get_online_querier_nodes, partition_file_list},
     datafusion::{
         distributed_plan::{
@@ -63,7 +65,7 @@ use crate::{
 // 6. execute physical plan to get stream
 #[tracing::instrument(name = "service:search:grpc:flight:follower:search", skip_all)]
 pub async fn search(
-    trace_id: &str,
+    query_tracker: &QueryTracker,
     flight_request: &FlightSearchRequest,
 ) -> Result<(
     SessionContext,
@@ -75,7 +77,7 @@ pub async fn search(
 
     let cfg = config::get_config();
     let mut req: Request = (*flight_request).clone().into();
-    let trace_id = trace_id.to_string();
+    let trace_id = query_tracker.trace_id().to_string();
 
     // create datafusion context, just used for decode plan, the params can use default
     let mut ctx = DataFusionContextBuilder::new()
@@ -154,11 +156,7 @@ pub async fn search(
     let role_group = req
         .search_event_type
         .as_ref()
-        .map(|v| {
-            SearchEventType::try_from(v.as_str())
-                .ok()
-                .map(RoleGroup::from)
-        })
+        .map(|v| v.parse::<SearchEventType>().ok().map(RoleGroup::from))
         .unwrap_or(Some(RoleGroup::Interactive));
     let mut nodes =
         get_online_querier_nodes(&trace_id, &req.org_id, &stream_key, role_group).await?;
@@ -207,7 +205,7 @@ pub async fn search(
 
     // check work group
     let _lock = crate::work_group::acquire_work_group_lock(
-        &trace_id,
+        query_tracker,
         &req,
         &mut took_watch,
         "super_cluster_follower",
@@ -255,7 +253,7 @@ pub async fn search(
     );
 
     // update search session scan stats
-    SEARCH_SERVER.add_file_stats(&trace_id, &scan_stats).await;
+    query_tracker.add_file_stats(&scan_stats);
 
     let search_infos = SearchInfos {
         plan: vec![],
@@ -280,7 +278,7 @@ pub async fn search(
     remote_scan_node.set_is_super_cluster(false);
 
     physical_plan = add_region_remote_scan_partial_reduce(
-        cfg.common.feature_partial_reduce_enabled,
+        cfg.search.feature_partial_reduce_enabled,
         physical_plan,
         remote_scan_node,
     )?;
@@ -306,7 +304,10 @@ fn add_region_remote_scan_partial_reduce(
     if physical_plan.name() == "SortPreservingMergeExec" {
         let top_merge_node = physical_plan.clone();
         let remote_scan_exec = Arc::new(RemoteScanExec::new(physical_plan, remote_scan_node)?);
-        return Ok(top_merge_node.with_new_children(vec![remote_scan_exec])?);
+        return Ok(top_merge_node.replace_children(
+            vec![remote_scan_exec],
+            ReplaceChildrenOptions::new(ChildrenPropertiesMode::Recompute),
+        )?);
     }
 
     let source_plan = physical_plan.clone();

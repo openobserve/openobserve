@@ -1,16 +1,16 @@
 <template>
-  <div class="flex flex-row pl-2">
+  <div class="flex flex-row ps-2">
     <div
       data-test="promql-operations-list-label"
       class="flex min-w-24 items-center whitespace-nowrap"
     >
       <span
-        class="rounded-default bg-badge-purple-ol-text mr-1.5 h-2 w-2 shrink-0"
+        class="rounded-default bg-badge-purple-ol-text me-1.5 h-2 w-2 shrink-0"
         aria-hidden="true"
       ></span>
       {{ t("panel.operations") }}
     </div>
-    <span class="mr-0.5 ml-0.5 flex items-center">:</span>
+    <span class="ms-0.5 me-0.5 flex items-center">:</span>
     <div class="scroll m-0.5 flex min-h-8 flex-wrap items-center gap-2">
       <!-- Operations with Drag and Drop -->
       <draggable
@@ -50,7 +50,7 @@
                   >
                     <!-- PromQL editor colours: teal functions, plain brackets -->
                     <AxisFieldChipLabel
-                      :label="computedLabel(element)"
+                      :label="raw(computedLabel(element))"
                       fn-class="text-promql-function"
                       bracket-class="text-text-body"
                       leading-fn
@@ -93,7 +93,7 @@
                         v-else-if="param.type === 'string'"
                         v-model="element.params[paramIndex] as string"
                         :label="param.name"
-                        :placeholder="param.placeholder"
+                        :placeholder="paramPlaceholder(param)"
                         class="showLabelOnTop mb-1.5"
                         :data-test="`promql-operation-param-${paramIndex}`"
                       />
@@ -122,6 +122,7 @@
                 </div>
               </ODropdown>
               <OButton
+                :aria-label="t('common.remove')"
                 variant="ghost"
                 size="icon-chip"
                 class="!w-4"
@@ -160,26 +161,47 @@
   >
     <OSearchInput v-model="searchQuery" data-test="operations-list-search-input" clearable />
 
-    <div class="overflow-y-auto" style="max-height: 400px">
+    <div class="overflow-y-auto" style="max-height: 25rem">
       <div class="border-border rounded-default divide-border divide-y border">
         <div
           v-for="category in categories"
           :key="category"
           :data-test="`operations-list-category-${category}`"
         >
-          <OCollapsible :default-open="true" :label="category">
+          <OCollapsible :default-open="true" :label="raw(category)">
             <div>
+              <p
+                v-if="isRangeGroupBlocked(category)"
+                class="text-text-secondary px-4 pt-2 text-xs"
+                data-test="operations-list-range-first-note"
+              >
+                {{ t("metrics.operationsList.rangeOnlyFirstNote") }}
+              </p>
               <div
                 v-for="op in getFilteredOperationsForCategory(category)"
                 :key="op.id"
                 :data-test="`promql-operation-option-${op.id}`"
                 :data-test-value="op.name"
-                class="promql-operation-option hover:bg-primary-background cursor-pointer px-4 py-2 text-sm"
+                :aria-disabled="isBlocked(op) ? 'true' : 'false'"
+                class="promql-operation-option px-4 py-2 text-sm"
+                :class="
+                  isBlocked(op)
+                    ? 'cursor-not-allowed opacity-50'
+                    : 'hover:bg-primary-background cursor-pointer'
+                "
                 @click="
-                  addOperation(op);
-                  showOperationSelector = false;
+                  if (!isBlocked(op)) {
+                    addOperation(op);
+                    showOperationSelector = false;
+                  }
                 "
               >
+                <!-- First child, so the tooltip anchors to the whole item rather than a sibling. -->
+                <OTooltip
+                  v-if="isBlocked(op)"
+                  :content="t('metrics.operationsList.rangeOnlyFirst')"
+                  side="top"
+                />
                 <div class="font-medium">{{ op.name }}</div>
                 <div class="text-text-secondary mt-0.5 text-xs">{{ op.documentation }}</div>
               </div>
@@ -204,9 +226,14 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import AxisFieldChipLabel from "@/components/dashboards/addPanel/AxisFieldChipLabel.vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { VueDraggableNext as draggable } from "vue-draggable-next";
-import { PromqlStep, PromqlStepSpec } from "@/components/promql/types";
+import {
+  PromqlStep,
+  PromqlStepArgSpec,
+  PromqlStepGroup,
+  PromqlStepSpec,
+} from "@/components/promql/types";
 import { promqlRenderer } from "@/components/promql/operations/queryModeller";
 
 const props = defineProps<{
@@ -218,7 +245,7 @@ const emit = defineEmits<{
   "update:operations": [value: PromqlStep[]];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const showOperationSelector = ref(false);
 
 // Access shared label options from meta
@@ -262,6 +289,11 @@ const getStepSpec = (id: string): PromqlStepSpec | undefined => {
   return promqlRenderer.getStepSpec(id);
 };
 
+// The step catalog is a module-level singleton, so prose placeholders are stored
+// as i18n keys and resolved here per render; code tokens ("5m") stay in `placeholder`.
+const paramPlaceholder = (param: PromqlStepArgSpec): I18nText | undefined =>
+  param.placeholderKey ? t(param.placeholderKey) : param.placeholder;
+
 const getFilteredOperationsForCategory = (category: string): PromqlStepSpec[] => {
   const operations = promqlRenderer.getStepsForGroup(category);
   // Operations for this category
@@ -277,7 +309,16 @@ const getFilteredOperationsForCategory = (category: string): PromqlStepSpec[] =>
   );
 };
 
+// A range function needs a range vector, which in a chain only the bare selector gives.
+const isRangeStep = (id: string) => getStepSpec(id)?.group === PromqlStepGroup.RateAndRange;
+
+const isBlocked = (op: PromqlStepSpec) => isRangeStep(op.id) && props.operations.length > 0;
+
+const isRangeGroupBlocked = (category: string) =>
+  category === PromqlStepGroup.RateAndRange && props.operations.length > 0;
+
 const handleDragUpdate = (newVal: PromqlStep[]) => {
+  if (newVal.some((step, index) => index > 0 && isRangeStep(step.id))) return;
   // Create new array instead of mutating props
   const newOperations = [...newVal];
   emit("update:operations", newOperations);

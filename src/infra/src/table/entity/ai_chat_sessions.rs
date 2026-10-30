@@ -1,0 +1,44 @@
+//! `SeaORM` Entity for the `ai_chat_sessions` table (server-side chat persistence).
+
+use sea_orm::entity::prelude::*;
+
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
+#[sea_orm(table_name = "ai_chat_sessions")]
+pub struct Model {
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub org_id: String,
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub session_id: String,
+    /// Owner: the stable `users.id`, never the (mutable, reusable) email.
+    pub user_id: String,
+    /// Owner's email at creation, for audit and display only.
+    pub user_email: String,
+    pub opencode_session_id: Option<String>,
+    pub agent_type: String,
+    pub title: String,
+    /// `prompt` | `generated` | `user` ('' while untitled): who set `title`.
+    pub title_source: String,
+    pub status: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub first_event_at: Option<i64>,
+    pub last_event_at: Option<i64>,
+    /// Highest contiguous durably-committed opencode seq; -1 when none.
+    pub last_committed_seq: i64,
+    /// Ownership epoch; bumped by every restore onto another replica.
+    pub session_epoch: i64,
+    /// Client-supplied id of the most recent turn, so a retried request does
+    /// not start a second model run.
+    pub last_turn_id: Option<String>,
+    /// The share this chat was forked from; its first turn is seeded from it.
+    pub forked_from_share: Option<String>,
+    /// Last source event (seq) the fork's seed history includes.
+    pub fork_seed_seq: Option<i64>,
+    /// When every live o2-ai replica confirmed it dropped this deleted chat's copy.
+    pub replica_purged_at: Option<i64>,
+}
+
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {}
+
+impl ActiveModelBehavior for ActiveModel {}

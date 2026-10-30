@@ -15,7 +15,7 @@
 
 use config::{meta::self_reporting::error::PipelineError, utils::time::now_micros};
 use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     table::entity::{pipeline_last_errors, prelude::PipelineLastErrors},
 };
 use sea_orm::{
@@ -33,9 +33,9 @@ pub async fn upsert(
     timestamp: i64,
     error_data: &PipelineError,
 ) -> Result<(), infra::errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
-    // Serialize node_errors to JSON
+    // Serialize node_errors to JSON before taking the write lock
     let node_errors_json = if !error_data.node_errors.is_empty() {
         Some(serde_json::to_value(&error_data.node_errors)?)
     } else {
@@ -128,11 +128,30 @@ pub async fn batch_upsert(
     // Collapse repeats and fix the row order so concurrently flushing nodes can't deadlock
     let errors = dedup_and_sort(errors);
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    // Serialize node_errors to JSON before taking the write lock: pure CPU
+    // work has no business inside the serialized critical section
+    let mut errors_json = Vec::with_capacity(errors.len());
+    for (pipeline_id, pipeline_name, org_id, timestamp, error_data) in errors {
+        let node_errors_json = if !error_data.node_errors.is_empty() {
+            Some(serde_json::to_value(&error_data.node_errors)?)
+        } else {
+            None
+        };
+        errors_json.push((
+            pipeline_id,
+            pipeline_name,
+            org_id,
+            timestamp,
+            error_data,
+            node_errors_json,
+        ));
+    }
+
+    let client = get_orm_client_rw().await;
     let txn = client.begin().await?;
 
     // Collect all pipeline_ids to check which exist
-    let pipeline_ids: Vec<&str> = errors.iter().map(|(id, ..)| id.as_str()).collect();
+    let pipeline_ids: Vec<&str> = errors_json.iter().map(|(id, ..)| id.as_str()).collect();
 
     let existing_records = PipelineLastErrors::find()
         .filter(pipeline_last_errors::Column::PipelineId.is_in(pipeline_ids))
@@ -148,14 +167,8 @@ pub async fn batch_upsert(
 
     let now = now_micros();
 
-    for (pipeline_id, pipeline_name, org_id, timestamp, error_data) in errors {
-        // Serialize node_errors to JSON
-        let node_errors_json = if !error_data.node_errors.is_empty() {
-            Some(serde_json::to_value(&error_data.node_errors)?)
-        } else {
-            None
-        };
-
+    for (pipeline_id, pipeline_name, org_id, timestamp, error_data, node_errors_json) in errors_json
+    {
         if let Some(existing) = existing_map.get(&pipeline_id) {
             // Check if error content has actually changed
             let error_changed = existing.error_summary != error_data.error
@@ -199,7 +212,7 @@ pub async fn batch_upsert(
 pub async fn list_by_org(
     org_id: &str,
 ) -> Result<Vec<pipeline_last_errors::Model>, infra::errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let errors = PipelineLastErrors::find()
         .filter(pipeline_last_errors::Column::OrgId.eq(org_id))
@@ -214,7 +227,7 @@ pub async fn list_by_org(
 pub async fn get_by_pipeline_id(
     pipeline_id: &str,
 ) -> Result<Option<pipeline_last_errors::Model>, infra::errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let error = PipelineLastErrors::find_by_id(pipeline_id)
         .one(client)
@@ -225,7 +238,7 @@ pub async fn get_by_pipeline_id(
 
 /// Deletes a pipeline error record by pipeline_id.
 pub async fn delete(pipeline_id: &str) -> Result<(), infra::errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     PipelineLastErrors::delete_many()
         .filter(pipeline_last_errors::Column::PipelineId.eq(pipeline_id))
@@ -237,7 +250,7 @@ pub async fn delete(pipeline_id: &str) -> Result<(), infra::errors::Error> {
 
 /// Deletes all pipeline error records for an organization.
 pub async fn delete_by_org(org_id: &str) -> Result<(), infra::errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     PipelineLastErrors::delete_many()
         .filter(pipeline_last_errors::Column::OrgId.eq(org_id))
@@ -251,8 +264,7 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), infra::errors::Error> {
 ///
 /// This is used for periodic cleanup of stale errors.
 pub async fn delete_older_than(cutoff_timestamp: i64) -> Result<u64, infra::errors::Error> {
-    let _lock = infra::table::get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let result = PipelineLastErrors::delete_many()
         .filter(pipeline_last_errors::Column::LastErrorTimestamp.lt(cutoff_timestamp))

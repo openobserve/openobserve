@@ -13,9 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { raw } from "@/types/i18n";
+import { sqlLiteral, sqlLike } from "@/utils/query/sqlFilterBuilder";
+
 /**
  * Operator list that mirrors the dashboard condition operators
  * (AddCondition.vue) so both surfaces stay in sync.
+ *
+ * Doubles as the dropdown options AND the value persisted in the alert config
+ * (and matched by `buildAnomalyFilterExpression`'s `case` arms below), so the
+ * word-shaped entries stay verbatim — hence `raw()`.
  */
 export const ANOMALY_FILTER_OPERATORS = [
   "=",
@@ -32,11 +39,11 @@ export const ANOMALY_FILTER_OPERATORS = [
   "re_match",
   "re_not_match",
   "Contains",
-  "Starts With",
-  "Ends With",
-  "Not Contains",
-  "Is Null",
-  "Is Not Null",
+  raw("Starts With"),
+  raw("Ends With"),
+  raw("Not Contains"),
+  raw("Is Null"),
+  raw("Is Not Null"),
 ] as const;
 
 export type AnomalyFilterOperator = (typeof ANOMALY_FILTER_OPERATORS)[number];
@@ -59,7 +66,7 @@ export const buildAnomalyFilterExpression = (
 ): string => {
   if (!field) return "";
 
-  const quoted = (v: string) => `'${v}'`;
+  const quoted = (v: string) => sqlLiteral(v);
 
   switch (operator) {
     case "Is Null":
@@ -82,11 +89,11 @@ export const buildAnomalyFilterExpression = (
     case "re_not_match":
       return `re_not_match(${field}, ${quoted(value)})`;
     case "Not Contains":
-      return `${field} NOT LIKE '%${value}%'`;
+      return sqlLike(field, value, "contains", true);
     case "Starts With":
-      return `${field} LIKE '${value}%'`;
+      return sqlLike(field, value, "start");
     case "Ends With":
-      return `${field} LIKE '%${value}'`;
+      return sqlLike(field, value, "end");
     default:
       // =, <>, >, <, >=, <=
       return `${field} ${operator} ${quoted(value)}`;

@@ -1,22 +1,22 @@
 <template>
   <div v-if="shouldShowJoins" class="w-full" data-test="dashboard-joins-container">
-    <div class="flex flex-row pl-3">
+    <div class="flex flex-row ps-3">
       <div class="flex items-center text-sm whitespace-nowrap" :class="labelWidthClass">
         <span
-          class="rounded-default bg-badge-teal-ol-text mr-1.5 h-2 w-2 shrink-0"
+          class="rounded-default bg-badge-teal-ol-text me-1.5 h-2 w-2 shrink-0"
           aria-hidden="true"
         ></span>
         {{ t("panel.joins") }}
       </div>
       <span class="mx-0.5 flex items-center">:</span>
       <div
-        class="flex min-h-8 flex-row flex-wrap items-center gap-2 pl-0.5"
+        class="flex min-h-8 flex-row flex-wrap items-center gap-2 ps-0.5"
         data-test="dashboard-filter-layout"
       >
         <div
           v-for="(joinObj, index) in currentJoins"
           :key="index"
-          class="my-0.5 mr-2 flex flex-row"
+          class="my-0.5 me-2 flex flex-row"
         >
           <OButtonGroup
             class="axis-field border-border-default border-s-badge-teal-ol-border bg-surface-panel border border-s-2 [&>*:not(:first-child)]:!border-s"
@@ -95,7 +95,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { watchDebounced } from "@vueuse/core";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import AddJoinPopUp from "./AddJoinPopUp.vue";
@@ -176,9 +176,8 @@ export default defineComponent({
   setup() {
     const dashboardPanelDataPageKey = inject<string>("dashboardPanelDataPageKey", "dashboard");
 
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
-
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     /**
      * Determines if joins section should be displayed

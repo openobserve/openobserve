@@ -241,8 +241,7 @@ test.describe("Pipeline History Tests", { tag: ['@all', '@pipelines', '@history'
 
     // Dismiss any open dropdown overlay
     await page.keyboard.press('Escape');
-    await page.locator('[data-test="pipeline-history-search-select-popover"]')
-      .waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+    await pageManager.pipelinesPage.waitForHistorySearchSelectPopoverHidden();
 
     // Click search button to apply filter
     await pageManager.pipelinesPage.clickHistoryManualSearchBtn();

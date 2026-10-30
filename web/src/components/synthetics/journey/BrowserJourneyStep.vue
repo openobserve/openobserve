@@ -16,10 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
 import type { BrowserStep, StepReplayResult } from "@/types/synthetics";
-import { ACTION_ICONS, ACTION_LABELS } from "@/constants/synthetics";
+import { ACTION_ICONS, ACTION_LABEL_KEYS } from "@/constants/synthetics";
 
 /**
  * Replay status dot states.
@@ -34,7 +34,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import BrowserJourneyStepEditor from "./BrowserJourneyStepEditor.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   step: BrowserStep;
@@ -62,7 +62,7 @@ const emit = defineEmits<{
 
 // ── Computed from shared constants ──────────────────────────────────
 const actionIcon = computed(() => ACTION_ICONS[props.step.action]);
-const actionLabel = computed(() => ACTION_LABELS[props.step.action]);
+const actionLabel = computed(() => t(ACTION_LABEL_KEYS[props.step.action]));
 const displayName = computed(() => props.step.name || actionLabel.value);
 /**
  * What the collapsed row shows on the right.
@@ -81,15 +81,15 @@ const stepNumberClass = computed(() => {
   if (!props.replayDotState) return "w-6! text-center text-sm tabular-nums text-text-muted";
   switch (props.replayDotState) {
     case "active":
-      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-primary-soft-bg)] text-[var(--color-badge-primary-soft-text)] border border-[var(--color-badge-primary-soft-text)] text-white text-xs font-semi-bold";
+      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-badge-primary-soft-bg text-badge-primary-soft-text border border-badge-primary-soft-text text-white text-xs font-semi-bold";
     case "pass":
-      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-success-soft-bg)] text-[var(--color-badge-success-soft-text)] border border-[var(--color-badge-success-soft-text)] text-xs font-semi-bold";
+      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-badge-success-soft-bg text-badge-success-soft-text border border-badge-success-soft-text text-xs font-semi-bold";
     case "fail":
-      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-error-soft-bg)] text-[var(--color-badge-error-soft-text)] border border-[var(--color-badge-error-soft-text)]  text-xs font-semi-bold";
+      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-badge-error-soft-bg text-badge-error-soft-text border border-badge-error-soft-text  text-xs font-semi-bold";
     case "skip":
-      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-default-soft-bg)] text-[var(--color-badge-default-soft-text)] border border-[var(--color-badge-default-soft-text)]  text-xs font-semi-bold";
+      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-badge-default-soft-bg text-badge-default-soft-text border border-badge-default-soft-text  text-xs font-semi-bold";
     default:
-      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 border border-border-default text-text-muted border border-[var(--color-text-muted)]  text-xs font-semi-bold";
+      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 border border-border-default text-text-muted border border-text-muted  text-xs font-semi-bold";
   }
 });
 
@@ -150,7 +150,7 @@ function toggleStackTrace() {
 
 function copyStackTrace() {
   const stack = se.value?.stack;
-  if (stack) copyToClipboard(stack);
+  if (stack) copyToClipboard(stack, t);
 }
 
 function toggleExpanded() {
@@ -166,12 +166,12 @@ function toggleExpanded() {
       :class="[
         rowOpacityClass,
         { 'border-border-default border-b': expanded },
-        showErrorCard && 'bg-[var(--color-badge-error-soft-bg)]',
+        showErrorCard && 'bg-badge-error-soft-bg',
       ]"
     >
       <!-- Drag handle — visibility:hidden during replay to preserve layout -->
       <span
-        class="text-text-muted absolute left-[-0.1rem] shrink-0 cursor-grab opacity-0 transition-opacity group-hover:opacity-100"
+        class="text-text-muted absolute left-[-0.1rem] shrink-0 cursor-grab opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-100"
         :class="{ invisible: replayDotState }"
         data-test="synthetics-journey-step-drag-handle"
         aria-hidden="true"
@@ -184,7 +184,7 @@ function toggleExpanded() {
         <OCheckbox
           :model-value="selected ? true : false"
           size="xs"
-          class="pl-1"
+          class="ps-1"
           :data-test="`synthetics-journey-step-checkbox-${index}`"
           @update:model-value="emit('toggle-select')"
         />
@@ -192,7 +192,7 @@ function toggleExpanded() {
         <!-- Step number (colored status circle during replay) -->
         <span
           :class="stepNumberClass"
-          class="ml-1"
+          class="ms-1"
           :data-test="replayDotState ? `synthetics-journey-step-dot-${index}` : undefined"
           :aria-label="
             replayDotState
@@ -283,7 +283,7 @@ function toggleExpanded() {
       data-test="synthetics-journey-step-error-card"
     >
       <!-- Header -->
-      <div class="flex items-center gap-2 bg-[var(--color-badge-error-soft-bg)] px-3 py-2">
+      <div class="bg-badge-error-soft-bg flex items-center gap-2 px-3 py-2">
         <OIcon :name="errorIconName" size="sm" class="text-status-error-text" aria-hidden="true" />
         <span class="text-text-heading flex-1 text-xs font-semibold">{{ errorLabel }}</span>
         <span class="text-text-secondary font-mono text-xs"
@@ -314,9 +314,10 @@ function toggleExpanded() {
                 ? t("synthetics.journey.hideStackTrace")
                 : t("synthetics.journey.showStackTrace")
             }}
-            stack trace
+            {{ t("synthetics.journey.stackTraceLabel") }}
           </OButton>
           <OButton
+            :aria-label="t('common.copyToClipboard')"
             v-if="showStackTrace"
             variant="ghost"
             size="xs"
@@ -330,8 +331,7 @@ function toggleExpanded() {
           v-if="showStackTrace"
           class="bg-code-bg rounded-default m-0 mt-2 max-h-75 overflow-x-auto overflow-y-auto p-3 font-mono text-xs leading-relaxed"
           data-test="synthetics-journey-step-stack-content"
-          >{{ se?.stack }}</pre
-        >
+          >{{ se?.stack }}</pre>
       </div>
 
       <!-- Info boxes -->

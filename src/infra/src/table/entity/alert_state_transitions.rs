@@ -20,6 +20,7 @@ pub struct Model {
     /// Observed value at transition time; source for per-group history (M-8).
     /// `None` on a disappearance transition — no observation was made.
     pub value: Option<f64>,
+    pub rule_value: Option<String>,
     /// Rendered labels, duplicated from the state row so history stays
     /// readable after that row is reaped (M-7).
     pub group_labels: Option<String>,

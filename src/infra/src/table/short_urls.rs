@@ -22,11 +22,9 @@ use sea_orm::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::get_lock;
 use crate::{
     db::{
-        IndexStatement, ORM_CLIENT, ORM_CLIENT_DDL, connect_to_orm, connect_to_orm_ddl, postgres,
-        sqlite,
+        IndexStatement, get_orm_client_ddl, get_orm_client_ro, get_orm_client_rw, postgres, sqlite,
     },
     errors::{self, DbError, Error},
 };
@@ -90,7 +88,7 @@ pub async fn init() -> Result<(), errors::Error> {
 }
 
 pub async fn create_table() -> Result<(), errors::Error> {
-    let client = ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
+    let client = get_orm_client_ddl().await;
     let builder = client.get_database_backend();
 
     let schema = Schema::new(builder);
@@ -113,7 +111,7 @@ pub async fn create_table_index() -> Result<(), errors::Error> {
         &["created_ts"],
     );
 
-    let client = ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
+    let client = get_orm_client_ddl().await;
     match client.get_database_backend() {
         DatabaseBackend::Postgres => {
             postgres::create_index(index1).await?;
@@ -127,7 +125,8 @@ pub async fn create_table_index() -> Result<(), errors::Error> {
     Ok(())
 }
 
-pub async fn add(short_id: &str, original_url: &str, org_id: &str) -> Result<(), errors::Error> {
+/// Returns `false` when a row with the same `short_id` already exists.
+pub async fn add(short_id: &str, original_url: &str, org_id: &str) -> Result<bool, errors::Error> {
     let record = ActiveModel {
         short_id: Set(short_id.to_string()),
         original_url: Set(original_url.to_string()),
@@ -136,20 +135,21 @@ pub async fn add(short_id: &str, original_url: &str, org_id: &str) -> Result<(),
         ..Default::default()
     };
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
+    let inserted = Entity::insert(record)
+        .on_conflict(
+            sea_orm::sea_query::OnConflict::column(Column::ShortId)
+                .do_nothing()
+                .to_owned(),
+        )
+        .exec_without_returning(client)
+        .await?;
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Entity::insert(record).exec(client).await?;
-
-    Ok(())
+    Ok(inserted > 0)
 }
 
 pub async fn remove(short_id: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::ShortId.eq(short_id))
         .exec(client)
@@ -159,7 +159,7 @@ pub async fn remove(short_id: &str) -> Result<(), errors::Error> {
 }
 
 pub async fn get(short_id: &str, org_id: &str) -> Result<ShortUrlRecord, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let mut query = Entity::find()
         .select_only()
         .column(Column::ShortId)
@@ -187,7 +187,7 @@ pub async fn get(short_id: &str, org_id: &str) -> Result<ShortUrlRecord, errors:
 }
 
 pub async fn list(limit: Option<i64>) -> Result<Vec<ShortUrlRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let mut res = Entity::find()
         .select_only()
         .column(Column::ShortId)
@@ -202,19 +202,8 @@ pub async fn list(limit: Option<i64>) -> Result<Vec<ShortUrlRecord>, errors::Err
     Ok(records)
 }
 
-pub async fn contains(short_id: &str) -> Result<bool, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let record = Entity::find()
-        .filter(Column::ShortId.eq(short_id))
-        .into_model::<ShortUrlRecord>()
-        .one(client)
-        .await?;
-
-    Ok(record.is_some())
-}
-
 pub async fn len() -> usize {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let len = Entity::find().count(client).await;
 
     match len {
@@ -226,24 +215,28 @@ pub async fn len() -> usize {
     }
 }
 
-pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database (only for SQLite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Entity::delete_many()
+/// Short ids of the org.
+pub async fn list_ids_by_org(org_id: &str) -> Result<Vec<String>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    let records = Entity::find()
+        .select_only()
+        .column(Column::ShortId)
         .filter(Column::OrgId.eq(org_id))
-        .exec(client)
+        .into_model::<ShortId>()
+        .all(client)
         .await?;
+    Ok(records.into_iter().map(|r| r.short_id).collect())
+}
 
-    Ok(())
+/// Deletes all short URLs of the org and returns their ids.
+pub async fn delete_by_org(org_id: &str) -> Result<Vec<String>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let delete = Entity::delete_many().filter(Column::OrgId.eq(org_id));
+    Ok(super::delete_returning(client, delete, &[Column::ShortId]).await?)
 }
 
 pub async fn clear() -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many().exec(client).await?;
 
     Ok(())
@@ -257,7 +250,7 @@ pub async fn get_expired(
     expired_before: i64,
     limit: Option<i64>,
 ) -> Result<Vec<String>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let mut res = Entity::find()
         .select_only()
         .column(Column::ShortId)
@@ -270,10 +263,7 @@ pub async fn get_expired(
 }
 
 pub async fn batch_remove(short_ids: Vec<String>) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::ShortId.is_in(short_ids))
         .exec(client)
@@ -298,5 +288,28 @@ mod tests {
         let rec = ShortUrlRecord::new("", "", "");
         assert!(rec.short_id.is_empty());
         assert!(rec.original_url.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_org_delete_returns_exactly_the_ids_it_removed() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org = crate::table::testing::unique("t_short");
+        let other = format!("{org}_other");
+        let ids = [format!("{org}_1"), format!("{org}_2"), format!("{org}_3")];
+        for (id, owner) in [(&ids[0], &org), (&ids[1], &org), (&ids[2], &other)] {
+            assert!(add(id, "https://example.com", owner).await.unwrap());
+        }
+
+        let mut removed = delete_by_org(&org).await.unwrap();
+        removed.sort();
+        let left = list_ids_by_org(&org).await.unwrap();
+        let kept = list_ids_by_org(&other).await.unwrap();
+        delete_by_org(&other).await.unwrap();
+
+        assert_eq!(removed, [ids[0].clone(), ids[1].clone()]);
+        assert!(left.is_empty());
+        assert_eq!(kept, [ids[2].clone()]);
     }
 }

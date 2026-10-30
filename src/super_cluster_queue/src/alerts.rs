@@ -13,11 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
-    errors::Result,
-    table,
-};
+use infra::{db::get_orm_client_rw, errors::Result, table};
 use o2_enterprise::enterprise::super_cluster::queue::{AlertMessage, Message, MessageType};
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
@@ -38,7 +34,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
 }
 
 pub(crate) async fn process_msg(msg: AlertMessage) -> Result<()> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_rw().await;
     match msg {
         AlertMessage::Create {
             org_id,

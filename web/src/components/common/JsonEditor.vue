@@ -20,8 +20,8 @@
         data-test="common-json-editor-validation-errors"
         class="text-status-error-text max-h-50 shrink-0 overflow-y-auto p-3"
       >
-        <div class="mb-2 font-bold">Please fix the following issues:</div>
-        <ul class="ml-3">
+        <div class="mb-2 font-bold">{{ t("common.pleaseFixIssues") }}</div>
+        <ul class="ms-3">
           <li v-for="(error, index) in localValidationErrors" :key="index">
             {{ error }}
           </li>
@@ -46,7 +46,7 @@
       </div>
     </div>
     <!-- o2aichat enabled -->
-    <div v-if="store.state.isAiChatEnabled" class="ml-2 h-full w-[25vw]">
+    <div v-if="store.state.isAiChatEnabled" class="ms-2 h-full w-[25vw]">
       <O2AIChat
         class="h-full"
         :is-open="store.state.isAiChatEnabled"
@@ -57,8 +57,16 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, watch, computed, defineAsyncComponent } from "vue";
-import { useI18n } from "vue-i18n";
+import {
+  defineComponent,
+  ref,
+  onMounted,
+  watch,
+  computed,
+  defineAsyncComponent,
+  type PropType,
+} from "vue";
+import { type I18nText, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import O2AIChat from "../O2AIChat.vue";
@@ -79,7 +87,7 @@ export default defineComponent({
       required: true,
     },
     title: {
-      type: String,
+      type: String as unknown as PropType<I18nText>,
       required: true,
     },
     type: {
@@ -99,7 +107,7 @@ export default defineComponent({
   },
   emits: ["close", "saveJson"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
     const jsonContent = ref("");
@@ -139,6 +147,14 @@ export default defineComponent({
 
     const protectedFields = computed(() => getProtectedFields(props.type));
 
+    // The protected-field errors are rebuilt on every edit, so the stale ones have
+    // to be dropped first. Matching on the rendered message (not an English prefix)
+    // keeps that working in every locale.
+    const protectedFieldError = (field: string): I18nText =>
+      t("common.cannotModifyProtectedField", { field });
+    const isProtectedFieldError = (err: unknown) =>
+      typeof err === "string" && protectedFields.value.some((f) => err === protectedFieldError(f));
+
     const handleEditorChange = (value: string) => {
       try {
         const newContent = JSON.parse(value);
@@ -154,11 +170,8 @@ export default defineComponent({
         if (protectedFieldChanges.length > 0) {
           // Add validation errors for changed protected fields
           localValidationErrors.value = [
-            ...localValidationErrors.value.filter((err) => !err.startsWith("Cannot modify")),
-            ...protectedFieldChanges.map(
-              (field) =>
-                `Cannot modify ${field} field directly , will be reverted to the original value`,
-            ),
+            ...localValidationErrors.value.filter((err) => !isProtectedFieldError(err)),
+            ...protectedFieldChanges.map((field) => protectedFieldError(field)),
           ];
 
           // Revert the changes by restoring protected fields
@@ -177,10 +190,10 @@ export default defineComponent({
 
         // Clear any previous protected field validation errors
         localValidationErrors.value = localValidationErrors.value.filter(
-          (err) => !err.startsWith("Cannot modify"),
+          (err) => !isProtectedFieldError(err),
         );
       } catch (error) {
-        localValidationErrors.value = ["Invalid JSON format"];
+        localValidationErrors.value = [t("common.invalidJsonFormat")];
       }
     };
 
@@ -209,7 +222,7 @@ export default defineComponent({
 
         emit("saveJson", JSON.stringify(finalContent));
       } catch (error) {
-        localValidationErrors.value = ["Invalid JSON format"];
+        localValidationErrors.value = [t("common.invalidJsonFormat")];
       }
     };
 

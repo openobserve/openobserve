@@ -25,7 +25,11 @@
         icon-left="info-outline"
       >
         <template #icon-left><OIcon name="info-outline" size="sm" /></template>
-        <OTooltip :content="t('dashboard.colorBySeriesTooltip')" side="bottom" max-width="250px" />
+        <OTooltip
+          :content="t('dashboard.colorBySeriesTooltip')"
+          side="bottom"
+          max-width="15.625rem"
+        />
       </OButton>
     </div>
     <OButton
@@ -52,10 +56,11 @@
 
 <script lang="ts">
 import { defineComponent, inject, ref, computed, onBeforeMount } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ColorBySeriesPopUp from "./ColorBySeriesPopUp.vue";
+import { getLegendSeriesNames } from "@/composables/dashboard/useSeriesFormatting";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -69,10 +74,10 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const showColorBySeriesPopUp = ref(false);
 
@@ -112,6 +117,12 @@ export default defineComponent({
             name: series.data[0].name,
           }));
         return { series: gaugeSeriesNames };
+      }
+
+      if (panelType === "bar-gauge") {
+        return {
+          series: getLegendSeriesNames(chartOptions, panelType).map((name) => ({ name })),
+        };
       }
 
       // For other chart types, use the existing logic

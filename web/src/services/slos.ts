@@ -13,15 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { gt } from "@/types/i18n";
+
 import http from "./http";
+import analytics from "./product_analytics";
 
 /**
  * Reject when the body carries an error code, even on HTTP 200.
  *
  * The SLO API answers some failures with HTTP 200 and the real status inside
- * the payload (`{code: 501, message: "SLOs are disabled…"}` when
- * `ZO_SLO_ENABLED` is unset, for instance). axios only rejects on the HTTP
- * status, so without this every caller reads that as success: the list does
+ * the payload (`{code: 500, message: "…"}`, for instance). axios only rejects
+ * on the HTTP status, so without this every caller reads that as success:
+ * the list does
  * `res.data?.list ?? []` and renders EMPTY with no error, and a create
  * resolves, toasts "SLO saved" and redirects — telling the user their SLO was
  * saved when nothing was written. Silence is the worst possible reading of a
@@ -34,7 +37,7 @@ import http from "./http";
 function rejectBodyErrors(res: any) {
   const code = res?.data?.code;
   if (typeof code === "number" && code >= 400) {
-    const err: any = new Error(res.data?.message || `Request failed (${code})`);
+    const err: any = new Error(res.data?.message || gt("slos.requestFailed", { code }));
     // Shaped like an axios error so callers reading `e.response.data.message`
     // — which is every one of them — keep working unchanged.
     err.response = { status: code, data: res.data };
@@ -54,15 +57,33 @@ const slos = {
   },
 
   create: (org_identifier: string, data: object) => {
-    return http().post(`/api/${org_identifier}/slos`, data).then(rejectBodyErrors);
+    return http()
+      .post(`/api/${org_identifier}/slos`, data)
+      .then(rejectBodyErrors)
+      .then((res) => {
+        analytics.track("slo_created", { sli_type: (data as { sli_type?: string }).sli_type });
+        return res;
+      });
   },
 
   update: (org_identifier: string, slo_id: string, data: object) => {
-    return http().put(`/api/${org_identifier}/slos/${slo_id}`, data).then(rejectBodyErrors);
+    return http()
+      .put(`/api/${org_identifier}/slos/${slo_id}`, data)
+      .then(rejectBodyErrors)
+      .then((res) => {
+        analytics.track("slo_updated", { sli_type: (data as { sli_type?: string }).sli_type });
+        return res;
+      });
   },
 
   delete: (org_identifier: string, slo_id: string) => {
-    return http().delete(`/api/${org_identifier}/slos/${slo_id}`).then(rejectBodyErrors);
+    return http()
+      .delete(`/api/${org_identifier}/slos/${slo_id}`)
+      .then(rejectBodyErrors)
+      .then((res) => {
+        analytics.track("slo_deleted", { count: 1 });
+        return res;
+      });
   },
 
   // Separate from update so a relocation can never carry a definition change,
@@ -81,11 +102,37 @@ const slos = {
   setEnabled: (org_identifier: string, slo_id: string, value: boolean) => {
     return http()
       .put(`/api/${org_identifier}/slos/${slo_id}/enable?value=${value}`)
-      .then(rejectBodyErrors);
+      .then(rejectBodyErrors)
+      .then((res) => {
+        analytics.track(value ? "slo_enabled" : "slo_disabled", { count: 1 });
+        return res;
+      });
   },
 
   groups: (org_identifier: string, slo_id: string) => {
     return http().get(`/api/${org_identifier}/slos/${slo_id}/groups`).then(rejectBodyErrors);
+  },
+
+  // Under /alerts, not /slos: it answers a question about alerts, and is
+  // authorized as one. Ineligible alerts come back too, each with its reason.
+  eligibleAlerts: (org_identifier: string) => {
+    return http().get(`/api/${org_identifier}/alerts/slo-eligible`).then(rejectBodyErrors);
+  },
+
+  // What an alert SLI would have measured, from the availability ledger, so
+  // the form can show the ribbon and the achieved SLI before saving.
+  alertPreview: (
+    org_identifier: string,
+    alert_id: string,
+    params: { window_secs: number; slice_interval_secs: number },
+  ) => {
+    const q = new URLSearchParams({
+      window_secs: String(params.window_secs),
+      slice_interval_secs: String(params.slice_interval_secs),
+    });
+    return http()
+      .get(`/api/v2/${org_identifier}/alerts/${alert_id}/slo-preview?${q}`)
+      .then(rejectBodyErrors);
   },
 };
 

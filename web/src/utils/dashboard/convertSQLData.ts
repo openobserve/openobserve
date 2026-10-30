@@ -23,10 +23,34 @@
  */
 import { convertSQLChartData } from "./sql";
 import { applySeriesColorMappings } from "./chartColorUtils";
-import { chartColor } from "@/utils/chartTheme";
-import { calculateMetricFontSize } from "./sql/charts/convertSQLMetricChart";
+import { layoutMetricGrid } from "./metricGrid";
 import { calculateGridPositions, getTrellisGrid } from "./calculateGridForSubPlot";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
+import { escapeHtml } from "@/utils/html";
+import { applyGaugeSeriesThresholds, applyLineAreaThresholds } from "./thresholds";
+import {
+  alignGaugeValueFonts,
+  gaugeAutoRange,
+  sizeGaugeDial,
+  type GaugeDialSeries,
+} from "./gaugeDial";
+import { applySeriesOverrides } from "./seriesOverrides";
+import { applyChartStyleOptions } from "./seriesStyleOverrides";
+import {
+  HEATMAP_MAX_CELLS,
+  addHeatmapWarning,
+  heatmapColorRange,
+  heatmapColorScale,
+} from "./heatmapDefaults";
+import { sharedHeatmapTimeAxis } from "./heatmapTimeAxis";
+import {
+  applyPieDonutChartAlignment,
+  applyPieDonutLegendPositioning,
+  getChartDimensions,
+} from "./legendConfiguration";
+import { isTimeSeries, isTimeStamp } from "./dateTimeUtils";
+import { fitStackedAxisBounds } from "./stackTotals";
+import { mergeBarTrackMax } from "./barTrack";
 
 /**
  * Re-applies trellis layout on merged multi-query data.
@@ -201,6 +225,8 @@ export const convertMultiSQLData = async (
   chartPanelStyle: any,
   annotations: any,
   loading?: any,
+  // Metric sparkline: per-query histogram hits (aligned with searchQueryData).
+  sparklineData?: any,
 ) => {
   if (!Array.isArray(searchQueryData) || searchQueryData.length === 0) {
     // this sets a blank object until it loads
@@ -237,6 +263,10 @@ export const convertMultiSQLData = async (
       ...panelSchema,
       queries: [panelSchema.queries[panelQueryIndex]],
       ...(isMultiQuery ? { config: { ...panelSchema.config, trellis: undefined } } : {}),
+      // Heatmap tiles draw side by side in one panel, so they split its cell budget.
+      ...(isMultiQuery && panelSchema.type === "heatmap"
+        ? { heatmapCellBudget: Math.floor(HEATMAP_MAX_CELLS / searchQueryData.length) }
+        : {}),
     };
 
     options.push(
@@ -251,6 +281,7 @@ export const convertMultiSQLData = async (
         chartPanelStyle,
         annotations,
         loading,
+        Array.isArray(sparklineData) ? sparklineData[i] : undefined,
       ),
     );
   }
@@ -296,8 +327,15 @@ export const convertMultiSQLData = async (
       });
     });
 
-    if (options[0]?.options?.series?.[0]) {
-      options[0].options.series[0].data = mergedData;
+    const merged = options[0]?.options;
+    if (merged?.series?.[0]) {
+      merged.series[0].data = mergedData;
+      // Query 0 sized the legend and placed the pie from its own slices; size them for every query's.
+      if (merged.legend?.show) {
+        applyPieDonutLegendPositioning(panelSchema, merged, chartPanelRef);
+        const { chartWidth, chartHeight } = getChartDimensions(chartPanelRef);
+        applyPieDonutChartAlignment(panelSchema, merged, chartWidth, chartHeight);
+      }
     }
 
     applySeriesColorMappings(
@@ -305,6 +343,7 @@ export const convertMultiSQLData = async (
       panelSchema?.config?.color?.colorBySeries,
       store.state.theme,
     );
+    applySeriesOverrides(options[0]?.options, panelSchema, store.state.theme);
     return options[0];
   }
 
@@ -318,86 +357,15 @@ export const convertMultiSQLData = async (
       }
     });
 
-    // read the panel dimensions once — offsetWidth/offsetHeight are live DOM
-    // reads and this block references them for every grid cell
-    const panelW = chartPanelRef?.value?.offsetWidth ?? 0;
-    const panelH = chartPanelRef?.value?.offsetHeight ?? 0;
-    const gridData = calculateGridPositions(panelW, panelH, allMetricSeries.length);
-    const longestText = allMetricSeries.reduce(
-      (acc: string, s: any) =>
-        (s._metricText ?? "").length > acc.length ? (s._metricText ?? "") : acc,
-      "",
-    );
-    const labelFontSize = Math.max(11, Math.min(14, Math.round(gridData.gridWidth / 30)));
-    // The label renders below the value inside the same cell, so the value's
-    // vertical budget is the cell height minus the label line and gaps.
-    // Sizing against the longest value keeps all cells' fonts identical.
-    const sharedFontSize = calculateMetricFontSize(
-      longestText,
-      gridData.gridWidth,
-      gridData.gridHeight - labelFontSize - 10,
+    layoutMetricGrid(
+      allMetricSeries,
+      panelSchema?.config?.sparkline,
+      chartPanelRef?.value?.offsetWidth ?? 0,
+      chartPanelRef?.value?.offsetHeight ?? 0,
     );
 
-    allMetricSeries.forEach((s: any, idx: number) => {
-      const cell = gridData?.gridArray?.[idx];
-      if (!cell) return;
-      const cx = ((parseFloat(cell.left) + parseFloat(cell.width) / 2) / 100) * panelW;
-      const cy = ((parseFloat(cell.top) + parseFloat(cell.height) / 2) / 100) * panelH;
-      const fill = s?._metricFillColor ?? chartColor("--color-text-heading");
-      // Grid-cell rect (px) is the hover zone; cx/cy/fontSize place + size the
-      // copy icon beside the number, clamped inside the cell.
-      s._metricLayout = {
-        left: (parseFloat(cell.left) / 100) * panelW,
-        top: (parseFloat(cell.top) / 100) * panelH,
-        width: (parseFloat(cell.width) / 100) * panelW,
-        height: (parseFloat(cell.height) / 100) * panelH,
-        cx,
-        cy: cy - labelFontSize / 2 - 2,
-        fontSize: sharedFontSize,
-        // vertical space under the value taken by the field label, so a
-        // below-the-value copy button clears it
-        labelClearance: labelFontSize * 1.2 + 8,
-      };
-      s.renderItem = () => {
-        try {
-          return {
-            type: "group",
-            children: [
-              {
-                type: "text",
-                style: {
-                  text: s._metricText ?? "",
-                  fontSize: sharedFontSize,
-                  fontWeight: 500,
-                  align: "center",
-                  verticalAlign: "middle",
-                  x: cx,
-                  y: cy - labelFontSize / 2 - 2,
-                  fill,
-                },
-              },
-              {
-                type: "text",
-                style: {
-                  text: s._metricLabel ?? "",
-                  fontSize: labelFontSize,
-                  fontWeight: 400,
-                  align: "center",
-                  verticalAlign: "middle",
-                  x: cx,
-                  y: cy + sharedFontSize / 2 + 4,
-                  fill,
-                  opacity: 0.65,
-                },
-              },
-            ],
-          };
-        } catch {
-          return "";
-        }
-      };
-    });
-
+    // Canvas base = panel background; each cell paints its own mapped background.
+    options[0].options.backgroundColor = panelSchema?.config?.background?.value?.color ?? "";
     options[0].options.series = allMetricSeries;
     return options[0];
   }
@@ -417,6 +385,7 @@ export const convertMultiSQLData = async (
       allSeries.length,
     );
     const minDim = Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight);
+    const autoRange = gaugeAutoRange(allSeries.map((s: GaugeDialSeries) => s?.data?.[0]?.value));
 
     allSeries.forEach((s: any, idx: number) => {
       const cell = gridDataForGauge.gridArray[idx];
@@ -425,23 +394,18 @@ export const convertMultiSQLData = async (
         `${parseFloat(cell.left) + parseFloat(cell.width) / 2}%`,
         `${parseFloat(cell.top) + parseFloat(cell.height) / 2}%`,
       ];
-      s.radius = `${minDim / 2 - 5}px`;
-      if (s.progress) {
-        s.progress.width = `${minDim / 6}`;
-      }
-      if (s.axisLine?.lineStyle) {
-        s.axisLine.lineStyle.width = `${minDim / 6}`;
-      }
-      if (s.title) {
-        s.title.width = `${gridDataForGauge.gridWidth}`;
-      }
+      if (s._autoRange && autoRange) Object.assign(s, autoRange);
+      sizeGaugeDial(s, minDim, gridDataForGauge.gridWidth);
     });
+    alignGaugeValueFonts(allSeries, minDim);
     options[0].options.series = allSeries;
     applySeriesColorMappings(
       options[0].options.series,
       panelSchema?.config?.color?.colorBySeries,
       store.state.theme,
     );
+    applyGaugeSeriesThresholds(allSeries, panelSchema?.config);
+    applySeriesOverrides(options[0].options, panelSchema, store.state.theme);
     return options[0];
   }
 
@@ -536,6 +500,30 @@ export const convertMultiSQLData = async (
       }
     });
 
+    // Each tile reports its own cell-limit and duplicate warnings; only options[0] reaches the panel.
+    options.slice(1).forEach((opt: any) => {
+      const message = opt?.extras?.limitNumberOfSeriesWarningMessage;
+      if (message) {
+        options[0].extras = options[0].extras ?? {};
+        addHeatmapWarning(options[0].extras, message);
+      }
+    });
+
+    options[0].extras = options[0].extras ?? {};
+    options[0].extras.heatmapRowValues = options.map(
+      (opt: any) => opt?.extras?.heatmapRowValues?.[0] ?? null,
+    );
+
+    // One zoom box or hovered time maps through a single column list, so tiles must share it.
+    if (
+      options[0].extras?.heatmapTimeAxis &&
+      !sharedHeatmapTimeAxis(options.map((opt: any) => opt?.extras?.heatmapTimeAxis))
+    ) {
+      delete options[0].extras.heatmapTimeAxis;
+      options[0].extras.isTimeSeries = false;
+      if (options[0].options.toolbox) options[0].options.toolbox.show = false;
+    }
+
     options[0].options.grid = allGrids;
     options[0].options.xAxis = allXAxes;
     options[0].options.yAxis = allYAxes;
@@ -549,8 +537,9 @@ export const convertMultiSQLData = async (
       trigger: "item",
       formatter: (params: any) => {
         try {
-          const yLabel =
-            allYAxes[params.seriesIndex]?.data?.[params?.value?.[1]] ?? params?.seriesName ?? "";
+          // An empty tile keeps its axis but loses its series, so series and axis indices can differ.
+          const yAxis = allYAxes[allSeries[params.seriesIndex]?.yAxisIndex];
+          const yLabel = yAxis?.data?.[params?.value?.[1]] ?? params?.seriesName ?? "";
           const rawVal = params?.value?.[2];
           const formatted =
             formatUnitValue(
@@ -561,7 +550,7 @@ export const convertMultiSQLData = async (
                 panelSchema?.config?.decimals,
               ),
             ) || rawVal;
-          return `${yLabel} <br/> ${params?.marker ?? ""} ${params?.name ?? ""} : ${formatted}`;
+          return `${escapeHtml(yLabel)} <br/> ${params?.marker ?? ""} ${escapeHtml(params?.name ?? "")} : ${escapeHtml(formatted)}`;
         } catch {
           return "";
         }
@@ -569,8 +558,17 @@ export const convertMultiSQLData = async (
     };
 
     if (options[0].options.visualMap) {
-      options[0].options.visualMap.min = isFinite(globalMin) ? globalMin : 0;
-      options[0].options.visualMap.max = isFinite(globalMax) ? globalMax : 0;
+      // Re-resolved over the shared range: a pin one query rejected may still hold for the panel.
+      const { color, ...sharedRange } = heatmapColorScale(
+        panelSchema?.config,
+        heatmapColorRange(panelSchema?.config, {
+          min: isFinite(globalMin) ? globalMin : 0,
+          max: isFinite(globalMax) ? globalMax : 0,
+        }),
+        allSeries.map((series: any) => series.data ?? []),
+      );
+      Object.assign(options[0].options.visualMap, sharedRange);
+      options[0].options.visualMap.inRange = { color };
       options[0].options.visualMap.bottom = VISUAL_MAP_BOTTOM;
     }
 
@@ -583,14 +581,25 @@ export const convertMultiSQLData = async (
   }
 
   // C3: X-axis merge + reindex for time-series charts
+  const isHorizontal = chartType === "h-bar" || chartType === "h-stacked";
+  const categoryAxis = isHorizontal ? "yAxis" : "xAxis";
+  const horizontalCategories = isHorizontal ? options[0]?.options?.yAxis : null;
+  const timeSample = horizontalCategories?.[0]?.data?.slice(0, 20) ?? [];
+  // An h-bar breakdown adds a per-row second axis, and time rows of a shifted twin pair up by position.
+  const mergeableHorizontal =
+    horizontalCategories?.length === 1 &&
+    !(timeSample.length && (isTimeSeries(timeSample) || isTimeStamp(timeSample, null)));
   const needsXAxisMerge =
     options.length > 1 &&
-    options[0]?.options?.xAxis?.[0]?.data &&
+    options[0]?.options?.[categoryAxis]?.[0]?.data &&
+    (!isHorizontal || mergeableHorizontal) &&
     !["pie", "donut", "metric", "gauge", "heatmap"].includes(chartType);
 
   if (needsXAxisMerge) {
     // Save each query's original xAxis BEFORE merging
-    const originalXAxes = options.map((opt: any) => [...(opt?.options?.xAxis?.[0]?.data || [])]);
+    const originalXAxes = options.map((opt: any) => [
+      ...(opt?.options?.[categoryAxis]?.[0]?.data || []),
+    ]);
 
     // Build merged xAxis (union of all queries' values)
     const mergedXAxisSet = new Set<any>();
@@ -598,10 +607,12 @@ export const convertMultiSQLData = async (
       xData.forEach((v: any) => mergedXAxisSet.add(v));
     });
 
-    // Sort: timestamps numerically, categorical strings alphabetically
-    const mergedXAxis = Array.from(mergedXAxisSet).sort((a: any, b: any) =>
-      typeof a === "number" ? a - b : String(a).localeCompare(String(b)),
-    );
+    // Horizontal charts keep query 1's row order, which can be its ORDER BY stack-total order.
+    const mergedXAxis = isHorizontal
+      ? Array.from(mergedXAxisSet)
+      : Array.from(mergedXAxisSet).sort((a: any, b: any) =>
+          typeof a === "number" ? a - b : String(a).localeCompare(String(b)),
+        );
 
     // Optimization: skip reindexing if merged === original Q1 xAxis
     const q1Unchanged =
@@ -609,7 +620,7 @@ export const convertMultiSQLData = async (
       mergedXAxis.every((v: any, idx: number) => v === originalXAxes[0][idx]);
 
     // Apply merged xAxis to result
-    options[0].options.xAxis[0].data = mergedXAxis;
+    options[0].options[categoryAxis][0].data = mergedXAxis;
 
     // Reindex every query's series data to align with merged xAxis
     options.forEach((opt: any, queryIdx: number) => {
@@ -637,6 +648,10 @@ export const convertMultiSQLData = async (
 
   // C2: Series labeling + C4: Stack collision fix — apply to ALL queries when multi-query
   if (options && options.length > 1 && options[0]?.options) {
+    // A right-clicked series alerts on its own panel query, a shifted one on its parent's.
+    const seriesRoleAt = (i: number) =>
+      Number(metadata?.queries?.[i]?.timeRangeGap?.seconds) ? "shifted" : "primary";
+
     // Label Q1 series
     if (options[0].options.series) {
       const pIdx0 = metadata?.queries?.[0]?.panelQueryIndex ?? 0;
@@ -649,6 +664,8 @@ export const convertMultiSQLData = async (
           ...it,
           name: buildLabeledName(it.name, q1Config, pIdx0, q1Period),
           _queryIndex: 0,
+          _panelQueryIndex: pIdx0,
+          _seriesRole: seriesRoleAt(0),
         };
       });
     }
@@ -668,6 +685,8 @@ export const convertMultiSQLData = async (
               ...it,
               name: buildLabeledName(it.name, qConfig, panelQueryIndex, periodAsStr),
               _queryIndex: i,
+              _panelQueryIndex: panelQueryIndex,
+              _seriesRole: seriesRoleAt(i),
               // C4: prefix stack names to prevent cross-query stacking
               stack: it.stack ? `q${i}-${it.stack}` : it.stack,
             };
@@ -695,6 +714,10 @@ export const convertMultiSQLData = async (
     }
   }
 
+  if (isMultiQuery && chartType === "h-bar" && panelSchema?.config?.show_bar_track) {
+    mergeBarTrackMax(options[0]?.options, options);
+  }
+
   // Re-apply color mappings on the fully merged+renamed series
   if (options[0]?.options?.series) {
     applySeriesColorMappings(
@@ -712,6 +735,17 @@ export const convertMultiSQLData = async (
     reapplyTrellisLayout(options[0].options, panelSchema, chartPanelRef, chartPanelStyle);
   }
 
+  if (options[0]?.options) {
+    if (chartType === "gauge") {
+      applyGaugeSeriesThresholds(options[0].options.series ?? [], panelSchema?.config);
+    }
+    // Override colours first: a threshold step outranks them and recolours on top.
+    applySeriesOverrides(options[0].options, panelSchema, store.state.theme);
+    applyChartStyleOptions(options[0].options, panelSchema);
+    fitStackedAxisBounds(chartType, options[0].options);
+    applyLineAreaThresholds(options[0].options, panelSchema);
+  }
+
   return options[0];
 };
 
@@ -726,6 +760,8 @@ export const convertSQLData = async (
   chartPanelStyle: any,
   annotations: any,
   loading?: any,
+  // Metric sparkline: histogram hits for this query (fed to the sparkline trend).
+  sparklineData?: any,
 ) => {
   return convertSQLChartData(
     panelSchema,
@@ -738,5 +774,6 @@ export const convertSQLData = async (
     chartPanelStyle,
     annotations,
     loading,
+    sparklineData,
   );
 };

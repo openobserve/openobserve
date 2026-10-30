@@ -41,8 +41,9 @@ vi.mock("./AddTab.vue", () => ({
 // Inline rename + reorder pull in i18n, the store, notifications and the tab
 // persistence helpers — mock them so the component mounts in isolation (mirrors
 // AddTab.spec).
+const mockT = vi.hoisted(() => vi.fn((key: string) => key));
 vi.mock("vue-i18n", () => ({
-  useI18n: () => ({ t: (key: string) => key }),
+  useI18n: () => ({ t: mockT }),
 }));
 
 const mockStore = {
@@ -54,12 +55,17 @@ vi.mock("vuex", () => ({
 
 const mockShowPositiveNotification = vi.fn();
 const mockShowErrorNotification = vi.fn();
-const mockShowConflictErrorNotification = vi.fn();
 vi.mock("@/composables/useNotifications", () => ({
   default: () => ({
     showPositiveNotification: mockShowPositiveNotification,
     showErrorNotification: mockShowErrorNotification,
-    showConfictErrorNotificationWithRefreshBtn: mockShowConflictErrorNotification,
+  }),
+}));
+const mockOpenConflict = vi.fn();
+vi.mock("@/composables/dashboard/useDashboardSaveConflict", () => ({
+  useDashboardSaveConflict: () => ({
+    isConflict: (error: any) => error?.response?.status === 409,
+    openConflict: mockOpenConflict,
   }),
 }));
 
@@ -177,6 +183,32 @@ describe("TabList", () => {
       );
     });
 
+    it("shows a panel-count badge per tab, excluding section headers", () => {
+      const dashboard = {
+        ...mockDashboardData,
+        tabs: [
+          {
+            tabId: "tab1",
+            name: "First Tab",
+            // Two real panels + one section header → count should be 2.
+            panels: [{ id: "p1" }, { o2SectionHeader: true, id: "h1" }, { id: "p2" }],
+          },
+        ],
+      };
+      wrapper = createWrapper({ dashboardData: dashboard });
+
+      const badge = wrapper.find('[data-test="dashboard-tab-tab1-panel-count"]');
+      expect(badge.exists()).toBe(true);
+      expect(badge.text()).toBe("2");
+    });
+
+    it("shows 0 on a tab with no panels", () => {
+      wrapper = createWrapper();
+      const badge = wrapper.find('[data-test="dashboard-tab-tab1-panel-count"]');
+      expect(badge.exists()).toBe(true);
+      expect(badge.text()).toBe("0");
+    });
+
     it("should display tab names correctly", () => {
       wrapper = createWrapper();
 
@@ -247,7 +279,8 @@ describe("TabList", () => {
         expect(classes).toContain("whitespace-nowrap");
         expect(classes).toContain("overflow-hidden");
         expect(classes).toContain("text-ellipsis");
-        expect(classes).toContain("w-full");
+        // flex-1 (was w-full) so the name shares the row with the panel-count badge.
+        expect(classes).toContain("flex-1");
       });
     });
   });
@@ -292,7 +325,7 @@ describe("TabList", () => {
     it("should show add button without requiring hover", () => {
       wrapper = createWrapper({ viewOnly: false });
 
-      // The + is a persistent affordance (Sheets/Datadog-style tab bars).
+      // The + is a persistent affordance (spreadsheet-style tab bars).
       const addButton = wrapper.find('[data-test="dashboard-tab-add-btn"]');
       expect(addButton.isVisible()).toBe(true);
     });
@@ -689,6 +722,20 @@ describe("TabList", () => {
       expect(wrapper.emitted("refresh")).toBeTruthy();
     });
 
+    it("opens the save-conflict dialog on a 409 and keeps the new order on screen", async () => {
+      mockUpdateDashboard.mockRejectedValueOnce({ response: { status: 409 } });
+      wrapper = createWrapper();
+
+      await wrapper.vm.onReorder({ from: "tab3", to: "tab1", before: true });
+      await flushPromises();
+
+      expect(mockOpenConflict).toHaveBeenCalledWith(
+        expect.objectContaining({ mine: wrapper.props("dashboardData") }),
+      );
+      expect(wrapper.emitted("refresh")).toBeFalsy();
+      expect(wrapper.vm.tabs.map((tab: any) => tab.tabId)).toEqual(["tab3", "tab1", "tab2"]);
+    });
+
     it("should ignore a reorder referencing an unknown tab id", async () => {
       wrapper = createWrapper();
 
@@ -696,6 +743,50 @@ describe("TabList", () => {
 
       expect(mockUpdateDashboard).not.toHaveBeenCalled();
       expect(wrapper.vm.tabs.map((tab: any) => tab.tabId)).toEqual(["tab1", "tab2", "tab3"]);
+    });
+  });
+
+  describe("Layout edit mode", () => {
+    it("locks reordering in view mode but keeps rename and add", () => {
+      wrapper = createWrapper({ layoutMode: "view" });
+
+      expect(wrapper.findComponent({ name: "OTabs" }).props("reorderable")).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-tab-tab1-rename-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-tab-add-btn"]').exists()).toBe(true);
+    });
+
+    it("allows reordering in edit mode and hides rename and add", () => {
+      wrapper = createWrapper({ layoutMode: "edit" });
+
+      expect(wrapper.findComponent({ name: "OTabs" }).props("reorderable")).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-tab-tab1-rename-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-tab-add-btn"]').exists()).toBe(false);
+    });
+
+    it("does not start a rename on double-click in edit mode", async () => {
+      wrapper = createWrapper({ layoutMode: "edit" });
+
+      await wrapper.find('[data-test="dashboard-tab-tab2-name"]').trigger("dblclick");
+
+      expect(wrapper.vm.editingTabId).toBeNull();
+    });
+
+    it("drafts a reorder from OTabs without saving it", async () => {
+      wrapper = createWrapper({ layoutMode: "edit" });
+
+      wrapper
+        .findComponent({ name: "OTabs" })
+        .vm.$emit("reorder", { from: "tab3", to: "tab1", before: true });
+      await flushPromises();
+
+      expect(wrapper.props("dashboardData").tabs.map((tab: any) => tab.tabId)).toEqual([
+        "tab3",
+        "tab1",
+        "tab2",
+      ]);
+      expect(wrapper.emitted("layoutChange")).toHaveLength(1);
+      expect(mockUpdateDashboard).not.toHaveBeenCalled();
+      expect(mockShowPositiveNotification).not.toHaveBeenCalled();
     });
   });
 
@@ -712,6 +803,21 @@ describe("TabList", () => {
       expect(wrapper.vm.editingTabId).toBe("tab2");
     });
 
+    // A 0 min track (`minmax(0,max-content)`) lets the editing tab shrink to 0px
+    // once the strip overflows, hiding the input. jsdom has no layout engine, so
+    // assert the declaration rather than the width.
+    it("should size the rename field with a max-content track that cannot collapse", async () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.startRename({ tabId: "tab2", name: "Second Tab" });
+      await flushPromises();
+
+      const grid = wrapper.find('[data-test="dashboard-tab-tab2-rename-input"]').element
+        .parentElement as HTMLElement;
+      expect(grid.className).toContain("grid-cols-[max-content]");
+      expect(grid.className).not.toContain("minmax(0");
+    });
+
     it("should persist a changed name via editTab and emit refresh", async () => {
       wrapper = createWrapper();
 
@@ -725,6 +831,32 @@ describe("TabList", () => {
       });
       expect(wrapper.emitted("refresh")).toBeTruthy();
       expect(wrapper.vm.editingTabId).toBe(null);
+    });
+
+    it("describes the rename as old to new in the conflict dialog on a 409", async () => {
+      const tab = { tabId: "tab1", name: "First Tab" };
+      // editTab renames the cached tab (the one on screen) before the save fails.
+      mockEditTab.mockImplementationOnce(async (...args: any[]) => {
+        tab.name = args[4].name;
+        throw { response: { status: 409 } };
+      });
+      wrapper = createWrapper();
+
+      wrapper.vm.startRename(tab);
+      await flushPromises();
+      wrapper.vm.editingName = "Renamed Tab";
+      await wrapper.vm.commitRename(tab);
+
+      expect(mockT).toHaveBeenCalledWith("dashboard.saveConflict.change.renamedTab", {
+        from: "First Tab",
+        to: "Renamed Tab",
+      });
+
+      // t() is mocked as identity, so the change carries the i18n key.
+      expect(mockOpenConflict.mock.calls.at(-1)![0].change).toBe(
+        "dashboard.saveConflict.change.renamedTab",
+      );
+      expect(wrapper.emitted("refresh")).toBeFalsy();
     });
 
     it("should not call editTab when the name is unchanged", async () => {

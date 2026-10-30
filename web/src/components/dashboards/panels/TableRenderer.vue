@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="table-wrapper relative h-full w-full" data-test="dashboard-table-renderer-wrapper">
     <OTable
       ref="tableRef"
-      :key="paginationMode"
+      :key="tableKey"
       :data="sortedRows"
       :columns="otableColumns"
       sorting="server"
@@ -34,15 +34,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :wrap="wrapCells"
       :pagination="showPagination ? 'client' : 'none'"
       :page-size="effectivePageSize"
-      :custom-pagination-bar="showPagination"
       :horizontal-scroll="true"
-      :row-height="22"
+      :row-height="tableRowHeight(density)"
       :virtual-scroll="virtualizeRows"
+      :window-row-model="virtualizeRows"
       :default-columns="false"
       :show-global-filter="false"
       :enable-column-filter="enableFiltering"
+      :enable-column-format="enableColumnFormat"
+      @format-column="onFormatColumn"
       :enable-column-reorder="false"
-      :enable-cell-copy="true"
+      :enable-cell-copy="false"
+      :expansion="rowsExpandable ? 'multiple' : 'none'"
+      :row-key="rowsExpandable ? expansionRowKey : undefined"
+      :measure-expanded-rows="rowsExpandable"
       :class="{ 'wrap-enabled': wrapCells }"
       data-test="dashboard-panel-table"
       @row-click="
@@ -62,28 +67,140 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <JsonFieldRenderer :value="value" />
       </template>
 
-      <!-- PanelSchemaRenderer excludes `table` panels from its own OEmptyState,
-           so mirror the chart panels' "No Data" treatment here. -->
-      <template #empty>
-        <OEmptyState
-          size="inline"
-          icon="bar-chart"
-          :title="t('panel.noData')"
-          :backdrop="false"
-          data-test="no-data"
+      <template
+        v-for="col in barGaugeColumns"
+        :key="`bar-gauge-cell-${col.id}`"
+        #[`cell-${col.id}`]="{ value, column, row }"
+      >
+        <ODataBarCell
+          :value="value"
+          :min="col.barRange?.min ?? 0"
+          :max="col.barRange?.max ?? 0"
+          :color="col.barColor?.(value) ?? null"
+          :display="formatCellValue(value, column, row)"
+          gauge
+          :data-test="`dashboard-table-bar-gauge-${col.id}`"
         />
       </template>
 
+      <template
+        v-for="col in sparklineColumns"
+        :key="`sparkline-cell-${col.id}`"
+        #[`cell-${col.id}`]="{ value, column, row }"
+      >
+        <OSparkline
+          v-if="parseSparklineValue(value)"
+          :points="parseSparklineValue(value) ?? []"
+          size="xs"
+          :data-test="`dashboard-table-sparkline-${col.id}`"
+        />
+        <span v-else>{{ formatCellValue(value, column, row) }}</span>
+      </template>
+
+      <template
+        v-for="col in linkFieldColumns"
+        :key="`link-cell-${col.id}`"
+        #[`cell-${col.id}`]="{ value, column, row }"
+      >
+        <a
+          v-if="getHttpUrl(value)"
+          :href="getHttpUrl(value) || undefined"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-text-link hover:text-text-link-hover hover:underline"
+          @click.stop
+        >
+          {{ formatCellValue(value, column, row) }}
+        </a>
+        <span v-else>{{ formatCellValue(value, column, row) }}</span>
+      </template>
+
+      <template v-if="rowsExpandable" #expansion="{ row }">
+        <dl
+          class="text-compact grid grid-cols-[minmax(0,max-content)_minmax(0,1fr)] gap-x-4 gap-y-1 px-3 py-2"
+          data-test="dashboard-table-row-detail"
+        >
+          <template v-for="col in otableColumns" :key="`detail-${col.id}`">
+            <dt class="text-text-secondary">{{ col.header }}</dt>
+            <dd class="text-text-body min-w-0 wrap-anywhere whitespace-pre-wrap">
+              <JsonFieldRenderer v-if="col.showFieldAsJson" :value="row[col.accessorKey]" />
+              <a
+                v-else-if="getHttpUrl(row[col.accessorKey])"
+                :href="getHttpUrl(row[col.accessorKey]) || undefined"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-text-link hover:text-text-link-hover hover:underline"
+                :data-test="`dashboard-table-row-detail-link-${col.id}`"
+                @click.stop
+              >
+                {{ formatCellValue(row[col.accessorKey], col, row) }}
+              </a>
+              <span
+                v-else
+                class="rounded-default px-1"
+                :style="detailValueStyle(col, row)"
+                :data-test="`dashboard-table-row-detail-value-${col.id}`"
+                >{{ formatCellValue(row[col.accessorKey], col, row) }}</span
+              >
+            </dd>
+          </template>
+        </dl>
+      </template>
+
+      <!-- Forward parent-provided cell slots (e.g. a caller's trailing action column). -->
+      <template v-for="name in forwardedCellSlots" :key="name" #[name]="scope">
+        <slot :name="name" v-bind="scope" />
+      </template>
+
+      <template #cell-hover-actions="{ row, column, value }">
+        <OButton
+          v-if="isCopyableCellValue(value)"
+          variant="ghost"
+          size="icon-xs-circle"
+          :data-test="`dashboard-table-cell-copy-${column.id}`"
+          :data-copied="copiedCellKey === cellKey(column, row) ? 'true' : undefined"
+          @click.stop="copyCellValue(value, column, row)"
+        >
+          <OIcon
+            :name="copiedCellKey === cellKey(column, row) ? 'check' : 'content-copy'"
+            size="xs"
+          />
+          <OTooltip :content="t('common.copy')" />
+        </OButton>
+        <OButton
+          v-if="isCellDrillable(column.id)"
+          variant="ghost"
+          size="icon-xs-circle"
+          :data-test="`dashboard-table-cell-drilldown-${column.id}`"
+          @click.stop="onCellDrilldown({ columnId: column.id, row, value })"
+        >
+          <OIcon name="search" size="xs" />
+          <OTooltip :content="t('dashboard.tableCellDrilldownTooltip')" />
+        </OButton>
+      </template>
+
+      <!-- PanelSchemaRenderer excludes `table` panels from its own OEmptyState, so
+           mirror the chart panels' "No Data" treatment here. Forwarded like #bottom
+           so a parent can reword it — a triage table reports empty as "All clear". -->
+      <template #empty>
+        <slot name="empty">
+          <OEmptyState
+            size="inline"
+            icon="bar-chart"
+            :title="t('panel.noData')"
+            :backdrop="false"
+            data-test="no-data"
+          />
+        </slot>
+      </template>
+
       <!-- Pagination footer: forward parent's #bottom slot or show default pagination controls -->
-      <template #bottom="scope">
+      <template #pagination-bar="scope">
         <slot name="bottom" v-bind="scope">
-          <!-- This #bottom IS the pager (the built-in bar is suppressed via
-               :custom-pagination-bar), so it carries its own separator + padding.
-               With pagination off it still renders — TablePaginationControls then
-               shows the row count alone, so it drops the bar chrome. -->
+          <!-- This replaces OTable's built-in bar, so it carries its own separator and padding; with pagination off it shows the row count alone and drops that chrome. -->
           <div
             class="flex w-full items-center"
-            :class="showPagination ? 'border-border-default min-h-10 border-t px-3 py-1' : 'pr-2'"
+            :class="showPagination ? 'border-border-default min-h-10 border-t px-3 py-1' : 'pe-2'"
             data-test="dashboard-table-pagination"
           >
             <div class="flex-1" />
@@ -108,25 +225,82 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, computed, toRaw, watch, type PropType } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
 import JsonFieldRenderer from "@/components/dashboards/panels/JsonFieldRenderer.vue";
+import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
+import OSparkline from "@/lib/data/Sparkline/OSparkline.vue";
+import { parseSparklineValue, tableRowHeight } from "@/utils/dashboard/tableOptions";
 import { TABLE_ROWS_PER_PAGE_DEFAULT_VALUE } from "@/utils/dashboard/constants";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
 import { isColorDark } from "@/utils/dashboard/chartColorUtils";
 import { buildValueMappingCache, lookupValueMappingFull } from "@/utils/dashboard/tableConfigUtils";
+import { copyToClipboard } from "@/utils/clipboard";
+import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
 import { useStore } from "vuex";
+
+type TableRow = Record<string, unknown>;
+
+interface TableColumn {
+  field?: string;
+  name?: string;
+  label?: string;
+  header?: string;
+  pinned?: string;
+  size?: number;
+  format?: (value: unknown, row: TableRow) => unknown;
+}
+
+const PINNED_WIDTH_MIN = 60;
+const PINNED_WIDTH_MAX = 320;
+const CELL_PADDING = 24;
+
+// 53-bit string hash (cyrb53): a short key per row instead of keeping every row's JSON alive.
+const contentHash = (text: string): string => {
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+};
+
+// A pinned column needs a fixed size for the sticky offsets after it, so it is sized to its longest value.
+const pinnedColumnWidth = (col: TableColumn, rows: TableRow[]): number => {
+  const field = col.field ?? col.name ?? "";
+  let longest = String(col.label ?? col.header ?? field);
+  for (const row of rows) {
+    const value = col.format ? col.format(row[field], row) : row[field];
+    const text = value == null ? "" : String(value);
+    if (text.length > longest.length) longest = text;
+  }
+  // eslint-disable-next-line local/no-hardcoded-px -- canvas text measurement takes a CSS px font size
+  const textWidth = calculateWidthText(longest, "13px");
+  return Math.min(PINNED_WIDTH_MAX, Math.max(PINNED_WIDTH_MIN, textWidth + CELL_PADDING));
+};
 
 export default defineComponent({
   name: "TableRenderer",
   components: {
     OTable,
     OEmptyState,
+    OButton,
+    OIcon,
+    OTooltip,
     TablePaginationControls,
     JsonFieldRenderer,
+    ODataBarCell,
+    OSparkline,
   },
   props: {
     data: {
@@ -159,11 +333,46 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    /** Show the per-column "format this column" icon (add/edit panel only). */
+    enableColumnFormat: {
+      required: false,
+      type: Boolean,
+      default: false,
+    },
+    /** Column ids drillable → Logs (group-by fields); empty hides the button. */
+    drilldownColumns: {
+      required: false,
+      type: Array as PropType<string[]>,
+      default: () => [],
+    },
+    /** SELECT * / dynamic-columns tables: every cell is drillable. */
+    drilldownAllColumns: {
+      required: false,
+      type: Boolean,
+      default: false,
+    },
+    /** Row density (`table_density`); absent keeps the compact rows. */
+    density: {
+      required: false,
+      type: String,
+      default: undefined,
+    },
+    expandableRows: {
+      required: false,
+      type: Boolean,
+      default: false,
+    },
+    /** Columns that identify a row (its dimensions), so an expanded row stays open when its values change. */
+    rowKeyFields: {
+      required: false,
+      type: Array as PropType<string[]>,
+      default: () => [],
+    },
   },
-  emits: ["row-click"],
-  setup(props) {
+  emits: ["row-click", "format-column", "explore-cell"],
+  setup(props, { emit, slots }) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const tableRef = ref<any>(null);
 
     // "Records per page" is `v-model.number`, so clearing it yields "" — a
@@ -197,7 +406,43 @@ export default defineComponent({
     // with pagination off never starts slicing when it is toggled on.
     const paginationMode = computed(() => (props.showPagination ? "client" : "none"));
 
+    // Pivot rows are merged cells, so a per-row detail view has no single row to show.
+    const rowsExpandable = computed(() => props.expandableRows && !isPivot.value);
+
+    // OTable reads rowKey once at creation, so the expansion toggle re-keys the table too.
+    const tableKey = computed(() => `${paginationMode.value}-${rowsExpandable.value}`);
+
+    // Dashboard rows carry no id; a dimension key, numbered among equal keys, survives sorts and value refreshes.
+    const rowContentKey = (row: TableRow): string => {
+      const fields = props.rowKeyFields;
+      return contentHash(JSON.stringify(fields.length ? fields.map((field) => row[field]) : row));
+    };
+    const expansionRowIds = computed(() => {
+      const ids = new WeakMap<object, string>();
+      if (!rowsExpandable.value) return ids;
+      const seen = new Map<string, number>();
+      for (const row of (props.data?.rows as TableRow[] | undefined) ?? []) {
+        if (!row || typeof row !== "object") continue;
+        const content = rowContentKey(row);
+        const count = seen.get(content) ?? 0;
+        seen.set(content, count + 1);
+        ids.set(toRaw(row), count ? `${content}#${count}` : content);
+      }
+      return ids;
+    });
+    const expansionRowKey = (row: TableRow): string =>
+      expansionRowIds.value.get(toRaw(row)) ?? rowContentKey(row);
+
     const tableColumns = computed(() => (props.data?.columns as any[]) || []);
+
+    // Sticky offsets add up the earlier pinned columns' sizes, so only the last pinned one can fit its content.
+    const sizedPinnedColumns = computed(() => {
+      const pinned = (tableColumns.value as TableColumn[]).filter((c) => c.pinned === "left");
+      const rows = (props.data?.rows as TableRow[] | undefined) ?? [];
+      return new Map(
+        pinned.slice(0, -1).map((col) => [col, col.size ?? pinnedColumnWidth(col, rows)]),
+      );
+    });
 
     // Map the column config → OTableColumnDef. The original fields stay at the
     // top level (CSV export reads them there) and are mirrored into `meta` for
@@ -208,6 +453,7 @@ export default defineComponent({
         // Key on `field`, not `name`: `name` is the display label, so two columns
         // sharing a label would collide to the same column id.
         id: col.field ?? col.name,
+        ...(sizedPinnedColumns.value.has(col) && { size: sizedPinnedColumns.value.get(col) }),
         header: col.header ?? col.label ?? col.name ?? col.field,
         accessorKey: col.field ?? col.name,
         filterable: props.enableFiltering && !col._isRowField && !col._isTotalColumn,
@@ -215,13 +461,18 @@ export default defineComponent({
           ...(col.meta ?? {}),
           // Without a width OTable falls back to TanStack's flat 150px; autoWidth
           // sizes each column to its content. Pivot fixes its own widths.
-          ...(isPivot.value ? {} : { autoWidth: true }),
+          ...(isPivot.value
+            ? {}
+            : sizedPinnedColumns.value.has(col)
+              ? { fixedWidth: true }
+              : { autoWidth: true }),
           _col: col,
           format: col.format,
           align: col.align,
           _isRowField: col._isRowField,
           _isTotalColumn: col._isTotalColumn,
           _totalColRightIndex: col._totalColRightIndex,
+          formattable: props.enableColumnFormat && !col._isRowField && !col._isTotalColumn,
         },
       })),
     );
@@ -237,6 +488,47 @@ export default defineComponent({
     const jsonFieldColumns = computed(() =>
       (otableColumns.value as any[]).filter((c: any) => c.showFieldAsJson),
     );
+
+    const barGaugeColumns = computed(() =>
+      (otableColumns.value as any[]).filter(
+        (c: any) => !c.showFieldAsJson && c.cellType === "bar_gauge",
+      ),
+    );
+    const sparklineColumns = computed(() =>
+      (otableColumns.value as any[]).filter(
+        (c: any) => !c.showFieldAsJson && c.cellType === "sparkline",
+      ),
+    );
+
+    // Only absolute http(s) URLs are links. This both avoids turning arbitrary
+    // text into a link and prevents unsafe protocols such as javascript:.
+    const getHttpUrl = (value: unknown): string | null => {
+      if (typeof value !== "string") return null;
+      const url = value.trim();
+      if (!/^https?:\/\//i.test(url)) return null;
+      try {
+        const protocol = new URL(url).protocol;
+        return protocol === "http:" || protocol === "https:" ? url : null;
+      } catch {
+        return null;
+      }
+    };
+
+    // A column gets a cell slot only when at least one response value is a URL.
+    // The slot still renders any mixed non-URL values as regular formatted text.
+    const linkFieldColumns = computed(() => {
+      const rows = (props.data?.rows as any[]) || [];
+      return (otableColumns.value as any[]).filter((col: any) => {
+        if (col.showFieldAsJson || col.cellType) return false;
+        const field = col.field ?? col.name;
+        return rows.some((row: any) => getHttpUrl(row?.[field]) !== null);
+      });
+    });
+
+    const formatCellValue = (value: any, column: any, row: any): any => {
+      const format = column?.meta?.format as ((value: any, row: any) => any) | undefined;
+      return format ? format(value, row) : value;
+    };
 
     /**
      * Computes the inline style for a given TanStack cell.
@@ -284,6 +576,35 @@ export default defineComponent({
 
     // Colour engine, in precedence order: auto-color palette → value-mapping →
     // conditional rules → column override.
+    const drilldownColumnSet = computed(() => new Set(props.drilldownColumns));
+    const isCellDrillable = (columnId: string) =>
+      props.drilldownAllColumns || drilldownColumnSet.value.has(columnId);
+
+    // Dedicated drilldown event (the search icon), independent of row-click, so it fires even when
+    // a panel drilldown config would otherwise own plain cell clicks.
+    const onCellDrilldown = (params: { columnId: string; row: any; value: any }) => {
+      if (!isCellDrillable(params.columnId)) return;
+      emit("explore-cell", params, sortedRows.value.indexOf(params.row));
+    };
+
+    const isCopyableCellValue = (value: any) =>
+      value !== null && value !== undefined && String(value).trim() !== "";
+
+    const copiedCellKey = ref<string | null>(null);
+    let copiedTimer: ReturnType<typeof setTimeout> | null = null;
+    const cellKey = (column: any, row: any) => `${column?.id}#${sortedRows.value.indexOf(row)}`;
+
+    const copyCellValue = async (value: any, column: any, row: any) => {
+      const text = String(formatCellValue(value, column, row) ?? "");
+      const ok = await copyToClipboard(text, t, { silent: true });
+      if (!ok) return;
+      copiedCellKey.value = cellKey(column, row);
+      if (copiedTimer) clearTimeout(copiedTimer);
+      copiedTimer = setTimeout(() => {
+        copiedCellKey.value = null;
+      }, 2000);
+    };
+
     const cellStyleFn = computed(
       () =>
         (params: { columnId: string; row: any; value: any }): Record<string, any> => {
@@ -310,15 +631,25 @@ export default defineComponent({
             };
           }
 
-          // 2) Value-mapping color (valid hex only; else fall through).
-          const found = lookupValueMappingFull(value, valueMappingCache.value, "color");
-          if (found?.color && /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/i.test(found.color)) {
-            const hex = found.color;
-            return {
-              ...base,
-              backgroundColor: hex,
-              color: isColorDark(hex) ? "#ffffff" : "#000000",
-            };
+          // 2) Value-mapping colors — `color` is the background, `textColor` the text.
+          const found = lookupValueMappingFull(value, valueMappingCache.value);
+          if (found) {
+            const isHex = (c: any) =>
+              typeof c === "string" && /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/i.test(c);
+            const bg = isHex(found.color) ? found.color : "";
+            const txt = isHex(found.textColor)
+              ? found.textColor
+              : bg
+                ? isColorDark(bg)
+                  ? "#ffffff"
+                  : "#000000"
+                : "";
+            if (bg || txt) {
+              const style: Record<string, any> = { ...base };
+              if (bg) style.backgroundColor = bg;
+              if (txt) style.color = txt;
+              return style;
+            }
           }
 
           // 3) Conditional styling rules — last matching rule wins.
@@ -350,6 +681,10 @@ export default defineComponent({
           return base;
         },
     );
+
+    // The detail view shows a value with the same colours its cell has.
+    const detailValueStyle = (col: { id: string; accessorKey: string }, row: TableRow) =>
+      cellStyleFn.value({ columnId: col.id, row, value: row[col.accessorKey] });
 
     // ── Dashboard sort state (parent-managed, passed into TenstackTable) ──────
     const localSortBy = ref<string>("");
@@ -425,7 +760,12 @@ export default defineComponent({
     };
 
     const downloadTableAsJSON = (title?: string) => {
-      const rows = tableRef.value?.getRows() ?? [];
+      // Strip the internal per-query marker (`__q`) so it never leaks into exports.
+      const rows = (tableRef.value?.getRows() ?? []).map((row: any) => {
+        const copy = { ...row };
+        delete copy.__q;
+        return copy;
+      });
       const content = JSON.stringify({ columns: props.data?.columns, rows }, null, 2);
       const blob = new Blob([content], { type: "application/json" });
       const url = URL.createObjectURL(blob);
@@ -440,23 +780,51 @@ export default defineComponent({
     const onOTableSortChange = (params: { column: string; order: "asc" | "desc" }) =>
       handleSortChange(params.column ?? "", params.order ?? "asc");
 
+    const onFormatColumn = (columnId: string) => {
+      const col = colById.value.get(columnId);
+      emit("format-column", col?.alias ?? columnId);
+    };
+
+    // Forward any parent-provided `#cell-<id>` slots to OTable so callers can add custom cells.
+    const forwardedCellSlots = computed(() =>
+      Object.keys(slots).filter((n) => n.startsWith("cell-")),
+    );
+
     return {
+      forwardedCellSlots,
       t,
       tableRef,
       tableColumns,
       otableColumns,
       pivotRowColumns,
       jsonFieldColumns,
+      barGaugeColumns,
+      sparklineColumns,
+      parseSparklineValue,
+      tableRowHeight,
+      linkFieldColumns,
+      getHttpUrl,
+      formatCellValue,
       cellStyleFn,
       effectivePageSize,
       isPivot,
       virtualizeRows,
-      paginationMode,
+      tableKey,
+      rowsExpandable,
+      expansionRowKey,
+      detailValueStyle,
       sortedRows,
       localSortBy,
       localSortOrder,
       handleSortChange,
       onOTableSortChange,
+      onFormatColumn,
+      onCellDrilldown,
+      isCellDrillable,
+      isCopyableCellValue,
+      copyCellValue,
+      copiedCellKey,
+      cellKey,
       getTableCsvString,
       downloadTableAsCSV,
       downloadTableAsJSON,
@@ -493,6 +861,7 @@ export default defineComponent({
   right: 0;
   transform: translateY(-50%);
   height: 1rem;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the column divider is a 1-device-pixel rule and must not scale with text or it smears at fractional zoom */
   width: 1px;
   background: var(--color-border-default);
 }
@@ -515,6 +884,7 @@ export default defineComponent({
   font-weight: 600;
   /* 1px so this matches the value→data separator weight; heavier lines on both
      sides of a short value row read as a double line. */
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the pivot group-header rule is a 1-device-pixel border and must not scale with text or it smears at fractional zoom */
   border-bottom: 1px solid var(--color-table-row-divider);
 }
 
@@ -546,19 +916,26 @@ export default defineComponent({
   opacity: 0.4;
 }
 
+/* Touch has no th:hover — keep the sort affordance faintly visible. */
+@media (max-width: 47.99rem) {
+  .table-wrapper :deep(.pivot-sort-icon) {
+    opacity: 0.4;
+  }
+}
+
 .table-wrapper :deep(.pivot-sort-active) {
   opacity: 1 !important;
 }
 
 /* Sticky total column visual separator */
 .table-wrapper :deep(.pivot-total-col) {
-  box-shadow: inset 0.25rem 0 0.375rem -0.125rem var(--color-actions-column-shadow) !important;
+  box-shadow: var(--shadow-pivot-edge-geom) var(--color-actions-column-shadow) !important;
 }
 
 .table-wrapper :deep(.sticky-column.pivot-total-col) {
   box-shadow:
-    0.25rem 0 0.5rem var(--color-actions-column-shadow),
-    inset 0.25rem 0 0.375rem -0.125rem var(--color-actions-column-shadow) !important;
+    var(--shadow-pivot-cast-geom) var(--color-actions-column-shadow),
+    var(--shadow-pivot-edge-geom) var(--color-actions-column-shadow) !important;
 }
 
 @media print {
@@ -567,6 +944,21 @@ export default defineComponent({
     height: 100% !important;
     max-height: none !important;
     overflow: hidden !important;
+  }
+}
+
+/* Layered to outrank the global print reset in base-elements.css, which sets every .h-full to height:auto and every scroll area to overflow:visible. */
+@layer base {
+  @media print {
+    /* Keep the table panel at its grid-cell height; grown ancestors push the footer past the cell's clip. */
+    :global(.grid-stack-item-content:has([data-test="dashboard-table-renderer-wrapper"]) .h-full) {
+      height: 100% !important;
+    }
+
+    /* Rows cannot scroll on paper; clip them above the footer instead of painting over it. */
+    .table-wrapper :deep([data-test="o2-table-scroll-container"]) {
+      overflow: clip !important;
+    }
   }
 }
 </style>

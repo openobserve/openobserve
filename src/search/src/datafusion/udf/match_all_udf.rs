@@ -106,8 +106,6 @@ impl ScalarUDFImpl for FuzzyMatchAllUdf {
 
 #[cfg(test)]
 mod tests {
-    use datafusion::logical_expr::ScalarUDFImpl as _;
-
     use super::*;
 
     #[test]

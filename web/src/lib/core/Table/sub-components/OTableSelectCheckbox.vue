@@ -3,6 +3,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import type { I18nText } from "@/types/i18n";
 import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
 
 const props = defineProps<{
@@ -10,6 +11,7 @@ const props = defineProps<{
   indeterminate?: boolean;
   rowId?: string;
   disabled?: boolean;
+  label?: I18nText;
 }>();
 
 const emit = defineEmits<{
@@ -36,6 +38,7 @@ function handleUpdate(val: CheckboxModelValue) {
     :model-value="checkboxModel"
     :data-test="`o2-table-select-${rowId ?? 'header'}`"
     size="sm"
+    :aria-label="label"
     :disabled="disabled"
     @update:model-value="handleUpdate"
   />

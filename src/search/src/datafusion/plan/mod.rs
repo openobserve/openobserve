@@ -18,4 +18,6 @@ pub mod deduplication_exec;
 pub mod projections;
 #[cfg(feature = "vectorscan")]
 pub mod regex_projections;
+pub mod shared_subplan;
+pub mod shared_subplan_exec;
 pub mod tantivy_optimize_exec;

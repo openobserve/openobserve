@@ -1,0 +1,542 @@
+[
+  {
+    "id": "cap-redis-s01-java-legacy",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.operation": "GET",
+        "db.statement": "GET item:3",
+        "db.system": "redis",
+        "server.address": "redis",
+        "network.peer.address": "172.21.0.3",
+        "server.port": 6379,
+        "network.peer.port": 6379
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "GET item:?",
+      "operation": "GET",
+      "stmt_class": "query",
+      "system": "redis",
+      "namespace": null,
+      "instance": "redis",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "redis-S01-get",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/java-legacy.json",
+    "dialect": "redis"
+  },
+  {
+    "id": "cap-redis-s01-node-era-legacy",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system": "redis",
+        "net.peer.name": "redis",
+        "net.peer.port": 6379,
+        "db.connection_string": "redis://redis:6379",
+        "db.statement": "GET item:3"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "GET item:?",
+      "operation": "GET",
+      "stmt_class": "query",
+      "system": "redis",
+      "namespace": null,
+      "instance": "redis",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "redis-S01-get",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/node-redis-era-legacy.json",
+    "dialect": "redis"
+  },
+  {
+    "id": "cap-redis-s01-node-cur",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system.name": "redis",
+        "server.address": "redis",
+        "server.port": 6379,
+        "db.operation.name": "GET",
+        "db.query.text": "GET item:3"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "GET item:?",
+      "operation": "GET",
+      "stmt_class": "query",
+      "system": "redis",
+      "namespace": null,
+      "instance": "redis",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "redis-S01-get",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/node-redis-cur-legacy.json",
+    "dialect": "redis"
+  },
+  {
+    "id": "cap-redis-s02-java-setex",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.operation": "SETEX",
+        "db.statement": "SETEX item:tmp 60 ?",
+        "db.system": "redis",
+        "server.address": "redis",
+        "network.peer.address": "172.21.0.3",
+        "server.port": 6379,
+        "network.peer.port": 6379
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SETEX item:tmp",
+      "operation": "SETEX",
+      "stmt_class": "query",
+      "system": "redis",
+      "namespace": null,
+      "instance": "redis",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "redis-S02-setex",
+    "literals": [
+      "60"
+    ],
+    "source": "tests/dbm-capture/fixtures/java-legacy.json",
+    "dialect": "redis"
+  },
+  {
+    "id": "cap-redis-s02-node-cur-set",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system.name": "redis",
+        "server.address": "redis",
+        "server.port": 6379,
+        "db.operation.name": "SET",
+        "db.query.text": "SET item:tmp [3 other arguments]"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SET item:tmp",
+      "operation": "SET",
+      "stmt_class": "query",
+      "system": "redis",
+      "namespace": null,
+      "instance": "redis",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "redis-S02-set",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/node-redis-cur-legacy.json",
+    "dialect": "redis"
+  },
+  {
+    "id": "cap-redis-s03-java-legacy-arity3",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.operation": "MGET",
+        "db.statement": "MGET item:1 item:2 item:3",
+        "db.system": "redis",
+        "server.address": "redis",
+        "network.peer.address": "172.21.0.3",
+        "server.port": 6379,
+        "network.peer.port": 6379
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "MGET item:?",
+      "operation": "MGET",
+      "stmt_class": "query",
+      "system": "redis",
+      "namespace": null,
+      "instance": "redis",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "redis-S03-mget",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/java-legacy.json",
+    "dialect": "redis"
+  },
+  {
+    "id": "cap-redis-s05-java-new-arity20",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.query.text": "MGET item:1 item:2 item:3 item:4 item:5 item:6 item:7 item:8 item:9 item:10 item:11 item:12 item:13 item:14 item:15 item:16 item:17 item:18 item:19 item:20",
+        "db.namespace": "0",
+        "db.operation.name": "MGET",
+        "server.port": 6379,
+        "network.peer.port": 6379,
+        "db.system.name": "redis",
+        "server.address": "redis",
+        "network.peer.address": "172.21.0.3"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "MGET item:?",
+      "operation": "MGET",
+      "stmt_class": "query",
+      "system": "redis",
+      "namespace": "0",
+      "instance": "redis",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "redis-S03-mget",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/java-new.json",
+    "dialect": "redis"
+  },
+  {
+    "id": "cap-redis-s03-node-cur-argshidden",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system.name": "redis",
+        "server.address": "redis",
+        "server.port": 6379,
+        "db.operation.name": "MGET",
+        "db.query.text": "MGET [3 other arguments]"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "MGET",
+      "operation": "MGET",
+      "stmt_class": "query",
+      "system": "redis",
+      "namespace": null,
+      "instance": "redis",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "redis-S03-mget-argshidden",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/node-redis-cur-legacy.json",
+    "dialect": "redis"
+  },
+  {
+    "id": "cap-redis-s06-java-legacy",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.operation": "SET",
+        "db.statement": "SET batch:1 ?",
+        "db.system": "redis",
+        "server.address": "redis",
+        "network.peer.address": "172.21.0.3",
+        "server.port": 6379,
+        "network.peer.port": 6379
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SET batch:?",
+      "operation": "SET",
+      "stmt_class": "query",
+      "system": "redis",
+      "namespace": null,
+      "instance": "redis",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "redis-S06-set-batch",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/java-legacy.json",
+    "dialect": "redis"
+  },
+  {
+    "id": "cap-redis-s07-java-new-pipeline",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.query.text": "SET batch:1 ?; SET batch:2 ?; SET batch:3 ?; SET batch:4 ?; SET batch:5 ?",
+        "db.namespace": "0",
+        "db.operation.name": "PIPELINE SET",
+        "server.port": 6379,
+        "network.peer.port": 6379,
+        "db.system.name": "redis",
+        "db.operation.batch.size": 5,
+        "server.address": "redis",
+        "network.peer.address": "172.21.0.3"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SET batch:?",
+      "operation": "PIPELINE SET",
+      "stmt_class": "query",
+      "system": "redis",
+      "namespace": "0",
+      "instance": "redis",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "redis-S06-set-batch",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/java-new.json"
+  },
+  {
+    "id": "cap-redis-s06-node-era-legacy",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system": "redis",
+        "net.peer.name": "redis",
+        "net.peer.port": 6379,
+        "db.connection_string": "redis://redis:6379",
+        "db.statement": "SET batch:1 [1 other arguments]"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SET batch:?",
+      "operation": "SET",
+      "stmt_class": "query",
+      "system": "redis",
+      "namespace": null,
+      "instance": "redis",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "redis-S06-set-batch",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/node-redis-era-legacy.json",
+    "dialect": "redis"
+  },
+  {
+    "id": "cap-redis-s09-node-era-legacy-incr",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system": "redis",
+        "net.peer.name": "redis",
+        "net.peer.port": 6379,
+        "db.connection_string": "redis://redis:6379",
+        "db.statement": "INCR txn:counter"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "INCR txn:counter",
+      "operation": "INCR",
+      "stmt_class": "query",
+      "system": "redis",
+      "namespace": null,
+      "instance": "redis",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "redis-S09-incr",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/node-redis-era-legacy.json",
+    "dialect": "redis"
+  },
+  {
+    "id": "cap-redis-s09-java-legacy-jedis-multi",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.operation": "MULTI INCR",
+        "db.statement": "INCR txn:counter;INCR txn:counter",
+        "db.system": "redis",
+        "server.address": "redis",
+        "network.peer.address": "172.21.0.3",
+        "server.port": 6379,
+        "network.peer.port": 6379
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "INCR txn:counter",
+      "operation": "MULTI INCR",
+      "stmt_class": "query",
+      "system": "redis",
+      "namespace": null,
+      "instance": "redis",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "redis-S09-incr",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/java-legacy.json"
+  },
+  {
+    "id": "cap-redis-s10-java-dup-ping",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.operation.name": "PING",
+        "server.port": 6379,
+        "db.system.name": "redis",
+        "db.system": "redis",
+        "server.address": "redis",
+        "network.peer.address": "172.21.0.3",
+        "db.query.text": "PING",
+        "db.namespace": "0",
+        "network.peer.port": 6379,
+        "db.operation": "PING",
+        "db.statement": "PING"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "PING",
+      "operation": "PING",
+      "stmt_class": "ping",
+      "system": "redis",
+      "namespace": "0",
+      "instance": "redis",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "probe-ping-command",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/java-dup.json",
+    "dialect": "redis"
+  },
+  {
+    "id": "cap-redis-s10-node-cur-ping",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system.name": "redis",
+        "server.address": "redis",
+        "server.port": 6379,
+        "db.operation.name": "PING",
+        "db.query.text": "PING"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "PING",
+      "operation": "PING",
+      "stmt_class": "ping",
+      "system": "redis",
+      "namespace": null,
+      "instance": "redis",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "probe-ping-command",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/node-redis-cur-legacy.json",
+    "dialect": "redis"
+  },
+  {
+    "id": "cap-redis-s11-java-legacy-memory",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.operation": "MEMORY",
+        "db.statement": "MEMORY DOCTOR-BOGUS",
+        "db.system": "redis",
+        "server.address": "redis",
+        "network.peer.address": "172.21.0.3",
+        "server.port": 6379,
+        "network.peer.port": 6379
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "MEMORY DOCTOR-BOGUS",
+      "operation": "MEMORY",
+      "stmt_class": "query",
+      "system": "redis",
+      "namespace": null,
+      "instance": "redis",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "redis-S11-error",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/java-legacy.json",
+    "dialect": "redis"
+  },
+  {
+    "id": "cap-redis-s11-node-era-dup-memory",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system": "redis",
+        "net.peer.name": "redis",
+        "net.peer.port": 6379,
+        "db.connection_string": "redis://redis:6379",
+        "db.system.name": "redis",
+        "server.address": "redis",
+        "server.port": 6379,
+        "db.operation.name": "MEMORY",
+        "db.statement": "MEMORY DOCTOR-BOGUS",
+        "db.query.text": "MEMORY DOCTOR-BOGUS"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "MEMORY DOCTOR-BOGUS",
+      "operation": "MEMORY",
+      "stmt_class": "query",
+      "system": "redis",
+      "namespace": null,
+      "instance": "redis",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "redis-S11-error",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/node-redis-era-dup.json",
+    "dialect": "redis"
+  }
+]

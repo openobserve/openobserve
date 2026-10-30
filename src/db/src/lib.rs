@@ -21,12 +21,15 @@ use {
     infra::errors::Error, o2_enterprise::enterprise::common::config::get_config as get_o2_config,
 };
 
+pub mod agent_signals;
 pub mod alerts;
 pub mod authz;
 pub mod backfill;
 pub mod compact;
 pub mod dashboards;
+pub mod db_monitoring;
 pub mod distinct_values;
+pub mod downtimes;
 pub mod enrichment_table;
 pub mod file_list;
 pub mod folders;
@@ -43,21 +46,24 @@ pub mod model_pricing;
 pub mod ofga;
 pub mod org_ingestion_tokens;
 pub mod org_status;
+pub mod org_storage;
 pub mod org_users;
 pub mod organization;
+pub mod password_policy;
 pub mod pipeline_errors;
+pub mod prompt_settings;
 #[cfg(feature = "vectorscan")]
 pub mod re_pattern;
 pub mod saved_view;
 pub mod scheduler;
 pub mod schema;
 pub mod search_job;
-#[cfg(feature = "enterprise")]
 pub mod service_graph;
 pub mod session;
 pub mod short_url;
 pub mod sourcemaps;
 pub mod system_settings;
+pub mod teardown;
 pub mod user;
 #[cfg(feature = "enterprise")]
 pub mod workflows;

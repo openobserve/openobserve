@@ -27,6 +27,9 @@ pub static LOCAL_NODE_ID: AtomicI32 = AtomicI32::new(0);
 pub static mut LOCAL_NODE_KEY_LEASE_ID: i64 = 0;
 pub static LOCAL_NODE_STATUS: AtomicI32 = AtomicI32::new(NodeStatus::Prepare as _);
 pub static LOCAL_NODE: Lazy<Node> = Lazy::new(load_local_node);
+/// Random per process so a client cannot forge the MCP loopback marker.
+pub static MCP_LOOPBACK_SECRET: Lazy<String> =
+    Lazy::new(|| hex::encode(crate::utils::rand::random_bytes(32)));
 
 fn load_local_node() -> Node {
     let cfg = get_config();
@@ -156,9 +159,9 @@ mod tests {
         assert_eq!(parse("querier"), Role::Querier);
         assert_eq!(parse("compactor"), Role::Compactor);
         assert_eq!(parse("router"), Role::Router);
-        assert_eq!(parse("alertmanager"), Role::AlertManager);
-        assert_eq!(parse("alertManager"), Role::AlertManager);
-        assert_eq!(parse("AlertManager"), Role::AlertManager);
+        assert_eq!(parse("scheduler"), Role::Scheduler);
+        assert_eq!(parse("alertManager"), Role::Scheduler);
+        assert_eq!(parse("Scheduler"), Role::Scheduler);
         assert!("alert_manager".parse::<Role>().is_ok());
     }
 
@@ -221,13 +224,5 @@ mod tests {
         let rg = load_role_group();
         // just ensure no panic, returns any valid RoleGroup
         let _ = format!("{rg:?}");
-    }
-
-    #[test]
-    fn test_is_online_initial_state() {
-        // Initially NodeStatus is Prepare, so neither online nor offline
-        let online = is_online();
-        let offline = is_offline();
-        assert!(!(online && offline));
     }
 }

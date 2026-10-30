@@ -13,6 +13,8 @@ function replaceAbsoluteUrlsWithProxies(proxyUrl, cssString, excludedDomains = [
   const urlRegex = /url\(\s*(['"]?)(https?:\/\/[^'")]+)\1\s*\)/g;
 
   function replaceWithProxy(match, t1, url) {
+    // Stored records are shared with every later conversion, so a second pass must not proxy a proxied URL again.
+    if (url.startsWith(proxyUrl)) return match;
     const isExcluded = excludedDomains.some((domain) => url.includes(domain));
     if (isExcluded) {
       return match;

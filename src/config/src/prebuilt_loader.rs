@@ -20,12 +20,16 @@ use serde::{Deserialize, Serialize};
 
 use crate::meta::destinations::{
     Destination, DestinationType, Email, Endpoint, HTTPOutputFormat, HTTPType, Module, Template,
-    TemplateType,
+    TemplateKind, TemplateType,
 };
 
 /// Configuration structure for prebuilt destinations loaded from JSON
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PrebuiltDestinationsConfig {
+    /// Monotonic revision of the shipped prebuilt definitions. Bumped whenever a
+    /// shipped body/type is corrected; gates the startup reseed (design §6.3).
+    #[serde(default)]
+    pub revision: u32,
     pub destinations: Vec<PrebuiltDestinationConfig>,
 }
 
@@ -154,6 +158,11 @@ pub fn get_prebuilt_template(prebuilt_type: &str) -> Option<Template> {
     None
 }
 
+/// Get the revision number of the prebuilt configuration
+pub fn get_prebuilt_revision() -> u32 {
+    load_prebuilt_config().revision
+}
+
 /// Convert TemplateConfig to Template
 fn convert_template_config(config: &TemplateConfig, dest_type: &str) -> Template {
     let template_type = if dest_type == "email" {
@@ -174,6 +183,7 @@ fn convert_template_config(config: &TemplateConfig, dest_type: &str) -> Template
         is_default: false,
         template_type,
         body: config.body.clone(),
+        kind: TemplateKind::default(),
     }
 }
 
@@ -182,6 +192,7 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
     // Return built-in configuration with templates embedded
     // This ensures the system works even if the JSON file is missing
     PrebuiltDestinationsConfig {
+        revision: 2,
         destinations: vec![
             PrebuiltDestinationConfig {
                 id: "slack".to_string(),
@@ -201,7 +212,7 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
                 }),
                 template: TemplateConfig {
                     name: "prebuilt_slack".to_string(),
-                    body: r#"{"text": "🚨 Alert: {alert_name}"}"#.to_string(),
+                    body: r#"{"text": "[{alert_status}] {alert_name}"}"#.to_string(),
                     title: None,
                 },
                 credential_fields: vec![],
@@ -218,7 +229,7 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
                 endpoint: None,
                 template: TemplateConfig {
                     name: "prebuilt_email".to_string(),
-                    body: "<h2>🚨 Alert: {alert_name}</h2>".to_string(),
+                    body: "<h2>[{alert_status}] {alert_name}</h2>".to_string(),
                     title: Some("OpenObserve Alert: {alert_name}".to_string()),
                 },
                 credential_fields: vec![],
@@ -242,7 +253,7 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
                 }),
                 template: TemplateConfig {
                     name: "prebuilt_msteams".to_string(),
-                    body: r#"{"@type": "MessageCard", "text": "🚨 Alert: {alert_name}"}"#.to_string(),
+                    body: r#"{"@type": "MessageCard", "text": "[{alert_status}] {alert_name}"}"#.to_string(),
                     title: None,
                 },
                 credential_fields: vec![],
@@ -266,7 +277,7 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
                 }),
                 template: TemplateConfig {
                     name: "prebuilt_pagerduty".to_string(),
-                    body: r#"{"payload": {"summary": "OpenObserve Alert: {alert_name}", "severity": "{severity}", "source": "{source}"}, "routing_key": "{routing_key}", "event_action": "trigger"}"#.to_string(),
+                    body: r#"{"payload": {"summary": "OpenObserve [{alert_status}]: {alert_name}", "severity": "{severity}", "source": "{source}"}, "routing_key": "{routing_key}", "event_action": "trigger"}"#.to_string(),
                     title: None,
                 },
                 credential_fields: vec![],
@@ -290,7 +301,7 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
                 }),
                 template: TemplateConfig {
                     name: "prebuilt_discord".to_string(),
-                    body: r#"{"content": "🚨 Alert: {alert_name}"}"#.to_string(),
+                    body: r#"{"content": "[{alert_status}] {alert_name}"}"#.to_string(),
                     title: None,
                 },
                 credential_fields: vec![],
@@ -314,7 +325,7 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
                 }),
                 template: TemplateConfig {
                     name: "prebuilt_webhook".to_string(),
-                    body: r#"{"alert": {"name": "{alert_name}"}}"#.to_string(),
+                    body: r#"{"alert": {"name": "{alert_name}", "status": "{alert_status}"}}"#.to_string(),
                     title: None,
                 },
                 credential_fields: vec![],
@@ -338,7 +349,7 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
                 }),
                 template: TemplateConfig {
                     name: "prebuilt_opsgenie".to_string(),
-                    body: r#"{"message": "Alert: {alert_name}", "priority": "{credential_priority}"}"#.to_string(),
+                    body: r#"{"message": "[{alert_status}] {alert_name}", "priority": "{credential_priority}"}"#.to_string(),
                     title: None,
                 },
                 credential_fields: vec![],
@@ -362,7 +373,7 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
                 }),
                 template: TemplateConfig {
                     name: "prebuilt_servicenow".to_string(),
-                    body: r#"{"short_description": "Alert: {alert_name}", "assignment_group": "{credential_assignmentGroup}"}"#.to_string(),
+                    body: r#"{"short_description": "[{alert_status}] {alert_name}", "assignment_group": "{credential_assignmentGroup}"}"#.to_string(),
                     title: None,
                 },
                 credential_fields: vec![],
@@ -443,7 +454,6 @@ fn convert_to_destination(config: PrebuiltDestinationConfig) -> Result<Destinati
                     } else {
                         Some(headers)
                     },
-                    action_id: None,
                     output_format: Some(output_format),
                     destination_type: Some(endpoint_config.destination_type),
                     metadata: endpoint_metadata,
@@ -511,7 +521,6 @@ fn load_builtin_destinations() -> Vec<Destination> {
                         "Content-Type".to_string(),
                         "application/json".to_string(),
                     )])),
-                    action_id: None,
                     output_format: Some(HTTPOutputFormat::JSON),
                     destination_type: Some("slack".to_string()),
                     metadata: HashMap::from([
@@ -539,7 +548,6 @@ fn load_builtin_destinations() -> Vec<Destination> {
                         "Content-Type".to_string(),
                         "application/json".to_string(),
                     )])),
-                    action_id: None,
                     output_format: Some(HTTPOutputFormat::JSON),
                     destination_type: Some("teams".to_string()),
                     metadata: HashMap::from([
@@ -569,7 +577,6 @@ fn load_builtin_destinations() -> Vec<Destination> {
                             "Token YOUR_INTEGRATION_KEY".to_string(),
                         ),
                     ])),
-                    action_id: None,
                     output_format: Some(HTTPOutputFormat::JSON),
                     destination_type: Some("pagerduty".to_string()),
                     metadata: HashMap::from([
@@ -596,7 +603,6 @@ fn load_builtin_destinations() -> Vec<Destination> {
                         "Content-Type".to_string(),
                         "application/json".to_string(),
                     )])),
-                    action_id: None,
                     output_format: Some(HTTPOutputFormat::JSON),
                     destination_type: Some("discord".to_string()),
                     metadata: HashMap::from([
@@ -623,7 +629,6 @@ fn load_builtin_destinations() -> Vec<Destination> {
                         "Content-Type".to_string(),
                         "application/json".to_string(),
                     )])),
-                    action_id: None,
                     output_format: Some(HTTPOutputFormat::JSON),
                     destination_type: Some("webhook".to_string()),
                     metadata: HashMap::from([
@@ -653,7 +658,6 @@ fn load_builtin_destinations() -> Vec<Destination> {
                             "GenieKey YOUR_API_KEY".to_string(),
                         ),
                     ])),
-                    action_id: None,
                     output_format: Some(HTTPOutputFormat::JSON),
                     destination_type: Some("opsgenie".to_string()),
                     metadata: HashMap::from([
@@ -683,7 +687,6 @@ fn load_builtin_destinations() -> Vec<Destination> {
                             "Basic YOUR_AUTH_TOKEN".to_string(),
                         ),
                     ])),
-                    action_id: None,
                     output_format: Some(HTTPOutputFormat::JSON),
                     destination_type: Some("servicenow".to_string()),
                     metadata: HashMap::from([
@@ -715,6 +718,67 @@ mod tests {
     use std::fs;
 
     use super::*;
+
+    #[test]
+    fn builtin_prebuilt_config_is_revised_and_clean() {
+        let cfg = load_builtin_config();
+        assert!(cfg.revision >= 1, "builtin config must carry revision >= 1");
+        for d in &cfg.destinations {
+            assert!(
+                !d.template.body.contains("{alert_time}"),
+                "dangling {{alert_time}} in builtin body: {}",
+                d.id
+            );
+        }
+    }
+
+    /// CUSTOM bodies: nothing can be injected into the author's raw JSON, so one without
+    /// `{alert_status}` would render a resolve byte-identical to the firing.
+    #[test]
+    fn every_shipped_prebuilt_template_can_announce_a_recovery() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../config/prebuilt-destinations.json"
+        );
+        let cfg: PrebuiltDestinationsConfig =
+            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        // The builtin is not a copy of the file, it is the fallback used
+        // whenever the process does not run from the repo root — which is every
+        // real deployment. Checking only the file passed green while the
+        // fallback shipped a body that its own validation refuses.
+        let builtin = load_builtin_config();
+        for d in cfg.destinations.iter().chain(builtin.destinations.iter()) {
+            assert!(
+                d.template.body.contains("{alert_status}"),
+                "prebuilt '{}' cannot say a recovery is a recovery",
+                d.id
+            );
+            assert!(
+                !d.template.body.to_lowercase().contains("firing")
+                    || d.template.body.contains("{alert_status}"),
+                "prebuilt '{}' hardcodes a status that lies on recovery",
+                d.id
+            );
+        }
+    }
+
+    #[test]
+    fn shipped_prebuilt_json_is_revised_and_clean() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../config/prebuilt-destinations.json"
+        );
+        let raw = std::fs::read_to_string(path).unwrap();
+        let cfg: PrebuiltDestinationsConfig = serde_json::from_str(&raw).unwrap();
+        assert!(cfg.revision >= 1);
+        for d in &cfg.destinations {
+            assert!(
+                !d.template.body.contains("{alert_time}"),
+                "dangling in JSON body: {}",
+                d.id
+            );
+        }
+    }
 
     #[test]
     fn test_load_prebuilt_destinations() {

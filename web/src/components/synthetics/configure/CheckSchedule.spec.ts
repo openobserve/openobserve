@@ -559,6 +559,34 @@ describe("CheckSchedule", () => {
     });
   });
 
+  describe("legacy timezone names", () => {
+    it("keeps a stored Asia/Calcutta as the value, shown as Asia/Kolkata and found by either name", () => {
+      const check = makeCheck({
+        schedule: {
+          type: "cron",
+          cron: "*/5 * * * *",
+          timezone: "Asia/Calcutta",
+          isCustomFrequency: false,
+        },
+      });
+      wrapper = mountSchedule(check);
+      const select = wrapper
+        .findAllComponents(OSelectStub)
+        .find((c) => c.attributes("data-test") === "synthetics-check-schedule-timezone-select")!;
+      expect(select.props("modelValue")).toBe("Asia/Calcutta");
+      const options = select.props("options") as {
+        label: string;
+        value: string;
+        searchText?: string;
+      }[];
+      const stored = options.find((o) => o.value === "Asia/Calcutta");
+      expect(stored?.label).toBe("Asia/Kolkata");
+      expect(stored?.searchText).toContain("Asia/Calcutta");
+      expect(options.filter((o) => o.label === "Asia/Kolkata")).toHaveLength(1);
+      expect(wrapper.emitted("update:check")).toBeFalsy();
+    });
+  });
+
   describe("preset detection from schedule", () => {
     it("should detect 1min preset", () => {
       const check = makeCheck({

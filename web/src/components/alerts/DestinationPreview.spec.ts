@@ -15,6 +15,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import DestinationPreview from "./DestinationPreview.vue";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import i18n from "@/locales";
 
 // Stub ODialog so tests are deterministic (no Portal/Reka teleport)
@@ -135,15 +136,44 @@ describe("DestinationPreview", () => {
     expect(wrapper.find('[data-test="slack-preview"]').exists()).toBe(true);
   });
 
-  it("should display Slack bot name", () => {
+  it("uses a generic Slack sender", () => {
     wrapper = mountComponent({ type: "slack" });
     const botName = wrapper.find('[data-test="slack-bot-name"]');
-    expect(botName.text()).toBe("OpenObserve Bot");
+    expect(botName.text()).toBe("Slack app");
+  });
+
+  it("uses a neutral avatar and explains Slack-owned icon and channel details", () => {
+    wrapper = mountComponent({ type: "slack" });
+
+    expect(wrapper.find('[data-test="slack-avatar-icon"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="slack-avatar-initials"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="slack-preview-disclaimer"]').exists()).toBe(true);
   });
 
   it("should display Slack message body", () => {
     wrapper = mountComponent({ type: "slack" });
     expect(wrapper.find('[data-test="slack-message-body"]').exists()).toBe(true);
+  });
+
+  it("keeps the Slack preview aligned with the fallback Block Kit sample", () => {
+    wrapper = mountComponent({ type: "slack" });
+
+    expect(wrapper.find('[data-test="slack-block-header"]').text()).toBe("🚨 High CPU Usage");
+    expect(wrapper.findAll('[data-test^="slack-field-"]').map((field) => field.text())).toEqual([
+      "Stream:system-metrics",
+      "Type:logs",
+      "Status:🔴 Firing",
+      "Count:15",
+    ]);
+    expect(wrapper.find('[data-test="slack-stream-type"]').text()).toBe("logs");
+    expect(wrapper.find('[data-test="slack-threshold"]').text()).toContain("greater than 80%");
+    expect(wrapper.find('[data-test="slack-preview-action"]').text()).toBe("View in OpenObserve");
+    expect(
+      wrapper
+        .find('[data-test="slack-preview"]')
+        .classes()
+        .some((className) => className.startsWith("border-s")),
+    ).toBe(false);
   });
 
   it("should render MS Teams preview when type is msteams", () => {
@@ -169,10 +199,15 @@ describe("DestinationPreview", () => {
     expect(subject.text()).toContain("OpenObserve Alert Notification");
   });
 
-  it("should display Email from address", () => {
+  it("shows the entered recipients as To and no hardcoded From", () => {
+    wrapper = mountComponent({ type: "email", recipients: ["a@acme.io", "b@acme.io"] });
+    expect(wrapper.find('[data-test="email-to"]').text()).toBe("To: a@acme.io, b@acme.io");
+    expect(wrapper.find('[data-test="email-from"]').exists()).toBe(false);
+  });
+
+  it("shows no To line before any recipient is picked", () => {
     wrapper = mountComponent({ type: "email" });
-    const from = wrapper.find('[data-test="email-from"]');
-    expect(from.text()).toContain("alerts@openobserve.ai");
+    expect(wrapper.find('[data-test="email-to"]').exists()).toBe(false);
   });
 
   it("should display Email body", () => {
@@ -194,6 +229,33 @@ describe("DestinationPreview", () => {
     wrapper = mountComponent({ type: "opsgenie" });
     expect(wrapper.find('[data-test="opsgenie-preview"]').exists()).toBe(true);
   });
+
+  // The cards are fixed-light brand replicas, so each CTA needs its fixed brand
+  // variant; a theme-following one turns unreadable in dark mode.
+  it.each([
+    ["slack", "preview-slack"],
+    ["msteams", "preview-teams"],
+    ["email", "preview-email"],
+    ["opsgenie", "preview-opsgenie"],
+  ])("renders the %s CTA with the %s variant", (type, variant) => {
+    wrapper = mountComponent({ type });
+    const cta = wrapper
+      .findAllComponents({ name: "OButton" })
+      .find((button) => button.text() === "View in OpenObserve");
+    expect(cta?.props("variant")).toBe(variant);
+  });
+
+  it.each(["slack", "msteams", "email", "pagerduty", "servicenow", "opsgenie"])(
+    "keeps theme-following colors out of the fixed-light %s card",
+    (type) => {
+      wrapper = mountComponent({ type });
+      const card = wrapper.find(`[data-test="${type}-preview"]`);
+      const themed = [card, ...card.findAll("*")]
+        .flatMap((element) => element.classes())
+        .filter((name) => /(^|:)(text-text-|bg-surface-|border-border-|[a-z]+-button-)/.test(name));
+      expect(themed).toEqual([]);
+    },
+  );
 
   it("should emit update:modelValue=false when Close button is clicked", async () => {
     // @click:primary removed from ODialog — Close button now lives in footer slot (commit 1f896ef747)
@@ -330,5 +392,39 @@ describe("DestinationPreview", () => {
   it("should render the destination-preview-card container", () => {
     wrapper = mountComponent({ type: "slack" });
     expect(wrapper.find('[data-test="destination-preview-card"]').exists()).toBe(true);
+  });
+
+  it("shows the rendered body for a type without a mockup", () => {
+    wrapper = mountComponent({ type: "custom", templateContent: '{"alert": "High CPU"}' });
+    expect(wrapper.findComponent(OCodeBlock).attributes("data-test")).toBe("raw-preview");
+    // The dialog body already pads the content; the block's own margin is dropped.
+    expect(wrapper.findComponent(OCodeBlock).classes()).toContain("my-0!");
+    expect(wrapper.find('[data-test="raw-preview"] code').text()).toBe('{"alert": "High CPU"}');
+    expect(wrapper.findComponent(OCodeBlock).props("lang")).toBe("json");
+    // The footer's Copy Template button is the only copy action.
+    expect(wrapper.find('[data-test="raw-preview-copy-btn"]').exists()).toBe(false);
+  });
+
+  it("leaves the language to auto-detection when the body is not JSON", () => {
+    wrapper = mountComponent({ type: "custom", templateContent: "alert=High CPU" });
+    expect(wrapper.findComponent(OCodeBlock).props("lang")).toBeUndefined();
+  });
+
+  it("says the rendered body is filled with sample data", () => {
+    wrapper = mountComponent({ type: "custom", templateContent: "{}" });
+    expect(wrapper.find('[data-test="raw-preview-note"]').text()).toBe(
+      "Your URL receives this body as is, not a formatted card. The values are sample alert data.",
+    );
+  });
+
+  it("does not show the rendered body for a type with a mockup", () => {
+    wrapper = mountComponent({ type: "slack", templateContent: "body" });
+    expect(wrapper.find('[data-test="raw-preview"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="raw-preview-note"]').exists()).toBe(false);
+  });
+
+  it("names a custom destination Web Hook in the dialog title", () => {
+    wrapper = mountComponent({ type: "custom" });
+    expect(wrapper.findComponent(ODialogStub).props("title")).toContain("Web Hook");
   });
 });

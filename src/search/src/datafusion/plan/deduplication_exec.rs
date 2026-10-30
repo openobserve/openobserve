@@ -26,10 +26,10 @@ use arrow_schema::{DataType, SortOptions, TimeUnit};
 use config::TIMESTAMP_COL_NAME;
 use datafusion::{
     arrow::datatypes::SchemaRef,
-    common::{Result, Statistics, internal_err},
+    common::{Result, Statistics, internal_err, tree_node::TreeNodeRecursion},
     execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext},
     physical_expr::{
-        EquivalenceProperties, LexRequirement, OrderingRequirements, Partitioning,
+        EquivalenceProperties, LexRequirement, OrderingRequirements, Partitioning, PhysicalExpr,
         PhysicalSortRequirement,
     },
     physical_plan::{
@@ -106,6 +106,18 @@ impl DisplayAs for DeduplicationExec {
 }
 
 impl ExecutionPlan for DeduplicationExec {
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(&Arc<dyn PhysicalExpr>) -> Result<TreeNodeRecursion>,
+    ) -> Result<TreeNodeRecursion> {
+        let columns = self
+            .deduplication_columns
+            .iter()
+            .map(|column| Arc::new(column.clone()) as Arc<dyn PhysicalExpr>)
+            .collect::<Vec<_>>();
+        datafusion::physical_plan::execution_plan::apply_expression_roots(columns.iter(), _f)
+    }
+
     fn name(&self) -> &'static str {
         "DeduplicationExec"
     }
@@ -156,8 +168,19 @@ impl ExecutionPlan for DeduplicationExec {
         )))
     }
 
-    fn partition_statistics(&self, partition: Option<usize>) -> Result<Arc<Statistics>> {
-        self.input.partition_statistics(partition)
+    fn child_stats_requests(
+        &self,
+        partition: Option<usize>,
+    ) -> Vec<datafusion::physical_plan::ChildStats> {
+        vec![datafusion::physical_plan::ChildStats::At(partition)]
+    }
+
+    fn statistics_from_inputs(
+        &self,
+        input_stats: &[Arc<Statistics>],
+        _args: &datafusion::physical_plan::StatisticsArgs,
+    ) -> Result<Arc<Statistics>> {
+        Ok(Arc::clone(&input_stats[0]))
     }
 
     // if don't have this, the optimizer will not merge the SortExec

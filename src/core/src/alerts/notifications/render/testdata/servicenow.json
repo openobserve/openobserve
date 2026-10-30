@@ -1,0 +1,4 @@
+{
+  "description": "Value **92.5** exceeded `80` — see [runbook](https://rb.example/x)\n\n<script>alert(1)</script>\n\nhost: web-1 & web-2\ncpu: 92.5",
+  "short_description": "CPU \"high\" & <fire> on web-1"
+}

@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use infra::table::providers::ProviderRateLimits;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -34,8 +35,22 @@ pub struct ProviderRequestBody {
     #[serde(alias = "auth_config")]
     pub auth_config: serde_json::Value,
     #[serde(default)]
+    #[serde(alias = "rate_limits")]
+    #[schema(value_type = Object)]
+    pub rate_limits: Option<ProviderRateLimits>,
+    #[serde(default)]
     #[serde(alias = "is_default")]
     pub is_default: bool,
+}
+
+/// HTTP request body for testing a Provider without persisting changes.
+#[derive(Clone, Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderTestRequestBody {
+    #[serde(flatten)]
+    pub provider: ProviderRequestBody,
+    #[serde(default)]
+    pub provider_id: Option<String>,
 }
 
 /// HTTP response body for a Provider (auth_config masked).
@@ -46,11 +61,16 @@ pub struct ProviderResponseBody {
     pub org_id: String,
     pub name: String,
     pub provider_type: String,
+    /// Null for a provider on the built-in default, so the form field stays empty.
     pub endpoint: Option<String>,
+    /// The URL actually called, with the default filled in when `endpoint` is null.
+    pub resolved_endpoint: String,
     pub default_model: String,
     pub available_models: Vec<String>,
     /// API key / auth config is masked in responses.
     pub auth_config_masked: bool,
+    #[schema(value_type = Object)]
+    pub rate_limits: Option<ProviderRateLimits>,
     pub is_default: bool,
     pub created_at: i64,
     pub updated_at: i64,
@@ -74,6 +94,7 @@ impl From<ProviderRequestBody> for infra::table::providers::Provider {
             default_model: value.default_model,
             available_models: value.available_models,
             auth_config: value.auth_config,
+            rate_limits: value.rate_limits,
             is_default: value.is_default,
             created_at: 0,
             updated_at: 0,
@@ -83,15 +104,18 @@ impl From<ProviderRequestBody> for infra::table::providers::Provider {
 
 impl From<infra::table::providers::Provider> for ProviderResponseBody {
     fn from(value: infra::table::providers::Provider) -> Self {
+        let resolved_endpoint = resolved_endpoint_of(&value);
         Self {
             id: value.id,
             org_id: value.org_id,
             name: value.name,
             provider_type: value.provider_type,
             endpoint: value.endpoint,
+            resolved_endpoint,
             default_model: value.default_model,
             available_models: value.available_models,
             auth_config_masked: true,
+            rate_limits: value.rate_limits,
             is_default: value.is_default,
             created_at: value.created_at,
             updated_at: value.updated_at,
@@ -105,6 +129,21 @@ impl From<Vec<infra::table::providers::Provider>> for ListProvidersResponseBody 
             list: value.into_iter().map(ProviderResponseBody::from).collect(),
         }
     }
+}
+
+/// Falls back to the stored value for an unresolvable type: a response must not fail on a bad row.
+#[cfg(feature = "enterprise")]
+fn resolved_endpoint_of(provider: &infra::table::providers::Provider) -> String {
+    o2_enterprise::enterprise::llm_evaluations::providers::resolve_endpoint_for_type(
+        &provider.provider_type,
+        provider.endpoint.as_deref(),
+    )
+    .unwrap_or_else(|_| provider.endpoint.clone().unwrap_or_default())
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn resolved_endpoint_of(provider: &infra::table::providers::Provider) -> String {
+    provider.endpoint.clone().unwrap_or_default()
 }
 
 #[cfg(test)]
@@ -122,6 +161,7 @@ mod tests {
             default_model: "gpt-4".to_string(),
             available_models: vec!["gpt-4".to_string()],
             auth_config: serde_json::json!({"api_key": "secret"}),
+            rate_limits: None,
             is_default: false,
             created_at: 1000,
             updated_at: 2000,
@@ -129,6 +169,54 @@ mod tests {
         let resp = ProviderResponseBody::from(provider);
         assert!(resp.auth_config_masked);
         assert_eq!(resp.name, "OpenAI");
+    }
+
+    #[test]
+    fn test_provider_response_keeps_a_legacy_full_url() {
+        let legacy = "https://api.openai.com/v1/chat/completions";
+        let provider = infra::table::providers::Provider {
+            id: "abc".to_string(),
+            org_id: "org1".to_string(),
+            name: "OpenAI".to_string(),
+            provider_type: "openai".to_string(),
+            endpoint: Some(legacy.to_string()),
+            default_model: "gpt-4o".to_string(),
+            available_models: vec!["gpt-4o".to_string()],
+            auth_config: serde_json::json!({"api_key": "secret"}),
+            rate_limits: None,
+            is_default: false,
+            created_at: 1000,
+            updated_at: 2000,
+        };
+        let resp = ProviderResponseBody::from(provider);
+        assert_eq!(resp.endpoint.as_deref(), Some(legacy));
+        assert_eq!(resp.resolved_endpoint, legacy);
+    }
+
+    #[test]
+    fn test_provider_response_fills_in_the_default_endpoint() {
+        // `endpoint` stays null to track the default; the response still names the URL called.
+        let provider = infra::table::providers::Provider {
+            id: "abc".to_string(),
+            org_id: "org1".to_string(),
+            name: "OpenAI".to_string(),
+            provider_type: "openai".to_string(),
+            endpoint: None,
+            default_model: "gpt-4o".to_string(),
+            available_models: vec!["gpt-4o".to_string()],
+            auth_config: serde_json::json!({"api_key": "secret"}),
+            rate_limits: None,
+            is_default: false,
+            created_at: 1000,
+            updated_at: 2000,
+        };
+        let resp = ProviderResponseBody::from(provider);
+        assert!(resp.endpoint.is_none());
+        #[cfg(feature = "enterprise")]
+        assert_eq!(
+            resp.resolved_endpoint,
+            "https://api.openai.com/v1/chat/completions"
+        );
     }
 
     #[test]
@@ -140,6 +228,7 @@ mod tests {
             default_model: "gpt-4".to_string(),
             available_models: vec![],
             auth_config: serde_json::json!({"api_key": "k"}),
+            rate_limits: None,
             is_default: false,
         };
         let provider = infra::table::providers::Provider::from(body);
@@ -163,7 +252,49 @@ mod tests {
         assert_eq!(body.default_model, "gpt-4o");
         assert_eq!(body.available_models, vec!["gpt-4o", "gpt-4o-mini"]);
         assert_eq!(body.auth_config, serde_json::json!({"api_key": "k"}));
+        assert!(body.rate_limits.is_none());
         assert!(body.is_default);
+    }
+
+    #[test]
+    fn test_provider_test_request_accepts_a_stored_provider_id() {
+        let body: ProviderTestRequestBody = serde_json::from_value(serde_json::json!({
+            "name": "Test",
+            "providerType": "openai",
+            "authConfig": {"api_key": ""},
+            "providerId": "provider-1"
+        }))
+        .unwrap();
+
+        assert_eq!(body.provider_id.as_deref(), Some("provider-1"));
+        assert_eq!(
+            body.provider.auth_config,
+            serde_json::json!({"api_key": ""})
+        );
+    }
+
+    #[test]
+    fn test_provider_request_body_accepts_rate_limits() {
+        let body: ProviderRequestBody = serde_json::from_value(serde_json::json!({
+            "name": "Test",
+            "provider_type": "openai",
+            "auth_config": {"api_key": "k"},
+            "rate_limits": {
+                "max_concurrency": 4,
+                "requests_per_minute": 120,
+                "tokens_per_minute": 60_000
+            }
+        }))
+        .unwrap();
+
+        assert_eq!(
+            body.rate_limits,
+            Some(ProviderRateLimits {
+                max_concurrency: Some(4),
+                requests_per_minute: Some(120),
+                tokens_per_minute: Some(60_000),
+            })
+        );
     }
 
     #[test]

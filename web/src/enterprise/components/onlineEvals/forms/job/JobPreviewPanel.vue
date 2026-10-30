@@ -1,6 +1,6 @@
 <template>
   <aside
-    class="border-border-default max-[68.75rem]:border-border-default min-w-0 flex-[3.5] overflow-auto border-l p-3 max-[68.75rem]:border-t max-[68.75rem]:border-l-0"
+    class="border-border-default max-[68.75rem]:border-border-default min-w-0 flex-[3.5] overflow-auto border-s p-3 max-[68.75rem]:border-s-0 max-[68.75rem]:border-t"
   >
     <section
       class="border-dialog-header-border rounded-default mb-3 border px-4 py-3.5"
@@ -34,7 +34,7 @@
 
     <section class="border-dialog-header-border rounded-default mb-0 border px-4 py-3.5">
       <header class="text-text-secondary mb-1.5 flex items-center gap-1.5">
-        <OIcon name="info" size="xs" />
+        <OIcon name="fact-check" size="xs" />
         <span class="text-compact text-text-heading m-0 font-semibold">{{
           t("onlineEvals.job.preview.summaryTitle")
         }}</span>
@@ -57,7 +57,7 @@
 
 <script setup lang="ts">
 import { computed, toRef } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { EvalTargetScope } from "@/services/online-evals.service";
@@ -76,7 +76,7 @@ const props = defineProps<{
   filterReady: boolean;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const {
   count: matchedCount,

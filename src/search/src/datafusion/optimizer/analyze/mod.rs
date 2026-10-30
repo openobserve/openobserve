@@ -14,3 +14,4 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod remove_index_fields;
+pub mod shared_subplan;

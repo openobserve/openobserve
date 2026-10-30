@@ -1,0 +1,95 @@
+[
+  {
+    "id": "semconv-old-full-record",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.name": "orders",
+        "db.statement": "SELECT email FROM accounts WHERE account_id = 111948",
+        "db.user": "app_rw",
+        "net.peer.name": "pg-primary.internal:5432",
+        "deployment.environment": "prod"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT email FROM accounts WHERE account_id = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "orders",
+      "instance": "pg-primary.internal",
+      "env": "prod",
+      "status_code": null,
+      "user": "app_rw",
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_accounts_by_id",
+    "literals": ["111948"],
+    "source": "authored"
+  },
+  {
+    "id": "semconv-new-full-record",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system.name": "postgresql",
+        "db.namespace": "orders",
+        "db.query.text": "SELECT email FROM accounts WHERE account_id = 222873",
+        "server.address": "pg-primary.internal:5432",
+        "deployment.environment.name": "prod"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT email FROM accounts WHERE account_id = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "orders",
+      "instance": "pg-primary.internal",
+      "env": "prod",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_accounts_by_id",
+    "literals": ["222873"],
+    "source": "authored"
+  },
+  {
+    "id": "semconv-dup-new-names-win",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.system.name": "postgresql",
+        "db.name": "legacy_orders",
+        "db.namespace": "orders",
+        "db.statement": "SELECT email FROM accounts WHERE account_id = 333721",
+        "db.query.text": "SELECT email FROM accounts WHERE account_id = 444962",
+        "net.peer.name": "pg-old-alias.internal:5432",
+        "server.address": "pg-primary.internal:5432",
+        "deployment.environment": "staging-old",
+        "deployment.environment.name": "prod"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT email FROM accounts WHERE account_id = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "orders",
+      "instance": "pg-primary.internal",
+      "env": "prod",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_accounts_by_id",
+    "literals": ["333721", "444962"],
+    "source": "authored"
+  }
+]

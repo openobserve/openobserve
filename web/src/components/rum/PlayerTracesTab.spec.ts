@@ -27,11 +27,14 @@ import { nextTick } from "vue";
 const mockSearch = vi.fn();
 const mockFetchQueryDataWithHttpStream = vi.fn();
 
-vi.mock("@/services/search", () => ({
-  default: {
-    search: (...args: any[]) => mockSearch(...args),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      search: (...args: any[]) => mockSearch(...args),
+    },
+  });
+});
 
 // Fix 1: generateTraceContext lives in zincutils, not @/utils/trace.
 // Fix 2: formatTimeWithSuffix mock kept for deterministic duration assertions.
@@ -54,6 +57,19 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
 vi.mock("@/composables/useStreamingSearch", () => ({
   default: () => ({
     fetchQueryDataWithHttpStream: (...args: any[]) => mockFetchQueryDataWithHttpStream(...args),
+  }),
+}));
+
+// Stream discovery: default resolves nothing so every row falls back to the
+// default stream and the pre-discovery tests keep their single-call shape;
+// individual tests override with per-id locations.
+const mockResolveTraceLocationsBulk = vi.fn().mockResolvedValue({});
+const mockFallbackTracesStream = vi.fn().mockResolvedValue("default");
+vi.mock("@/composables/rum/useCorrelatedTracesStream", () => ({
+  default: () => ({
+    resolveTraceLocationsBulk: mockResolveTraceLocationsBulk,
+    fallbackTracesStream: mockFallbackTracesStream,
+    cancel: vi.fn(),
   }),
 }));
 
@@ -100,15 +116,27 @@ function createTraceMetadata(overrides: Record<string, any> = {}) {
  * the fetchTraceMetadata Promise (setTimeout creates a macrotask that
  * flushPromises() does not drain).
  */
-function setupSuccessfulMocks(rumHits?: any[], traceMetadataHits?: any[]) {
+function setupSuccessfulMocks(rumHits?: any[], traceMetadataHits?: any[], operationHits?: any[]) {
   mockSearch.mockReset();
   mockFetchQueryDataWithHttpStream.mockReset();
 
   const hits = rumHits ?? [createRumHit()];
   const metadata = traceMetadataHits ?? [createTraceMetadata()];
 
-  mockSearch.mockImplementation((_params: any, source: string) => {
+  mockSearch.mockImplementation((params: any, source: string) => {
     if (source === "RUM") {
+      if (params.page_type === "traces") {
+        return Promise.resolve({
+          data: {
+            hits:
+              operationHits ??
+              metadata.map((hit) => ({
+                trace_id: hit.trace_id,
+                operation_name: hit.first_event?.operation_name,
+              })),
+          },
+        });
+      }
       return Promise.resolve({ data: { hits } });
     }
     return Promise.resolve({ data: { hits: [] } });
@@ -203,6 +231,7 @@ const globalStubs = {
           @click="$emit('row-click', row)"
         >
           <slot name="cell-timestamp" :row="row" :value="null" :column="{}" />
+          <slot name="cell-page"      :row="row" :value="null" :column="{}" />
           <slot name="cell-route"     :row="row" :value="null" :column="{}" />
           <slot name="cell-duration"  :row="row" :value="null" :column="{}" />
           <slot name="cell-status"    :row="row" :value="null" :column="{}" />
@@ -214,6 +243,27 @@ const globalStubs = {
     name: "TraceStatusCell",
     template: '<span data-test="trace-status-cell" />',
     props: ["item"],
+  },
+  // Lists its options; tests pick values by emitting update:modelValue.
+  OSelect: {
+    name: "OSelect",
+    template: `
+      <div v-bind="$attrs">
+        <span v-for="option in options" :key="option.value" data-test="select-option">{{ option.label }}</span>
+      </div>
+    `,
+    inheritAttrs: false,
+    props: [
+      "modelValue",
+      "options",
+      "multiple",
+      "searchable",
+      "clearable",
+      "labelKey",
+      "valueKey",
+      "placeholder",
+    ],
+    emits: ["update:modelValue"],
   },
 };
 
@@ -293,8 +343,195 @@ describe("PlayerTracesTab", () => {
       expect(wrapper.find('[data-test="rum-player-traces-tab-table"]').exists()).toBe(true);
     });
 
-    it("should display the route path in the table row", () => {
-      expect(wrapper.text()).toContain("/products");
+    it("should display the HTTP server operation in the table row", () => {
+      expect(wrapper.text()).toContain("GET /api/products");
+    });
+
+    it("gives each row its own stream and fetches metadata per distinct stream", async () => {
+      const P1 = "01a034c1aabc72f78880daf6c9755cff"; // → payments_traces
+      const C1 = "01a038ddccc770b9bba3b2df20c12415"; // → checkout_traces
+      mockResolveTraceLocationsBulk.mockResolvedValueOnce({
+        [P1]: { stream: "payments_traces" },
+        [C1]: { stream: "checkout_traces" },
+      });
+
+      // RUM hits for both ids; metadata mock answers per queried stream.
+      mockSearch.mockReset();
+      mockFetchQueryDataWithHttpStream.mockReset();
+      mockSearch.mockImplementation((params: any, source: string) =>
+        Promise.resolve(
+          source === "RUM"
+            ? params.page_type === "traces"
+              ? {
+                  data: {
+                    hits: [
+                      { trace_id: P1, operation_name: "POST /api/payments" },
+                      { trace_id: C1, operation_name: "POST /api/checkout" },
+                    ],
+                  },
+                }
+              : {
+                  data: {
+                    hits: [
+                      createRumHit({ _trace_id: P1, _view_url: "https://example.com/pay" }),
+                      createRumHit({ _trace_id: C1, _view_url: "https://example.com/checkout" }),
+                    ],
+                  },
+                }
+            : { data: { hits: [] } },
+        ),
+      );
+      mockFetchQueryDataWithHttpStream.mockImplementation((args: any, handlers: any) => {
+        const stream = args.queryReq.stream_name;
+        const id = stream === "payments_traces" ? P1 : C1;
+        handlers.data(null, {
+          content: { results: { hits: [createTraceMetadata({ trace_id: id })] } },
+        });
+        handlers.complete();
+      });
+
+      wrapper.unmount();
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // metadata fetched once per distinct stream
+      const streamsQueried = mockFetchQueryDataWithHttpStream.mock.calls.map(
+        ([args]: any[]) => args.queryReq.stream_name,
+      );
+      expect(streamsQueried.sort()).toEqual(["checkout_traces", "payments_traces"]);
+
+      // both rows render, each carrying its own stream context
+      expect(wrapper.text()).toContain("POST /api/payments");
+      expect(wrapper.text()).toContain("POST /api/checkout");
+
+      // clicking the checkout row opens the embedded view against ITS stream
+      const rows = wrapper.findAll('[data-test^="table-row-"]');
+      const checkoutRow = rows.find((r: any) => r.text().includes("POST /api/checkout"));
+      expect(checkoutRow).toBeDefined();
+      await checkoutRow!.trigger("click");
+      await flushPromises();
+
+      const traceDetails = wrapper.findComponent({ name: "TraceDetails" });
+      expect(traceDetails.exists()).toBe(true);
+      expect(traceDetails.props("streamNameProp")).toBe("checkout_traces");
+      expect(traceDetails.props("traceIdProp")).toBe(C1);
+    });
+
+    it("fetches nothing for an id found in no stream when the org has no default stream", async () => {
+      mockFallbackTracesStream.mockResolvedValueOnce(null);
+      setupSuccessfulMocks();
+      wrapper.unmount();
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="rum-player-traces-tab-empty"]').exists()).toBe(true);
+    });
+
+    it("keeps the found traces when another id is in no stream and the org has no default", async () => {
+      const P1 = "01a034c1aabc72f78880daf6c9755cff"; // → qms_uat
+      const U1 = "01a038ddccc770b9bba3b2df20c12415"; // in no stream
+      mockResolveTraceLocationsBulk.mockResolvedValueOnce({ [P1]: { stream: "qms_uat" } });
+      mockFallbackTracesStream.mockResolvedValueOnce(null);
+      setupSuccessfulMocks(
+        [createRumHit({ _trace_id: P1 }), createRumHit({ _trace_id: U1 })],
+        [createTraceMetadata({ trace_id: P1 })],
+      );
+      wrapper.unmount();
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const streamsQueried = mockFetchQueryDataWithHttpStream.mock.calls.map(
+        ([args]: any[]) => args.queryReq.stream_name,
+      );
+      expect(streamsQueried).toEqual(["qms_uat"]);
+      expect(wrapper.findAll('[data-test^="table-row-"]')).toHaveLength(1);
+      expect(wrapper.text()).toContain("GET /api/products");
+    });
+
+    it("bounds the metadata query by the indexed ranges instead of the session window", async () => {
+      const P1 = "01a034c1aabc72f78880daf6c9755cff";
+      mockResolveTraceLocationsBulk.mockResolvedValueOnce({
+        [P1]: {
+          stream: "default",
+          range: { start_time: 1_700_000_000_000_000, end_time: 1_700_000_090_000_000 },
+        },
+      });
+      setupSuccessfulMocks(
+        [createRumHit({ _trace_id: P1 })],
+        [createTraceMetadata({ trace_id: P1 })],
+      );
+      wrapper.unmount();
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const queryReq = mockFetchQueryDataWithHttpStream.mock.calls[0][0].queryReq;
+      expect(queryReq.start_time).toBe(1_700_000_000_000_000 - 60_000_000);
+      expect(queryReq.end_time).toBe(1_700_000_090_000_000 + 60_000_000);
+    });
+
+    it("keeps the session window when a trace has no indexed range", async () => {
+      const P1 = "01a034c1aabc72f78880daf6c9755cff";
+      mockResolveTraceLocationsBulk.mockResolvedValueOnce({ [P1]: { stream: "default" } });
+      setupSuccessfulMocks(
+        [createRumHit({ _trace_id: P1 })],
+        [createTraceMetadata({ trace_id: P1 })],
+      );
+      wrapper.unmount();
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const queryReq = mockFetchQueryDataWithHttpStream.mock.calls[0][0].queryReq;
+      // the component's default props: startTime 1000 ms, endTime 2000 ms
+      expect(queryReq.start_time).toBe(1000 * 1000);
+      expect(queryReq.end_time).toBe(2000 * 1000);
+    });
+
+    it("opens a row over its indexed range when the metadata carries no timings", async () => {
+      const P1 = "01a034c1aabc72f78880daf6c9755cff";
+      mockResolveTraceLocationsBulk.mockResolvedValueOnce({
+        [P1]: {
+          stream: "default",
+          range: { start_time: 1_700_000_000_000_000, end_time: 1_700_000_090_000_000 },
+        },
+      });
+      setupSuccessfulMocks(
+        [createRumHit({ _trace_id: P1 })],
+        [createTraceMetadata({ trace_id: P1, start_time: undefined, end_time: undefined })],
+      );
+      wrapper.unmount();
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const rows = wrapper.findAll('[data-test^="table-row-"]');
+      await rows[0].trigger("click");
+      await flushPromises();
+
+      const traceDetails = wrapper.findComponent({ name: "TraceDetails" });
+      expect(traceDetails.props("startTimeProp")).toBe(1_700_000_000_000_000 - 60_000_000);
+      expect(traceDetails.props("endTimeProp")).toBe(1_700_000_090_000_000 + 60_000_000);
+    });
+
+    it("joins legacy zero-stripped RUM ids with padded traces-stream metadata", async () => {
+      // SDK 0.4.x stored the id zero-stripped (31 hex chars) in _rumdata while
+      // the traces stream stores the padded 32-char form — the join must still hit.
+      setupSuccessfulMocks(
+        [createRumHit({ _trace_id: "1a034c1aabc72f78880daf6c9755cff" })],
+        [createTraceMetadata({ trace_id: "01a034c1aabc72f78880daf6c9755cff" })],
+      );
+      wrapper.unmount();
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // Row survives the metadata filter (previously dropped: raw 31-char key
+      // never matched the 32-char metadata key)
+      expect(wrapper.find('[data-test="rum-player-traces-tab-table"]').exists()).toBe(true);
+      expect(wrapper.text()).toContain("GET /api/products");
+
+      // The traces-stream metadata query was filtered on the padded id
+      const queryReq = mockFetchQueryDataWithHttpStream.mock.calls[0][0].queryReq;
+      expect(queryReq.filter).toContain("01a034c1aabc72f78880daf6c9755cff");
+      expect(queryReq.stream_name).toBe("default");
     });
 
     it("should display trace count badge in filter bar", () => {
@@ -443,11 +680,11 @@ describe("PlayerTracesTab", () => {
       expect(wrapper.find('[data-test="rum-player-traces-tab-table"]').exists()).toBe(true);
     });
 
-    it("should show the selected trace route in detail header", async () => {
+    it("should show the selected HTTP server operation in detail header", async () => {
       await wrapper.find('[data-test="table-row-0"]').trigger("click");
       await nextTick();
 
-      expect(wrapper.text()).toContain("/products");
+      expect(wrapper.text()).toContain("GET /api/products");
     });
   });
 
@@ -557,6 +794,80 @@ describe("PlayerTracesTab", () => {
   // =========================================================================
 
   describe("trace metadata", () => {
+    it("replaces an internal trace summary with the HTTP server operation", async () => {
+      wrapper.unmount();
+      setupSuccessfulMocks(
+        [createRumHit()],
+        [
+          createTraceMetadata({
+            first_event: {
+              service_name: "product-catalog",
+              operation_name: "middleware - query",
+            },
+          }),
+        ],
+        [
+          {
+            trace_id: "trace-abc123def456",
+            operation_name: "POST /api/products",
+          },
+        ],
+      );
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect(wrapper.text()).toContain("POST /api/products");
+      expect(wrapper.text()).not.toContain("middleware - query");
+    });
+
+    it("falls back to the trace summary when operation enrichment fails", async () => {
+      wrapper.unmount();
+      setupSuccessfulMocks();
+      mockSearch.mockImplementation((params: any) => {
+        if (params.page_type === "traces") {
+          return Promise.reject(new Error("Operation search failed"));
+        }
+        return Promise.resolve({ data: { hits: [createRumHit()] } });
+      });
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect(wrapper.text()).toContain("GET /api/products");
+      expect(warnSpy).toHaveBeenCalledWith(
+        "HTTP server operation fetch failed:",
+        expect.any(Error),
+      );
+    });
+
+    it("queries the earliest routed server operation for all displayed trace IDs", async () => {
+      wrapper.unmount();
+      setupSuccessfulMocks(
+        [createRumHit({ _trace_id: "trace-1" }), createRumHit({ _trace_id: "trace-2" })],
+        [
+          createTraceMetadata({ trace_id: "trace-1" }),
+          createTraceMetadata({ trace_id: "trace-2" }),
+        ],
+      );
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const operationSearch = mockSearch.mock.calls.find(
+        ([params]) => params.page_type === "traces",
+      );
+      const sql = operationSearch?.[0].query.query.sql;
+      expect(sql).toContain("trace_id IN ('trace-1','trace-2')");
+      expect(sql).toContain("first_value(operation_name ORDER BY _timestamp ASC)");
+      expect(sql).toContain("span_kind='2'");
+      expect(sql).toContain("http_route IS NOT NULL");
+      expect(
+        mockSearch.mock.calls.filter(([params]) => params.page_type === "traces"),
+      ).toHaveLength(1);
+    });
+
     it("should display computed e2e duration in the table cell", async () => {
       wrapper.unmount();
 
@@ -634,6 +945,27 @@ describe("PlayerTracesTab", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
+    it("should render the hash-routed page of each row", async () => {
+      wrapper.unmount();
+
+      mockSearch.mockImplementation((_params: any, source: string) => {
+        if (source === "RUM") {
+          return Promise.resolve({
+            data: { hits: [createRumHit({ _view_url: "https://app.example.com/#/file-manager" })] },
+          });
+        }
+        return Promise.resolve({ data: { hits: [] } });
+      });
+      mockFetchQueryDataWithHttpStream.mockImplementation((_queryReq: any, handlers: any) => {
+        handlers.error(null, new Error("Metadata fetch failed"));
+      });
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect(wrapper.text()).toContain("/#/file-manager");
+    });
+
     it("should render available RUM views when metadata fetch errors", async () => {
       wrapper.unmount();
 
@@ -654,6 +986,27 @@ describe("PlayerTracesTab", () => {
       expect(wrapper.find('[data-test="rum-player-traces-tab-table"]').exists()).toBe(true);
       expect(wrapper.text()).toContain("/products");
     });
+
+    it("still lists ids found in no stream when the metadata fetch errors", async () => {
+      const P1 = "01a034c1aabc72f78880daf6c9755cff";
+      const U1 = "01a038ddccc770b9bba3b2df20c12415";
+      wrapper.unmount();
+      mockResolveTraceLocationsBulk.mockResolvedValueOnce({ [P1]: { stream: "qms_uat" } });
+      mockFallbackTracesStream.mockResolvedValueOnce(null);
+      setupSuccessfulMocks([
+        createRumHit({ _trace_id: P1, _view_url: "https://example.com/orders" }),
+        createRumHit({ _trace_id: U1, _view_url: "https://example.com/audit" }),
+      ]);
+      mockFetchQueryDataWithHttpStream.mockImplementation((_queryReq: any, handlers: any) => {
+        handlers.error(null, new Error("Metadata fetch failed"));
+      });
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect(wrapper.findAll('[data-test^="table-row-"]')).toHaveLength(2);
+      expect(wrapper.text()).toContain("/audit");
+    });
   });
 
   // =========================================================================
@@ -667,8 +1020,40 @@ describe("PlayerTracesTab", () => {
       );
     });
 
+    it("should keep the hash route of a hash-routed SPA", () => {
+      expect((wrapper.vm as any).shortRoute("https://app.example.com/#/file-manager")).toBe(
+        "/#/file-manager",
+      );
+      expect((wrapper.vm as any).shortRoute("https://example.com/app/#/orders?tab=2")).toBe(
+        "/app/#/orders?tab=2",
+      );
+    });
+
+    it("should ignore an in-page anchor that is not a route", () => {
+      expect((wrapper.vm as any).shortRoute("https://example.com/docs#install")).toBe("/docs");
+    });
+
+    it("should label each row with its browser page, separately from the request", () => {
+      const row = {
+        route: "https://app.example.com/#/PatientCharts",
+        metadata: { httpOperation: "GET /api/v1/patients" },
+      };
+      expect((wrapper.vm as any).pageRoute(row)).toBe("/#/PatientCharts");
+      expect((wrapper.vm as any).traceDisplayName(row)).toBe("GET /api/v1/patients");
+      expect((wrapper.vm as any).pageRoute({ route: "" })).toBe("");
+    });
+
     it("should return the original string for an invalid URL", () => {
       expect((wrapper.vm as any).shortRoute("not-a-url")).toBe("not-a-url");
+    });
+
+    it("falls back to the browser route when operation metadata is unavailable", () => {
+      expect(
+        (wrapper.vm as any).traceDisplayName({
+          route: "https://example.com/products",
+          metadata: { rootOperation: "unknown" },
+        }),
+      ).toBe("/products");
     });
   });
 
@@ -847,6 +1232,208 @@ describe("PlayerTracesTab", () => {
   });
 
   // =========================================================================
+  // Search bar
+  // =========================================================================
+
+  describe("search bar", () => {
+    beforeEach(async () => {
+      wrapper.unmount();
+      setupSuccessfulMocks(
+        [
+          createRumHit(),
+          createRumHit({
+            _trace_id: "trace-0f9e8d7c6b5a",
+            _view_url: "https://example.com/checkout",
+            _view_id: "view-2",
+          }),
+        ],
+        [
+          createTraceMetadata(),
+          createTraceMetadata({
+            trace_id: "trace-0f9e8d7c6b5a",
+            start_time: 1_010_000_000,
+            end_time: 1_012_000_000,
+            spans: [4, 1],
+            first_event: { service_name: "checkout", operation_name: "POST /api/orders" },
+          }),
+        ],
+      );
+      wrapper = mountComponent();
+      await flushPromises();
+    });
+
+    const search = async (value: string) => {
+      await wrapper.find('[data-test="rum-player-traces-tab-search"] input').setValue(value);
+      await flushPromises();
+    };
+
+    const rowCount = () => wrapper.findAll('[data-test^="table-row-"]').length;
+
+    it("should list every trace while the search is empty", () => {
+      expect(wrapper.find('[data-test="rum-player-traces-tab-search"]').exists()).toBe(true);
+      expect(rowCount()).toBe(2);
+    });
+
+    it("should filter by request name, ignoring case", async () => {
+      await search("post /API/orders");
+      expect(rowCount()).toBe(1);
+      expect(wrapper.text()).toContain("POST /api/orders");
+      expect(wrapper.text()).not.toContain("GET /api/products");
+    });
+
+    it("should filter by page and by trace id", async () => {
+      await search("/products");
+      expect(rowCount()).toBe(1);
+      expect(wrapper.text()).toContain("GET /api/products");
+
+      await search("0f9e8d7c");
+      expect(rowCount()).toBe(1);
+      expect(wrapper.text()).toContain("POST /api/orders");
+    });
+
+    it("should count only the matching traces and their errors", async () => {
+      const countBadge = () => wrapper.find('[data-test="rum-player-traces-tab-count-badge"]');
+      const errorBadge = () =>
+        wrapper.find('[data-test="rum-player-traces-tab-error-count-badge"]');
+      expect(countBadge().text()).toContain("2");
+      expect(errorBadge().exists()).toBe(true);
+
+      await search("products");
+      expect(countBadge().text()).toContain("1");
+      expect(errorBadge().exists()).toBe(false);
+    });
+
+    it("should show no rows when nothing matches, and all again once cleared", async () => {
+      await search("no-such-request");
+      expect(rowCount()).toBe(0);
+
+      await search("");
+      expect(rowCount()).toBe(2);
+    });
+  });
+
+  // =========================================================================
+  // Status and page filters
+  // =========================================================================
+
+  describe("status and page filters", () => {
+    // Three traces: a fast success and a slow success on /products, a fast error on /checkout.
+    // The end-to-end duration runs from the RUM event (_date, ms) to the trace end (ns).
+    beforeEach(async () => {
+      wrapper.unmount();
+      setupSuccessfulMocks(
+        [
+          createRumHit({ _date: 1_000 }),
+          createRumHit({
+            _trace_id: "trace-0f9e8d7c6b5a",
+            _view_url: "https://example.com/checkout",
+            _view_id: "view-2",
+            _date: 1_010,
+          }),
+          createRumHit({ _trace_id: "trace-5a5a5a5a5a5a", _view_id: "view-3", _date: 20 }),
+        ],
+        [
+          createTraceMetadata(),
+          createTraceMetadata({
+            trace_id: "trace-0f9e8d7c6b5a",
+            start_time: 1_010_000_000,
+            end_time: 1_012_000_000,
+            spans: [4, 1],
+            first_event: { service_name: "checkout", operation_name: "POST /api/orders" },
+          }),
+          createTraceMetadata({
+            trace_id: "trace-5a5a5a5a5a5a",
+            start_time: 1_020_000_000,
+            end_time: 1_025_000_000,
+            first_event: { service_name: "reports", operation_name: "GET /api/report" },
+          }),
+        ],
+      );
+      wrapper = mountComponent();
+      await flushPromises();
+    });
+
+    const filter = (name: "status" | "page") =>
+      wrapper
+        .findAllComponents({ name: "OSelect" })
+        .find(
+          (select) => select.attributes("data-test") === `rum-player-traces-tab-${name}-filter`,
+        )!;
+
+    const choose = async (name: "status" | "page", values: string[]) => {
+      filter(name).vm.$emit("update:modelValue", values);
+      await flushPromises();
+    };
+
+    const rowCount = () => wrapper.findAll('[data-test^="table-row-"]').length;
+
+    it("should check every status by default and list every trace", () => {
+      expect(filter("status").props("modelValue")).toEqual(["error", "success", "slow"]);
+      expect(filter("status").text()).toContain("Slow (≥ 1 s)");
+      expect(rowCount()).toBe(3);
+    });
+
+    it("should show only failed traces when only Error is checked", async () => {
+      await choose("status", ["error"]);
+      expect(rowCount()).toBe(1);
+      expect(wrapper.text()).toContain("POST /api/orders");
+    });
+
+    it("should show only traces of a second or more when only Slow is checked", async () => {
+      await choose("status", ["slow"]);
+      expect(rowCount()).toBe(1);
+      expect(wrapper.text()).toContain("GET /api/report");
+    });
+
+    it("should keep failed and slow traces when Success is unchecked", async () => {
+      await choose("status", ["error", "slow"]);
+      expect(rowCount()).toBe(2);
+      expect(wrapper.text()).not.toContain("GET /api/products");
+    });
+
+    it("should show every trace when no status is checked", async () => {
+      await choose("status", []);
+      expect(rowCount()).toBe(3);
+    });
+
+    it("should offer each visited page once, in visit order", () => {
+      const options = filter("page")
+        .findAll('[data-test="select-option"]')
+        .map((option) => option.text());
+      expect(options).toEqual(["/products", "/checkout"]);
+    });
+
+    it("should combine the page, status and search filters, and count only the matches", async () => {
+      const countBadge = () => wrapper.find('[data-test="rum-player-traces-tab-count-badge"]');
+
+      await choose("page", ["/products"]);
+      expect(rowCount()).toBe(2);
+      expect(countBadge().text()).toContain("2");
+      expect(wrapper.find('[data-test="rum-player-traces-tab-error-count-badge"]').exists()).toBe(
+        false,
+      );
+
+      await wrapper.find('[data-test="rum-player-traces-tab-search"] input').setValue("report");
+      await flushPromises();
+      expect(rowCount()).toBe(1);
+      expect(wrapper.text()).toContain("GET /api/report");
+
+      await choose("status", ["error"]);
+      expect(rowCount()).toBe(0);
+    });
+
+    it("should clear the page selection when the session changes", async () => {
+      await choose("page", ["/checkout"]);
+      expect(rowCount()).toBe(1);
+
+      await wrapper.setProps({ sessionId: "another-session" });
+      await flushPromises();
+      expect(filter("page").props("modelValue")).toEqual([]);
+      expect(rowCount()).toBe(3);
+    });
+  });
+
+  // =========================================================================
   // Formatting utilities — additional coverage
   // =========================================================================
 
@@ -991,6 +1578,258 @@ describe("PlayerTracesTab", () => {
       await flushPromises();
 
       expect(mockSearch).not.toHaveBeenCalled();
+    });
+  });
+
+  // =========================================================================
+  // SQL is schema-guarded so a mobile stream never 400s
+  //
+  // =========================================================================
+
+  describe("schema-guarded SQL", () => {
+    function lastRumSql(): string {
+      const call = mockSearch.mock.calls.find((c: any[]) => c[1] === "RUM");
+      return call?.[0]?.query?.query?.sql ?? "";
+    }
+
+    it("omits browser-only fields and filters on a mobile schema", async () => {
+      wrapper.unmount();
+      mockSearch.mockClear();
+      mockGetStream.mockResolvedValueOnce({
+        schema: [
+          { name: "_o2_trace_id" },
+          { name: "session_id" },
+          { name: "view_url" },
+          { name: "view_id" },
+          { name: "type" },
+          { name: "date" },
+        ],
+      });
+
+      // Act
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // Assert: query ran (no early return), references neither absent column.
+      const sql = lastRumSql();
+      expect(sql).not.toBe("");
+      expect(sql).not.toContain("max(view_loading_type)");
+      expect(sql).toContain("NULL as _view_loading_type");
+      expect(sql).not.toContain("action_id is not null");
+      expect(sql).not.toContain("resource_url");
+      expect(sql).toContain("_o2_trace_id");
+      expect(sql).toContain("max(view_url)");
+    });
+
+    it("includes unlinked traces and filters Socket.IO groups on a browser schema", async () => {
+      // Arrange: browser schema carries every column.
+      wrapper.unmount();
+      mockSearch.mockClear();
+      mockGetStream.mockResolvedValueOnce({
+        schema: [
+          { name: "_oo_trace_id" },
+          { name: "session_id" },
+          { name: "view_url" },
+          { name: "view_id" },
+          { name: "view_loading_type" },
+          { name: "type" },
+          { name: "date" },
+          { name: "action_id" },
+          { name: "resource_url" },
+        ],
+      });
+
+      // Act
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // Assert
+      const sql = lastRumSql();
+      expect(sql).toContain("max(view_loading_type) as _view_loading_type");
+      expect(sql).not.toContain("action_id is not null");
+      expect(sql).toContain(
+        "HAVING MAX(CASE WHEN resource_url LIKE '%/socket.io/%' AND resource_url LIKE '%transport=polling%' THEN 1 ELSE 0 END) = 0",
+      );
+    });
+
+    it("keeps null resource URLs while excluding a trace containing Socket.IO polling", async () => {
+      wrapper.unmount();
+      mockSearch.mockClear();
+      mockGetStream.mockResolvedValueOnce({
+        schema: [{ name: "_oo_trace_id" }, { name: "session_id" }, { name: "resource_url" }],
+      });
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const sql = lastRumSql();
+      expect(sql).not.toContain("resource_url NOT LIKE");
+      expect(sql).toContain("resource_url LIKE '%/socket.io/%'");
+      expect(sql).toContain("resource_url LIKE '%transport=polling%'");
+    });
+
+    it("does not query at all when the stream has no trace_id column", async () => {
+      // Arrange: neither namespace present → nothing to correlate.
+      wrapper.unmount();
+      mockGetStream.mockResolvedValueOnce({
+        schema: [{ name: "session_id" }, { name: "view_url" }],
+      });
+      mockSearch.mockClear();
+
+      // Act
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // Assert: early return, no search issued, empty state shown.
+      expect(mockSearch).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="rum-player-traces-tab-empty"]').exists()).toBe(true);
+    });
+  });
+
+  // =========================================================================
+  // Events-only sessions search `_rumdata` by server arrival, not device clock
+  // =========================================================================
+
+  describe("arrival-time window (rumWindowUs)", () => {
+    const START_MS = 1_700_000_000_000;
+    const END_MS = 1_700_000_100_000;
+    const DAY_US = 86_400_000_000;
+    const RUM_WINDOW = { start: START_MS * 1000 - DAY_US, end: END_MS * 1000 + DAY_US };
+    const PAD = 60_000_000;
+
+    function rumCalls(): any[] {
+      return mockSearch.mock.calls.filter(
+        (c: any[]) => c[1] === "RUM" && c[0].page_type === "logs",
+      );
+    }
+
+    async function remount(props: Record<string, any>, rumHits: any[], metaHits?: any[]) {
+      wrapper.unmount();
+      vi.clearAllMocks();
+      setupSuccessfulMocks(rumHits, metaHits);
+      wrapper = mountComponent({ props: { startTime: START_MS, endTime: END_MS, ...props } });
+      await flushPromises();
+    }
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("queries _rumdata from the prop start to at least the prop end", async () => {
+      vi.spyOn(Date, "now").mockReturnValue(END_MS);
+      await remount({ rumWindowUs: RUM_WINDOW }, [createRumHit()]);
+
+      const query = rumCalls()[0][0].query.query;
+      expect(query.start_time).toBe(RUM_WINDOW.start);
+      expect(query.end_time).toBeGreaterThanOrEqual(RUM_WINDOW.end);
+      expect(query.sql).toContain("min(_timestamp) as _first_ts");
+      expect(query.sql).toContain("max(_timestamp) as _last_ts");
+    });
+
+    it("resolves stream locations, metadata and the row detail over the padded arrival window", async () => {
+      const first = START_MS * 1000 + 1_000_000;
+      const last = END_MS * 1000 + 5_000_000;
+      await remount(
+        { rumWindowUs: RUM_WINDOW },
+        [createRumHit({ _first_ts: first, _last_ts: last })],
+        [createTraceMetadata({ start_time: undefined, end_time: undefined })],
+      );
+
+      const bulk = mockResolveTraceLocationsBulk.mock.calls[0];
+      expect(bulk[1]).toBe(START_MS * 1000 - PAD);
+      expect(bulk[2]).toBe(last + PAD);
+
+      const queryReq = mockFetchQueryDataWithHttpStream.mock.calls[0][0].queryReq;
+      expect(queryReq.start_time).toBe(START_MS * 1000 - PAD);
+      expect(queryReq.end_time).toBe(last + PAD);
+
+      await wrapper.find('[data-test="table-row-0"]').trigger("click");
+      await flushPromises();
+      const traceDetails = wrapper.findComponent({ name: "TraceDetails" });
+      expect(traceDetails.props("startTimeProp")).toBe(START_MS * 1000 - PAD);
+      expect(traceDetails.props("endTimeProp")).toBe(last + PAD);
+    });
+
+    it("keeps the device start when every row arrived 5 min after its device time", async () => {
+      const lag = 300_000_000;
+      await remount(
+        { rumWindowUs: RUM_WINDOW },
+        [createRumHit({ _first_ts: START_MS * 1000 + lag, _last_ts: END_MS * 1000 + lag })],
+        [createTraceMetadata({ start_time: undefined, end_time: undefined })],
+      );
+
+      const bulk = mockResolveTraceLocationsBulk.mock.calls[0];
+      expect(bulk[1]).toBe(START_MS * 1000 - PAD);
+      expect(bulk[2]).toBe(END_MS * 1000 + lag + PAD);
+
+      const queryReq = mockFetchQueryDataWithHttpStream.mock.calls[0][0].queryReq;
+      expect(queryReq.start_time).toBe(START_MS * 1000 - PAD);
+      expect(queryReq.end_time).toBe(END_MS * 1000 + lag + PAD);
+
+      await wrapper.find('[data-test="table-row-0"]').trigger("click");
+      await flushPromises();
+      const traceDetails = wrapper.findComponent({ name: "TraceDetails" });
+      expect(traceDetails.props("startTimeProp")).toBe(START_MS * 1000 - PAD);
+      expect(traceDetails.props("endTimeProp")).toBe(END_MS * 1000 + lag + PAD);
+    });
+
+    it("spans both windows when the device clock runs hours ahead", async () => {
+      const H = 3_600_000_000;
+      await remount({ rumWindowUs: RUM_WINDOW }, [
+        createRumHit({ _first_ts: START_MS * 1000 - 3 * H, _last_ts: END_MS * 1000 - 3 * H }),
+      ]);
+
+      const bulk = mockResolveTraceLocationsBulk.mock.calls[0];
+      expect(bulk[1]).toBe(START_MS * 1000 - 3 * H - PAD);
+      expect(bulk[2]).toBe(END_MS * 1000);
+
+      const queryReq = mockFetchQueryDataWithHttpStream.mock.calls[0][0].queryReq;
+      expect(queryReq.start_time).toBe(START_MS * 1000 - 3 * H - PAD);
+      expect(queryReq.end_time).toBe(END_MS * 1000);
+    });
+
+    it("falls back to the device window when no hit carries a usable _first_ts", async () => {
+      await remount({ rumWindowUs: RUM_WINDOW }, [createRumHit({ _first_ts: null, _last_ts: "" })]);
+
+      const bulk = mockResolveTraceLocationsBulk.mock.calls[0];
+      expect(bulk[1]).toBe(START_MS * 1000);
+      expect(bulk[2]).toBe(END_MS * 1000);
+    });
+
+    it("keeps a trace that arrived 20 s after the last device-clock event inside the window", async () => {
+      const last = END_MS * 1000 + 20_000_000;
+      await remount({ rumWindowUs: RUM_WINDOW }, [
+        createRumHit({ _first_ts: START_MS * 1000, _last_ts: last }),
+      ]);
+
+      const bulk = mockResolveTraceLocationsBulk.mock.calls[0];
+      expect(bulk[2]).toBeGreaterThanOrEqual(last + PAD);
+    });
+
+    it("extends end_time to the current time on a later re-fetch", async () => {
+      const nowSpy = vi.spyOn(Date, "now").mockReturnValue(END_MS + DAY_US / 1000 + 1_000);
+      await remount({ rumWindowUs: RUM_WINDOW }, [createRumHit()]);
+      const firstEnd = rumCalls()[0][0].query.query.end_time;
+
+      nowSpy.mockReturnValue(END_MS + DAY_US / 1000 + 600_000);
+      await wrapper.setProps({ sessionId: "test-session-456" });
+      await flushPromises();
+
+      const secondEnd = rumCalls()[1][0].query.query.end_time;
+      expect(firstEnd).toBe((END_MS + DAY_US / 1000 + 1_000) * 1000);
+      expect(secondEnd).toBeGreaterThan(firstEnd);
+    });
+
+    it("leaves the query untouched without the prop", async () => {
+      await remount({}, [createRumHit({ _first_ts: START_MS * 1000, _last_ts: END_MS * 1000 })]);
+
+      const query = rumCalls()[0][0].query.query;
+      expect(query.sql).not.toContain("_first_ts");
+      expect(query.start_time).toBe(START_MS * 1000);
+      expect(query.end_time).toBe(END_MS * 1000);
+      const bulk = mockResolveTraceLocationsBulk.mock.calls[0];
+      expect(bulk[1]).toBe(START_MS * 1000);
+      expect(bulk[2]).toBe(END_MS * 1000);
     });
   });
 });

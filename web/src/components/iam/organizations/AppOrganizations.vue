@@ -19,13 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, watch } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OrganizationsEnterprise from "@/components/iam/organizations/ListOrganizations.vue";
 
 import config from "@/aws-exports";
-import { watch } from "vue";
 
 export default defineComponent({
   name: "AppOrganizations",
@@ -34,7 +33,7 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const componentName = ref("OrganizationsEnterprise");
 

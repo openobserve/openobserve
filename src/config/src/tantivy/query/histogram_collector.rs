@@ -866,7 +866,7 @@ mod tests {
                         .set_index_option(IndexRecordOption::Basic)
                         .set_tokenizer("raw"),
                 )
-                .set_fast(None),
+                .set_fast(tantivy::tokenizer::RAW_TOKENIZER_NAME),
         );
         let index = Index::create_in_ram(schema_builder.build());
 

@@ -3,8 +3,8 @@
     <template #trigger>
       <OButton
         :style="{
-          width: changeStyle ? '170px' : '180px',
-          height: changeStyle ? '40px' : '',
+          width: changeStyle ? '10.625rem' : '11.25rem',
+          height: changeStyle ? '2.5rem' : '',
         }"
         data-test="date-time-btn"
         variant="outline"
@@ -32,7 +32,7 @@
           <OTabPanel name="relative">
             <div class="date-time-table relative flex flex-col">
               <div
-                class="relative-row border-border-default flex items-center border-b px-3 py-2 [&>*]:mr-1.5"
+                class="relative-row border-border-default flex items-center border-b px-3 py-2 [&>*]:me-1.5"
                 v-for="(period, periodIndex) in relativePeriods"
                 :key="'date_' + periodIndex"
               >
@@ -45,7 +45,7 @@
                     :class="
                       isSelected(item, period.value)
                         ? 'bg-button-primary! text-button-primary-foreground!'
-                        : 'bg-[color-mix(in_srgb,var(--color-text-heading)_7%,transparent)]!'
+                        : 'bg-text-heading/7!'
                     "
                     @click="setRelativeDate(period, item)"
                     >{{ item }}</OButton
@@ -53,9 +53,9 @@
                 </div>
               </div>
               <div
-                class="relative-row border-border-default flex items-center border-b px-3 py-2 [&>*]:mr-1.5"
+                class="relative-row border-border-default flex items-center border-b px-3 py-2 [&>*]:me-1.5"
               >
-                <div class="min-w-18.75 text-sm font-semibold">Custom</div>
+                <div class="min-w-18.75 text-sm font-semibold">{{ t("common.custom") }}</div>
                 <div class="flex gap-2">
                   <div class="flex w-20 flex-col">
                     <OInput
@@ -96,14 +96,17 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import type { DropdownAlign } from "@/lib/overlay/Dropdown/ODropdown.types";
-import { ref, reactive, watch, computed } from "vue";
+import { reactive, watch, computed } from "vue";
 import type { PropType } from "vue";
+import { useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 // Period keys used to index relativeDates and label lookups.
 type PeriodKey = "s" | "m" | "h" | "d" | "w" | "M";
 
 interface RelativePeriod {
-  label: string;
+  label: I18nText;
   value: PeriodKey;
 }
 
@@ -122,6 +125,12 @@ const props = defineProps({
     type: String as PropType<DropdownAlign>,
     validator: (v: DropdownAlign) => ["start", "center", "end"].includes(v),
   },
+  // A month has no fixed length, so a time shift (one delta for both ends) cannot use it.
+  excludeMonths: {
+    default: false,
+    required: false,
+    type: Boolean,
+  },
 });
 
 const emit = defineEmits(["update:modelValue"]);
@@ -134,20 +143,20 @@ const picker = reactive({
       relative: {
         value: 0,
         period: "m",
-        label: "Minutes",
+        label: t("common.minutes"),
       },
     },
   },
 });
 
 // Periods for selection
-const relativePeriods: RelativePeriod[] = [
-  { label: "Seconds", value: "s" },
-  { label: "Minutes", value: "m" },
-  { label: "Hours", value: "h" },
-  { label: "Days", value: "d" },
-  { label: "Weeks", value: "w" },
-  { label: "Months", value: "M" },
+const allRelativePeriods: RelativePeriod[] = [
+  { label: t("common.seconds"), value: "s" },
+  { label: t("common.minutes"), value: "m" },
+  { label: t("common.hours"), value: "h" },
+  { label: t("common.days"), value: "d" },
+  { label: t("common.weeks"), value: "w" },
+  { label: t("common.months"), value: "M" },
 ];
 
 const relativeDates: Record<PeriodKey, number[]> = {
@@ -159,20 +168,38 @@ const relativeDates: Record<PeriodKey, number[]> = {
   M: [1, 2, 3, 4, 5, 6],
 };
 
+// Same plural keys the comparison legend uses (dateTimeUtils), so both read the same.
+const agoKeys: Record<PeriodKey, I18nKey> = {
+  s: "dashboard.utils.secondsAgo",
+  m: "dashboard.utils.minutesAgo",
+  h: "dashboard.utils.hoursAgo",
+  d: "dashboard.utils.daysAgo",
+  w: "dashboard.utils.weeksAgo",
+  M: "dashboard.utils.monthsAgo",
+};
+
+const pastKeys: Record<PeriodKey, I18nKey> = {
+  s: "common.pastSecond",
+  m: "common.pastMinute",
+  h: "common.pastHour",
+  d: "common.pastDay",
+  w: "common.pastWeek",
+  M: "common.pastMonth",
+};
+
+const relativePeriods = computed(() =>
+  props.excludeMonths ? allRelativePeriods.filter((p) => p.value !== "M") : allRelativePeriods,
+);
+
 // Options for custom period input
-const relativePeriodsSelect = ref([
-  { label: "Seconds", value: "s" },
-  { label: "Minutes", value: "m" },
-  { label: "Hours", value: "h" },
-  { label: "Days", value: "d" },
-  { label: "Weeks", value: "w" },
-  { label: "Months", value: "M" },
-]);
+const relativePeriodsSelect = computed(() =>
+  relativePeriods.value.map((p) => ({ label: p.label, value: p.value })),
+);
 
 // Function to map period values to their labels
 const getPeriodLabelFromValue = (periodValue: SelectModelValue | string) => {
-  const period = relativePeriods.find((p) => p.value === periodValue);
-  return period ? period.label : "Minutes";
+  const period = allRelativePeriods.find((p) => p.value === periodValue);
+  return period ? period.label : t("common.minutes");
 };
 
 // Watch modelValue to reflect the correct offset when passed in from parent
@@ -211,11 +238,15 @@ const updateCustomPeriod = (newPeriod: SelectModelValue | string) => {
 
 // Display the current selected offset
 const getDisplayValue = () => {
-  return `${picker.data.selectedDate.relative.value} ${picker.data.selectedDate.relative.label} ago`;
+  const count = picker.data.selectedDate.relative.value;
+  const key = agoKeys[picker.data.selectedDate.relative.period as PeriodKey] ?? agoKeys.m;
+  return t(key, { count }, count);
 };
 
 const getTrimmedDisplayValue = () => {
-  return `Past ${picker.data.selectedDate.relative.value} ${picker.data.selectedDate.relative.label}`;
+  const count = picker.data.selectedDate.relative.value;
+  const key = pastKeys[picker.data.selectedDate.relative.period as PeriodKey] ?? pastKeys.m;
+  return t(key, { count }, count);
 };
 
 // Check if the current selection matches the modelValue
@@ -228,10 +259,10 @@ const isSelected = (value: number, period: PeriodKey) => {
 
 // Display period label for custom input
 const getPeriodLabel = () => {
-  const selectedPeriod = relativePeriods.find(
+  const selectedPeriod = allRelativePeriods.find(
     (p) => p.value === picker.data.selectedDate.relative.period,
   );
-  return selectedPeriod ? selectedPeriod.label : "Minutes";
+  return selectedPeriod ? selectedPeriod.label : t("common.minutes");
 };
 
 const computedClass = computed(() => {

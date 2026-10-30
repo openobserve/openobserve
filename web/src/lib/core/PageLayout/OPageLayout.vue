@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Header — from props (the normal case):
     :title :subtitle :icon :back :titleDataTest
     #actions      — right-aligned header actions (O2 buttons)
+    #actions-overflow — secondary actions; inline on desktop, behind "More" < md
     #header-tabs  — inline module tabs in the header row (Level-2 nav)
     #title        — custom title node (when a string title isn't enough)
     #header       — ESCAPE HATCH: a fully custom header the props can't express.
@@ -52,7 +53,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   v-model:sidebarWidth — bidirectional bind for the rail width (resizable mode).
 -->
 <template>
-  <div class="flex h-full flex-col">
+  <!-- Named container so the header collapses on ITS width, not the viewport: the AI panel narrows the page without changing the viewport. -->
+  <div class="@container/page flex h-full flex-col">
     <!-- ── Header (props → OPageHeader, or #header escape hatch) ── -->
     <!-- Just a shrink-0 slot: OPageHeader draws its OWN border-b (so the header
          is a consistent 60px). Don't add a border here — it would double the
@@ -67,6 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title-data-test="titleDataTest"
           :tabs-below="tabsBelow"
           :title-overflow="titleOverflow"
+          :overflow-first="overflowFirst"
         >
           <template v-if="!!slots.title" #title><slot name="title" /></template>
           <template v-if="!!slots['title-prefix']" #title-prefix
@@ -77,6 +80,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           /></template>
           <template v-if="!!slots.subtitle" #subtitle><slot name="subtitle" /></template>
           <template v-if="!!slots.actions" #actions><slot name="actions" /></template>
+          <template v-if="!!slots['actions-overflow']" #actions-overflow
+            ><slot name="actions-overflow"
+          /></template>
           <template v-if="!!slots['header-tabs']" #tabs><slot name="header-tabs" /></template>
         </OPageHeader>
       </slot>
@@ -87,19 +93,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <slot name="subnav" />
     </div>
 
+    <!-- ── Body (mobile): sidebar collapses into an off-canvas drawer ── -->
+    <template v-if="!!slots.sidebar && isMobile">
+      <div
+        v-if="!sidebarTriggerOwner"
+        class="border-border-default px-page-edge flex shrink-0 items-center border-b py-1"
+        data-drawer-anchor="page-layout-sidebar"
+      >
+        <OButton
+          variant="ghost"
+          size="sm"
+          data-test="o-page-layout-mobile-sidebar-btn"
+          @click="mobileSidebarOpen = true"
+        >
+          <template #icon-left><OIcon name="menu" size="sm" /></template>
+          {{ t("common.sidePanel") }}
+        </OButton>
+      </div>
+      <OContent
+        :bleed="bleed"
+        :y="padY"
+        :class="[BODY_ENTER, 'flex min-h-0 w-full flex-1 flex-col overflow-hidden']"
+      >
+        <slot />
+      </OContent>
+      <ODrawer
+        v-model:open="mobileSidebarOpen"
+        side="left"
+        size="sm"
+        bleed
+        seamless
+        anchor='[data-drawer-anchor="page-layout-sidebar"]'
+        :anchor-edge="sidebarTriggerOwner ? 'bottom' : 'top'"
+        data-test="o-page-layout-mobile-sidebar-drawer"
+      >
+        <div class="flex h-full flex-col overflow-hidden">
+          <slot name="sidebar" />
+        </div>
+      </ODrawer>
+    </template>
+
     <!-- ── Body: resizable sidebar + main (OSplitter) ───────────── -->
     <OSplitter
-      v-if="!!slots.sidebar && resizable"
+      v-else-if="!!slots.sidebar && resizable"
       v-model="internalWidth"
       unit="px"
       :limits="splitterLimits"
       :horizontal="false"
-      class="min-h-0 flex-1 overflow-hidden"
+      :class="[BODY_ENTER, 'min-h-0 flex-1 overflow-hidden']"
     >
       <template #before>
         <div
           v-if="sidebarVisible"
-          class="border-border-default flex h-full w-full flex-col overflow-hidden border-r"
+          class="border-border-default flex h-full w-full flex-col overflow-hidden border-e"
         >
           <slot name="sidebar" />
         </div>
@@ -107,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #separator>
         <slot name="separator">
           <div
-            class="h-full w-1 bg-transparent transition-colors duration-300 hover:bg-[var(--color-orange-500)]"
+            class="hover:bg-splitter-hover h-full w-1 bg-transparent transition-colors duration-300"
           ></div>
         </slot>
       </template>
@@ -119,10 +165,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OSplitter>
 
     <!-- ── Body: fixed-width sidebar + main ─────────────────────── -->
-    <div v-else-if="!!slots.sidebar" class="flex min-h-0 flex-1">
+    <div v-else-if="!!slots.sidebar" :class="[BODY_ENTER, 'flex min-h-0 flex-1']">
       <aside
-        class="border-border-default flex h-full shrink-0 flex-col overflow-hidden border-r"
-        :style="{ width: (sidebarWidth ?? 200) + 'px' }"
+        class="border-border-default flex h-full shrink-0 flex-col overflow-hidden border-e"
+        :style="{ width: sidebarWidth + 'px' }"
       >
         <slot name="sidebar" />
       </aside>
@@ -132,7 +178,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- ── Body: constrained reading column (no sidebar) ────────── -->
-    <ConstrainedPage v-else-if="constrained" :size="contentSize" class="min-h-0 flex-1">
+    <ConstrainedPage
+      v-else-if="constrained"
+      :size="contentSize"
+      :class="[BODY_ENTER, 'min-h-0 flex-1']"
+    >
       <slot />
     </ConstrainedPage>
 
@@ -141,9 +191,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else
       :bleed="bleed"
       :y="padY"
-      :class="
-        scroll ? 'min-h-0 flex-1 overflow-auto' : 'flex min-h-0 flex-1 flex-col overflow-hidden'
-      "
+      :class="[
+        BODY_ENTER,
+        scroll ? 'min-h-0 flex-1 overflow-auto' : 'flex min-h-0 flex-1 flex-col overflow-hidden',
+      ]"
     >
       <slot />
     </OContent>
@@ -151,25 +202,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, useSlots } from "vue";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { ref, computed, watch, useSlots, provide } from "vue";
+import { useRouter } from "vue-router";
+// The route view already fades the whole page in, so the body takes only the slide and the header stays still.
+import { ENTER_SLIDE as BODY_ENTER } from "@/lib/styles/motion";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
+import { PAGE_LAYOUT_SIDEBAR_KEY } from "./pageLayoutSidebar";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 interface BackTarget {
-  label: string;
+  /** Optional, as on OPageHeader: without it the button reads plain "Back". */
+  label?: I18nText;
   to?: import("vue-router").RouteLocationRaw;
   onClick?: () => void;
   dataTest?: string;
 }
 
+const RAIL_WIDTH = 230;
+
 const props = withDefaults(
   defineProps<{
     // Header (from props)
-    title?: string;
-    subtitle?: string;
+    title?: I18nText;
+    subtitle?: I18nText;
     icon?: IconName;
     back?: BackTarget;
     titleDataTest?: string;
@@ -180,6 +243,8 @@ const props = withDefaults(
      * control (an inline-edited page name) so the <h1> stops clipping it.
      */
     titleOverflow?: "truncate" | "visible";
+    /** Forwarded to OPageHeader: desktop renders #actions-overflow before #actions. */
+    overflowFirst?: boolean;
     // Body
     bleed?: boolean;
     padY?: boolean;
@@ -198,10 +263,11 @@ const props = withDefaults(
   }>(),
   {
     tabsBelow: false,
+    overflowFirst: false,
     bleed: false,
     padY: false,
     scroll: false,
-    sidebarWidth: 200,
+    sidebarWidth: RAIL_WIDTH,
     resizable: false,
     splitterLimits: () => [0, 400] as [number, number],
     constrained: false,
@@ -215,6 +281,24 @@ const emit = defineEmits<{
 }>();
 
 const slots = useSlots();
+const { t } = useI18nTyped();
+
+const { isMobile } = useBreakpoint();
+const mobileSidebarOpen = ref(false);
+// Picking a destination from the phone sidebar is the end of that interaction.
+const router = useRouter();
+watch(
+  () => router?.currentRoute?.value?.fullPath,
+  () => (mobileSidebarOpen.value = false),
+);
+// Only a sidebar host provides, so a nested sidebar-less layout doesn't shadow its parent's trigger.
+const sidebarTriggerOwner = ref<symbol | null>(null);
+if (slots.sidebar) {
+  provide(PAGE_LAYOUT_SIDEBAR_KEY, {
+    owner: sidebarTriggerOwner,
+    open: () => (mobileSidebarOpen.value = true),
+  });
+}
 
 const hasHeader = computed(
   () =>

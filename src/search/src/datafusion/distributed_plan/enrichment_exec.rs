@@ -24,10 +24,10 @@ use bytes::Bytes;
 use config::{get_batch_size, utils::record_batch_ext::convert_vrl_to_record_batch};
 use datafusion::{
     arrow::datatypes::SchemaRef,
-    common::{Result, internal_err},
+    common::{Result, internal_err, tree_node::TreeNodeRecursion},
     error::DataFusionError,
     execution::{SendableRecordBatchStream, TaskContext},
-    physical_expr::{EquivalenceProperties, Partitioning},
+    physical_expr::{EquivalenceProperties, Partitioning, PhysicalExpr},
     physical_plan::{
         DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
         execution_plan::{Boundedness, EmissionType},
@@ -141,6 +141,13 @@ impl EnrichmentMetrics {
 }
 
 impl ExecutionPlan for EnrichmentExec {
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(&Arc<dyn PhysicalExpr>) -> Result<TreeNodeRecursion>,
+    ) -> Result<TreeNodeRecursion> {
+        Ok(TreeNodeRecursion::Continue)
+    }
+
     fn name(&self) -> &'static str {
         "EnrichmentExec"
     }

@@ -14,7 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
-import { buildDefaultSqlFields, SKIP_SEED_TYPES } from "@/utils/dashboard/defaultFields";
+import type { TranslateFn } from "@/types/i18n";
+import { buildDefaultBuilderFields, SKIP_SEED_TYPES } from "@/utils/dashboard/defaultFields";
 import { applyPromqlSeed, isAutoSeededSlot } from "@/utils/dashboard/promqlSeed";
 
 /**
@@ -27,14 +28,14 @@ import { applyPromqlSeed, isAutoSeededSlot } from "@/utils/dashboard/promqlSeed"
  * SQL metrics -> avg(value) if the stream has a "value" column, else
  * count(_timestamp).
  */
-const useDefaultPanelFields = (pageKey: string = "dashboard") => {
+const useDefaultPanelFields = (pageKey: string = "dashboard", t: TranslateFn) => {
   const {
     dashboardPanelData,
     updateGroupedFields,
     makeAutoSQLQuery,
     isAddXAxisNotAllowed,
     isAddYAxisNotAllowed,
-  } = useDashboardPanelData(pageKey);
+  } = useDashboardPanelData(pageKey, t);
 
   const applyDefaultPanelFields = async () => {
     const idx = dashboardPanelData.layout.currentQueryIndex;
@@ -70,7 +71,8 @@ const useDefaultPanelFields = (pageKey: string = "dashboard") => {
 
     // hasValueColumn is scoped to `stream`, so a missing/stale schema (incl. join
     // streams) falls back to count(_timestamp).
-    const { x, y } = buildDefaultSqlFields(
+    const { x, y } = buildDefaultBuilderFields(
+      dashboardPanelData.data.type,
       streamType,
       dashboardPanelData.meta?.streamFields?.groupedFields ?? [],
       stream,
@@ -79,8 +81,12 @@ const useDefaultPanelFields = (pageKey: string = "dashboard") => {
     // Respect chart-type axis rules: metric/gauge etc. don't allow an x-axis, so
     // only seed x/y where the current chart type permits it (computed from the
     // now-empty field state after removeXYFilters).
-    query.fields.x = isAddXAxisNotAllowed.value ? [] : x;
-    query.fields.y = isAddYAxisNotAllowed.value ? [] : y;
+    // A time bucket is not an entity; the user picks the entity field.
+    query.fields.x =
+      isAddXAxisNotAllowed.value || dashboardPanelData.data.type === "hostmap" ? [] : x;
+    // A count is not a state; the user picks the state column.
+    query.fields.y =
+      isAddYAxisNotAllowed.value || dashboardPanelData.data.type === "state-timeline" ? [] : y;
     query.fields.breakdown = [];
     query.fields.filter = {
       filterType: "group",

@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="section-header border-border-default flex items-center gap-0 border-b px-3 py-2.5"
       >
         <div
-          class="section-header-accent rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0"
+          class="section-header-accent rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0"
         />
         <span
           class="section-header-title text-compact text-text-heading font-semibold tracking-[0.01em]"
@@ -60,7 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroupItem>
           </OToggleGroup>
 
-          <!-- Open Full Editor (SQL/PromQL tabs) -->
+          <!-- Open Full Editor (SQL/PromQL tabs). An SLO alert has no query
+               to open an editor for. -->
           <OButton
             v-if="localTab !== 'custom'"
             data-test="step2-view-editor-btn"
@@ -81,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-if="isEventBased">
                 <!-- Alert if row -->
                 <div
-                  class="rounded-default text-compact flex items-start gap-3 px-3 py-2"
+                  class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
                   data-test="alert-if-row-logs"
                 >
                   <span
@@ -95,6 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="max-w-45 min-w-32.5">
                         <OSelect
                           v-model="selectedFunction"
+                          :aria-label="t('alerts.queryConfig.aggregationFunction')"
                           :options="logFunctionOptions"
                           labelKey="label"
                           valueKey="value"
@@ -103,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OTooltip
                           :content="
                             logFunctionOptions.find((o: any) => o.value === selectedFunction)
-                              ?.tooltip || ''
+                              ?.tooltip || raw('')
                           "
                           :delay="400"
                         />
@@ -115,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >{{ t("alerts.conditionOf") }}</span
                         >
                         <OFormSelect
+                          :aria-label="t('alerts.column')"
                           name="query_condition.aggregation.having.column"
                           :options="numericColumns"
                           searchable
@@ -138,10 +141,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-if="selectedFunction === 'total_events'">
                       <div class="flex items-start gap-2">
                         <span
-                          class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                          class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                           >{{ t("alerts.criticalIf") }}</span
                         >
                         <OFormSelect
+                          :aria-label="t('common.operator')"
                           name="trigger_condition.operator"
                           :options="numericOperators"
                           width="xs"
@@ -152,6 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <!-- Message hangs under the threshold field it describes. -->
                         <div class="flex flex-col gap-1">
                           <OFormInput
+                            :aria-label="t('alerts.alertIfNoOfEvents')"
                             name="trigger_condition.threshold"
                             type="number"
                             width="xs"
@@ -176,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                            critical's operator, so the row only echoes it. -->
                       <div v-if="countWarningVisible" class="flex items-start gap-2">
                         <span
-                          class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                          class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                           >{{ t("alerts.warningIf") }}</span
                         >
                         <span
@@ -185,6 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                         <div class="flex flex-col gap-1">
                           <OFormInput
+                            :aria-label="t('alerts.warningIf')"
                             name="trigger_condition.warning_threshold"
                             type="number"
                             width="xs"
@@ -230,10 +236,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-else>
                       <div class="flex items-start gap-2">
                         <span
-                          class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                          class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                           >{{ t("alerts.criticalIf") }}</span
                         >
                         <OFormSelect
+                          :aria-label="t('common.operator')"
                           name="query_condition.aggregation.having.operator"
                           :options="numericOperators"
                           :searchable="false"
@@ -244,6 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <!-- Message hangs under the value field it describes. -->
                         <div class="flex flex-col gap-1">
                           <OFormInput
+                            :aria-label="t('common.value')"
                             name="query_condition.aggregation.having.value"
                             type="number"
                             width="xs"
@@ -266,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                            critical's operator, so the row only echoes it. -->
                       <div v-if="aggWarningVisible" class="flex items-start gap-2">
                         <span
-                          class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                          class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                           >{{ t("alerts.warningIf") }}</span
                         >
                         <span
@@ -275,6 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                         <div class="flex flex-col gap-1">
                           <OFormInput
+                            :aria-label="t('alerts.warningIf')"
                             name="query_condition.aggregation.warning_value"
                             type="number"
                             width="xs"
@@ -338,6 +347,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-for="(group, index) in logGroupByRows" :key="index">
                       <div class="flex items-center gap-1">
                         <OFormSelect
+                          :aria-label="t('alerts.groupBy')"
                           :name="`logGroupBy[${index}]`"
                           :options="columns"
                           searchable
@@ -346,6 +356,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @update:model-value="onLogGroupByChange"
                         />
                         <OButton
+                          :aria-label="t('common.remove')"
                           variant="ghost"
                           size="icon-circle-sm"
                           class="text-icon-color hover:text-status-error-text"
@@ -380,7 +391,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      meaning there and M-10 rejects it at save time. -->
                 <div
                   v-if="selectedFunction !== 'total_events' && hasLogGroupByFields && !isMultiAlert"
-                  class="rounded-default text-compact flex items-start gap-3 px-3 py-2"
+                  class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
                   data-test="alert-having-groups-row"
                 >
                   <span
@@ -395,6 +406,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                   <div class="flex flex-nowrap items-start gap-2">
                     <OFormSelect
+                      :aria-label="t('common.operator')"
                       name="trigger_condition.operator"
                       :options="numericOperators"
                       :searchable="false"
@@ -404,6 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Message hangs under the threshold field it describes. -->
                     <div class="flex flex-col gap-1">
                       <OFormInput
+                        :aria-label="t('alerts.alertIfNoOfEvents')"
                         name="trigger_condition.threshold"
                         type="number"
                         width="xs"
@@ -429,7 +442,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- METRICS -->
               <template v-else>
                 <!-- Alert if row -->
-                <div class="rounded-default text-compact flex items-start gap-3 px-3 py-2">
+                <div
+                  class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
+                >
                   <span
                     class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-bold whitespace-nowrap"
                     >{{ t("alerts.threshold") }}*</span
@@ -441,6 +456,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="max-w-45 min-w-32.5">
                         <OSelect
                           v-model="selectedFunction"
+                          :aria-label="t('alerts.queryConfig.aggregationFunction')"
                           :options="logFunctionOptions"
                           labelKey="label"
                           valueKey="value"
@@ -449,7 +465,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OTooltip
                           :content="
                             logFunctionOptions.find((o: any) => o.value === selectedFunction)
-                              ?.tooltip || ''
+                              ?.tooltip || raw('')
                           "
                           :delay="400"
                         />
@@ -464,6 +480,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div class="relative inline-flex">
                           <OFormSelect
                             name="query_condition.aggregation.having.column"
+                            :aria-label="t('alerts.column')"
                             :options="columns"
                             searchable
                             :placeholder="t('alerts.placeholders.selectColumn')"
@@ -506,10 +523,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-if="selectedFunction === 'total_events'">
                       <div class="flex items-start gap-2">
                         <span
-                          class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                          class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                           >{{ t("alerts.criticalIf") }}</span
                         >
                         <OFormSelect
+                          :aria-label="t('common.operator')"
                           name="trigger_condition.operator"
                           :options="numericOperators"
                           :searchable="false"
@@ -519,6 +537,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <!-- Message hangs under the threshold field it describes. -->
                         <div class="flex flex-col gap-1">
                           <OFormInput
+                            :aria-label="t('alerts.alertIfNoOfEvents')"
                             name="trigger_condition.threshold"
                             type="number"
                             width="xs"
@@ -540,7 +559,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                            critical's operator, so the row only echoes it. -->
                       <div v-if="countWarningVisible" class="flex items-start gap-2">
                         <span
-                          class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                          class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                           >{{ t("alerts.warningIf") }}</span
                         >
                         <span
@@ -549,6 +568,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                         <div class="flex flex-col gap-1">
                           <OFormInput
+                            :aria-label="t('alerts.warningIf')"
                             name="trigger_condition.warning_threshold"
                             type="number"
                             width="xs"
@@ -594,10 +614,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-else>
                       <div class="flex items-start gap-2">
                         <span
-                          class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                          class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                           >{{ t("alerts.criticalIf") }}</span
                         >
                         <OFormSelect
+                          :aria-label="t('common.operator')"
                           name="query_condition.aggregation.having.operator"
                           :options="numericOperators"
                           :searchable="false"
@@ -607,6 +628,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <!-- Message hangs under the value field it describes. -->
                         <div class="flex flex-col gap-1">
                           <OFormInput
+                            :aria-label="t('common.value')"
                             name="query_condition.aggregation.having.value"
                             type="number"
                             width="xs"
@@ -629,7 +651,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                            critical's operator, so the row only echoes it. -->
                       <div v-if="aggWarningVisible" class="flex items-start gap-2">
                         <span
-                          class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                          class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                           >{{ t("alerts.warningIf") }}</span
                         >
                         <span
@@ -638,6 +660,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                         <div class="flex flex-col gap-1">
                           <OFormInput
+                            :aria-label="t('alerts.warningIf')"
                             name="query_condition.aggregation.warning_value"
                             type="number"
                             width="xs"
@@ -700,6 +723,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-for="(group, index) in metricGroupByRows" :key="index">
                       <div class="flex items-center gap-1">
                         <OFormSelect
+                          :aria-label="t('alerts.groupBy')"
                           :name="`query_condition.aggregation.group_by[${index}]`"
                           :options="columns"
                           searchable
@@ -708,6 +732,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @update:model-value="syncMetricGroupByToProps"
                         />
                         <OButton
+                          :aria-label="t('common.remove')"
                           variant="ghost"
                           size="icon-circle-sm"
                           class="text-icon-color hover:text-status-error-text"
@@ -741,7 +766,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="
                     selectedFunction !== 'total_events' && hasMetricGroupByFields && !isMultiAlert
                   "
-                  class="rounded-default text-compact flex items-start gap-3 px-3 py-2"
+                  class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
                 >
                   <span
                     class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-bold whitespace-nowrap"
@@ -755,6 +780,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                   <div class="flex flex-nowrap items-start gap-2">
                     <OFormSelect
+                      :aria-label="t('common.operator')"
                       name="trigger_condition.operator"
                       :options="numericOperators"
                       :searchable="false"
@@ -764,6 +790,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Message hangs under the threshold field it describes. -->
                     <div class="flex flex-col gap-1">
                       <OFormInput
+                        :aria-label="t('alerts.alertIfNoOfEvents')"
                         name="trigger_condition.threshold"
                         type="number"
                         width="xs"
@@ -787,7 +814,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <!-- Check every row -->
-              <div class="rounded-default text-compact flex items-start gap-3 px-3 py-2">
+              <div
+                class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
+              >
                 <span
                   class="text-text-heading text-compact min-w-22.5 shrink-0 leading-7 font-bold whitespace-nowrap"
                 >
@@ -795,10 +824,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip :content="t('alerts.howOftenCheckTooltip')" :delay="300" side="top" />
                 </span>
                 <div class="flex flex-col gap-1">
-                  <div class="flex items-center gap-2">
+                  <div class="flex items-center gap-2 max-md:flex-wrap">
                     <!-- Minutes/hours mode: number input -->
                     <template v-if="frequencyMode !== 'cron'">
                       <OFormInput
+                        :aria-label="t('alerts.queryConfig.checkEvery')"
                         name="_ui.checkEvery"
                         type="number"
                         class="max-w-25 min-w-25"
@@ -814,6 +844,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        by `name=`, no v-model mirror). -->
                     <template v-else>
                       <OFormInput
+                        :aria-label="t('alerts.queryConfig.cron')"
                         name="trigger_condition.cron"
                         :placeholder="t('alerts.queryConfig.cronExpressionPlaceholder')"
                         class="max-w-25 min-w-25"
@@ -823,6 +854,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- Unit dropdown: minutes / hours / cron -->
                     <OSelect
+                      :aria-label="t('common.timeUnit')"
                       class="max-w-25 min-w-20"
                       :model-value="frequencyMode"
                       :options="frequencyUnitOptions"
@@ -836,8 +868,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-if="frequencyMode === 'cron'">
                       <span class="inline-block max-w-37.5 min-w-37.5">
                         <OFormSelect
+                          :aria-label="t('alerts.downtimes.scheduleForm.timezone')"
                           name="trigger_condition.timezone"
-                          :options="filteredTimezones"
+                          :options="timezoneSelectOptions"
                           searchable
                           :placeholder="t('alerts.queryConfig.timezonePlaceholder')"
                           class="max-w-37.5 min-w-37.5"
@@ -845,7 +878,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                         <OTooltip
                           v-if="cronTimezone"
-                          :content="cronTimezone"
+                          :content="raw(cronTimezone)"
                           :delay="300"
                           side="bottom"
                         />
@@ -886,16 +919,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Review your SQL query hint -->
                       <span
                         v-if="generatedSqlQuery && !showFilters"
-                        class="ml-1 cursor-help text-xs whitespace-nowrap italic underline decoration-dotted underline-offset-2"
+                        class="ms-1 cursor-help text-xs whitespace-nowrap italic underline decoration-dotted underline-offset-2"
                         :class="'text-text-secondary'"
                       >
                         {{ t("alerts.queryConfig.viewAlertQuery") }}
                         <OTooltip :delay="200" side="bottom">
                           <template #content>
-                            <pre
-                              class="hljs rounded-default m-0 p-2 font-mono text-xs whitespace-pre-wrap"
-                              v-html="highlightedSqlQuery"
-                            />
+                            <AlertQueryPreview :query="generatedSqlQuery" />
                           </template>
                         </OTooltip>
                       </span>
@@ -913,14 +943,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div
                     v-if="frequencyMode === 'cron' && cronDescription && !cronError"
-                    class="text-2xs ml-0 italic"
+                    class="text-2xs ms-0 italic"
                     :class="'text-text-secondary'"
                   >
                     {{ cronDescription }}
                   </div>
                   <div
                     v-if="frequencyMode === 'cron' && cronError"
-                    class="text-status-error-text text-2xs ml-0"
+                    class="text-status-error-text text-2xs ms-0"
                   >
                     {{ cronError }}
                   </div>
@@ -981,16 +1011,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Review your SQL query hint -->
                   <span
                     v-if="generatedSqlQuery && !showFilters"
-                    class="ml-1 cursor-help text-xs whitespace-nowrap italic underline decoration-dotted underline-offset-2"
+                    class="ms-1 cursor-help text-xs whitespace-nowrap italic underline decoration-dotted underline-offset-2"
                     :class="'text-text-secondary'"
                   >
                     {{ t("alerts.queryConfig.viewAlertQuery") }}
                     <OTooltip :delay="200" side="bottom">
                       <template #content>
-                        <pre
-                          class="hljs rounded-default m-0 p-2 font-mono text-xs whitespace-pre-wrap"
-                          v-html="highlightedSqlQuery"
-                        />
+                        <AlertQueryPreview :query="generatedSqlQuery" />
                       </template>
                     </OTooltip>
                   </span>
@@ -1034,13 +1061,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="flex items-center gap-2">
                       <div class="rounded-default bg-theme-accent h-3.5 w-0.75 shrink-0" />
                       <span class="text-xs font-semibold">{{
-                        localTab === "sql" ? t("alerts.sqlEditor") : t("alerts.promqlEditor")
+                        localTab === "sql"
+                          ? t("alerts.sqlEditor")
+                          : isForecastMode
+                            ? t("alerts.forecast.expression")
+                            : t("alerts.promqlEditor")
                       }}</span>
                     </div>
                     <!-- fx toggle shown here only when VRL is not yet enabled -->
-                    <OSwitch v-if="localTab === 'sql' && !showVrl" v-model="showVrl">
+                    <OSwitch
+                      v-if="localTab === 'sql' && !showVrl"
+                      v-model="showVrl"
+                      :aria-label="t('alerts.queryConfig.showVrlEditor')"
+                    >
                       <OTooltip :content="t('alerts.queryConfig.showVrlEditor')" :delay="300" />
                     </OSwitch>
+                    <OToggleGroup
+                      v-if="localTab === 'promql'"
+                      :model-value="isForecastMode ? 'forecast' : 'threshold'"
+                      type="single"
+                      data-test="alert-promql-mode"
+                      @update:model-value="onPromqlModeChange"
+                    >
+                      <OToggleGroupItem
+                        value="threshold"
+                        size="xs"
+                        data-test="alert-promql-mode-threshold"
+                      >
+                        {{ t("alerts.forecast.modeThreshold") }}
+                      </OToggleGroupItem>
+                      <OToggleGroupItem
+                        value="forecast"
+                        size="xs"
+                        data-test="alert-promql-mode-forecast"
+                      >
+                        {{ t("alerts.forecast.modeForecast") }}
+                      </OToggleGroupItem>
+                    </OToggleGroup>
                   </div>
                   <div class="relative min-h-0 flex-1">
                     <div class="absolute inset-0">
@@ -1049,7 +1106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test-prefix="alert-inline-sql"
                         :languages="localTab === 'promql' ? ['promql'] : ['sql']"
                         :default-language="localTab === 'promql' ? 'promql' : 'sql'"
-                        :query="localTab === 'sql' ? localSqlQuery : localPromqlQuery"
+                        :query="localTab === 'sql' ? localSqlQuery : editorPromqlQuery"
                         editor-height="100%"
                         :disable-ai="!streamName"
                         :keywords="effectiveKeywords"
@@ -1062,10 +1119,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div
                       v-if="
-                        (localTab === 'sql' ? !localSqlQuery : !localPromqlQuery) &&
+                        (localTab === 'sql' ? !localSqlQuery : !editorPromqlQuery) &&
                         queryEditorPlaceholderFlag
                       "
-                      class="query-editor-placeholder-overlay pointer-events-none absolute inset-0 z-1 flex items-start pt-0.75 pr-2 pl-[2.15rem] select-none"
+                      class="query-editor-placeholder-overlay pointer-events-none absolute inset-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 select-none"
                     >
                       <span class="query-editor-placeholder-typewriter">{{
                         inlineEditorPlaceholder
@@ -1093,10 +1150,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="`alert-promql-sample-${sample.id}`"
                       @click="insertPromqlSample(sample)"
                     >
-                      <OTag type="exampleChip" value="dim" :label="sample.label" />
+                      <OTag type="exampleChip" value="dim" :label="raw(sample.label)" />
                       <OTooltip
                         :content="
-                          canInsertPromqlSample ? sample.query : t('alerts.promqlSampleDisabled')
+                          canInsertPromqlSample
+                            ? raw(sample.query)
+                            : t('alerts.promqlSampleDisabled')
                         "
                         :delay="300"
                       />
@@ -1106,7 +1165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- VRL pane — with its own header, side-by-side with SQL pane -->
                 <div
-                  class="border-border-default flex w-1/2 shrink-0 flex-col overflow-hidden border-l"
+                  class="border-border-default flex w-1/2 shrink-0 flex-col overflow-hidden border-s"
                   v-if="showVrl && localTab === 'sql'"
                 >
                   <div
@@ -1125,6 +1184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OSelect
                         class="w-32.5!"
                         v-model="selectedSavedFunctionName"
+                        :aria-label="t('alerts.placeholders.savedFunctions')"
                         :options="functionsList"
                         labelKey="name"
                         valueKey="name"
@@ -1141,7 +1201,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span>{{ t("alerts.queryConfig.noFunctions") }}</span>
                         </template>
                       </OSelect>
-                      <OSwitch v-model="showVrl">
+                      <OSwitch
+                        v-model="showVrl"
+                        :aria-label="t('alerts.queryConfig.hideVrlEditor')"
+                      >
                         <OTooltip :content="t('alerts.queryConfig.hideVrlEditor')" :delay="300" />
                       </OSwitch>
                     </div>
@@ -1167,7 +1230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <div
                         v-if="!vrlFunctionContent && vrlEditorPlaceholderFlag"
-                        class="query-editor-placeholder-overlay pointer-events-none absolute inset-0 z-1 flex items-start pt-0.75 pr-2 pl-[2.15rem] select-none"
+                        class="query-editor-placeholder-overlay pointer-events-none absolute inset-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 select-none"
                       >
                         <span class="query-editor-placeholder-typewriter">{{
                           vrlPlaceholder
@@ -1188,8 +1251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="absolute inset-0 flex items-center gap-1.25 overflow-hidden px-2.5">
                 <template v-if="inlineStatusState === 'sql-status-bar--error'">
                   <OIcon class="shrink-0" name="error-outline" size="xs" />
-                  <span class="min-w-0 flex-1 truncate">{{ sqlQueryErrorMsg }}</span>
-                  <OTooltip side="top">{{ sqlQueryErrorMsg }}</OTooltip>
+                  <OTruncatedText class="flex-1">{{ sqlQueryErrorMsg }}</OTruncatedText>
                 </template>
                 <template v-else-if="inlineStatusState === 'sql-status-bar--hint'">
                   <OIcon class="shrink-0 opacity-60" name="edit" size="xs" />
@@ -1202,10 +1264,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
+            <OBanner
+              v-if="localTab === 'sql' && isMultiAlert && sqlQueryHasHaving"
+              dense
+              variant="warning"
+              class="mt-2"
+              :content="t('alerts.queryConfig.sqlHavingClauseWarning')"
+              data-test="alert-sql-having-clause-warning"
+            />
+
             <!-- SQL/PromQL condition rows (scheduled only): Check every + Alert if in one block -->
             <div v-if="isRealTime === 'false'" class="mt-2 flex flex-col gap-0 px-1">
               <!-- Check every -->
-              <div class="rounded-default text-compact flex items-start gap-3 px-3 py-2">
+              <div
+                class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
+              >
                 <span
                   class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-7 font-bold whitespace-nowrap"
                 >
@@ -1216,6 +1289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="flex items-center gap-2">
                     <template v-if="frequencyMode !== 'cron'">
                       <OFormInput
+                        :aria-label="t('alerts.queryConfig.checkEvery')"
                         name="_ui.checkEvery"
                         type="number"
                         class="max-w-25 min-w-25"
@@ -1229,6 +1303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
                     <template v-else>
                       <OFormInput
+                        :aria-label="t('alerts.queryConfig.cron')"
                         name="trigger_condition.cron"
                         :placeholder="t('alerts.queryConfig.cronExpressionPlaceholder')"
                         class="max-w-25 min-w-25"
@@ -1236,6 +1311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </template>
                     <OSelect
+                      :aria-label="t('common.timeUnit')"
                       class="max-w-25 min-w-20"
                       :model-value="frequencyMode"
                       :options="frequencyUnitOptions"
@@ -1247,8 +1323,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-if="frequencyMode === 'cron'">
                       <span class="inline-block max-w-37.5 min-w-37.5">
                         <OFormSelect
+                          :aria-label="t('alerts.downtimes.scheduleForm.timezone')"
                           name="trigger_condition.timezone"
-                          :options="filteredTimezones"
+                          :options="timezoneSelectOptions"
                           searchable
                           :placeholder="t('alerts.queryConfig.timezonePlaceholder')"
                           class="max-w-37.5 min-w-37.5"
@@ -1256,7 +1333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                         <OTooltip
                           v-if="cronTimezone"
-                          :content="cronTimezone"
+                          :content="raw(cronTimezone)"
                           :delay="300"
                           side="bottom"
                         />
@@ -1287,10 +1364,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <!-- SQL: Alert if No. of events -->
+              <!-- SQL: Simple vs Multi alert choice — placed before the
+                   condition row so the row below reads as "pick a mode,
+                   then fill in its shape", not "fill in a row, then a
+                   switch silently repurposes it". -->
+              <AlertMultiToggle
+                v-if="!showVrl && localTab === 'sql'"
+                :enabled="isMultiAlert"
+                @change="onSqlMultiAlertChange"
+              />
+
+              <!-- SQL Simple: Alert if No. of events -->
               <div
-                v-if="localTab === 'sql'"
-                class="rounded-default text-compact flex items-start gap-3 px-3 py-2"
+                v-if="localTab === 'sql' && !isMultiAlert"
+                class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
               >
                 <span
                   class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
@@ -1299,10 +1386,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex flex-col gap-1.5">
                   <div class="flex items-start gap-2">
                     <span
-                      class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                      class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                       >{{ t("alerts.criticalIf") }}</span
                     >
                     <OFormSelect
+                      :aria-label="t('common.operator')"
                       name="trigger_condition.operator"
                       :options="numericOperators"
                       :searchable="false"
@@ -1316,6 +1404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        right into empty space instead of widening the row. -->
                     <div class="flex flex-col gap-1">
                       <OFormInput
+                        :aria-label="t('alerts.alertIfNoOfEvents')"
                         name="trigger_condition.threshold"
                         type="number"
                         width="xs"
@@ -1340,7 +1429,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        critical's operator, so the row only echoes it. -->
                   <div v-if="countWarningVisible" class="flex items-start gap-2">
                     <span
-                      class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                      class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                       >{{ t("alerts.warningIf") }}</span
                     >
                     <span
@@ -1349,6 +1438,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                     <div class="flex flex-col gap-1">
                       <OFormInput
+                        :aria-label="t('alerts.warningIf')"
                         name="trigger_condition.warning_threshold"
                         type="number"
                         width="xs"
@@ -1391,9 +1481,157 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
+              <!-- SQL Multi: Alert if [column]. Reuses the exact
+                   having.operator/.value + warning_value fields Custom's
+                   Measure mode uses (this flow classifies the whole SQL
+                   result set as one aggregate value, the same value-based
+                   severity shape). The column itself is a dropdown sourced
+                   from the query's own resolved output columns (§11 of
+                   sql_simple_multi_alert_fe_prd.md) rather than a fixed
+                   literal — options are refreshed on the same validate-sql
+                   pass as the SQL editor's own validation. -->
+              <div
+                v-if="localTab === 'sql' && isMultiAlert"
+                class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
+              >
+                <span
+                  class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
+                  >{{ t("alerts.alertIfColumn") }} *</span
+                >
+                <div class="flex flex-col gap-1.5">
+                  <div class="flex items-start gap-2">
+                    <span
+                      class="text-text-secondary text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
+                      >{{ t("alerts.column") }}</span
+                    >
+                    <!-- onLogMeasureColumnChange's body is generic (reads/writes
+                         aggregation.having.column via the form) despite its
+                         name — reused as-is rather than duplicating it. -->
+                    <OFormSelect
+                      :aria-label="t('alerts.column')"
+                      name="query_condition.aggregation.having.column"
+                      :options="sqlAggColumnOptions"
+                      searchable
+                      width="xs"
+                      data-test="alert-sql-agg-column-select"
+                      :placeholder="t('alerts.placeholders.selectColumn')"
+                      @update:model-value="onLogMeasureColumnChange($event)"
+                    />
+                  </div>
+                  <div class="flex items-start gap-2">
+                    <span
+                      class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
+                      >{{ t("alerts.criticalIf") }}</span
+                    >
+                    <OFormSelect
+                      :aria-label="t('common.operator')"
+                      name="query_condition.aggregation.having.operator"
+                      :options="numericOperators"
+                      :searchable="false"
+                      width="xs"
+                      data-test="alert-sql-agg-operator-select"
+                      @update:model-value="onConditionOperatorChange"
+                    />
+                    <!-- Message hangs under the value field it describes. -->
+                    <div class="flex flex-col gap-1">
+                      <OFormInput
+                        :aria-label="t('common.value')"
+                        name="query_condition.aggregation.having.value"
+                        type="number"
+                        width="xs"
+                        data-test="alert-sql-agg-value-input"
+                        :placeholder="t('alerts.placeholders.value')"
+                        @update:model-value="onConditionValueChange($event)"
+                      >
+                        <template #error />
+                      </OFormInput>
+                      <div
+                        v-if="havingValueError"
+                        class="text-input-error-text text-xs whitespace-nowrap"
+                        data-test="alert-sql-agg-value-error"
+                        role="alert"
+                      >
+                        {{ havingValueError }}
+                      </div>
+                    </div>
+                  </div>
+                  <!-- Optional WARNING level, same pattern as Custom's
+                       Measure mode. Shares critical's operator, so the row
+                       only echoes it. -->
+                  <div v-if="aggWarningVisible" class="flex items-start gap-2">
+                    <span
+                      class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
+                      >{{ t("alerts.warningIf") }}</span
+                    >
+                    <span
+                      class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
+                      >{{ conditionOperator }}</span
+                    >
+                    <div class="flex flex-col gap-1">
+                      <OFormInput
+                        :aria-label="t('alerts.warningIf')"
+                        name="query_condition.aggregation.warning_value"
+                        type="number"
+                        width="xs"
+                        data-test="alert-sql-agg-warning-value-input"
+                        :placeholder="t('alerts.optional')"
+                      >
+                        <template #error />
+                      </OFormInput>
+                      <div
+                        v-if="aggregationWarningError"
+                        class="text-input-error-text text-xs whitespace-nowrap"
+                        data-test="alert-sql-agg-warning-value-error"
+                        role="alert"
+                      >
+                        {{ aggregationWarningError }}
+                      </div>
+                    </div>
+                    <OButton
+                      variant="ghost"
+                      size="icon-circle-sm"
+                      class="text-icon-color hover:text-status-error-text self-center"
+                      :aria-label="t('alerts.removeWarning')"
+                      data-test="alert-remove-warning-button"
+                      @click="removeAggWarning"
+                    >
+                      <OIcon name="close" size="sm" />
+                    </OButton>
+                  </div>
+                  <div v-else>
+                    <OButton
+                      variant="ghost-primary"
+                      size="sm"
+                      data-test="alert-add-warning-button"
+                      @click="addAggWarning"
+                    >
+                      <OIcon name="add" size="sm" />
+                      {{ t("alerts.addWarning") }}
+                    </OButton>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                v-if="localTab === 'promql' && !isForecastMode"
+                class="flex flex-col gap-1 px-3 py-2"
+              >
+                <OFormSwitch
+                  name="query_condition.promql_rule_mode"
+                  :label="t('alerts.promRuleMode')"
+                  data-test="alert-prom-rule-mode"
+                  @update:model-value="onPromRuleModeChange"
+                />
+                <p class="text-text-secondary text-xs">{{ t("alerts.promRuleModeDescription") }}</p>
+              </div>
+              <ForecastAlertFields v-if="localTab === 'promql' && isForecastMode" />
+
               <!-- PromQL: Alert if the value is + Having series -->
-              <template v-if="localTab === 'promql' && promqlCondition">
-                <div class="rounded-default text-compact flex items-start gap-3 px-3 py-2">
+              <template v-else-if="localTab === 'promql' && (promqlCondition || isPromRuleMode)">
+                <div
+                  v-if="!isPromRuleMode"
+                  class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
+                >
                   <span
                     class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
                     >{{ t("alerts.alertIfValueIs") }} *
@@ -1406,10 +1644,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="flex flex-col gap-1.5">
                     <div class="flex items-start gap-2">
                       <span
-                        class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                        class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                         >{{ t("alerts.criticalIf") }}</span
                       >
                       <OFormSelect
+                        :aria-label="t('alerts.alertIfValueIs')"
                         name="query_condition.promql_condition.operator"
                         :options="numericOperators"
                         :searchable="false"
@@ -1420,6 +1659,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Message hangs under the value field it describes. -->
                       <div class="flex flex-col gap-1">
                         <OFormInput
+                          :aria-label="t('alerts.alertIfValueIs')"
                           name="query_condition.promql_condition.value"
                           type="number"
                           width="xs"
@@ -1445,7 +1685,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                          Shares critical's operator, so the row only echoes it. -->
                     <div v-if="promqlWarningVisible" class="flex items-start gap-2">
                       <span
-                        class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                        class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                         >{{ t("alerts.warningIf") }}</span
                       >
                       <span
@@ -1454,6 +1694,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                       <div class="flex flex-col gap-1">
                         <OFormInput
+                          :aria-label="t('alerts.warningIf')"
                           name="query_condition.promql_warning_value"
                           type="number"
                           width="xs"
@@ -1496,25 +1737,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                 </div>
-                <!-- Simple vs Multi alert (M-9), PromQL flavour. Unlike the
-                     builder branches there is no group-by field to gate on:
-                     a PromQL alert's grouping is the expression's own
-                     `by (…)` clause, so the choice is always offered once a
-                     condition exists to classify each series against. -->
                 <AlertMultiToggle
                   :enabled="isPromqlMultiAlert"
+                  :disabled="isRuleMultiRequired"
                   name="query_condition.promql_multi_alert"
                   unit="series"
                   @change="onPromqlMultiAlertChange"
                 />
 
-                <!-- Series-count gate — hidden for a per-series alert, for the
-                     same reason the group-count row is: per-series evaluation
-                     fires on ANY breaching series, so a count rule has no
-                     meaning and M-10 rejects it at save time. -->
+                <p v-if="isRuleMultiRequired" class="text-text-secondary px-3 text-xs">
+                  {{ t("alerts.promRuleModePendingMulti") }}
+                </p>
+
+                <!-- Rule expressions own matching, so an extra series-count gate would change their semantics. -->
                 <div
-                  v-if="!isPromqlMultiAlert"
-                  class="rounded-default text-compact flex items-start gap-3 px-3 py-2"
+                  v-if="!isPromqlMultiAlert && !isPromRuleMode"
+                  class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
                 >
                   <span
                     class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
@@ -1527,6 +1765,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                   <div class="flex items-start gap-2">
                     <OFormSelect
+                      :aria-label="t('common.operator')"
                       name="trigger_condition.operator"
                       :options="numericOperators"
                       :searchable="false"
@@ -1535,6 +1774,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Message hangs under the threshold field it describes. -->
                     <div class="flex flex-col gap-1">
                       <OFormInput
+                        :aria-label="t('alerts.alertIfNoOfEvents')"
                         name="trigger_condition.threshold"
                         type="number"
                         width="xs"
@@ -1567,7 +1807,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="viewSqlEditor"
       :tab="localTab === 'promql' ? 'promql' : 'sql'"
       :sqlQuery="localSqlQuery"
-      :promqlQuery="localPromqlQuery"
+      :promqlQuery="editorPromqlQuery"
       :vrlFunction="vrlFunctionContent"
       :streamName="streamName"
       :streamType="streamType"
@@ -1577,7 +1817,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :savedFunctions="functionsList"
       :sqlQueryErrorMsg="sqlQueryErrorMsg"
       @update:sqlQuery="updateSqlQuery"
-      @update:promqlQuery="updatePromqlQuery"
+      @update:promqlQuery="onEditorPromqlUpdate"
       @update:vrlFunction="handleVrlFunctionUpdate"
       @validate-sql="handleValidateSql"
     />
@@ -1610,11 +1850,9 @@ import {
   type Ref,
 } from "vue";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import {
-  b64EncodeUnicode,
-  getUUID,
   convertMinutesToCron,
   getCronIntervalDifferenceInSeconds,
   isAboveMinRefreshInterval,
@@ -1622,18 +1860,16 @@ import {
   getImageURL,
   resolveBrowserTimezone,
 } from "@/utils/zincutils";
-import hljs from "highlight.js/lib/core";
-import sql from "highlight.js/lib/languages/sql";
-
-hljs.registerLanguage("sql", sql);
-
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useStreams from "@/composables/useStreams";
+import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
+import { savedBrowserTimezone } from "@/utils/timezoneAliases";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import { alertPromqlSamples } from "@/utils/alerts/promqlSamples";
+import AlertQueryPreview from "@/components/alerts/AlertQueryPreview.vue";
 import FilterGroup from "@/components/alerts/FilterGroup.vue";
 import QueryEditorDialog from "@/components/alerts/QueryEditorDialog.vue";
 import CustomConfirmDialog from "@/components/alerts/CustomConfirmDialog.vue";
@@ -1643,12 +1879,22 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import AlertMultiToggle from "@/components/alerts/AlertMultiToggle.vue";
+import ForecastAlertFields from "@/components/alerts/steps/ForecastAlertFields.vue";
+import {
+  FORECAST_FREQUENCY_MINUTES,
+  FORECAST_PERIOD_MINUTES,
+  isForecastRowTemplate,
+  parseForecastAlertPromql,
+} from "@/utils/alerts/forecastAlert";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import { type QueryConfigMeta } from "./QueryConfig.schema";
@@ -1659,7 +1905,10 @@ export default defineComponent({
   name: "Step2QueryConfig",
   components: {
     OTag,
+    OTruncatedText,
     AlertMultiToggle,
+    ForecastAlertFields,
+    AlertQueryPreview,
     FilterGroup,
     QueryEditorDialog,
     CustomConfirmDialog,
@@ -1669,10 +1918,12 @@ export default defineComponent({
     OToggleGroupItem,
     OSelect,
     OSwitch,
+    OFormSwitch,
     OTooltip,
     OIcon,
     OFormInput,
     OFormSelect,
+    OBanner,
   },
   props: {
     tab: {
@@ -1727,11 +1978,31 @@ export default defineComponent({
       type: String,
       default: "",
     },
+    sqlAggColumnOptions: {
+      type: Array as PropType<string[]>,
+      default: () => [],
+    },
+    sqlQueryHasHaving: {
+      type: Boolean,
+      default: false,
+    },
     isAggregationEnabled: {
       type: Boolean,
       default: false,
     },
     beingUpdated: {
+      type: Boolean,
+      default: false,
+    },
+    /**
+     * True while a prefill is seeding the WHOLE form at once (library alert,
+     * dashboard panel, logs search). Distinguishes "these fields changed
+     * because someone handed us a finished alert" from "the user just changed
+     * this field", which is the only signal that tells the mode-default
+     * watchers to keep their hands off. `beingUpdated` cannot serve: a prefill
+     * is a NEW alert.
+     */
+    isSeeding: {
       type: Boolean,
       default: false,
     },
@@ -1762,7 +2033,7 @@ export default defineComponent({
     "update:triggerCondition",
   ],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
 
     // Descendant step: the AddAlert orchestrator owns the ONE form and provides
@@ -1787,8 +2058,6 @@ export default defineComponent({
         : initialFreqRaw >= 60 && initialFreqRaw % 60 === 0
           ? "hours"
           : "minutes";
-    const hasInitialGroupBy =
-      (props.inputData.aggregation?.group_by || []).filter((g: string) => g?.trim()).length > 0;
 
     // Field get/set helpers — the form is the single source of truth for the
     // validated scalars; props.* stay a write-through copy for the SQL-gen path.
@@ -1852,9 +2121,6 @@ export default defineComponent({
     const localIsAggregationEnabled = ref(props.isAggregationEnabled);
 
     // Expandable section toggles — auto-expand filters if editing an alert with existing conditions
-    const hasExistingFilters = props.inputData.conditions?.conditions?.some(
-      (c: any) => c.filterType === "condition" && c.column && c.column.trim() !== "",
-    );
     const showFilters = ref(true);
     const showVrl = ref(!!props.vrlFunction?.trim());
     const filtersSectionRef = ref<HTMLElement | null>(null);
@@ -1904,7 +2170,8 @@ export default defineComponent({
         if (cols?.length) {
           const fields = (cols as any[]).map((c: any) => ({
             name: typeof c === "string" ? c : (c.value ?? c.label ?? c),
-            type: c.type ?? "Utf8",
+            // An untyped column must read as unknown, so operators and quoting fall back to the value itself.
+            type: c.type,
           }));
           updateFieldKeywords(fields);
         }
@@ -1919,7 +2186,7 @@ export default defineComponent({
       if (localTab.value === "sql") {
         updateSqlQuery(newQuery);
       } else {
-        updatePromqlQuery(newQuery);
+        onEditorPromqlUpdate(newQuery);
       }
       autoCompleteData.value.query = newQuery;
       autoCompleteData.value.cursorIndex = inlineQueryEditorRef.value?.getCursorIndex?.() ?? 0;
@@ -1933,7 +2200,7 @@ export default defineComponent({
     // Inline editor status bar state
     const inlineStatusState = computed(() => {
       if (props.sqlQueryErrorMsg?.trim()) return "sql-status-bar--error";
-      const query = localTab.value === "sql" ? localSqlQuery.value : localPromqlQuery.value;
+      const query = localTab.value === "sql" ? localSqlQuery.value : editorPromqlQuery.value;
       if (!query?.trim()) return "sql-status-bar--hint";
       return "sql-status-bar--idle";
     });
@@ -1964,6 +2231,7 @@ export default defineComponent({
       ref({}),
       isSqlModeForPlaceholder,
       noStreamForPlaceholder,
+      t,
       { noStreamText: t("pipeline.queryEditorPlaceholder") },
     );
 
@@ -1973,7 +2241,7 @@ export default defineComponent({
     // variant rules that drive each metric card's function dialog
     // (metricDefaults "Rule set A"), so they are real queries for the actual
     // metric. The rate window binds to the alert's period.
-    const { getStream } = useStreams();
+    const { getStream } = useStreams(t);
     const promqlMetricType = ref("");
     watch(
       () => [props.streamName, props.streamType, localTab.value],
@@ -2016,16 +2284,16 @@ export default defineComponent({
 
     // Chips insert only into an EMPTY editor — silently replacing a
     // half-written query is the one way this feature makes someone angry.
-    const canInsertPromqlSample = computed(() => !localPromqlQuery.value);
+    const canInsertPromqlSample = computed(() => !editorPromqlQuery.value);
     const insertPromqlSample = (sample: { query: string }) => {
       if (!canInsertPromqlSample.value) return;
-      updatePromqlQuery(sample.query);
+      onEditorPromqlUpdate(sample.query);
       queryEditorPlaceholderFlag.value = false;
     };
 
     const onBlurInlineSqlEditor = async () => {
       queryEditorPlaceholderFlag.value =
-        localTab.value === "sql" ? localSqlQuery.value === "" : localPromqlQuery.value === "";
+        localTab.value === "sql" ? localSqlQuery.value === "" : editorPromqlQuery.value === "";
       if (localTab.value === "sql") {
         await _sqlOnBlur();
         emit("validate-sql");
@@ -2210,6 +2478,22 @@ export default defineComponent({
           // Edit mode: alert was saved with total_events (aggregation: null)
           selectedFunction.value = "total_events";
           localIsAggregationEnabled.value = false;
+        } else if (props.isSeeding || fv("query_condition.type") === "promql") {
+          // NOT a user switching stream type — a prefill is seeding the whole
+          // form and the stream type only "changed" as part of that. The
+          // alert already knows what it is, so defaulting `avg` + `having`
+          // over it invents a measure alert nobody asked for; on a PromQL
+          // alert (which is what most metric prefills are) it invents a SECOND
+          // threshold beside the real `promql_condition` one.
+          //
+          // Both halves of the guard earn their place: `isSeeding` covers the
+          // window where stream_type has landed but the query type has not
+          // yet, and the form read covers a PromQL alert on its own terms.
+          // `localTab` is NOT usable here — this watcher runs ahead of the one
+          // that syncs it on a whole-form seed.
+          selectedFunction.value = "total_events";
+          localIsAggregationEnabled.value = false;
+          emit("update:isAggregationEnabled", false);
         } else {
           // New alert switching to metrics — default to avg + init aggregation
           selectedFunction.value = "avg";
@@ -2375,6 +2659,104 @@ export default defineComponent({
       (s: any) => !!s.values?.query_condition?.promql_multi_alert,
     );
     const isPromqlMultiAlert = computed(() => promqlMultiAlertStore.value);
+    const promRuleModeStore = form.useStore(
+      (s: any) => !!s.values?.query_condition?.promql_rule_mode,
+    );
+    const isPromRuleMode = computed(() => promRuleModeStore.value);
+    const pendingPeriodStore = form.useStore((s: any) => Number(s.values?.pending_period_sec ?? 0));
+    const isRuleMultiRequired = computed(
+      () => localTab.value === "promql" && isPromRuleMode.value && pendingPeriodStore.value > 0,
+    );
+    watch(
+      [isRuleMultiRequired, isPromqlMultiAlert],
+      ([required, enabled]) => {
+        if (required && !enabled) setFV("query_condition.promql_multi_alert", true);
+      },
+      { immediate: true },
+    );
+    const onPromRuleModeChange = (enabled: unknown) => {
+      if (enabled) {
+        setFV("query_condition.promql_condition", null);
+        setFV("query_condition.promql_warning_value", null);
+        setFV("trigger_condition.warning_threshold", null);
+        if (isRuleMultiRequired.value) setFV("query_condition.promql_multi_alert", true);
+        setFV("trigger_condition.operator", ">=");
+        setFV("trigger_condition.threshold", 1);
+      } else {
+        setFV("query_condition.promql_condition", { column: "value", operator: ">=", value: "" });
+      }
+    };
+
+    // Forecast mode edits U and a few fields; the PromQL and its condition are generated from them.
+    const forecastStore = form.useStore((s: any) => s.values?._ui?.forecast ?? null);
+    const isForecastMode = computed(() => !!forecastStore.value);
+    const forecastExpression = computed(() => String(forecastStore.value?.U ?? ""));
+
+    // Editor affordances work on U in Forecast mode, never on the generated query.
+    const editorPromqlQuery = computed(() =>
+      isForecastMode.value ? forecastExpression.value : localPromqlQuery.value,
+    );
+    const onEditorPromqlUpdate = (query: string) => {
+      if (isForecastMode.value) setFV("_ui.forecast.U", query);
+      else updatePromqlQuery(query);
+    };
+
+    // Threshold settings Forecast mode overwrites, restored when the user switches back.
+    const THRESHOLD_FIELDS = [
+      "query_condition.promql_condition",
+      "query_condition.promql_multi_alert",
+      "query_condition.promql_rule_mode",
+      "query_condition.promql_warning_value",
+      "trigger_condition.threshold",
+      "trigger_condition.operator",
+      "trigger_condition.period",
+      "trigger_condition.frequency",
+      "_ui.checkEvery",
+      "row_template",
+    ];
+    let thresholdSnapshot: Record<string, unknown> | null = null;
+
+    const leaveForecastMode = () => {
+      updatePromqlQuery(forecastExpression.value);
+      setFV("_ui.forecast", null);
+      if (thresholdSnapshot) {
+        Object.entries(thresholdSnapshot).forEach(([path, value]) => setFV(path, value));
+      } else {
+        setFV("query_condition.promql_condition", { column: "value", operator: ">=", value: "" });
+        if (isForecastRowTemplate(String(fv("row_template") ?? ""))) setFV("row_template", "");
+      }
+      thresholdSnapshot = null;
+    };
+
+    const onPromqlModeChange = (mode: unknown) => {
+      if (!mode || mode === (isForecastMode.value ? "forecast" : "threshold")) return;
+      if (mode === "threshold") {
+        leaveForecastMode();
+        return;
+      }
+      thresholdSnapshot = Object.fromEntries(
+        THRESHOLD_FIELDS.map((path) => [path, JSON.parse(JSON.stringify(fv(path) ?? null))]),
+      );
+      setFV("query_condition.promql_warning_value", "");
+      // A query this mode generated earlier reopens with its own fields, not as a nested U.
+      const promql = String(fv("query_condition.promql") ?? "");
+      setFV(
+        "_ui.forecast",
+        parseForecastAlertPromql(promql, fv("query_condition.promql_condition")) ?? {
+          U: promql,
+          T: "",
+          direction: "rises",
+          W: "2d",
+          H: 7,
+        },
+      );
+      setFV("query_condition.promql_rule_mode", false);
+      setFV("trigger_condition.period", FORECAST_PERIOD_MINUTES);
+      if (frequencyMode.value === "minutes") {
+        checkEveryFrequency.value = FORECAST_FREQUENCY_MINUTES;
+        setStoredFrequency(FORECAST_FREQUENCY_MINUTES);
+      }
+    };
 
     /** M-10 for the series-count gate — same rule, same reason as groups. */
     const onPromqlMultiAlertChange = (value: unknown) => {
@@ -2413,6 +2795,26 @@ export default defineComponent({
     };
 
     /**
+     * SQL tab's Simple/Multi choice. Shares the M-10 count-gate side effect
+     * above, and additionally pins the fields the SQL multi-alert has no
+     * picker for: a fixed `count` function, no group-by (this flow classifies
+     * the whole result set as one aggregate value, not per-group). The value
+     * column is NOT pinned here — it's a user-picked dropdown sourced from
+     * the query's resolved output columns (§11 of sql_simple_multi_alert_fe_prd.md),
+     * so switching Multi on just clears any stale column and leaves the
+     * dropdown to be filled in.
+     */
+    const onSqlMultiAlertChange = (value: unknown) => {
+      onMultiAlertChange(value);
+      if (!value) return;
+      writeAggregation((agg) => {
+        agg.function = "count";
+        agg.group_by = [];
+        agg.having.column = "";
+      });
+    };
+
+    /**
      * Give the Simple/Multi choice a real `false` to select.
      *
      * An alert saved before this feature has no `multi_alert` key at all, so
@@ -2420,9 +2822,17 @@ export default defineComponent({
      * NEITHER option selected — which looks broken and hides the alert's
      * actual (simple) behaviour. Writing the explicit `false` costs nothing:
      * the API skips serializing it, so this never turns into a stored change.
+     *
+     * A saved Simple SQL alert reads `null` here instead of `undefined`: it
+     * saves with `aggregation: null` (alertPayload.ts, no picker means
+     * nothing to keep), and TanStack Form's path getter short-circuits to
+     * `null` — not `undefined` — the moment it walks through a `null`
+     * intermediate (`aggregation`), before it ever reaches `multi_alert`.
+     * `=== undefined` alone misses that case and leaves the radio unset.
      */
     const normalizeMultiAlertFlag = () => {
-      if (fv("query_condition.aggregation.multi_alert") === undefined) {
+      const current = fv("query_condition.aggregation.multi_alert");
+      if (current === undefined || current === null) {
         setFV("query_condition.aggregation.multi_alert", false);
       }
     };
@@ -2453,14 +2863,42 @@ export default defineComponent({
       (tab) => {
         if (tab === "promql") {
           normalizePromqlMultiAlertFlag();
+          if (fv("query_condition.promql_rule_mode")) onPromRuleModeChange(true);
           if (fv("query_condition.aggregation.multi_alert")) {
             setFV("query_condition.aggregation.multi_alert", false);
           }
-        } else if (fv("query_condition.promql_multi_alert")) {
-          setFV("query_condition.promql_multi_alert", false);
+        } else {
+          // SQL's choice has no group-by to wait for either — visible
+          // whenever the sql tab is, so normalise on entering it too.
+          if (tab === "sql") normalizeMultiAlertFlag();
+          if (fv("query_condition.promql_multi_alert")) {
+            setFV("query_condition.promql_multi_alert", false);
+          }
         }
       },
       { immediate: true },
+    );
+
+    // SQL Multi's value-column dropdown options refresh whenever the preview
+    // query itself fires (PreviewAlert's own /result_schema call, forwarded
+    // via AddAlert's handleSqlSchemaUpdated — §11.7 of
+    // sql_simple_multi_alert_fe_prd.md, amended). Only clear the selection if
+    // the FETCHED list says it's actually gone — never eagerly/optimistically
+    // on every keystroke, so a column that's still valid in the next
+    // projection response is left alone rather than flashing empty.
+    // Re-requires an explicit pick once it IS confirmed missing (§11.4,
+    // mandatory).
+    watch(
+      () => props.sqlAggColumnOptions,
+      (options) => {
+        if (localTab.value !== "sql" || !isMultiAlert.value) return;
+        const column = fv("query_condition.aggregation.having.column");
+        if (column && !options.includes(column)) {
+          writeAggregation((agg) => {
+            agg.having.column = "";
+          });
+        }
+      },
     );
 
     // name="trigger_condition.operator" owns the value, but it is NOT written yet
@@ -2548,9 +2986,9 @@ export default defineComponent({
       set: (v) => setFV("trigger_condition.timezone", v ?? ""),
     });
     const cronError = ref("");
-    const cronDescription = computed(() => describeCron(cronExpression.value, cronTimezone.value));
-    const filteredTimezones = ref<string[]>([]);
-
+    const cronDescription = computed(() =>
+      describeCron(t, cronExpression.value, cronTimezone.value),
+    );
     // Initialize timezone
     // Populate the timezone OPTIONS only. This must NOT seed the timezone value:
     // `cronTimezone` is now form-owned, so writing here would push a browser
@@ -2558,23 +2996,10 @@ export default defineComponent({
     // display ref, leaving the stored value untouched until the user entered cron
     // mode (onFrequencyUnitChange still seeds it there). defaultAlertValue()
     // already seeds `timezone: "UTC"`, so the control is never blank anyway.
-    const initTimezones = () => {
-      try {
-        const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-        // @ts-ignore
-        const zones: string[] =
-          typeof Intl !== "undefined" && typeof Intl.supportedValuesOf === "function"
-            ? // @ts-ignore
-              Intl.supportedValuesOf("timeZone")
-            : [cronTimezone.value || "UTC"];
-        // Convenience shortcuts first (matching the reports picker), then every
-        // IANA zone. This only populates OPTIONS — it must not seed cronTimezone.
-        filteredTimezones.value = [`Browser Time (${browserTz})`, "UTC", ...zones];
-      } catch {
-        filteredTimezones.value = ["UTC"];
-      }
-    };
-    initTimezones();
+    // The stored zone is an option under its own name, so a legacy `Asia/Calcutta` saves back unchanged.
+    const { zones: filteredTimezones, timezoneOptions: timezoneSelectOptions } = useTimezoneOptions(
+      { browserEntry: true, current: cronTimezone },
+    );
 
     const validateCron = () => {
       cronError.value = "";
@@ -2629,7 +3054,7 @@ export default defineComponent({
           // Entering cron mode is where a timezone first gets SAVED (parity:
           // pre-migration seeded it here, not at mount).
           if (!cronTimezone.value) {
-            cronTimezone.value = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            cronTimezone.value = savedBrowserTimezone();
           }
         }
         validateCron();
@@ -2775,11 +3200,11 @@ export default defineComponent({
             value: "custom",
           },
           {
-            label: "SQL",
+            label: raw("SQL"),
             value: "sql",
           },
           {
-            label: "PromQL",
+            label: raw("PromQL"),
             value: "promql",
           },
         ];
@@ -2792,12 +3217,11 @@ export default defineComponent({
           value: "custom",
         },
         {
-          label: "SQL",
+          label: raw("SQL"),
           value: "sql",
         },
       ];
     });
-
     // Hide tabs completely for real-time alerts (only one option)
     const shouldShowTabs = computed(() => {
       return props.isRealTime === "false";
@@ -3459,15 +3883,10 @@ export default defineComponent({
     // (empty SQL / SQL error / empty PromQL / aggregate-column toast) are
     // re-homed in useAlertForm.runImperativeQueryChecks (same messages).
 
-    const highlightedSqlQuery = computed(() => {
-      if (!props.generatedSqlQuery) return "";
-      return hljs.highlight(props.generatedSqlQuery, { language: "sql" }).value;
-    });
-
     return {
+      raw,
       t,
       store,
-      highlightedSqlQuery,
       localTab,
       tabOptions,
       shouldShowTabs,
@@ -3479,6 +3898,11 @@ export default defineComponent({
       viewSqlEditor,
       localSqlQuery,
       localPromqlQuery,
+      isForecastMode,
+      forecastExpression,
+      editorPromqlQuery,
+      onEditorPromqlUpdate,
+      onPromqlModeChange,
       vrlFunctionContent,
       selectedSavedFunctionName,
       updateSqlQuery,
@@ -3520,7 +3944,11 @@ export default defineComponent({
       hasMetricGroupByFields,
       isMultiAlert,
       onMultiAlertChange,
+      onSqlMultiAlertChange,
       isPromqlMultiAlert,
+      isPromRuleMode,
+      isRuleMultiRequired,
+      onPromRuleModeChange,
       onPromqlMultiAlertChange,
       checkEveryFrequency,
       onCheckEveryChange,
@@ -3548,6 +3976,7 @@ export default defineComponent({
       checkEveryError,
       havingValueError,
       filteredTimezones,
+      timezoneSelectOptions,
       onFrequencyUnitChange,
       frequencyUnitOptions,
       onCronExpressionChange,

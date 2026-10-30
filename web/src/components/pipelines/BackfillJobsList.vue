@@ -22,46 +22,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          tick — needed because #o2-page-actions is created by the parent shell
          (Functions.vue) which may not have fully rendered when this component
          mounts on initial page load. -->
-    <Teleport to="#o2-page-actions" defer>
-      <OSelect
-        v-model="filters.status"
-        :options="allStatusOptions"
-        placeholder="Status"
-        clearable
-        searchable
-        class="w-37.5"
-        data-test="status-filter"
-      />
-      <OSelect
-        v-model="filters.pipelineId"
-        :options="allPipelineOptions"
-        labelKey="label"
-        valueKey="value"
-        placeholder="Pipeline"
-        clearable
-        searchable
-        class="w-62.5"
-        data-test="pipeline-filter"
-      />
-      <OButton variant="outline" size="sm" @click="clearFilters" data-test="clear-filters-btn">
-        Clear Filters
-      </OButton>
-      <OTableColumnToggle
-        :columns="columns"
-        :column-visibility="columnVisibility"
-        @update:column-visibility="setColumnVisibility"
-      />
-      <OButton
-        variant="outline"
-        size="icon-sm"
-        class="shrink-0"
-        @click="refreshJobs"
-        :disabled="loading"
-        data-test="refresh-btn"
-        icon-left="refresh"
+    <!-- A phone header only has room for the title, so the filters become a toolbar row in the body. -->
+    <Teleport to="#o2-page-actions" defer :disabled="isMobile">
+      <div
+        :class="
+          isMobile
+            ? 'px-page-edge border-border-default flex flex-wrap items-center gap-2 border-b py-2'
+            : 'contents'
+        "
       >
-        <OTooltip content="Refresh" side="top" />
-      </OButton>
+        <OSelect
+          v-model="filters.status"
+          :options="allStatusOptions"
+          :placeholder="t('common.status')"
+          clearable
+          searchable
+          class="w-37.5 max-md:w-32"
+          data-test="status-filter"
+        />
+        <OSelect
+          v-model="filters.pipelineId"
+          :options="allPipelineOptions"
+          labelKey="label"
+          valueKey="value"
+          :placeholder="t('pipeline.pipelineLabel')"
+          clearable
+          searchable
+          class="w-62.5 max-md:w-auto max-md:min-w-32 max-md:flex-1"
+          data-test="pipeline-filter"
+        />
+        <OButton variant="outline" size="sm" @click="clearFilters" data-test="clear-filters-btn">
+          {{ t("pipeline.clearFilters") }}
+        </OButton>
+        <OTableColumnToggle
+          :columns="columns"
+          :column-visibility="columnVisibility"
+          @update:column-visibility="setColumnVisibility"
+        />
+        <OButton
+          variant="outline"
+          size="icon-sm"
+          class="shrink-0"
+          @click="refreshJobs"
+          :disabled="loading"
+          data-test="refresh-btn"
+          icon-left="refresh"
+        >
+          <OTooltip :content="t('common.refresh')" side="top" />
+        </OButton>
+      </div>
     </Teleport>
 
     <!-- Jobs Table -->
@@ -79,6 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           table-id="pipelines-backfill-jobs-list"
           row-key="job_id"
           :loading="loading"
+          :forbidden="forbidden"
           pagination="client"
           :page-size="selectedPerPage"
           :page-size-options="perPageOptionsList"
@@ -100,13 +110,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 (id) => id === 'clear-filters' && ((filters.status = ''), (filters.pipelineId = ''))
               "
             />
-          </template>
-
-          <!-- Bottom footer -->
-          <template #bottom="{ totalRows }">
-            <div class="mr-4 flex items-center py-2 text-xs font-normal">
-              {{ totalRows }} Backfill Job{{ totalRows === 1 ? "" : "s" }}
-            </div>
           </template>
 
           <!-- Pipeline Name Column -->
@@ -136,10 +139,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ row.progress_percent }}%
                 </OProgressBar>
               </div>
-              <div class="text-text-body w-24 shrink-0 pr-2 text-xs whitespace-nowrap">
+              <div class="text-text-body w-24 shrink-0 pe-2 text-xs whitespace-nowrap">
                 <template v-if="row.chunks_total">
                   {{ row.chunks_completed || 0 }}/{{ row.chunks_total }}
-                  chunks
+                  {{ t("pipeline.chunksUnit") }}
                 </template>
               </div>
             </div>
@@ -151,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :value="row.created_at"
               unit="us"
               :timezone="store.state.timezone"
-              empty-label="N/A"
+              :empty-label="raw('N/A')"
             />
           </template>
 
@@ -162,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               unit="us"
               mode="absolute"
               :timezone="store.state.timezone"
-              empty-label="Never"
+              :empty-label="t('pipeline.never')"
             />
           </template>
 
@@ -173,61 +176,134 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="canPauseJob(row)"
                 variant="ghost-destructive"
                 size="icon-sm"
+                class="max-md:hidden"
                 @click="confirmPauseJob(row)"
                 data-test="pause-job-btn"
                 icon-left="pause"
               >
-                <OTooltip content="Job" />
+                <OTooltip :content="t('pipeline.jobTooltipLabel')" />
               </OButton>
               <OButton
                 v-if="canResumeJob(row)"
                 variant="ghost-success"
                 size="icon-sm"
+                class="max-md:hidden"
                 @click="confirmResumeJob(row)"
                 data-test="resume-job-btn"
                 icon-left="play-arrow"
               >
-                <OTooltip content="Resume Job" />
+                <OTooltip :content="t('pipeline.resumeJob')" />
               </OButton>
               <OButton
                 v-if="canEditJob(row.status)"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 @click="editJob(row)"
                 data-test="edit-job-btn"
                 icon-left="edit"
               >
-                <OTooltip content="Edit Job" />
+                <OTooltip :content="t('pipeline.editJob')" />
               </OButton>
               <OButton
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 @click="viewJob(row)"
                 data-test="view-job-btn"
                 icon-left="visibility"
               >
-                <OTooltip content="View Details" />
+                <OTooltip :content="t('pipeline.viewDetails')" />
               </OButton>
               <OButton
                 v-if="canDeleteJob(row.status)"
                 variant="ghost-destructive"
                 size="icon-sm"
+                class="max-md:hidden"
                 @click="confirmDeleteJob(row)"
                 data-test="delete-job-btn"
                 icon-left="delete"
               >
-                <OTooltip content="Delete Job" />
+                <OTooltip :content="t('pipeline.deleteJobTooltip')" />
               </OButton>
               <OButton
                 v-if="row.error"
                 variant="ghost-destructive"
                 size="icon-sm"
+                class="max-md:hidden"
                 @click="showErrorDialog(row)"
                 data-test="error-indicator-btn"
                 icon-left="error"
               >
-                <OTooltip :content="`Error: ${row.error}`" />
+                <OTooltip :content="t('common.errorPrefix', { message: row.error })" />
               </OButton>
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    :aria-label="t('common.moreActions')"
+                    icon-left="more-vert"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    class="md:hidden"
+                    data-test="backfill-jobs-row-more-actions"
+                    @click.stop
+                  />
+                </template>
+                <ODropdownItem
+                  v-if="canPauseJob(row)"
+                  icon-left="pause"
+                  class="md:hidden"
+                  data-test="pause-job-btn-menu"
+                  @select="confirmPauseJob(row)"
+                >
+                  <span>{{ t("pipeline.jobTooltipLabel") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="canResumeJob(row)"
+                  icon-left="play-arrow"
+                  class="md:hidden"
+                  data-test="resume-job-btn-menu"
+                  @select="confirmResumeJob(row)"
+                >
+                  <span>{{ t("pipeline.resumeJob") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="canEditJob(row.status)"
+                  icon-left="edit"
+                  class="md:hidden"
+                  data-test="edit-job-btn-menu"
+                  @select="editJob(row)"
+                >
+                  <span>{{ t("pipeline.editJob") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="visibility"
+                  class="md:hidden"
+                  data-test="view-job-btn-menu"
+                  @select="viewJob(row)"
+                >
+                  <span>{{ t("pipeline.viewDetails") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="canDeleteJob(row.status)"
+                  icon-left="delete"
+                  variant="destructive"
+                  class="md:hidden"
+                  data-test="delete-job-btn-menu"
+                  @select="confirmDeleteJob(row)"
+                >
+                  <span>{{ t("pipeline.deleteJobTooltip") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="row.error"
+                  icon-left="error"
+                  class="md:hidden"
+                  data-test="error-indicator-btn-menu"
+                  @select="showErrorDialog(row)"
+                >
+                  <span>{{ t("common.errorPrefix", { message: row.error }) }}</span>
+                </ODropdownItem>
+              </ODropdown>
             </div>
           </template>
         </OTable>
@@ -254,8 +330,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="backfill-jobs-list-error-dialog"
       v-model:open="errorDialogVisible"
       size="md"
-      title="Backfill Job Error"
-      primary-button-label="Close"
+      :title="t('pipeline.backfillJobErrorTitle')"
+      :primary-button-label="t('common.close')"
       @update:open="(v) => !v && closeErrorDialog()"
       @click:primary="
         errorDialogVisible = false;
@@ -268,23 +344,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div v-if="errorDialogData">
         <div class="mb-3">
-          <div class="text-text-label text-xs">Job ID</div>
+          <div class="text-text-label text-xs">{{ t("pipeline.jobIdLabel") }}</div>
           <div class="text-sm font-medium">
             {{ errorDialogData.job_id }}
           </div>
         </div>
 
         <div class="mb-3">
-          <div class="text-text-label text-xs">Pipeline</div>
+          <div class="text-text-label text-xs">{{ t("pipeline.pipelineLabel") }}</div>
           <div class="text-sm">
             {{ errorDialogData.pipeline_name || errorDialogData.pipeline_id }}
           </div>
         </div>
 
         <div>
-          <div class="text-text-label mb-2 text-xs">Error Message</div>
+          <div class="text-text-label mb-2 text-xs">{{ t("pipeline.errorMessageLabel") }}</div>
           <div
-            class="rounded-default bg-banner-error-soft-bg border-l-status-negative text-compact text-banner-error-soft-text border-l-[3px] p-3 font-mono leading-[1.6] wrap-break-word whitespace-pre-wrap"
+            class="rounded-default bg-banner-error-soft-bg border-s-status-negative text-compact text-banner-error-soft-text border-s-3 p-3 font-mono leading-[1.6] wrap-break-word whitespace-pre-wrap"
           >
             {{ errorDialogData.error }}
           </div>
@@ -297,6 +373,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmDialog.show"
       :title="confirmDialog.title"
       :message="confirmDialog.message"
+      :message-keypath="confirmDialog.messageKeypath"
+      :message-name="confirmDialog.messageName"
+      :ok-variant="confirmDialog.okVariant"
       @update:ok="confirmDialog.onConfirm"
       @update:cancel="resetConfirmDialog"
     />
@@ -312,7 +391,10 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
 import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -325,13 +407,18 @@ import ConfirmDialog from "../ConfirmDialog.vue";
 import { timestampToTimezoneDate } from "../../utils/zincutils";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
+import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 
 const store = useStore();
+const { t } = useI18nTyped();
+const { isMobile } = useBreakpoint();
 
 // Refs
 const qTableRef = ref();
 
 const loading = ref(false);
+const forbidden = ref(false);
 const jobs = ref<BackfillJob[]>([]);
 const showDetailsDialog = ref(false);
 const selectedJobId = ref("");
@@ -341,11 +428,22 @@ const selectedJob = ref<BackfillJob | null>(null);
 const errorDialogVisible = ref(false);
 const errorDialogData = ref<BackfillJob | null>(null);
 
+interface ConfirmDialogState {
+  show: boolean;
+  title: I18nText;
+  message: I18nText;
+  messageKeypath?: I18nKey;
+  messageName?: string;
+  okVariant?: ButtonVariant;
+  onConfirm: () => void;
+}
+
 // Confirm dialog
-const confirmDialog = ref({
+const confirmDialog = ref<ConfirmDialogState>({
   show: false,
-  title: "",
-  message: "",
+  // raw("") is only the empty placeholder — the real values are assigned from t().
+  title: raw(""),
+  message: raw(""),
   onConfirm: () => {},
 });
 
@@ -365,7 +463,7 @@ const { columnVisibility, setColumnVisibility } = useExternalColumnToggle(
 const columns: OTableColumnDef[] = [
   {
     id: "pipeline_name",
-    header: "Pipeline",
+    header: t("pipeline.pipelineLabel"),
     accessorKey: "pipeline_name",
     sortable: true,
     hideable: true,
@@ -374,7 +472,7 @@ const columns: OTableColumnDef[] = [
   },
   {
     id: "time_range",
-    header: "Time Range",
+    header: t("pipeline.timeRange"),
     accessorKey: "start_time",
     sortable: true,
     hideable: true,
@@ -383,7 +481,7 @@ const columns: OTableColumnDef[] = [
   },
   {
     id: "progress_percent",
-    header: "Progress",
+    header: t("pipeline.progressLabel"),
     accessorKey: "progress_percent",
     sortable: true,
     hideable: true,
@@ -392,7 +490,7 @@ const columns: OTableColumnDef[] = [
   },
   {
     id: "created_at",
-    header: "Created",
+    header: t("pipeline.created"),
     accessorKey: "created_at",
     sortable: true,
     hideable: true,
@@ -401,7 +499,7 @@ const columns: OTableColumnDef[] = [
   },
   {
     id: "last_triggered_at",
-    header: "Last Triggered",
+    header: t("pipeline.lastTriggered"),
     accessorKey: "last_triggered_at",
     sortable: true,
     hideable: true,
@@ -410,9 +508,9 @@ const columns: OTableColumnDef[] = [
   },
   {
     id: "actions",
-    header: "Actions",
+    header: t("common.actions"),
     accessorKey: "actions",
-    meta: { align: "center", actionCount: 4 },
+    meta: { align: "center", actionCount: 5 },
     isAction: true,
     size: 128,
   },
@@ -428,6 +526,7 @@ onMounted(() => {
 
 const loadJobs = async () => {
   loading.value = true;
+  forbidden.value = false;
 
   try {
     const response = await backfillService.listBackfillJobs({
@@ -437,10 +536,14 @@ const loadJobs = async () => {
     loadPipelineOptions();
   } catch (error: any) {
     console.error("Error loading backfill jobs:", error);
-    toast({
-      variant: "error",
-      message: "Failed to load backfill jobs",
-    });
+    forbidden.value = error?.response?.status === 403;
+    // The grouped access toast already reports a 403; a second red toast adds nothing.
+    if (!forbidden.value) {
+      toast({
+        variant: "error",
+        message: t("toastMessages.pipelines.failedToLoadBackfillJobs"),
+      });
+    }
   } finally {
     loading.value = false;
   }
@@ -534,8 +637,9 @@ const canDeleteJob = (status: string) => {
 const resetConfirmDialog = () => {
   confirmDialog.value = {
     show: false,
-    title: "",
-    message: "",
+    // raw("") resets the fields to the empty placeholder.
+    title: raw(""),
+    message: raw(""),
     onConfirm: () => {},
   };
 };
@@ -543,8 +647,10 @@ const resetConfirmDialog = () => {
 const confirmPauseJob = (job: BackfillJob) => {
   confirmDialog.value = {
     show: true,
-    title: "Backfill Job",
-    message: `Are you sure you want to pause the backfill job for "${job.pipeline_name || job.pipeline_id}"? You can resume it later.`,
+    title: t("pipeline.backfillJobTitle"),
+    message: t("pipeline.confirmPauseBackfillJob", {
+      name: job.pipeline_name || job.pipeline_id,
+    }),
     onConfirm: () => pauseJob(job.pipeline_id, job.job_id),
   };
 };
@@ -552,8 +658,10 @@ const confirmPauseJob = (job: BackfillJob) => {
 const confirmResumeJob = (job: BackfillJob) => {
   confirmDialog.value = {
     show: true,
-    title: "Resume Backfill Job",
-    message: `Are you sure you want to resume the backfill job for "${job.pipeline_name || job.pipeline_id}"?`,
+    title: t("pipeline.resumeBackfillJobTitle"),
+    message: t("pipeline.confirmResumeBackfillJob", {
+      name: job.pipeline_name || job.pipeline_id,
+    }),
     onConfirm: () => resumeJob(job.pipeline_id, job.job_id),
   };
 };
@@ -561,8 +669,11 @@ const confirmResumeJob = (job: BackfillJob) => {
 const confirmDeleteJob = (job: BackfillJob) => {
   confirmDialog.value = {
     show: true,
-    title: "Delete Backfill Job",
-    message: `Are you sure you want to delete the backfill job for "${job.pipeline_name || job.pipeline_id}"? This will remove the job from the list but will not affect the backfilled data.`,
+    title: t("pipeline.deleteBackfillJobTitle"),
+    message: raw(""),
+    messageKeypath: "pipeline.confirmDeleteBackfillJob",
+    messageName: job.pipeline_name || job.pipeline_id,
+    okVariant: "destructive",
     onConfirm: () => deleteJob(job.pipeline_id, job.job_id),
   };
 };
@@ -578,7 +689,7 @@ const pauseJob = async (pipelineId: string, jobId: string) => {
 
     toast({
       variant: "success",
-      message: "Backfill job paused successfully",
+      message: t("toastMessages.pipelines.backfillJobPausedSuccessfully"),
     });
 
     loadJobs();
@@ -586,7 +697,7 @@ const pauseJob = async (pipelineId: string, jobId: string) => {
     console.error("Error pausing backfill job:", error);
     toast({
       variant: "error",
-      message: error?.response?.data?.error || "Failed to pause backfill job",
+      message: error?.response?.data?.error || t("pipeline.pauseBackfillJobFailed"),
       timeout: 5000,
     });
   }
@@ -603,7 +714,7 @@ const resumeJob = async (pipelineId: string, jobId: string) => {
 
     toast({
       variant: "success",
-      message: "Backfill job resumed successfully",
+      message: t("toastMessages.pipelines.backfillJobResumedSuccessfully"),
     });
 
     loadJobs();
@@ -611,7 +722,7 @@ const resumeJob = async (pipelineId: string, jobId: string) => {
     console.error("Error resuming backfill job:", error);
     toast({
       variant: "error",
-      message: error?.response?.data?.error || "Failed to resume backfill job",
+      message: error?.response?.data?.error || t("pipeline.resumeBackfillJobFailed"),
       timeout: 5000,
     });
   }
@@ -627,7 +738,7 @@ const deleteJob = async (pipelineId: string, jobId: string) => {
 
     toast({
       variant: "success",
-      message: "Backfill job deleted successfully",
+      message: t("toastMessages.pipelines.backfillJobDeletedSuccessfully"),
     });
 
     loadJobs();
@@ -635,7 +746,7 @@ const deleteJob = async (pipelineId: string, jobId: string) => {
     console.error("Error deleting backfill job:", error);
     toast({
       variant: "error",
-      message: error?.response?.data?.error || "Failed to delete backfill job",
+      message: error?.response?.data?.error || t("pipeline.deleteBackfillJobFailed"),
       timeout: 5000,
     });
   }

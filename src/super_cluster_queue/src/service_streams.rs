@@ -40,8 +40,27 @@ pub(crate) async fn process_msg(msg: ServiceStreamsMessage) -> Result<()> {
                 record.service_name
             );
             let org_id = record.org_id.clone();
-            service_streams::put(&org_id, *record).await?;
-            infra::coordinator::service_streams::emit_put_event(&org_id).await?;
+            // Orphan disambiguations are irrelevant here: the put event below makes this
+            // cluster's nodes reload the org's services wholesale (F19).
+            let outcome = service_streams::put(
+                &org_id,
+                *record,
+                service_streams::DEFAULT_MAX_STREAMS_PER_TYPE,
+            )
+            .await?;
+            // A no-op put must not make every node re-read the org's whole table.
+            if outcome.changed {
+                // Never propagate: a redelivered apply re-derives changed=false, losing the emit.
+                for attempt in 1..=3u8 {
+                    match infra::coordinator::service_streams::emit_put_event(&org_id).await {
+                        Ok(()) => break,
+                        Err(e) if attempt == 3 => log::error!(
+                            "[SUPER_CLUSTER:service_streams] emit_put_event failed after {attempt} attempts: org={org_id} error={e}"
+                        ),
+                        Err(_) => tokio::time::sleep(std::time::Duration::from_millis(500)).await,
+                    }
+                }
+            }
         }
         ServiceStreamsMessage::Delete {
             org_id,
@@ -53,7 +72,9 @@ pub(crate) async fn process_msg(msg: ServiceStreamsMessage) -> Result<()> {
                 service_key
             );
             service_streams::delete_all(&org_id).await?;
-            infra::coordinator::service_streams::emit_delete_event(&org_id, &service_key).await?;
+            // Org-scope reload: the delete wiped the whole org's rows, so a per-service
+            // delete event would evict only one cache key on this cluster's nodes (F6).
+            infra::coordinator::service_streams::emit_reload_event(&org_id).await?;
         }
     }
     Ok(())

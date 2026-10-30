@@ -36,9 +36,8 @@ pub fn config_node_to_proto(node: ConfigNode) -> NodeDetails {
             Role::Querier => ProtoRole::Querier as i32,
             Role::Compactor => ProtoRole::Compactor as i32,
             Role::Router => ProtoRole::Router as i32,
-            Role::AlertManager => ProtoRole::AlertManager as i32,
+            Role::Scheduler => ProtoRole::Scheduler as i32,
             Role::FlattenCompactor => ProtoRole::FlattenCompactor as i32,
-            Role::ActionServer => ProtoRole::ScriptServer as i32,
         })
         .collect();
 
@@ -95,9 +94,8 @@ pub fn proto_node_to_config(node: NodeDetails) -> ConfigNode {
             r if r == ProtoRole::Querier as i32 => Some(Role::Querier),
             r if r == ProtoRole::Compactor as i32 => Some(Role::Compactor),
             r if r == ProtoRole::Router as i32 => Some(Role::Router),
-            r if r == ProtoRole::AlertManager as i32 => Some(Role::AlertManager),
+            r if r == ProtoRole::Scheduler as i32 => Some(Role::Scheduler),
             r if r == ProtoRole::FlattenCompactor as i32 => Some(Role::FlattenCompactor),
-            r if r == ProtoRole::ScriptServer as i32 => Some(Role::ActionServer),
             _ => None,
         })
         .collect();
@@ -295,9 +293,8 @@ mod tests {
         let roles = vec![
             Role::All,
             Role::Compactor,
-            Role::AlertManager,
+            Role::Scheduler,
             Role::FlattenCompactor,
-            Role::ActionServer,
         ];
         let node = ConfigNode {
             id: 2,
@@ -315,7 +312,7 @@ mod tests {
             metrics: NodeMetrics::default(),
         };
         let proto = config_node_to_proto(node);
-        assert_eq!(proto.roles.len(), 5);
+        assert_eq!(proto.roles.len(), 4);
         assert_eq!(proto.role_group, ProtoRoleGroup::None as i32);
         assert_eq!(proto.status, ProtoNodeStatus::Prepare as i32);
     }
@@ -354,9 +351,8 @@ mod tests {
                 ProtoRole::All as i32,
                 ProtoRole::Ingester as i32,
                 ProtoRole::Querier as i32,
-                ProtoRole::AlertManager as i32,
+                ProtoRole::Scheduler as i32,
                 ProtoRole::FlattenCompactor as i32,
-                ProtoRole::ScriptServer as i32,
                 999, // unknown role — filtered out
             ],
             role_group: ProtoRoleGroup::None as i32,
@@ -368,7 +364,7 @@ mod tests {
             metrics: None, // exercises map_or_else default branch
         };
         let config_node = proto_node_to_config(proto_node);
-        assert_eq!(config_node.role.len(), 6);
+        assert_eq!(config_node.role.len(), 5);
         assert_eq!(config_node.role_group, RoleGroup::None);
         assert_eq!(config_node.status, NodeStatus::Prepare);
         // metrics should be default when None

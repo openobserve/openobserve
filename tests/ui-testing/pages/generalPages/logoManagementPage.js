@@ -1,5 +1,6 @@
 import { expect } from '@playwright/test';
 import path from 'path';
+import { reauthenticateAlpha1 } from '../../playwright-tests/utils/reauth-alpha1.js';
 
 export
     class LogoManagementPage {
@@ -79,6 +80,25 @@ export
         }).toPass({ timeout: 20000 });
     }
 
+    // Hard-navigate to the _meta general settings page and confirm we stayed
+    // there. The preceding org switch can still be redirecting to /web/, so a
+    // bare goto races that redirect and gets "interrupted by navigation to
+    // /web/" (or lands on /web/ and drops the org). Retry the goto until the URL
+    // sticks on _meta settings and the page's submit button has rendered.
+    async openMetaGeneralSettings() {
+        const url = process.env["ZO_BASE_URL"] + "/web/settings/general?org_identifier=_meta";
+        await expect(async () => {
+            await this.page.goto(url, { waitUntil: 'domcontentloaded' });
+            // The shared alpha1 session can expire mid-run (minted once, reused by every shard); self-heal like navigateToBase() does, since this goto bypasses that helper and would otherwise dead-end on the Dex login page.
+            if (/\/dex\/|\/web\/login/.test(this.page.url())) {
+                await reauthenticateAlpha1(this.page);
+                await this.page.goto(url, { waitUntil: 'domcontentloaded' });
+            }
+            await expect(this.page).toHaveURL(/settings\/general\?org_identifier=_meta/, { timeout: 5000 });
+            await this.submitButton.waitFor({ state: 'visible', timeout: 10000 });
+        }).toPass({ timeout: 45000 });
+    }
+
     async managementPageURLValidation() {
         await expect(this.page).toHaveURL(/defaulttestmulti/);
     }
@@ -136,7 +156,7 @@ export
             await this.confirmDeleteButton.waitFor({ state: 'visible' });
             await this.confirmDeleteButton.click({ force: true });
         }
-        await this.page.goto(process.env["ZO_BASE_URL"] + "/web/settings/general?org_identifier=_meta");
+        await this.openMetaGeneralSettings();
         await this.fileUploadInput.waitFor({ state: 'attached' });
         await this.fileUploadInput.setInputFiles(filePath);
         // wait for Vue reactivity to process the file change before clicking save
@@ -163,7 +183,7 @@ export
         }
 
         // Navigate to the settings page
-        await this.page.goto(process.env["ZO_BASE_URL"] + "/web/settings/general?org_identifier=_meta");
+        await this.openMetaGeneralSettings();
 
         // Upload dark mode logo
         await this.fileUploadInputDark.waitFor({ state: 'attached' });

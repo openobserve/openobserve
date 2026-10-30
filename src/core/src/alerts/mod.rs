@@ -26,12 +26,13 @@ use config::{
         },
         cluster::RoleGroup,
         search::{SearchEventContext, SearchEventType, SqlQuery},
-        sql::resolve_stream_names,
+        sql::{TableReferenceExt, resolve_stream_names_with_type},
         stream::StreamType,
     },
     utils::{
         base64,
         json::{Map, Value},
+        sql::quote_identifier,
     },
 };
 use search::utils::is_permissable_function_error;
@@ -40,20 +41,42 @@ use usage_reporting::http_report_metrics;
 
 use crate::{search as SearchService, service::setup_tracing_with_trace_id};
 
+pub mod ack;
 pub mod alert;
-pub mod backfill;
 #[cfg(feature = "enterprise")]
-pub mod deduplication;
+pub mod alert_calibration;
+pub mod auto_investigate_decisions;
+pub mod backfill;
+pub mod composite;
+pub mod composite_graph_lock;
 pub mod derived_streams;
+pub mod destination_usage;
 pub mod destinations;
+pub mod downtimes;
 pub mod external_alerts;
 #[cfg(feature = "enterprise")]
-pub mod grouping;
-#[cfg(feature = "enterprise")]
 pub mod incidents;
+pub mod lifecycle;
 #[cfg(feature = "enterprise")]
-pub mod org_config;
+pub mod mute;
+pub mod notifications;
+mod prom_rule;
+#[cfg(feature = "enterprise")]
+pub mod rca_live;
+#[cfg(feature = "enterprise")]
+pub mod rca_resume;
+#[cfg(feature = "enterprise")]
+pub mod rca_runs;
+#[cfg(feature = "enterprise")]
+pub mod rca_steering;
+#[cfg(feature = "enterprise")]
+pub mod rca_turn;
+pub mod recovery;
 pub mod scheduler;
+pub mod slack_destination;
+pub mod slack_investigate;
+pub mod slack_publish;
+pub mod slack_view;
 pub mod templates;
 
 #[async_trait]
@@ -149,16 +172,26 @@ impl QueryConditionExt for QueryCondition {
                 }
             }
             QueryType::Slo => {
-                // An SLO alert runs no query. It reads the running aggregate
-                // the ingest pass already computed, which is why five alerts
-                // on one SLO cost five cheap status reads and ZERO extra
-                // raw-data scans (§6b.9). The caller branches before reaching
-                // here (`alert.rs`); this arm exists so the dispatch stays
-                // exhaustive and a mis-routed SLO alert degrades to "nothing
-                // matched" rather than running an empty SQL string.
+                // An SLO alert runs no query — it reads the running aggregate
+                // the ingest pass already computed, so several alerts on one
+                // SLO cost only cheap status reads and no extra raw-data
+                // scans. `alert.rs` branches before reaching here; this arm
+                // keeps the dispatch exhaustive so a mis-routed SLO alert
+                // degrades to "nothing matched" rather than running an empty
+                // SQL string.
                 return Ok(eval_results);
             }
             QueryType::PromQL => {
+                if self.promql_rule_mode {
+                    return prom_rule::evaluate(
+                        self,
+                        org_id,
+                        end_time,
+                        &trace_id,
+                        search_event_context,
+                    )
+                    .await;
+                }
                 let Some(v) = self.promql.as_ref() else {
                     return Ok(eval_results);
                 };
@@ -176,24 +209,22 @@ impl QueryConditionExt for QueryCondition {
                 };
                 let end = end_time;
                 let condition = self.promql_condition.as_ref().unwrap();
-                // Multi-level PromQL (alerts_2.md §4.4, same strategy as the
-                // SQL HAVING): query at the LESS severe value so the warning
-                // band comes back too, then classify each series below.
-                // Single-level alerts widen to critical, i.e. the expression is
-                // byte-identical to before.
+                // Same strategy as the SQL HAVING clause: query at the LESS
+                // severe threshold so the warning band comes back too, then
+                // classify each series below. With no warning threshold this
+                // widens to critical, leaving the expression unchanged.
                 let promql_critical = to_float(&condition.value);
                 let promql_filter = config::meta::alerts::aggregation_level::widened_threshold(
                     condition.operator,
                     promql_critical,
                     self.promql_warning_value,
                 );
-                // Observation completeness (M-11), the PromQL mirror of the
-                // SQL multi path dropping its HAVING: with the threshold in
-                // the expression, a recovered series just stops being
-                // returned and could only recover K evaluations late via the
-                // reaper, with a NULL value. Per-series alerts therefore run
-                // the raw expression and classify in Rust; single alerts keep
-                // the filtered query unchanged.
+                // Per-series alerts run the raw expression and classify in
+                // Rust, mirroring the SQL multi path dropping its HAVING: with
+                // the threshold baked into the expression, a recovered series
+                // simply stops being returned and could only resolve later via
+                // the reaper timeout, with a NULL value. Single alerts keep the
+                // filtered query.
                 let query = if self.promql_multi_alert {
                     format!("({v})")
                 } else {
@@ -220,6 +251,7 @@ impl QueryConditionExt for QueryCondition {
                     search_type: Some(SearchEventType::Alerts),
                     regions: vec![],
                     clusters: vec![],
+                    search_event_context,
                 };
                 // check super cluster
                 #[cfg(not(feature = "enterprise"))]
@@ -238,11 +270,17 @@ impl QueryConditionExt for QueryCondition {
                 )
                 .await
                 {
-                    Ok(v) => v,
+                    Ok(v) if !v.warnings.is_empty() => {
+                        return Err(anyhow::anyhow!(
+                            "Partial response: {}",
+                            v.warnings.join(", ")
+                        ));
+                    }
+                    Ok(v) => v.value,
                     // A failed search is an ERROR, not an empty result. Returning
                     // Ok here would record outcome=Normal/level=Ok and refresh
-                    // `level_at`, silently clearing a prior Critical (§7.6 —
-                    // errors must leave the level axis untouched).
+                    // `level_at`, silently clearing a prior Critical — an error
+                    // must leave the level untouched.
                     Err(e) => {
                         return Err(anyhow::anyhow!("PromQL search error for alert query: {e}"));
                     }
@@ -287,17 +325,17 @@ impl QueryConditionExt for QueryCondition {
                 // observation rather than a bare series count. Direction is
                 // operator-aware: for `<`/`<=` the worst offender is the MIN.
                 //
-                // KNOWN LIMITATION (§7.5) — single alerts only: their filter
-                // is widened just to the warning level, so a healthy run
-                // returns no series and records actual_value=None — history
-                // shows "— → Ok". Per-series alerts run unfiltered (above)
-                // and record the real healthy reading.
+                // KNOWN LIMITATION, single alerts only: their filter is widened
+                // just to the warning level, so a healthy run returns no series
+                // and records actual_value=None — history shows "— → Ok".
+                // Per-series alerts run unfiltered (above) and record the real
+                // healthy reading.
                 eval_results.actual_value = config::meta::alerts::level::worst_observed_value(
                     &series_values,
                     condition.operator,
                 );
-                // T-9: label the worst SERIES by its PromQL labels, so history
-                // shows which series the value came from.
+                // Label the worst series by its PromQL labels, so history shows
+                // which series the value came from.
                 eval_results.group_label = eval_results.actual_value.and_then(|w| {
                     values
                         .iter()
@@ -314,11 +352,11 @@ impl QueryConditionExt for QueryCondition {
                         })
                         .filter(|label| !label.is_empty())
                 });
-                // ── Per-series fan-out (M-1/M-2/M-3, gated by M-9) ──────────
-                // Additive, exactly like the aggregation path above: the
-                // worst-series collapse computed already is what the single
-                // per-evaluation trigger record needs (D8); this only ADDS the
-                // per-group view.
+                // ── Per-series fan-out ──────────────────────────────────────
+                // Purely additive, like the aggregation path below: the
+                // worst-series collapse computed above is what the single
+                // per-evaluation trigger record needs; this only ADDS the
+                // per-series view.
                 if self.promql_multi_alert {
                     eval_results.group_classification =
                         Some(config::meta::alerts::grouping::classify_promql_series(
@@ -339,30 +377,7 @@ impl QueryConditionExt for QueryCondition {
             }
         };
 
-        let stream_names = resolve_stream_names(&sql)
-            .map_err(|e| anyhow::anyhow!("Error resolving stream names in SQL query: {e}"))?;
-
-        // SQL may contain multiple stream names, check for each stream
-        // if the query period is greater than the max query range
-        for stream in stream_names.iter() {
-            if infra::schema::get_stream_schema_from_cache(org_id, stream, stream_type)
-                .await
-                .is_none()
-            {
-                return Err(anyhow::anyhow!(
-                    "Stream \"{stream}\" not found in schema, skipping alert evaluation"
-                ));
-            };
-
-            if let Some(settings) = infra::schema::get_settings(org_id, stream, stream_type).await {
-                let max_query_range = settings.max_query_range;
-                if max_query_range > 0 && trigger_condition.period > max_query_range * 60 {
-                    return Err(anyhow::anyhow!(
-                        "Query period is greater than max query range of {max_query_range} hours for stream \"{stream}\""
-                    ));
-                }
-            }
-        }
+        check_query_streams(org_id, stream_type, &sql, trigger_condition.period).await?;
 
         let mut time_diff = Duration::try_minutes(trigger_condition.period)
             .unwrap()
@@ -374,7 +389,8 @@ impl QueryConditionExt for QueryCondition {
         } else {
             Some(end_time - time_diff)
         };
-        // Hybrid count evaluation (alerts_2.md §4.4c). Guards, in order:
+        // Hybrid count evaluation — decide from a COUNT(*) pre-query and fetch
+        // rows only as a notification sample. Guards, in order:
         //  - threshold bypass (search_event_type) — no threshold, no hybrid;
         //  - aggregation — already exact, needs per-group rows;
         //  - VRL — transforms rows post-query, a SQL count could disagree;
@@ -421,10 +437,10 @@ impl QueryConditionExt for QueryCondition {
             hybrid_exact_count = Some(exact);
         }
 
-        // Per-group evaluation reads a page sized to the M-6 cap, not to the
-        // threshold: for a multi-alert the count gate is always "any group"
-        // (M-10), so `required_search_size` would ask for a handful of rows and
-        // the fan-out would see a fraction of the groups.
+        // Per-group evaluation reads a page sized to the max-groups cap, not to
+        // the threshold: a multi-alert's count gate is always "any group", so
+        // `required_search_size` would ask for a handful of rows and the
+        // fan-out would see a fraction of the groups.
         let multi_group_cap = self
             .aggregation
             .as_ref()
@@ -435,8 +451,8 @@ impl QueryConditionExt for QueryCondition {
             -1
         } else if let Some(cap) = multi_group_cap {
             // ONE row past the cap, so a full page is itself the overflow
-            // signal (M-6) and the persisted counts can be marked lower bounds
-            // honestly (§5.3). `cap == 0` means unlimited.
+            // signal and the persisted counts can honestly be marked lower
+            // bounds. `cap == 0` means unlimited.
             if cap == 0 { -1 } else { cap as i64 + 1 }
         } else if hybrid {
             // Decision already made from the exact count; this fetch is only
@@ -528,7 +544,6 @@ impl QueryConditionExt for QueryCondition {
                 sort_by: None,
                 quick_mode: false,
                 track_total_hits: false,
-                query_type: "".to_string(),
                 uses_zo_fn: false,
                 query_fn: self.vrl_function.clone(),
                 skip_wal: false,
@@ -571,9 +586,7 @@ impl QueryConditionExt for QueryCondition {
                     start_time: start_time.unwrap(),
                     end_time,
                     quick_mode: false,
-                    query_type: "".to_string(),
                     track_total_hits: false,
-                    action_id: None,
                     uses_zo_fn: false,
                     query_fn: encode_query_fn,
                     skip_wal: false,
@@ -682,18 +695,23 @@ impl QueryConditionExt for QueryCondition {
                 // ── Aggregation alerts ──────────────────────────────────────
                 // The threshold is `having.value` / `warning_value` applied to
                 // each row's aggregate, NOT a row count. The SQL HAVING was
-                // widened to the less severe threshold (alerts_2.md §4.4), so
-                // the returned set deliberately includes the warning band and
-                // MUST be re-classified here — counting rows would both ignore
-                // severity and fire spuriously on the widened set.
+                // widened to the less severe threshold, so the returned set
+                // deliberately includes the warning band and MUST be
+                // re-classified here — counting rows would both ignore severity
+                // and fire spuriously on the widened set.
                 Some(agg) => {
                     // Classify each group's aggregate, then re-apply the
                     // GROUP-COUNT threshold. Both axes must hold — dropping the
                     // count silently rewrites "for at least 3 groups" as "for
                     // any group".
+                    let col = if self.query_type == QueryType::SQL {
+                        &agg.having.column
+                    } else {
+                        "alert_agg_value"
+                    };
                     let classified: Vec<_> = records
                         .iter()
-                        .filter_map(|r| r.get("alert_agg_value").and_then(|v| v.as_f64()))
+                        .filter_map(|r| r.get(col).and_then(|v| v.as_f64()))
                         .collect();
 
                     let level =
@@ -709,12 +727,12 @@ impl QueryConditionExt for QueryCondition {
                     // Direction is operator-aware: for `<`/`<=` the worst
                     // offender is the MIN, not the max.
                     //
-                    // KNOWN LIMITATION (§7.5): the HAVING filter is widened
-                    // only to the warning level, so a healthy run returns no
-                    // rows and records actual_value=None — history shows
-                    // "— → Ok". Dropping the filter would cost a full
-                    // per-group fetch on every healthy evaluation;
-                    // deliberately deferred to the SLO work.
+                    // KNOWN LIMITATION: the HAVING filter is widened only to
+                    // the warning level, so a healthy run returns no rows and
+                    // records actual_value=None — history shows "— → Ok".
+                    // Dropping the filter would cost a full per-group fetch on
+                    // every healthy evaluation; deliberately deferred to the
+                    // SLO work.
                     let offenders: Vec<f64> = classified
                         .iter()
                         .filter(|v| {
@@ -732,9 +750,9 @@ impl QueryConditionExt for QueryCondition {
                         agg.having.operator,
                     );
 
-                    // T-9: identify WHICH group produced the worst value, so
-                    // history reads "avg(cpu)=97.2 for host=b" and not just a
-                    // number. Label = the group_by columns of that row.
+                    // Identify WHICH group produced the worst value, so history
+                    // reads "avg(cpu)=97.2 for host=b" and not just a number.
+                    // Label = the group_by columns of that row.
                     let group_label = worst.and_then(|w| {
                         let group_by = agg.group_by.as_deref().unwrap_or(&[]);
                         if group_by.is_empty() {
@@ -742,7 +760,7 @@ impl QueryConditionExt for QueryCondition {
                         }
                         records
                             .iter()
-                            .find(|r| r.get("alert_agg_value").and_then(|v| v.as_f64()) == Some(w))
+                            .find(|r| r.get(col).and_then(|v| v.as_f64()) == Some(w))
                             .map(|r| {
                                 group_by
                                     .iter()
@@ -762,11 +780,11 @@ impl QueryConditionExt for QueryCondition {
                     eval_results.actual_value = worst;
                     eval_results.group_label = group_label;
 
-                    // ── Per-group fan-out (M-1/M-2/M-3, gated by M-9) ───────
+                    // ── Per-group fan-out ───────────────────────────────────
                     // Purely additive: everything above still runs, because the
                     // worst-group collapse is what the single per-evaluation
-                    // trigger record needs (D8) and what every non-multi alert
-                    // is evaluated by. This only *adds* the per-group view.
+                    // trigger record needs and what every non-multi alert is
+                    // evaluated by. This only *adds* the per-group view.
                     if let Some(cap) = multi_group_cap
                         && let Some(group_by) = agg.group_by.as_ref()
                     {
@@ -779,7 +797,7 @@ impl QueryConditionExt for QueryCondition {
                         let observations: Vec<GroupObservation> = records
                             .iter()
                             .filter_map(|r| {
-                                let value = r.get("alert_agg_value")?.as_f64()?;
+                                let value = r.get(col)?.as_f64()?;
                                 let labels =
                                     config::meta::alerts::dispatch::row_group_labels(r, group_by);
                                 Some(GroupObservation::new(labels, value))
@@ -831,8 +849,8 @@ impl QueryConditionExt for QueryCondition {
                             config::meta::alerts::level::evaluate_level(actual, trigger_condition);
                         eval_results.actual_value = Some(actual);
                         // The fetch was capped at `size`; a full page means the
-                        // true count may be higher — record it as a lower
-                        // bound so history can render "≥ N" (§7.5).
+                        // true count may be higher — record it as a lower bound
+                        // so history can render "≥ N".
                         eval_results.value_is_lower_bound =
                             size > 0 && records.len() as i64 >= size;
                         eval_results.level = level;
@@ -849,7 +867,42 @@ impl QueryConditionExt for QueryCondition {
     }
 }
 
-/// Run the §4.4c COUNT(*) decision query for a hybrid count-based alert.
+/// Checks that every stream in the alert SQL exists and allows the alert period.
+async fn check_query_streams(
+    org_id: &str,
+    stream_type: StreamType,
+    sql: &str,
+    period: i64,
+) -> Result<(), anyhow::Error> {
+    let stream_refs = resolve_stream_names_with_type(sql)
+        .map_err(|e| anyhow::anyhow!("Error resolving stream names in SQL query: {e}"))?;
+
+    for stream_ref in stream_refs.iter() {
+        let stream = stream_ref.stream_name();
+        // A JOIN may name another type, e.g. "enrichment_tables".tbl in a logs alert.
+        let stream_type = stream_ref.get_stream_type(stream_type);
+        if infra::schema::get_stream_schema_from_cache(org_id, &stream, stream_type)
+            .await
+            .is_none()
+        {
+            return Err(anyhow::anyhow!(
+                "Stream \"{stream}\" not found in schema, skipping alert evaluation"
+            ));
+        };
+
+        if let Some(settings) = infra::schema::get_settings(org_id, &stream, stream_type).await {
+            let max_query_range = settings.max_query_range;
+            if max_query_range > 0 && period > max_query_range * 60 {
+                return Err(anyhow::anyhow!(
+                    "Query period is greater than max query range of {max_query_range} hours for stream \"{stream}\""
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Run the COUNT(*) decision query for a hybrid count-based alert.
 ///
 /// Returns `(exact_count, query_took_ms)`. The user's SQL runs verbatim inside
 /// the wrapper, over the same time window the payload query would use, so the
@@ -873,9 +926,7 @@ async fn run_alert_count_query(
             start_time,
             end_time,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
-            action_id: None,
             uses_zo_fn: false,
             query_fn: None, // guard upstream: hybrid excludes VRL alerts
             skip_wal: false,
@@ -1050,7 +1101,24 @@ impl ConditionExt for ConditionList {
 #[async_trait]
 impl ConditionExt for Condition {
     async fn evaluate(&self, row: &Map<String, Value>) -> bool {
-        let val = match row.get(&self.column) {
+        // this is a special case introduced for draft workflows
+        // ideal in other places FE does not allow empty cols,
+        // but on BE we do not have specific restrictions, so when col is empty
+        // it is UB. Thus we use that for draft workflows and cond always evaluates to true
+        if self.column.is_empty() {
+            return true;
+        }
+        let resolved = resolve_column(row, &self.column);
+        match self.operator {
+            Operator::IsNull => return resolved.is_none_or(Value::is_null),
+            Operator::IsNotNull => return resolved.is_some_and(|v| !v.is_null()),
+            Operator::IsEmpty => return resolved.is_none_or(is_empty_value),
+            Operator::IsNotEmpty => {
+                return resolved.is_some_and(|v| !is_empty_value(v));
+            }
+            _ => {}
+        }
+        let val = match resolved {
             Some(val) => val,
             None => {
                 return false;
@@ -1069,6 +1137,7 @@ impl ConditionExt for Condition {
                     Operator::LessThanEquals => val <= con_val,
                     Operator::Contains => val.contains(con_val),
                     Operator::NotContains => !val.contains(con_val),
+                    _ => false,
                 }
             }
             Value::Number(_) => {
@@ -1287,6 +1356,46 @@ async fn evaluate_condition_items(
     result
 }
 
+/// Null, or an empty string; a missing column is handled by the callers.
+fn is_empty_value(v: &Value) -> bool {
+    v.is_null() || matches!(v, Value::String(s) if s.is_empty())
+}
+
+/// Walks `segments` into `map`, trying every split point because `_` is both the
+/// flattening separator and a legal character inside a key (`meta_alert_count`).
+fn descend_segments<'a>(map: &'a Map<String, Value>, segments: &[&str]) -> Option<&'a Value> {
+    for take in (1..=segments.len()).rev() {
+        let key = segments[..take].join("_");
+        let Some(child) = map.get(&key) else {
+            continue;
+        };
+        let rest = &segments[take..];
+        if rest.is_empty() {
+            return Some(child);
+        }
+        if let Some(child_map) = child.as_object()
+            && let Some(found) = descend_segments(child_map, rest)
+        {
+            return Some(found);
+        }
+    }
+    None
+}
+
+/// Resolves a condition column against a record that may be flattened (`meta_alert_count`,
+/// the ingest shape and what the workflow field picker submits) or nested (`meta.alert_count`,
+/// the shape a workflow now preserves), so both keep matching the same saved condition.
+fn resolve_column<'a>(row: &'a Map<String, Value>, column: &str) -> Option<&'a Value> {
+    if let Some(val) = row.get(column) {
+        return Some(val);
+    }
+    let segments: Vec<&str> = column.split(['.', '_']).filter(|s| !s.is_empty()).collect();
+    if segments.len() < 2 {
+        return None;
+    }
+    descend_segments(row, &segments)
+}
+
 /// Evaluates a single condition against a record
 async fn evaluate_condition(
     row: &Map<String, Value>,
@@ -1295,7 +1404,22 @@ async fn evaluate_condition(
     condition_value: &Value,
     ignore_case: bool,
 ) -> bool {
-    let val: &Value = match row.get(column) {
+    // this is a special case introduced for draft workflows
+    // ideal in other places FE does not allow empty cols,
+    // but on BE we do not have specific restrictions, so when col is empty
+    // it is UB. Thus we use that for draft workflows and cond always evaluates to true
+    if column.is_empty() {
+        return true;
+    }
+    let resolved = resolve_column(row, column);
+    match operator {
+        Operator::IsNull => return resolved.is_none_or(Value::is_null),
+        Operator::IsNotNull => return resolved.is_some_and(|v| !v.is_null()),
+        Operator::IsEmpty => return resolved.is_none_or(is_empty_value),
+        Operator::IsNotEmpty => return resolved.is_some_and(|v| !is_empty_value(v)),
+        _ => {}
+    }
+    let val: &Value = match resolved {
         Some(val) => val,
         None => {
             return false;
@@ -1320,6 +1444,7 @@ async fn evaluate_condition(
                     Operator::LessThanEquals => val_lower <= con_val_lower,
                     Operator::Contains => val_lower.contains(&con_val_lower),
                     Operator::NotContains => !val_lower.contains(&con_val_lower),
+                    _ => false,
                 }
             } else {
                 match operator {
@@ -1331,6 +1456,7 @@ async fn evaluate_condition(
                     Operator::LessThanEquals => val <= con_val,
                     Operator::Contains => val.contains(con_val),
                     Operator::NotContains => !val.contains(con_val),
+                    _ => false,
                 }
             }
         }
@@ -1436,13 +1562,19 @@ pub async fn build_sql(
                 ))?
         )
     };
-    if query_condition.aggregation.is_none() {
+    let Some(agg) = query_condition.aggregation.as_ref() else {
         return Ok(format!("SELECT * FROM \"{stream_name}\" {where_sql}"));
     };
+    build_aggregation_sql(stream_name, &schema, agg, &where_sql)
+}
 
-    // handle aggregation
-    let mut sql = String::new();
-    let agg = query_condition.aggregation.as_ref().unwrap();
+/// Only columns of `schema` reach the SQL; any other `group_by`/`having` entry is refused.
+fn build_aggregation_sql(
+    stream_name: &str,
+    schema: &Schema,
+    agg: &config::meta::alerts::Aggregation,
+    where_sql: &str,
+) -> Result<String, anyhow::Error> {
     let having_expr = {
         let data_type = match schema.field_with_name(&agg.having.column) {
             Ok(field) => field.data_type(),
@@ -1453,87 +1585,115 @@ pub async fn build_sql(
                 ));
             }
         };
-        // Multi-level aggregations (alerts_2.md §4.4, option B): widen the
-        // HAVING clause to the LESS severe threshold so every group that could
-        // be warning-or-worse comes back, then classify each group in Rust via
-        // the shared helper. Filtering on the critical threshold would drop the
-        // entire warning band inside the database, where nothing downstream
-        // could recover it.
-        //
-        // Single-level aggregations widen to the critical value, i.e. the
-        // clause is byte-identical to before.
-        let filter_value = config::meta::alerts::aggregation_level::having_filter_value(agg)
-            .map_err(|e| anyhow::anyhow!("Invalid aggregation threshold: {e}"))?;
-        let widened = Condition {
-            value: serde_json::json!(filter_value),
-            ..agg.having.clone()
-        };
-        build_expr(&widened, "alert_agg_value", data_type)?
+        build_having_expr(agg, data_type)?
     };
 
+    let col = quote_identifier(&agg.having.column);
     let func_expr = match agg.function {
-        AggFunction::Avg => format!("AVG(\"{}\")", agg.having.column),
-        AggFunction::Max => format!("MAX(\"{}\")", agg.having.column),
-        AggFunction::Min => format!("MIN(\"{}\")", agg.having.column),
-        AggFunction::Sum => format!("SUM(\"{}\")", agg.having.column),
-        AggFunction::Count => format!("COUNT(\"{}\")", agg.having.column),
-        AggFunction::Median => format!("MEDIAN(\"{}\")", agg.having.column),
-        AggFunction::P50 => format!(
-            "approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY \"{}\")",
-            agg.having.column
-        ),
-        AggFunction::P75 => format!(
-            "approx_percentile_cont(0.75) WITHIN GROUP (ORDER BY \"{}\")",
-            agg.having.column
-        ),
-        AggFunction::P90 => format!(
-            "approx_percentile_cont(0.9) WITHIN GROUP (ORDER BY \"{}\")",
-            agg.having.column
-        ),
-        AggFunction::P95 => format!(
-            "approx_percentile_cont(0.95) WITHIN GROUP (ORDER BY \"{}\")",
-            agg.having.column
-        ),
-        AggFunction::P99 => format!(
-            "approx_percentile_cont(0.99) WITHIN GROUP (ORDER BY \"{}\")",
-            agg.having.column
-        ),
+        AggFunction::Avg => format!("AVG({col})"),
+        AggFunction::Max => format!("MAX({col})"),
+        AggFunction::Min => format!("MIN({col})"),
+        AggFunction::Sum => format!("SUM({col})"),
+        AggFunction::Count => format!("COUNT({col})"),
+        AggFunction::Median => format!("MEDIAN({col})"),
+        AggFunction::P50 => format!("approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY {col})"),
+        AggFunction::P75 => format!("approx_percentile_cont(0.75) WITHIN GROUP (ORDER BY {col})"),
+        AggFunction::P90 => format!("approx_percentile_cont(0.9) WITHIN GROUP (ORDER BY {col})"),
+        AggFunction::P95 => format!("approx_percentile_cont(0.95) WITHIN GROUP (ORDER BY {col})"),
+        AggFunction::P99 => format!("approx_percentile_cont(0.99) WITHIN GROUP (ORDER BY {col})"),
     };
 
-    if let Some(group) = agg.group_by.as_ref()
-        && !group.is_empty()
-    {
-        let cols = group.join(", ");
-        if agg.multi_alert {
-            // Multi-alerts (M-9) drop the HAVING filter. A group that falls
-            // back under the threshold must still be RETURNED: otherwise its
-            // recovery is indistinguishable from it vanishing, and it would
-            // only resolve via M-7's timeout — K evaluations late, and with a
-            // NULL value where the real reading should be.
-            //
-            // The page stays bounded, so it is ordered worst-first (§5.3).
-            // That ordering is what keeps the rollup level exact and lets the
-            // M-6 cap admit the true top of the distribution rather than an
-            // arbitrary slice. The group columns are the deterministic
-            // tiebreak within a severity band.
-            let severity_order =
-                config::meta::alerts::aggregation_level::severity_order_sql(agg, "alert_agg_value")
-                    .map_err(|e| anyhow::anyhow!("Invalid aggregation threshold: {e}"))?;
-            sql = format!(
-                "SELECT {cols}, {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"{where_sql} GROUP BY {cols} ORDER BY {severity_order}, {cols}"
-            );
-        } else {
-            sql = format!(
-                "SELECT {cols}, {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"{where_sql} GROUP BY {cols} HAVING {having_expr}"
-            );
-        }
-    }
-    if sql.is_empty() {
-        sql = format!(
+    let group = agg.group_by.as_deref().unwrap_or(&[]);
+    if group.is_empty() {
+        return Ok(format!(
             "SELECT {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"{where_sql} HAVING {having_expr}"
-        );
+        ));
     }
-    Ok(sql)
+    let cols = quoted_group_by(schema, group)
+        .map_err(|column| {
+            anyhow::anyhow!("Group by column {column} not found on stream {stream_name}")
+        })?
+        .join(", ");
+    if agg.multi_alert {
+        // No HAVING: a group back under the threshold must still be returned to show recovery.
+        // Worst-first order keeps the bounded page exact; group columns are the tiebreak.
+        let severity_order =
+            config::meta::alerts::aggregation_level::severity_order_sql(agg, "alert_agg_value")
+                .map_err(|e| anyhow::anyhow!("Invalid aggregation threshold: {e}"))?;
+        return Ok(format!(
+            "SELECT {cols}, {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"{where_sql} GROUP BY {cols} ORDER BY {severity_order}, {cols}"
+        ));
+    }
+    Ok(format!(
+        "SELECT {cols}, {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"{where_sql} GROUP BY {cols} HAVING {having_expr}"
+    ))
+}
+
+/// Quoted, escaped identifiers; `Err` carries the first entry that is not a column of `schema`.
+fn quoted_group_by(schema: &Schema, group_by: &[String]) -> Result<Vec<String>, String> {
+    group_by
+        .iter()
+        .map(|col| match schema.field_with_name(col) {
+            Ok(_) => Ok(quote_identifier(col)),
+            Err(_) => Err(col.clone()),
+        })
+        .collect()
+}
+
+/// `HAVING` clause filtering the `alert_agg_value` aggregate.
+///
+/// `column_type` is the type of the source column as stored in the schema; the
+/// comparison itself runs against [`having_data_type`].
+fn build_having_expr(
+    agg: &config::meta::alerts::Aggregation,
+    column_type: &DataType,
+) -> Result<String, anyhow::Error> {
+    // Widen the clause to the LESS severe of the critical and warning
+    // thresholds, so every group that could be warning-or-worse comes back and
+    // Rust classifies each one. Filtering on the critical threshold would drop
+    // the entire warning band inside the database, where nothing downstream
+    // could recover it. With no warning threshold this widens to critical,
+    // leaving the clause unchanged.
+    let filter_value = config::meta::alerts::aggregation_level::having_filter_value(agg)
+        .map_err(|e| anyhow::anyhow!("Invalid aggregation threshold: {e}"))?;
+    let widened = Condition {
+        // The widened threshold is an f64, but `json!(1.0_f64)` serializes as
+        // `1.0` and never `1`. An integral threshold has to stay an integer:
+        // a string comparison would otherwise quote it as '1.0' rather than
+        // the '1' the alert was saved with (#13786).
+        value: if filter_value.fract() == 0.0 && filter_value.abs() < i64::MAX as f64 {
+            serde_json::json!(filter_value as i64)
+        } else {
+            serde_json::json!(filter_value)
+        },
+        ..agg.having.clone()
+    };
+    build_expr(
+        &widened,
+        "alert_agg_value",
+        &having_data_type(&agg.function, column_type),
+    )
+}
+
+/// Type the `HAVING` comparison is built for: the aggregate's OUTPUT type, not
+/// the source column's.
+///
+/// `COUNT("host")` is Int64 even when `host` is Utf8, so typing the comparison
+/// from the column emits a quoted `'1'` literal that DataFusion then has to cast
+/// back to Int64 — and fails on anything non-integral (#13786). `MIN`/`MAX`/
+/// `SUM` do return their input type, so those keep the column's.
+fn having_data_type(func: &AggFunction, column_type: &DataType) -> DataType {
+    match func {
+        AggFunction::Count => DataType::Int64,
+        AggFunction::Avg
+        | AggFunction::Median
+        | AggFunction::P50
+        | AggFunction::P75
+        | AggFunction::P90
+        | AggFunction::P95
+        | AggFunction::P99 => DataType::Float64,
+        AggFunction::Min | AggFunction::Max | AggFunction::Sum => column_type.clone(),
+    }
 }
 
 fn build_expr(
@@ -1541,41 +1701,96 @@ fn build_expr(
     field_alias: &str,
     field_type: &DataType,
 ) -> Result<String, anyhow::Error> {
-    let field_alias = if !field_alias.is_empty() {
-        field_alias
-    } else {
+    let field_alias = quote_identifier(if field_alias.is_empty() {
         cond.column.as_str()
-    };
+    } else {
+        field_alias
+    });
+    // Null/empty checks take no value. On non-string columns "empty" can only
+    // mean null, so the empty checks degrade to the null checks there.
+    let is_string_type = matches!(
+        field_type,
+        DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View
+    );
+    match cond.operator {
+        Operator::IsNull => return Ok(format!("{field_alias} IS NULL")),
+        Operator::IsNotNull => return Ok(format!("{field_alias} IS NOT NULL")),
+        Operator::IsEmpty => {
+            return Ok(if is_string_type {
+                format!("({field_alias} IS NULL OR {field_alias} = '')")
+            } else {
+                format!("{field_alias} IS NULL")
+            });
+        }
+        Operator::IsNotEmpty => {
+            return Ok(if is_string_type {
+                format!("({field_alias} IS NOT NULL AND {field_alias} != '')")
+            } else {
+                format!("{field_alias} IS NOT NULL")
+            });
+        }
+        _ => {}
+    }
     let expr = match field_type {
-        DataType::Utf8 | DataType::LargeUtf8 => {
+        DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => {
             let val = if cond.value.is_string() {
                 cond.value.as_str().unwrap_or_default().to_string()
             } else {
                 cond.value.to_string()
             };
+            // Double up embedded single quotes so a value like "it's" can't
+            // terminate the SQL string literal early.
+            let val = val.replace('\'', "''");
             match cond.operator {
-                Operator::EqualTo => format!("\"{field_alias}\" = '{val}'"),
-                Operator::NotEqualTo => format!("\"{field_alias}\" != '{val}'"),
-                Operator::GreaterThan => format!("\"{field_alias}\" > '{val}'"),
+                Operator::EqualTo => format!("{field_alias} = '{val}'"),
+                Operator::NotEqualTo => format!("{field_alias} != '{val}'"),
+                Operator::GreaterThan => format!("{field_alias} > '{val}'"),
                 Operator::GreaterThanEquals => {
-                    format!("\"{field_alias}\" >= '{val}'")
+                    format!("{field_alias} >= '{val}'")
                 }
-                Operator::LessThan => format!("\"{field_alias}\" < '{val}'"),
-                Operator::LessThanEquals => format!("\"{field_alias}\" <= '{val}'"),
-                Operator::Contains => format!("str_match(\"{field_alias}\", '{val}')"),
+                Operator::LessThan => format!("{field_alias} < '{val}'"),
+                Operator::LessThanEquals => format!("{field_alias} <= '{val}'"),
+                Operator::Contains => format!("str_match({field_alias}, '{val}')"),
                 Operator::NotContains => {
-                    format!("\"{field_alias}\" NOT LIKE '%{val}%'")
+                    format!("{field_alias} NOT LIKE '%{val}%'")
+                }
+                // Null checks returned above; keep the dead arm panic-free.
+                _ => {
+                    return Err(anyhow::anyhow!(
+                        "Column {} has data_type [{field_type}] and it does not supported operator [{:?}]",
+                        cond.column,
+                        cond.operator
+                    ));
                 }
             }
         }
         DataType::Int16 | DataType::Int32 | DataType::Int64 => {
             let val = if cond.value.is_number() {
-                cond.value.as_i64().unwrap_or_default()
+                // `as_i64` returns None for a fractional number AND for an
+                // integral one that was serialized as a float (`1.0`). Falling
+                // back to the f64 keeps the comparison the user asked for
+                // instead of silently defaulting the threshold to 0; DataFusion
+                // coerces Int64 against a float literal. Display of an integral
+                // f64 drops the `.0`, so `1.0` still renders as `1`.
+                match cond.value.as_i64() {
+                    Some(v) => v.to_string(),
+                    None => cond
+                        .value
+                        .as_f64()
+                        .ok_or_else(|| {
+                            anyhow::anyhow!(
+                                "Column [{}] dataType is [{field_type}] but value is [{}]",
+                                cond.column,
+                                cond.value,
+                            )
+                        })?
+                        .to_string(),
+                }
             } else {
                 cond.value
                     .as_str()
                     .unwrap_or_default()
-                    .parse()
+                    .parse::<i64>()
                     .map_err(|e| {
                         anyhow::anyhow!(
                             "Column [{}] dataType is [{field_type}] but value is [{}], err: {e}",
@@ -1583,17 +1798,18 @@ fn build_expr(
                             cond.value,
                         )
                     })?
+                    .to_string()
             };
             match cond.operator {
-                Operator::EqualTo => format!("\"{field_alias}\" = {val}"),
-                Operator::NotEqualTo => format!("\"{field_alias}\" != {val}"),
-                Operator::GreaterThan => format!("\"{field_alias}\" > {val}"),
+                Operator::EqualTo => format!("{field_alias} = {val}"),
+                Operator::NotEqualTo => format!("{field_alias} != {val}"),
+                Operator::GreaterThan => format!("{field_alias} > {val}"),
                 Operator::GreaterThanEquals => {
-                    format!("\"{field_alias}\" >= {val}")
+                    format!("{field_alias} >= {val}")
                 }
-                Operator::LessThan => format!("\"{field_alias}\" < {val}"),
+                Operator::LessThan => format!("{field_alias} < {val}"),
                 Operator::LessThanEquals => {
-                    format!("\"{field_alias}\" <= {val}")
+                    format!("{field_alias} <= {val}")
                 }
                 _ => {
                     return Err(anyhow::anyhow!(
@@ -1621,15 +1837,15 @@ fn build_expr(
                     })?
             };
             match cond.operator {
-                Operator::EqualTo => format!("\"{field_alias}\" = {val}"),
-                Operator::NotEqualTo => format!("\"{field_alias}\" != {val}"),
-                Operator::GreaterThan => format!("\"{field_alias}\" > {val}"),
+                Operator::EqualTo => format!("{field_alias} = {val}"),
+                Operator::NotEqualTo => format!("{field_alias} != {val}"),
+                Operator::GreaterThan => format!("{field_alias} > {val}"),
                 Operator::GreaterThanEquals => {
-                    format!("\"{field_alias}\" >= {val}")
+                    format!("{field_alias} >= {val}")
                 }
-                Operator::LessThan => format!("\"{field_alias}\" < {val}"),
+                Operator::LessThan => format!("{field_alias} < {val}"),
                 Operator::LessThanEquals => {
-                    format!("\"{field_alias}\" <= {val}")
+                    format!("{field_alias} <= {val}")
                 }
                 _ => {
                     return Err(anyhow::anyhow!(
@@ -1657,8 +1873,8 @@ fn build_expr(
                     })?
             };
             match cond.operator {
-                Operator::EqualTo => format!("\"{field_alias}\" = {val}"),
-                Operator::NotEqualTo => format!("\"{field_alias}\" != {val}"),
+                Operator::EqualTo => format!("{field_alias} = {val}"),
+                Operator::NotEqualTo => format!("{field_alias} != {val}"),
                 _ => {
                     return Err(anyhow::anyhow!(
                         "Column {} has data_type [{field_type}] and it does not supported operator [{:?}]",
@@ -1683,7 +1899,8 @@ mod tests {
     use arrow_schema::{DataType, Field, Schema};
     use config::{
         meta::alerts::{
-            ConditionGroup, ConditionItem, ConditionItemCondition, LogicalOperator, Operator,
+            Aggregation, ConditionGroup, ConditionItem, ConditionItemCondition, LogicalOperator,
+            Operator,
         },
         utils::json::Value,
     };
@@ -1760,6 +1977,29 @@ mod tests {
 
         // Should produce: ("level" = 'error' OR "status" = 'critical')
         assert_eq!(sql, "(\"level\" = 'error' OR \"status\" = 'critical')");
+    }
+
+    #[tokio::test]
+    async fn test_condition_group_to_sql_escapes_apostrophe() {
+        let schema = Schema::new(vec![Field::new("k8s_cluster", DataType::Utf8, false)]);
+
+        let condition_group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![ConditionItem::Condition(ConditionItemCondition {
+                column: "k8s_cluster".to_string(),
+                operator: Operator::EqualTo,
+                value: Value::String("it's production".to_string()),
+                ignore_case: None,
+                logical_operator: LogicalOperator::And,
+            })],
+        };
+
+        let sql = condition_group.to_sql(&schema).await.unwrap();
+
+        // A bare apostrophe must be doubled, not passed through raw, or the
+        // generated SQL string literal terminates early and fails to parse.
+        assert_eq!(sql, "(\"k8s_cluster\" = 'it''s production')");
     }
 
     #[tokio::test]
@@ -1887,28 +2127,6 @@ mod tests {
 
         let sql = condition_group.to_sql(&schema).await.unwrap();
         assert_eq!(sql, "");
-    }
-
-    #[tokio::test]
-    async fn test_condition_group_to_sql_single_condition() {
-        let schema = Schema::new(vec![Field::new("level", DataType::Utf8, false)]);
-
-        // Single condition should be wrapped in parentheses
-        let condition_group = ConditionGroup {
-            filter_type: "group".to_string(),
-            logical_operator: LogicalOperator::And,
-            conditions: vec![ConditionItem::Condition(ConditionItemCondition {
-                column: "level".to_string(),
-                operator: Operator::EqualTo,
-                value: Value::String("error".to_string()),
-                ignore_case: None,
-                logical_operator: LogicalOperator::And,
-            })],
-        };
-
-        let sql = condition_group.to_sql(&schema).await.unwrap();
-
-        assert_eq!(sql, "(\"level\" = 'error')");
     }
 
     #[tokio::test]
@@ -2426,6 +2644,103 @@ mod tests {
         println!("✓ All deeply nested group tests with operator precedence passed!");
     }
 
+    #[tokio::test]
+    async fn test_condition_evaluate_null_operators() {
+        use config::utils::json::json;
+
+        let is_null = make_cond("err", Operator::IsNull, Value::String(String::new()));
+        let is_not_null = make_cond("err", Operator::IsNotNull, Value::String(String::new()));
+
+        let missing = json!({"other": 1});
+        let null_val = json!({"err": null});
+        let present = json!({"err": "boom"});
+
+        assert!(is_null.evaluate(missing.as_object().unwrap()).await);
+        assert!(is_null.evaluate(null_val.as_object().unwrap()).await);
+        assert!(!is_null.evaluate(present.as_object().unwrap()).await);
+
+        assert!(!is_not_null.evaluate(missing.as_object().unwrap()).await);
+        assert!(!is_not_null.evaluate(null_val.as_object().unwrap()).await);
+        assert!(is_not_null.evaluate(present.as_object().unwrap()).await);
+    }
+
+    #[tokio::test]
+    async fn test_condition_evaluate_empty_operators() {
+        use config::utils::json::json;
+
+        let is_empty = make_cond("input", Operator::IsEmpty, Value::String(String::new()));
+        let is_not_empty = make_cond("input", Operator::IsNotEmpty, Value::String(String::new()));
+
+        let missing = json!({"other": 1});
+        let null_val = json!({"input": null});
+        let empty_str = json!({"input": ""});
+        let present = json!({"input": "hello"});
+        let number = json!({"input": 0});
+
+        assert!(is_empty.evaluate(missing.as_object().unwrap()).await);
+        assert!(is_empty.evaluate(null_val.as_object().unwrap()).await);
+        assert!(is_empty.evaluate(empty_str.as_object().unwrap()).await);
+        assert!(!is_empty.evaluate(present.as_object().unwrap()).await);
+        assert!(!is_empty.evaluate(number.as_object().unwrap()).await);
+
+        assert!(!is_not_empty.evaluate(missing.as_object().unwrap()).await);
+        assert!(!is_not_empty.evaluate(null_val.as_object().unwrap()).await);
+        assert!(!is_not_empty.evaluate(empty_str.as_object().unwrap()).await);
+        assert!(is_not_empty.evaluate(present.as_object().unwrap()).await);
+        assert!(is_not_empty.evaluate(number.as_object().unwrap()).await);
+    }
+
+    #[tokio::test]
+    async fn test_condition_group_empty_operators() {
+        use config::utils::json::json;
+
+        let schema = Schema::new(vec![Field::new("input", DataType::Utf8, true)]);
+        let group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![ConditionItem::Condition(ConditionItemCondition {
+                column: "input".to_string(),
+                operator: Operator::IsEmpty,
+                value: Value::String(String::new()),
+                ignore_case: None,
+                logical_operator: LogicalOperator::And,
+            })],
+        };
+
+        assert_eq!(
+            group.to_sql(&schema).await.unwrap(),
+            "((\"input\" IS NULL OR \"input\" = ''))"
+        );
+        let empty_str = json!({"input": ""});
+        assert!(group.evaluate(empty_str.as_object().unwrap()).await);
+        let present = json!({"input": "x"});
+        assert!(!group.evaluate(present.as_object().unwrap()).await);
+    }
+
+    #[tokio::test]
+    async fn test_condition_group_null_operators() {
+        use config::utils::json::json;
+
+        let schema = Schema::new(vec![Field::new("err", DataType::Utf8, true)]);
+        let group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![ConditionItem::Condition(ConditionItemCondition {
+                column: "err".to_string(),
+                operator: Operator::IsNull,
+                value: Value::String(String::new()),
+                ignore_case: None,
+                logical_operator: LogicalOperator::And,
+            })],
+        };
+
+        assert_eq!(group.to_sql(&schema).await.unwrap(), "(\"err\" IS NULL)");
+        let empty = json!({});
+        assert!(group.evaluate(empty.as_object().unwrap()).await);
+        let present = json!({"err": "x"});
+        assert!(!group.evaluate(present.as_object().unwrap()).await);
+    }
+
     // ── build_expr sync unit tests ───────────────────────────────────────────
 
     fn make_cond(column: &str, operator: Operator, value: Value) -> Condition {
@@ -2513,6 +2828,73 @@ mod tests {
     }
 
     #[test]
+    fn test_build_expr_null_operators_any_type() {
+        let cond = make_cond("msg", Operator::IsNull, Value::String(String::new()));
+        let expr = build_expr(&cond, "", &DataType::Utf8).unwrap();
+        assert_eq!(expr, "\"msg\" IS NULL");
+
+        let cond = make_cond("code", Operator::IsNull, Value::String(String::new()));
+        let expr = build_expr(&cond, "", &DataType::Int64).unwrap();
+        assert_eq!(expr, "\"code\" IS NULL");
+
+        let cond = make_cond("msg", Operator::IsNotNull, Value::String(String::new()));
+        let expr = build_expr(&cond, "", &DataType::Utf8).unwrap();
+        assert_eq!(expr, "\"msg\" IS NOT NULL");
+    }
+
+    #[test]
+    fn test_build_expr_utf8view_value_comparisons() {
+        let cond = make_cond(
+            "level",
+            Operator::EqualTo,
+            Value::String("error".to_string()),
+        );
+        let expr = build_expr(&cond, "", &DataType::Utf8View).unwrap();
+        assert_eq!(expr, "\"level\" = 'error'");
+
+        let cond = make_cond("msg", Operator::Contains, Value::String("oom".to_string()));
+        let expr = build_expr(&cond, "", &DataType::Utf8View).unwrap();
+        assert_eq!(expr, "str_match(\"msg\", 'oom')");
+
+        let cond = make_cond(
+            "msg",
+            Operator::NotContains,
+            Value::String("spam".to_string()),
+        );
+        let expr = build_expr(&cond, "", &DataType::Utf8View).unwrap();
+        assert_eq!(expr, "\"msg\" NOT LIKE '%spam%'");
+    }
+
+    #[test]
+    fn test_build_expr_empty_operators() {
+        let cond = make_cond("msg", Operator::IsEmpty, Value::String(String::new()));
+        let expr = build_expr(&cond, "", &DataType::Utf8).unwrap();
+        assert_eq!(expr, "(\"msg\" IS NULL OR \"msg\" = '')");
+
+        let cond = make_cond("msg", Operator::IsNotEmpty, Value::String(String::new()));
+        let expr = build_expr(&cond, "", &DataType::Utf8).unwrap();
+        assert_eq!(expr, "(\"msg\" IS NOT NULL AND \"msg\" != '')");
+
+        // Utf8View is a string type too — it must get the empty-string check.
+        let cond = make_cond("msg", Operator::IsEmpty, Value::String(String::new()));
+        let expr = build_expr(&cond, "", &DataType::Utf8View).unwrap();
+        assert_eq!(expr, "(\"msg\" IS NULL OR \"msg\" = '')");
+
+        let cond = make_cond("msg", Operator::IsNotEmpty, Value::String(String::new()));
+        let expr = build_expr(&cond, "", &DataType::Utf8View).unwrap();
+        assert_eq!(expr, "(\"msg\" IS NOT NULL AND \"msg\" != '')");
+
+        // Non-string columns can only be "empty" by being null.
+        let cond = make_cond("code", Operator::IsEmpty, Value::String(String::new()));
+        let expr = build_expr(&cond, "", &DataType::Int64).unwrap();
+        assert_eq!(expr, "\"code\" IS NULL");
+
+        let cond = make_cond("code", Operator::IsNotEmpty, Value::String(String::new()));
+        let expr = build_expr(&cond, "", &DataType::Int64).unwrap();
+        assert_eq!(expr, "\"code\" IS NOT NULL");
+    }
+
+    #[test]
     fn test_build_expr_int_greater_than() {
         let cond = make_cond(
             "code",
@@ -2557,5 +2939,468 @@ mod tests {
         let cond = make_cond("b", Operator::EqualTo, Value::String("maybe".to_string()));
         let result = build_expr(&cond, "", &DataType::Boolean);
         assert!(result.is_err());
+    }
+
+    /// An integral threshold serialized as a float (`json!(1.0_f64)`, which the
+    /// widened HAVING value always is) must not fall through `as_i64() == None`
+    /// to a silent 0 — that replaces the user's threshold with "anything above
+    /// zero" and the alert fires on every evaluation.
+    #[test]
+    fn test_build_expr_int_float_valued_number_is_not_zeroed() {
+        let cond = make_cond(
+            "code",
+            Operator::GreaterThan,
+            Value::Number(serde_json::Number::from_f64(400.0).unwrap()),
+        );
+        let expr = build_expr(&cond, "", &DataType::Int64).unwrap();
+        assert_eq!(expr, "\"code\" > 400");
+    }
+
+    #[test]
+    fn test_build_expr_int_fractional_number_kept() {
+        let cond = make_cond(
+            "code",
+            Operator::LessThan,
+            Value::Number(serde_json::Number::from_f64(1.5).unwrap()),
+        );
+        let expr = build_expr(&cond, "", &DataType::Int64).unwrap();
+        assert_eq!(expr, "\"code\" < 1.5");
+    }
+
+    // ── Aggregation SQL: group_by identifiers ───────────────────────────────
+
+    fn agg_schema() -> Schema {
+        Schema::new(vec![
+            Field::new("host", DataType::Utf8, false),
+            Field::new("region", DataType::Utf8, false),
+            Field::new("latency", DataType::Int64, false),
+        ])
+    }
+
+    fn group_agg(group_by: &[&str], multi_alert: bool) -> Aggregation {
+        Aggregation {
+            group_by: Some(group_by.iter().map(|s| s.to_string()).collect()),
+            function: AggFunction::Avg,
+            having: make_cond(
+                "latency",
+                Operator::GreaterThan,
+                Value::Number(serde_json::Number::from(100)),
+            ),
+            warning_value: None,
+            multi_alert,
+        }
+    }
+
+    #[test]
+    fn test_build_aggregation_sql_quotes_group_by_columns() {
+        let agg = group_agg(&["host", "region"], false);
+        let sql = build_aggregation_sql("svc", &agg_schema(), &agg, "").unwrap();
+        assert_eq!(
+            sql,
+            "SELECT \"host\", \"region\", AVG(\"latency\") AS alert_agg_value, MIN(_timestamp) as zo_sql_min_time, MAX(_timestamp) AS zo_sql_max_time FROM \"svc\" GROUP BY \"host\", \"region\" HAVING \"alert_agg_value\" > 100"
+        );
+    }
+
+    #[test]
+    fn test_build_aggregation_sql_multi_alert_quotes_group_by_in_order_by() {
+        let agg = group_agg(&["host"], true);
+        let sql = build_aggregation_sql("svc", &agg_schema(), &agg, " WHERE 1 = 1").unwrap();
+        assert_eq!(
+            sql,
+            "SELECT \"host\", AVG(\"latency\") AS alert_agg_value, MIN(_timestamp) as zo_sql_min_time, MAX(_timestamp) AS zo_sql_max_time FROM \"svc\" WHERE 1 = 1 GROUP BY \"host\" ORDER BY CASE WHEN \"alert_agg_value\" > 100 THEN 2 ELSE 0 END DESC, \"host\""
+        );
+    }
+
+    #[test]
+    fn test_build_aggregation_sql_rejects_group_by_entry_not_in_schema() {
+        for entry in [
+            "nonexistent",
+            "host, (SELECT secret FROM \"other\" LIMIT 1)",
+            "host\" FROM \"other\" --",
+            "",
+        ] {
+            let agg = group_agg(&["host", entry], false);
+            let err = build_aggregation_sql("svc", &agg_schema(), &agg, "")
+                .unwrap_err()
+                .to_string();
+            assert_eq!(
+                err,
+                format!("Group by column {entry} not found on stream svc"),
+                "entry {entry:?} must be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn test_build_aggregation_sql_escapes_quotes_inside_schema_backed_identifiers() {
+        let tricky = "host\" FROM \"other\" --";
+        let schema = Schema::new(vec![
+            Field::new(tricky, DataType::Utf8, false),
+            Field::new("lat\"ency", DataType::Int64, false),
+        ]);
+        let mut agg = group_agg(&[tricky], false);
+        agg.having.column = "lat\"ency".to_string();
+        let sql = build_aggregation_sql("svc", &schema, &agg, "").unwrap();
+        assert_eq!(
+            sql,
+            "SELECT \"host\"\" FROM \"\"other\"\" --\", AVG(\"lat\"\"ency\") AS alert_agg_value, MIN(_timestamp) as zo_sql_min_time, MAX(_timestamp) AS zo_sql_max_time FROM \"svc\" GROUP BY \"host\"\" FROM \"\"other\"\" --\" HAVING \"alert_agg_value\" > 100"
+        );
+    }
+
+    #[test]
+    fn test_build_expr_escapes_quotes_inside_column_name() {
+        let cond = make_cond(
+            "lev\"el",
+            Operator::EqualTo,
+            Value::String("error".to_string()),
+        );
+        let expr = build_expr(&cond, "", &DataType::Utf8).unwrap();
+        assert_eq!(expr, "\"lev\"\"el\" = 'error'");
+        let expr = build_expr(&cond, "al\"ias", &DataType::Utf8).unwrap();
+        assert_eq!(expr, "\"al\"\"ias\" = 'error'");
+    }
+
+    #[test]
+    fn test_build_aggregation_sql_empty_group_by_collapses_to_single_row() {
+        let mut agg = group_agg(&[], false);
+        let sql = build_aggregation_sql("svc", &agg_schema(), &agg, "").unwrap();
+        assert!(!sql.contains("GROUP BY"), "{sql}");
+        agg.group_by = None;
+        assert_eq!(
+            build_aggregation_sql("svc", &agg_schema(), &agg, "").unwrap(),
+            sql
+        );
+    }
+
+    #[test]
+    fn test_quoted_group_by_reports_first_unknown_column() {
+        let schema = agg_schema();
+        assert_eq!(
+            quoted_group_by(&schema, &["host".into(), "region".into()]),
+            Ok(vec!["\"host\"".to_string(), "\"region\"".to_string()])
+        );
+        assert_eq!(
+            quoted_group_by(&schema, &["host".into(), "a".into(), "b".into()]),
+            Err("a".to_string())
+        );
+        let quoted = Schema::new(vec![Field::new("a\"b", DataType::Utf8, false)]);
+        assert_eq!(
+            quoted_group_by(&quoted, &["a\"b".into()]),
+            Ok(vec!["\"a\"\"b\"".to_string()])
+        );
+    }
+
+    // ── HAVING clause type resolution ───────────────────────────────────────
+
+    fn make_agg(function: AggFunction, operator: Operator, value: Value) -> Aggregation {
+        Aggregation {
+            group_by: None,
+            function,
+            having: make_cond("host", operator, value),
+            warning_value: None,
+            multi_alert: false,
+        }
+    }
+
+    /// #13786: `COUNT` over a string column is Int64, so the threshold must be
+    /// an unquoted integer. Typing the comparison from the column emitted
+    /// `< '1.0'`, which DataFusion cannot cast to Int64 — the query failed with
+    /// "Cast error: Cannot cast string '1.0' to value of Int64 type".
+    #[test]
+    fn test_build_having_expr_count_over_string_column() {
+        let agg = make_agg(
+            AggFunction::Count,
+            Operator::LessThan,
+            Value::Number(serde_json::Number::from(1)),
+        );
+        let expr = build_having_expr(&agg, &DataType::Utf8).unwrap();
+        assert_eq!(expr, "\"alert_agg_value\" < 1");
+    }
+
+    #[test]
+    fn test_build_having_expr_count_over_int_column() {
+        let agg = make_agg(
+            AggFunction::Count,
+            Operator::GreaterThanEquals,
+            Value::Number(serde_json::Number::from(10)),
+        );
+        let expr = build_having_expr(&agg, &DataType::Int64).unwrap();
+        assert_eq!(expr, "\"alert_agg_value\" >= 10");
+    }
+
+    /// The threshold reaches the clause as an f64 no matter how it was stored,
+    /// so an integer column must still get its exact threshold and not 0.
+    #[test]
+    fn test_build_having_expr_avg_over_int_column_keeps_threshold() {
+        let agg = make_agg(
+            AggFunction::Avg,
+            Operator::GreaterThan,
+            Value::Number(serde_json::Number::from(100)),
+        );
+        let expr = build_having_expr(&agg, &DataType::Int64).unwrap();
+        assert_eq!(expr, "\"alert_agg_value\" > 100");
+    }
+
+    #[test]
+    fn test_build_having_expr_fractional_threshold() {
+        let agg = make_agg(
+            AggFunction::Avg,
+            Operator::GreaterThan,
+            Value::Number(serde_json::Number::from_f64(99.5).unwrap()),
+        );
+        let expr = build_having_expr(&agg, &DataType::Float64).unwrap();
+        assert_eq!(expr, "\"alert_agg_value\" > 99.5");
+    }
+
+    /// A numeric string threshold is a documented shape of `having.value`.
+    #[test]
+    fn test_build_having_expr_string_threshold() {
+        let agg = make_agg(
+            AggFunction::Count,
+            Operator::GreaterThan,
+            Value::String("5".to_string()),
+        );
+        let expr = build_having_expr(&agg, &DataType::Utf8).unwrap();
+        assert_eq!(expr, "\"alert_agg_value\" > 5");
+    }
+
+    /// With a warning band the clause widens to the LESS severe threshold, and
+    /// that widened value goes through the same typing.
+    #[test]
+    fn test_build_having_expr_widens_to_warning_threshold() {
+        let mut agg = make_agg(
+            AggFunction::Count,
+            Operator::GreaterThan,
+            Value::Number(serde_json::Number::from(100)),
+        );
+        agg.warning_value = Some(50.0);
+        let expr = build_having_expr(&agg, &DataType::Utf8).unwrap();
+        assert_eq!(expr, "\"alert_agg_value\" > 50");
+    }
+
+    #[test]
+    fn test_having_data_type_by_function() {
+        // COUNT is Int64 regardless of the column it counts.
+        assert_eq!(
+            having_data_type(&AggFunction::Count, &DataType::Utf8),
+            DataType::Int64
+        );
+        // Averages and percentiles are Float64.
+        for func in [
+            AggFunction::Avg,
+            AggFunction::Median,
+            AggFunction::P50,
+            AggFunction::P75,
+            AggFunction::P90,
+            AggFunction::P95,
+            AggFunction::P99,
+        ] {
+            assert_eq!(
+                having_data_type(&func, &DataType::Int64),
+                DataType::Float64,
+                "{func} should compare as Float64"
+            );
+        }
+        // MIN/MAX/SUM return their input type.
+        for func in [AggFunction::Min, AggFunction::Max, AggFunction::Sum] {
+            assert_eq!(
+                having_data_type(&func, &DataType::Int64),
+                DataType::Int64,
+                "{func} should keep the column type"
+            );
+        }
+        assert_eq!(
+            having_data_type(&AggFunction::Max, &DataType::Utf8),
+            DataType::Utf8
+        );
+    }
+
+    // A workflow carries the alert payload UNFLATTENED, but the field picker submits the
+    // flattened key (`meta_alert_count`) as the column. Both shapes must resolve, or every
+    // condition saved before workflows stopped flattening would silently stop matching.
+    #[tokio::test]
+    async fn test_resolve_column_flat_key_against_nested_record() {
+        let row = match serde_json::json!({
+            "meta": {"alert_count": 50, "alert_name": "verify"},
+            "data": []
+        }) {
+            Value::Object(m) => m,
+            _ => unreachable!(),
+        };
+
+        assert_eq!(
+            resolve_column(&row, "meta_alert_count"),
+            Some(&Value::from(50))
+        );
+        assert_eq!(
+            resolve_column(&row, "meta_alert_name"),
+            Some(&Value::from("verify"))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_resolve_column_dotted_path_against_nested_record() {
+        let row = match serde_json::json!({"meta": {"alert_count": 50}}) {
+            Value::Object(m) => m,
+            _ => unreachable!(),
+        };
+
+        assert_eq!(
+            resolve_column(&row, "meta.alert_count"),
+            Some(&Value::from(50))
+        );
+    }
+
+    // The ingest path still hands over an already-flattened row; a literal key wins
+    // outright so nothing about pipelines changes.
+    #[tokio::test]
+    async fn test_resolve_column_prefers_literal_key() {
+        let row = match serde_json::json!({
+            "meta_alert_count": 7,
+            "meta": {"alert_count": 50}
+        }) {
+            Value::Object(m) => m,
+            _ => unreachable!(),
+        };
+
+        assert_eq!(
+            resolve_column(&row, "meta_alert_count"),
+            Some(&Value::from(7))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_resolve_column_missing_is_none() {
+        let row = match serde_json::json!({"meta": {"alert_count": 50}}) {
+            Value::Object(m) => m,
+            _ => unreachable!(),
+        };
+
+        assert_eq!(resolve_column(&row, "meta_missing_field"), None);
+        assert_eq!(resolve_column(&row, "nope"), None);
+    }
+
+    // A nested record must satisfy a saved flat-key condition end to end.
+    #[tokio::test]
+    async fn test_evaluate_condition_matches_nested_record_via_flat_key() {
+        let row = match serde_json::json!({
+            "meta": {"alert_count": 50, "alert_name": "verify"},
+            "data": []
+        }) {
+            Value::Object(m) => m,
+            _ => unreachable!(),
+        };
+
+        assert!(
+            evaluate_condition(
+                &row,
+                "meta_alert_count",
+                &Operator::EqualTo,
+                &Value::from(50),
+                false
+            )
+            .await
+        );
+        assert!(
+            !evaluate_condition(
+                &row,
+                "meta_alert_count",
+                &Operator::EqualTo,
+                &Value::from(51),
+                false
+            )
+            .await
+        );
+    }
+
+    // The branch builder saves thresholds as strings ("500"), so a numeric field must
+    // still compare numerically — lexically "700" < "500" would misroute every branch.
+    #[tokio::test]
+    async fn test_evaluate_condition_numeric_field_against_string_threshold() {
+        let row = match serde_json::json!({ "meta": {"alert_count": 700} }) {
+            Value::Object(m) => m,
+            _ => unreachable!(),
+        };
+
+        assert!(
+            evaluate_condition(
+                &row,
+                "meta_alert_count",
+                &Operator::GreaterThan,
+                &Value::from("500"),
+                false
+            )
+            .await,
+            "700 > \"500\" must hold numerically"
+        );
+        assert!(
+            !evaluate_condition(
+                &row,
+                "meta_alert_count",
+                &Operator::GreaterThan,
+                &Value::from("900"),
+                false
+            )
+            .await,
+            "700 > \"900\" must be false"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_evaluate_condition_null_checks_see_nested_record() {
+        let row = match serde_json::json!({"meta": {"alert_name": "verify"}}) {
+            Value::Object(m) => m,
+            _ => unreachable!(),
+        };
+
+        assert!(
+            evaluate_condition(
+                &row,
+                "meta_alert_name",
+                &Operator::IsNotNull,
+                &Value::Null,
+                false
+            )
+            .await
+        );
+        assert!(
+            evaluate_condition(&row, "meta_absent", &Operator::IsNull, &Value::Null, false).await
+        );
+    }
+
+    #[tokio::test]
+    async fn test_check_query_streams_join_enrichment_table() {
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org_id = "test_org_alert_join_enrich";
+        let logs_key = format!("{org_id}/{}/app", StreamType::Logs);
+        let enrich_key = format!("{org_id}/{}/geo", StreamType::EnrichmentTables);
+        let schema = Schema::new(vec![Field::new("ip", DataType::Utf8, true)]);
+        {
+            let mut w = STREAM_SCHEMAS_LATEST.write().await;
+            w.insert(logs_key.clone(), SchemaCache::new(schema.clone()));
+            w.insert(enrich_key.clone(), SchemaCache::new(schema));
+        }
+
+        let sql =
+            r#"SELECT a.ip FROM "app" AS a JOIN "enrichment_tables"."geo" AS b ON a.ip = b.ip"#;
+        let missing_sql =
+            r#"SELECT a.ip FROM "app" AS a JOIN "enrichment_tables"."nope" AS b ON a.ip = b.ip"#;
+        let ok = check_query_streams(org_id, StreamType::Logs, sql, 10).await;
+        let missing = check_query_streams(org_id, StreamType::Logs, missing_sql, 10).await;
+
+        {
+            let mut w = STREAM_SCHEMAS_LATEST.write().await;
+            w.remove(&logs_key);
+            w.remove(&enrich_key);
+        }
+
+        assert!(ok.is_ok(), "join with enrichment table rejected: {ok:?}");
+        assert!(
+            missing
+                .unwrap_err()
+                .to_string()
+                .contains("\"nope\" not found")
+        );
     }
 }

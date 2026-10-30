@@ -36,12 +36,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 import { computed } from "vue";
 import KeyValueRow from "./KeyValueRow.vue";
 
 interface Field {
   key: string;
-  label: string;
+  label: I18nText;
   value: any;
   valueClass?: string;
   slot?: boolean;
@@ -49,7 +50,7 @@ interface Field {
 }
 
 interface Props {
-  title: string;
+  title: I18nText;
   fields: Field[];
   dataTest?: string;
 }

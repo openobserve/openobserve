@@ -39,29 +39,29 @@ const treeSpan = (
 // the `traceTree` array TraceDetails builds — one entry per root span.
 export const patternTraceTrees = {
   // Baseline: single root, root service calls one downstream service
-  singleRoot: [treeSpan("a1", "alertmanager", "", [treeSpan("q1", "querier", "a1", [], 80)], 100)],
+  singleRoot: [treeSpan("a1", "scheduler", "", [treeSpan("q1", "querier", "a1", [], 80)], 100)],
   // Two root spans with distinct services, each with its own downstream call
   multiRootDistinctServices: [
-    treeSpan("a1", "alertmanager", "", [treeSpan("q1", "querier", "a1", [], 80)], 100),
+    treeSpan("a1", "scheduler", "", [treeSpan("q1", "querier", "a1", [], 80)], 100),
     treeSpan("i1", "ingester", "", [treeSpan("c1", "compactor", "i1", [], 40)], 60),
   ],
   // Two root spans that belong to the same service, no cross-service calls
   multiRootSameService: [
-    treeSpan("a1", "alertmanager", "", [], 100),
-    treeSpan("a2", "alertmanager", "", [], 50),
+    treeSpan("a1", "scheduler", "", [], 100),
+    treeSpan("a2", "scheduler", "", [], 50),
   ],
   // Two root spans whose services call each other (cyclic service relationship)
   multiRootCyclicServices: [
-    treeSpan("a1", "alertmanager", "", [treeSpan("q1", "querier", "a1", [], 80)], 100),
-    treeSpan("q2", "querier", "", [treeSpan("a2", "alertmanager", "q2", [], 30)], 50),
+    treeSpan("a1", "scheduler", "", [treeSpan("q1", "querier", "a1", [], 80)], 100),
+    treeSpan("q2", "querier", "", [treeSpan("a2", "scheduler", "q2", [], 30)], 50),
   ],
   // Root span calling another service, plus an orphan root of that same child service
   multiRootOrphanChildService: [
-    treeSpan("a1", "alertmanager", "", [treeSpan("q1", "querier", "a1", [], 80)], 100),
+    treeSpan("a1", "scheduler", "", [treeSpan("q1", "querier", "a1", [], 80)], 100),
     treeSpan("q2", "querier", "missing-parent", [], 30),
   ],
   // Single root span, single service, no relationships at all
-  singleServiceOnly: [treeSpan("a1", "alertmanager", "", [], 100)],
+  singleServiceOnly: [treeSpan("a1", "scheduler", "", [], 100)],
 };
 
 export default {
@@ -77,7 +77,7 @@ export default {
               duration: 295986,
               end_time: 1755853746921707300,
               operation_name: "service:alerts:evaluate_scheduled",
-              service_name: "alertmanager",
+              service_name: "scheduler",
               span_status: "UNSET",
               start_time: 1755853746625720300,
               trace_id: "eab4575014a1fe101dba7de80a3cf6c3",
@@ -85,7 +85,7 @@ export default {
             service_name: [
               {
                 count: 4,
-                service_name: "alertmanager",
+                service_name: "scheduler",
               },
               {
                 count: 31,
@@ -121,8 +121,8 @@ export default {
           reference_parent_span_id: "d4b07e603e2fa32f",
           reference_parent_trace_id: "eab4575014a1fe101dba7de80a3cf6c3",
           reference_ref_type: "ChildOf",
-          service_name: "alertmanager",
-          service_service_instance: "dev2-openobserve-alertmanager-0",
+          service_name: "scheduler",
+          service_service_instance: "dev2-openobserve-scheduler-0",
           service_service_version: "v0.15.0-rc5",
           span_id: "6b080023171f5767",
           span_kind: "1",
@@ -152,8 +152,8 @@ export default {
           reference_parent_span_id: "6b080023171f5767",
           reference_parent_trace_id: "eab4575014a1fe101dba7de80a3cf6c3",
           reference_ref_type: "ChildOf",
-          service_name: "alertmanager",
-          service_service_instance: "dev2-openobserve-alertmanager-0",
+          service_name: "scheduler",
+          service_service_instance: "dev2-openobserve-scheduler-0",
           service_service_version: "v0.15.0-rc5",
           span_id: "d427ced59acf399b",
           span_kind: "1",
@@ -185,8 +185,8 @@ export default {
           reference_parent_span_id: "d427ced59acf399b",
           reference_parent_trace_id: "eab4575014a1fe101dba7de80a3cf6c3",
           reference_ref_type: "ChildOf",
-          service_name: "alertmanager",
-          service_service_instance: "dev2-openobserve-alertmanager-0",
+          service_name: "scheduler",
+          service_service_instance: "dev2-openobserve-scheduler-0",
           service_service_version: "v0.15.0-rc5",
           span_id: "bf6bde74cdcc245f",
           span_kind: "1",

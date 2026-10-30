@@ -41,6 +41,25 @@ describe("synthetics route builders", () => {
     });
   });
 
+  it("opens the status-pages tab and omits section for checks", () => {
+    expect(syntheticsListRoute(CTX, { section: "status-pages" })).toEqual({
+      name: "synthetics",
+      query: { org_identifier: "acme", folder: "f_ksuid_01", section: "status-pages" },
+    });
+    expect(syntheticsListRoute(CTX, { section: "checks" })).toEqual({
+      name: "synthetics",
+      query: { org_identifier: "acme", folder: "f_ksuid_01" },
+    });
+  });
+
+  it("merges extra query params into the results route", () => {
+    expect(syntheticsResultsRoute(CTX, "m1", { extra: { period: "1h", run: "r1" } })).toEqual({
+      name: "synthetic-monitor-results",
+      params: { id: "m1" },
+      query: { org_identifier: "acme", folder: "f_ksuid_01", period: "1h", run: "r1" },
+    });
+  });
+
   it("carries the folder and type into the create wizard", () => {
     expect(syntheticsCreateRoute(CTX, "browser")).toEqual({
       name: "synthetics-add",

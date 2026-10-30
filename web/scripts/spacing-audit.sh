@@ -17,7 +17,7 @@ if ! command -v rg >/dev/null 2>&1; then
 fi
 
 OUT=/tmp
-EXCL=(-g '!*.spec.*' -g '!test/**' -g '!__mocks__/**' -g '!assets/dashboard/echarts.min.js')
+EXCL=(-g '!*.spec.*' -g '!test/**' -g '!__mocks__/**')
 PROPS='(?:p|px|py|pt|pr|pb|pl|m|mx|my|mt|mr|mb|ml|gap|gap-x|gap-y|space-x|space-y)'
 
 echo "== 1. Tailwind spacing utility histogram =="

@@ -17,10 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="sessions_page flex min-h-0 flex-1 flex-col overflow-hidden">
     <div>
-      <div class="bg-card-glass-bg border-border-default px-page-edge border-b py-1.5">
-        <div class="flex items-start gap-1">
+      <div
+        class="bg-card-glass-bg border-border-default px-page-edge border-b py-1.5"
+        data-drawer-anchor="rum-errors-toolbar"
+      >
+        <div class="flex items-start gap-1 max-md:flex-wrap">
           <!-- Query editor (flex-grow to fill available space) -->
-          <div class="relative min-w-0 flex-1">
+          <div class="relative min-w-0 flex-1 max-md:basis-full">
             <QueryEditor
               ref="errorQueryEditorRef"
               editor-id="rum-errors-query-editor"
@@ -34,7 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 errorEditorHeight,
               ]"
               v-model:query="errorTrackingState.data.editorValue"
-              :debounce-time="300"
+              :debounce-time="100"
+              :filter-mode="true"
               :keywords="effectiveKeywords"
               :suggestions="effectiveSuggestions"
               :field-value-resolver="resolveFieldValues"
@@ -44,14 +48,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <div
               v-if="!errorTrackingState.data.editorValue && !editorFocused"
-              class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start py-0.75 pr-2 pb-0 pl-[2.15rem] select-none"
+              class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start py-0.75 ps-[2.15rem] pe-2 pb-0 select-none"
             >
               <span class="query-editor-placeholder-typewriter">{{ editorPlaceholder }}</span>
             </div>
           </div>
 
           <!-- Controls on the right -->
-          <div class="flex shrink-0 items-start gap-1">
+          <div class="flex shrink-0 items-start gap-1 max-md:w-full max-md:flex-wrap">
+            <OButton
+              variant="outline"
+              size="icon-toolbar"
+              icon-left="menu"
+              class="md:hidden"
+              data-test="rum-errors-mobile-fields-btn"
+              @click="mobileFieldsOpen = true"
+            >
+              <OTooltip :content="t('search.showFields')" />
+            </OButton>
             <SyntaxGuide />
             <DateTime
               auto-apply
@@ -86,6 +100,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :column-visibility="columnVisibility"
               @update:column-visibility="setColumnVisibility"
             />
+            <ShareButton
+              ref="shareButtonRef"
+              data-test="rum-app-errors-share-link-btn"
+              :url="shareUrl"
+              variant="outline"
+              size="icon-toolbar"
+              shortcut-id="rumErrorsCopyUrl"
+              class="shrink-0"
+            />
           </div>
           <!-- end controls -->
         </div>
@@ -94,14 +117,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- end bg-card-glass-bg -->
     </div>
     <!-- end toolbar wrapper -->
+    <ODrawer
+      v-if="isMobile"
+      v-model:open="mobileFieldsOpen"
+      side="left"
+      :width="80"
+      bleed
+      :title="t('search.showFields')"
+      anchor='[data-drawer-anchor="rum-errors-toolbar"]'
+      data-test="rum-errors-mobile-fields-drawer"
+    >
+      <SearchFieldList
+        :fields="streamFields"
+        :time-stamp="{
+          startTime: dateTime.startTime,
+          endTime: dateTime.endTime,
+        }"
+        :stream-name="errorTrackingState.data.stream.errorStream"
+        stream-type="logs"
+        :enable-grouping="true"
+        :query="errorTrackingState.data.editorValue"
+        :base-filter="fieldListBaseFilter"
+        @event-emitted="handleSidebarEvent"
+      />
+    </ODrawer>
     <OSplitter
       class="logs-horizontal-splitter min-h-0 flex-1"
       v-model="splitterModel"
       unit="px"
       :horizontal="false"
+      :limits="isMobile ? [0, 0] : undefined"
     >
       <template #before>
-        <div class="bg-surface-panel border-border-default h-full overflow-auto border-r py-1">
+        <div
+          v-if="!isMobile"
+          class="bg-surface-panel border-border-default h-full overflow-auto border-e py-1"
+        >
           <SearchFieldList
             :fields="streamFields"
             :time-stamp="{
@@ -120,9 +171,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #after>
         <div class="flex h-full min-h-0 flex-col">
           <!-- Errors-over-time chart + KPI summary -->
-          <div class="px-page-edge grid h-44 shrink-0 grid-cols-1 gap-2 pt-1.5 lg:grid-cols-5">
+          <!-- Stacked < lg the grid must size itself, or it overflows into the filter bar below. -->
+          <div
+            class="px-page-edge grid shrink-0 grid-cols-1 gap-2 pt-1.5 max-lg:auto-rows-min lg:h-44 lg:grid-cols-5"
+          >
             <ErrorsOverTimeChart
-              class="lg:col-span-3"
+              class="max-lg:min-h-40 lg:col-span-3"
               :buckets="chartSeries"
               :deploy="latestDeploy"
               :spike-factor="deploySpikeFactor"
@@ -241,6 +295,8 @@ import {
   defineAsyncComponent,
   watch,
 } from "vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { rangesFromServerError, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useSqlSuggestions from "@/composables/useSuggestions";
@@ -270,17 +326,19 @@ import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import { cloneDeep } from "lodash-es";
 import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import useStreams from "@/composables/useStreams";
 import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ShareButton from "@/components/common/ShareButton.vue";
+import useRum from "@/composables/rum/useRum";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import NoData from "@/components/shared/grid/NoData.vue";
 
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const dateTime = ref({
   startTime: 0,
   endTime: 0,
@@ -289,6 +347,15 @@ const dateTime = ref({
 });
 const streamFields: Ref<any[]> = ref([]);
 const splitterModel = ref(250);
+const { isMobile } = useBreakpoint();
+const mobileFieldsOpen = ref(false);
+watch(
+  isMobile,
+  (mobile) => {
+    splitterModel.value = mobile ? 0 : 250;
+  },
+  { immediate: true },
+);
 const editorFocused = ref(false);
 const errorQueryEditorRef = ref<any>(null);
 
@@ -326,14 +393,18 @@ const {
   resolveFieldValues,
 } = useSqlSuggestions();
 
+// Set as soon as the page mounts, so a value lookup on the first keystroke is not left without a stream.
+const syncSuggestStreamContext = () => {
+  autoCompleteData.value.org = store.state.selectedOrganization?.identifier ?? "";
+  autoCompleteData.value.streamType = "logs";
+  autoCompleteData.value.streamName = errorTrackingState.data.stream.errorStream;
+};
 const updateAutoComplete = (value: string) => {
   _sqlOnQueryChange();
   autoCompleteData.value.query = value;
   autoCompleteData.value.cursorIndex = errorQueryEditorRef.value?.getCursorIndex?.();
   autoCompleteData.value.popup.open = errorQueryEditorRef.value?.triggerAutoComplete;
-  autoCompleteData.value.org = store.state.selectedOrganization.identifier;
-  autoCompleteData.value.streamType = "logs";
-  autoCompleteData.value.streamName = errorTrackingState.data.stream.errorStream;
+  syncSuggestStreamContext();
   getSuggestions();
 };
 
@@ -345,6 +416,7 @@ const { placeholder: editorPlaceholder } = useQueryPlaceholder(
   computed(() => ({})),
   _sqlMode,
   _noStream,
+  t,
 );
 const { errorTrackingState } = useErrorTracking();
 const {
@@ -361,7 +433,7 @@ const {
   cancelAll,
   fetchTrend,
   lastQueryError,
-} = useErrorIssuesData();
+} = useErrorIssuesData(t);
 
 // Turn the last issues-search server error into editor squiggles (filter mode).
 watch(lastQueryError, async (err) => {
@@ -379,9 +451,14 @@ watch(lastQueryError, async (err) => {
   });
 });
 const store = useStore();
+watch(
+  () => [store.state.selectedOrganization?.identifier, errorTrackingState.data.stream.errorStream],
+  syncSuggestStreamContext,
+  { immediate: true },
+);
 const isLoading: Ref<true[]> = ref([]);
 const isMounted = ref(false);
-const { getStream } = useStreams();
+const { getStream } = useStreams(t);
 const schemaMapping: Ref<{ [key: string]: boolean }> = ref({});
 
 const tableErrors = computed(() =>
@@ -555,6 +632,7 @@ const userDataSet = new Set([
   "geo_info_location_accuracy_radius",
   "source",
   "oo_evp_origin",
+  "o2_evp_origin",
   "session_has_replay",
   "version",
   "env",
@@ -566,8 +644,10 @@ const userDataSet = new Set([
   "usr_name",
   "user_agent_os_family",
   "oo_evp_origin_version",
+  "o2_evp_origin_version",
   "ip",
   "oosource",
+  "o2source",
   "user_agent_user_agent_major",
   "geo_info_country",
   "error_stack",
@@ -576,6 +656,9 @@ const userDataSet = new Set([
 ]);
 
 const router = useRouter();
+
+const { shareUrl } = useRum();
+const shareButtonRef = ref<InstanceType<typeof ShareButton> | null>(null);
 
 onBeforeMount(() => {
   restoreUrlQueryParams();
@@ -697,13 +780,6 @@ const handleRowClick = (row: any) => {
   handleErrorTypeClick({ row });
 };
 
-// Severity spine flush against the row's left edge — same mechanism and
-// colors as the sessions table, for cross-page consistency.
-const getIssueStatusColor = (row: any) => {
-  if (row.error_handling === "handled") return "var(--color-severity-warning-color)";
-  return "var(--color-severity-error-color)";
-};
-
 function restoreUrlQueryParams() {
   const queryParams = router.currentRoute.value.query;
 
@@ -762,6 +838,10 @@ useShortcuts([
     handler: () => {
       if (!isInputFocused()) runQuery();
     },
+  },
+  {
+    id: "rumErrorsCopyUrl",
+    handler: () => shareButtonRef.value?.handleShareClick(),
   },
 ]);
 </script>

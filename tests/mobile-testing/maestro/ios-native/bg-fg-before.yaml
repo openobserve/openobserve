@@ -1,0 +1,9 @@
+appId: com.o2native.ios
+---
+# Record MainViewController (viewA), then background with the Home key. Foreground is done OUTSIDE
+# this flow via `simctl launch` (activates without terminating → same process → same session);
+# Maestro's launchApp would cold-restart the app and start a NEW session.
+- launchApp:
+    clearState: false
+- assertVisible: "O2 Native iOS"
+- pressKey: Home

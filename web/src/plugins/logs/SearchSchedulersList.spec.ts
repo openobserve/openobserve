@@ -4,16 +4,20 @@ import SearchSchedulersList from "@/plugins/logs/SearchSchedulersList.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { nextTick } from "vue";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 
 // Mock services
-vi.mock("@/services/search", () => ({
-  default: {
-    get_scheduled_search_list: vi.fn(),
-    cancel_scheduled_search: vi.fn(),
-    retry_scheduled_search: vi.fn(),
-    delete_scheduled_search: vi.fn(),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_scheduled_search_list: vi.fn(),
+      cancel_scheduled_search: vi.fn(),
+      retry_scheduled_search: vi.fn(),
+      delete_scheduled_search: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/aws-exports", () => ({
   default: {
@@ -72,7 +76,8 @@ vi.mock("@/utils/date", () => ({
 }));
 
 // Mock utils
-vi.mock("@/utils/zincutils", () => ({
+vi.mock("@/utils/zincutils", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   timestampToTimezoneDate: vi.fn(),
   b64EncodeUnicode: vi.fn((str) => btoa(str)),
   b64DecodeUnicode: vi.fn((str) => atob(str)),
@@ -94,6 +99,7 @@ describe("SearchSchedulersList Component", () => {
   beforeEach(async () => {
     // Reset mocks
     vi.clearAllMocks();
+    resetListViewState();
 
     // Setup search service mock
     const { default: searchServiceMock } = await import("@/services/search");
@@ -455,7 +461,7 @@ describe("SearchSchedulersList Component", () => {
     });
 
     it("should copy text to clipboard successfully", async () => {
-      await wrapper.vm.copyToClipboard("test text", {
+      await wrapper.vm.copyToClipboard("test text", i18n.global.t, {
         successMessage: "Query Copied Successfully!",
         timeout: 5000,
       });
@@ -471,7 +477,7 @@ describe("SearchSchedulersList Component", () => {
     it("should handle clipboard error", async () => {
       navigator.clipboard.writeText.mockRejectedValueOnce(new Error("Failed"));
 
-      await wrapper.vm.copyToClipboard("test text", "Query");
+      await wrapper.vm.copyToClipboard("test text", i18n.global.t);
 
       expect(mockToast).toHaveBeenCalledWith({
         variant: "error",
@@ -481,7 +487,7 @@ describe("SearchSchedulersList Component", () => {
     });
 
     it("should handle different content types", async () => {
-      await wrapper.vm.copyToClipboard("function code", {
+      await wrapper.vm.copyToClipboard("function code", i18n.global.t, {
         successMessage: "Function Copied Successfully!",
         timeout: 5000,
       });
@@ -564,6 +570,12 @@ describe("SearchSchedulersList Component", () => {
       expect(wrapper.vm.toBeDeletedJob).toEqual(mockJob);
     });
 
+    it("gives the delete confirm a destructive button and leaves cancel-job plain", () => {
+      const [deleteDialog, cancelDialog] = wrapper.findAllComponents({ name: "ConfirmDialog" });
+      expect(deleteDialog.props("okVariant")).toBe("destructive");
+      expect(cancelDialog.props("okVariant")).not.toBe("destructive");
+    });
+
     it("should set up cancel confirmation", () => {
       wrapper.vm.confirmCancelJob(mockJob);
 
@@ -600,7 +612,7 @@ describe("SearchSchedulersList Component", () => {
       store.state.zoConfig.usage_publish_interval = 180;
 
       const delayMsg = wrapper.vm.delayMessage;
-      expect(delayMsg).toBe("3 minute(s)");
+      expect(delayMsg).toBe("3 minutes");
     });
 
     it("should handle exactly 60 seconds", () => {
@@ -614,7 +626,7 @@ describe("SearchSchedulersList Component", () => {
       store.state.zoConfig.usage_publish_interval = 7200;
 
       const delayMsg = wrapper.vm.delayMessage;
-      expect(delayMsg).toBe("120 minute(s)");
+      expect(delayMsg).toBe("120 minutes");
     });
   });
 
@@ -827,7 +839,6 @@ describe("SearchSchedulersList Component", () => {
 
     it("should have loading and result tracking", () => {
       expect(typeof wrapper.vm.isLoading).toBe("boolean");
-      expect(typeof wrapper.vm.resultTotal).toBe("number");
       expect(typeof wrapper.vm.showSearchResults).toBe("boolean");
     });
 
@@ -836,6 +847,43 @@ describe("SearchSchedulersList Component", () => {
       expect(typeof wrapper.vm.confirmCancel).toBe("boolean");
       expect(typeof wrapper.vm.toBeDeletedJob).toBe("object");
       expect(typeof wrapper.vm.toBeCancelled).toBe("object");
+    });
+  });
+
+  describe("View state restore", () => {
+    const mountList = () =>
+      mount(SearchSchedulersList, {
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: { OTable: true, AppTabs: true, QueryEditor: true, ConfirmDialog: true },
+          mocks: { $router: mockRouter },
+        },
+      });
+
+    it("restores page, size and sort", () => {
+      resetListViewState();
+      useListViewState("searchSchedulers", {
+        pageSize: 10,
+        currentPage: 3,
+        sortBy: "created_at",
+        sortOrder: "desc",
+      });
+      const restored = mountList();
+      expect(restored.vm.pageSize).toBe(10);
+      expect(restored.vm.currentPage).toBe(3);
+      expect(restored.vm.sortBy).toBe("created_at");
+      expect(restored.vm.sortOrder).toBe("desc");
+      restored.unmount();
+    });
+
+    it("saves changes to the view state", async () => {
+      wrapper.vm.pageSize = 50;
+      wrapper.vm.sortBy = "user_id";
+      await nextTick();
+      const saved: any = useListViewState("searchSchedulers", {});
+      expect(saved.pageSize).toBe(50);
+      expect(saved.sortBy).toBe("user_id");
     });
   });
 });

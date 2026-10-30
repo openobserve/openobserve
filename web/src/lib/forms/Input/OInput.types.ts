@@ -1,6 +1,8 @@
 // Copyright 2026 OpenObserve Inc.
 
-export type InputSize = "sm" | "md";
+import type { I18nText } from "@/types/i18n";
+
+export type InputSize = "xs" | "sm" | "md";
 
 /**
  * Semantic field width — maps to pre-defined CSS tokens.
@@ -35,13 +37,13 @@ export interface InputProps {
   /** HTML input type — use `textarea` for a multi-line field */
   type?: InputType;
   /** Floating / static label */
-  label?: string;
+  label?: I18nText;
   /** Placeholder text */
-  placeholder?: string;
+  placeholder?: I18nText;
   /** Helper text displayed below the field */
-  helpText?: string;
+  helpText?: I18nText;
   /** Error message — when provided the field shows error styling */
-  errorMessage?: string;
+  errorMessage?: I18nText;
   /** Marks the field as being in an error state without a message */
   error?: boolean;
   /** Text prefix rendered inside the field (left) */
@@ -50,6 +52,11 @@ export interface InputProps {
   suffix?: string;
   /** Shows a ✕ button to clear the field */
   clearable?: boolean;
+  /**
+   * Adds a show/hide toggle to a `type="password"` field. Ignored for every
+   * other type — revealing a value only means anything when it starts masked.
+   */
+  revealable?: boolean;
   /** Prevents value editing */
   readonly?: boolean;
   /** Prevents interaction */
@@ -66,6 +73,12 @@ export interface InputProps {
   mask?: string;
   /** Maximum character length — shows a counter when set */
   maxlength?: number;
+  /** Minimum value — `type="number"`/`"date"`/`"datetime-local"` only */
+  min?: number | string;
+  /** Maximum value — `type="number"`/`"date"`/`"datetime-local"` only */
+  max?: number | string;
+  /** Step increment — `type="number"` only */
+  step?: number | string;
   /** Rows for textarea type */
   rows?: number;
   /** Control size */

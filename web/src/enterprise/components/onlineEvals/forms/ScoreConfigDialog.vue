@@ -8,7 +8,7 @@
     side="right"
     :width="50"
     data-test="score-config-dialog"
-    :title="drawerTitle"
+    :title="raw(drawerTitle)"
     form-id="score-config-form"
     :secondary-button-label="t('onlineEvals.buttons.cancel')"
     :primary-button-label="t('onlineEvals.buttons.save')"
@@ -19,7 +19,7 @@
     <OForm id="score-config-form" :form="form">
       <div
         v-if="mode === 'edit'"
-        class="rounded-default text-text-body mb-4 flex items-start gap-2.5 border border-[color-mix(in_srgb,var(--color-status-info-text)_20%,transparent)] bg-[color-mix(in_srgb,var(--color-status-info-text)_14%,transparent)] px-3 py-2.5 text-xs leading-normal"
+        class="rounded-default text-text-body border-status-info-text/20 bg-status-info-text/14 mb-4 flex items-start gap-2.5 border px-3 py-2.5 text-xs leading-normal"
       >
         <OIcon name="info" size="xs" class="text-status-info-text mt-px shrink-0" />
         <div class="flex min-w-0 flex-col gap-0.5">
@@ -45,7 +45,11 @@
           :label="t('onlineEvals.scoreConfig.nameLabel')"
           :required="mode === 'create'"
           :disabled="mode === 'edit'"
-          :placeholder="t('onlineEvals.scoreConfig.namePlaceholder')"
+          :placeholder="
+            t('onlineEvals.scoreConfig.namePlaceholder', {
+              example: raw(`&quot;faithfulness&quot;`),
+            })
+          "
           size="sm"
           data-test="score-config-name-input"
         />
@@ -95,11 +99,9 @@
             class="sc-dtype-radio rounded-default min-w-0 flex-1 border transition-[border-color,background] duration-120"
             :class="[
               formValues.dataType === type
-                ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_5%,var(--color-card-bg))]'
+                ? 'border-accent bg-card-bg-tint'
                 : 'border-dialog-header-border bg-card-bg',
-              mode === 'edit'
-                ? ''
-                : 'hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]',
+              mode === 'edit' ? '' : 'hover:border-dialog-header-border-accent',
             ]"
           >
             <ORadio
@@ -171,7 +173,7 @@
       <!-- Boolean info banner -->
       <div
         v-if="formValues.dataType === 'boolean'"
-        class="border-dialog-header-border rounded-default text-text-body mb-4 flex items-start gap-2.5 border bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] px-3 py-2.5 text-xs leading-normal"
+        class="border-dialog-header-border rounded-default text-text-body bg-text-secondary/12 mb-4 flex items-start gap-2.5 border px-3 py-2.5 text-xs leading-normal"
       >
         <OIcon name="info" size="xs" class="text-text-secondary mt-px shrink-0" />
         <span>
@@ -181,7 +183,7 @@
 
       <!-- Healthy threshold -->
       <div
-        class="border-dialog-header-border rounded-default mt-1 border bg-[color-mix(in_srgb,var(--color-primary-600)_2.5%,var(--color-card-bg))] px-3.5 pt-3 pb-2.5"
+        class="border-dialog-header-border rounded-default bg-card-bg-tint-faint mt-1 border px-3.5 pt-3 pb-2.5"
       >
         <div class="mb-3 flex items-center gap-2.5">
           <span class="inline-flex items-center gap-1">
@@ -192,7 +194,7 @@
             <OIcon name="info-outline" size="sm" class="text-text-secondary">
               <OTooltip
                 :content="t('onlineEvals.scoreConfig.healthyThresholdIntro')"
-                max-width="300px"
+                max-width="18.75rem"
               />
             </OIcon>
           </span>
@@ -207,21 +209,23 @@
           <!-- Narrow drawers (<51.25rem): stack so the label + input don't crush. -->
           <div class="flex flex-col gap-2.5 min-[51.25rem]:flex-row">
             <label
-              class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 border px-3 py-1.5 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
+              class="rounded-default hover:border-dialog-header-border-accent grid min-w-0 flex-1 cursor-pointer grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 border px-3 py-1.5 transition-[border-color,background] duration-120"
               :class="
                 formValues.healthyDirection === 'gte'
-                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
+                  ? 'border-accent bg-card-bg-tint-subtle'
                   : 'border-dialog-header-border bg-card-bg'
               "
             >
               <input
                 type="radio"
-                class="sc-radio"
+                class="sc-radio checked:border-radio-checked-border"
                 value="gte"
                 :checked="formValues.healthyDirection === 'gte'"
                 @change="form.setFieldValue('healthyDirection', 'gte')"
               />
-              <span class="text-text-body text-center font-mono text-lg font-bold">≥</span>
+              <span class="text-text-body text-center font-mono text-lg font-bold">{{
+                t("onlineEvals.scoreConfig.gteSymbol")
+              }}</span>
               <span class="text-compact text-text-body">{{
                 t("onlineEvals.scoreConfig.gteLabel")
               }}</span>
@@ -230,27 +234,29 @@
                 type="number"
                 size="sm"
                 field-width="xs"
-                :placeholder="String(defaultGteValue)"
+                :placeholder="raw(String(defaultGteValue))"
                 data-test="score-config-gte-value-input"
                 @focus="form.setFieldValue('healthyDirection', 'gte')"
               />
             </label>
             <label
-              class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 border px-3 py-1.5 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
+              class="rounded-default hover:border-dialog-header-border-accent grid min-w-0 flex-1 cursor-pointer grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 border px-3 py-1.5 transition-[border-color,background] duration-120"
               :class="
                 formValues.healthyDirection === 'lte'
-                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
+                  ? 'border-accent bg-card-bg-tint-subtle'
                   : 'border-dialog-header-border bg-card-bg'
               "
             >
               <input
                 type="radio"
-                class="sc-radio"
+                class="sc-radio checked:border-radio-checked-border"
                 value="lte"
                 :checked="formValues.healthyDirection === 'lte'"
                 @change="form.setFieldValue('healthyDirection', 'lte')"
               />
-              <span class="text-text-body text-center font-mono text-lg font-bold">≤</span>
+              <span class="text-text-body text-center font-mono text-lg font-bold">{{
+                t("onlineEvals.scoreConfig.lteSymbol")
+              }}</span>
               <span class="text-compact text-text-body">{{
                 t("onlineEvals.scoreConfig.lteLabel")
               }}</span>
@@ -259,7 +265,7 @@
                 type="number"
                 size="sm"
                 field-width="xs"
-                :placeholder="String(defaultLteValue)"
+                :placeholder="raw(String(defaultLteValue))"
                 data-test="score-config-lte-value-input"
                 @focus="form.setFieldValue('healthyDirection', 'lte')"
               />
@@ -276,7 +282,8 @@
             v-if="formValues.categories.length === 0"
             class="text-2xs text-text-secondary border-dialog-header-border rounded-default bg-card-bg border border-dashed px-3 py-2.5 italic"
           >
-            {{ t("onlineEvals.scoreConfig.addCategoryPlaceholder") }}…
+            {{ t("onlineEvals.scoreConfig.addCategoryPlaceholder")
+            }}{{ t("onlineEvals.scoreConfig.ellipsis") }}
           </div>
           <div
             v-else
@@ -285,7 +292,7 @@
             <label
               v-for="cat in formValues.categories"
               :key="cat"
-              class="rounded-default flex cursor-pointer items-center gap-2.5 px-2.5 py-1.75 transition-[background] duration-120 hover:bg-[color-mix(in_srgb,var(--color-text-heading)_6%,transparent)]"
+              class="rounded-default hover:bg-text-heading/6 flex cursor-pointer items-center gap-2.5 px-2.5 py-1.75 transition-[background] duration-120"
               :class="
                 formValues.healthyCategories.includes(cat)
                   ? 'bg-[color-mix(in_srgb,color-mix(in_srgb,var(--color-status-success-text)_14%,transparent)_35%,transparent)]'
@@ -294,7 +301,7 @@
             >
               <input
                 type="checkbox"
-                class="sc-checkbox"
+                class="sc-checkbox checked:bg-checkbox-checked-bg checked:border-checkbox-checked-border"
                 :checked="formValues.healthyCategories.includes(cat)"
                 @change="toggleHealthyCategory(cat)"
               />
@@ -315,16 +322,16 @@
           <!-- Narrow drawers (<51.25rem): stack so the label + hint don't crush. -->
           <div class="flex flex-col gap-2.5 min-[51.25rem]:flex-row">
             <label
-              class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1rem_1fr] items-start gap-2.5 border px-3 py-1.75 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
+              class="rounded-default hover:border-dialog-header-border-accent grid min-w-0 flex-1 cursor-pointer grid-cols-[1rem_1fr] items-start gap-2.5 border px-3 py-1.75 transition-[border-color,background] duration-120"
               :class="
                 formValues.healthyBool === true
-                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
+                  ? 'border-accent bg-card-bg-tint-subtle'
                   : 'border-dialog-header-border bg-card-bg'
               "
             >
               <input
                 type="radio"
-                class="sc-radio"
+                class="sc-radio checked:border-radio-checked-border"
                 :value="true"
                 :checked="formValues.healthyBool === true"
                 @change="form.setFieldValue('healthyBool', true)"
@@ -339,16 +346,16 @@
               </div>
             </label>
             <label
-              class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1rem_1fr] items-start gap-2.5 border px-3 py-1.75 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
+              class="rounded-default hover:border-dialog-header-border-accent grid min-w-0 flex-1 cursor-pointer grid-cols-[1rem_1fr] items-start gap-2.5 border px-3 py-1.75 transition-[border-color,background] duration-120"
               :class="
                 formValues.healthyBool === false
-                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
+                  ? 'border-accent bg-card-bg-tint-subtle'
                   : 'border-dialog-header-border bg-card-bg'
               "
             >
               <input
                 type="radio"
-                class="sc-radio"
+                class="sc-radio checked:border-radio-checked-border"
                 :value="false"
                 :checked="formValues.healthyBool === false"
                 @change="form.setFieldValue('healthyBool', false)"
@@ -378,7 +385,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OFormTagInput from "@/lib/forms/TagInput/OFormTagInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -411,7 +418,7 @@ const emit = defineEmits<{
   (e: "cancel"): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Drawer open state — starts open (parent mounts this only when creating/editing
 // a score config). Any dismiss path (× / Escape / overlay) flows through
@@ -589,11 +596,7 @@ function buildHealthyThreshold(v: ScoreConfigForm) {
   return { healthy_value: v.healthyBool };
 }
 
-// @submit handler — OForm only calls this once the schema passes (name required
-// + the create-only slug pattern; there is no min<max ordering rule). A
-// categorical config with zero categories is allowed (buildCategories() just
-// sends `categories: null`). The handler builds the payload from the validated
-// `value` only. OForm awaits this, so the ODrawer Save spinner spans the save.
+// OForm calls this only after the schema passes and awaits it, so the Save spinner spans the save.
 async function save(value: ScoreConfigForm) {
   if (!props.orgId) return;
   try {
@@ -649,21 +652,12 @@ async function save(value: ScoreConfigForm) {
 /* keep(generated-content): the healthy-threshold choice controls are native
    <input type="radio"|"checkbox">; their checked affordance is drawn with
    ::after on the input itself, which no utility can express. */
-.sc-radio:checked {
-  border-color: var(--color-primary-600);
-}
-
 .sc-radio:checked::after {
   content: "";
   width: 0.4375rem;
   height: 0.4375rem;
   border-radius: var(--radius-full);
-  background: var(--color-primary-600);
-}
-
-.sc-checkbox:checked {
-  background: var(--color-primary-600);
-  border-color: var(--color-primary-600);
+  background: var(--color-accent);
 }
 
 .sc-checkbox:checked::after {

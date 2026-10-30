@@ -13,6 +13,32 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { resolveSeverityFieldValue, type KnownLogSeverityLevel } from "@/utils/logs/statusParser";
+
+const SOURCE_EVENT_SEVERITY_FIELDS: ReadonlyArray<readonly [string, string]> = [
+  ["severity_text", "severity_text"],
+  ["severityText", "severity_text"],
+  ["severity", "severity"],
+  ["level", "level"],
+  ["loglevel", "loglevel"],
+  ["log_level", "log_level"],
+  ["severity_number", "severity_number"],
+  ["severityNumber", "severity_number"],
+];
+
+const SOURCE_EVENT_VOCABULARY: Readonly<Record<KnownLogSeverityLevel, string>> = {
+  emergency: "FATAL",
+  alert: "FATAL",
+  critical: "FATAL",
+  error: "ERROR",
+  warning: "WARN",
+  notice: "WARN",
+  info: "INFO",
+  ok: "INFO",
+  debug: "DEBUG",
+  trace: "TRACE",
+};
+
 /**
  * Normalize a log row's severity into a human-readable label for the source
  * event banner.
@@ -63,25 +89,11 @@ export function normalizeSeverity(raw: string | number | null | undefined): stri
   return null;
 }
 
-/**
- * Pull the best-available severity field from a log row and normalize it.
- * Returns null when no field is set or all values are unrecognized.
- */
 export function extractSeverity(row: Record<string, any> | null | undefined): string | null {
   if (!row) return null;
-  const candidates = [
-    row.severity_text,
-    row.severityText,
-    row.severity,
-    row.level,
-    row.loglevel,
-    row.log_level,
-    row.severity_number,
-    row.severityNumber,
-  ];
-  for (const candidate of candidates) {
-    const normalized = normalizeSeverity(candidate);
-    if (normalized) return normalized;
+  for (const [alias, field] of SOURCE_EVENT_SEVERITY_FIELDS) {
+    const resolved = resolveSeverityFieldValue(field, row[alias]);
+    if (resolved) return SOURCE_EVENT_VOCABULARY[resolved.level];
   }
   return null;
 }

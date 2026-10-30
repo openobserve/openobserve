@@ -113,10 +113,13 @@ module.exports = defineConfig({
     navigationTimeout: process.env.CI ? 90000 : 30000,
     actionTimeout: process.env.CI ? 45000 : 15000,
     screenshot: process.env.CI ? 'only-on-failure' : 'off',
-    video: process.env.CI ? 'retain-on-failure' : 'off',
+    video: 'off',
   },
 
-  timeout: process.env.CI ? 5 * 60 * 1000 : 3 * 60 * 1000,
+  // beforeEach pays navigateToBase plus the one-per-worker fixture ingestion against the
+  // shared cloud org, and the multi-panel specs legitimately run 2.4-3.0 min after that.
+  // A 3 min local cap left them timing out in setup rather than on any real assertion.
+  timeout: 5 * 60 * 1000,
 
   expect: {
     timeout: process.env.CI ? 30000 : 10000,

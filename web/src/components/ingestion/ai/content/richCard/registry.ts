@@ -18,6 +18,8 @@
 // its data-source-ui.md (see buildFromMarkdown.ts). No per-provider code and no
 // list to maintain here — add frontmatter in the content repo and it lights up.
 
+import type { TranslateFn } from "@/types/i18n";
+
 import type { CardSubstitutions, RichCardContent } from "@/components/ingestion/setupCard/types";
 import { getAICardRaw } from "../index";
 import { parseFrontmatter } from "./parseFrontmatter";
@@ -36,9 +38,10 @@ export function hasRichCard(slug: string | undefined): boolean {
 export function getRichCardContent(
   slug: string | undefined,
   subs: CardSubstitutions,
+  t: TranslateFn,
 ): RichCardContent | undefined {
   if (!slug) return undefined;
   const md = getAICardRaw(slug);
   if (!md) return undefined;
-  return buildFromMarkdown(slug, md, subs) ?? undefined;
+  return buildFromMarkdown(slug, md, subs, t) ?? undefined;
 }

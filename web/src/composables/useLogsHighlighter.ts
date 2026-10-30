@@ -20,21 +20,18 @@
  * Provides the core highlighting logic that can be used with caching.
  */
 
-import { useTextHighlighter } from "@/composables/useTextHighlighter";
+import type { TranslateFn } from "@/types/i18n";
+import { useTextHighlighter, scopeHighlightQuery } from "@/composables/useTextHighlighter";
 import { getThemeColors } from "@/utils/logs/keyValueParser";
 import { escapeHtml } from "@/utils/html";
 import { ref, watch, onBeforeUnmount, getCurrentInstance } from "vue";
-import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { searchState } from "@/composables/useLogs/searchState";
 
-export function useLogsHighlighter() {
+export function useLogsHighlighter(t: TranslateFn) {
   const processedResults = ref<Record<string, string>>({});
 
-  const store = useStore();
   const { isDark } = useTheme();
   const currentColors = ref(getThemeColors(isDark.value));
-  const { searchObj } = searchState();
 
   // Track active processing to prevent memory leaks
   let abortController: AbortController | null = null;
@@ -67,8 +64,13 @@ export function useLogsHighlighter() {
     },
   );
 
-  const { processTextWithHighlights, extractKeywords, splitTextByKeywords, isFTSColumn } =
-    useTextHighlighter();
+  const {
+    processTextWithHighlights,
+    extractKeywords,
+    extractHighlightPatterns,
+    splitTextByKeywords,
+    isFTSColumn,
+  } = useTextHighlighter();
 
   /**
    * Process hits array in chunks to avoid blocking the main thread
@@ -96,6 +98,11 @@ export function useLogsHighlighter() {
     if (!hits || hits.length === 0 || !columns || columns.length === 0) {
       return processedResults.value;
     }
+
+    // Scoping depends only on (query, column), so it runs once per column, not per cell
+    const columnQueries = columns.map((column) =>
+      column.id === "source" ? queryString : scopeHighlightQuery(queryString, column.id),
+    );
 
     // Split hits into chunks
     const chunks = [];
@@ -143,7 +150,8 @@ export function useLogsHighlighter() {
             ),
             showBraces: columns[columnIndex].id === "source",
             showQuotes: columns[columnIndex].id === "source",
-            queryString,
+            // Field filters highlight only their own column; source scopes per key
+            queryString: columnQueries[columnIndex],
           });
 
           batchUpdates[cacheKey] = processedHtml;
@@ -294,7 +302,7 @@ export function useLogsHighlighter() {
   const truncateLargeContent = (data: any, maxSize: number = 50000): string => {
     if (typeof data === "string") {
       if (data.length > maxSize) {
-        return data.substring(0, maxSize) + `... [truncated, original size: ${data.length} chars]`;
+        return data.substring(0, maxSize) + t("search.contentTruncated", { size: data.length });
       }
       return data;
     }
@@ -304,13 +312,12 @@ export function useLogsHighlighter() {
         const jsonStr = JSON.stringify(data);
         if (jsonStr.length > maxSize) {
           return (
-            jsonStr.substring(0, maxSize) +
-            `... [truncated, original size: ${jsonStr.length} chars]`
+            jsonStr.substring(0, maxSize) + t("search.contentTruncated", { size: jsonStr.length })
           );
         }
         return jsonStr;
       } catch (error) {
-        return "[Object too large to display]";
+        return t("search.objectTooLargeToDisplay");
       }
     }
 
@@ -425,7 +432,7 @@ export function useLogsHighlighter() {
     if (!text || !queryString) return escapeHtml(text);
 
     const keywords = extractKeywords(queryString);
-    const parts = splitTextByKeywords(text, keywords);
+    const parts = splitTextByKeywords(text, keywords, extractHighlightPatterns(queryString));
 
     return parts
       .map((part) => {
@@ -496,7 +503,11 @@ export function useLogsHighlighter() {
     showQuotes: boolean = false,
   ): string {
     const keywords = extractKeywords(queryString);
-    const highlightParts = splitTextByKeywords(text, keywords);
+    const highlightParts = splitTextByKeywords(
+      text,
+      keywords,
+      extractHighlightPatterns(queryString),
+    );
 
     let result = "";
 
@@ -582,7 +593,11 @@ export function useLogsHighlighter() {
     }
 
     const entries = Object.entries(obj);
+    const allFieldsQuery = queryString;
     entries.forEach(([key, value], index) => {
+      // Field filters (str_match, re_match, ...) highlight only their own key
+      const queryString = scopeHighlightQuery(allFieldsQuery, key);
+
       // KEYS: Always colored, never highlighted
       let keyContent = "";
 
@@ -768,12 +783,12 @@ export function useLogsHighlighter() {
         let processedValue = value;
         if (typeof value === "string" && value.length > 100000) {
           processedValue =
-            value.substring(0, 100000) + `... [field truncated, ${value.length} chars]`;
+            value.substring(0, 100000) + t("search.fieldTruncated", { size: value.length });
         } else if (typeof value === "object" && value !== null) {
           const valueStr = JSON.stringify(value);
           if (valueStr.length > 100000) {
             processedValue =
-              valueStr.substring(0, 100000) + `... [field truncated, ${valueStr.length} chars]`;
+              valueStr.substring(0, 100000) + t("search.fieldTruncated", { size: valueStr.length });
           }
         }
 

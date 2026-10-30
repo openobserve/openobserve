@@ -1,13 +1,13 @@
 ﻿<script setup lang="ts">
 import { computed } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useGreeting } from "./useGreeting";
 import { getImageURL } from "@/utils/zincutils";
 import { useTheme } from "@/composables/useTheme";
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const email = computed<string>(() => store.state.userInfo?.email ?? "");
 const role = computed<string>(() => store.state.currentuser?.role ?? "");
@@ -26,33 +26,39 @@ const logoSrc = computed(() =>
   <header class="welcome-hero flex max-w-[44rem] flex-col items-center gap-2.5 text-center">
     <div class="welcome-hero__row flex items-center gap-3.5">
       <div class="welcome-hero__logo-wrap relative inline-flex">
+        <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
         <span
-          class="welcome-hero__logo-halo pointer-events-none absolute inset-[-18px] z-0 rounded-full bg-[radial-gradient(closest-side,rgba(123,97,255,0.35),rgba(245,158,11,0.12)_55%,transparent_70%)] blur-[14px]"
+          class="welcome-hero__logo-halo pointer-events-none absolute inset-[-1.125rem] z-0 rounded-full bg-[radial-gradient(closest-side,rgba(123,97,255,0.35),rgba(245,158,11,0.12)_55%,transparent_70%)] blur-[14px]"
           aria-hidden="true"
         ></span>
-        <img :src="logoSrc" alt="O2 Assistant" class="welcome-hero__logo relative z-1 h-14 w-14" />
+        <!-- eslint-enable local/no-hardcoded-px -->
+        <img
+          :src="logoSrc"
+          :alt="t('aiAssistant.welcome.taglineHighlight')"
+          class="welcome-hero__logo relative z-1 h-14 w-14 max-md:h-10 max-md:w-10"
+        />
       </div>
 
       <div class="welcome-hero__heading-block flex items-center">
         <div
-          class="welcome-hero__title text-typography-body m-0 flex items-center gap-2 text-3xl leading-[1.15] font-bold tracking-[-0.01em]"
+          class="welcome-hero__title text-typography-body m-0 flex items-center gap-2 text-3xl leading-[1.15] font-bold tracking-[-0.01em] max-md:text-2xl"
         >
           {{ greeting }}
           <span
             class="welcome-hero__wave inline-block [transform-origin:70%_70%] text-2xl leading-none"
             aria-hidden="true"
-            >👋</span
+            >{{ t("aiAssistant.welcome.wave") }}</span
           >
         </div>
       </div>
     </div>
 
     <div
-      class="welcome-hero__tagline text-typography-meta m-0 mt-1 max-w-[38rem] text-sm leading-[1.6]"
+      class="welcome-hero__tagline text-typography-meta m-0 mt-1 max-w-[38rem] text-sm leading-[1.6] max-md:mt-0 max-md:text-xs"
     >
       {{ t("aiAssistant.welcome.taglineLead") }}
       <span
-        class="welcome-hero__highlight bg-[image:var(--color-gradient-brand-ribbon)] [background-clip:text] font-semibold text-transparent [-webkit-background-clip:text]"
+        class="welcome-hero__highlight bg-gradient-brand-ribbon [background-clip:text] font-semibold text-transparent [-webkit-background-clip:text]"
         >{{ t("aiAssistant.welcome.taglineHighlight") }}</span
       >{{ t("aiAssistant.welcome.taglineTail") }}
       <span
@@ -63,17 +69,17 @@ const logoSrc = computed(() =>
         class="welcome-hero__code welcome-hero__code--vrl rounded-default text-lang-vrl-text bg-lang-vrl-bg px-1.5 py-px font-mono text-xs font-semibold tracking-[0.01em]"
         >{{ t("aiAssistant.welcome.taglineVrl") }}</span
       >
-      and
+      {{ t("common.and") }}
       <span
         class="welcome-hero__code welcome-hero__code--promql rounded-default text-lang-promql-text bg-lang-promql-bg px-1.5 py-px font-mono text-xs font-semibold tracking-[0.01em]"
-        >{{ t("aiAssistant.welcome.taglinePromql") }}</span
+        >{{ raw("PromQL") }}</span
       >
-      — {{ t("aiAssistant.welcome.taglineAnd") }}
+      {{ t("aiAssistant.welcome.taglineDash") }} {{ t("aiAssistant.welcome.taglineAnd") }}
     </div>
 
     <div
       v-if="email"
-      class="welcome-hero__meta text-2xs mt-1.5 inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 rounded-full bg-[color-mix(in_srgb,var(--color-border-default)_30%,transparent)] px-3 py-1.5"
+      class="welcome-hero__meta text-2xs bg-border-default/30 mt-1.5 inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 rounded-full px-3 py-1.5 max-md:hidden"
     >
       <span class="welcome-hero__meta-item inline-flex items-center gap-1">
         <span class="welcome-hero__meta-label text-typography-meta">{{

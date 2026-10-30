@@ -19,8 +19,18 @@ import { useStreamDetect } from "./useStreamDetect";
 const nameList = vi.fn();
 const search = vi.fn();
 
-vi.mock("@/services/stream", () => ({ default: { nameList: (...a: any[]) => nameList(...a) } }));
-vi.mock("@/services/search", () => ({ default: { search: (...a: any[]) => search(...a) } }));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { nameList: (...a: any[]) => nameList(...a) },
+  });
+});
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { search: (...a: any[]) => search(...a) },
+  });
+});
 
 // The six sqlserver_* metric streams a real collector run produces.
 const SQLSERVER_STREAMS = [
@@ -57,6 +67,55 @@ describe("useStreamDetect", () => {
     expect(d.count.value).toBe(SQLSERVER_STREAMS.length);
     // Existence is proof — keyword mode must NOT hit _search.
     expect(search).not.toHaveBeenCalled();
+  });
+
+  it('keyword "system_" connects on the hostmetrics system_* streams', async () => {
+    // The tightened host-agent keyword (design 4.5): underscore included.
+    nameList.mockResolvedValue({
+      data: { list: [{ name: "system_cpu_time" }, { name: "system_memory_usage" }] },
+    });
+
+    const d = useStreamDetect({
+      config: () => ({
+        orgId: "default",
+        streamType: "metrics",
+        streamName: "system_",
+        match: "keyword",
+        filter: "",
+      }),
+    });
+
+    await d.check();
+
+    expect(d.connected.value).toBe(true);
+    expect(d.count.value).toBe(2);
+  });
+
+  it('keyword "system_" does NOT match an underscore-less near-miss like mysystemd', async () => {
+    // nameList filters by substring server-side — the mock must behave like that API.
+    nameList.mockImplementation(
+      (_org: any, _type: any, _schema: any, _f: any, _t: any, kw: string) => {
+        const all = ["mysystemd", "systemdaemon_metrics"];
+        return Promise.resolve({
+          data: { list: all.filter((n) => n.includes(kw)).map((name) => ({ name })) },
+        });
+      },
+    );
+
+    const d = useStreamDetect({
+      config: () => ({
+        orgId: "default",
+        streamType: "metrics",
+        streamName: "system_",
+        match: "keyword",
+        filter: "",
+      }),
+    });
+
+    await d.check();
+
+    expect(d.connected.value).toBe(false);
+    expect(d.stalled.value).toBe(true);
   });
 
   it("exact mode (the regression) does NOT connect on a substring-only match", async () => {

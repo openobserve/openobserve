@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { raw, type I18nText } from "@/types/i18n";
 // Copyright 2026 OpenObserve Inc.
 //
 // OTimeCell — the ONE timestamp renderer for every table.
@@ -12,7 +13,7 @@
 //   <OTimeCell :value="row.timestamp" unit="ms" :timezone="store.state.timezone" />
 
 import { computed } from "vue";
-import { formatDistanceToNowStrict } from "date-fns";
+import { formatDistanceStrict } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
@@ -32,7 +33,7 @@ const props = withDefaults(
     /** IANA timezone for the absolute rendering. Defaults to the browser zone. */
     timezone?: string;
     /** Text shown when the value is empty/zero/invalid. Default "—". */
-    emptyLabel?: string;
+    emptyLabel?: I18nText;
     /**
      * In "relative" mode, only show "x ago" for timestamps within this many
      * days; older ones fall back to an absolute date (e.g. "Jun 24, 2024").
@@ -40,8 +41,10 @@ const props = withDefaults(
      * past the cutoff we show the real date. Default 30.
      */
     relativeCutoffDays?: number;
+    /** Current epoch ms for the relative text; pass a ticking clock (useNow) to keep "x ago" current. */
+    now?: number;
   }>(),
-  { unit: "auto", mode: "relative", emptyLabel: "—", relativeCutoffDays: 30 },
+  { unit: "auto", mode: "relative", emptyLabel: raw("—"), relativeCutoffDays: 30 },
 );
 
 /** Normalise any supported input to epoch milliseconds, or null if invalid. */
@@ -112,11 +115,10 @@ const prettyDate = computed(() => {
  */
 const relative = computed(() => {
   if (epochMs.value === null) return null;
-  const ageMs = Math.abs(Date.now() - epochMs.value);
+  const now = props.now ?? Date.now();
+  const ageMs = Math.abs(now - epochMs.value);
   if (ageMs <= props.relativeCutoffDays * 86_400_000) {
-    return formatDistanceToNowStrict(new Date(epochMs.value), {
-      addSuffix: true,
-    });
+    return formatDistanceStrict(new Date(epochMs.value), now, { addSuffix: true });
   }
   return prettyDate.value;
 });

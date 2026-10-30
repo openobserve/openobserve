@@ -33,6 +33,9 @@ import OTime from "@/lib/forms/Time/OTime.vue";
 import { parseDate } from "@internationalized/date";
 import type { DateValue } from "@internationalized/date";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 const props = withDefaults(defineProps<DateTimeRangeProps>(), {
   startDate: "",
@@ -48,7 +51,8 @@ const props = withDefaults(defineProps<DateTimeRangeProps>(), {
   hideTime: false,
   showTimezone: false,
   disabled: false,
-  placeholder: "Select date range",
+  // No default here: t() cannot run at module scope, so the English fallback is
+  // resolved reactively below (see `placeholderText`).
 });
 
 const emit = defineEmits<DateTimeRangeEmits>();
@@ -127,14 +131,16 @@ const RELATIVE_OPTIONS: Record<RelativeUnit, number[]> = {
   months: [1, 2, 3, 4, 5, 6],
 };
 
-const UNIT_LABELS: Record<RelativeUnit, string> = {
-  seconds: "Seconds",
-  minutes: "Minutes",
-  hours: "Hours",
-  days: "Days",
-  weeks: "Weeks",
-  months: "Months",
-};
+// Computed, not a plain const: resolving once at setup would freeze the labels
+// at whatever locale was active when the picker mounted.
+const UNIT_LABELS = computed<Record<RelativeUnit, I18nText>>(() => ({
+  seconds: t("common.seconds"),
+  minutes: t("common.minutes"),
+  hours: t("common.hours"),
+  days: t("common.days"),
+  weeks: t("common.weeks"),
+  months: t("common.months"),
+}));
 
 const UNIT_TO_HOURS: Record<RelativeUnit, number> = {
   seconds: 1 / 3600,
@@ -159,8 +165,8 @@ const timezones = computed((): string[] => {
   return ["", "UTC", ...list.filter((t) => t !== "UTC")];
 });
 
-function tzLabel(tz: string): string {
-  return tz === "" ? "Browser Time" : tz;
+function tzLabel(tz: string): I18nText {
+  return tz === "" ? t("common.browserTime") : raw(tz);
 }
 
 const tzSearch = ref("");
@@ -179,6 +185,8 @@ function selectTimezone(tz: string) {
 }
 
 // ── Trigger label ──────────────────────────────────────────────
+const placeholderText = computed((): string => props.placeholder ?? t("common.selectDateRange"));
+
 const triggerLabel = computed((): string => {
   if (props.mode === "relative" && (props.relativeAmount ?? 0) > 0) {
     return formatRelativeLabel(props.relativeUnit, props.relativeAmount);
@@ -189,27 +197,23 @@ const triggerLabel = computed((): string => {
     if (start && end) return `${start} → ${end}`;
     return start || end;
   }
-  return props.placeholder ?? "Select date range";
+  return placeholderText.value;
 });
 
+// One whole-sentence pipe-plural key per unit: the unit noun cannot be appended to
+// a translated "Past" fragment because word order differs across languages, and how
+// many plural forms exist is the message's business, not this file's.
+const RELATIVE_LABEL_KEYS: Record<RelativeUnit, I18nKey> = {
+  seconds: "common.pastSecond",
+  minutes: "common.pastMinute",
+  hours: "common.pastHour",
+  days: "common.pastDay",
+  weeks: "common.pastWeek",
+  months: "common.pastMonth",
+};
+
 function formatRelativeLabel(unit: RelativeUnit, amount: number): string {
-  const singular: Record<RelativeUnit, string> = {
-    seconds: "Second",
-    minutes: "Minute",
-    hours: "Hour",
-    days: "Day",
-    weeks: "Week",
-    months: "Month",
-  };
-  const plural: Record<RelativeUnit, string> = {
-    seconds: "Seconds",
-    minutes: "Minutes",
-    hours: "Hours",
-    days: "Days",
-    weeks: "Weeks",
-    months: "Months",
-  };
-  return `Past ${amount} ${amount === 1 ? singular[unit] : plural[unit]}`;
+  return t(RELATIVE_LABEL_KEYS[unit], { count: amount });
 }
 
 // ── Calendar ───────────────────────────────────────────────────
@@ -284,9 +288,7 @@ function handleApply() {
 
 // ── Trigger styling ────────────────────────────────────────────
 const hasError = computed(() => !!props.errorMessage);
-const isPlaceholder = computed(
-  () => triggerLabel.value === (props.placeholder ?? "Select date range"),
-);
+const isPlaceholder = computed(() => triggerLabel.value === placeholderText.value);
 
 const triggerClasses = computed(() => [
   "flex items-center gap-2 w-full min-h-10 px-3 rounded-default border text-sm transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring bg-datepicker-bg",
@@ -370,7 +372,7 @@ const triggerClasses = computed(() => [
       <PopoverContent
         :side-offset="4"
         align="start"
-        class="rounded-default bg-datepicker-popup-bg border-datepicker-popup-border z-50 w-80 border shadow-lg outline-none"
+        class="rounded-default bg-datepicker-popup-bg border-datepicker-popup-border z-50 w-80 border shadow-lg outline-none max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto"
         data-test="datetimerange-popup"
       >
         <!-- Tab bar -->
@@ -390,7 +392,7 @@ const triggerClasses = computed(() => [
             data-test="datetimerange-tab-relative"
             @click="activeTab = 'relative'"
           >
-            Relative
+            {{ t("common.relative") }}
           </button>
           <button
             type="button"
@@ -403,7 +405,7 @@ const triggerClasses = computed(() => [
             data-test="datetimerange-tab-absolute"
             @click="activeTab = 'absolute'"
           >
-            Absolute
+            {{ t("common.absolute") }}
           </button>
         </div>
 
@@ -443,7 +445,9 @@ const triggerClasses = computed(() => [
 
           <!-- Custom row -->
           <div class="border-datepicker-popup-border mt-1 flex items-center gap-2 border-t pt-2">
-            <span class="text-datepicker-relative-label w-14 shrink-0 text-xs">Custom</span>
+            <span class="text-datepicker-relative-label w-14 shrink-0 text-xs">{{
+              t("common.custom")
+            }}</span>
             <input
               v-model="customAmount"
               type="number"
@@ -468,7 +472,7 @@ const triggerClasses = computed(() => [
             v-if="showTimezone"
             class="border-datepicker-popup-border flex flex-col gap-1 border-t pt-2"
           >
-            <span class="text-datepicker-relative-label text-xs">Timezone</span>
+            <span class="text-datepicker-relative-label text-xs">{{ t("common.timezone") }}</span>
             <button
               type="button"
               :disabled="disabled"
@@ -499,7 +503,7 @@ const triggerClasses = computed(() => [
               <input
                 v-model="tzSearch"
                 type="text"
-                placeholder="Search timezone..."
+                :placeholder="t('components.dateTimeRange.searchTimezonePlaceholder')"
                 autofocus
                 class="bg-datepicker-bg text-datepicker-text border-datepicker-inner-border focus:border-datepicker-focus-border placeholder:text-datepicker-placeholder h-7 w-full border-b px-2 text-xs outline-none"
                 data-test="datetimerange-timezone-search"
@@ -523,7 +527,7 @@ const triggerClasses = computed(() => [
                   v-if="filteredTimezones.length === 0"
                   class="text-datepicker-weekday-text px-2 py-2 text-xs"
                 >
-                  No timezones found
+                  {{ t("components.dateTimeRange.noTimezonesFound") }}
                 </div>
               </div>
             </div>
@@ -541,7 +545,7 @@ const triggerClasses = computed(() => [
               data-test="datetimerange-relative-apply"
               @click="commitRelative"
             >
-              Apply
+              {{ t("common.apply") }}
             </button>
           </div>
         </div>
@@ -549,7 +553,7 @@ const triggerClasses = computed(() => [
         <!-- ── ABSOLUTE TAB ──────────────────────────────────── -->
         <div
           v-if="activeTab === 'absolute'"
-          class="flex max-h-[70vh] flex-col gap-3 overflow-y-auto p-3"
+          class="flex max-h-[70vh] flex-col gap-3 overflow-y-auto p-3 max-lg:max-h-none max-lg:overflow-visible"
           data-test="datetimerange-absolute-panel"
         >
           <!-- Range calendar -->
@@ -652,7 +656,7 @@ const triggerClasses = computed(() => [
           >
             <OTime
               v-model="stagedStartTime"
-              label="Start time"
+              :label="t('common.startTime')"
               :with-seconds="withSeconds"
               :disabled="disabled"
               data-test="datetimerange-start-time"
@@ -660,7 +664,7 @@ const triggerClasses = computed(() => [
             />
             <OTime
               v-model="stagedEndTime"
-              label="End time"
+              :label="t('common.endTime')"
               :with-seconds="withSeconds"
               :disabled="disabled"
               data-test="datetimerange-end-time"
@@ -670,7 +674,7 @@ const triggerClasses = computed(() => [
 
           <!-- Timezone -->
           <div v-if="showTimezone" class="flex flex-col gap-1">
-            <span class="text-datepicker-label text-xs">Timezone</span>
+            <span class="text-datepicker-label text-xs">{{ t("common.timezone") }}</span>
             <button
               type="button"
               :disabled="disabled"
@@ -701,7 +705,7 @@ const triggerClasses = computed(() => [
               <input
                 v-model="tzSearch"
                 type="text"
-                placeholder="Search timezone..."
+                :placeholder="t('components.dateTimeRange.searchTimezonePlaceholder')"
                 autofocus
                 class="bg-datepicker-bg text-datepicker-text border-datepicker-inner-border focus:border-datepicker-focus-border placeholder:text-datepicker-placeholder h-9 w-full border-b px-3 text-sm outline-none"
                 data-test="datetimerange-timezone-search"
@@ -725,7 +729,7 @@ const triggerClasses = computed(() => [
                   v-if="filteredTimezones.length === 0"
                   class="text-datepicker-weekday-text px-3 py-2 text-sm"
                 >
-                  No timezones found
+                  {{ t("components.dateTimeRange.noTimezonesFound") }}
                 </div>
               </div>
             </div>
@@ -740,7 +744,7 @@ const triggerClasses = computed(() => [
               data-test="datetimerange-apply"
               @click="handleApply"
             >
-              Apply
+              {{ t("common.apply") }}
             </button>
           </div>
         </div>

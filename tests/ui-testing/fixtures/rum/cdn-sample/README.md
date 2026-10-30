@@ -10,7 +10,7 @@ page render.
 
 | File             | Purpose                                                                    |
 | ---------------- | -------------------------------------------------------------------------- |
-| `oo-rum.js`      | SDK configuration & `init()` — **edit `OO_CONFIG` here** (shared by all pages) |
+| `o2-rum.js`      | SDK configuration & `init()` — **edit `O2_CONFIG` here** (shared by all pages) |
 | `styles.css`     | Shared styles + nav                                                         |
 | `index.html`     | Home — SDK status, session reset, action/error/log buttons                 |
 | `products.html`  | Product list with loading→populated transition; "Add to cart" RUM actions  |
@@ -19,10 +19,10 @@ page render.
 | `app.js`         | Home-page button handlers                                                   |
 
 Every page's `<head>` contains the **same** async loader stub and loads
-`oo-rum.js`, so the SDK initializes on each navigation. Navigating between pages
+`o2-rum.js`, so the SDK initializes on each navigation. Navigating between pages
 produces a **multi-view session** with a continuous **Session Replay**.
 
-The two SDK bundles expose globals `window.OO_RUM` and `window.OO_LOGS`.
+The two SDK bundles expose globals `window.O2_RUM` and `window.O2_LOGS`.
 
 ## Where the SDK bundles come from
 
@@ -32,7 +32,7 @@ the async-loader stub in `<head>`. A specific released version is pinned in the
 HTML; when the app is served by the E2E fixture server
 (`tests/ui-testing/fixtures/rum/serve.js`), the version segment can be
 rewritten to any *released* version (the CDN has no `latest` alias) and the
-`OO_CONFIG` block in `oo-rum.js` is templated with the run's token/site/org.
+`O2_CONFIG` block in `o2-rum.js` is templated with the run's token/site/org.
 
 ### ⚠️ Known CDN caveat: the lazy `chunks/` directory
 
@@ -49,7 +49,7 @@ https://browsersdk.openobserve.ai/<v>/chunks/recorder-…-openobserve-rum.js -> 
 When that happens RUM metrics still work, but the browser console shows
 `ChunkLoadError: Loading chunk recorder failed` and **Session Replay never
 records**. This is a provisioning issue on the OpenObserve CDN, not a config
-error — nothing in `oo-rum.js` can fix it. The E2E suite handles it by
+error — nothing in `o2-rum.js` can fix it. The E2E suite handles it by
 resolving the SDK version **best-effort** (probing candidates against the CDN
 and falling back to the pin — see
 `tests/ui-testing/playwright-tests/utils/rum-sdk-version.js`) and by
@@ -63,7 +63,7 @@ recorder chunk is not served, instead of failing CI on an external outage.
 ## Why the stub in `<head>` (not a tag at end of `<body>`)
 
 - `async` → the bundle download never blocks HTML parsing, other JS, or CSS.
-- The inline stub creates `window.OO_RUM` / `window.OO_LOGS` **synchronously**
+- The inline stub creates `window.O2_RUM` / `window.O2_LOGS` **synchronously**
   as small queue objects, so `init()` / `onReady()` calls made before the
   bundle arrives are buffered and flushed the instant it parses.
 - Result: early **uncaught errors**, **long tasks**, and the **initial render**
@@ -72,7 +72,7 @@ recorder chunk is not served, instead of failing CI on an external outage.
 
 ### Does this track *slow JavaScript*?
 
-Yes — two distinct signals, both enabled in `oo-rum.js`:
+Yes — two distinct signals, both enabled in `o2-rum.js`:
 
 - `trackResources: true` → **slow JS/CSS/image downloads** via Resource Timing.
 - `trackLongTasks: true` → **slow JS execution** (main-thread blocking ≥ 50ms)
@@ -83,10 +83,10 @@ resources that loaded before the SDK finished downloading are still recorded.
 
 ## Configure
 
-Open [`oo-rum.js`](./oo-rum.js) and fill in `OO_CONFIG`:
+Open [`o2-rum.js`](./o2-rum.js) and fill in `O2_CONFIG`:
 
 ```js
-var OO_CONFIG = {
+var O2_CONFIG = {
   clientToken: '<OPENOBSERVE_CLIENT_TOKEN>',          // RUM token
   applicationId: 'web-application-id',
   site: '<OPENOBSERVE_SITE>',                         // host only, no https://, no trailing slash

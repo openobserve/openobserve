@@ -6,7 +6,7 @@
           data-test="attribute-value-cell-dropdown-btn"
           size="icon-xs"
           variant="ghost"
-          aria-label="Add icon"
+          :aria-label="t('components.attributeValueCell.addIcon')"
         >
           <OIcon :name="isDropdownOpen ? 'expand-less' : 'expand-more'" size="xs" />
         </OButton>
@@ -15,16 +15,18 @@
         <slot name="dropdown" :field="field" :value="value" />
       </div>
     </ODropdown>
-    <span class="truncate pl-1">{{ value }}</span>
+    <OTruncatedText class="ps-1">{{ value }}</OTruncatedText>
   </div>
 </template>
 
 <script lang="ts">
 import { computed, ref, useSlots } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 export default {
   name: "AttributeValueCell",
@@ -32,6 +34,7 @@ export default {
     OButton,
     ODropdown,
     OIcon,
+    OTruncatedText,
   },
   props: {
     field: {
@@ -47,11 +50,13 @@ export default {
     const slots = useSlots();
     const hasDropdownSlot = computed(() => !!slots["dropdown"]);
     const isDropdownOpen = ref(false);
+    const { t } = useI18nTyped();
 
     return {
       hasDropdownSlot,
       getImageURL,
       isDropdownOpen,
+      t,
     };
   },
 };

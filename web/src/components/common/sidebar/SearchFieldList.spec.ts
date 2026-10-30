@@ -9,11 +9,14 @@ import streamService from "@/services/stream";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 
 // Mock streamService
-vi.mock("@/services/stream", () => ({
-  default: {
-    fieldValues: vi.fn(),
-  },
-}));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      fieldValues: vi.fn(),
+    },
+  });
+});
 
 // Shared mocks accessible in both the vi.mock factory and test callbacks.
 // vi.hoisted ensures they exist before vi.mock factories run.
@@ -113,6 +116,9 @@ const mockI18n = createI18n({
     en: {
       search: {
         searchField: "Search field",
+      },
+      common: {
+        valueCopiedToClipboard: "Value copied to clipboard",
       },
     },
   },
@@ -696,6 +702,28 @@ describe("FieldList.vue Comprehensive Coverage", () => {
     });
   });
 
+  describe("Embedded Single Quote Escaping", () => {
+    // Regression: a value containing a literal ' must have it doubled before
+    // being wrapped in the outer quotes, otherwise the generated SQL is invalid.
+    it("escapes an embedded single quote when including a value", () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+
+      expect(vm.buildExpression("op", "notificationHandling's", "include")).toBe(
+        "op='notificationHandling''s'",
+      );
+    });
+
+    it("escapes an embedded single quote when excluding a value", () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+
+      expect(vm.buildExpression("op", "notificationHandling's", "exclude")).toBe(
+        "op!='notificationHandling''s'",
+      );
+    });
+  });
+
   describe("CopyContentValue Function Tests", () => {
     it("should copy value to clipboard successfully", async () => {
       wrapper = createWrapper();
@@ -703,7 +731,7 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       await vm.copyContentValue("test-value");
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith("test-value", {
+      expect(mockCopyToClipboard).toHaveBeenCalledWith("test-value", expect.any(Function), {
         successMessage: "Value copied to clipboard",
       });
     });
@@ -714,7 +742,7 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       await vm.copyContentValue("");
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith("", {
+      expect(mockCopyToClipboard).toHaveBeenCalledWith("", expect.any(Function), {
         successMessage: "Value copied to clipboard",
       });
     });
@@ -725,7 +753,7 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       await vm.copyContentValue("special@value!$");
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith("special@value!$", {
+      expect(mockCopyToClipboard).toHaveBeenCalledWith("special@value!$", expect.any(Function), {
         successMessage: "Value copied to clipboard",
       });
     });
@@ -736,7 +764,7 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       await vm.copyContentValue("12345");
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith("12345", {
+      expect(mockCopyToClipboard).toHaveBeenCalledWith("12345", expect.any(Function), {
         successMessage: "Value copied to clipboard",
       });
     });
@@ -747,7 +775,7 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       await vm.copyContentValue(null);
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(null, {
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(null, expect.any(Function), {
         successMessage: "Value copied to clipboard",
       });
     });
@@ -758,7 +786,7 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       await vm.copyContentValue(undefined);
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(undefined, {
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(undefined, expect.any(Function), {
         successMessage: "Value copied to clipboard",
       });
     });
@@ -965,7 +993,7 @@ describe("FieldList.vue Comprehensive Coverage", () => {
       const copyButton = wrapper.find('[data-test*="copy-btn"]');
       await copyButton.trigger("click");
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith("test_field", {
+      expect(mockCopyToClipboard).toHaveBeenCalledWith("test_field", expect.any(Function), {
         successMessage: "Value copied to clipboard",
       });
     });

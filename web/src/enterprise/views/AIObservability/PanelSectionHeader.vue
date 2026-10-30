@@ -3,8 +3,8 @@
 // PanelSectionHeader — the one title (+ optional hint / icon) header for the AI
 // Observability card/panel/drawer sections. Every one of these panels wraps an
 // OTable, so the header insets to the SAME `px-page-edge` grid line the table
-// content uses — the hand-rolled `px-4` blocks these replaced sat 2px off the
-// columns, which read as "bad header spacing".
+// content uses — the hand-rolled `px-4` blocks these replaced sat a hair off
+// the columns, which read as "bad header spacing".
 //
 // Pass `icon` + `tone` to tie a section to its summary tile and its detail
 // drawer: the same glyph + colour on the tile, the table header, and the drawer
@@ -12,14 +12,15 @@
 // `#actions` slot for a trailing control.
 -->
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 import { computed } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 const props = defineProps<{
-  title: string;
+  title: I18nText;
   /** Optional one-line explanation under the title. */
-  hint?: string;
+  hint?: I18nText;
   /** Optional leading glyph — use the SAME one as the section's summary tile. */
   icon?: IconName;
   /** Icon colour — match the summary tile's tone so the two read as one thing. */

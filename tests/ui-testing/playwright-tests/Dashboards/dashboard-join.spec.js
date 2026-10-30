@@ -32,11 +32,13 @@ const { waitForDashboardPage } = require("../../pages/dashboardPages/dashCreatio
 const PageManager = require("../../pages/page-manager");
 const testLogger = require("../utils/test-logger.js");
 const { JoinHelper, getTableRowCount, verifyJoinChipVisible } = require("../../pages/dashboardPages/dashboard-joins.js");
+const { getAuthHeaders, getOrgIdentifier } = require("../utils/cloud-auth.js");
 
 // Test data files (from CI-accessible location)
 const testAppUsers = require("../../../test-data/joins/test_app_users.json");
 const testSessions = require("../../../test-data/joins/test_sessions.json");
 const testWebRequests = require("../../../test-data/joins/test_web_requests.json");
+const { ingestBase } = require('../utils/ingest-url.js');
 
 const generateDashboardName = (testId) => `Joins_Test_${testId}`;
 const generateStreamNames = (testId) => ({
@@ -58,20 +60,10 @@ const navigateToDashboards = async (page) => {
   await page.waitForTimeout(2000);
 };
 
-const getAuthToken = async () => {
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString("base64");
-  return `Basic ${basicAuthCredentials}`;
-};
-
 const ingestJoinTestData = async (streamName, data) => {
-  const orgId = process.env["ORGNAME"];
-  const headers = {
-    "Content-Type": "application/json",
-    Authorization: await getAuthToken(),
-  };
-  const url = `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
+  const orgId = getOrgIdentifier();
+  const headers = getAuthHeaders();
+  const url = `${ingestBase(process.env.INGESTION_URL)}/api/${orgId}/${streamName}/_json`;
   const fetchResponse = await fetch(url, {
     method: "POST",
     headers,
@@ -85,10 +77,10 @@ const ingestJoinTestData = async (streamName, data) => {
 };
 
 const deleteStream = async (streamName) => {
-  const orgId = process.env["ORGNAME"];
+  const orgId = getOrgIdentifier();
   const baseUrl = process.env["INGESTION_URL"] || "http://localhost:5080";
   try {
-    const headers = { Authorization: await getAuthToken() };
+    const headers = getAuthHeaders();
     await fetch(`${baseUrl}/api/${orgId}/streams/${streamName}`, {
       method: "DELETE",
       headers,
@@ -100,9 +92,9 @@ const deleteStream = async (streamName) => {
 };
 
 const verifyStreamExists = async (streamName, maxWaitMs = 60000) => {
-  const orgId = process.env["ORGNAME"];
+  const orgId = getOrgIdentifier();
   const baseUrl = process.env["INGESTION_URL"] || "http://localhost:5080";
-  const headers = { Authorization: await getAuthToken() };
+  const headers = getAuthHeaders();
   const startTime = Date.now();
 
   while (Date.now() - startTime < maxWaitMs) {
@@ -132,9 +124,11 @@ const ingestTestData = async (streams) => {
   await ingestJoinTestData(streams.WEB_REQUESTS, testWebRequests);
 
   testLogger.info("Verifying streams are indexed (polling up to 60 seconds)...");
-  await verifyStreamExists(streams.WEB_REQUESTS, 60000);
-  await verifyStreamExists(streams.APP_USERS, 60000);
-  await verifyStreamExists(streams.SESSIONS, 60000);
+  await Promise.all([
+    verifyStreamExists(streams.WEB_REQUESTS, 60000),
+    verifyStreamExists(streams.APP_USERS, 60000),
+    verifyStreamExists(streams.SESSIONS, 60000),
+  ]);
   testLogger.info("All streams verified");
 };
 
@@ -146,13 +140,10 @@ const cleanupStreams = async (streams) => {
 };
 
 const deleteDashboardByName = async (dashboardName) => {
-  const orgId = process.env["ORGNAME"];
+  const orgId = getOrgIdentifier();
   const baseUrl = process.env["INGESTION_URL"] || "http://localhost:5080";
   try {
-    const headers = {
-      "Content-Type": "application/json",
-      Authorization: await getAuthToken(),
-    };
+    const headers = getAuthHeaders();
     const listResponse = await fetch(`${baseUrl}/api/${orgId}/dashboards`, {
       method: "GET",
       headers,
@@ -196,6 +187,10 @@ async function verifyJoinChipIsVisible(page, streamName, joinIndex = 0) {
 // ============================================================================
 
 test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
+  // Ingest of 3 streams + 3-6 panels built serially does not fit the config's
+  // default 180s. Test 5 already raised itself to 300s; apply that to all.
+  test.describe.configure({ timeout: 300000 });
+
 
   /**
    * Test 1: Core Join Types (3 panels)

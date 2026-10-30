@@ -17,7 +17,14 @@ import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } 
 import { mount, flushPromises } from "@vue/test-utils";
 import { createRouter, createWebHistory } from "vue-router";
 import OrganizationManagement from "./OrganizationManagement.vue";
-import { aiCreditsSchema, extendTrialSchema } from "./OrganizationManagement.schema";
+import { makeAiCreditsSchema, makeExtendTrialSchema } from "./OrganizationManagement.schema";
+import i18nInstance from "@/locales";
+import type { TranslateFn } from "@/types/i18n";
+
+// Schemas are t-threaded factories; build them once with the real translator.
+const schemaT = (i18nInstance.global as any).t as TranslateFn;
+const extendTrialSchema = makeExtendTrialSchema(schemaT);
+const aiCreditsSchema = makeAiCreditsSchema(schemaT);
 import store from "../../test/unit/helpers/store";
 import { createI18n } from "vue-i18n";
 import enLocaleFull from "@/locales/languages/en-US.json";
@@ -50,16 +57,20 @@ vi.mock("@/services/org_storage", () => ({
 }));
 
 // ── Mock organizations service ──
-vi.mock("@/services/organizations", () => ({
-  default: {
-    get_admin_org: vi.fn(),
-    extend_trial_period: vi.fn(),
-    create_external_contract: vi.fn(),
-    extend_external_contract: vi.fn(),
-    revoke_external_contract: vi.fn(),
-    set_ai_usage_limit: vi.fn(),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_admin_org: vi.fn(),
+      extend_trial_period: vi.fn(),
+      create_external_contract: vi.fn(),
+      extend_external_contract: vi.fn(),
+      revoke_external_contract: vi.fn(),
+      set_quota_usage_limit: vi.fn(),
+      resurrect_org: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/utils/zincutils", () => ({
   timestampToTimezoneDate: vi.fn((timestamp) => {
@@ -159,8 +170,8 @@ const ODialogStub = {
   `,
 };
 
-// Stub OTable so tests are fast. The stub renders the #cell-actions slot
-// for every row in `data` so action-button tests can find rendered buttons.
+// Stub OTable so tests are fast. The stub renders the #cell-actions and
+// #cell-status slots for every row in `data` so cell tests find real output.
 const OTableStub = {
   name: "OTable",
   inheritAttrs: false,
@@ -169,6 +180,7 @@ const OTableStub = {
     <div data-test="org-management-list-table">
       <slot name="toolbar" />
       <div v-for="(row, idx) in (data || [])" :key="idx" :data-test="'otable-row-' + idx">
+        <span :data-test="'otable-status-' + idx"><slot name="cell-status" :row="row" /></span>
         <slot name="cell-actions" :row="row" />
       </div>
       <slot name="empty" v-if="!data || data.length === 0" />
@@ -183,7 +195,7 @@ describe("OrganizationManagement.vue", () => {
   let mockCreateExternalContract: any;
   let mockExtendExternalContract: any;
   let mockRevokeExternalContract: any;
-  let mockSetAiUsageLimit: any;
+  let mockSetQuotaUsageLimit: any;
 
   // Global setup to ensure consistent timestamp behavior across environments
   beforeAll(() => {
@@ -206,7 +218,7 @@ describe("OrganizationManagement.vue", () => {
     mockCreateExternalContract = (mockedOrgService as any).create_external_contract;
     mockExtendExternalContract = (mockedOrgService as any).extend_external_contract;
     mockRevokeExternalContract = (mockedOrgService as any).revoke_external_contract;
-    mockSetAiUsageLimit = (mockedOrgService as any).set_ai_usage_limit;
+    mockSetQuotaUsageLimit = (mockedOrgService as any).set_quota_usage_limit;
 
     // Setup default mock responses
     mockGetAdminOrg.mockResolvedValue({ data: { data: [] } });
@@ -214,8 +226,8 @@ describe("OrganizationManagement.vue", () => {
     mockCreateExternalContract?.mockResolvedValue?.({ data: true });
     mockExtendExternalContract?.mockResolvedValue?.({ data: true });
     mockRevokeExternalContract?.mockResolvedValue?.({ data: true });
-    mockSetAiUsageLimit?.mockResolvedValue?.({
-      data: { credits_used: 0, credits_limit: 1000 },
+    mockSetQuotaUsageLimit?.mockResolvedValue?.({
+      data: { pool: "synthetics_browser_steps", mode: "free", used: 0, limit: 0, remaining: 0 },
     });
 
     // Setup default store state
@@ -284,7 +296,8 @@ describe("OrganizationManagement.vue", () => {
       wrapper = createWrapper();
       await flushPromises();
       expect(wrapper.vm.extendTrialPrompt).toBe(false);
-      expect(wrapper.vm.aiCreditsPrompt).toBe(false);
+      expect(wrapper.vm.usageLimitsPrompt).toBe(false);
+      expect(wrapper.vm.usageLimitsTab).toBe("ai_credits");
       expect(wrapper.vm.extendedTrial).toBe(1);
       expect(Array.isArray(wrapper.vm.tabledata)).toBe(true);
       expect(wrapper.vm.resultTotal).toBe(0);
@@ -293,17 +306,24 @@ describe("OrganizationManagement.vue", () => {
     it("should have correct column configuration", () => {
       wrapper = createWrapper();
       const columns = wrapper.vm.columns;
-      expect(columns).toHaveLength(10);
+      expect(columns).toHaveLength(17);
       expect(columns[0].id).toBe("name");
       expect(columns[1].id).toBe("identifier");
       expect(columns[2].id).toBe("subscription_status");
-      expect(columns[3].id).toBe("billing_provider");
-      expect(columns[4].id).toBe("ai_credits_used");
-      expect(columns[5].id).toBe("ai_credits_total");
-      expect(columns[6].id).toBe("created_on");
-      expect(columns[7].id).toBe("trial_expiry");
-      expect(columns[8].id).toBe("contract_end_date");
-      expect(columns[9].id).toBe("actions");
+      expect(columns[3].id).toBe("status");
+      expect(columns[4].id).toBe("billing_provider");
+      expect(columns[5].id).toBe("ai_credits_used");
+      expect(columns[6].id).toBe("ai_credits_total");
+      expect(columns[7].id).toBe("browser_steps_used");
+      expect(columns[8].id).toBe("browser_steps_total");
+      expect(columns[9].id).toBe("protocol_steps_used");
+      expect(columns[10].id).toBe("protocol_steps_total");
+      expect(columns[11].id).toBe("status_steps_used");
+      expect(columns[12].id).toBe("status_steps_total");
+      expect(columns[13].id).toBe("created_on");
+      expect(columns[14].id).toBe("trial_expiry");
+      expect(columns[15].id).toBe("contract_end_date");
+      expect(columns[16].id).toBe("actions");
     });
 
     it("should have subscription plans mapping", () => {
@@ -449,11 +469,56 @@ describe("OrganizationManagement.vue", () => {
         billing_provider: "-",
         credits_used: 125,
         credits_limit: 5000,
+        browser_steps_used: 0,
+        browser_steps_limit: 0,
+        protocol_steps_used: 0,
+        protocol_steps_limit: 0,
+        status_steps_used: 0,
+        status_steps_limit: 0,
         created_at: "2023-12-01",
         trial_expires_at: "2023-12-01",
         contract_end_date: 0,
         contract_end_date_display: "-",
         org_storage_enabled: false,
+        status: "active",
+        deleted_at: null,
+        grace_period_days: null,
+      });
+    });
+
+    it("should carry every synthetics pool from the response into the row", async () => {
+      mockGetAdminOrg.mockResolvedValue({
+        data: {
+          data: [
+            {
+              id: 1,
+              name: "Test Org",
+              identifier: "test-org",
+              plan: "1",
+              created_at: 1701388800000000,
+              trial_expires_at: 1701388800000000,
+              browser_steps_used: 400,
+              browser_steps_limit: 10000,
+              protocol_steps_used: 900,
+              protocol_steps_limit: 20000,
+              status_steps_used: 12000,
+              status_steps_limit: 43200,
+            },
+          ],
+        },
+      });
+
+      wrapper = createWrapper();
+      await wrapper.vm.getData();
+
+      // A dropped field opens the limit dialog at 0, and saving that wipes the grant.
+      expect(wrapper.vm.tabledata[0]).toMatchObject({
+        browser_steps_used: 400,
+        browser_steps_limit: 10000,
+        protocol_steps_used: 900,
+        protocol_steps_limit: 20000,
+        status_steps_used: 12000,
+        status_steps_limit: 43200,
       });
     });
 
@@ -969,7 +1034,7 @@ describe("OrganizationManagement.vue", () => {
 
       // Extend trial button should always be present
       expect(wrapper.find('[data-test="otg-management-extend-trial-btn"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="org-management-set-ai-credits-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="org-management-set-usage-limits-btn"]').exists()).toBe(true);
       // Add contract button should show when billing_provider is "-"
       expect(wrapper.find('[data-test="org-management-add-contract-btn"]').exists()).toBe(true);
       // Storage enable button should show when org_storage_enabled is false
@@ -1035,6 +1100,115 @@ describe("OrganizationManagement.vue", () => {
       // Storage enable button should NOT show
       const storageEnableBtn = wrapper.find('[data-test="org-management-storage-enable-btn"]');
       expect(storageEnableBtn.exists()).toBe(false);
+    });
+  });
+
+  describe("Organization Deletion Status", () => {
+    const orgRow = (overrides: Record<string, any> = {}) => ({
+      id: 1,
+      name: "Test Org",
+      identifier: "test-org",
+      plan: "0",
+      created_at: 123456789,
+      trial_expires_at: 987654321,
+      billing_provider: "-",
+      org_storage_enabled: true,
+      ...overrides,
+    });
+
+    const mountWithRow = async (row: Record<string, any>) => {
+      store.state.zoConfig.meta_org = "default";
+      mockGetAdminOrg.mockResolvedValue({ data: { data: [row] } });
+      wrapper = createWrapper();
+      await flushPromises();
+      await nextTick();
+    };
+
+    it("should default a row with no status field to active", async () => {
+      await mountWithRow(orgRow());
+      expect(wrapper.vm.tabledata[0].status).toBe("active");
+      expect(wrapper.vm.tabledata[0].deleted_at).toBeNull();
+      expect(wrapper.vm.tabledata[0].grace_period_days).toBeNull();
+    });
+
+    it("should render the status badge for an active org", async () => {
+      await mountWithRow(orgRow({ status: "active" }));
+      expect(wrapper.find('[data-test="otable-status-0"]').text()).toBe("Active");
+      expect(wrapper.find('[data-test="org-management-resurrect-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="org-management-cleanup-tasks-btn"]').exists()).toBe(false);
+    });
+
+    it("should render the pending-deletion badge with the days remaining", async () => {
+      const threeDaysAgoMicros = (Date.now() - 3 * 86400000) * 1000;
+      await mountWithRow(
+        orgRow({
+          status: "pending_deletion",
+          deleted_at: threeDaysAgoMicros,
+          grace_period_days: 10,
+        }),
+      );
+      expect(wrapper.find('[data-test="otable-status-0"]').text()).toBe(
+        "Pending deletion — 7 days left",
+      );
+    });
+
+    it("should fall back to the bare pending label without a grace period", async () => {
+      await mountWithRow(orgRow({ status: "pending_deletion" }));
+      expect(wrapper.find('[data-test="otable-status-0"]').text()).toBe("Pending deletion");
+    });
+
+    it("should show only the resurrect button for a pending_deletion org", async () => {
+      await mountWithRow(orgRow({ status: "pending_deletion" }));
+      expect(wrapper.find('[data-test="org-management-resurrect-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="org-management-cleanup-tasks-btn"]').exists()).toBe(false);
+    });
+
+    it("should show only the cleanup-tasks button for a deleting org", async () => {
+      await mountWithRow(orgRow({ status: "deleting" }));
+      expect(wrapper.find('[data-test="org-management-cleanup-tasks-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="org-management-resurrect-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="otable-status-0"]').text()).toBe("Deleting");
+    });
+
+    it("should open the cleanup dialog targeting the clicked org", async () => {
+      await mountWithRow(orgRow({ status: "deleting" }));
+      await wrapper.find('[data-test="org-management-cleanup-tasks-btn"]').trigger("click");
+      expect(wrapper.vm.showCleanupDialog).toBe(true);
+      expect(wrapper.vm.cleanupTargetOrg).toEqual({ id: "test-org", name: "Test Org" });
+    });
+
+    it("should resurrect against the configured meta org and refresh the list", async () => {
+      const { default: mockedOrgService } = await import("@/services/organizations");
+      const mockResurrect = (mockedOrgService as any).resurrect_org;
+      mockResurrect.mockResolvedValue({});
+      await mountWithRow(orgRow({ status: "pending_deletion" }));
+      mockGetAdminOrg.mockClear();
+      // meta org is read at call time and must differ from the selected org so
+      // the assertion proves resurrect targets zoConfig.meta_org, not the selection.
+      store.state.zoConfig.meta_org = "meta-distinct";
+
+      await wrapper.find('[data-test="org-management-resurrect-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(mockResurrect).toHaveBeenCalledWith("meta-distinct", "test-org");
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "success", message: "Organization resurrected." }),
+      );
+      expect(mockGetAdminOrg).toHaveBeenCalled();
+    });
+
+    it("should surface the server message when resurrect fails", async () => {
+      const { default: mockedOrgService } = await import("@/services/organizations");
+      const mockResurrect = (mockedOrgService as any).resurrect_org;
+      mockResurrect.mockRejectedValue({ response: { data: { message: "Grace period expired" } } });
+      await mountWithRow(orgRow({ status: "pending_deletion" }));
+
+      await wrapper.find('[data-test="org-management-resurrect-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "error", message: "Grace period expired" }),
+      );
     });
   });
 
@@ -1109,7 +1283,7 @@ describe("OrganizationManagement.vue", () => {
       expect(dialog?.exists()).toBe(true);
       expect(dialog!.attributes("data-title")).toBe("Extend Trial for Acme");
       expect(dialog!.attributes("data-sub-title")).toBe("Set the new trial extension period.");
-      expect(dialog!.attributes("data-primary-label")).toBe("Extend trial by 2 week(s)");
+      expect(dialog!.attributes("data-primary-label")).toBe("Extend trial by 2 weeks");
       expect(dialog!.attributes("data-secondary-label")).toBe("Cancel");
       expect(dialog!.attributes("data-size")).toBe("sm");
     });
@@ -1148,10 +1322,36 @@ describe("OrganizationManagement.vue", () => {
     });
   });
 
-  describe("AI credit allowance dialog", () => {
+  describe("usage allowance dialog", () => {
+    it("offers one tab per quota pool, carrying the former buttons' selectors", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.toggleUsageLimitsDialog({ name: "Acme", identifier: "acme" });
+      await nextTick();
+
+      // The Actions-column buttons became tabs; the e2e selectors moved with them
+      // rather than being dropped. The step tab is now one per grant.
+      expect(wrapper.find('[data-test="org-management-set-ai-credits-btn"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="org-management-set-synthetics-browser-steps-btn"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="org-management-set-synthetics-protocol-steps-btn"]').exists(),
+      ).toBe(true);
+    });
+
+    it("defaults to the AI credits tab — the pre-existing behaviour of the icon", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.toggleUsageLimitsDialog({ name: "Acme", identifier: "acme" });
+      await nextTick();
+
+      expect(wrapper.vm.usageLimitsTab).toBe("ai_credits");
+    });
+  });
+
+  describe("AI credit allowance tab", () => {
     it("opens with the selected organization's current credit limit", async () => {
       wrapper = createWrapper();
-      wrapper.vm.toggleAiCreditsDialog({
+      wrapper.vm.toggleUsageLimitsDialog({
         name: "Acme",
         identifier: "acme",
         credits_used: 125,
@@ -1159,7 +1359,7 @@ describe("OrganizationManagement.vue", () => {
       });
       await nextTick();
 
-      expect(wrapper.vm.aiCreditsPrompt).toBe(true);
+      expect(wrapper.vm.usageLimitsPrompt).toBe(true);
       expect(wrapper.vm.aiCreditsFormDefaults).toEqual({ creditsLimit: 5000 });
       const dialog = wrapper
         .findAll('[data-test="o-dialog-stub"]')
@@ -1168,12 +1368,12 @@ describe("OrganizationManagement.vue", () => {
       expect(dialog?.attributes("data-primary-label")).toBe("Save Credits");
     });
 
-    it("sends the target org and updates the row from the response", async () => {
-      mockSetAiUsageLimit.mockResolvedValue({
-        data: { credits_used: 125, credits_limit: 7500 },
+    it("targets the ai_credits pool and updates the row from the response", async () => {
+      mockSetQuotaUsageLimit.mockResolvedValue({
+        data: { pool: "ai_credits", mode: "free", used: 125, limit: 7500, remaining: 7375 },
       });
       wrapper = createWrapper();
-      wrapper.vm.toggleAiCreditsDialog({
+      wrapper.vm.toggleUsageLimitsDialog({
         name: "Acme",
         identifier: "acme",
         credits_used: 125,
@@ -1182,13 +1382,15 @@ describe("OrganizationManagement.vue", () => {
 
       await wrapper.vm.submitAiCredits({ creditsLimit: "7500" } as any);
 
-      expect(mockSetAiUsageLimit).toHaveBeenCalledWith("default", {
+      // Both pools now go through the pool-parameterised route; the pool is an
+      // explicit argument, never implied by the URL.
+      expect(mockSetQuotaUsageLimit).toHaveBeenCalledWith("default", "ai_credits", {
         org_id: "acme",
-        credits_limit: 7500,
+        limit: 7500,
       });
-      expect(wrapper.vm.aiCreditsDataRow.credits_used).toBe(125);
-      expect(wrapper.vm.aiCreditsDataRow.credits_limit).toBe(7500);
-      expect(wrapper.vm.aiCreditsPrompt).toBe(false);
+      expect(wrapper.vm.usageLimitsRow.credits_used).toBe(125);
+      expect(wrapper.vm.usageLimitsRow.credits_limit).toBe(7500);
+      expect(wrapper.vm.usageLimitsPrompt).toBe(false);
       expect(mockToastFn).toHaveBeenCalledWith({
         variant: "success",
         message: "AI credits updated successfully.",
@@ -1196,11 +1398,11 @@ describe("OrganizationManagement.vue", () => {
     });
 
     it("keeps the dialog open and reports an API error", async () => {
-      mockSetAiUsageLimit.mockRejectedValue({
+      mockSetQuotaUsageLimit.mockRejectedValue({
         response: { data: { message: "limit update failed" } },
       });
       wrapper = createWrapper();
-      wrapper.vm.toggleAiCreditsDialog({
+      wrapper.vm.toggleUsageLimitsDialog({
         name: "Acme",
         identifier: "acme",
         credits_used: 125,
@@ -1209,11 +1411,165 @@ describe("OrganizationManagement.vue", () => {
 
       await wrapper.vm.submitAiCredits({ creditsLimit: 7500 });
 
-      expect(wrapper.vm.aiCreditsPrompt).toBe(true);
+      expect(wrapper.vm.usageLimitsPrompt).toBe(true);
       expect(wrapper.vm.loading).toBe(false);
       expect(mockToastFn).toHaveBeenCalledWith({
         variant: "error",
         message: "limit update failed",
+        timeout: 5000,
+      });
+    });
+  });
+
+  describe("synthetics step allowance tab", () => {
+    it("opens with the selected organization's current step limit", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.toggleUsageLimitsDialog(
+        {
+          name: "Acme",
+          identifier: "acme",
+          browser_steps_used: 400,
+          browser_steps_limit: 10000,
+        },
+        "synthetics_browser_steps",
+      );
+      await nextTick();
+
+      expect(wrapper.vm.usageLimitsPrompt).toBe(true);
+      expect(wrapper.vm.usageLimitsTab).toBe("synthetics_browser_steps");
+      expect(wrapper.vm.syntheticsStepsFormDefaults).toEqual({ stepsLimit: 10000 });
+      const dialog = wrapper
+        .findAll('[data-test="o-dialog-stub"]')
+        .find((item: any) => (item.attributes("data-title") || "").startsWith("Set Browser Steps"));
+      expect(dialog?.attributes("data-title")).toBe("Set Browser Steps for Acme");
+      expect(dialog?.attributes("data-primary-label")).toBe("Save Steps");
+    });
+
+    it("targets the browser step pool and updates the row from the response", async () => {
+      mockSetQuotaUsageLimit.mockResolvedValue({
+        data: {
+          pool: "synthetics_browser_steps",
+          mode: "free",
+          used: 400,
+          limit: 25000,
+          remaining: 24600,
+        },
+      });
+      wrapper = createWrapper();
+      wrapper.vm.toggleUsageLimitsDialog(
+        {
+          name: "Acme",
+          identifier: "acme",
+          browser_steps_used: 400,
+          browser_steps_limit: 10000,
+        },
+        "synthetics_browser_steps",
+      );
+
+      await wrapper.vm.submitSyntheticsSteps({ stepsLimit: "25000" } as any);
+
+      // The pool is an explicit argument, not implied by the route: sending
+      // this to the AI pool would credit the wrong allowance silently.
+      expect(mockSetQuotaUsageLimit).toHaveBeenCalledWith("default", "synthetics_browser_steps", {
+        org_id: "acme",
+        limit: 25000,
+      });
+      // Neutral response field names — `credits_*` would be the wrong noun.
+      expect(wrapper.vm.usageLimitsRow.browser_steps_used).toBe(400);
+      expect(wrapper.vm.usageLimitsRow.browser_steps_limit).toBe(25000);
+      expect(wrapper.vm.usageLimitsPrompt).toBe(false);
+      expect(mockToastFn).toHaveBeenCalledWith({
+        variant: "success",
+        message: "Synthetics steps updated successfully.",
+      });
+    });
+
+    it("writes the protocol grant without disturbing the browser one", async () => {
+      mockSetQuotaUsageLimit.mockResolvedValue({
+        data: {
+          pool: "synthetics_protocol_steps",
+          mode: "free",
+          used: 90,
+          limit: 40000,
+          remaining: 39910,
+        },
+      });
+      wrapper = createWrapper();
+      wrapper.vm.toggleUsageLimitsDialog(
+        {
+          name: "Acme",
+          identifier: "acme",
+          browser_steps_used: 400,
+          browser_steps_limit: 10000,
+          protocol_steps_used: 90,
+          protocol_steps_limit: 20000,
+        },
+        "synthetics_protocol_steps",
+      );
+
+      await wrapper.vm.submitSyntheticsSteps({ stepsLimit: "40000" } as any);
+
+      expect(mockSetQuotaUsageLimit).toHaveBeenCalledWith("default", "synthetics_protocol_steps", {
+        org_id: "acme",
+        limit: 40000,
+      });
+      expect(wrapper.vm.usageLimitsRow.protocol_steps_used).toBe(90);
+      expect(wrapper.vm.usageLimitsRow.protocol_steps_limit).toBe(40000);
+      // The grants are independent: applying this response to the browser pair
+      // would overstate that grant and silently strand the protocol one.
+      expect(wrapper.vm.usageLimitsRow.browser_steps_used).toBe(400);
+      expect(wrapper.vm.usageLimitsRow.browser_steps_limit).toBe(10000);
+    });
+
+    it("does not touch the AI pool", async () => {
+      mockSetQuotaUsageLimit.mockResolvedValue({
+        data: {
+          pool: "synthetics_browser_steps",
+          mode: "free",
+          used: 0,
+          limit: 25000,
+          remaining: 25000,
+        },
+      });
+      wrapper = createWrapper();
+      wrapper.vm.toggleUsageLimitsDialog(
+        { name: "Acme", identifier: "acme" },
+        "synthetics_browser_steps",
+      );
+
+      await wrapper.vm.submitSyntheticsSteps({ stepsLimit: 25000 } as any);
+
+      // Now that both pools share one route, "wrong pool" means the wrong pool
+      // argument rather than the wrong endpoint.
+      expect(mockSetQuotaUsageLimit).not.toHaveBeenCalledWith(
+        "default",
+        "ai_credits",
+        expect.anything(),
+      );
+    });
+
+    it("keeps the dialog open and reports an API error", async () => {
+      mockSetQuotaUsageLimit.mockRejectedValue({
+        response: { data: { message: "step limit update failed" } },
+      });
+      wrapper = createWrapper();
+      wrapper.vm.toggleUsageLimitsDialog(
+        {
+          name: "Acme",
+          identifier: "acme",
+          browser_steps_used: 400,
+          browser_steps_limit: 10000,
+        },
+        "synthetics_browser_steps",
+      );
+
+      await wrapper.vm.submitSyntheticsSteps({ stepsLimit: 25000 } as any);
+
+      expect(wrapper.vm.usageLimitsPrompt).toBe(true);
+      expect(wrapper.vm.loading).toBe(false);
+      expect(mockToastFn).toHaveBeenCalledWith({
+        variant: "error",
+        message: "step limit update failed",
         timeout: 5000,
       });
     });
@@ -1464,8 +1820,9 @@ describe("OrganizationManagement.vue", () => {
 
       expect(mockConfirmFn).toHaveBeenCalledWith({
         title: "Revoke External Contract",
-        message:
-          'Are you sure you want to revoke the external contract for "TestOrg"? The organization will revert to the Free tier.',
+        messageKeypath: "settings.organizationManagementPage.revokeConfirmMessage",
+        messageName: "TestOrg",
+        confirmVariant: "destructive",
       });
     });
 

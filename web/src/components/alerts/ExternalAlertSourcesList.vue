@@ -23,13 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
   >
     <template #actions>
-      <OButton
-        variant="primary"
-        size="sm"
-        icon-left="add"
-        data-test="alert-sources-add-btn"
-        @click="openAddDrawer"
-      >
+      <OButton variant="primary" size="sm" data-test="alert-sources-add-btn" @click="openAddDrawer">
         {{ t("alert_sources.add") }}
       </OButton>
     </template>
@@ -37,8 +31,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AddExternalAlertSource
       v-model:open="showAddDrawer"
       :editing-integration="editTargetIntegration"
-      @created="fetchAll"
-      @updated="fetchAll"
+      @created="fetchAll(true)"
+      @updated="fetchAll(true)"
     />
 
     <div class="min-h-0 w-full flex-1 overflow-hidden">
@@ -49,11 +43,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="advancedColumns"
           row-key="rowKey"
           :loading="loading"
+          :forbidden="forbidden"
           pagination="client"
           :page-size="20"
           :page-size-options="[10, 20, 50, 100]"
           :row-class="noDestinationRowClass"
-          :footer-title="t('alert_sources.header')"
           wrap
           horizontal-scroll
           :default-columns="false"
@@ -72,20 +66,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
-              :loading="loading"
+              :last-run-at="lastUpdatedAt"
+              :loading="fetching"
+              shortcut-id="alertSourcesRefresh"
               data-test="alert-sources-refresh-btn"
-              @click="fetchAll"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('alert_sources.refresh')"
-                shortcut-id="alertSourcesRefresh"
-              />
-            </OButton>
+              @click="refreshAll"
+            />
           </template>
           <template #empty>
             <OEmptyState
@@ -194,9 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`alert-sources-copy-token-${row.integration.id}`"
                 @click="copyTokenFor(row.integration)"
               />
-              <span class="truncate font-mono text-xs" :title="displayedUrlFor(row.integration)">{{
-                displayedUrlFor(row.integration)
-              }}</span>
+              <span class="truncate font-mono text-xs">{{ displayedUrlFor(row.integration) }}</span>
             </div>
             <span v-else class="text-text-secondary">—</span>
           </template>
@@ -206,6 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-sm"
                 icon-left="edit"
+                class="max-md:hidden"
                 :title="t('alert_sources.edit')"
                 :data-test="`alert-sources-edit-${row.integration.id}`"
                 @click="openEditFor(row.integration)"
@@ -214,6 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-sm"
                 icon-left="autorenew"
+                class="max-md:hidden"
                 :title="t('alert_sources.rotateToken')"
                 :data-test="`alert-sources-rotate-${row.integration.id}`"
                 @click="confirmRotate(row.integration)"
@@ -222,6 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :variant="row.integration.enabled ? 'ghost-destructive' : 'ghost-success'"
                 size="icon-sm"
                 :icon-left="row.integration.enabled ? 'pause' : 'play-arrow'"
+                class="max-md:hidden"
                 :title="
                   row.integration.enabled ? t('alert_sources.disable') : t('alert_sources.enable')
                 "
@@ -232,6 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost-destructive"
                 size="icon-sm"
                 icon-left="delete"
+                class="max-md:hidden"
                 :disabled="row.integration.name === 'default'"
                 :title="
                   row.integration.name === 'default'
@@ -241,6 +232,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`alert-sources-delete-${row.integration.id}`"
                 @click="confirmDelete(row.integration)"
               />
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    :aria-label="t('common.moreActions')"
+                    icon-left="more-vert"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    class="md:hidden"
+                    data-test="alert-sources-row-more-actions"
+                    @click.stop
+                  />
+                </template>
+                <ODropdownItem
+                  icon-left="edit"
+                  class="md:hidden"
+                  :data-test="`alert-sources-edit-${row.integration.id}-menu`"
+                  @select="openEditFor(row.integration)"
+                >
+                  <span>{{ t("alert_sources.edit") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="autorenew"
+                  class="md:hidden"
+                  :data-test="`alert-sources-rotate-${row.integration.id}-menu`"
+                  @select="confirmRotate(row.integration)"
+                >
+                  <span>{{ t("alert_sources.rotateToken") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  :icon-left="row.integration.enabled ? 'pause' : 'play-arrow'"
+                  class="md:hidden"
+                  :data-test="`alert-sources-toggle-enabled-${row.integration.id}-menu`"
+                  @select="toggleEnabledFor(row.integration)"
+                >
+                  <span>{{
+                    row.integration.enabled ? t("alert_sources.disable") : t("alert_sources.enable")
+                  }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="delete"
+                  variant="destructive"
+                  class="md:hidden"
+                  :disabled="row.integration.name === 'default'"
+                  :data-test="`alert-sources-delete-${row.integration.id}-menu`"
+                  @select="confirmDelete(row.integration)"
+                >
+                  <span>{{
+                    row.integration.name === "default"
+                      ? t("alert_sources.defaultCannotDelete")
+                      : t("alert_sources.delete")
+                  }}</span>
+                </ODropdownItem>
+              </ODropdown>
             </div>
             <span
               v-else
@@ -268,10 +312,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       v-model="deleteDialogVisible"
       :title="t('alert_sources.deleteConfirmTitle')"
-      :message="t('alert_sources.deleteConfirmMessage')"
+      message-keypath="alert_sources.deleteConfirmMessage"
+      :message-name="deleteTarget?.name"
       :warning-message="t('alert_sources.deleteConfirmWarning')"
       :ok-label="t('alert_sources.delete')"
-      ok-color="destructive"
+      ok-variant="destructive"
       data-test="alert-sources-delete-dialog"
       @update:ok="doDelete"
     />
@@ -279,9 +324,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { alertSourcesQuery } from "@/services/alert_sources.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, getCurrentInstance } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -290,6 +337,9 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddExternalAlertSource from "./AddExternalAlertSource.vue";
 import alertSources from "@/services/alert_sources";
@@ -331,18 +381,21 @@ export default defineComponent({
   components: {
     OPageLayout,
     OButton,
+    ORefreshButton,
     OTag,
     OTable,
     OIcon,
     OSearchInput,
     OEmptyState,
     OTooltip,
+    ODropdown,
+    ODropdownItem,
     ConfirmDialog,
     AddExternalAlertSource,
   },
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // useShortcuts must run in setup(); the proxy reaches this Options-API
     // component's own methods.
@@ -358,7 +411,7 @@ export default defineComponent({
       {
         id: "alertSourcesRefresh",
         handler: () => {
-          if (!isInputFocused()) vm()?.fetchAll();
+          if (!isInputFocused()) vm()?.refreshAll();
         },
       },
       {
@@ -367,11 +420,16 @@ export default defineComponent({
       },
     ]);
 
-    return { store, t };
+    return { store, t, raw };
   },
   data() {
     return {
       loading: false,
+      // Request in flight with rows still on screen — the refresh button's
+      // spinner. `loading` is the skeleton, for a cold read only.
+      fetching: false,
+      forbidden: false,
+      lastUpdatedAt: null as number | null,
       filterQuery: "",
       showAddDrawer: false,
       editTargetIntegration: undefined as AlertSourceIntegration | undefined,
@@ -529,8 +587,13 @@ export default defineComponent({
     this.fetchAll();
   },
   methods: {
-    async fetchAll() {
-      await this.fetchIntegrations();
+    // Named handler: binding fetchAll straight to @click puts the MouseEvent in
+    // `force`.
+    refreshAll() {
+      return this.fetchAll(true);
+    },
+    async fetchAll(force = false) {
+      await this.fetchIntegrations(force);
       const fetches: Promise<void>[] = [];
       if (this.defaultSource) {
         fetches.push(this.fetchSenders(this.defaultSource.id));
@@ -540,15 +603,38 @@ export default defineComponent({
       }
       await Promise.all(fetches);
     },
-    async fetchIntegrations() {
-      this.loading = true;
+    async fetchIntegrations(force = false) {
       try {
-        const res = await alertSources.list(this.orgIdentifier);
-        this.integrations = res.data.integrations;
-      } catch (e) {
-        toast({ variant: "error", message: this.t("alert_sources.error") });
+        // `force` only bypasses staleTime — the rows on screen stay either way,
+        // and the skeleton is reserved for a genuinely cold read.
+        const options = alertSourcesQuery(this.orgIdentifier);
+        // Paint what is already cached before the request goes out.
+        const cached = queryClient.getQueryData<any>(options.queryKey);
+        if (cached !== undefined) this.integrations = cached;
+        this.loading = cached === undefined;
+        this.fetching = true;
+        this.forbidden = false;
+        // Options API, so this reads imperatively rather than through useQuery.
+        // TODO: move to `useQuery` when this component moves to `setup()`.
+        if (force) {
+          await queryClient.invalidateQueries({
+            queryKey: options.queryKey,
+            exact: true,
+            refetchType: "none",
+          });
+        }
+        this.integrations = await queryClient.fetchQuery(options);
+        this.lastUpdatedAt =
+          queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? Date.now();
+      } catch (e: any) {
+        this.forbidden = e?.response?.status === 403;
+        // The grouped access toast already reports a 403; a second red toast adds nothing.
+        if (!this.forbidden) {
+          toast({ variant: "error", message: this.t("alert_sources.error") });
+        }
       } finally {
         this.loading = false;
+        this.fetching = false;
       }
     },
     async fetchSenders(integrationId: string) {
@@ -614,10 +700,10 @@ export default defineComponent({
       }
     },
     copyUrlFor(integration: AlertSourceIntegration) {
-      copyToClipboard(this.fullUrlFor(integration));
+      copyToClipboard(this.fullUrlFor(integration), this.t);
     },
     copyTokenFor(integration: AlertSourceIntegration) {
-      copyToClipboard(integration.token);
+      copyToClipboard(integration.token, this.t);
     },
     fullUrlFor(integration: AlertSourceIntegration): string {
       return `${this.ingestionBaseUrl}${integration.url}`;
@@ -640,7 +726,7 @@ export default defineComponent({
         toast({ variant: "success", message: this.t("alert_sources.rotatedSuccess") });
         this.revealedIds = this.revealedIds.filter((id) => id !== this.rotateTarget?.id);
         this.rotateTarget = undefined;
-        await this.fetchAll();
+        await this.fetchAll(true);
       } catch (e) {
         toast({ variant: "error", message: this.t("alert_sources.error") });
       }
@@ -656,7 +742,7 @@ export default defineComponent({
         toast({ variant: "success", message: this.t("alert_sources.deletedSuccess") });
         this.revealedIds = this.revealedIds.filter((id) => id !== this.deleteTarget?.id);
         this.deleteTarget = undefined;
-        await this.fetchAll();
+        await this.fetchAll(true);
       } catch (e) {
         toast({ variant: "error", message: this.t("alert_sources.error") });
       }
@@ -670,7 +756,7 @@ export default defineComponent({
             ? this.t("alert_sources.disabledSuccess")
             : this.t("alert_sources.enabledSuccess"),
         });
-        await this.fetchIntegrations();
+        await this.fetchIntegrations(true);
       } catch (e) {
         toast({ variant: "error", message: this.t("alert_sources.error") });
       }

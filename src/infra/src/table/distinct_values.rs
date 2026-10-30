@@ -19,9 +19,8 @@ use sea_orm::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::get_lock;
 use crate::{
-    db::{ORM_CLIENT, ORM_CLIENT_DDL, connect_to_orm, connect_to_orm_ddl},
+    db::{get_orm_client_ddl, get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
 };
 
@@ -109,7 +108,7 @@ pub async fn init() -> Result<(), errors::Error> {
 }
 
 pub async fn create_table() -> Result<(), errors::Error> {
-    let client = ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
+    let client = get_orm_client_ddl().await;
     let builder = client.get_database_backend();
 
     let schema = Schema::new(builder);
@@ -136,10 +135,7 @@ pub async fn add(record: DistinctFieldRecord) -> Result<(), errors::Error> {
         field_name: Set(record.field_name),
     };
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let res = Entity::insert(record).exec(client).await;
 
     match res {
@@ -158,9 +154,6 @@ pub async fn add(record: DistinctFieldRecord) -> Result<(), errors::Error> {
 }
 
 pub async fn remove(record: DistinctFieldRecord) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
     let record = ActiveModel {
         origin: Set(record.origin),
         origin_id: Set(record.origin_id),
@@ -170,7 +163,7 @@ pub async fn remove(record: DistinctFieldRecord) -> Result<(), errors::Error> {
         field_name: Set(record.field_name),
     };
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete(record)
         .exec(client)
         .await
@@ -185,7 +178,7 @@ pub async fn check_field_use(
     stream_type: &str,
     field_name: &str,
 ) -> Result<Vec<DistinctFieldRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let records = Entity::find()
         .filter(Column::OrgName.eq(org_name))
         .filter(Column::StreamName.eq(stream_name))
@@ -201,10 +194,7 @@ pub async fn check_field_use(
 /// This is specifically for the case when a dashboard is deleted, we can bulk remove
 /// the dependencies, without having to go through one by one
 pub async fn batch_remove(origin: OriginType, origin_id: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::Origin.eq(origin))
         .filter(Column::OriginId.eq(origin_id))
@@ -217,10 +207,7 @@ pub async fn batch_remove(origin: OriginType, origin_id: &str) -> Result<(), err
 
 /// Delete all distinct value field records for the given org.
 pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database (only for SQLite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::OrgName.eq(org_id))
         .exec(client)
@@ -231,8 +218,7 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
 }
 
 pub async fn len() -> Result<u64, errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     Entity::find()
         .count(client)
         .await

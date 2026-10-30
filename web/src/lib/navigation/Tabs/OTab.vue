@@ -7,6 +7,7 @@ import { TabsTrigger } from "reka-ui";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { iconRegistry } from "@/lib/core/Icon/OIcon.icons";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import useDragHandle from "@/composables/useDragHandle";
 
 // Disable auto-attribute inheritance so the consumer's `data-test="..."` lands
@@ -19,7 +20,7 @@ const props = withDefaults(defineProps<OTabProps>(), {
   disableDrag: false,
 });
 
-defineSlots<OTabSlots>();
+const slots = defineSlots<OTabSlots>();
 
 const context = inject<ComputedRef<TabsContext>>(TABS_CONTEXT_KEY);
 
@@ -75,20 +76,27 @@ const baseClasses = computed<string>(() =>
     // Horizontal inset. A vertical (side-rail) tab is a selectable PILL, so the
     // rail container insets it (px-1.5) to give the pill breathing room from the
     // rail edges. With that 6px container inset + the tab's own 2px active border
-    // + this pl-1, the label lands on the page-edge grid line (12px) while the
+    // + this ps-1, the label lands on the page-edge grid line (12px) while the
     // pill never touches the rail edge. Rails add the px-1.5; tabs don't hand-roll
     // their own padding override.
     // Reorderable tabs widen the left inset to a 0.75rem gutter that hosts the
     // hover-revealed drag grip. The gutter is tied to `reorderable` (not
     // per-press state), so a tab is pixel-identical at rest, on hover, and
     // while its label is being edited — the grip only ever changes opacity.
-    isReorderable.value ? "pl-3 pr-2" : isVertical.value ? "pl-1 pr-2" : "px-2",
+    isReorderable.value
+      ? "ps-3 pe-2"
+      : isVertical.value
+        ? "ps-1 pe-2"
+        : slots.trailing
+          ? "ps-2 pe-1"
+          : "px-2",
     "font-normal text-sm whitespace-nowrap",
     isVertical.value ? "rounded-default" : "rounded-t-default",
-    "outline-none transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] duration-150",
+    "outline-none transition-[color,background-color,border-color,text-decoration-color,fill,stroke] duration-(--duration-hover-out) hover:duration-(--duration-hover-in)",
     "select-none",
-    "ring-offset-1 ring-offset-surface-base",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tabs-indicator",
+    "focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-focus-ring-accent",
+    // The horizontal strip scrolls on x, which clips y as well, so an outside outline would lose its bottom edge.
+    isVertical.value ? "focus-visible:outline-offset-2" : "focus-visible:-outline-offset-2",
   ].join(" "),
 );
 
@@ -97,7 +105,7 @@ const stateClasses = computed<string>(() => {
     return [
       "text-tabs-disabled-text cursor-not-allowed opacity-60",
       // Keep the transparent left border so disabled items don't shift width.
-      isVertical.value ? "border-l-2 border-transparent" : "",
+      isVertical.value ? "border-s-2 border-transparent" : "",
     ].join(" ");
   }
   if (isActive.value) {
@@ -110,7 +118,7 @@ const stateClasses = computed<string>(() => {
     return [
       "text-tabs-active-text cursor-pointer",
       isVertical.value
-        ? "bg-tabs-active-bg border-l-2 border-tabs-indicator"
+        ? "bg-tabs-active-bg border-s-2 border-tabs-indicator"
         : "border-b-2 border-transparent",
     ].join(" ");
   }
@@ -121,7 +129,7 @@ const stateClasses = computed<string>(() => {
       : "enabled:hover:text-tabs-hover-text",
     // Transparent border (left for vertical, bottom for horizontal) keeps inactive
     // items the same size as the active one — no layout shift on activation.
-    isVertical.value ? "border-l-2 border-transparent" : "border-b-2 border-transparent",
+    isVertical.value ? "border-s-2 border-transparent" : "border-b-2 border-transparent",
   ].join(" ");
 });
 
@@ -164,7 +172,7 @@ const heightClasses = computed<string>(() => {
            this drop-target tab) so the drop position is visible during drag.
            Together with the grab cursor and the FLIP slide it carries the whole
            reorder affordance — reorderable tabs stay clean text (no grip icon),
-           matching Sheets/Datadog/Grafana tab strips. -->
+           matching Sheets/Grafana tab strips. -->
       <span
         v-if="isDropTarget"
         aria-hidden="true"
@@ -220,10 +228,32 @@ const heightClasses = computed<string>(() => {
             >{{ icon }}</span
           >
         </slot>
-        <span v-if="label" class="o-tab__label truncate">{{ label }}</span>
+        <OTruncatedText
+          v-if="label"
+          class="o-tab__label"
+          :class="context?.collapseLabels && !isActive ? 'max-md:hidden' : ''"
+          :tooltip="tooltip ? false : undefined"
+          >{{ label }}</OTruncatedText
+        >
+        <OIcon
+          v-if="suffixIcon"
+          :name="suffixIcon as any"
+          size="xs"
+          class="ms-auto shrink-0"
+          :class="suffixIcon === 'lock' ? 'text-warning-600' : ''"
+        />
       </template>
       <slot v-else />
     </TabsTrigger>
+    <!-- OTabs measures this with the trigger for the underline and the overflow arrows. -->
+    <span
+      v-if="slots.trailing"
+      data-otab-trailing
+      class="inline-flex shrink-0 items-center gap-0.5 border-b-2 border-transparent pe-1.5"
+      :class="heightClasses"
+    >
+      <slot name="trailing" />
+    </span>
     <OTooltip v-if="tooltip" :content="tooltip" />
   </span>
 </template>

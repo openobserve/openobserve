@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Navigation arrows: only when pagination is enabled -->
     <template v-if="showPagination">
       <OButton
+        :aria-label="t('search.firstPage')"
         v-if="pagesNumber > 1"
         variant="ghost"
         size="icon"
@@ -50,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
       </OButton>
       <OButton
+        :aria-label="t('common.previous')"
         v-if="pagesNumber > 1"
         variant="ghost"
         size="icon"
@@ -60,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
       </OButton>
       <OButton
+        :aria-label="t('common.next')"
         v-if="pagesNumber > 1"
         variant="ghost"
         size="icon"
@@ -70,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
       </OButton>
       <OButton
+        :aria-label="t('search.lastPage')"
         v-if="pagesNumber > 1"
         variant="ghost"
         size="icon"
@@ -85,9 +89,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- used only as a param type in a template inline handler, which eslint-plugin-vue cannot see; vue-tsc keeps it honest
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 export default defineComponent({
   name: "TablePaginationControls",
@@ -126,17 +131,21 @@ export default defineComponent({
   },
   emits: ["update:rowsPerPage", "firstPage", "prevPage", "nextPage", "lastPage"],
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const countDisplay = computed(() => {
       const { showPagination, pagination, totalRows } = props;
-      if (totalRows === 0) return "0 of 0";
+      if (totalRows === 0) return t("dashboard.dashboards.paginationEmpty");
       if (!showPagination || pagination.rowsPerPage === 0) {
-        return `1-${totalRows} of ${totalRows}`;
+        return t("dashboard.dashboards.paginationRange", {
+          start: 1,
+          end: totalRows,
+          total: totalRows,
+        });
       }
 
       const start = (pagination.page - 1) * pagination.rowsPerPage + 1;
       const end = Math.min(pagination.page * pagination.rowsPerPage, totalRows);
-      return `${start}-${end} of ${totalRows}`;
+      return t("dashboard.dashboards.paginationRange", { start, end, total: totalRows });
     });
 
     const formattedPaginationOptions = computed(() => {
@@ -150,12 +159,13 @@ export default defineComponent({
         else opts.splice(idx, 0, current);
       }
       return opts.map((opt) => ({
-        label: opt === 0 ? "All" : String(opt),
+        label: opt === 0 ? t("common.all") : raw(String(opt)),
         value: opt,
       }));
     });
 
     return {
+      raw,
       countDisplay,
       formattedPaginationOptions,
       t,

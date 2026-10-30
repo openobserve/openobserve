@@ -22,17 +22,14 @@ import enMessages from "@/locales/languages/en-US.json";
 import { ref } from "vue";
 
 // ─── Service mocks ───────────────────────────────────────────────────────────
-vi.mock("@/services/alert_destination", () => ({
-  default: {
-    create: vi.fn(),
-  },
-}));
-
-vi.mock("@/composables/useActions", () => ({
-  default: vi.fn(() => ({
-    isActionsEnabled: { value: true },
-  })),
-}));
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create: vi.fn(),
+    },
+  });
+});
 
 vi.mock("axios", () => ({
   default: { get: vi.fn() },
@@ -98,9 +95,9 @@ const BaseImportStub = {
   setup(_props: any, { expose }: any) {
     const jsonArrayOfObj = ref<any[]>([]);
     const jsonStr = ref("");
-    const isImporting = ref(false);
-    expose({ jsonArrayOfObj, jsonStr, isImporting });
-    return { jsonArrayOfObj, jsonStr, isImporting };
+    const isImportingLocal = ref(false);
+    expose({ jsonArrayOfObj, jsonStr, isImportingLocal });
+    return { jsonArrayOfObj, jsonStr, isImportingLocal };
   },
 };
 
@@ -223,11 +220,6 @@ describe("ImportDestination", () => {
       expect(wrapper.vm.jsonArrayOfObj[0].template).toBe("template1");
     });
 
-    it("updateDestinationAction sets action_id on the item", () => {
-      wrapper.vm.updateDestinationAction("action1", 0);
-      expect(wrapper.vm.jsonArrayOfObj[0].action_id).toBe("action1");
-    });
-
     it("updateDestinationEmails parses comma-separated string into array", () => {
       wrapper.vm.updateDestinationEmails("a@a.com, b@b.com", 0);
       expect(wrapper.vm.jsonArrayOfObj[0].emails).toEqual(["a@a.com", "b@b.com"]);
@@ -237,26 +229,6 @@ describe("ImportDestination", () => {
       wrapper.vm.updateSkipTlsVerify(true, 0);
       expect(wrapper.vm.jsonArrayOfObj[0].skip_tls_verify).toBe(true);
       expect(wrapper.vm.userSelectedSkipTlsVerify[0]).toBe(true);
-    });
-  });
-
-  // ─── getServiceActions ────────────────────────────────────────────────────
-  describe("getServiceActions", () => {
-    it("returns only service-type actions", () => {
-      const actions = wrapper.vm.getServiceActions();
-      expect(Array.isArray(actions)).toBe(true);
-      actions.forEach((a: any) => {
-        expect(a.execution_details_type).toBe("service");
-      });
-    });
-
-    it("returns empty array when no service actions exist", () => {
-      const saved = mockStore.state.organizationData.actions;
-      mockStore.state.organizationData.actions = [
-        { id: "x", name: "X", execution_details_type: "webhook" },
-      ];
-      expect(wrapper.vm.getServiceActions()).toEqual([]);
-      mockStore.state.organizationData.actions = saved;
     });
   });
 
@@ -290,6 +262,24 @@ describe("ImportDestination", () => {
         1,
       );
       expect(result).toBe(true);
+    });
+
+    it("accepts and offers a content template for an email destination", async () => {
+      await wrapper.setProps({
+        templates: [
+          ...defaultProps.templates,
+          { name: "content-template", type: "http", kind: "content" },
+        ],
+      });
+      const result = await wrapper.vm.validateDestinationInputs(
+        { name: "email-dest", type: "email", template: "content-template", emails: ["recipient"] },
+        1,
+      );
+      expect(result).toBe(true);
+
+      wrapper.vm.jsonArrayOfObj = [{ type: "email" }];
+      wrapper.vm.destinationErrorsToDisplay = [[]];
+      expect(wrapper.vm.getFormattedTemplates).toEqual(["email-template", "content-template"]);
     });
 
     it("returns true for a valid email destination", async () => {
@@ -408,22 +398,6 @@ describe("ImportDestination", () => {
       );
       expect(result).toBe(false);
     });
-
-    it("returns false for action type with non-existent action_id", async () => {
-      const result = await wrapper.vm.validateDestinationInputs(
-        { name: "act-dest", type: "action", action_id: "non-existent" },
-        1,
-      );
-      expect(result).toBe(false);
-    });
-
-    it("returns true for action type with a valid service action id", async () => {
-      const result = await wrapper.vm.validateDestinationInputs(
-        { name: "act-dest", type: "action", action_id: "action1" },
-        1,
-      );
-      expect(result).toBe(true);
-    });
   });
 
   // ─── getCorrectionRequiredError — single source for the "required" rule ─────
@@ -467,9 +441,9 @@ describe("ImportDestination", () => {
     });
 
     it("does nothing and resets isImporting when jsonStr is empty", async () => {
-      wrapper.vm.$refs.baseImportRef.isImporting = true;
+      wrapper.vm.$refs.baseImportRef.isImportingLocal = true;
       await wrapper.vm.importJson({ jsonStr: "", jsonArray: [] });
-      expect(wrapper.vm.$refs.baseImportRef.isImporting).toBe(false);
+      expect(wrapper.vm.$refs.baseImportRef.isImportingLocal).toBe(false);
     });
 
     it("calls toast with the parse error message for invalid JSON", async () => {
@@ -478,9 +452,9 @@ describe("ImportDestination", () => {
     });
 
     it("resets isImporting on parse error", async () => {
-      wrapper.vm.$refs.baseImportRef.isImporting = true;
+      wrapper.vm.$refs.baseImportRef.isImportingLocal = true;
       await wrapper.vm.importJson({ jsonStr: "{ bad json }", jsonArray: [] });
-      expect(wrapper.vm.$refs.baseImportRef.isImporting).toBe(false);
+      expect(wrapper.vm.$refs.baseImportRef.isImportingLocal).toBe(false);
     });
 
     it("resets error arrays before processing", async () => {
@@ -653,12 +627,6 @@ describe("ImportDestination", () => {
       expect(wrapper.find('[data-test="destination-import-emails-input"]').exists()).toBe(true);
     });
 
-    it("renders the action correction select for action_id field errors", async () => {
-      wrapper.vm.destinationErrorsToDisplay = [[{ field: "action_id", message: "action missing" }]];
-      await wrapper.vm.$nextTick();
-      expect(wrapper.find('[data-test="destination-import-action-input"]').exists()).toBe(true);
-    });
-
     it("renders plain text for unknown-field string errors", async () => {
       wrapper.vm.destinationErrorsToDisplay = [["plain string error"]];
       await wrapper.vm.$nextTick();
@@ -679,21 +647,6 @@ describe("ImportDestination", () => {
       wrapper.vm.filterTemplates("email");
       wrapper.vm.filteredTemplates.forEach((t: string) => {
         expect(t.toLowerCase()).toContain("email");
-      });
-    });
-  });
-
-  // ─── filterActions ────────────────────────────────────────────────────────
-  describe("filterActions", () => {
-    it("returns full list when val is empty", () => {
-      wrapper.vm.filterActions("");
-      expect(Array.isArray(wrapper.vm.filteredActions)).toBe(true);
-    });
-
-    it("filters actions by partial label match", () => {
-      wrapper.vm.filterActions("Test");
-      wrapper.vm.filteredActions.forEach((a: any) => {
-        expect(a.label.toLowerCase()).toContain("test");
       });
     });
   });

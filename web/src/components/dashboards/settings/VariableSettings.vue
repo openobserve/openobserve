@@ -47,7 +47,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
       </DashboardHeader>
-      <div ref="tableWrapper" data-test="dashboard-variable-settings-drag">
+      <div
+        ref="tableWrapper"
+        class="min-h-0 flex-1 overflow-y-auto"
+        data-test="dashboard-variable-settings-drag"
+      >
         <OTable
           data-test="dashboard-variables-table"
           :data="dashboardVariablesList"
@@ -61,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-global-filter="false"
         >
           <template #empty>
-            <NoData />
+            <OEmptyState size="hero" preset="no-variables" @action="() => addVariables()" />
           </template>
 
           <template #cell-drag>
@@ -78,11 +82,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-name="{ row }">
-            <div class="item-name">
-              <span class="block overflow-hidden text-ellipsis whitespace-nowrap">
-                {{ row.name }}
-              </span>
-              <OTooltip v-if="row.name.length > 30" :content="row.name" />
+            <div class="item-name flex items-center gap-1.5">
+              <OTruncatedText>{{ row.name }}</OTruncatedText>
+              <!-- Dependency indicator: icon + count of variables this one depends
+                   on. OTooltip WRAPS the chip (default-slot mode) so the whole chip
+                   is the hover target — child mode would anchor only to the count. -->
+              <OTooltip
+                v-if="getDependencies(row).length"
+                :content="
+                  t('dashboard.variableSettingsPage.dependsOn', {
+                    names: getDependencies(row).join(', '),
+                  })
+                "
+              >
+                <span
+                  class="text-text-secondary bg-surface-subtle inline-flex shrink-0 cursor-help items-center gap-0.5 rounded-full px-1.5 py-0.5"
+                  :data-test="`dashboard-variable-${row.name}-dependencies`"
+                >
+                  <OIcon name="account-tree" size="xs" />
+                  <span class="text-2xs leading-none">{{ getDependencies(row).length }}</span>
+                </span>
+              </OTooltip>
             </div>
           </template>
 
@@ -148,6 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="editVariableFn(row.name)"
                 :data-test="`dashboard-edit-variable-${row.name}`"
                 icon-left="edit"
+                class="max-md:hidden"
               >
               </OButton>
               <OButton
@@ -156,16 +177,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('dashboard.delete')"
                 @click.stop="showDeleteDialogFn({ row: { name: row.name } })"
                 data-test="dashboard-delete-variable"
+                class="max-md:hidden"
               >
                 <template #icon-left><OIcon name="delete" size="sm" /></template>
               </OButton>
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    icon-left="more-vert"
+                    :title="t('dashboard.moreActions')"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    class="md:hidden"
+                    data-test="dashboard-variable-row-more-actions"
+                    @click.stop
+                  />
+                </template>
+                <ODropdownItem
+                  icon-left="edit"
+                  class="md:hidden"
+                  :data-test="`dashboard-edit-variable-${row.name}-menu`"
+                  @select="editVariableFn(row.name)"
+                >
+                  <span>{{ t("dashboard.edit") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="delete"
+                  variant="destructive"
+                  class="md:hidden"
+                  data-test="dashboard-delete-variable-menu"
+                  @select="showDeleteDialogFn({ row: { name: row.name } })"
+                >
+                  <span>{{ t("dashboard.delete") }}</span>
+                </ODropdownItem>
+              </ODropdown>
             </div>
           </template>
         </OTable>
 
         <ConfirmDialog
           :title="t('dashboard.deleteVariable')"
-          :message="t('dashboard.deleteVariableMsg')"
+          message-keypath="dashboard.deleteVariableMsg"
+          :message-name="selectedDelete?.name"
+          ok-variant="destructive"
           @update:ok="deleteVariableFn"
           @update:cancel="confirmDeleteDialog = false"
           v-model="confirmDeleteDialog"
@@ -193,13 +247,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   defineComponent,
   ref,
+  computed,
   onMounted,
   onActivated,
   onBeforeUnmount,
   reactive,
   nextTick,
+  watch,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
+import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/variablesDependencyUtils";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import { getDashboard, deleteVariable, updateDashboard } from "../../../utils/commons";
@@ -207,37 +264,45 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AddSettingVariable from "./AddSettingVariable.vue";
 import DashboardHeader from "./common/DashboardHeader.vue";
-import NoData from "../../shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import VariablesDependenciesGraph from "./VariablesDependenciesGraph.vue";
 import useNotifications from "@/composables/useNotifications";
+import { useDashboardSaveConflict } from "@/composables/dashboard/useDashboardSaveConflict";
 import Sortable from "sortablejs";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL, TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import { useDashboardSettingsDraft } from "./dashboardSettingsDraft";
 
 export default defineComponent({
   name: "VariableSettings",
   components: {
     AddSettingVariable,
-    NoData,
+    OEmptyState,
     ConfirmDialog,
     DashboardHeader,
     VariablesDependenciesGraph,
     OButton,
+    ODropdown,
+    ODropdownItem,
     OIcon,
     ODialog,
     OTag,
     OTooltip,
     OTable,
+    OTruncatedText,
   },
   emits: ["save"],
   setup(props, { emit }) {
     const store: any = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const route = useRoute();
     const isAddVariable = ref(false);
 
@@ -254,7 +319,7 @@ export default defineComponent({
     const columns: OTableColumnDef[] = [
       {
         id: "drag",
-        header: "",
+        header: raw(""),
         size: 32,
         minSize: 32,
         maxSize: 32,
@@ -262,7 +327,7 @@ export default defineComponent({
       },
       {
         id: "index",
-        header: "#",
+        header: raw("#"),
         size: TABLE_INDEX_COL_SIZE,
         meta: { align: "left" },
       },
@@ -306,14 +371,21 @@ export default defineComponent({
       return index < 9 ? `0${index + 1}` : `${index + 1}`;
     };
 
-    const {
-      showPositiveNotification,
-      showErrorNotification,
-      showConfictErrorNotificationWithRefreshBtn,
-    } = useNotifications();
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
+
+    const saveConflict = useDashboardSaveConflict();
     // list of all variables, which will be same as the dashboard variables list
     const dashboardVariablesList: any = ref([]);
-    const selectedVariable = ref(null);
+
+    // Per-variable dependency graph — each entry's `parentVariables` are the
+    // variables that one depends on (referenced in its stream/field/filters).
+    const dependencyGraph = computed(() =>
+      buildVariablesDependencyGraph(dashboardVariablesList.value ?? []),
+    );
+    const getDependencies = (row: any): string[] =>
+      dependencyGraph.value?.[row?.name]?.parentVariables ?? [];
+
+    const selectedVariable = ref<string | null>(null);
     const confirmDeleteDialog = ref<boolean>(false);
     const selectedDelete: any = ref(null);
     const variableTypes = [
@@ -391,17 +463,19 @@ export default defineComponent({
 
         emit("save");
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              t("dashboard.variableSettingsPage.variableReorderFailed"),
-          );
-        } else {
-          showErrorNotification(
-            error?.message ?? t("dashboard.variableSettingsPage.variableReorderFailed"),
-          );
+        if (saveConflict.isConflict(error)) {
+          void saveConflict.openConflict({
+            dashboardId: dashboardVariableData.data.dashboardId,
+            folderId: (route.query.folder as string) ?? "default",
+            mine: dashboardVariableData.data,
+            change: t("dashboard.saveConflict.change.reorderedVariables"),
+            onResolved: getDashboardData,
+          });
+          return;
         }
+        showErrorNotification(
+          error?.message ?? t("dashboard.variableSettingsPage.variableReorderFailed"),
+        );
         await getDashboardData();
       }
     };
@@ -444,8 +518,31 @@ export default defineComponent({
       });
     };
 
+    const draftContext = useDashboardSettingsDraft();
+
+    // Reopens the variable form a draft or another tab left unsaved; a variable deleted since then drops it.
+    const openPendingVariable = () => {
+      const pending = draftContext?.pending.variable;
+      if (!draftContext || !pending || isAddVariable.value) return;
+      const exists =
+        pending.variableName === null ||
+        dashboardVariablesList.value.some((v: { name: string }) => v.name === pending.variableName);
+      if (!exists) {
+        draftContext.pending.variable = null;
+        return;
+      }
+      selectedVariable.value = pending.variableName;
+      isAddVariable.value = true;
+    };
+
+    watch(
+      () => draftContext?.restoreRevision,
+      () => openPendingVariable(),
+    );
+
     onMounted(async () => {
       await getDashboardData();
+      openPendingVariable();
       await initSortable();
     });
 
@@ -499,12 +596,15 @@ export default defineComponent({
           timeout: 2000,
         });
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              t("dashboard.variableSettingsPage.variableDeletionFailed"),
-          );
+        if (saveConflict.isConflict(error)) {
+          void saveConflict.openConflict({
+            dashboardId: route.query.dashboard as string,
+            folderId: (route.query.folder as string) ?? "default",
+            change: t("dashboard.saveConflict.change.deletedVariable", {
+              name: selectedDelete.value?.name ?? "",
+            }),
+            onResolved: getDashboardData,
+          });
         } else {
           showErrorNotification(
             error?.message ?? t("dashboard.variableSettingsPage.variableDeletionFailed"),
@@ -541,11 +641,13 @@ export default defineComponent({
     };
 
     return {
+      selectedDelete,
       t,
       store,
       getDashboardData,
       addVariables,
       dashboardVariablesList,
+      getDependencies,
       isAddVariable,
       showDeleteDialogFn,
       confirmDeleteDialog,

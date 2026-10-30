@@ -31,7 +31,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   inset, so it lines up with the header and any table below it.
 -->
 <template>
-  <div class="grid gap-2.5" :style="gridStyle" data-test="kpi-card-row">
+  <div
+    class="grid max-lg:flex max-lg:flex-wrap max-lg:gap-1.5"
+    :class="gap"
+    :style="gridStyle"
+    data-test="kpi-card-row"
+  >
     <slot />
   </div>
 </template>
@@ -45,10 +50,12 @@ const props = withDefaults(
     columns?: number;
     /** Minimum card width before the responsive grid wraps. */
     minWidth?: string;
+    gap?: string;
   }>(),
   {
     columns: undefined,
     minWidth: "11.25rem",
+    gap: "gap-2.5",
   },
 );
 

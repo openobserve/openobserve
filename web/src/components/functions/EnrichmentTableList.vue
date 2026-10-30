@@ -19,7 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="enrichment-tables-list-page" class="flex h-full min-h-0 flex-col">
     <OPageLayout
-      v-if="!showAddJSTransformDialog"
       :title="t('function.enrichmentTables')"
       icon="dataset"
       :subtitle="t('function.enrichmentTablesSubtitle')"
@@ -42,17 +41,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="min-h-0 w-full flex-1 overflow-hidden">
         <div class="bg-card-glass-bg h-full">
           <OTable
-            ref="qTable"
+            ref="oTableRef"
             :frame="false"
             data-test="enrichment-tables-list-table"
             :data="visibleRows"
             :columns="columns"
             row-key="name"
             :loading="loading"
+            :forbidden="forbidden"
             pagination="client"
             :page-size="selectedPerPage"
             :page-size-options="perPageOptionsList"
+            :current-page="currentPage"
+            @update:current-page="onPageChange"
+            @update:page-size="selectedPerPage = $event"
             sorting="client"
+            :sort-by="sortBy"
+            :sort-order="sortOrder"
+            @update:sort-by="sortBy = $event"
+            @update:sort-order="sortOrder = $event"
             filter-mode="client"
             show-index
             :show-global-filter="false"
@@ -68,8 +75,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Toolbar: type filter + search -->
             <template #toolbar>
-              <div class="flex w-full items-center gap-2">
+              <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
                 <OToggleGroup
+                  mobile-dropdown
                   :model-value="selectedFilter"
                   @update:model-value="
                     (v) => {
@@ -95,26 +103,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSearchInput
                   data-test="enrichment-tables-search-input"
                   v-model="filterQuery"
-                  class="ml-auto w-64"
+                  class="ms-auto w-64 max-md:ms-0 max-md:w-auto max-md:min-w-40 max-md:flex-1"
                   :placeholder="t('function.searchEnrichmentTable')"
                 />
               </div>
             </template>
             <template #toolbar-trailing>
-              <OButton
+              <ORefreshButton
+                layout="inline"
                 variant="outline"
-                size="icon-sm"
-                icon-left="refresh"
-                :loading="loading"
+                :last-run-at="lastUpdatedAt"
+                :loading="fetching"
+                shortcut-id="enrichmentTablesRefresh"
                 data-test="enrichment-tables-list-refresh-btn"
                 @click="refreshList"
-              >
-                <OTooltip
-                  side="bottom"
-                  :content="t('common.refresh')"
-                  shortcut-id="enrichmentTablesRefresh"
-                />
-              </OButton>
+              />
             </template>
             <template #empty>
               <OEmptyState
@@ -149,11 +152,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon name="check-circle" size="sm" class="text-status-positive">
                       <OTooltip>
                         <template #content>
-                          <div style="max-width: 300px">
-                            <strong>Status: All Completed</strong><br />
-                            {{ row.urlJobs.length }} URL job(s) completed<br />
+                          <div style="max-width: 18.75rem">
+                            <strong>{{ t("function.statusAllCompleted") }}</strong
+                            ><br />
+                            {{ t("function.urlJobsCompleted", { count: row.urlJobs.length })
+                            }}<br />
                             <br />
-                            <em style="font-size: 0.85em">Click "Url" to see details</em>
+                            <em style="font-size: 0.85em">{{
+                              t("function.clickUrlToSeeDetails")
+                            }}</em>
                           </div>
                         </template>
                       </OTooltip>
@@ -163,13 +170,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon name="sync" size="sm" class="animate-spin">
                       <OTooltip>
                         <template #content>
-                          <div style="max-width: 300px">
-                            <strong>Status: Processing</strong><br />
-                            One or more jobs are currently processing<br />
+                          <div style="max-width: 18.75rem">
+                            <strong>{{ t("function.statusProcessing") }}</strong
+                            ><br />
+                            {{ t("function.jobsCurrentlyProcessing") }}<br />
                             <br />
                             <em style="font-size: 0.85em"
-                              >Note: Progress is not real-time. Refresh to see latest updates.<br />Click
-                              "Url" for details</em
+                              >{{ t("function.progressNotRealTimeNote") }}<br />{{
+                                t("function.clickUrlForDetails")
+                              }}</em
                             >
                           </div>
                         </template>
@@ -185,11 +194,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <OTooltip>
                         <template #content>
-                          <div style="max-width: 350px">
-                            <strong>Status: Failed</strong><br />
-                            One or more jobs have failed<br />
+                          <div style="max-width: 21.875rem">
+                            <strong>{{ t("function.statusFailed") }}</strong
+                            ><br />
+                            {{ t("function.jobsFailedNote") }}<br />
                             <br />
-                            Click to see details and retry failed jobs
+                            {{ t("function.clickToRetryFailedJobs") }}
                           </div>
                         </template>
                       </OTooltip>
@@ -199,11 +209,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon name="schedule" size="sm">
                       <OTooltip>
                         <template #content>
-                          <div style="max-width: 300px">
-                            <strong>Status: Pending</strong><br />
-                            Job(s) waiting to be processed<br />
+                          <div style="max-width: 18.75rem">
+                            <strong>{{ t("function.statusPending") }}</strong
+                            ><br />
+                            {{ t("function.jobsWaitingToBeProcessed") }}<br />
                             <br />
-                            <em style="font-size: 0.85em">Click "Url" for details</em>
+                            <em style="font-size: 0.85em">{{
+                              t("function.clickUrlForDetails")
+                            }}</em>
                           </div>
                         </template>
                       </OTooltip>
@@ -222,6 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('logStream.explore')"
                   variant="ghost"
                   size="icon-sm"
+                  class="max-md:hidden"
                   @click="exploreEnrichmentTable(row)"
                   icon-left="search"
                   data-row-action="view"
@@ -236,6 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('logStream.schemaHeader')"
                   variant="ghost"
                   size="icon-sm"
+                  class="max-md:hidden"
                   @click="listSchema(row)"
                   icon-left="format-list-bulleted"
                   data-row-action="view"
@@ -253,6 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('function.enrichmentTables')"
                   variant="ghost"
                   size="icon-sm"
+                  class="max-md:hidden"
                   @click="showAddUpdateFn(row)"
                   icon-left="edit"
                   data-row-action="edit"
@@ -264,10 +280,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('function.delete')"
                   variant="ghost-destructive"
                   size="icon-sm"
+                  class="max-md:hidden"
                   @click="showDeleteDialogFn(row)"
                   icon-left="delete"
                   data-row-action="delete"
                 />
+                <ODropdown side="bottom" align="end">
+                  <template #trigger>
+                    <OButton
+                      :aria-label="t('common.moreActions')"
+                      icon-left="more-vert"
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      class="md:hidden"
+                      data-test="enrichment-table-row-more-actions"
+                      @click.stop
+                    />
+                  </template>
+                  <ODropdownItem
+                    v-if="
+                      !row.urlJobs ||
+                      row.urlJobs.length === 0 ||
+                      row.aggregateStatus === 'completed'
+                    "
+                    icon-left="search"
+                    class="md:hidden"
+                    :data-test="`${row.name}-explore-btn-menu`"
+                    @select="exploreEnrichmentTable(row)"
+                  >
+                    <span>{{ t("logStream.explore") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    v-if="
+                      !row.urlJobs ||
+                      row.urlJobs.length === 0 ||
+                      row.aggregateStatus === 'completed'
+                    "
+                    icon-left="format-list-bulleted"
+                    class="md:hidden"
+                    :data-test="`${row.name}-schema-btn-menu`"
+                    @select="listSchema(row)"
+                  >
+                    <span>{{ t("logStream.schemaHeader") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    v-if="
+                      !row.urlJobs ||
+                      row.urlJobs.length === 0 ||
+                      row.aggregateStatus === 'completed' ||
+                      row.aggregateStatus === 'failed'
+                    "
+                    icon-left="edit"
+                    class="md:hidden"
+                    :data-test="`${row.name}-edit-btn-menu`"
+                    @select="showAddUpdateFn(row)"
+                  >
+                    <span>{{ t("function.enrichmentTables") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="delete"
+                    variant="destructive"
+                    class="md:hidden"
+                    :data-test="`${row.name}-delete-btn-menu`"
+                    @select="showDeleteDialogFn(row)"
+                  >
+                    <span>{{ t("function.delete") }}</span>
+                  </ODropdownItem>
+                </ODropdown>
               </div>
             </template>
 
@@ -286,46 +365,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
 
-            <template #bottom>
-              <div class="flex w-full items-center justify-between py-2">
-                <div class="mr-4 flex items-center text-xs font-normal">
-                  {{ resultTotal }} {{ t("function.enrichmentTables") }}
-                </div>
-                <OButton
-                  v-if="selectedEnrichmentTables.length > 0"
-                  data-test="enrichment-tables-bulk-delete-btn"
-                  variant="outline-destructive"
-                  size="sm"
-                  icon-left="delete"
-                  :loading="bulkDeleteLoading"
-                  @click="openBulkDeleteDialog"
-                >
-                  Delete
-                </OButton>
-              </div>
+            <template #selection-actions>
+              <OButton
+                data-test="enrichment-tables-bulk-delete-btn"
+                variant="outline-destructive"
+                size="sm"
+                icon-left="delete"
+                :loading="bulkDeleteLoading"
+                @click="openBulkDeleteDialog"
+              >
+                {{ t("common.delete") }}
+              </OButton>
             </template>
           </OTable>
         </div>
       </div>
     </OPageLayout>
-    <div v-else>
-      <AddEnrichmentTable
-        v-model="formData"
-        :isUpdating="isUpdated"
-        @update:list="refreshList"
-        @cancel:hideform="hideForm"
-      />
-    </div>
+    <!-- Keyed per open: the form reads its defaults from modelValue only at setup. -->
+    <AddEnrichmentTable
+      :key="formKey"
+      :open="showAddJSTransformDialog"
+      v-model="formData"
+      :isUpdating="isUpdated"
+      @update:list="refreshList"
+      @cancel:hideform="hideForm"
+    />
     <ConfirmDialog
-      title="Delete Enrichment Table"
-      message="Are you sure you want to delete enrichment table?"
+      :title="t('function.deleteEnrichmentTableTitle')"
+      message-keypath="function.deleteEnrichmentTableConfirm"
+      :message-name="selectedDelete?.name"
+      ok-variant="destructive"
       @update:ok="deleteLookupTable"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
     <ConfirmDialog
-      title="Bulk Delete Enrichment Tables"
-      :message="`Are you sure you want to delete ${selectedEnrichmentTables.length} enrichment table(s)?`"
+      :title="t('function.bulkDeleteEnrichmentTablesTitle')"
+      :message="
+        t('functions.confirmDeleteEnrichmentTables', { count: selectedEnrichmentTables.length })
+      "
+      ok-variant="destructive"
       @update:ok="bulkDeleteEnrichmentTables"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -344,7 +423,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="p-4">
         <div class="mb-4 flex items-center justify-between">
-          <div class="text-xl font-semibold">URL Jobs for {{ selectedTableForUrlJobs?.name }}</div>
+          <div class="text-xl font-semibold">
+            {{ t("function.urlJobsFor") }} {{ selectedTableForUrlJobs?.name }}
+          </div>
         </div>
         <div v-if="selectedTableForUrlJobs?.urlJobs && selectedTableForUrlJobs.urlJobs.length > 0">
           <ul class="divide-border flex flex-col divide-y">
@@ -355,7 +436,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex items-center gap-2 p-4"
             >
               <div class="flex min-w-0 flex-1 flex-col">
-                <span class="text-sm font-bold">Job {{ (index as number) + 1 }}</span>
+                <span class="text-sm font-bold"
+                  >{{ t("function.jobLabelPrefix") }} {{ (index as number) + 1 }}</span
+                >
                 <span class="text-muted-foreground block text-xs">{{ job.url }}</span>
                 <span class="text-muted-foreground mt-2 block text-xs">
                   <OTag
@@ -369,12 +452,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="job.status === 'completed'"
                   class="text-muted-foreground mt-2 block text-xs"
                 >
-                  Records: {{ job.total_records_processed?.toLocaleString() }}<br />
-                  Size:
+                  {{ t("function.recordsLabel") }} {{ job.total_records_processed?.toLocaleString()
+                  }}<br />
+                  {{ t("function.sizeLabel") }}
                   {{
                     job.total_bytes_fetched
                       ? formatSizeFromMB((job.total_bytes_fetched / 1024 / 1024).toFixed(2))
-                      : "0 MB"
+                      : raw("0 MB")
                   }}
                 </span>
                 <span
@@ -382,40 +466,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`enrichment-url-jobs-item-${index}-error`"
                   class="text-status-error-text mt-2 block text-xs"
                 >
-                  Error: {{ job.error_message }}
+                  {{ t("function.errorLabel") }} {{ job.error_message }}
                 </span>
               </div>
             </li>
           </ul>
         </div>
-        <div v-else class="text-text-muted p-3 text-center">No URL jobs found</div>
+        <div v-else class="text-text-muted p-3 text-center">
+          {{ t("function.noUrlJobsFound") }}
+        </div>
       </div>
     </ODrawer>
   </div>
 </template>
 
 <script lang="ts">
+import { streamKeys } from "@/services/stream.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { enrichmentTableStatusesQuery } from "@/services/jstransform.queries";
 import { computed, defineComponent, onBeforeMount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useListViewState } from "@/composables/useListViewState";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 import AddEnrichmentTable from "./AddEnrichmentTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import segment from "../../services/segment_analytics";
+import analytics from "../../services/product_analytics";
 import { formatSizeFromMB, getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import streamService from "@/services/stream";
 import useStreams from "@/composables/useStreams";
 import EnrichmentSchema from "./EnrichmentSchema.vue";
 import { useReo } from "@/services/reodotdev_analytics";
-import jsTransformService from "@/services/jstransform";
 import { useToast } from "@/lib/feedback/Toast/useToast";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
@@ -440,7 +532,10 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OButton,
+    ORefreshButton,
     ODrawer,
+    ODropdown,
+    ODropdownItem,
     OSearchInput,
     OTooltip,
     OIcon,
@@ -451,12 +546,12 @@ export default defineComponent({
   emits: ["updated:fields", "update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const jsTransforms: any = ref([]);
     const formData: any = ref({});
     const showAddJSTransformDialog: any = ref(false);
-    const qTable: any = ref(null);
+    const formKey = ref(0);
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
@@ -466,8 +561,32 @@ export default defineComponent({
     const showEnrichmentSchema = ref<boolean>(false);
     const showUrlJobsDialogState = ref<boolean>(false);
     const selectedTableForUrlJobs = ref<any>(null);
-    const filterQuery = ref("");
+    const viewState = useListViewState("enrichmentTables", {
+      filterQuery: "",
+      filter: "all",
+      pageSize: 20,
+      currentPage: 1,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+    });
+    const filterQuery = ref(viewState.filterQuery);
     const loading = ref(false);
+    // Request in flight with rows still on screen — the refresh button's
+    // spinner. `loading` is the skeleton, for a cold read only.
+    const fetching = ref(false);
+    const lastUpdatedAt = ref<number | null>(null);
+    const forbidden = ref(false);
+    const currentPage = ref(viewState.currentPage);
+    const onPageChange = (page: number) => {
+      currentPage.value = page;
+    };
+    const oTableRef: any = ref(null);
+    // setTimeout(0) is a macrotask, so it runs after TanStack's own deferred auto-reset-on-data-change (its own microtask queue), letting the restored page win.
+    const restorePageIndex = () => {
+      setTimeout(() => {
+        oTableRef.value?.restorePage?.(currentPage.value);
+      }, 0);
+    };
     const { track } = useReo();
     const { toast } = useToast();
     const columns: OTableColumnDef[] = [
@@ -484,7 +603,7 @@ export default defineComponent({
       },
       {
         id: "type",
-        header: "Type",
+        header: t("common.type"),
         accessorFn: (row: any) => (row.urlJobs && row.urlJobs.length > 0 ? "Url" : "File"),
         sortable: true,
         resizable: true,
@@ -546,7 +665,7 @@ export default defineComponent({
     };
 
     const perPageOptionsList = [20, 50, 100, 250, 500];
-    const { getStreams, resetStreamType, getStream } = useStreams();
+    const { getStreams, getStreamsFetchedAt, resetStreamType, getStream } = useStreams(t);
 
     onBeforeMount(() => {
       getLookupTables();
@@ -577,28 +696,49 @@ export default defineComponent({
     });
 
     const getLookupTables = async (force: boolean = false) => {
-      loading.value = true;
-      const dismiss = toast({
-        variant: "loading",
-        message: "Please wait while loading enrichment tables...",
-        timeout: 0,
-      });
+      // The streams half is already a cached query, so on a revisit or a
+      // refresh there are rows to keep — only a cold read spins and toasts.
+      const warm =
+        jsTransforms.value.length > 0 ||
+        queryClient.getQueryData(
+          streamKeys.nameList(store.state.selectedOrganization.identifier, "enrichment_tables"),
+        ) !== undefined;
+      loading.value = !warm;
+      fetching.value = true;
+      forbidden.value = false;
+      const dismiss = warm
+        ? () => {}
+        : toast({
+            variant: "loading",
+            message: t("toastMessages.functions.pleaseWaitWhileLoadingEnrichmentTables"),
+            timeout: 0,
+          });
 
       try {
+        const opts = enrichmentTableStatusesQuery(store.state.selectedOrganization.identifier);
         // Fetch both streams and URL job statuses in parallel
         const [streamsRes, statusRes] = await Promise.all([
           getStreams("enrichment_tables", false, false, force),
-          jsTransformService
-            .get_all_enrichment_table_statuses(store.state.selectedOrganization.identifier)
-            .catch((err: any) => {
-              // If status API fails, continue with empty status map
-              console.warn("Error fetching URL statuses:", err);
-              return { data: {} };
-            }),
+          (force
+            ? queryClient
+                .invalidateQueries({
+                  queryKey: opts.queryKey,
+                  exact: true,
+                  refetchType: "none",
+                })
+                .then(() => queryClient.fetchQuery(opts))
+            : queryClient.fetchQuery(opts)
+          ).catch((err: any) => {
+            // If status API fails, continue with empty status map
+            console.warn("Error fetching URL statuses:", err);
+            return {};
+          }),
         ]);
+        // Read from the rows' own list query: the statuses read above swallows its failures.
+        lastUpdatedAt.value = (await getStreamsFetchedAt("enrichment_tables")) ?? Date.now();
 
         const res: any = streamsRes;
-        const urlJobMap = statusRes.data || {};
+        const urlJobMap: Record<string, any> = statusRes || {};
 
         // Create a map of stream names from the streams list
         const streamMap = new Map();
@@ -683,27 +823,41 @@ export default defineComponent({
         });
 
         jsTransforms.value = Array.from(allTables.values());
-        resultTotal.value = jsTransforms.value.length;
         dismiss();
       } catch (err: any) {
         console.info("Error while fetching enrichment tables", err);
         dismiss();
-        if (err.response?.status != 403) {
+        forbidden.value = err?.response?.status === 403;
+        if (!forbidden.value) {
           toast({
             variant: "error",
-            message: err.response?.data?.message || "Error while fetching functions.",
+            message: err.response?.data?.message || t("functions.fetchFunctionsError"),
           });
         }
       } finally {
         loading.value = false;
+        fetching.value = false;
+        restorePageIndex();
       }
     };
 
-    const resultTotal = ref<number>(0);
     const maxRecordToReturn = ref<number>(100);
-    const selectedPerPage = ref<number>(20);
+    const selectedPerPage = ref<number>(viewState.pageSize);
     const selectedEnrichmentTable = ref<any>(null);
-    const selectedFilter = ref<string>("all");
+    const selectedFilter = ref<string>(viewState.filter);
+    const sortBy = ref(viewState.sortBy);
+    const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
+    watch([filterQuery, selectedFilter], () => (currentPage.value = 1));
+    watch([filterQuery, selectedFilter, selectedPerPage, currentPage, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        filterQuery: filterQuery.value,
+        filter: selectedFilter.value,
+        pageSize: selectedPerPage.value,
+        currentPage: currentPage.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
+    });
 
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
@@ -715,6 +869,7 @@ export default defineComponent({
     };
 
     const addLookupTable = () => {
+      formKey.value += 1;
       showAddJSTransformDialog.value = true;
     };
 
@@ -753,23 +908,25 @@ export default defineComponent({
       }
       addLookupTable();
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: action,
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         page: "Functions",
       });
     };
 
     const refreshList = () => {
-      router.push({
-        name: "enrichmentTables",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
+      // A surviving `action` re-opens the form on the next mount, hiding the list.
+      if (router.currentRoute.value.query.action) {
+        router.replace({
+          name: "enrichmentTables",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
+      }
       showAddJSTransformDialog.value = false;
-      resetStreamType("enrichment_tables");
+      // Not resetStreamType: it drops the cached list, leaving only the skeleton.
       getLookupTables(true);
     };
 
@@ -792,8 +949,11 @@ export default defineComponent({
         )
         .then((res: any) => {
           if (res.data.code == 200) {
+            analytics.track("stream_deleted", { stream_type: "enrichment_tables", count: 1 });
             toast({
-              message: `${selectedDelete.value.name} deleted successfully.`,
+              message: t("toastMessages.functions.deletedSuccessfully", {
+                name: selectedDelete.value.name,
+              }),
               variant: "success",
             });
             resetStreamType("enrichment_tables");
@@ -803,16 +963,17 @@ export default defineComponent({
         .catch((err: any) => {
           if (err.response.status != 403) {
             toast({
-              message: err.response?.data?.message || "Error while deleting stream.",
+              message:
+                err.response?.data?.message ||
+                t("toastMessages.functions.errorWhileDeletingStream"),
               variant: "error",
             });
           }
         });
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Delete Enrichment Table",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         function_name: selectedDelete.value.name,
         is_ingest_func: selectedDelete.value.ingest,
         page: "Functions",
@@ -861,19 +1022,32 @@ export default defineComponent({
             }
           });
 
+          if (successfulDeletions > 0) {
+            analytics.track("stream_deleted", {
+              stream_type: "enrichment_tables",
+              count: successfulDeletions,
+            });
+          }
           if (successfulDeletions > 0 && failedDeletions === 0) {
             toast({
-              message: `Successfully deleted ${successfulDeletions} enrichment table(s).`,
+              message: t("toastMessages.functions.successfullyDeletedEnrichmentTables", {
+                count: successfulDeletions,
+              }),
               variant: "success",
             });
           } else if (successfulDeletions > 0 && failedDeletions > 0) {
             toast({
-              message: `Deleted ${successfulDeletions} enrichment table(s). Failed to delete ${failedDeletions} enrichment table(s).`,
+              message: t("toastMessages.functions.enrichmentTablesDeletedWithFailures", {
+                count: successfulDeletions,
+                failed: failedDeletions,
+              }),
               variant: "warning",
             });
           } else if (failedDeletions > 0) {
             toast({
-              message: `Failed to delete ${failedDeletions} enrichment table(s).`,
+              message: t("toastMessages.functions.failedToDeleteEnrichmentTables", {
+                count: failedDeletions,
+              }),
               variant: "error",
             });
           }
@@ -902,7 +1076,7 @@ export default defineComponent({
 
       const dismiss = toast({
         variant: "loading",
-        message: "Redirecting to explorer...",
+        message: t("toastMessages.functions.redirectingToExplorer"),
         timeout: 0,
       });
 
@@ -992,15 +1166,6 @@ export default defineComponent({
     });
     const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 
-    // Watch visibleRows to sync resultTotal with search filter
-    watch(
-      visibleRows,
-      (newVisibleRows) => {
-        resultTotal.value = newVisibleRows.length;
-      },
-      { immediate: true },
-    );
-
     useShortcuts([
       {
         id: "enrichmentTablesRefresh",
@@ -1012,7 +1177,11 @@ export default defineComponent({
 
     return {
       t,
-      qTable,
+      raw,
+      oTableRef,
+      currentPage,
+      onPageChange,
+      restorePageIndex,
       store,
       router,
       jsTransforms,
@@ -1023,7 +1192,9 @@ export default defineComponent({
       selectedDelete,
       getLookupTables,
       loading,
-      resultTotal,
+      fetching,
+      lastUpdatedAt,
+      forbidden,
       refreshList,
       perPageOptionsList,
       selectedPerPage,
@@ -1035,6 +1206,7 @@ export default defineComponent({
       changePagination,
       maxRecordToReturn,
       showAddJSTransformDialog,
+      formKey,
       delete: "delete",
       filterQuery,
       filterData,
@@ -1055,6 +1227,8 @@ export default defineComponent({
       bulkDeleteEnrichmentTables,
       bulkDeleteLoading,
       selectedFilter,
+      sortBy,
+      sortOrder,
       showUrlJobsDialog,
       showUrlJobsDialogState,
       selectedTableForUrlJobs,
@@ -1074,7 +1248,6 @@ export default defineComponent({
         (newVal != oldVal || this.jsTransforms.value == undefined) &&
         this.router.currentRoute.value.name == "pipeline"
       ) {
-        this.resultTotal = 0;
         this.jsTransforms = [];
         this.getLookupTables(true);
       }

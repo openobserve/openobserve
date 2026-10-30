@@ -18,10 +18,10 @@ import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
 import Vector from "@/components/ingestion/logs/Vector.vue";
 
-// Mock CopyContent component
-vi.mock("@/components/CopyContent.vue", () => ({
+// Mock CredentialCodeBlock component
+vi.mock("@/components/ingestion/CredentialCodeBlock.vue", () => ({
   default: {
-    name: "CopyContent",
+    name: "CredentialCodeBlock",
     props: ["content"],
     template: "<div class='copy-content-mock'>{{ content }}</div>",
   },
@@ -95,7 +95,7 @@ describe("Vector.vue Comprehensive Coverage", () => {
       expect(wrapper.vm.$options.name).toBe("vector-mechanism");
     });
 
-    it("should render CopyContent component", () => {
+    it("should render CredentialCodeBlock component", () => {
       wrapper = createWrapper();
       const copyContent = wrapper.find(".copy-content-mock");
       expect(copyContent.exists()).toBe(true);
@@ -347,20 +347,21 @@ describe("Vector.vue Comprehensive Coverage", () => {
     });
   });
 
-  describe("CopyContent Component Integration Tests", () => {
-    it("should pass content to CopyContent component", () => {
+  describe("CredentialCodeBlock Component Integration Tests", () => {
+    it("should pass content to CredentialCodeBlock component", () => {
       wrapper = createWrapper();
       const copyContent = wrapper.find(".copy-content-mock");
       expect(copyContent.text()).toContain("[sinks.openobserve]");
     });
 
-    it("should render CopyContent with correct classes", () => {
+    it("should name the block with its slug", () => {
       wrapper = createWrapper();
-      const copyContentContainer = wrapper.find(".copy-content-container-cls");
-      expect(copyContentContainer.exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "CredentialCodeBlock" }).attributes("slug")).toBe(
+        "vector",
+      );
     });
 
-    it("should pass vector configuration to CopyContent", () => {
+    it("should pass vector configuration to CredentialCodeBlock", () => {
       wrapper = createWrapper();
       const copyContent = wrapper.find(".copy-content-mock");
       expect(copyContent.text()).toContain('type = "http"');
@@ -456,7 +457,7 @@ describe("Vector.vue Comprehensive Coverage", () => {
       expect(container.exists()).toBe(true);
     });
 
-    it("should render only one CopyContent component", () => {
+    it("should render only one CredentialCodeBlock component", () => {
       wrapper = createWrapper();
       const copyComponents = wrapper.findAll(".copy-content-mock");
       expect(copyComponents).toHaveLength(1);

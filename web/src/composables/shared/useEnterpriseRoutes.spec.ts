@@ -1,5 +1,17 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import useEnterpriseRoutes from "./useEnterpriseRoutes";
+import enLocale from "@/locales/languages/en-US.json";
+import store from "@/stores";
+
+/** Every `meta.titleKey` in a route tree, children included. */
+const collectTitleKeys = (routes: any[]): string[] =>
+  routes.flatMap((route) => [
+    ...(route?.meta?.titleKey ? [route.meta.titleKey] : []),
+    ...collectTitleKeys(route?.children ?? []),
+  ]);
+
+const enMessage = (key: string) =>
+  key.split(".").reduce<any>((node, part) => node?.[part], enLocale);
 
 // Mock the config module with mutable reference
 vi.mock("@/aws-exports", () => {
@@ -15,11 +27,11 @@ vi.mock("@/aws-exports", () => {
     freePlan: "free",
     paidPlan: "pay-as-you-go",
     enterprisePlan: "enterprise",
-    ooApplicationID: undefined,
-    ooClientToken: undefined,
-    ooSite: undefined,
-    ooService: undefined,
-    ooOrgIdentifier: undefined,
+    o2ApplicationID: undefined,
+    o2ClientToken: undefined,
+    o2Site: undefined,
+    o2Service: undefined,
+    o2OrgIdentifier: undefined,
     environment: undefined,
     ddAPPID: undefined,
     ddClientToken: undefined,
@@ -70,10 +82,6 @@ vi.mock("@/components/iam/quota/Quota.vue", () => ({
 
 vi.mock("@/components/iam/organizations/AppOrganizations.vue", () => ({
   default: vi.fn(() => ({ name: "AppOrganizations" })),
-}));
-
-vi.mock("@/components/actionScripts/ActionScripts.vue", () => ({
-  default: vi.fn(() => ({ name: "ActionScripts" })),
 }));
 
 vi.mock("@/views/User.vue", () => ({
@@ -233,17 +241,78 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(organizationsRoute.path).toBe("organizations");
     });
 
-    // Test 19: Should have 5 children in basic configuration
-    it("should have 5 children in basic configuration", () => {
+    // Test 19: 6 base children + groups/editGroup/roles/editRole/quota (RBAC),
+    // always registered now — locked in OSS rather than absent.
+    it("should have 11 children in basic configuration", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      expect(iamRoute.children.length).toBe(5);
+      expect(iamRoute.children.length).toBe(11);
     });
 
-    // Test 20: Should have only 1 route in basic configuration
-    it("should have only 1 route in basic configuration", () => {
+    // Test 19a: MCP setup is served by every edition, so it must be present on
+    // the OSS build too — not pushed inside the enterprise/cloud branch.
+    it("should include mcpServer child route on OSS", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(1);
+      const iamRoute = routes.find((route: any) => route.name === "iam");
+      const mcpRoute = iamRoute.children.find((child: any) => child.name === "mcpServer");
+      expect(mcpRoute).toBeDefined();
+      expect(mcpRoute.path).toBe("mcpServer");
+    });
+
+    // Test 20: iam + synthetics + its 6 sub-routes (all OSS) + on-call's 7
+    // routes + incidents' 2 routes + the workflows parent — always registered
+    // now, locked in OSS rather than absent.
+    it("should have 18 routes in basic configuration", () => {
+      const routes = useEnterpriseRoutes();
+      expect(routes.length).toBe(18);
+    });
+
+    // Fleet APIs 403 on OSS, so the routes must be absent, which also drops the nav entry via router.hasRoute.
+    it("should not register the Fleet routes", () => {
+      const names = useEnterpriseRoutes().map((route: any) => route.name);
+      expect(names).not.toContain("fleet");
+      expect(names).not.toContain("fleetConfigEditor");
+    });
+
+    // Synthetics moved out of `o2_enterprise` into `src/synthetics`; only the
+    // private-VPC-agent half stays enterprise, so the pages register in an OSS
+    // build and the backend `/config` flag decides whether they are reachable.
+    it("should register every synthetics route on OSS", () => {
+      const routes = useEnterpriseRoutes();
+      const names = routes.map((r: any) => r.name);
+      expect(names).toEqual(
+        expect.arrayContaining([
+          "synthetics",
+          "synthetics-add",
+          "synthetics-edit",
+          "synthetic-private-location",
+          "synthetic-monitor-results",
+          "synthetics-run-detail",
+        ]),
+      );
+    });
+
+    // Synthetics produces an empty org's first data, so the empty-data gate must not block it.
+    it.each([
+      "synthetics",
+      "synthetics-add",
+      "synthetics-edit",
+      "synthetics-status-page-edit",
+      "synthetic-private-location",
+      "synthetic-monitor-results",
+      "synthetics-run-detail",
+    ])("should flag the %s route as allowOnEmptyData", (name) => {
+      const routes = useEnterpriseRoutes();
+      const route = routes.find((r: any) => r.name === name);
+      expect(route).toBeDefined();
+      expect(route.meta?.allowOnEmptyData).toBe(true);
+    });
+
+    // The flag on the parent is inherited by every IAM child through merged meta.
+    it("should flag the iam route as allowOnEmptyData", () => {
+      const routes = useEnterpriseRoutes();
+      const iamRoute = routes.find((route: any) => route.name === "iam");
+      expect(iamRoute.meta?.allowOnEmptyData).toBe(true);
     });
   });
 
@@ -252,34 +321,6 @@ describe("useEnterpriseRoutes.ts", () => {
       const config = await import("@/aws-exports");
       config.default.isCloud = "true";
       config.default.isEnterprise = "false";
-    });
-
-    // Test 21: Should add actions route when isCloud is true
-    it("should add actions route when isCloud is true", () => {
-      const routes = useEnterpriseRoutes();
-      const actionsRoute = routes.find((route: any) => route.name === "actionScripts");
-      expect(actionsRoute).toBeDefined();
-    });
-
-    // Test 22: Should have correct actions route path
-    it("should have correct actions route path", () => {
-      const routes = useEnterpriseRoutes();
-      const actionsRoute = routes.find((route: any) => route.name === "actionScripts");
-      expect(actionsRoute.path).toBe("actions");
-    });
-
-    // Test 23: Should have actions route component
-    it("should have actions route component", () => {
-      const routes = useEnterpriseRoutes();
-      const actionsRoute = routes.find((route: any) => route.name === "actionScripts");
-      expect(actionsRoute.component).toBeDefined();
-    });
-
-    // Test 24: Should have actions route beforeEnter guard
-    it("should have actions route beforeEnter guard", () => {
-      const routes = useEnterpriseRoutes();
-      const actionsRoute = routes.find((route: any) => route.name === "actionScripts");
-      expect(typeof actionsRoute.beforeEnter).toBe("function");
     });
 
     // Test 25: Should add groups child route
@@ -353,10 +394,10 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(iamRoute.children.length).toBe(12);
     });
 
-    // Test 34: iam + synthetics + 5 synthetics sub-routes + actions + 2 incidents + workflows = 11
-    it("should have 11 routes in cloud configuration", () => {
+    // Test 34: iam + synthetics + 6 synthetics sub-routes + 7 oncall + 2 incidents + workflows = 18
+    it("should have 18 routes in cloud configuration", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(11);
+      expect(routes.length).toBe(18);
     });
   });
 
@@ -367,13 +408,6 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = "true";
     });
 
-    // Test 35: Should add actions route when isEnterprise is true
-    it("should add actions route when isEnterprise is true", () => {
-      const routes = useEnterpriseRoutes();
-      const actionsRoute = routes.find((route: any) => route.name === "actionScripts");
-      expect(actionsRoute).toBeDefined();
-    });
-
     // Test 36: Should add enterprise IAM routes
     it("should add enterprise IAM routes", () => {
       const routes = useEnterpriseRoutes();
@@ -381,10 +415,54 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(iamRoute.children.length).toBe(11);
     });
 
-    // Test 37: iam + synthetics + 5 synthetics sub-routes + actions + 2 incidents + workflows = 11
+    it.each([
+      ["fleet", "fleet"],
+      ["fleet/configurations/:id", "fleetConfigEditor"],
+    ])("should register the Fleet route %s as %s", (path, name) => {
+      const route = useEnterpriseRoutes().find((r: any) => r.name === name);
+      expect(route?.path).toBe(path);
+      expect(typeof route?.beforeEnter).toBe("function");
+    });
+
+    // Test 37: iam + synthetics + 6 synthetics sub-routes + 7 oncall + 2 incidents + 2 autoobserve + 2 fleet + workflows = 22
     it("should have enterprise routes structure", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(11);
+      expect(routes.length).toBe(22);
+    });
+
+    // On-call is configured before any data flows, so the empty-data gate must not block it.
+    it.each([
+      "onCallResponses",
+      "onCallResponseDetail",
+      "onCallMine",
+      "onCallTeams",
+      "onCallTeamDetail",
+      "onCallPolicies",
+      "onCallRouting",
+    ])("should flag the %s route as allowOnEmptyData", (name) => {
+      const routes = useEnterpriseRoutes();
+      const route = routes.find((r: any) => r.name === name);
+      expect(route).toBeDefined();
+      expect(route.meta?.allowOnEmptyData).toBe(true);
+    });
+  });
+
+  // My on-call and Policies are URL-only, so their routes must keep resolving.
+  describe("on-call URL-only routes (AC-15)", () => {
+    beforeEach(async () => {
+      const config = await import("@/aws-exports");
+      config.default.isCloud = "false";
+      config.default.isEnterprise = "true";
+    });
+
+    it.each([
+      ["oncall/me", "onCallMine"],
+      ["oncall/policies", "onCallPolicies"],
+    ])("keeps %s resolvable by URL as %s", (path, name) => {
+      const routes = useEnterpriseRoutes();
+      const route = routes.find((r: any) => r.path === path);
+      expect(route?.name).toBe(name);
+      expect(typeof route?.component).not.toBe("undefined");
     });
   });
 
@@ -395,10 +473,10 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = "true";
     });
 
-    // Test 38: Should add all routes when both flags are true (iam + synthetics + 5 synthetics sub-routes + actions + 2 incidents + workflows = 11)
+    // Test 38: Should add all routes when both flags are true (iam + synthetics + 6 synthetics sub-routes + 7 oncall + 2 incidents + 2 autoobserve + 2 fleet + workflows = 22)
     it("should add all routes when both flags are true", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(11);
+      expect(routes.length).toBe(22);
     });
 
     // Test 39: Should have all IAM children when both flags are true
@@ -479,20 +557,11 @@ describe("useEnterpriseRoutes.ts", () => {
       const config = await import("@/aws-exports");
       config.default.isCloud = "true";
       config.default.isEnterprise = "false";
-    });
-
-    // Test 44: Should call routeGuard for actions route
-    it("should call routeGuard for actions route", async () => {
-      const { routeGuard } = await import("@/utils/zincutils");
-      const routes = useEnterpriseRoutes();
-      const actionsRoute = routes.find((route: any) => route.name === "actionScripts");
-
-      const mockTo = {};
-      const mockFrom = {};
-      const mockNext = vi.fn();
-
-      actionsRoute.beforeEnter(mockTo, mockFrom, mockNext);
-      expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
+      // These guards now check feature access (via `withFeatureGate`) before
+      // ever reaching `routeGuard` — the groups/roles/quota routes below need
+      // RBAC unlocked too, or they'd redirect to the locked page instead,
+      // and `routeGuard` would never be reached at all.
+      store.state.zoConfig = { ...store.state.zoConfig, rbac_enabled: true };
     });
 
     // Test 45: Should call routeGuard for groups route
@@ -568,6 +637,40 @@ describe("useEnterpriseRoutes.ts", () => {
 
       quotaRoute.beforeEnter(mockTo, mockFrom, mockNext);
       expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
+    });
+
+    // N1 regression: on a cold load/refresh, zoConfig is still {} — rbac_enabled
+    // hasn't arrived yet. That must NOT redirect a real Enterprise/Cloud user to
+    // the locked page; it must reach routeGuard like any other visit.
+    it("still calls routeGuard for groups when rbac_enabled hasn't loaded yet", async () => {
+      store.state.zoConfig = {};
+      const { routeGuard } = await import("@/utils/zincutils");
+      const routes = useEnterpriseRoutes();
+      const iamRoute = routes.find((route: any) => route.name === "iam");
+      const groupsRoute = iamRoute.children.find((child: any) => child.name === "groups");
+
+      const mockTo = { query: {} };
+      const mockFrom = {};
+      const mockNext = vi.fn();
+
+      groupsRoute.beforeEnter(mockTo, mockFrom, mockNext);
+      expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
+    });
+
+    it("redirects to the locked page when rbac_enabled is explicitly false", async () => {
+      store.state.zoConfig = { ...store.state.zoConfig, rbac_enabled: false };
+      const routes = useEnterpriseRoutes();
+      const iamRoute = routes.find((route: any) => route.name === "iam");
+      const groupsRoute = iamRoute.children.find((child: any) => child.name === "groups");
+
+      const mockTo = { query: {}, fullPath: "/iam/groups" };
+      const mockFrom = {};
+      const mockNext = vi.fn();
+
+      groupsRoute.beforeEnter(mockTo, mockFrom, mockNext);
+      expect(mockNext).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "enterpriseFeatureLocked" }),
+      );
     });
   });
 
@@ -646,13 +749,6 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = "false";
     });
 
-    // Test 56: Should have component for actions route
-    it("should have component for actions route", () => {
-      const routes = useEnterpriseRoutes();
-      const actionsRoute = routes.find((route: any) => route.name === "actionScripts");
-      expect(typeof actionsRoute.component).toBe("function");
-    });
-
     // Test 57: Should have component for groups route
     it("should have component for groups route", () => {
       const routes = useEnterpriseRoutes();
@@ -702,7 +798,7 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = undefined;
 
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(1); // Should fallback to basic routes only
+      expect(routes.length).toBe(18); // Always registered now (oncall/incidents/workflows locked, not absent, in OSS)
     });
 
     // Test 63: Should handle config with null values
@@ -712,7 +808,7 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = null;
 
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(1); // Should fallback to basic routes only
+      expect(routes.length).toBe(18); // Always registered now (oncall/incidents/workflows locked, not absent, in OSS)
     });
 
     // Test 64: Should handle config with non-string values
@@ -722,7 +818,7 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = false;
 
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(1); // Should only add routes when string "true"
+      expect(routes.length).toBe(18); // Always registered now (oncall/incidents/workflows locked, not absent, in OSS)
     });
 
     // Test 65: Should handle config with empty string values
@@ -732,7 +828,7 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = "";
 
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(1); // Should fallback to basic routes only
+      expect(routes.length).toBe(18); // Always registered now (oncall/incidents/workflows locked, not absent, in OSS)
     });
 
     // Test 66: Should handle mixed string cases
@@ -742,7 +838,7 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = "TRUE";
 
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(1); // Should be case sensitive, only "true" should work
+      expect(routes.length).toBe(18); // Always registered now (oncall/incidents/workflows locked, not absent, in OSS)
     });
 
     // Test 67: Should maintain iam route as first element
@@ -798,5 +894,34 @@ describe("useEnterpriseRoutes.ts", () => {
       const uniqueNames = [...new Set(allNames)];
       expect(uniqueNames.length).toBe(allNames.length); // No duplicates
     });
+  });
+
+  // Route meta is untyped (`routes: any`), so a typo in a titleKey cannot be
+  // caught by the compiler — this is the gate instead. An unresolvable key would
+  // put the raw key in the browser tab.
+  describe("meta.titleKey", () => {
+    it("should only use i18n keys that exist in en-US.json", async () => {
+      const config = await import("@/aws-exports");
+      config.default.isCloud = "true";
+      config.default.isEnterprise = "true";
+
+      const titleKeys = collectTitleKeys(useEnterpriseRoutes());
+      expect(titleKeys.length).toBeGreaterThan(0);
+
+      for (const titleKey of titleKeys) {
+        expect(enMessage(titleKey), `no en-US message for "${titleKey}"`).toBeTypeOf("string");
+      }
+    });
+  });
+});
+
+describe("useEnterpriseRoutes lazy loading", () => {
+  it("lazy-loads every route component", () => {
+    const walk = (routes: any[]): void =>
+      routes.forEach((route) => {
+        if (route.component) expect(typeof route.component, route.path).toBe("function");
+        if (route.children) walk(route.children);
+      });
+    walk(useEnterpriseRoutes());
   });
 });

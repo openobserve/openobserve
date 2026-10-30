@@ -3,7 +3,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 
 <script setup lang="ts">
 import { computed, ref, useId, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -23,7 +23,7 @@ export interface SecurityNotice {
 
 const props = defineProps<{ notices: SecurityNotice[]; dataTest?: string }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const expanded = ref(false);
 const listId = useId();
 

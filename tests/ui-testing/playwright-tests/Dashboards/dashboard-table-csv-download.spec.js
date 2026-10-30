@@ -78,15 +78,27 @@ test.describe("Dashboard Table Chart — CSV Download", () => {
     });
   }
 
-  /** Retrieves the last captured blob content for a given MIME type. */
-  async function getCapturedBlob(page, mimeType) {
-    return page.evaluate((type) => {
-      const blobs = window.__capturedBlobs || [];
-      for (let i = blobs.length - 1; i >= 0; i--) {
-        if (blobs[i].type === type) return blobs[i].content;
-      }
-      return null;
-    }, mimeType);
+  /** Polls for the last captured export blob of a given MIME type. */
+  async function getCapturedBlob(page, mimeType, timeout = 15000) {
+    // The app builds its own application/json blobs (e.g. RUM batches), so only a { rows } payload counts as the export.
+    const readExport = () =>
+      page.evaluate((type) => {
+        const blobs = window.__capturedBlobs || [];
+        for (let i = blobs.length - 1; i >= 0; i--) {
+          if (blobs[i].type !== type || !blobs[i].content) continue;
+          if (type !== "application/json") return blobs[i].content;
+          try {
+            if (Array.isArray(JSON.parse(blobs[i].content)?.rows)) return blobs[i].content;
+          } catch (_) {}
+        }
+        return null;
+      }, mimeType);
+    let content = null;
+    await expect
+      .poll(async () => (content = await readExport()) !== null, { timeout })
+      .toBe(true)
+      .catch(() => {});
+    return content;
   }
 
   /**
@@ -103,8 +115,7 @@ test.describe("Dashboard Table Chart — CSV Download", () => {
     testLogger.info("Navigated to dashboard view");
 
     // 2. Wait for the panel bar (dashboard container) to render
-    await page
-      .locator('[data-test="dashboard-panel-bar"]')
+    await pm.dashboardPanelActions.panelBar
       .first()
       .waitFor({ state: "visible", timeout: 15000 });
 
@@ -191,7 +202,6 @@ test.describe("Dashboard Table Chart — CSV Download", () => {
       // 3. Install blob interceptor, then trigger CSV download
       await installBlobInterceptor(page);
       await pm.dashboardPanelEdit.downloadCsvPanel(panelName);
-      await page.waitForTimeout(500);
 
       // 4. Retrieve intercepted CSV content
       const csvContent = await getCapturedBlob(page, "text/csv");
@@ -247,7 +257,6 @@ test.describe("Dashboard Table Chart — CSV Download", () => {
       // Install interceptor, download CSV
       await installBlobInterceptor(page);
       await pm.dashboardPanelEdit.downloadCsvPanel(panelName);
-      await page.waitForTimeout(500);
 
       const csvContent = await getCapturedBlob(page, "text/csv");
       expect(csvContent).not.toBeNull();
@@ -284,7 +293,6 @@ test.describe("Dashboard Table Chart — CSV Download", () => {
       // Install interceptor, download JSON
       await installBlobInterceptor(page);
       await pm.dashboardPanelEdit.downloadJsonPanel(panelName);
-      await page.waitForTimeout(500);
 
       const jsonContent = await getCapturedBlob(page, "application/json");
       testLogger.info("JSON captured", { length: jsonContent?.length ?? 0 });
@@ -371,15 +379,27 @@ test.describe("Dashboard PromQL Table Chart — CSV Download", () => {
     });
   }
 
-  /** Retrieves the last captured blob content for a given MIME type. */
-  async function getCapturedBlob(page, mimeType) {
-    return page.evaluate((type) => {
-      const blobs = window.__capturedBlobs || [];
-      for (let i = blobs.length - 1; i >= 0; i--) {
-        if (blobs[i].type === type) return blobs[i].content;
-      }
-      return null;
-    }, mimeType);
+  /** Polls for the last captured export blob of a given MIME type. */
+  async function getCapturedBlob(page, mimeType, timeout = 15000) {
+    // The app builds its own application/json blobs (e.g. RUM batches), so only a { rows } payload counts as the export.
+    const readExport = () =>
+      page.evaluate((type) => {
+        const blobs = window.__capturedBlobs || [];
+        for (let i = blobs.length - 1; i >= 0; i--) {
+          if (blobs[i].type !== type || !blobs[i].content) continue;
+          if (type !== "application/json") return blobs[i].content;
+          try {
+            if (Array.isArray(JSON.parse(blobs[i].content)?.rows)) return blobs[i].content;
+          } catch (_) {}
+        }
+        return null;
+      }, mimeType);
+    let content = null;
+    await expect
+      .poll(async () => (content = await readExport()) !== null, { timeout })
+      .toBe(true)
+      .catch(() => {});
+    return content;
   }
 
   /**
@@ -393,7 +413,7 @@ test.describe("Dashboard PromQL Table Chart — CSV Download", () => {
     await page.waitForTimeout(500);
 
     // Click save button — use force in case an overlay partially covers it
-    const saveBtn = page.locator('[data-test="dashboard-panel-save"]');
+    const saveBtn = pm.dashboardPanelActions.panelSaveBtn;
     await saveBtn.waitFor({ state: "visible", timeout: 10000 });
     await saveBtn.click({ force: true });
 
@@ -481,7 +501,6 @@ test.describe("Dashboard PromQL Table Chart — CSV Download", () => {
       // 4. Install blob interceptor, trigger CSV download
       await installBlobInterceptor(page);
       await pm.dashboardPanelEdit.downloadCsvPanel(panelName);
-      await page.waitForTimeout(500);
 
       // 5. Retrieve and validate CSV content
       const csvContent = await getCapturedBlob(page, "text/csv");
@@ -525,7 +544,6 @@ test.describe("Dashboard PromQL Table Chart — CSV Download", () => {
       // Install interceptor, download JSON
       await installBlobInterceptor(page);
       await pm.dashboardPanelEdit.downloadJsonPanel(panelName);
-      await page.waitForTimeout(500);
 
       const jsonContent = await getCapturedBlob(page, "application/json");
       testLogger.info("PromQL JSON captured", {

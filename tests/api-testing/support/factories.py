@@ -116,6 +116,79 @@ def dashboard_payload(
     }
 
 
+def axis_item(alias: str, *, label: str | None = None, column: str | None = None) -> dict[str, Any]:
+    """One entry for a panel's `x` / `y` / `breakdown` array.
+
+    `label` is a required String in the v8 schema (not optional) — omitting it
+    is a 422. For `customQuery` panels the `alias` must match the SELECT alias
+    verbatim, or the axis renders blank.
+    """
+    return {
+        "label": label if label is not None else alias,
+        "alias": alias,
+        "column": column if column is not None else alias,
+        "color": None,
+    }
+
+
+def panel_payload(
+    *,
+    stream: str,
+    sql: str,
+    x_alias: str,
+    y_alias: str,
+    panel_id: str | None = None,
+    title: str | None = None,
+    description: str = "",
+    panel_type: str = "bar",
+    stream_type: str = "logs",
+    layout: dict[str, int] | None = None,
+) -> dict[str, Any]:
+    """A v8 `Panel` carrying hand-written SQL, for the AddPanel/UpdatePanel APIs.
+
+    `customQuery` is hard-coded True: with False, OO discards `sql` and rebuilds
+    the query from the field config, which silently defeats any test asserting on
+    the SQL it supplied.
+
+    Note `config` (PanelConfig) is snake_case while `fields`/`queries` are
+    camelCase — the v8 schema genuinely mixes both.
+    """
+    return {
+        "id": panel_id or unique_name("panel"),
+        "type": panel_type,
+        "title": title or unique_name("Panel"),
+        "description": description,
+        "config": {
+            "show_legends": True,
+            "legends_position": None,
+        },
+        "queryType": "sql",
+        "queries": [
+            {
+                "query": sql,
+                "vrlFunctionQuery": None,
+                "customQuery": True,
+                "fields": {
+                    "stream": stream,
+                    "stream_type": stream_type,
+                    "x": [axis_item(x_alias)],
+                    "y": [axis_item(y_alias)],
+                    "z": [],
+                    # A bare [] is rejected: PanelFilter is an untagged enum and
+                    # the empty list matches neither variant. It must be a group.
+                    "filter": {
+                        "filterType": "group",
+                        "logicalOperator": "AND",
+                        "conditions": [],
+                    },
+                },
+                "config": {"promql_legend": ""},
+            }
+        ],
+        "layout": layout if layout is not None else {"x": 0, "y": 0, "w": 24, "h": 9, "i": 1},
+    }
+
+
 def alert_template_payload(
     *,
     name: str | None = None,

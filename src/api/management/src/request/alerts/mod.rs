@@ -19,16 +19,16 @@ use axum::{
     Json,
     extract::{OriginalUri, Path, Query},
     http::StatusCode,
-    response::Response,
+    response::{IntoResponse, Response},
 };
 use axum_extra::extract::Query as ExtraQuery;
 use config::meta::{
     alerts::alert::{Alert as MetaAlert, AlertTypeFilter},
-    triggers::{Trigger, TriggerModule},
+    triggers::{ScheduledTriggerData, Trigger, TriggerModule},
 };
 use db::scheduler;
 use hashbrown::HashMap;
-use infra::db::{ORM_CLIENT, connect_to_orm};
+use infra::db::{get_orm_client_ro, get_orm_client_rw};
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
     alerts::{
@@ -41,36 +41,41 @@ use openobserve_core::{
 use svix_ksuid::Ksuid;
 #[cfg(feature = "enterprise")]
 use {
-    openobserve_core::auth::check_permissions,
+    openobserve_core::auth::{check_folder_write_permissions, check_permissions},
     openobserve_core::authz::{StreamPermissionResourceType, check_stream_permissions},
+    openobserve_core::background_access::{alert_sources, anomaly_config_sources, guard_write},
 };
 
 #[cfg(feature = "enterprise")]
 use crate::models::alerts::requests::UpdateAnomalyAlertFields;
 #[cfg(feature = "enterprise")]
-use crate::models::alerts::responses::anomaly_config_to_list_item;
+use crate::models::alerts::responses::anomaly_list_items;
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     models::alerts::{
         requests::{
             AlertBulkEnableRequest, CloneAlertRequestBody, CreateAlertRequestBody,
             EnableAlertQuery, GenerateSqlRequestBody, ListAlertsQuery, MoveAlertsRequestBody,
-            UpdateAlertRequestBody,
+            UpdateAlertRequestBody, ValidateCompositeRequestBody,
         },
         responses::{
             AlertBulkEnableResponse, AlertGroupLabel, AlertGroupResponseItem,
-            AlertGroupTransitionItem, EnableAlertResponseBody, GenerateSqlMetadata,
-            GenerateSqlResponseBody, GetAlertResponseBody, ListAlertGroupTransitionsResponseBody,
-            ListAlertGroupsResponseBody, ListAlertsResponseBody, ListAlertsResponseBodyItem,
+            AlertGroupTransitionItem, BulkDeleteAlertResponse, CompositeTimelineLane,
+            CompositeTimelineResponse, CompositeTimelineTransition, EnableAlertResponseBody,
+            GenerateSqlMetadata, GenerateSqlResponseBody, GetAlertResponseBody,
+            ListAlertGroupTransitionsResponseBody, ListAlertGroupsResponseBody,
+            ListAlertsResponseBody, ListAlertsResponseBodyItem,
         },
     },
     request::{
-        BulkDeleteRequest, BulkDeleteResponse,
+        BulkDeleteRequest,
         dashboards::{get_folder, is_overwrite},
     },
 };
 
-pub mod dedup_stats;
+pub mod ack;
+pub mod auto_investigate;
+pub mod chart_render;
 pub mod deduplication;
 pub mod destinations;
 pub mod external_events;
@@ -78,7 +83,115 @@ pub mod history;
 pub mod history_summary;
 pub mod incident_integrations;
 pub mod incidents;
+pub mod mute;
+#[cfg(feature = "cloud")]
+pub mod slack_oauth;
 pub mod templates;
+
+/// Stripped on export: re-importing this state would claim a model the destination never trained.
+#[cfg(feature = "enterprise")]
+const ANOMALY_EXPORT_STRIPPED_KEYS: &[&str] = &[
+    "is_trained",
+    "training_started_at",
+    "training_completed_at",
+    "last_processed_timestamp",
+    "current_model_version",
+    "status",
+    "last_error",
+    "retries",
+    "last_failed_at",
+    "last_alert_fired_at",
+    "last_recovery_notified_at",
+];
+
+/// Reject an `oncall_team` that names no on-call team in this organization.
+///
+/// A mistyped or cross-org team id is not a loud failure later: routing takes
+/// `alerts.oncall_team` as its highest-precedence tier, finds no such team, and
+/// the page reaches nobody. Save is the one moment when somebody is looking, so
+/// the id is checked here rather than at 3am.
+///
+/// `None` — absent, `null` or an empty string — clears the binding and is always
+/// allowed.
+async fn validate_oncall_team(org_id: &str, team_id: Option<&str>) -> Result<(), Response> {
+    let Some(team_id) = team_id else {
+        return Ok(());
+    };
+    // `get` filters on org_id, so a real team belonging to another tenant reads
+    // as "not found" — which is exactly the answer this alert deserves.
+    match infra::table::oncall_teams::get(org_id, team_id).await {
+        Ok(Some(_)) => Ok(()),
+        Ok(None) => Err(MetaHttpResponse::bad_request(format!(
+            "oncall_team `{team_id}` is not an on-call team in this organization"
+        ))),
+        Err(e) => {
+            log::error!("[alerts] validating oncall_team: {e}");
+            Err(MetaHttpResponse::internal_error(e.to_string()))
+        }
+    }
+}
+
+/// Advisories about who this alert will page, for a save that has succeeded.
+///
+/// Same posture as `validate_oncall_team` — say it at save — but a warning
+/// rather than a refusal: routing is not being changed, and an operator who
+/// meant it must still be able to save. An alert bound to an explicit
+/// `oncall_team` is silent here, because ownership rules never get a say.
+async fn paging_warnings(_org_id: &str, _alert: &MetaAlert) -> Vec<String> {
+    #[cfg(feature = "enterprise")]
+    {
+        if _alert
+            .oncall_team
+            .as_deref()
+            .is_some_and(|t| !t.trim().is_empty())
+        {
+            return Vec::new();
+        }
+        let rules = match o2_enterprise::enterprise::oncall::routing::list_rules(_org_id).await {
+            Ok(rules) => rules,
+            Err(e) => {
+                // Never fails the save: the alert is already stored, and an
+                // advisory that cannot be computed is not an error the caller
+                // can act on.
+                log::error!("[alerts] reading ownership rules for save-time warnings: {e}");
+                return Vec::new();
+            }
+        };
+        let semantic_groups = db::system_settings::get_semantic_field_groups(_org_id).await;
+        o2_enterprise::enterprise::oncall::routing::paging_warnings(
+            &semantic_groups,
+            &_alert.query_condition,
+            &rules,
+        )
+    }
+    #[cfg(not(feature = "enterprise"))]
+    Vec::new()
+}
+
+/// Reject a `runbook_url` that is not a link.
+///
+/// Refused at save, when somebody is looking, rather than stored and left to
+/// fail at read. A runbook is read at exactly one moment — the middle of a page
+/// — and "the link does nothing" is then indistinguishable from "there is no
+/// runbook".
+///
+/// `None` clears the link and is always allowed.
+fn validate_runbook_url(url: Option<&str>) -> Result<(), Response> {
+    let Some(url) = url else {
+        return Ok(());
+    };
+    config::meta::alerts::alert::normalize_runbook_url(url)
+        .map(|_| ())
+        .map_err(MetaHttpResponse::bad_request)
+}
+
+/// Removes the runtime/training keys from an anomaly config's export payload, in place.
+#[cfg(feature = "enterprise")]
+fn strip_anomaly_runtime_state(obj: &mut serde_json::Map<String, serde_json::Value>) {
+    for &key in ANOMALY_EXPORT_STRIPPED_KEYS {
+        obj.remove(key);
+    }
+}
 
 /// CreateAlert
 #[utoipa::path(
@@ -94,16 +207,17 @@ pub mod templates;
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("folder" = Option<String>, Query, description = "Folder ID (Required if alert folder is not the default folder)"),
+        ("folder" = Option<String>, Query, description = "Folder ID for the alert. Authoritative: it overrides any folder_id in the body. The default folder is used when absent."),
       ),
     request_body(content = inline(CreateAlertRequestBody), description = "Alert data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a new alert rule with flexible query options. IMPORTANT: Alert name must use snake_case (no spaces/special chars like :,#,?,&,%,/,quotes), destinations array is required with valid destination names. QueryCondition supports 3 query types: (1) Custom - uses conditions, aggregation, vrl_function, search_event_type, multi_time_range; (2) SQL - uses sql, vrl_function, search_event_type; (3) PromQL - uses promql, promql_condition, multi_time_range", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"description": "Create a new alert rule with flexible query options. IMPORTANT: Alert name must use snake_case (no spaces/special chars like :,#,?,&,%,/,quotes), destinations must name existing destinations and may be empty. QueryCondition supports 3 query types: (1) Custom - uses conditions, aggregation, vrl_function, search_event_type, multi_time_range; (2) SQL - uses sql, vrl_function, search_event_type; (3) PromQL - uses promql, promql_condition, multi_time_range", "category": "alerts"}))
     )
 )]
 pub async fn create_alert(
@@ -115,27 +229,1083 @@ pub async fn create_alert(
     let query_str = uri.query().unwrap_or("");
     let folder_id = get_folder(query_str);
 
+    // The body folder is ignored in favour of the gated `?folder=`. Rejecting a
+    // disagreement rather than silently creating elsewhere: a client that sets
+    // only the body field would otherwise land in the default folder unnoticed.
+    if let Some(body_folder) = req_body.folder_id.as_deref().filter(|f| !f.is_empty())
+        && body_folder != folder_id
+    {
+        return MetaHttpResponse::bad_request(format!(
+            "folder_id in the body ({body_folder}) disagrees with the folder query parameter ({folder_id}); send the folder as ?folder= only"
+        ));
+    }
+
     // Anomaly detection path: delegate to anomaly config creation (enterprise only).
     #[cfg(feature = "enterprise")]
     if req_body.alert_type == Some(AlertTypeFilter::AnomalyDetection) {
         return create_anomaly_alert(&org_id, user_email.user_id, req_body, &folder_id).await;
     }
+    if req_body.alert_type == Some(AlertTypeFilter::Composite) {
+        return create_composite_alert(&org_id, &folder_id, user_email.user_id, req_body).await;
+    }
     let overwrite = is_overwrite(query_str);
     let mut alert: MetaAlert = req_body.into();
+    if let Err(resp) = validate_oncall_team(&org_id, alert.oncall_team.as_deref()).await {
+        return resp;
+    }
+    if let Err(resp) = validate_runbook_url(alert.runbook_url.as_deref()) {
+        return resp;
+    }
     if alert.owner.clone().filter(|o| !o.is_empty()).is_none() {
         alert.owner = Some(user_email.user_id.clone());
     }
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) =
+        guard_alert_create(&org_id, &user_email.user_id, &folder_id, &alert, overwrite).await
+    {
+        return resp;
+    }
     alert.last_edited_by = Some(user_email.user_id);
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     match alert::create(client, &org_id, &folder_id, alert, overwrite).await {
-        Ok(v) => MetaHttpResponse::json(
-            MetaHttpResponse::message(StatusCode::OK, "Alert saved")
-                .with_id(v.id.map(|id| id.to_string()).unwrap_or_default())
-                .with_name(v.name),
-        ),
+        Ok(v) => {
+            let warnings = paging_warnings(&org_id, &v).await;
+            MetaHttpResponse::json(
+                MetaHttpResponse::message(StatusCode::OK, "Alert saved")
+                    .with_id(v.id.map(|id| id.to_string()).unwrap_or_default())
+                    .with_name(v.name)
+                    .with_warnings(warnings),
+            )
+        }
         Err(e) => e.into(),
     }
+}
+
+async fn create_composite_alert(
+    org_id: &str,
+    folder_id: &str,
+    user_id: String,
+    req: CreateAlertRequestBody,
+) -> Response {
+    if let Some(field) = req.composite_unsupported_field() {
+        return composite_field_error(
+            StatusCode::BAD_REQUEST,
+            "composite_unsupported_field",
+            field,
+            "field is not supported for composite alerts",
+        );
+    }
+    let Some(condition) = req.composite_condition.clone() else {
+        return composite_machine_error(
+            StatusCode::BAD_REQUEST,
+            "composite_condition_required",
+            "composite_condition is required",
+        );
+    };
+    #[cfg(feature = "enterprise")]
+    if let Some(children) =
+        composite_unauthorized_children(org_id, &user_id, &condition.expression).await
+    {
+        return composite_access_error(children);
+    }
+    let input = composite_input(None, org_id, folder_id, user_id, req.alert, condition);
+    match openobserve_core::alerts::composite::create_composite(input).await {
+        Ok(definition) => MetaHttpResponse::json(
+            MetaHttpResponse::message(StatusCode::OK, "Alert saved")
+                .with_id(definition.id)
+                .with_name(definition.name),
+        ),
+        Err(error) => composite_error_response(error),
+    }
+}
+
+async fn update_composite_alert(
+    org_id: &str,
+    id: &str,
+    user_id: String,
+    req: UpdateAlertRequestBody,
+) -> Response {
+    if let Some(field) = req.composite_unsupported_field() {
+        return composite_field_error(
+            StatusCode::BAD_REQUEST,
+            "composite_unsupported_field",
+            field,
+            "field is not supported for composite alerts",
+        );
+    }
+    let Some(condition) = req.composite_condition.clone() else {
+        return composite_machine_error(
+            StatusCode::BAD_REQUEST,
+            "composite_condition_required",
+            "composite_condition is required",
+        );
+    };
+    #[cfg(feature = "enterprise")]
+    if let Some(children) =
+        composite_unauthorized_children(org_id, &user_id, &condition.expression).await
+    {
+        return composite_access_error(children);
+    }
+    let current = openobserve_core::alerts::composite::get_composite(org_id, id)
+        .await
+        .ok()
+        .flatten();
+    #[cfg(feature = "enterprise")]
+    if let Some(current) = &current
+        && composite_subject_unauthorized(&current.definition, &user_id, "PUT").await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
+    #[cfg(feature = "enterprise")]
+    let stored_owner = current
+        .as_ref()
+        .map(|current| current.definition.owner.clone());
+    #[cfg(feature = "enterprise")]
+    let named_owner = req.alert.owner.clone();
+    let folder_id = current
+        .map(|current| current.definition.folder_id)
+        .unwrap_or_else(|| "default".to_string());
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
+    let mut input = composite_input(
+        Some(id.to_string()),
+        org_id,
+        &folder_id,
+        user_id,
+        req.alert,
+        condition,
+    );
+    #[cfg(feature = "enterprise")]
+    if let Some(stored) = stored_owner {
+        input.owner = updated_owner(named_owner, stored);
+    }
+    match openobserve_core::alerts::composite::update_composite(id, input).await {
+        Ok(_) => MetaHttpResponse::ok("Alert Updated"),
+        Err(error) => composite_error_response(error),
+    }
+}
+
+/// Only a named owner moves ownership; an omitted or empty one keeps `stored`.
+#[cfg(feature = "enterprise")]
+fn updated_owner(named: Option<String>, stored: Option<String>) -> Option<String> {
+    named.filter(|owner| !owner.is_empty()).or(stored)
+}
+
+/// The save's own checks answer first, so a bad body is never reported as a refused read.
+#[cfg(feature = "enterprise")]
+async fn guard_alert_create(
+    org_id: &str,
+    user_id: &str,
+    folder_id: &str,
+    alert: &MetaAlert,
+    overwrite: bool,
+) -> Result<(), Response> {
+    if !openobserve_core::background_access::rbac_enforced().await {
+        return Ok(());
+    }
+    let prepared = alert::validate_save(org_id, Some(folder_id), alert, true, overwrite)
+        .await
+        .map_err(Response::from)?;
+    guard_write(org_id, user_id, &alert_sources(org_id, &prepared)).await
+}
+
+#[cfg(feature = "enterprise")]
+async fn composite_unauthorized_children(
+    org_id: &str,
+    user_id: &str,
+    expression: &str,
+) -> Option<Vec<String>> {
+    use config::meta::alerts::composite::{collect_references, parse_expr};
+    let Ok(parsed) = parse_expr(expression) else {
+        return None;
+    };
+    let Ok(references) = collect_references(&parsed) else {
+        return None;
+    };
+    let mut unauthorized = Vec::new();
+    for id in references {
+        if !check_permissions(
+            &id, org_id, user_id, "alerts", "GET", None, false, true, false,
+        )
+        .await
+        {
+            unauthorized.push(id);
+        }
+    }
+    (!unauthorized.is_empty()).then_some(unauthorized)
+}
+
+/// Authorize the composite itself (not just its children) for a read/mutation.
+/// Returns `true` when the caller may not access the composite, so callers can
+/// short-circuit with a 403. Mirrors `move_composite`'s subject check.
+#[cfg(feature = "enterprise")]
+async fn composite_subject_unauthorized(
+    definition: &infra::table::entity::alert_composites::Model,
+    user_id: &str,
+    method: &str,
+) -> bool {
+    !check_permissions(
+        &definition.id,
+        &definition.org,
+        user_id,
+        "alerts",
+        method,
+        Some(&definition.folder_id),
+        false,
+        true,
+        false,
+    )
+    .await
+}
+
+fn composite_input(
+    id: Option<String>,
+    org_id: &str,
+    folder_id: &str,
+    user_id: String,
+    alert: crate::models::alerts::Alert,
+    condition: crate::models::alerts::requests::CompositeCondition,
+) -> openobserve_core::alerts::composite::CompositeCreate {
+    openobserve_core::alerts::composite::CompositeCreate {
+        id,
+        org: org_id.to_string(),
+        folder_id: folder_id.to_string(),
+        name: alert.name,
+        description: Some(alert.description).filter(|value| !value.is_empty()),
+        expression: condition.expression,
+        warning_counts_as_firing: condition.warning_counts_as_firing,
+        stale_child_policy: condition.stale_child_policy.storage_id(),
+        destinations: alert.destinations,
+        template: alert.template.filter(|s| !s.is_empty()),
+        context_attributes: alert
+            .context_attributes
+            .map(|value| serde_json::json!(value)),
+        enabled: alert.enabled,
+        silence_seconds: alert.trigger_condition.silence_minutes * 60,
+        creates_incident: alert.creates_incident,
+        workflows: alert.workflows,
+        priority: alert.priority.map(|value| value.to_i32()),
+        tags: alert.tags,
+        owner: alert.owner.or_else(|| Some(user_id.clone())),
+        last_edited_by: Some(user_id),
+        pending_period_sec: alert.pending_period_sec,
+    }
+}
+
+async fn composite_detail_response(
+    composite: infra::table::alert_composites::CompositeWithChildren,
+    _user_id: Option<&str>,
+) -> Response {
+    let definition = composite.definition;
+    #[cfg(feature = "enterprise")]
+    if let Some(user_id) = _user_id
+        && composite_subject_unauthorized(&definition, user_id, "GET").await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
+    let scheduler_job_present = infra::scheduler::get(
+        &definition.org,
+        TriggerModule::CompositeAlert,
+        &definition.id,
+    )
+    .await
+    .is_ok();
+    let db = get_orm_client_ro().await;
+
+    // Evaluate exactly as the scheduler would (system context, no child query).
+    // Inaccessible children are masked below; a failed evaluation degrades to
+    // nulls rather than failing the whole read.
+    let evaluation = openobserve_core::alerts::composite::evaluate_definition(
+        db,
+        &definition,
+        &composite.children,
+    )
+    .await
+    .ok();
+    let evaluated_by_id = evaluation
+        .as_ref()
+        .map(|evaluation| {
+            evaluation
+                .children
+                .iter()
+                .map(|child| (child.alert_id.clone(), child.clone()))
+                .collect::<std::collections::HashMap<_, _>>()
+        })
+        .unwrap_or_default();
+    let composite_state = infra::table::alert_states::get(
+        &definition.id,
+        config::meta::alerts::state::ROLLUP_GROUP_KEY,
+    )
+    .await
+    .ok()
+    .flatten();
+
+    // Resolve every child in a fixed pair of queries (`resolve_many`) instead of
+    // one `resolve_by_id` per child on the hot detail read path.
+    let child_ids: Vec<String> = composite
+        .children
+        .iter()
+        .map(|child| child.child_alert_id.clone())
+        .collect();
+    let resolutions = infra::table::alert_composites::resolve_many(db, &definition.org, &child_ids)
+        .await
+        .unwrap_or_default();
+
+    let mut children = Vec::with_capacity(composite.children.len());
+    for child in composite.children {
+        #[cfg(feature = "enterprise")]
+        let child_authorized = match _user_id {
+            Some(user_id) => {
+                check_permissions(
+                    &child.child_alert_id,
+                    &definition.org,
+                    user_id,
+                    "alerts",
+                    "GET",
+                    None,
+                    false,
+                    true,
+                    false,
+                )
+                .await
+            }
+            None => false,
+        };
+        #[cfg(not(feature = "enterprise"))]
+        let child_authorized = true;
+        if !child_authorized {
+            // Redact the KSUID: an inaccessible child must not leak its stable
+            // alert_id to a caller who cannot read it.
+            children.push(serde_json::json!({
+                "alert_id": null,
+                "accessible": false,
+            }));
+            continue;
+        }
+        let (name, alert_type, folder_id, enabled) = match resolutions.get(&child.child_alert_id) {
+            Some(infra::table::alert_composites::Resolution::Alert(alert)) => (
+                Some(alert.name.clone()),
+                Some(if alert.slo_id.is_some() {
+                    "slo"
+                } else {
+                    "scheduled"
+                }),
+                Some(alert.folder_id.clone()),
+                Some(alert.enabled),
+            ),
+            Some(infra::table::alert_composites::Resolution::Composite(composite)) => (
+                Some(composite.name.clone()),
+                Some("composite"),
+                Some(composite.folder_id.clone()),
+                Some(composite.enabled),
+            ),
+            _ => (None, None, None, None),
+        };
+        let evaluated = evaluated_by_id.get(&child.child_alert_id);
+        children.push(serde_json::json!({
+            "alert_id": child.child_alert_id,
+            "accessible": name.is_some(),
+            "name": name,
+            "alert_type": alert_type,
+            "folder_id": folder_id,
+            "enabled": enabled,
+            "level": evaluated.and_then(|child| child.level).map(|level| level.to_string()),
+            "level_at": evaluated.and_then(|child| child.level_at),
+            "effective_cadence_seconds": null,
+            "stale_deadline": evaluated.map(|child| child.stale_deadline),
+            "stale": evaluated.map(|child| child.stale).unwrap_or(true),
+            "truth": evaluated.map(|child| child.truth).unwrap_or(false),
+        }));
+    }
+    let evaluation_json = evaluation.map(|evaluation| {
+        serde_json::json!({
+            "result": evaluation.result,
+            "level": evaluation.level.to_string(),
+            "evaluated_at": composite_state.and_then(|state| state.level_at),
+        })
+    });
+    MetaHttpResponse::json(serde_json::json!({
+        "id": definition.id,
+        "alert_type": "composite",
+        "folderId": definition.folder_id,
+        "name": definition.name,
+        "description": definition.description,
+        "enabled": definition.enabled,
+        "destinations": definition.destinations,
+        "template": definition.template,
+        "context_attributes": definition.context_attributes,
+        "trigger_condition": { "silence": definition.silence_seconds / 60 },
+        "creates_incident": definition.creates_incident,
+        "workflows": definition.workflows,
+        "priority": definition.priority,
+        "tags": definition.tags,
+        "scheduler_job_present": scheduler_job_present,
+        "composite_condition": {
+            "expression": definition.expression,
+            "warning_counts_as_firing": definition.warning_counts_as_firing,
+            "stale_child_policy": stale_policy_name(definition.stale_child_policy),
+        },
+        "children": children,
+        "evaluation": evaluation_json,
+        "pending_period_sec": definition.pending_period_sec,
+    }))
+}
+
+fn composite_list_item(
+    definition: infra::table::entity::alert_composites::Model,
+    folder_name: &str,
+    trigger_data: &mut HashMap<String, Trigger>,
+) -> Option<ListAlertsResponseBodyItem> {
+    let alert_id = Ksuid::from_str(&definition.id).ok()?;
+    let tags = definition
+        .tags
+        .and_then(|tags| serde_json::from_value(tags).ok())
+        .unwrap_or_default();
+
+    let (last_triggered_at, last_satisfied_at) =
+        if let Some(trigger) = trigger_data.remove(&alert_id.to_string()) {
+            (
+                trigger.end_time,
+                serde_json::from_str::<ScheduledTriggerData>(&trigger.data)
+                    .ok()
+                    .and_then(|trigger_data| trigger_data.last_satisfied_at),
+            )
+        } else {
+            (None, None)
+        };
+
+    Some(ListAlertsResponseBodyItem {
+        alert_id,
+        folder_id: definition.folder_id.clone(),
+        folder_name: folder_name.to_string(),
+        name: definition.name,
+        owner: definition.owner,
+        description: definition.description,
+        alert_type: "composite".to_string(),
+        // Composites watch their children's outcomes, not a stream.
+        stream_name: None,
+        stream_type: None,
+        condition: None,
+        trigger_condition: None,
+        enabled: definition.enabled,
+        last_triggered_at,
+        last_satisfied_at,
+        is_real_time: false,
+        last_trained_at: None,
+        status: None,
+        last_error: None,
+        last_outcome: None,
+        last_outcome_at: None,
+        last_outcome_since: None,
+        level: None,
+        level_since: None,
+        priority: definition.priority.map(|value| value as u8),
+        oncall_team: None,
+        tags,
+        destinations: Vec::new(),
+        template: None,
+        groups_observed: None,
+        groups_firing: None,
+        groups_observed_is_lower_bound: None,
+        groups_firing_is_lower_bound: None,
+        child_count: None,
+        referenced_by_composite_count: None,
+        expression_summary: None,
+        active_downtime: None,
+        firing_started_at: None,
+        ack: None,
+        incident: None,
+        downtime_dimensions: Default::default(),
+        context_attributes: None,
+    })
+}
+
+fn stale_policy_name(value: i16) -> &'static str {
+    match value {
+        1 => "treat_as_false",
+        2 => "treat_as_true",
+        _ => "use_last_state",
+    }
+}
+
+fn composite_error_response(
+    error: openobserve_core::alerts::composite::CompositeServiceError,
+) -> Response {
+    use openobserve_core::alerts::composite::CompositeServiceError;
+    match error {
+        CompositeServiceError::ClientSuppliedId => composite_machine_error(
+            StatusCode::BAD_REQUEST,
+            "composite_unsupported_field",
+            error,
+        ),
+        CompositeServiceError::InvalidExpression(_) => composite_machine_error(
+            StatusCode::BAD_REQUEST,
+            "composite_invalid_expression",
+            error,
+        ),
+        CompositeServiceError::ChildNotAccessible(children) => composite_access_error(children),
+        CompositeServiceError::ChildNotEligible(_) => {
+            composite_machine_error(StatusCode::BAD_REQUEST, "child_not_eligible", error)
+        }
+        CompositeServiceError::Cycle => {
+            composite_machine_error(StatusCode::CONFLICT, "composite_cycle", error)
+        }
+        CompositeServiceError::TooDeep => {
+            composite_machine_error(StatusCode::CONFLICT, "composite_too_deep", error)
+        }
+        CompositeServiceError::NotFound => {
+            composite_machine_error(StatusCode::NOT_FOUND, "composite_not_found", error)
+        }
+        CompositeServiceError::FolderNotFound => {
+            composite_machine_error(StatusCode::NOT_FOUND, "composite_folder_not_found", error)
+        }
+        CompositeServiceError::ChildReferenced(_) => {
+            composite_machine_error(StatusCode::CONFLICT, "child_referenced", error)
+        }
+        CompositeServiceError::Lock(_) => composite_machine_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "composite_graph_lock_unavailable",
+            error,
+        ),
+        CompositeServiceError::WritesDisabled => composite_machine_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "composite_writes_disabled",
+            error,
+        ),
+        CompositeServiceError::SuperClusterUnsupported => composite_machine_error(
+            StatusCode::CONFLICT,
+            "composite_super_cluster_unsupported",
+            error,
+        ),
+        CompositeServiceError::PermissionDenied => {
+            composite_machine_error(StatusCode::FORBIDDEN, "permission_denied", error)
+        }
+        CompositeServiceError::Database(_) | CompositeServiceError::Scheduler(_) => {
+            composite_machine_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "composite_internal_error",
+                error,
+            )
+        }
+        CompositeServiceError::NegativePendingPeriod => {
+            composite_machine_error(StatusCode::BAD_REQUEST, "negative_pending_period", error)
+        }
+    }
+}
+
+fn composite_machine_error(status: StatusCode, code: &str, message: impl ToString) -> Response {
+    (
+        status,
+        Json(serde_json::json!({
+            "code": code,
+            "message": message.to_string(),
+        })),
+    )
+        .into_response()
+}
+
+fn composite_access_error(children: Vec<String>) -> Response {
+    (
+        StatusCode::FORBIDDEN,
+        Json(serde_json::json!({
+            "code": "child_not_accessible",
+            "message": "one or more child alerts are not accessible",
+            "children": children.into_iter().map(|alert_id| serde_json::json!({
+                "alert_id": alert_id,
+                "accessible": false,
+            })).collect::<Vec<_>>(),
+        })),
+    )
+        .into_response()
+}
+
+fn composite_field_error(
+    status: StatusCode,
+    code: &str,
+    field: &str,
+    message: impl ToString,
+) -> Response {
+    (
+        status,
+        Json(serde_json::json!({
+            "code": code,
+            "message": message.to_string(),
+            "field": field,
+        })),
+    )
+        .into_response()
+}
+
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/alerts/composites/validate",
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "ValidateCompositeAlert",
+    summary = "Validate a composite alert condition",
+    description = "Parses and validates a composite alert's boolean expression over child alert IDs and returns the canonical form, resolved children, and an advisory result without persisting anything.",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(content = inline(ValidateCompositeRequestBody), content_type = "application/json"),
+    responses((status = 200, body = crate::models::alerts::responses::CompositeValidationResponse))
+)]
+pub async fn validate_composite_alert(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(request): Json<ValidateCompositeRequestBody>,
+) -> Response {
+    use config::meta::alerts::composite::{collect_references, parse_expr};
+    let parsed = match parse_expr(&request.composite_condition.expression) {
+        Ok(parsed) => parsed,
+        Err(error) => {
+            return composite_machine_error(
+                StatusCode::BAD_REQUEST,
+                "composite_invalid_expression",
+                error,
+            );
+        }
+    };
+    let references = match collect_references(&parsed) {
+        Ok(references) => references,
+        Err(error) => {
+            return composite_machine_error(
+                StatusCode::BAD_REQUEST,
+                "composite_invalid_expression",
+                error,
+            );
+        }
+    };
+    #[cfg(feature = "enterprise")]
+    let mut inaccessible = Vec::new();
+    #[cfg(not(feature = "enterprise"))]
+    let mut inaccessible = Vec::new();
+    #[cfg(feature = "enterprise")]
+    for id in &references {
+        if !check_permissions(
+            id,
+            &org_id,
+            &user_email.user_id,
+            "alerts",
+            "GET",
+            None,
+            false,
+            true,
+            false,
+        )
+        .await
+        {
+            inaccessible.push(id.clone());
+        }
+    }
+    let db = get_orm_client_ro().await;
+    // Resolve every reference in one batched query instead of per-ID round trips.
+    let resolutions = infra::table::alert_composites::resolve_many(db, &org_id, &references)
+        .await
+        .unwrap_or_default();
+    let mut children = Vec::with_capacity(references.len());
+    for id in references {
+        if inaccessible.contains(&id) {
+            continue;
+        }
+        match resolutions.get(&id) {
+            Some(infra::table::alert_composites::Resolution::Alert(alert))
+                if !alert.is_real_time =>
+            {
+                children.push(serde_json::json!({
+                    "alert_id": id,
+                    "accessible": true,
+                    "name": alert.name.clone(),
+                    "alert_type": if alert.slo_id.is_some() { "slo" } else { "scheduled" },
+                    "folder_id": alert.folder_id.clone(),
+                    "enabled": alert.enabled,
+                }));
+            }
+            Some(infra::table::alert_composites::Resolution::Alert(_)) => {
+                // A realtime alert is ineligible as a composite child: report it
+                // as a 400 `child_not_eligible` rather than masking it as 403
+                // `child_not_accessible`.
+                return composite_machine_error(
+                    StatusCode::BAD_REQUEST,
+                    "child_not_eligible",
+                    format!("child alert {id} is not eligible for composite evaluation"),
+                );
+            }
+            Some(infra::table::alert_composites::Resolution::Composite(composite)) => {
+                children.push(serde_json::json!({
+                    "alert_id": id,
+                    "accessible": true,
+                    "name": composite.name.clone(),
+                    "alert_type": "composite",
+                    "folder_id": composite.folder_id.clone(),
+                    "enabled": composite.enabled,
+                }));
+            }
+            _ => inaccessible.push(id),
+        }
+    }
+    if !inaccessible.is_empty() {
+        return composite_access_error(inaccessible);
+    }
+    let canonical_expression = match openobserve_core::alerts::composite::validate_composite_graph(
+        &org_id,
+        request.composite_id.as_deref(),
+        &request.composite_condition.expression,
+    )
+    .await
+    {
+        Ok(expression) => expression,
+        Err(error) => return composite_error_response(error),
+    };
+
+    // Current truth/result for the advisory preview. Degrades to nulls rather
+    // than failing the whole validation when a child cannot be evaluated.
+    let evaluation = openobserve_core::alerts::composite::evaluate_expression(
+        db,
+        &org_id,
+        &request.composite_condition.expression,
+        request.composite_condition.warning_counts_as_firing,
+        request.composite_condition.stale_child_policy.storage_id(),
+    )
+    .await
+    .ok();
+    let evaluated_by_id = evaluation
+        .as_ref()
+        .map(|evaluation| {
+            evaluation
+                .children
+                .iter()
+                .map(|child| (child.alert_id.clone(), child.clone()))
+                .collect::<std::collections::HashMap<_, _>>()
+        })
+        .unwrap_or_default();
+
+    let mut warnings = Vec::new();
+    for child in &mut children {
+        let id = child["alert_id"].as_str().unwrap_or_default().to_string();
+        let evaluated = evaluated_by_id.get(&id);
+        child["level"] = evaluated
+            .and_then(|child| child.level)
+            .map(|level| serde_json::json!(level.to_string()))
+            .unwrap_or(serde_json::Value::Null);
+        child["level_at"] = evaluated
+            .and_then(|child| child.level_at)
+            .map(|level_at| serde_json::json!(level_at))
+            .unwrap_or(serde_json::Value::Null);
+        child["stale_deadline"] = evaluated
+            .map(|child| serde_json::json!(child.stale_deadline))
+            .unwrap_or(serde_json::Value::Null);
+        child["stale"] = serde_json::json!(evaluated.map(|child| child.stale).unwrap_or(true));
+        child["truth"] = serde_json::json!(evaluated.map(|child| child.truth).unwrap_or(false));
+
+        if child["enabled"].as_bool() == Some(false) {
+            warnings.push(serde_json::json!({"code": "child_disabled", "alert_id": id}));
+        }
+        if evaluated.and_then(|child| child.level_at).is_none() {
+            warnings.push(serde_json::json!({"code": "child_never_evaluated", "alert_id": id}));
+        }
+    }
+
+    let (result, result_level) = match evaluation.as_ref() {
+        Some(evaluation) => (Some(evaluation.result), Some(evaluation.level.to_string())),
+        None => (None, None),
+    };
+
+    MetaHttpResponse::json(serde_json::json!({
+        "valid": true,
+        "canonical_expression": canonical_expression,
+        "children": children,
+        "result": result,
+        "result_level": result_level,
+        "warnings": warnings,
+    }))
+}
+
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/{alert_id}/composite-references",
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "GetCompositeReferences",
+    summary = "List composite alerts referencing an alert",
+    description = "Returns the composite alerts that reference the given alert as a child, plus the count of references hidden from the caller by permissions.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("alert_id" = String, Path, description = "Alert or composite alert ID"),
+    ),
+    responses((status = 200, body = crate::models::alerts::responses::CompositeReferencesResponse))
+)]
+pub async fn get_composite_references(
+    Path((org_id, alert_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    let db = get_orm_client_ro().await;
+    let subject = openobserve_core::alerts::composite::get_composite(&org_id, &alert_id)
+        .await
+        .ok()
+        .flatten();
+    #[cfg(feature = "enterprise")]
+    if let Some(_composite) = &subject
+        && composite_subject_unauthorized(&_composite.definition, &user_email.user_id, "GET").await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
+    #[cfg(feature = "enterprise")]
+    if subject.is_none() {
+        // The subject is a regular alert (or missing): authorize it too, so a
+        // caller who cannot read it doesn't learn which composites reference it.
+        if let Ok(infra::table::alert_composites::Resolution::Alert(alert)) =
+            infra::table::alert_composites::resolve_by_id(db, &org_id, &alert_id).await
+            && !check_permissions(
+                &alert_id,
+                &org_id,
+                &user_email.user_id,
+                "alerts",
+                "GET",
+                Some(&alert.folder_id),
+                false,
+                true,
+                false,
+            )
+            .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
+    }
+    let kind = if subject.is_some() {
+        infra::table::alert_composites::ChildKind::Composite
+    } else {
+        infra::table::alert_composites::ChildKind::Alert
+    };
+    match infra::table::alert_composites::list_parents(db, &org_id, kind, &alert_id).await {
+        Ok(parents) => {
+            let mut references = Vec::new();
+            #[cfg(feature = "enterprise")]
+            let mut hidden_reference_count = 0;
+            #[cfg(not(feature = "enterprise"))]
+            let hidden_reference_count = 0;
+            for parent in parents {
+                #[cfg(feature = "enterprise")]
+                if !check_permissions(
+                    &parent.id,
+                    &org_id,
+                    &user_email.user_id,
+                    "alerts",
+                    "GET",
+                    Some(&parent.folder_id),
+                    false,
+                    true,
+                    false,
+                )
+                .await
+                {
+                    hidden_reference_count += 1;
+                    continue;
+                }
+                references.push(serde_json::json!({
+                    "alert_id": parent.id,
+                    "name": parent.name,
+                    "folder_id": parent.folder_id,
+                }));
+            }
+            MetaHttpResponse::json(serde_json::json!({
+                "references": references,
+                "hidden_reference_count": hidden_reference_count,
+            }))
+        }
+        Err(error) => MetaHttpResponse::internal_error(error),
+    }
+}
+
+/// Max transitions returned per lane. Bounds the timeline payload; the lane
+/// renderer buckets to a fixed segment count regardless.
+const COMPOSITE_TIMELINE_LIMIT: u64 = 1000;
+/// Default timeline window when the caller omits `from`: the last 4 hours.
+const COMPOSITE_TIMELINE_DEFAULT_WINDOW_MICROS: i64 = 14_400_000_000;
+
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/{alert_id}/composite-timeline",
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "GetCompositeTimeline",
+    summary = "Per-child status history for a composite alert",
+    description = "Returns one status lane per child (plus the composite's own result) over a time window, read from each alert's durable level transitions. Children are ordered by display order (A/B/C).",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("alert_id" = String, Path, description = "Composite alert ID"),
+        ("from" = Option<i64>, Query, description = "Window start (micros). Defaults to 4h before `to`."),
+        ("to" = Option<i64>, Query, description = "Window end (micros). Defaults to now."),
+      ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = inline(CompositeTimelineResponse)),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Composite alert per-child status timeline", "category": "alerts"}))
+    )
+)]
+pub async fn get_composite_timeline(
+    Path((org_id, alert_id)): Path<(String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    let db = get_orm_client_ro().await;
+    let Some(composite) = openobserve_core::alerts::composite::get_composite(&org_id, &alert_id)
+        .await
+        .ok()
+        .flatten()
+    else {
+        return MetaHttpResponse::not_found(format!("composite alert not found: {alert_id}"));
+    };
+    #[cfg(feature = "enterprise")]
+    if composite_subject_unauthorized(&composite.definition, &user_email.user_id, "GET").await {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
+
+    let to = query
+        .get("to")
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or_else(|| chrono::Utc::now().timestamp_micros());
+    let from = query
+        .get("from")
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or_else(|| to - COMPOSITE_TIMELINE_DEFAULT_WINDOW_MICROS);
+    if from >= to {
+        return MetaHttpResponse::bad_request("from must be earlier than to");
+    }
+
+    let rollup = config::meta::alerts::state::ROLLUP_GROUP_KEY;
+    let child_ids: Vec<String> = composite
+        .children
+        .iter()
+        .map(|child| child.child_alert_id.clone())
+        .collect();
+    let current = infra::table::alert_states::get_rollups(&child_ids)
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .map(|state| (state.alert_id.clone(), state))
+        .collect::<HashMap<_, _>>();
+
+    // Resolve child identities and fetch their transitions in one round trip
+    // each, instead of one `resolve_by_id` + `list_transitions_between` per child.
+    let resolutions = infra::table::alert_composites::resolve_many(db, &org_id, &child_ids)
+        .await
+        .unwrap_or_default();
+    let mut transitions_by_alert = infra::table::alert_states::list_transitions_between_many(
+        &child_ids,
+        Some(rollup),
+        from,
+        to,
+        COMPOSITE_TIMELINE_LIMIT,
+    )
+    .await
+    .unwrap_or_default();
+
+    let mut children = Vec::with_capacity(composite.children.len());
+    for (slot, child) in composite.children.into_iter().enumerate() {
+        let id = child.child_alert_id;
+        #[cfg(feature = "enterprise")]
+        let authorized = check_permissions(
+            &id,
+            &org_id,
+            &user_email.user_id,
+            "alerts",
+            "GET",
+            None,
+            false,
+            true,
+            false,
+        )
+        .await;
+        #[cfg(not(feature = "enterprise"))]
+        let authorized = true;
+        let name = if !authorized {
+            None
+        } else {
+            match resolutions.get(&id) {
+                Some(infra::table::alert_composites::Resolution::Alert(alert)) => {
+                    Some(alert.name.clone())
+                }
+                Some(infra::table::alert_composites::Resolution::Composite(composite)) => {
+                    Some(composite.name.clone())
+                }
+                _ => None,
+            }
+        };
+        let state = if name.is_some() {
+            current.get(&id)
+        } else {
+            None
+        };
+        let transitions = if name.is_some() {
+            transitions_by_alert.remove(&id).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        children.push(CompositeTimelineLane {
+            alert_id: name.is_some().then_some(id),
+            slot: Some(slot),
+            name: name.clone(),
+            accessible: name.is_some(),
+            current_level: state
+                .and_then(|state| state.level)
+                .map(|level| level.to_string()),
+            level_since: state.and_then(|state| state.level_since),
+            transitions: transitions
+                .into_iter()
+                .map(|t| CompositeTimelineTransition {
+                    from_level: t.from_level.map(|level| level.to_string()),
+                    to_level: t.to_level.map(|level| level.to_string()),
+                    at: t.at,
+                })
+                .collect(),
+        });
+    }
+
+    let composite_state = infra::table::alert_states::get(&alert_id, rollup)
+        .await
+        .ok()
+        .flatten();
+    let result = CompositeTimelineLane {
+        alert_id: Some(alert_id.clone()),
+        slot: None,
+        name: Some(composite.definition.name),
+        accessible: true,
+        current_level: composite_state
+            .as_ref()
+            .and_then(|state| state.level)
+            .map(|level| level.to_string()),
+        level_since: composite_state.as_ref().and_then(|state| state.level_since),
+        transitions: infra::table::alert_states::list_transitions_between(
+            &alert_id,
+            Some(rollup),
+            from,
+            to,
+            COMPOSITE_TIMELINE_LIMIT,
+        )
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .map(|t| CompositeTimelineTransition {
+            from_level: t.from_level.map(|level| level.to_string()),
+            to_level: t.to_level.map(|level| level.to_string()),
+            at: t.at,
+        })
+        .collect(),
+    };
+
+    MetaHttpResponse::json(CompositeTimelineResponse {
+        from,
+        to,
+        children,
+        result,
+    })
 }
 
 #[cfg(feature = "enterprise")]
@@ -154,7 +1324,7 @@ async fn create_anomaly_alert(
     };
 
     let owner = if req_body.alert.owner.as_deref().unwrap_or("").is_empty() {
-        Some(user_id)
+        Some(user_id.clone())
     } else {
         req_body.alert.owner
     };
@@ -176,36 +1346,95 @@ async fn create_anomaly_alert(
         training_window_days: anomaly_fields.training_window_days,
         retrain_interval_days: anomaly_fields.retrain_interval_days,
         percentile: anomaly_fields.percentile,
+        alert_budget_per_day: anomaly_fields.alert_budget_per_day,
+        level_half_width_seconds: anomaly_fields.level_half_width_seconds,
         rcf_num_trees: anomaly_fields.rcf_num_trees,
         rcf_tree_size: anomaly_fields.rcf_tree_size,
         rcf_shingle_size: anomaly_fields.rcf_shingle_size,
+        band_width: anomaly_fields.band_width,
+        alert_direction: anomaly_fields.alert_direction,
+        alert_window_buckets: anomaly_fields.alert_window_buckets,
+        alert_window_fire_pct: anomaly_fields.alert_window_fire_pct,
+        alert_window_recover_pct: anomaly_fields.alert_window_recover_pct,
         alert_enabled: anomaly_fields.alert_enabled,
         alert_destinations: req_body.alert.destinations,
         enabled: Some(req_body.alert.enabled),
-        // Prefer explicit folder_id in JSON body; fall back to the ?folder= query param
-        // (same mechanism regular alerts use — the UI sends folder as a query param).
-        folder_id: req_body
-            .folder_id
-            .filter(|f| !f.is_empty())
-            .or_else(|| Some(query_folder_id.to_string()).filter(|f| !f.is_empty())),
+        // The route's permission gate resolves `?folder=`, so the write must use the same value — a
+        // body folder_id would create the config in an unauthorized folder.
+        folder_id: Some(query_folder_id.to_string()).filter(|f| !f.is_empty()),
         owner,
         // Feature 2: anomaly configs take the same triage metadata as
         // alerts, threaded from the shared request body.
         priority: req_body.alert.priority,
         tags: req_body.alert.tags,
     };
+    if let Err(resp) = guard_anomaly_create(org_id, &user_id, &req).await {
+        return resp;
+    }
 
     match openobserve_core::anomaly_detection::create_config(org_id, req).await {
         Ok(v) => MetaHttpResponse::json(v),
-        // A bad tag is user input: the same 400 the alert save path gives.
-        Err(e)
-            if e.downcast_ref::<config::meta::alerts::tags::TagError>()
-                .is_some() =>
-        {
-            MetaHttpResponse::bad_request(e.to_string())
-        }
-        Err(e) => MetaHttpResponse::internal_error(e.to_string()),
+        Err(e) => anomaly_save_error(e),
     }
+}
+
+/// The create's own checks answer first, so a bad body is never reported as a refused read.
+#[cfg(feature = "enterprise")]
+async fn guard_anomaly_create(
+    org_id: &str,
+    user_id: &str,
+    req: &openobserve_core::anomaly_detection::CreateAnomalyConfigRequest,
+) -> Result<(), Response> {
+    if !openobserve_core::background_access::rbac_enforced().await {
+        return Ok(());
+    }
+    openobserve_core::anomaly_detection::check_create_config(org_id, req)
+        .await
+        .map_err(anomaly_save_error)?;
+    let sources = openobserve_core::background_access::anomaly_sources(
+        org_id,
+        &req.stream_type,
+        &req.stream_name,
+        req.custom_sql.as_deref(),
+    );
+    guard_write(org_id, user_id, &sources).await
+}
+
+/// The update's own checks answer first, so a bad body is never reported as a refused read.
+#[cfg(feature = "enterprise")]
+async fn guard_anomaly_update(
+    org_id: &str,
+    anomaly_id: &str,
+    user_id: &str,
+    req: &openobserve_core::anomaly_detection::UpdateAnomalyConfigRequest,
+) -> Result<(), Response> {
+    if !openobserve_core::background_access::rbac_enforced().await {
+        return Ok(());
+    }
+    openobserve_core::anomaly_detection::check_update_config(org_id, anomaly_id, req)
+        .await
+        .map_err(anomaly_save_error)?;
+    let sources = openobserve_core::background_access::anomaly_update_sources(
+        org_id,
+        anomaly_id,
+        req.custom_sql.as_deref(),
+    );
+    openobserve_core::background_access::guard_loaded(org_id, user_id, sources).await
+}
+
+#[cfg(feature = "enterprise")]
+fn anomaly_save_error(e: anyhow::Error) -> Response {
+    // A bad tag is user input: the same 400 the alert save path gives.
+    if e.downcast_ref::<config::meta::alerts::tags::TagError>()
+        .is_some()
+    {
+        return MetaHttpResponse::bad_request(e.to_string());
+    }
+    // A rejected config shape is the caller's to fix, not a server fault.
+    if e.to_string().contains("validation error") {
+        return MetaHttpResponse::bad_request(e.to_string());
+    }
+    MetaHttpResponse::internal_error(e.to_string())
 }
 
 /// Split a rendered `k=v,k=v` label string back into pairs.
@@ -257,7 +1486,7 @@ pub async fn list_alert_groups(Path((org_id, alert_id)): Path<(String, String)>)
     let Ok(ksuid) = Ksuid::from_str(&alert_id) else {
         return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
     };
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     // Resolve through the alert itself so this endpoint inherits the same
     // org scoping and not-found behaviour as every other alert read — a raw
     // state-table query would happily serve another org's group labels, which
@@ -290,10 +1519,12 @@ pub async fn list_alert_groups(Path((org_id, alert_id)): Path<(String, String)>)
         .and_then(|r| r.groups_observed)
         .and_then(|n| i32::try_from(n).ok());
     let group_cap = config::get_config().limit.alert_max_groups;
+    let acked = group_acks(&org_id, &alert_id, &groups).await;
 
     let list: Vec<AlertGroupResponseItem> = groups
         .into_iter()
         .map(|g| AlertGroupResponseItem {
+            ack: acked.get(&g.group_key).cloned(),
             labels: parse_group_labels(g.group_labels.as_deref()),
             group_key: g.group_key,
             group_labels: g.group_labels,
@@ -304,6 +1535,7 @@ pub async fn list_alert_groups(Path((org_id, alert_id)): Path<(String, String)>)
             last_seen: g.last_seen,
             silenced_until: g.silenced_until,
             last_notified_level: g.last_notified_level.map(|l| l.to_string()),
+            firing_started_at: g.firing_started_at,
         })
         .collect();
 
@@ -363,7 +1595,7 @@ pub async fn list_alert_group_transitions(
     let Ok(ksuid) = Ksuid::from_str(&alert_id) else {
         return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
     };
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     if let Err(e) = alert::get_by_id(client, &org_id, ksuid).await {
         return e.into();
     }
@@ -393,6 +1625,7 @@ pub async fn list_alert_group_transitions(
                     to_outcome: t.to_outcome.to_string(),
                     at: t.at,
                     value: t.value,
+                    rule_value: t.rule_value,
                 })
                 .collect(),
         }),
@@ -408,7 +1641,7 @@ pub async fn list_alert_group_transitions(
     tag = "Alerts",
     operation_id = "GetAlert",
     summary = "Get alert details",
-    description = "Retrieves detailed information about a specific alert including its configuration, conditions, triggers, notification settings, and current status. Useful for viewing and understanding existing alert setups.",
+    description = "Retrieves detailed information about a specific alert including its configuration, conditions, triggers, notification settings, and current status. Useful for viewing and understanding existing alert setups. Composite alerts return a composite-shaped body (alert_type=\"composite\", composite_condition, children, evaluation) rather than GetAlertResponseBody.",
     security(
         ("Authorization"= [])
     ),
@@ -426,7 +1659,14 @@ pub async fn list_alert_group_transitions(
         ("x-o2-mcp" = json!({"description": "Get alert details by ID", "category": "alerts"}))
     )
 )]
-pub async fn get_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Response {
+pub async fn get_alert(
+    Path((org_id, alert_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    let detail_user_id = Some(user_email.user_id.as_str());
+    #[cfg(not(feature = "enterprise"))]
+    let detail_user_id = None;
     let alert_id_str = alert_id.clone();
     let alert_id = match Ksuid::from_str(&alert_id) {
         Ok(id) => id,
@@ -434,7 +1674,7 @@ pub async fn get_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Resp
             return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
         }
     };
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     match alert::get_by_id(client, &org_id, alert_id).await {
         Ok((_, alert)) => {
             let key = alert.get_unique_key();
@@ -445,6 +1685,11 @@ pub async fn get_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Resp
             MetaHttpResponse::json(resp_body)
         }
         Err(AlertError::AlertNotFound) => {
+            if let Ok(Some(composite)) =
+                openobserve_core::alerts::composite::get_composite(&org_id, &alert_id_str).await
+            {
+                return composite_detail_response(composite, detail_user_id).await;
+            }
             #[cfg(not(feature = "enterprise"))]
             {
                 MetaHttpResponse::not_found(format!("alert {alert_id_str} not found"))
@@ -510,7 +1755,7 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
             return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
         }
     };
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     match alert::get_by_id(client, &org_id, alert_id).await {
         Ok((_, alert)) => {
             let key = alert.get_unique_key();
@@ -537,19 +1782,7 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
                                 "alert_type".to_string(),
                                 serde_json::Value::String("anomaly_detection".to_string()),
                             );
-                            // Strip runtime/training state from the export payload
-                            for key in &[
-                                "is_trained",
-                                "training_started_at",
-                                "training_completed_at",
-                                "last_processed_timestamp",
-                                "current_model_version",
-                                "status",
-                                "last_error",
-                                "retries",
-                            ] {
-                                obj.remove(*key);
-                            }
+                            strip_anomaly_runtime_state(obj);
                         }
                         MetaHttpResponse::json(v)
                     }
@@ -577,7 +1810,7 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
     tag = "Alerts",
     operation_id = "CloneAlert",
     summary = "Clone an alert or anomaly detection config",
-    description = "Creates a copy of an existing alert or anomaly detection config. For anomaly configs, the clone starts untrained with counters reset. Provide an optional name and folder_id in the request body.",
+    description = "Creates a copy of an existing alert or anomaly detection config. For anomaly configs, the clone starts untrained with counters reset. Provide an optional name and folder_id in the request body; a folder_id requires write access to that destination folder.",
     security(
         ("Authorization"= [])
     ),
@@ -589,6 +1822,7 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
     request_body(content = inline(CloneAlertRequestBody), description = "Clone options", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
@@ -598,6 +1832,7 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
 )]
 pub async fn clone_alert(
     Path((org_id, alert_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Json(req_body): Json<CloneAlertRequestBody>,
 ) -> Response {
     let alert_id_str = alert_id.clone();
@@ -607,39 +1842,206 @@ pub async fn clone_alert(
             return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
         }
     };
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     // Check if this is a regular alert first
     match alert::get_by_id(client, &org_id, alert_id).await {
         Ok((folder, mut src_alert)) => {
+            // A clone copies the whole definition, so reading the source must be
+            // authorized too — the destination check alone would let a caller
+            // lift an alert out of a folder they cannot read.
+            #[cfg(feature = "enterprise")]
+            if !check_permissions(
+                &alert_id_str,
+                &org_id,
+                &user_email.user_id,
+                "alerts",
+                "GET",
+                Some(&folder.folder_id),
+                false,
+                true,
+                false,
+            )
+            .await
+            {
+                return MetaHttpResponse::forbidden("Unauthorized Access");
+            }
             // Clone the alert: copy fields, generate new name
             let new_name = req_body
                 .name
                 .unwrap_or_else(|| format!("{}_copy", src_alert.name));
+            // Resolve the effective destination BEFORE authorizing it: an absent
+            // folder_id falls back to the source folder, which `?folder=` need
+            // not have covered.
             let dst_folder = req_body
                 .folder_id
+                .filter(|f| !f.is_empty())
                 .unwrap_or_else(|| folder.folder_id.clone());
+            #[cfg(feature = "enterprise")]
+            if !check_folder_write_permissions(
+                &org_id,
+                &user_email.user_id,
+                "alert_folders",
+                &dst_folder,
+            )
+            .await
+            {
+                return MetaHttpResponse::forbidden("Unauthorized Access");
+            }
             src_alert.name = new_name;
             // Clear the ID so a new one is assigned on insert
             src_alert.id = None;
+            #[cfg(feature = "enterprise")]
+            if let Err(resp) =
+                guard_alert_create(&org_id, &user_email.user_id, &dst_folder, &src_alert, false)
+                    .await
+            {
+                return resp;
+            }
             match alert::create(client, &org_id, &dst_folder, src_alert, false).await {
                 Ok(saved) => MetaHttpResponse::json(saved),
                 Err(e) => e.into(),
             }
         }
         Err(AlertError::AlertNotFound) => {
+            if let Some(_composite) =
+                openobserve_core::alerts::composite::get_composite(&org_id, &alert_id_str)
+                    .await
+                    .ok()
+                    .flatten()
+            {
+                // Resolved here so the folder authorized below is the one written.
+                let dst_folder = req_body
+                    .folder_id
+                    .clone()
+                    .filter(|f| !f.is_empty())
+                    .unwrap_or_else(|| _composite.definition.folder_id.clone());
+                #[cfg(feature = "enterprise")]
+                {
+                    // The composite itself, not only the alerts it references.
+                    if !check_permissions(
+                        &alert_id_str,
+                        &org_id,
+                        &user_email.user_id,
+                        "alerts",
+                        "GET",
+                        Some(&_composite.definition.folder_id),
+                        false,
+                        true,
+                        false,
+                    )
+                    .await
+                    {
+                        return MetaHttpResponse::forbidden("Unauthorized Access");
+                    }
+                    if composite_subject_unauthorized(
+                        &_composite.definition,
+                        &user_email.user_id,
+                        "GET",
+                    )
+                    .await
+                    {
+                        return MetaHttpResponse::forbidden("Unauthorized Access");
+                    }
+                    if !check_folder_write_permissions(
+                        &org_id,
+                        &user_email.user_id,
+                        "alert_folders",
+                        &dst_folder,
+                    )
+                    .await
+                    {
+                        return MetaHttpResponse::forbidden("Unauthorized Access");
+                    }
+                }
+                return match openobserve_core::alerts::composite::clone_composite(
+                    &org_id,
+                    &alert_id_str,
+                    req_body.name,
+                    Some(dst_folder),
+                    "api".to_string(),
+                )
+                .await
+                {
+                    Ok(saved) => MetaHttpResponse::json(serde_json::json!({
+                        "id": saved.id,
+                        "name": saved.name,
+                        "alert_type": "composite",
+                    })),
+                    Err(error) => composite_error_response(error),
+                };
+            }
             #[cfg(not(feature = "enterprise"))]
             {
                 MetaHttpResponse::not_found(format!("alert {alert_id_str} not found"))
             }
             #[cfg(feature = "enterprise")]
             {
+                // Source read, then the folder the clone lands in, both resolved here.
+                let src_cfg =
+                    match openobserve_core::anomaly_detection::get_config(&org_id, &alert_id_str)
+                        .await
+                    {
+                        Ok(Some(cfg)) => cfg,
+                        Ok(None) => {
+                            return MetaHttpResponse::not_found(format!(
+                                "alert {alert_id_str} not found"
+                            ));
+                        }
+                        Err(e) => return MetaHttpResponse::internal_error(e.to_string()),
+                    };
+                let Some(src_folder) = src_cfg
+                    .get("folder_id")
+                    .and_then(|f| f.as_str())
+                    .map(str::to_string)
+                else {
+                    return MetaHttpResponse::forbidden("Unauthorized Access");
+                };
+                if !check_permissions(
+                    &alert_id_str,
+                    &org_id,
+                    &user_email.user_id,
+                    "alerts",
+                    "GET",
+                    Some(&src_folder),
+                    false,
+                    true,
+                    false,
+                )
+                .await
+                {
+                    return MetaHttpResponse::forbidden("Unauthorized Access");
+                }
+                let dst_folder = req_body
+                    .folder_id
+                    .clone()
+                    .filter(|f| !f.is_empty())
+                    .unwrap_or(src_folder);
+                if !check_folder_write_permissions(
+                    &org_id,
+                    &user_email.user_id,
+                    "alert_folders",
+                    &dst_folder,
+                )
+                .await
+                {
+                    return MetaHttpResponse::forbidden("Unauthorized Access");
+                }
+                if let Err(resp) = guard_write(
+                    &org_id,
+                    &user_email.user_id,
+                    &anomaly_config_sources(&org_id, &src_cfg),
+                )
+                .await
+                {
+                    return resp;
+                }
                 // Fall back to anomaly detection config clone
                 match openobserve_core::anomaly_detection::clone_config(
                     &org_id,
                     &alert_id_str,
                     req_body.name,
-                    req_body.folder_id,
+                    Some(dst_folder),
                 )
                 .await
                 {
@@ -680,6 +2082,7 @@ pub async fn clone_alert(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
@@ -713,6 +2116,9 @@ pub async fn update_alert(
         )
         .await;
     }
+    if req_body.alert_type == Some(AlertTypeFilter::Composite) {
+        return update_composite_alert(&org_id, &alert_id_str, user_email.user_id, req_body).await;
+    }
 
     // Save anomaly fields before req_body is consumed, in case we need the fallback.
     #[cfg(feature = "enterprise")]
@@ -721,12 +2127,45 @@ pub async fn update_alert(
     let alert_fields_for_fallback = req_body.alert.clone();
 
     let mut alert: MetaAlert = req_body.into();
+    if let Err(resp) = validate_oncall_team(&org_id, alert.oncall_team.as_deref()).await {
+        return resp;
+    }
+    if let Err(resp) = validate_runbook_url(alert.runbook_url.as_deref()) {
+        return resp;
+    }
     alert.last_edited_by = Some(user_email.user_id.clone());
     alert.id = Some(alert_id);
+    // the save's own checks answer first, so a bad body is never reported as a refused read
+    #[cfg(feature = "enterprise")]
+    if openobserve_core::background_access::rbac_enforced().await {
+        match alert::validate_save(&org_id, None, &alert, false, false).await {
+            Ok(prepared) => {
+                let sources = alert_sources(&org_id, &prepared);
+                if let Err(resp) = guard_write(&org_id, &user_email.user_id, &sources).await {
+                    return resp;
+                }
+            }
+            // not an alert: the anomaly fallback guards its own stored config
+            Err(AlertError::AlertNotFound) => {
+                return build_and_run_anomaly_update(
+                    &org_id,
+                    &alert_id_str,
+                    user_email.user_id,
+                    anomaly_config,
+                    alert_fields_for_fallback,
+                )
+                .await;
+            }
+            Err(e) => return e.into(),
+        }
+    }
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     match alert::update(client, &org_id, None, alert).await {
-        Ok(_) => MetaHttpResponse::ok("Alert Updated"),
+        Ok(v) => MetaHttpResponse::json(
+            MetaHttpResponse::message(StatusCode::OK, "Alert Updated")
+                .with_warnings(paging_warnings(&org_id, &v).await),
+        ),
         Err(AlertError::AlertNotFound) => {
             #[cfg(not(feature = "enterprise"))]
             {
@@ -759,10 +2198,18 @@ async fn build_and_run_anomaly_update(
 ) -> Response {
     use openobserve_core::anomaly_detection::UpdateAnomalyConfigRequest;
 
+    // A folder_id on the update is a move, and the route gate only covers `?folder=`.
+    if let Some(folder) = fields.folder_id.as_deref().filter(|f| !f.is_empty())
+        && !check_folder_write_permissions(org_id, &user_id, "alert_folders", folder).await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
+
+    // only a named owner moves ownership; an omitted or empty one keeps the stored owner
     let owner = fields
         .owner
         .or_else(|| alert.owner.clone())
-        .or(Some(user_id));
+        .filter(|owner| !owner.is_empty());
     let name = fields
         .name
         .or_else(|| Some(alert.name).filter(|n| !n.is_empty()));
@@ -784,6 +2231,13 @@ async fn build_and_run_anomaly_update(
         detection_window_seconds: fields.detection_window_seconds,
         training_window_days: fields.training_window_days,
         percentile: fields.percentile,
+        alert_budget_per_day: fields.alert_budget_per_day,
+        level_half_width_seconds: fields.level_half_width_seconds.map(Some),
+        band_width: fields.band_width,
+        alert_direction: fields.alert_direction,
+        alert_window_buckets: fields.alert_window_buckets,
+        alert_window_fire_pct: fields.alert_window_fire_pct,
+        alert_window_recover_pct: fields.alert_window_recover_pct,
         retrain_interval_days: fields.retrain_interval_days,
         alert_enabled: fields.alert_enabled,
         alert_destinations: Some(alert.destinations),
@@ -798,17 +2252,13 @@ async fn build_and_run_anomaly_update(
         // so an edit that removes every tag does clear them.
         tags: Some(alert.tags),
     };
+    if let Err(resp) = guard_anomaly_update(org_id, anomaly_id, &user_id, &req).await {
+        return resp;
+    }
 
     match openobserve_core::anomaly_detection::update_config(org_id, anomaly_id, req).await {
         Ok(v) => MetaHttpResponse::json(v),
-        // Same 400 as create: an invalid tag is the caller's to fix.
-        Err(e)
-            if e.downcast_ref::<config::meta::alerts::tags::TagError>()
-                .is_some() =>
-        {
-            MetaHttpResponse::bad_request(e.to_string())
-        }
-        Err(e) => MetaHttpResponse::internal_error(e.to_string()),
+        Err(e) => anomaly_save_error(e),
     }
 }
 
@@ -820,7 +2270,7 @@ async fn build_and_run_anomaly_update(
     tag = "Alerts",
     operation_id = "DeleteAlert",
     summary = "Delete alert",
-    description = "Permanently removes an alert and all its configurations including conditions, triggers, and notification settings. This action cannot be undone and will stop all monitoring and notifications for the deleted alert.",
+    description = "Permanently removes an alert and all its configurations including conditions, triggers, and notification settings. This action cannot be undone and will stop all monitoring and notifications for the deleted alert. Also deletes composite alerts; returns 409 when the alert is referenced by one or more composite alerts.",
     security(
         ("Authorization"= [])
     ),
@@ -831,6 +2281,7 @@ async fn build_and_run_anomaly_update(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 409, description = "Referenced by composite alerts", content_type = "application/json", body = Object),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
     extensions(
@@ -838,7 +2289,10 @@ async fn build_and_run_anomaly_update(
         ("x-o2-mcp" = json!({"description": "Delete an alert by ID", "category": "alerts", "requires_confirmation": true}))
     )
 )]
-pub async fn delete_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Response {
+pub async fn delete_alert(
+    Path((org_id, alert_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
     let alert_id_str = alert_id.clone();
     let alert_id = match Ksuid::from_str(&alert_id) {
         Ok(id) => id,
@@ -846,7 +2300,7 @@ pub async fn delete_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
             return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
         }
     };
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     // Check whether this ID belongs to a regular alert before attempting delete.
     // delete_by_id silently returns Ok(()) when the record is not found (required
@@ -854,9 +2308,53 @@ pub async fn delete_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
     let is_regular_alert = alert::get_by_id(client, &org_id, alert_id).await.is_ok();
 
     if is_regular_alert {
-        return match alert::delete_by_id(client, &org_id, alert_id).await {
+        return match alert::delete_by_id_user(client, &org_id, alert_id).await {
             Ok(_) => MetaHttpResponse::ok("Alert deleted"),
+            Err(AlertError::AlertReferencedByComposites { parents }) => {
+                reference_conflict_response(
+                    &org_id,
+                    &user_email.user_id,
+                    parents
+                        .into_iter()
+                        .map(|parent| (parent.alert_id, parent.name, parent.folder_id))
+                        .collect(),
+                )
+                .await
+            }
             Err(e) => e.into(),
+        };
+    }
+
+    if let Some(_composite) =
+        openobserve_core::alerts::composite::get_composite(&org_id, &alert_id_str)
+            .await
+            .ok()
+            .flatten()
+    {
+        #[cfg(feature = "enterprise")]
+        if composite_subject_unauthorized(&_composite.definition, &user_email.user_id, "DELETE")
+            .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
+        return match openobserve_core::alerts::composite::delete_composite(&org_id, &alert_id_str)
+            .await
+        {
+            Ok(()) => MetaHttpResponse::ok("Alert deleted"),
+            Err(openobserve_core::alerts::composite::CompositeServiceError::ChildReferenced(
+                parents,
+            )) => {
+                reference_conflict_response(
+                    &org_id,
+                    &user_email.user_id,
+                    parents
+                        .into_iter()
+                        .map(|parent| (parent.id, parent.name, parent.folder_id))
+                        .collect(),
+                )
+                .await
+            }
+            Err(error) => composite_error_response(error),
         };
     }
 
@@ -880,6 +2378,64 @@ pub async fn delete_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
     MetaHttpResponse::not_found(format!("alert {alert_id_str} not found"))
 }
 
+async fn readable_parent_snapshot(
+    org_id: &str,
+    user_id: &str,
+    parents: Vec<(String, String, String)>,
+) -> (Vec<serde_json::Value>, usize) {
+    #[cfg(not(feature = "enterprise"))]
+    let _ = (org_id, user_id);
+    let mut references = Vec::new();
+    #[cfg(feature = "enterprise")]
+    let mut hidden = 0;
+    #[cfg(not(feature = "enterprise"))]
+    let hidden = 0;
+    for (alert_id, name, folder_id) in parents {
+        #[cfg(feature = "enterprise")]
+        if !check_permissions(
+            &alert_id,
+            org_id,
+            user_id,
+            "alerts",
+            "GET",
+            Some(&folder_id),
+            false,
+            true,
+            false,
+        )
+        .await
+        {
+            hidden += 1;
+            continue;
+        }
+        references.push(serde_json::json!({
+            "alert_id": alert_id,
+            "name": name,
+            "folder_id": folder_id,
+        }));
+    }
+    (references, hidden)
+}
+
+async fn reference_conflict_response(
+    org_id: &str,
+    user_id: &str,
+    parents: Vec<(String, String, String)>,
+) -> Response {
+    let (references, hidden_reference_count) =
+        readable_parent_snapshot(org_id, user_id, parents).await;
+    (
+        StatusCode::CONFLICT,
+        Json(serde_json::json!({
+            "code": "child_referenced",
+            "message": "this alert is referenced by one or more composite alerts",
+            "references": references,
+            "hidden_reference_count": hidden_reference_count,
+        })),
+    )
+        .into_response()
+}
+
 /// DeleteAlertBulk
 #[utoipa::path(
     delete,
@@ -897,7 +2453,7 @@ pub async fn delete_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
     ),
     request_body(content = BulkDeleteRequest, description = "Alert ids", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteAlertResponse),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
     extensions(
@@ -914,11 +2470,15 @@ pub async fn delete_alert_bulk(
     let _user_id = user_email.user_id;
     let _folder_id = common::utils::http::get_folder(&query);
 
-    #[cfg(feature = "enterprise")]
+    // The delete loop unwraps each id, so a bad one is refused before anything is deleted.
     for id in &req.ids {
         if Ksuid::from_str(id).is_err() {
             return MetaHttpResponse::bad_request(format!("invalid alert id {id}"));
         };
+    }
+
+    #[cfg(feature = "enterprise")]
+    for id in &req.ids {
         if !check_permissions(
             id,
             &org_id,
@@ -939,16 +2499,72 @@ pub async fn delete_alert_bulk(
     let mut successful = Vec::with_capacity(req.ids.len());
     let mut unsuccessful = Vec::with_capacity(req.ids.len());
     let mut err = None;
+    let mut conflicts = Vec::new();
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     for id in req.ids {
         // already checked this is valid, so ok to unwrap
         let alert_id = Ksuid::from_str(&id).unwrap();
         let is_regular_alert = alert::get_by_id(client, &org_id, alert_id).await.is_ok();
         let result = if is_regular_alert {
-            alert::delete_by_id(client, &org_id, alert_id)
+            match alert::delete_by_id_user(client, &org_id, alert_id).await {
+                Ok(()) => Ok(()),
+                Err(AlertError::AlertReferencedByComposites { parents }) => {
+                    let (references, hidden_reference_count) = readable_parent_snapshot(
+                        &org_id,
+                        &_user_id,
+                        parents
+                            .into_iter()
+                            .map(|parent| (parent.alert_id, parent.name, parent.folder_id))
+                            .collect(),
+                    )
+                    .await;
+                    conflicts.push(serde_json::json!({
+                        "alert_id": id,
+                        "code": "child_referenced",
+                        "references": references,
+                        "hidden_reference_count": hidden_reference_count,
+                    }));
+                    Err("child_referenced".to_string())
+                }
+                Err(error) => Err(error.to_string()),
+            }
+        } else if let Some(_composite) =
+            openobserve_core::alerts::composite::get_composite(&org_id, &id)
                 .await
-                .map_err(|e| e.to_string())
+                .ok()
+                .flatten()
+        {
+            #[cfg(feature = "enterprise")]
+            if composite_subject_unauthorized(&_composite.definition, &_user_id, "DELETE").await {
+                return MetaHttpResponse::forbidden("Unauthorized Access");
+            }
+            match openobserve_core::alerts::composite::delete_composite(&org_id, &id).await {
+                Ok(()) => Ok(()),
+                Err(
+                    openobserve_core::alerts::composite::CompositeServiceError::ChildReferenced(
+                        parents,
+                    ),
+                ) => {
+                    let (references, hidden_reference_count) = readable_parent_snapshot(
+                        &org_id,
+                        &_user_id,
+                        parents
+                            .into_iter()
+                            .map(|parent| (parent.id, parent.name, parent.folder_id))
+                            .collect(),
+                    )
+                    .await;
+                    conflicts.push(serde_json::json!({
+                        "alert_id": id,
+                        "code": "child_referenced",
+                        "references": references,
+                        "hidden_reference_count": hidden_reference_count,
+                    }));
+                    Err("child_referenced".to_string())
+                }
+                Err(error) => Err(error.to_string()),
+            }
         } else {
             // Not a regular alert — fall back to anomaly config delete (enterprise only).
             #[cfg(not(feature = "enterprise"))]
@@ -970,11 +2586,12 @@ pub async fn delete_alert_bulk(
         }
     }
 
-    MetaHttpResponse::json(BulkDeleteResponse {
-        successful,
-        unsuccessful,
-        err,
-    })
+    MetaHttpResponse::json(serde_json::json!({
+        "successful": successful,
+        "unsuccessful": unsuccessful,
+        "err": err,
+        "conflicts": conflicts,
+    }))
 }
 
 /// Query parameters for the tag facet endpoint (PT-8b).
@@ -1043,7 +2660,7 @@ pub async fn list_alert_tags(
     if let Some(folder) = query.folder.clone() {
         params = params.in_folder(&folder);
     }
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let visible_ids: Vec<String> = match alert::list_v2(client, user_id, params).await {
         Ok(list) => list
             .into_iter()
@@ -1052,7 +2669,47 @@ pub async fn list_alert_tags(
         Err(e) => return e.into(),
     };
 
-    let mut counts = db::alerts::alert::tag_counts_for_alerts(&org_id, &visible_ids).await;
+    let counts = db::alerts::alert::tag_counts_for_alerts(&org_id, &visible_ids).await;
+
+    // Resolve composite visibility in bulk (one query), mirroring the
+    // regular-alert `visible_ids` path, rather than a per-composite
+    // `check_permissions` call.
+    #[cfg(feature = "enterprise")]
+    let visibility = permitted_alert_visibility(&org_id, user_email.user_id.as_str()).await;
+
+    let mut composite_counts = std::collections::BTreeMap::<String, u64>::new();
+    if let Ok(composites) = infra::table::alert_composites::list_by_org(client, &org_id).await {
+        for composite in composites.into_iter().filter(|composite| {
+            query
+                .folder
+                .as_ref()
+                .is_none_or(|folder| &composite.folder_id == folder)
+        }) {
+            #[cfg(feature = "enterprise")]
+            if !visible_alert(
+                &visibility,
+                &composite.id,
+                &composite.folder_id,
+                &composite.name,
+            ) {
+                continue;
+            }
+            let tags: Vec<String> = composite
+                .tags
+                .and_then(|tags| serde_json::from_value(tags).ok())
+                .unwrap_or_default();
+            for tag in tags {
+                *composite_counts.entry(tag).or_default() += 1;
+            }
+        }
+    }
+    // Index the alert tag counts by tag so the composite merge is O(1) per tag
+    // instead of a linear scan over every existing tag.
+    let mut count_map: std::collections::HashMap<String, u64> = counts.iter().cloned().collect();
+    for (tag, count) in composite_counts {
+        *count_map.entry(tag).or_default() += count;
+    }
+    let mut counts: Vec<(String, u64)> = count_map.into_iter().collect();
 
     if let Some(prefix) = query.prefix.as_deref() {
         let prefix = prefix.trim().to_lowercase();
@@ -1115,11 +2772,17 @@ pub async fn list_alerts(
     #[cfg(feature = "enterprise")]
     let user_id = Some(user_email.user_id.as_str());
 
-    #[cfg(feature = "enterprise")]
+    // Resolve the caller's visible object set once per request; it gates both
+    // the composite merge below and the `referenced_by_composite_count`
+    // enrichment, so we don't run per-row or duplicate permission lookups.
+    let visibility = match user_id {
+        Some(user_id) => permitted_alert_visibility(&org_id, user_id).await,
+        None => None,
+    };
+
     let folder_slug = query.folder.clone();
-    #[cfg(feature = "enterprise")]
     let name_substring = query.alert_name_substring.clone();
-    #[cfg(feature = "enterprise")]
+    let enabled_filter = query.enabled;
     let page_size_and_idx = query.page_size.map(|s| (s, query.page_idx.unwrap_or(0)));
 
     // Resolve the tag filter to an alert-ID set BEFORE building the query
@@ -1127,6 +2790,10 @@ pub async fn list_alerts(
     // ID predicate so pagination and sorting stay correct rather than
     // post-filtering an already-fetched page.
     let requested_tags = query.requested_tags();
+
+    // Opt-in (dependency view only): destinations/template ride the response only
+    // when asked for. Captured before `query` is moved into `params` below.
+    let include_dependencies = query.include_dependencies.unwrap_or(false);
 
     #[cfg(not(feature = "enterprise"))]
     let mut params = query.into(&org_id);
@@ -1155,16 +2822,60 @@ pub async fn list_alerts(
     #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
     let requested_sort = (params.sort_by, params.sort_desc);
 
-    // In enterprise builds, pagination is applied after merging regular alerts with
-    // anomaly detection configs, so we fetch all matching results from the DB here.
-    #[cfg(feature = "enterprise")]
-    {
-        params.page_size_and_idx = None;
+    // Composite definitions are fetched once here — used both to decide whether
+    // the `All` filter must merge (and so drop SQL pagination) and to build the
+    // merged rows below.
+    let db = get_orm_client_ro().await;
+    let composite_definitions = if matches!(
+        alert_type,
+        AlertTypeFilter::All | AlertTypeFilter::Composite
+    ) {
+        infra::table::alert_composites::list_by_org(db, &org_id)
+            .await
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+
+    // Only force a full fetch when an extra kind is actually being merged in.
+    // A single-kind list keeps SQL LIMIT/OFFSET so we don't fetch and sort
+    // every row in memory. `All` merges composites (and, in enterprise, anomaly
+    // configs) only when they exist.
+    let merges_extra = match alert_type {
+        AlertTypeFilter::Composite | AlertTypeFilter::AnomalyDetection => true,
+        AlertTypeFilter::All => {
+            !composite_definitions.is_empty() || {
+                #[cfg(feature = "enterprise")]
+                {
+                    openobserve_core::anomaly_detection::list_configs(&org_id, None, None)
+                        .await
+                        .map(|configs| !configs.is_empty())
+                        .unwrap_or(false)
+                }
+                #[cfg(not(feature = "enterprise"))]
+                {
+                    false
+                }
+            }
+        }
+        _ => false,
+    };
+    if merges_extra {
+        // Bound the regular-alert fetch to the prefix that could fall inside the
+        // requested page rather than fetching every row. Composites/anomalies
+        // only push regular alerts down the merged order, so the regular rows in
+        // any page are a subset of the first `(page_idx + 1) * page_size` regular
+        // rows. Unpaginated requests (no page_size) still fetch everything.
+        params.page_size_and_idx = page_size_and_idx
+            .map(|(page_size, page_idx)| (page_idx.saturating_add(1).saturating_mul(page_size), 0));
     }
 
     // Fetch regular (scheduled / realtime) alerts unless the filter is anomaly-only.
-    let list: Vec<ListAlertsResponseBodyItem> = if alert_type != AlertTypeFilter::AnomalyDetection {
-        let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let mut list: Vec<ListAlertsResponseBodyItem> = if !matches!(
+        alert_type,
+        AlertTypeFilter::AnomalyDetection | AlertTypeFilter::Composite
+    ) {
+        let client = get_orm_client_ro().await;
         let mut scheduled_jobs: HashMap<String, Trigger> =
             scheduler::list_by_org(&org_id, Some(TriggerModule::Alert))
                 .await
@@ -1179,25 +2890,93 @@ pub async fn list_alerts(
         };
 
         folders_and_alerts
-                .into_iter()
-                // Apply is_real_time filter when a specific type is requested.
-                .filter(|(_, a)| match alert_type {
-                    AlertTypeFilter::Scheduled => !a.is_real_time,
-                    AlertTypeFilter::Realtime => a.is_real_time,
-                    _ => true,
-                })
-                .map(|(folder, alert)| {
-                    let key = alert.get_unique_key();
-                    (folder, alert, scheduled_jobs.remove(&key))
-                })
-                .filter_map(|item| ListAlertsResponseBodyItem::try_from(item).ok())
-                .collect()
+            .into_iter()
+            // Apply is_real_time filter when a specific type is requested.
+            .filter(|(_, a)| match alert_type {
+                AlertTypeFilter::Scheduled => {
+                    !a.is_real_time && a.query_condition.slo_condition.is_none()
+                }
+                AlertTypeFilter::Realtime => {
+                    a.is_real_time && a.query_condition.slo_condition.is_none()
+                }
+                AlertTypeFilter::Slo => a.query_condition.slo_condition.is_some(),
+                _ => true,
+            })
+            .map(|(folder, alert)| {
+                let key = alert.get_unique_key();
+                (folder, alert, scheduled_jobs.remove(&key))
+            })
+            .filter_map(|item| ListAlertsResponseBodyItem::try_from(item).ok())
+            .collect()
     } else {
         vec![]
     };
-    // In enterprise builds, anomaly configs will be appended — we need mutability.
-    #[cfg(feature = "enterprise")]
-    let mut list = list;
+    // Merge composite rows. Folder display names are resolved once (like the
+    // regular-alert folder join) rather than one lookup per row.
+    if matches!(
+        alert_type,
+        AlertTypeFilter::All | AlertTypeFilter::Composite
+    ) && !composite_definitions.is_empty()
+    {
+        let folder_names: HashMap<String, String> =
+            infra::table::folders::list_folders(&org_id, config::meta::folder::FolderType::Alerts)
+                .await
+                .map(|folders| {
+                    folders
+                        .into_iter()
+                        .map(|folder| (folder.folder_id, folder.name))
+                        .collect()
+                })
+                .unwrap_or_default();
+        let mut trigger_data = scheduler::list_by_org(&org_id, Some(TriggerModule::CompositeAlert))
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .map(|t| (t.module_key.clone(), t))
+            .collect();
+        for definition in composite_definitions {
+            if !folder_slug
+                .as_ref()
+                .is_none_or(|folder| &definition.folder_id == folder)
+                || !name_substring.as_ref().is_none_or(|name| {
+                    definition
+                        .name
+                        .to_lowercase()
+                        .contains(&name.to_lowercase())
+                })
+                || !enabled_filter.is_none_or(|enabled| definition.enabled == enabled)
+            {
+                continue;
+            }
+            if !visible_alert(
+                &visibility,
+                &definition.id,
+                &definition.folder_id,
+                &definition.name,
+            ) {
+                continue;
+            }
+            let folder_name = folder_names
+                .get(&definition.folder_id)
+                .cloned()
+                .unwrap_or_else(|| definition.folder_id.clone());
+            let Some(item) = composite_list_item(definition, &folder_name, &mut trigger_data)
+            else {
+                continue;
+            };
+            let priority_matches = match &priority_filter {
+                None => true,
+                Some(wanted) => item.priority.is_some_and(|priority| {
+                    wanted.iter().any(|value| value.to_i32() as u8 == priority)
+                }),
+            };
+            if priority_matches
+                && config::meta::alerts::tags::matches_all_tags(&item.tags, &tag_filter)
+            {
+                list.push(item);
+            }
+        }
+    }
 
     // Fetch anomaly detection configs and merge when the filter includes them (enterprise only).
     #[cfg(feature = "enterprise")]
@@ -1216,9 +2995,10 @@ pub async fn list_alerts(
         // would return every anomaly config alongside the matching alerts.
         let before = list.len();
         list.extend(
-            configs
-                .iter()
-                .filter_map(anomaly_config_to_list_item)
+            anomaly_list_items(&org_id, &configs)
+                .await
+                .into_iter()
+                .filter(|item| enabled_filter.is_none_or(|enabled| item.enabled == enabled))
                 .filter(|item| match &priority_filter {
                     None => true,
                     // An empty set means "asked for priorities, none valid" —
@@ -1240,15 +3020,22 @@ pub async fn list_alerts(
         }
     }
 
-    // Apply pagination to the combined list (regular alerts + anomaly configs).
-    #[cfg(feature = "enterprise")]
-    let list = if let Some((page_size, page_idx)) = page_size_and_idx {
-        // Use saturating_mul to prevent u64 overflow before casting to usize.
-        let start = page_idx.saturating_mul(page_size) as usize;
-        list.into_iter()
-            .skip(start)
-            .take(page_size as usize)
-            .collect()
+    sort_merged_alert_list(&mut list, requested_sort.0, requested_sort.1);
+
+    // Apply pagination to the combined list. Single-kind lists were already
+    // paginated by the SQL query, so only re-paginate when extra kinds were
+    // merged in after it.
+    let list = if merges_extra {
+        if let Some((page_size, page_idx)) = page_size_and_idx {
+            // Use saturating_mul to prevent u64 overflow before casting to usize.
+            let start = page_idx.saturating_mul(page_size) as usize;
+            list.into_iter()
+                .skip(start)
+                .take(page_size as usize)
+                .collect()
+        } else {
+            list
+        }
     } else {
         list
     };
@@ -1256,9 +3043,212 @@ pub async fn list_alerts(
     // Enrich with durable run state (Part IV of alerts.md). One batched query
     // over the page that is actually being returned — not per alert.
     let mut list = list;
-    enrich_with_run_state(&mut list).await;
+    enrich_with_run_state(&org_id, &mut list).await;
+    enrich_with_composite_metadata(&org_id, &visibility, &mut list).await;
+    crate::models::alerts::responses::fill_active_downtimes(&org_id, &mut list).await;
+
+    // Feature-scoped fields: keep destinations/template off the default list path
+    // (bytes + module-scoped names) unless the dependency view explicitly opted in.
+    if !include_dependencies {
+        for item in &mut list {
+            item.destinations = Vec::new();
+            item.template = None;
+        }
+    }
 
     MetaHttpResponse::json(ListAlertsResponseBody { list })
+}
+
+/// Resolve the caller's visible alert/composite object set in one bulk query,
+/// mirroring `alert::list_v2`'s `permitted_alerts` path. `None` means "no
+/// filtering" (root user, OpenFGA disabled, or list-only-off), which is also the
+/// only result in OSS builds.
+async fn permitted_alert_visibility(
+    org_id: &str,
+    user_id: &str,
+) -> Option<(bool, hashbrown::HashSet<String>)> {
+    let permitted = alert::permitted_alerts(org_id, Some(user_id), None)
+        .await
+        .ok()
+        .flatten()?;
+    let is_all_permitted = permitted
+        .iter()
+        .any(|object| object == &format!("alert:_all_{org_id}"));
+    Some((is_all_permitted, permitted.into_iter().collect()))
+}
+
+/// Render a stored `{id}` expression with child IDs replaced by names; `None`
+/// when any operand is missing from `names`.
+fn name_resolved_expression(
+    expression: &str,
+    names: &hashbrown::HashMap<String, String>,
+) -> Option<String> {
+    let mut out = String::with_capacity(expression.len());
+    let mut rest = expression;
+    while let Some(open) = rest.find('{') {
+        let close = rest[open..].find('}')? + open;
+        out.push_str(&rest[..open]);
+        out.push_str(names.get(&rest[open + 1..close])?);
+        rest = &rest[close + 1..];
+    }
+    out.push_str(rest);
+
+    // Match the operator wording the detail page already renders, so the two
+    // views read the same for the same composite.
+    // `!` takes a TRAILING space only, exactly as the front-end helper does:
+    // a leading one turns `(!x)` into `( NOT x)`, which the detail page never
+    // renders, and the two views must read identically for one composite.
+    let spaced = out
+        .replace("&&", " AND ")
+        .replace("||", " OR ")
+        .replace('!', "NOT ");
+    Some(spaced.split_whitespace().collect::<Vec<_>>().join(" "))
+}
+
+fn visible_alert(
+    visibility: &Option<(bool, hashbrown::HashSet<String>)>,
+    id: &str,
+    folder_id: &str,
+    name: &str,
+) -> bool {
+    match visibility {
+        None => true,
+        Some((is_all_permitted, permitted)) => {
+            *is_all_permitted
+                || permitted.contains(&format!("alert:{}", name))
+                || permitted.contains(&format!("alert:{}/{}", folder_id, id))
+                || permitted.contains(&format!("alert:{}", id))
+        }
+    }
+}
+
+async fn enrich_with_composite_metadata(
+    org_id: &str,
+    visibility: &Option<(bool, hashbrown::HashSet<String>)>,
+    list: &mut [ListAlertsResponseBodyItem],
+) {
+    let db = get_orm_client_ro().await;
+
+    // Split the page by kind and resolve everything in bulk: one child-count
+    // query for composites and two reverse-reference queries, instead of a
+    // per-row `get_by_id` + `list_parents`.
+    let mut composite_ids = Vec::new();
+    let mut alert_ids = Vec::new();
+    for item in list.iter() {
+        if !matches!(item.alert_type.as_str(), "scheduled" | "slo" | "composite") {
+            continue;
+        }
+        let id = item.alert_id.to_string();
+        if item.alert_type == "composite" {
+            composite_ids.push(id);
+        } else {
+            alert_ids.push(id);
+        }
+    }
+
+    let child_counts = infra::table::alert_composites::children_count_for_many(db, &composite_ids)
+        .await
+        .unwrap_or_default();
+    let parents_for_composites = infra::table::alert_composites::list_parents_for_many(
+        db,
+        org_id,
+        infra::table::alert_composites::ChildKind::Composite,
+        &composite_ids,
+    )
+    .await
+    .unwrap_or_default();
+    let parents_for_alerts = infra::table::alert_composites::list_parents_for_many(
+        db,
+        org_id,
+        infra::table::alert_composites::ChildKind::Alert,
+        &alert_ids,
+    )
+    .await
+    .unwrap_or_default();
+
+    // Two more bulk resolutions for the expression summary: the composites'
+    // own definitions (for the stored `{id}` expression), then every operand
+    // those expressions mention, for the names. Operands come from the
+    // expression itself rather than a children query, so this needs no
+    // per-composite round trip.
+    let mut composite_expressions: hashbrown::HashMap<String, String> = hashbrown::HashMap::new();
+    let mut operand_ids: Vec<String> = Vec::new();
+    if !composite_ids.is_empty() {
+        let definitions = infra::table::alert_composites::resolve_many(db, org_id, &composite_ids)
+            .await
+            .unwrap_or_default();
+        for (id, resolution) in definitions {
+            if let infra::table::alert_composites::Resolution::Composite(composite) = resolution {
+                operand_ids.extend(
+                    composite
+                        .expression
+                        .split(['{', '}'])
+                        .skip(1)
+                        .step_by(2)
+                        .map(str::to_string),
+                );
+                composite_expressions.insert(id, composite.expression.clone());
+            }
+        }
+        operand_ids.sort_unstable();
+        operand_ids.dedup();
+    }
+
+    let mut visible_child_names: hashbrown::HashMap<String, String> = hashbrown::HashMap::new();
+    if !operand_ids.is_empty() {
+        let operands = infra::table::alert_composites::resolve_many(db, org_id, &operand_ids)
+            .await
+            .unwrap_or_default();
+        for (id, resolution) in operands {
+            let (name, folder_id) = match resolution {
+                infra::table::alert_composites::Resolution::Alert(alert) => {
+                    (alert.name.clone(), alert.folder_id.clone())
+                }
+                infra::table::alert_composites::Resolution::Composite(composite) => {
+                    (composite.name.clone(), composite.folder_id.clone())
+                }
+                _ => continue,
+            };
+            // Same gate as the reference counts above: a child the caller
+            // cannot read is left out, which drops the whole summary for any
+            // composite that mentions it.
+            if visible_alert(visibility, &id, &folder_id, &name) {
+                visible_child_names.insert(id, name);
+            }
+        }
+    }
+
+    for item in list.iter_mut() {
+        if !matches!(item.alert_type.as_str(), "scheduled" | "slo" | "composite") {
+            continue;
+        }
+        let id = item.alert_id.to_string();
+        if item.alert_type == "composite" {
+            // Every listed composite exists; a composite with no child rows
+            // still reports zero, matching the old per-row `children.len()`.
+            item.child_count = Some(child_counts.get(&id).copied().unwrap_or(0));
+            item.expression_summary = composite_expressions
+                .get(&id)
+                .and_then(|expression| name_resolved_expression(expression, &visible_child_names));
+        }
+        let parents = if item.alert_type == "composite" {
+            &parents_for_composites
+        } else {
+            &parents_for_alerts
+        };
+        let readable = parents
+            .get(&id)
+            .map(|parents| {
+                parents
+                    .iter()
+                    .filter(|parent| {
+                        visible_alert(visibility, &parent.id, &parent.folder_id, &parent.name)
+                    })
+                    .count()
+            })
+            .unwrap_or(0);
+        item.referenced_by_composite_count = Some(readable);
+    }
 }
 
 /// Attach `last_outcome` / `last_outcome_at` / `last_outcome_since` to a page of
@@ -1269,7 +3259,6 @@ pub async fn list_alerts(
 /// Re-sort a merged (regular + anomaly) list the way the SQL ORDER BY sorts
 /// the regular one (PT-3): unset priority LAST in both directions, ties broken
 /// on (name, folder name, id) so pagination stays a total order.
-#[cfg(feature = "enterprise")]
 fn sort_merged_alert_list(
     list: &mut [ListAlertsResponseBodyItem],
     sort_by: Option<config::meta::alerts::alert::AlertSortField>,
@@ -1315,7 +3304,29 @@ fn sort_merged_alert_list(
     }
 }
 
-async fn enrich_with_run_state(list: &mut [ListAlertsResponseBodyItem]) {
+/// Each group's ack in force on its current firing.
+async fn group_acks(
+    org_id: &str,
+    alert_id: &str,
+    groups: &[config::meta::alerts::state::AlertState],
+) -> std::collections::HashMap<String, config::meta::alerts::ack::AckView> {
+    if !groups.iter().any(|g| g.firing_started_at.is_some()) {
+        return Default::default();
+    }
+    let acks = infra::table::alert_acks::list_for_alert(org_id, alert_id)
+        .await
+        .unwrap_or_default();
+    let firing: std::collections::HashMap<&str, Option<i64>> = groups
+        .iter()
+        .map(|g| (g.group_key.as_str(), g.firing_started_at))
+        .collect();
+    acks.into_iter()
+        .filter(|a| a.in_force_for(firing.get(a.group_key.as_str()).copied().flatten()))
+        .map(|a| (a.group_key.clone(), a.view()))
+        .collect()
+}
+
+async fn enrich_with_run_state(org_id: &str, list: &mut [ListAlertsResponseBodyItem]) {
     if list.is_empty() {
         return;
     }
@@ -1351,6 +3362,82 @@ async fn enrich_with_run_state(list: &mut [ListAlertsResponseBodyItem]) {
             item.groups_firing = state.groups_firing.and_then(|n| i32::try_from(n).ok());
             item.groups_observed_is_lower_bound = state.groups_observed_is_lower_bound;
             item.groups_firing_is_lower_bound = state.groups_firing_is_lower_bound;
+            item.firing_started_at = state.firing_started_at;
+        }
+    }
+    enrich_with_acks(org_id, list, &by_id).await;
+    #[cfg(feature = "enterprise")]
+    enrich_with_incidents(org_id, list, &by_id).await;
+}
+
+/// The list's ack chips: one read of every listed alert's acks, matched to each firing.
+async fn enrich_with_acks(
+    org_id: &str,
+    list: &mut [ListAlertsResponseBodyItem],
+    rollups: &std::collections::HashMap<String, config::meta::alerts::state::AlertState>,
+) {
+    let ids: Vec<String> = list.iter().map(|i| i.alert_id.to_string()).collect();
+    let acks = match infra::table::alert_acks::list_for_alerts(org_id, &ids).await {
+        Ok(a) => a,
+        Err(e) => {
+            log::warn!("failed to load alert acks for list: {e}");
+            return;
+        }
+    };
+    let mut by_alert: std::collections::HashMap<String, Vec<config::meta::alerts::ack::AlertAck>> =
+        Default::default();
+    for a in acks {
+        by_alert.entry(a.alert_id.clone()).or_default().push(a);
+    }
+    for item in list.iter_mut() {
+        let id = item.alert_id.to_string();
+        let Some(acks) = by_alert.get(&id) else {
+            continue;
+        };
+        let mut firing: std::collections::HashMap<String, i64> = Default::default();
+        if let Some(started) = rollups.get(&id).and_then(|r| r.firing_started_at) {
+            firing.insert(
+                config::meta::alerts::state::ROLLUP_GROUP_KEY.to_string(),
+                started,
+            );
+        }
+        if acks.iter().any(|a| !a.group_key.is_empty()) {
+            let keys: Vec<String> = acks.iter().map(|a| a.group_key.clone()).collect();
+            if let Ok(rows) = infra::table::alert_states::firing_groups(&id, Some(&keys)).await {
+                firing.extend(rows);
+            }
+        }
+        item.ack = openobserve_core::alerts::ack::summary(acks, &firing);
+    }
+}
+
+/// The incident each firing alert's current episode belongs to (MK-1's Incident tile).
+#[cfg(feature = "enterprise")]
+async fn enrich_with_incidents(
+    org_id: &str,
+    list: &mut [ListAlertsResponseBodyItem],
+    rollups: &std::collections::HashMap<String, config::meta::alerts::state::AlertState>,
+) {
+    use crate::models::alerts::responses::AlertIncidentLink;
+
+    for item in list.iter_mut() {
+        let id = item.alert_id.to_string();
+        let Some(rollup) = rollups.get(&id).filter(|r| r.is_firing()) else {
+            continue;
+        };
+        let model = match rollup.episode_incident_id.as_deref() {
+            Some(incident_id) => infra::table::alert_incidents::get(org_id, incident_id).await,
+            None => {
+                infra::table::alert_incidents::find_open_incident_containing_alert(org_id, &id)
+                    .await
+            }
+        };
+        if let Ok(Some(m)) = model {
+            item.incident = Some(AlertIncidentLink {
+                id: m.id,
+                title: m.title,
+                status: m.status.parse().unwrap_or_default(),
+            });
         }
     }
 }
@@ -1385,6 +3472,7 @@ async fn enrich_with_run_state(list: &mut [ListAlertsResponseBodyItem]) {
 pub async fn enable_alert(
     Path((org_id, alert_id)): Path<(String, String)>,
     Query(query): Query<EnableAlertQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     let alert_id = match Ksuid::from_str(&alert_id) {
         Ok(id) => id,
@@ -1393,7 +3481,21 @@ pub async fn enable_alert(
         }
     };
     let should_enable = query.value;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    #[cfg(feature = "enterprise")]
+    if should_enable
+        && let Err(resp) = openobserve_core::background_access::guard_loaded(
+            &org_id,
+            &user_email.user_id,
+            openobserve_core::background_access::stored_alert_sources(
+                &org_id,
+                &alert_id.to_string(),
+            ),
+        )
+        .await
+    {
+        return resp;
+    }
+    let client = get_orm_client_rw().await;
     match alert::enable_by_id(client, &org_id, alert_id, should_enable).await {
         Ok(_) => {
             let resp_body = EnableAlertResponseBody {
@@ -1402,6 +3504,35 @@ pub async fn enable_alert(
             MetaHttpResponse::json(resp_body)
         }
         Err(AlertError::AlertNotFound) => {
+            if let Some(_composite) =
+                openobserve_core::alerts::composite::get_composite(&org_id, &alert_id.to_string())
+                    .await
+                    .ok()
+                    .flatten()
+            {
+                #[cfg(feature = "enterprise")]
+                if composite_subject_unauthorized(
+                    &_composite.definition,
+                    &user_email.user_id,
+                    "PUT",
+                )
+                .await
+                {
+                    return MetaHttpResponse::forbidden("Unauthorized Access");
+                }
+                return match openobserve_core::alerts::composite::set_composite_enabled(
+                    &org_id,
+                    &alert_id.to_string(),
+                    should_enable,
+                )
+                .await
+                {
+                    Ok(()) => MetaHttpResponse::json(EnableAlertResponseBody {
+                        enabled: should_enable,
+                    }),
+                    Err(error) => composite_error_response(error),
+                };
+            }
             #[cfg(not(feature = "enterprise"))]
             {
                 MetaHttpResponse::not_found(format!("alert {alert_id} not found"))
@@ -1502,13 +3633,57 @@ pub async fn enable_alert_bulk(
     let mut unsuccessful = Vec::with_capacity(req.ids.len());
     let mut err = None;
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     for id in req.ids {
+        #[cfg(feature = "enterprise")]
+        if should_enable
+            && let Some(message) = openobserve_core::background_access::loaded_denial_message(
+                &org_id,
+                &user_email.user_id,
+                openobserve_core::background_access::stored_alert_sources(&org_id, &id.to_string()),
+            )
+            .await
+        {
+            unsuccessful.push(id);
+            err = Some(message);
+            continue;
+        }
         match alert::enable_by_id(client, &org_id, id, should_enable).await {
             Ok(_) => {
                 successful.push(id);
             }
             Err(AlertError::AlertNotFound) => {
+                if let Some(_composite) =
+                    openobserve_core::alerts::composite::get_composite(&org_id, &id.to_string())
+                        .await
+                        .ok()
+                        .flatten()
+                {
+                    #[cfg(feature = "enterprise")]
+                    if composite_subject_unauthorized(
+                        &_composite.definition,
+                        &user_email.user_id,
+                        "PUT",
+                    )
+                    .await
+                    {
+                        return MetaHttpResponse::forbidden("Unauthorized Access");
+                    }
+                    match openobserve_core::alerts::composite::set_composite_enabled(
+                        &org_id,
+                        &id.to_string(),
+                        should_enable,
+                    )
+                    .await
+                    {
+                        Ok(()) => successful.push(id),
+                        Err(error) => {
+                            unsuccessful.push(id);
+                            err = Some(error.to_string());
+                        }
+                    }
+                    continue;
+                }
                 #[cfg(not(feature = "enterprise"))]
                 {
                     unsuccessful.push(id);
@@ -1560,7 +3735,7 @@ pub async fn enable_alert_bulk(
     tag = "Alerts",
     operation_id = "TriggerAlert",
     summary = "Manually trigger alert",
-    description = "Manually triggers an alert to test its functionality and notification delivery. Useful for testing alert configurations, verifying notification channels, and ensuring alerts work as expected before relying on them for monitoring.",
+    description = "Manually triggers an alert to test its functionality and notification delivery. Useful for testing alert configurations, verifying notification channels, and ensuring alerts work as expected before relying on them for monitoring. For an anomaly detection alert it runs detection now and returns `message`, `claim_lost`, `ineligible`, `anomaly_id`, `anomalies_found`, `points_scored` and `anomalies`; `claim_lost: true` means another detection run for this alert is in progress, and `ineligible: true` means the detector is disabled or untrained (`message` says which), so nothing was scored.",
     security(
         ("Authorization"= [])
     ),
@@ -1570,7 +3745,7 @@ pub async fn enable_alert_bulk(
         ("folder" = Option<String>, Query, description = "Folder ID (Required if RBAC enabled)"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success; for an anomaly alert, the detection result (see description)", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
@@ -1579,17 +3754,56 @@ pub async fn enable_alert_bulk(
         ("x-o2-mcp" = json!({"description": "Manually trigger an alert", "category": "alerts"}))
     )
 )]
-pub async fn trigger_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Response {
+pub async fn trigger_alert(
+    Path((org_id, alert_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
     let alert_id = match Ksuid::from_str(&alert_id) {
         Ok(id) => id,
         Err(_) => {
             return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
         }
     };
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = openobserve_core::background_access::guard_loaded(
+        &org_id,
+        &user_email.user_id,
+        openobserve_core::background_access::stored_alert_sources(&org_id, &alert_id.to_string()),
+    )
+    .await
+    {
+        return resp;
+    }
+    let client = get_orm_client_ro().await;
     match alert::trigger_by_id(client, &org_id, alert_id).await {
-        Ok(_) => MetaHttpResponse::ok("Alert triggered"),
+        Ok(triggered) => MetaHttpResponse::ok(triggered.response_message()),
         Err(AlertError::AlertNotFound) => {
+            if let Some(_composite) =
+                openobserve_core::alerts::composite::get_composite(&org_id, &alert_id.to_string())
+                    .await
+                    .ok()
+                    .flatten()
+            {
+                #[cfg(feature = "enterprise")]
+                if composite_subject_unauthorized(
+                    &_composite.definition,
+                    &user_email.user_id,
+                    "PUT",
+                )
+                .await
+                {
+                    return MetaHttpResponse::forbidden("Unauthorized Access");
+                }
+                return match openobserve_core::alerts::composite::trigger_composite(
+                    &org_id,
+                    &alert_id.to_string(),
+                )
+                .await
+                {
+                    Ok(()) => MetaHttpResponse::ok("Alert triggered"),
+                    Err(error) => composite_error_response(error),
+                };
+            }
             #[cfg(not(feature = "enterprise"))]
             {
                 MetaHttpResponse::not_found(format!("alert {alert_id} not found"))
@@ -1603,7 +3817,8 @@ pub async fn trigger_alert(Path((org_id, alert_id)): Path<(String, String)>) -> 
                 )
                 .await
                 {
-                    Ok(_) => MetaHttpResponse::ok("Detection triggered"),
+                    // The reply carries `claim_lost`, so an in-flight run is not shown as fresh.
+                    Ok(result) => MetaHttpResponse::json(result),
                     Err(e) => {
                         let msg = e.to_string().to_lowercase();
                         if msg.contains("not found") {
@@ -1645,7 +3860,10 @@ pub async fn trigger_alert(Path((org_id, alert_id)): Path<(String, String)>) -> 
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
     )
 )]
-pub async fn retrain_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Response {
+pub async fn retrain_alert(
+    Path((org_id, alert_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
     #[cfg(feature = "enterprise")]
     let alert_id_str = alert_id.clone();
     let alert_id = match Ksuid::from_str(&alert_id) {
@@ -1654,7 +3872,7 @@ pub async fn retrain_alert(Path((org_id, alert_id)): Path<(String, String)>) -> 
             return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
         }
     };
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     // Check if this is a regular alert — if so, return 400
     match alert::get_by_id(client, &org_id, alert_id).await {
         Ok(_) => {
@@ -1670,6 +3888,16 @@ pub async fn retrain_alert(Path((org_id, alert_id)): Path<(String, String)>) -> 
     #[cfg(not(feature = "enterprise"))]
     {
         MetaHttpResponse::bad_request("retrain is only supported for anomaly detection alerts")
+    }
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = openobserve_core::background_access::guard_loaded(
+        &org_id,
+        &user_email.user_id,
+        openobserve_core::background_access::runnable_anomaly_sources(&org_id, &alert_id_str),
+    )
+    .await
+    {
+        return resp;
     }
     #[cfg(feature = "enterprise")]
     match openobserve_core::anomaly_detection::train_model(&org_id, &alert_id_str).await {
@@ -1704,6 +3932,7 @@ pub async fn retrain_alert(Path((org_id, alert_id)): Path<(String, String)>) -> 
     request_body(content = inline(MoveAlertsRequestBody), description = "Identifies alerts and the destination folder", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
@@ -1717,20 +3946,87 @@ pub async fn move_alerts(
     Headers(user_email): Headers<UserEmail>,
     Json(req_body): Json<MoveAlertsRequestBody>,
 ) -> Response {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let total_ids = req_body.alert_ids.len() + req_body.anomaly_config_ids.len();
 
     // anomaly_config_ids is now a required Vec (defaults to empty), so no
-    // per-ID DB lookups are needed to classify IDs.
-    let alert_ids: Vec<Ksuid> = req_body.alert_ids;
+    // per-ID DB lookups are needed to classify those. Composite IDs are
+    // resolved once into a set so the bulk move doesn't pay a per-ID
+    // `get_composite` lookup.
+    let composite_id_set: std::collections::HashSet<String> =
+        infra::table::alert_composites::list_by_org(client, &org_id)
+            .await
+            .map(|definitions| {
+                definitions
+                    .into_iter()
+                    .map(|definition| definition.id)
+                    .collect()
+            })
+            .unwrap_or_default();
+    let mut alert_ids: Vec<Ksuid> = Vec::new();
+    let mut composite_ids = Vec::new();
+    for id in req_body.alert_ids {
+        if composite_id_set.contains(&id.to_string()) {
+            composite_ids.push(id);
+        } else {
+            alert_ids.push(id);
+        }
+    }
     #[cfg(feature = "enterprise")]
     let anomaly_ids: Vec<Ksuid> = req_body.anomaly_config_ids;
+
+    // The route is bypass:true, so the destination is only authorized here — the
+    // anomaly and composite branches below have no folder check of their own.
+    #[cfg(feature = "enterprise")]
+    if !check_folder_write_permissions(
+        &org_id,
+        &user_email.user_id,
+        "alert_folders",
+        &req_body.dst_folder_id,
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
 
     // Move anomaly configs first (enterprise only) so that if this fails,
     // regular alerts have not yet been relocated (reduces partial-move risk).
     #[cfg(feature = "enterprise")]
     for id in anomaly_ids {
         use openobserve_core::anomaly_detection::UpdateAnomalyConfigRequest;
+        // Source side: `update_config` performs no check of its own, so without
+        // this a caller could pull a config out of a folder they cannot reach.
+        let id_str = id.to_string();
+        // Fail closed: a read error or a config without a folder must deny, not
+        // skip the check and let the move through.
+        let src_folder = match openobserve_core::anomaly_detection::get_config(&org_id, &id_str)
+            .await
+        {
+            Ok(Some(cfg)) => cfg
+                .get("folder_id")
+                .and_then(|f| f.as_str())
+                .map(str::to_string),
+            Ok(None) => return MetaHttpResponse::not_found(format!("alert {id_str} not found")),
+            Err(e) => return MetaHttpResponse::internal_error(e.to_string()),
+        };
+        let Some(src_folder) = src_folder else {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        };
+        if !check_permissions(
+            &id_str,
+            &org_id,
+            &user_email.user_id,
+            "alerts",
+            "PUT",
+            Some(&src_folder),
+            false,
+            true,
+            false,
+        )
+        .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
         let req = UpdateAnomalyConfigRequest {
             folder_id: Some(req_body.dst_folder_id.clone()),
             ..Default::default()
@@ -1759,6 +4055,18 @@ pub async fn move_alerts(
         .await
     {
         return e.into();
+    }
+    for id in composite_ids {
+        if let Err(error) = openobserve_core::alerts::composite::move_composite(
+            &org_id,
+            &id.to_string(),
+            &req_body.dst_folder_id,
+            &user_email.user_id,
+        )
+        .await
+        {
+            return composite_error_response(error);
+        }
     }
 
     let message = if total_ids == 1 {
@@ -1862,6 +4170,23 @@ pub async fn generate_sql(
         ),
     );
 
+    let user_sql = match resolve_generate_sql(&query_condition) {
+        Ok(v) => v,
+        Err(e) => return e.into(),
+    };
+    if let Some(sql) = user_sql {
+        // Unparseable user SQL cannot prove a GROUP BY, so report false instead of failing.
+        let has_group_by = config::utils::sql::is_group_by_query(&sql).unwrap_or(false);
+        return MetaHttpResponse::json(GenerateSqlResponseBody {
+            sql,
+            metadata: Some(GenerateSqlMetadata {
+                has_aggregation: query_condition.aggregation.is_some(),
+                has_conditions: conditions.len().await > 0,
+                has_group_by,
+            }),
+        });
+    }
+
     // Call the existing build_sql function from service layer
     match build_sql(
         &org_id,
@@ -1906,10 +4231,74 @@ pub async fn generate_sql(
     }
 }
 
+// `None` means fall through to build_sql; families that run no SQL are refused rather
+// than silently answered with a generated `SELECT *`.
+fn resolve_generate_sql(
+    query_condition: &config::meta::alerts::QueryCondition,
+) -> Result<Option<String>, AlertError> {
+    use config::meta::alerts::QueryType;
+
+    match query_condition.query_type {
+        QueryType::Custom => Ok(None),
+        QueryType::SQL => {
+            let Some(sql) = query_condition.sql.as_ref().filter(|s| !s.is_empty()) else {
+                return Err(AlertError::SqlMissingQuery);
+            };
+            if search::sql::RE_ONLY_SELECT.is_match(sql) {
+                return Err(AlertError::SqlContainsSelectStar);
+            }
+            Ok(Some(sql.clone()))
+        }
+        QueryType::PromQL => Err(AlertError::SqlUnsupportedQueryType {
+            query_type: "PromQL",
+        }),
+        QueryType::Slo => Err(AlertError::SqlUnsupportedQueryType { query_type: "SLO" }),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use axum::{http::StatusCode, response::Response};
+    use config::meta::alerts::{QueryCondition, QueryType};
     use openobserve_core::alerts::alert::AlertError;
+    use svix_ksuid::KsuidLike;
+
+    use super::{
+        BulkDeleteRequest, HashMap, Headers, Json, Ksuid, Path, Query, UserEmail,
+        delete_alert_bulk, resolve_generate_sql,
+    };
+
+    /// Exporting `last_failed_at` hands an importer a backoff anchor for a model it never ran.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_export_strips_last_failed_at_with_the_rest_of_the_runtime_state() {
+        let mut config = serde_json::json!({
+            "anomaly_id": "a1",
+            "name": "keep me",
+            "threshold": 95,
+            "is_trained": true,
+            "training_started_at": 1_700_000_000_000_000i64,
+            "training_completed_at": 1_700_000_000_000_000i64,
+            "last_processed_timestamp": 1_700_000_000_000_000i64,
+            "current_model_version": 7,
+            "status": 3,
+            "last_error": "boom",
+            "retries": 4,
+            "last_failed_at": 1_700_000_000_000_000i64,
+            "last_alert_fired_at": 1_700_000_000_000_000i64,
+            "last_recovery_notified_at": 1_700_000_000_000_000i64,
+        });
+
+        super::strip_anomaly_runtime_state(config.as_object_mut().unwrap());
+
+        let left: Vec<&str> = config
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        assert_eq!(left, vec!["anomaly_id", "name", "threshold"]);
+    }
 
     fn status(err: AlertError) -> StatusCode {
         Response::from(err).status()
@@ -1936,14 +4325,6 @@ mod tests {
     fn test_alert_name_ofga_unsupported_is_bad_request() {
         assert_eq!(
             status(AlertError::AlertNameOfgaUnsupported),
-            StatusCode::BAD_REQUEST
-        );
-    }
-
-    #[test]
-    fn test_alert_destination_missing_is_bad_request() {
-        assert_eq!(
-            status(AlertError::AlertDestinationMissing),
             StatusCode::BAD_REQUEST
         );
     }
@@ -2149,6 +4530,48 @@ mod tests {
     }
 
     #[test]
+    fn test_frequency_out_of_range_is_bad_request() {
+        assert_eq!(
+            status(AlertError::FrequencyOutOfRange),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_silence_out_of_range_is_bad_request() {
+        assert_eq!(
+            status(AlertError::SilenceOutOfRange),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_tolerance_out_of_range_is_bad_request() {
+        assert_eq!(
+            status(AlertError::ToleranceOutOfRange),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_tz_offset_out_of_range_is_bad_request() {
+        assert_eq!(
+            status(AlertError::TzOffsetOutOfRange),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_cron_has_no_future_occurrence_is_bad_request() {
+        assert_eq!(
+            status(AlertError::CronHasNoFutureOccurrence {
+                cron: "0 0 0 1 1 * 2020".to_string()
+            }),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
     fn test_get_destination_with_template_error_is_internal_server_error() {
         use db::alerts::destinations::DestinationError;
         assert_eq!(
@@ -2157,5 +4580,443 @@ mod tests {
             )),
             StatusCode::INTERNAL_SERVER_ERROR
         );
+    }
+
+    fn query_condition(query_type: QueryType, sql: Option<&str>) -> QueryCondition {
+        QueryCondition {
+            query_type,
+            sql: sql.map(str::to_string),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn generate_sql_returns_the_users_sql_for_sql_query_type() {
+        let qc = query_condition(QueryType::SQL, Some("SELECT count(*) FROM \"logs\""));
+        let resolved = resolve_generate_sql(&qc).unwrap();
+        assert_eq!(
+            resolved,
+            Some("SELECT count(*) FROM \"logs\"".to_string()),
+            "SQL-type conditions must not be discarded in favour of SELECT *"
+        );
+    }
+
+    #[test]
+    fn generate_sql_rejects_sql_query_type_with_no_query() {
+        assert!(matches!(
+            resolve_generate_sql(&query_condition(QueryType::SQL, None)),
+            Err(AlertError::SqlMissingQuery)
+        ));
+        assert!(matches!(
+            resolve_generate_sql(&query_condition(QueryType::SQL, Some(""))),
+            Err(AlertError::SqlMissingQuery)
+        ));
+    }
+
+    #[test]
+    fn generate_sql_rejects_sql_query_type_containing_select_star() {
+        assert!(matches!(
+            resolve_generate_sql(&query_condition(
+                QueryType::SQL,
+                Some("SELECT * FROM \"logs\"")
+            )),
+            Err(AlertError::SqlContainsSelectStar)
+        ));
+    }
+
+    #[test]
+    fn generate_sql_defers_to_the_builder_for_custom_query_type() {
+        // None means "no user-supplied SQL", i.e. the caller falls through to build_sql.
+        assert_eq!(
+            resolve_generate_sql(&query_condition(QueryType::Custom, None)).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn generate_sql_rejects_promql_and_slo_rather_than_emitting_select_star() {
+        // A query is supplied so the rejection is provably about the TYPE, not a missing
+        // query — otherwise SqlMissingQuery would satisfy a bare is_err().
+        for ty in [QueryType::PromQL, QueryType::Slo] {
+            let err = resolve_generate_sql(&query_condition(ty, Some("SELECT 1")))
+                .expect_err("must not silently fall through to SELECT *");
+            assert_ne!(
+                err.to_string(),
+                AlertError::SqlMissingQuery.to_string(),
+                "rejected for the wrong reason"
+            );
+            assert_eq!(status(err), StatusCode::BAD_REQUEST);
+        }
+    }
+
+    #[tokio::test]
+    async fn bulk_delete_refuses_an_invalid_id_instead_of_panicking() {
+        let valid = Ksuid::new(None, None).to_string();
+        for ids in [
+            vec!["not-a-ksuid".to_string()],
+            vec![valid, "not-a-ksuid".to_string()],
+        ] {
+            let resp = delete_alert_bulk(
+                Path("default".to_string()),
+                Query(HashMap::new()),
+                Headers(UserEmail {
+                    user_id: "user@example.com".to_string(),
+                }),
+                Json(BulkDeleteRequest { ids: ids.clone() }),
+            )
+            .await;
+            assert_eq!(
+                resp.status(),
+                StatusCode::BAD_REQUEST,
+                "{ids:?} must be refused with a 400"
+            );
+        }
+    }
+
+    mod name_resolved_expression {
+        use super::super::name_resolved_expression;
+
+        fn names(pairs: &[(&str, &str)]) -> hashbrown::HashMap<String, String> {
+            pairs
+                .iter()
+                .map(|(id, name)| (id.to_string(), name.to_string()))
+                .collect()
+        }
+
+        #[test]
+        fn resolves_operands_and_spells_out_operators() {
+            let map = names(&[("a1", "checkout_errors"), ("b2", "db_latency")]);
+            assert_eq!(
+                name_resolved_expression("({a1} && {b2})", &map).unwrap(),
+                // Parens stay tight against the operand, matching the
+                // front-end's nameResolvedExpression for the same input.
+                "(checkout_errors AND db_latency)"
+            );
+            assert_eq!(
+                name_resolved_expression("{a1} || !{b2}", &map).unwrap(),
+                "checkout_errors OR NOT db_latency"
+            );
+        }
+
+        #[test]
+        fn a_negated_operand_inside_a_group_reads_cleanly() {
+            // The backend canonicalises `a && !b` into a nested form, so this
+            // shape is what the list actually renders, not a synthetic case.
+            let map = names(&[("a1", "checkout_errors"), ("b2", "db_latency")]);
+            assert_eq!(
+                name_resolved_expression("({a1} && (!{b2}))", &map).unwrap(),
+                "(checkout_errors AND (NOT db_latency))"
+            );
+        }
+
+        #[test]
+        fn drops_the_summary_when_any_child_is_not_readable() {
+            // The whole string is withheld rather than partially rendered: a
+            // summary naming one of two children is worse than none, and a
+            // placeholder would still confirm the hidden alert exists.
+            let map = names(&[("a1", "checkout_errors")]);
+            assert!(name_resolved_expression("{a1} && {b2}", &map).is_none());
+        }
+
+        #[test]
+        fn leaves_a_malformed_expression_alone_instead_of_panicking() {
+            let map = names(&[("a1", "checkout_errors")]);
+            assert!(name_resolved_expression("{a1", &map).is_none());
+        }
+
+        #[test]
+        fn a_name_containing_braces_cannot_break_the_next_operand() {
+            // Substitution walks the source once and never re-scans what it
+            // wrote, so a brace inside a name is inert rather than being
+            // treated as the start of another operand.
+            let map = names(&[("a1", "weird{b2}name"), ("b2", "second")]);
+            assert_eq!(
+                name_resolved_expression("{a1} && {b2}", &map).unwrap(),
+                "weird{b2}name AND second"
+            );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    mod stream_access {
+        use axum::{
+            Json,
+            body::to_bytes,
+            extract::{OriginalUri, Path},
+            http::{StatusCode, Uri},
+        };
+        use config::meta::stream::StreamType;
+        use openobserve_api_common::extractors::Headers;
+        use openobserve_core::{
+            auth::UserEmail,
+            authz::{QuerySource, TypedStream, fake_checker},
+            background_access::{anomaly_sources, guard_write},
+        };
+        use serde_json::json;
+
+        use super::super::*;
+
+        fn user() -> String {
+            format!("{}@example.com", config::ider::uuid())
+        }
+
+        fn logs(org: &str, name: &str) -> TypedStream {
+            TypedStream {
+                org_id: org.to_string(),
+                stream_type: StreamType::Logs,
+                name: name.to_string(),
+            }
+        }
+
+        async fn create(
+            org: &str,
+            user: &str,
+            body: serde_json::Value,
+        ) -> (StatusCode, serde_json::Value) {
+            let resp = create_alert(
+                Path(org.to_string()),
+                OriginalUri(Uri::from_static("/api/v2/org/alerts")),
+                Headers(UserEmail {
+                    user_id: user.to_string(),
+                }),
+                Json(serde_json::from_value(body).unwrap()),
+            )
+            .await;
+            json_body(resp).await
+        }
+
+        async fn json_body(resp: Response) -> (StatusCode, serde_json::Value) {
+            let status = resp.status();
+            let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+            (status, serde_json::from_slice(&bytes).unwrap_or_default())
+        }
+
+        async fn guard_body(
+            org: &str,
+            user: &str,
+            body: serde_json::Value,
+        ) -> (StatusCode, serde_json::Value) {
+            let req: CreateAlertRequestBody = serde_json::from_value(body).unwrap();
+            let alert: MetaAlert = req.into();
+            match guard_write(org, user, &alert_sources(org, &alert)).await {
+                Ok(()) => (StatusCode::OK, serde_json::Value::Null),
+                Err(resp) => json_body(resp).await,
+            }
+        }
+
+        #[tokio::test]
+        async fn alert_denied_stream_is_refused() {
+            let caller = user();
+            fake_checker().grant_read(&caller, &logs("sa_org1", "allowed"));
+            let (status, body) = guard_body(
+                "sa_org1",
+                &caller,
+                json!({
+                    "name": "a1",
+                    "stream_type": "logs",
+                    "stream_name": "secret",
+                    "query_condition": {
+                        "type": "sql",
+                        "sql": "SELECT * FROM secret JOIN allowed ON true JOIN other ON true"
+                    }
+                }),
+            )
+            .await;
+            assert_eq!(status, StatusCode::FORBIDDEN);
+            assert_eq!(
+                body["message"],
+                "Unauthorized Access: no read permission on logs/secret, logs/other"
+            );
+            assert!(body["hint"].as_str().is_some_and(|h| !h.is_empty()));
+        }
+
+        #[tokio::test]
+        async fn the_save_validation_answers_before_the_stream_check() {
+            fake_checker();
+            let caller = user();
+            let (status, body) = create(
+                "sa_org1",
+                &caller,
+                json!({"name": "a:4", "stream_type": "logs", "stream_name": "secret",
+                       "query_condition": {"type": "sql", "sql": "SELECT * FROM secret"}}),
+            )
+            .await;
+            assert_eq!(status, StatusCode::BAD_REQUEST);
+            assert_eq!(
+                body["message"],
+                AlertError::AlertNameOfgaUnsupported.to_string()
+            );
+        }
+
+        #[tokio::test]
+        async fn custom_and_promql_alerts_are_refused_on_their_streams() {
+            fake_checker();
+            let caller = user();
+            let (status, body) = guard_body(
+                "sa_org1",
+                &caller,
+                json!({"name": "a2", "stream_type": "logs", "stream_name": "secret",
+                       "query_condition": {"type": "custom"}}),
+            )
+            .await;
+            assert_eq!(status, StatusCode::FORBIDDEN);
+            assert_eq!(
+                body["message"],
+                "Unauthorized Access: no read permission on logs/secret"
+            );
+
+            let (status, body) = guard_body(
+                "sa_org1",
+                &caller,
+                json!({"name": "a3", "stream_type": "metrics", "stream_name": "cpu",
+                       "query_condition": {"type": "promql", "promql": "cpu / mem"}}),
+            )
+            .await;
+            assert_eq!(status, StatusCode::FORBIDDEN);
+            assert_eq!(
+                body["message"],
+                "Unauthorized Access: no read permission on metrics/cpu, metrics/mem"
+            );
+        }
+
+        #[tokio::test]
+        async fn decrypt_key_without_permission_is_refused() {
+            let caller = user();
+            fake_checker().grant_read(&caller, &logs("sa_org1", "app"));
+            let sources = [QuerySource::Sql {
+                org_id: "sa_org1".to_string(),
+                sql: "SELECT decrypt(body, 'vault_key') FROM app".to_string(),
+                default_type: StreamType::Logs,
+            }];
+            let resp = guard_write("sa_org1", &caller, &sources).await.unwrap_err();
+            let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+            let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(
+                body["message"],
+                "Unauthorized Access: cipher keys: vault_key"
+            );
+
+            fake_checker().grant_cipher_key("sa_org1", &caller, "vault_key");
+            assert!(guard_write("sa_org1", &caller, &sources).await.is_ok());
+        }
+
+        #[tokio::test]
+        async fn readable_alert_body_passes_the_guard() {
+            let caller = user();
+            fake_checker().grant_read(&caller, &logs("sa_org1", "app"));
+            let mut alert = MetaAlert::default();
+            alert.stream_name = "app".to_string();
+            alert.query_condition.query_type = config::meta::alerts::QueryType::SQL;
+            alert.query_condition.sql = Some("SELECT count(*) FROM app".to_string());
+            let sources = openobserve_core::background_access::alert_sources("sa_org1", &alert);
+            assert!(guard_write("sa_org1", &caller, &sources).await.is_ok());
+        }
+
+        #[tokio::test]
+        async fn org_admin_and_root_pass_and_admin_shortcut_stays_in_its_org() {
+            let admin = user();
+            fake_checker().grant_admin("sa_org1", &admin);
+            let own = anomaly_sources("sa_org1", "logs", "secret", Some("SELECT * FROM other"));
+            assert!(guard_write("sa_org1", &admin, &own).await.is_ok());
+            let foreign = [QuerySource::Stream {
+                org_id: "sa_org2".to_string(),
+                stream_type: StreamType::Logs,
+                name: "secret".to_string(),
+            }];
+            assert!(guard_write("sa_org1", &admin, &foreign).await.is_err());
+
+            let root = user();
+            fake_checker().grant_root(&root);
+            assert!(guard_write("sa_org1", &root, &foreign).await.is_ok());
+        }
+
+        #[tokio::test]
+        async fn undecodable_vrl_adds_no_source_so_the_save_answers_its_own_400() {
+            let caller = user();
+            fake_checker().grant_read(&caller, &logs("sa_org1", "app"));
+            let mut alert = MetaAlert::default();
+            alert.stream_name = "app".to_string();
+            alert.query_condition.query_type = config::meta::alerts::QueryType::Custom;
+            alert.query_condition.vrl_function = Some("%%%".to_string());
+            let sources = openobserve_core::background_access::alert_sources("sa_org1", &alert);
+            assert!(guard_write("sa_org1", &caller, &sources).await.is_ok());
+        }
+
+        #[tokio::test]
+        async fn anomaly_denied_custom_sql_is_refused() {
+            let caller = user();
+            fake_checker().grant_read(&caller, &logs("sa_org1", "app"));
+            let sources = anomaly_sources("sa_org1", "logs", "app", Some("SELECT * FROM secret"));
+            let resp = guard_write("sa_org1", &caller, &sources).await.unwrap_err();
+            assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+        }
+
+        #[test]
+        fn a_composite_keeps_the_owner_its_body_names() {
+            let req: CreateAlertRequestBody = serde_json::from_value(json!({
+                "name": "c1",
+                "owner": "someone@example.com",
+                "composite_condition": {"expression": "{a}"}
+            }))
+            .unwrap();
+            let condition = req.composite_condition.clone().unwrap();
+            let input = composite_input(
+                None,
+                "sa_org1",
+                "default",
+                "caller@example.com".to_string(),
+                req.alert,
+                condition,
+            );
+            assert_eq!(input.owner.as_deref(), Some("someone@example.com"));
+            assert_eq!(input.last_edited_by.as_deref(), Some("caller@example.com"));
+        }
+
+        #[test]
+        fn an_update_moves_the_owner_only_when_it_names_one() {
+            let stored = Some("alice@example.com".to_string());
+            assert_eq!(updated_owner(None, stored.clone()), stored);
+            assert_eq!(updated_owner(Some(String::new()), stored.clone()), stored);
+            assert_eq!(
+                updated_owner(Some("bob@example.com".to_string()), stored).as_deref(),
+                Some("bob@example.com")
+            );
+        }
+
+        #[tokio::test]
+        async fn an_invalid_anomaly_alert_create_from_a_denied_user_gets_the_400() {
+            fake_checker();
+            let req: openobserve_core::anomaly_detection::CreateAnomalyConfigRequest =
+                serde_json::from_value(json!({
+                    "name": "a5", "stream_name": "secret", "stream_type": "logs",
+                    "query_mode": "bogus", "detection_function": "count(*)",
+                    "histogram_interval": "5m", "schedule_interval": "1h",
+                    "detection_window_seconds": 3600
+                }))
+                .unwrap();
+            let resp = guard_anomaly_create("sa_org1", &user(), &req)
+                .await
+                .unwrap_err();
+            let (status, body) = json_body(resp).await;
+            assert_eq!(status, StatusCode::BAD_REQUEST);
+            assert!(
+                body["message"]
+                    .as_str()
+                    .is_some_and(|m| m.contains("validation error"))
+            );
+        }
+
+        #[tokio::test]
+        async fn an_anomaly_alert_update_answers_its_own_read_before_the_stream_check() {
+            fake_checker();
+            let req = openobserve_core::anomaly_detection::UpdateAnomalyConfigRequest {
+                custom_sql: Some("SELECT * FROM secret".to_string()),
+                ..Default::default()
+            };
+            let resp = guard_anomaly_update("sa_org1", "missing_anomaly", &user(), &req)
+                .await
+                .unwrap_err();
+            assert_ne!(resp.status(), StatusCode::FORBIDDEN);
+        }
     }
 }

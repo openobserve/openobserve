@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`pattern-severity-chip-${sev.key}`"
           >
             <span :class="sev.colorClass">{{ sev.label }}</span>
-            <span class="ml-1 tabular-nums opacity-70">{{ sev.countLabel }}</span>
+            <span class="ms-1 tabular-nums opacity-70">{{ sev.countLabel }}</span>
           </OToggleGroupItem>
         </OToggleGroup>
       </div>
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="border-table-header-border bg-table-header-bg flex min-w-full items-center gap-3 border-b"
       >
-        <div class="table-head w-28 flex-shrink-0 pr-1 pl-3 text-left">
+        <div class="table-head w-28 flex-shrink-0 ps-3 pe-1 text-left">
           <span class="text-table-header-text text-xs font-medium">{{
             t("search.occurrenceColumnHeader")
           }}</span>
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Left accent bar -->
         <span class="pattern-skel-pill absolute inset-y-0 left-0 w-1" aria-hidden="true" />
         <!-- Pattern column -->
-        <div class="min-w-0 flex-1 px-2 pl-3">
+        <div class="min-w-0 flex-1 px-2 ps-3">
           <span
             class="pattern-skel-pill rounded-default inline-block h-3"
             :class="skeletonWidth"
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <EmptyStateActionCard
             icon="schedule"
             :label="t('logs.noEvents.jumpToData')"
-            :sublabel="jumpTargetSublabel"
+            :sublabel="raw(jumpTargetSublabel)"
             data-test="log-patterns-jump-to-data-card"
             @click="emit('jump-to-stream-data', jumpTarget.from, jumpTarget.to)"
           />
@@ -204,8 +204,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import PatternCard from "./PatternCard.vue";
+import { usePatternActions } from "./usePatternActions";
 import WildcardValuePopover from "./WildcardValuePopover.vue";
 import useWildcardHover from "./useWildcardHover";
 import OVirtualScroll from "@/lib/core/VirtualScroll/OVirtualScroll.vue";
@@ -219,7 +220,7 @@ import {
   compactCount,
   type PatternSeverityKey,
 } from "./patternUtils";
-import { computed, ref, watch } from "vue";
+import { computed, watch, onUnmounted } from "vue";
 import { DateTime } from "luxon";
 
 const SKELETON_WIDTHS = [
@@ -270,7 +271,7 @@ const emit = defineEmits<{
 }>();
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Severity chips scale the sample's share up to the window's real total, which
 // SearchResult owns — one count query feeds both that chip row and its
@@ -293,7 +294,14 @@ const openDetails = (pattern: any, index: number) => {
   emit("open-details", pattern, index, filteredPatterns.value);
 };
 
-const { hoveredToken, onPopoverEnter, onPopoverLeave } = useWildcardHover();
+const { hoveredToken, onPopoverEnter, onPopoverLeave, cleanup } = useWildcardHover();
+
+onUnmounted(() => cleanup());
+
+// The severity filter is shared through usePatternActions rather than kept
+// local: "create an alert from the visible patterns" has to know which patterns
+// are visible, and that decision is made here.
+const { activeSeverities, setActiveSeverities } = usePatternActions();
 
 // --- Severity filter (multi-select; empty = show all) -----------------------
 const SEVERITY_ORDER: PatternSeverityKey[] = ["error", "warning", "info", "debug", "uncategorized"];
@@ -305,10 +313,8 @@ const SEVERITY_LABEL_KEY: Record<PatternSeverityKey, string> = {
   uncategorized: "logs.patternList.severityUncategorized",
 };
 
-const activeSeverities = ref<PatternSeverityKey[]>([]);
-
 const onSeverityFilterChange = (value: unknown) => {
-  activeSeverities.value = Array.isArray(value) ? (value as PatternSeverityKey[]) : [];
+  setActiveSeverities(Array.isArray(value) ? (value as PatternSeverityKey[]) : []);
 };
 
 // Chip counts come from the extraction sample, which is a clean partition
@@ -351,7 +357,7 @@ watch(severityChips, (chips) => {
   const available = new Set(chips.map((c) => c.key));
   const pruned = activeSeverities.value.filter((k) => available.has(k));
   if (pruned.length !== activeSeverities.value.length) {
-    activeSeverities.value = pruned;
+    setActiveSeverities(pruned);
   }
 });
 

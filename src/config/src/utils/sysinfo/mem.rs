@@ -32,21 +32,6 @@ pub fn get_memory_stats() -> MemoryStats {
     }
 }
 
-// Get total memory in bytes
-pub fn get_total_memory() -> usize {
-    get_memory_stats().total_memory
-}
-
-// Get used memory in bytes
-pub fn get_memory_usage() -> usize {
-    get_memory_stats().used_memory
-}
-
-// Get free memory in bytes
-pub fn get_free_memory() -> usize {
-    get_memory_stats().free_memory
-}
-
 // Get process memory usage in bytes
 #[allow(dead_code)]
 pub fn get_process_memory_usage() -> usize {
@@ -68,25 +53,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_sysinfo_get_total_memory() {
-        assert!(get_total_memory() > 0);
-    }
-
-    #[test]
-    fn test_sysinfo_get_memory_usage() {
-        assert!(get_memory_usage() > 0);
-    }
-
-    #[test]
     fn test_sysinfo_get_process_memory_usage() {
         assert!(get_process_memory_usage() > 0);
-    }
-
-    #[test]
-    fn test_sysinfo_get_free_memory() {
-        let free = get_free_memory();
-        let total = get_total_memory();
-        assert!(free <= total);
     }
 
     #[test]

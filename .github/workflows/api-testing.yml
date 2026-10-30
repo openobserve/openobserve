@@ -8,9 +8,8 @@ on:
   pull_request:
     branches:
       - "**"
-    # labeled/unlabeled so adding or removing the 'e2e' label re-fires the run and
-    # re-evaluates the gate in api_tests_summary.
-    types: [opened, reopened, synchronize, labeled, unlabeled]
+    # labeled/unlabeled so adding or removing 'ready-for-ci' starts or resets CI; drafts never run paid CI.
+    types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
   merge_group:
 
 concurrency:
@@ -24,7 +23,6 @@ env:
   ZO_BASE_URL: http://localhost:5080/
   ZO_BASE_URL_SC: http://localhost:5080/
   WS_ZO_BASE_URL: ws://localhost:5080/
-  ZO_USAGE_REPORTING_ENABLED: true
   ZO_USAGE_PUBLISH_INTERVAL: 5
   ZO_ALERT_SCHEDULE_INTERVAL: 3
   ZO_SMTP_ENABLED: true
@@ -34,6 +32,8 @@ env:
 
 jobs:
   check_changes:
+    # Runs only on PRs carrying the 'ready-for-ci' label; the merge queue runs unit tests only (see docs/ci).
+    if: ${{ github.event_name != 'merge_group' && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false)) }}
     name: check_changes
     runs-on: ubuntu-latest
     permissions:
@@ -41,42 +41,38 @@ jobs:
     outputs:
       has_changes: ${{ steps.check.outputs.has_changes }}
     steps:
+      # Debounce: a push inside this window cancels the run (concurrency) before anything paid starts.
+      - if: github.event_name == 'pull_request'
+        run: sleep 60
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
+      # One shared classification for every suite (see .github/actions/classify-changes); a change to
+      # this workflow file re-tests itself on top of it.
+      - uses: ./.github/actions/classify-changes
+        id: classify
       - id: check
+        env:
+          HAS_CHANGES: ${{ steps.classify.outputs.run_api }}
+          CHANGED_WORKFLOWS: ${{ steps.classify.outputs.changed_workflows }}
         run: |
-          # Skip when a PR touches only docs, images, frontend/UI-test files, or unrelated
-          # workflow files (e.g. a dependabot bump to another workflow) — none affect the API.
-          # Source and this workflow (api-testing.yml) still run the suite.
-          IGNORE_RE='(\.md$|^docs/|^web/|^tests/ui-testing/|^tests/playwright-tests/|\.(png|jpe?g|gif|svg|webp)$|^\.github/workflows/)'
-          CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }})
-          # Files not matching IGNORE_RE. Captured (not `grep -qv`) so the check doesn't depend
-          # on grep -qv exit semantics, which differ across grep builds; the `|| true` keeps
-          # `set -e` from aborting when grep matches nothing (exit 1). The `grep -qE` below is a
-          # loop-safe `if`-condition term (`set -e` doesn't fire there), so it needs no `|| true`.
-          RELEVANT=$(printf '%s' "$CHANGED" | grep -vE "$IGNORE_RE" || true)
-          if [ -z "$CHANGED" ] || [ -n "$RELEVANT" ] || printf '%s' "$CHANGED" | grep -qE '^\.github/workflows/api-testing\.yml$'; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
+          if [ "$HAS_CHANGES" = "true" ] || echo " $CHANGED_WORKFLOWS " | grep -q ' api-testing.yml '; then
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
           else
-            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
           fi
-
-  api_integration_tests:
-    name: api_integration_tests
+  build_api_binary:
+    name: build_api_binary
     needs: [check_changes]
-    # API-relevant changes are required in every case. On a pull_request the 'e2e'
-    # label is an ADDITIONAL opt-in, not a bypass: the label is shared with the
-    # Playwright suite, so a frontend-only PR carries it to run UI tests and must
-    # not drag the whole API suite (8 jobs, each a full cargo build) along with it.
-    if: >-
-      needs.check_changes.outputs.has_changes == 'true' &&
-      (github.event_name != 'pull_request' ||
-       contains(github.event.pull_request.labels.*.name, 'e2e'))
+    if: needs.check_changes.outputs.has_changes == 'true'
     runs-on: ubicloud-standard-4
+    env:
+      # CI executes a stripped binary; omitting dependency debuginfo keeps the
+      # shared compile cache small while preserving dev-profile debug assertions.
+      CARGO_PROFILE_DEV_DEBUG: "0"
     permissions:
-      contents: read  # only need to checkout the repo
+      contents: read
     steps:
       - name: Remove unused tools
         run: |
@@ -90,34 +86,81 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
-          toolchain: nightly-2026-05-20
+          toolchain: nightly-2026-10-24
 
       - name: Setup Rust Cache
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          cache-on-failure: true
-          shared-key: backend-debug-mimalloc
-          # Save the shared cache on merge_group runs (the main-ward build now that
-          # push:main is gone); keep the main-ref check for any non-PR fallback.
-          save-if: ${{ github.event_name == 'merge_group' || github.ref == 'refs/heads/main' }}
+          # Share one dependency build cache with the DB main-branch writer. Do
+          # not cache workspace crates: a measured warm cache still rebuilt all
+          # 42 workspace crates while increasing the archive from ~1.1 to 3.1 GiB.
+          shared-key: backend-debug0-mimalloc-deps-v1
+          add-job-id-key: false
+          # The DB workflow's successful push:main build is the only writer.
+          save-if: false
 
       - name: Install Protoc
-        run: |
-          bash ./.github/protoc.sh
+        run: bash ./.github/protoc.sh
 
       - name: Build OpenObserve debug binary
         run: cargo build --features mimalloc
 
+      # The consumers only execute this binary, so remove debug symbols from the
+      # distribution copy before compressing and uploading it once.
+      - name: Package OpenObserve debug binary
+        run: |
+          strip target/debug/openobserve
+          tar -C target/debug -czf openobserve-api-debug.tar.gz openobserve
+
+      - name: Upload OpenObserve debug binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: openobserve-api-debug-${{ github.sha }}
+          path: openobserve-api-debug.tar.gz
+          if-no-files-found: error
+          retention-days: 3
+          # The payload is already gzip-compressed; avoid a second compression pass.
+          compression-level: 0
+
+  api_integration_tests:
+    name: api_integration_tests
+    needs: [check_changes, build_api_binary]
+    if: needs.check_changes.outputs.has_changes == 'true'
+    runs-on: ubicloud-standard-4
+    permissions:
+      actions: read
+      contents: read  # only need to checkout the repo
+    steps:
+      - name: Checkout git repo
+        uses: actions/checkout@v5
+
+      - name: Download OpenObserve debug binary
+        uses: actions/download-artifact@v5
+        with:
+          name: openobserve-api-debug-${{ github.sha }}
+          path: api-binary-artifact
+
+      - name: Extract OpenObserve debug binary
+        run: |
+          mkdir -p target/debug
+          tar -xzf api-binary-artifact/openobserve-api-debug.tar.gz -C target/debug
+          chmod +x target/debug/openobserve
+
       - name: Setup Python
         uses: actions/setup-python@v7
+        id: setup-python
         with:
           python-version: "3.11.6"
 
       - name: Setup rye
-        uses: eifinger/setup-rye@v4
+        uses: eifinger/setup-rye@c694239a43768373e87d0103d7f547027a23f3c8 # v4.2.9
+        env:
+          # Reuse setup-python's interpreter so `rye self install` skips the flaky toolchain download.
+          RYE_TOOLCHAIN: ${{ steps.setup-python.outputs.python-path }}
         with:
           enable-cache: true
           working-directory: "tests/api-testing/"
@@ -151,7 +194,10 @@ jobs:
             fi
             sleep 1
           done
-          rye run pytest --ignore=tests/regression --ignore=tests/query_agent --ignore=tests/vortex --junitxml=junit-integration.xml
+          # test_pending_silence.py is carved into api_alerts_pending_tests
+          # (runs -n 4 in parallel) — those 4 wall-clock tests were ~85% of the
+          # alerts runtime when run serially here.
+          rye run pytest --ignore=tests/regression --ignore=tests/query_agent --ignore=tests/vortex --ignore=tests/alerts/test_pending_silence.py --junitxml=junit-integration.xml
           kill $SERVER_PID_DEFAULT || true
         working-directory: tests/api-testing/
 
@@ -181,15 +227,8 @@ jobs:
   # 2 phases: memtable + parquet) suite doesn't extend CI wall time.
   api_query_agent_tests:
     name: "api_query_agent / ${{ matrix.config.label }}"
-    needs: [check_changes]
-    # API-relevant changes are required in every case. On a pull_request the 'e2e'
-    # label is an ADDITIONAL opt-in, not a bypass: the label is shared with the
-    # Playwright suite, so a frontend-only PR carries it to run UI tests and must
-    # not drag the whole API suite (8 jobs, each a full cargo build) along with it.
-    if: >-
-      needs.check_changes.outputs.has_changes == 'true' &&
-      (github.event_name != 'pull_request' ||
-       contains(github.event.pull_request.labels.*.name, 'e2e'))
+    needs: [check_changes, build_api_binary]
+    if: needs.check_changes.outputs.has_changes == 'true'
     runs-on: ubicloud-standard-4
     # Run the full SQL regression suite with the single-node physical
     # optimizer both enabled (default) and disabled. The non-optimized
@@ -206,46 +245,39 @@ jobs:
           - label: single_node_opt_true
             env: "ZO_FEATURE_SINGLE_NODE_OPTIMIZE_ENABLED=true"
             mode: "true"
+          - label: remove_filter_with_index_false
+            env: "ZO_FEATURE_QUERY_REMOVE_FILTER_WITH_INDEX=false"
+            mode: "true"
     permissions:
+      actions: read
       contents: read
     steps:
-      - name: Remove unused tools
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-
       - name: Checkout git repo
         uses: actions/checkout@v5
+
+      - name: Download OpenObserve debug binary
+        uses: actions/download-artifact@v5
         with:
-          fetch-depth: 0
+          name: openobserve-api-debug-${{ github.sha }}
+          path: api-binary-artifact
 
-      - name: Setup Rust Toolchain
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: nightly-2026-05-20
-
-      - name: Setup Rust Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-          shared-key: backend-debug-mimalloc
-          save-if: false  # main api_integration_tests job writes the cache
-
-      - name: Install Protoc
-        run: bash ./.github/protoc.sh
-
-      - name: Build OpenObserve debug binary
-        run: cargo build --features mimalloc
+      - name: Extract OpenObserve debug binary
+        run: |
+          mkdir -p target/debug
+          tar -xzf api-binary-artifact/openobserve-api-debug.tar.gz -C target/debug
+          chmod +x target/debug/openobserve
 
       - name: Setup Python
         uses: actions/setup-python@v7
+        id: setup-python
         with:
           python-version: "3.11.6"
 
       - name: Setup rye
-        uses: eifinger/setup-rye@v4
+        uses: eifinger/setup-rye@c694239a43768373e87d0103d7f547027a23f3c8 # v4.2.9
+        env:
+          # Reuse setup-python's interpreter so `rye self install` skips the flaky toolchain download.
+          RYE_TOOLCHAIN: ${{ steps.setup-python.outputs.python-path }}
         with:
           enable-cache: true
           working-directory: "tests/api-testing/"
@@ -301,21 +333,15 @@ jobs:
 
   # Phase 6.b: regression matrix split. The 4 env-flag-sensitive test
   # configurations now run as 4 parallel jobs instead of 4 sequential
-  # restarts in one job. Each job builds OO once and runs its single
-  # configured pytest target.
+  # restarts in one job. Each job downloads the run-scoped OO binary and
+  # runs its single configured pytest target.
   api_regression_tests:
     name: "api_regression / ${{ matrix.config.label }}"
-    needs: [check_changes]
-    # API-relevant changes are required in every case. On a pull_request the 'e2e'
-    # label is an ADDITIONAL opt-in, not a bypass: the label is shared with the
-    # Playwright suite, so a frontend-only PR carries it to run UI tests and must
-    # not drag the whole API suite (8 jobs, each a full cargo build) along with it.
-    if: >-
-      needs.check_changes.outputs.has_changes == 'true' &&
-      (github.event_name != 'pull_request' ||
-       contains(github.event.pull_request.labels.*.name, 'e2e'))
+    needs: [check_changes, build_api_binary]
+    if: needs.check_changes.outputs.has_changes == 'true'
     runs-on: ubicloud-standard-4
     permissions:
+      actions: read
       contents: read  # only need to checkout the repo
     strategy:
       fail-fast: false
@@ -333,40 +359,43 @@ jobs:
           - label: join_match_one_false
             env: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=false"
             target: tests/regression/test_logs_to_logs_join.py
+          # A free-space requirement no runner meets keeps the disk circuit breaker tripped.
+          - label: otlp_grpc_backpressure
+            env: "ZO_DISK_CIRCUIT_BREAKER_ENABLED=true ZO_DISK_CIRCUIT_BREAKER_THRESHOLD=900000000"
+            target: tests/regression/test_otlp_grpc_backpressure.py
+          # Spawns and restarts its own server from target/debug/openobserve.
+          - label: sqlite_meta_invalid_utf8
+            env: ""
+            target: tests/regression/test_sqlite_invalid_utf8_meta_startup.py
+
+          # Cross-tenant gRPC ingest (o2-enterprise#2821); needs no server env, the listener is on by default.
+          - label: grpc_ingest_org_binding
+            env: ""
+            target: tests/regression/test_grpc_ingest_org_binding.py
     steps:
-      - name: Remove unused tools
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-
       - uses: actions/checkout@v5
-        with: { fetch-depth: 0 }
 
-      - name: Setup Rust Toolchain
-        uses: dtolnay/rust-toolchain@master
+      - name: Download OpenObserve debug binary
+        uses: actions/download-artifact@v5
         with:
-          toolchain: nightly-2026-05-20
+          name: openobserve-api-debug-${{ github.sha }}
+          path: api-binary-artifact
 
-      - name: Setup Rust Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-          shared-key: backend-debug-mimalloc
-          save-if: false  # main api_integration_tests job writes the cache
-
-      - name: Install Protoc
-        run: bash ./.github/protoc.sh
-
-      - name: Build OpenObserve debug binary
-        run: cargo build --features mimalloc
+      - name: Extract OpenObserve debug binary
+        run: |
+          mkdir -p target/debug
+          tar -xzf api-binary-artifact/openobserve-api-debug.tar.gz -C target/debug
+          chmod +x target/debug/openobserve
 
       - uses: actions/setup-python@v7
+        id: setup-python
         with: { python-version: "3.11.6" }
 
       - name: Setup rye
-        uses: eifinger/setup-rye@v4
+        uses: eifinger/setup-rye@c694239a43768373e87d0103d7f547027a23f3c8 # v4.2.9
+        env:
+          # Reuse setup-python's interpreter so `rye self install` skips the flaky toolchain download.
+          RYE_TOOLCHAIN: ${{ steps.setup-python.outputs.python-path }}
         with:
           enable-cache: true
           working-directory: "tests/api-testing/"
@@ -420,63 +449,136 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  # Carved out of the serial default-set job: the 4 pending/silence alert
+  # tests are wall-clock bound (each needs 2-3 alert eval cycles at the 60s
+  # frequency floor + a real pending window), so serially they were ~85% of
+  # the alerts runtime (~10 min). Run here with -n 4 so their waits overlap
+  # and this job lands at ~the single longest test (~3 min), in parallel with
+  # the other API jobs.
+  api_alerts_pending_tests:
+    name: api_alerts_pending
+    needs: [check_changes, build_api_binary]
+    if: needs.check_changes.outputs.has_changes == 'true'
+    runs-on: ubicloud-standard-4
+    permissions:
+      actions: read
+      contents: read  # only need to checkout the repo
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download OpenObserve debug binary
+        uses: actions/download-artifact@v5
+        with:
+          name: openobserve-api-debug-${{ github.sha }}
+          path: api-binary-artifact
+
+      - name: Extract OpenObserve debug binary
+        run: |
+          mkdir -p target/debug
+          tar -xzf api-binary-artifact/openobserve-api-debug.tar.gz -C target/debug
+          chmod +x target/debug/openobserve
+
+      - uses: actions/setup-python@v7
+        id: setup-python
+        with: { python-version: "3.11.6" }
+
+      - name: Setup rye
+        uses: eifinger/setup-rye@c694239a43768373e87d0103d7f547027a23f3c8 # v4.2.9
+        env:
+          # Reuse setup-python's interpreter so `rye self install` skips the flaky toolchain download.
+          RYE_TOOLCHAIN: ${{ steps.setup-python.outputs.python-path }}
+        with:
+          enable-cache: true
+          working-directory: "tests/api-testing/"
+          version: "0.27.0"
+
+      - name: Pin cpython
+        run: rye pin cpython@3.11.6
+        working-directory: tests/api-testing/
+
+      - name: Rye sync
+        run: rye sync
+        working-directory: tests/api-testing/
+
+      - name: Run pending/silence alert tests (parallel)
+        # Server binary lives at the repo root (target/debug/openobserve);
+        # this step uses working-directory: tests/api-testing/, so invoke it
+        # via ${{ github.workspace }}. The 4 tests use uniq() names/streams and
+        # a non-destructive shared org, so -n 4 is safe. --force-sugar omitted
+        # on purpose (see integration job — double-registers, ~3x count).
+        run: |
+          ${{ github.workspace }}/target/debug/openobserve > o2_alerts_pending.log 2>&1 &
+          SERVER_PID=$!
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:5080/healthz > /dev/null 2>&1; then
+              echo "Server ready after ${i}s"; break
+            fi
+            sleep 1
+          done
+          rye run pytest tests/alerts/test_pending_silence.py -n 4 -v --junitxml=junit-alerts-pending.xml
+          kill $SERVER_PID || true
+        working-directory: tests/api-testing/
+
+      # Test-count metrics sidecar (see integration job). Category dir name is
+      # api_integration_tests so the parser folds it into the integration total.
+      - name: Upload API junit (alerts pending)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-junit__api_integration_tests__alerts_pending
+          path: tests/api-testing/junit-alerts-pending.xml
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload server log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openobserve-alerts-pending-log
+          path: tests/api-testing/o2_alerts_pending.log
+          if-no-files-found: warn
+          retention-days: 14
+
   # Phase 5: schemathesis fuzz job — informational (continue-on-error),
   # surfaces 5xx panics across the 150 OpenAPI endpoints. Decoupled from
   # api_integration_tests so its findings don't block merges yet; teams
   # can promote it to blocking after the noise floor is understood.
   api_fuzz_tests:
     name: api_fuzz_tests
-    needs: [check_changes]
-    # API-relevant changes are required in every case. On a pull_request the 'e2e'
-    # label is an ADDITIONAL opt-in, not a bypass: the label is shared with the
-    # Playwright suite, so a frontend-only PR carries it to run UI tests and must
-    # not drag the whole API suite (8 jobs, each a full cargo build) along with it.
-    if: >-
-      needs.check_changes.outputs.has_changes == 'true' &&
-      (github.event_name != 'pull_request' ||
-       contains(github.event.pull_request.labels.*.name, 'e2e'))
+    needs: [check_changes, build_api_binary]
+    if: needs.check_changes.outputs.has_changes == 'true'
     runs-on: ubicloud-standard-4
     continue-on-error: true
     permissions:
+      actions: read
       contents: read  # only need to checkout the repo
     steps:
-      - name: Remove unused tools
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-
       - name: Checkout git repo
         uses: actions/checkout@v5
+
+      - name: Download OpenObserve debug binary
+        uses: actions/download-artifact@v5
         with:
-          fetch-depth: 0
+          name: openobserve-api-debug-${{ github.sha }}
+          path: api-binary-artifact
 
-      - name: Setup Rust Toolchain
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: nightly-2026-05-20
-
-      - name: Setup Rust Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-          shared-key: backend-debug-mimalloc
-          save-if: false  # don't write cache from this job (the main job does)
-
-      - name: Install Protoc
-        run: bash ./.github/protoc.sh
-
-      - name: Build OpenObserve debug binary
-        run: cargo build --features mimalloc
+      - name: Extract OpenObserve debug binary
+        run: |
+          mkdir -p target/debug
+          tar -xzf api-binary-artifact/openobserve-api-debug.tar.gz -C target/debug
+          chmod +x target/debug/openobserve
 
       - name: Setup Python
         uses: actions/setup-python@v7
+        id: setup-python
         with:
           python-version: "3.11.6"
 
       - name: Setup rye
-        uses: eifinger/setup-rye@v4
+        uses: eifinger/setup-rye@c694239a43768373e87d0103d7f547027a23f3c8 # v4.2.9
+        env:
+          # Reuse setup-python's interpreter so `rye self install` skips the flaky toolchain download.
+          RYE_TOOLCHAIN: ${{ steps.setup-python.outputs.python-path }}
         with:
           enable-cache: true
           working-directory: "tests/api-testing/"
@@ -509,19 +611,25 @@ jobs:
         #   --hypothesis-deadline    -> no equivalent; use --request-timeout
         #                               (seconds, not ms) to bound per-request
         #   --data-generation-method -> --mode / -m
+        # The two slack/oauth paths are excluded because CI configures no Slack
+        # credentials, so they correctly answer 503 "not configured" — which the
+        # not_a_server_error check cannot tell apart from a real 5xx panic.
         # `--checks not_a_server_error` keeps focus on 5xx panics (actual
         # backend bugs, not spec-conformance nits). `-n 20` bounds runtime;
         # `--mode positive` keeps inputs realistic (negative inputs are a
         # separate exercise once the noise floor here is understood).
+        # run_fuzz.py prevents Hypothesis' auto-loaded CI profile from
+        # overriding --suppress-health-check. Keep CI's too_slow suppression
+        # alongside filter_too_much; the 5xx response check is unchanged.
         run: |
-          rye run schemathesis run \
+          rye run python run_fuzz.py run \
             -u http://localhost:5080 \
             --auth "$ZO_ROOT_USER_EMAIL:$ZO_ROOT_USER_PASSWORD" \
             --checks not_a_server_error \
             -n 20 \
             --request-timeout 5 \
             -m positive \
-            --suppress-health-check=filter_too_much \
+            --suppress-health-check=filter_too_much,too_slow \
             --exclude-path "/api/{org_id}/v1/logs" \
             --exclude-path "/api/{org_id}/v1/metrics" \
             --exclude-path "/api/{org_id}/v1/traces" \
@@ -533,6 +641,8 @@ jobs:
             --exclude-path "/api/{org_id}/dashboards/{dashboard_id}/panels/{panel_id}" \
             --exclude-path "/api/{org_id}/pipelines/history" \
             --exclude-path "/api/{org_id}/organizations/assume_service_account" \
+            --exclude-path "/api/{org_id}/alerts/destinations/slack/oauth/start" \
+            --exclude-path "/api/{org_id}/alerts/destinations/slack/oauth/exchange" \
             http://localhost:5080/api-doc/openapi.json
         working-directory: tests/api-testing/
 
@@ -541,15 +651,15 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: openobserve-fuzz-log
-          path: tests/api-testing/o2_fuzz.log
+          path: o2_fuzz.log
           if-no-files-found: warn
           retention-days: 14
 
   api_tests_summary:
     runs-on: ubuntu-latest
     permissions: {}
-    needs: [check_changes, api_integration_tests, api_query_agent_tests, api_regression_tests]
-    if: always()
+    needs: [check_changes, build_api_binary, api_integration_tests, api_query_agent_tests, api_regression_tests, api_alerts_pending_tests]
+    if: always() && github.event_name != 'merge_group' && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false))
     steps:
       - name: Check test results
         run: |
@@ -559,31 +669,23 @@ jobs:
             exit 1
           fi
 
-          # 2. Nothing API-relevant changed → nothing ran → allow, whatever the labels say.
-          #    This covers the frontend-only PR that carries the 'e2e' label to run the
-          #    Playwright suite: the API suite doesn't apply to it and isn't required.
+          # 2. Nothing API-relevant changed → nothing ran → allow.
           if [ "${{ needs.check_changes.outputs.has_changes }}" != "true" ]; then
             echo "✅ No API-relevant changes — suite not required."
             exit 0
           fi
 
-          # 3. API-relevant pull_request WITHOUT the 'e2e' label: the suite did not run,
-          #    so block until the author opts in by adding the label.
-          if [ "${{ github.event_name }}" == "pull_request" ] && \
-             [ "${{ contains(github.event.pull_request.labels.*.name, 'e2e') }}" != "true" ]; then
-            echo "::error::This PR changes API-relevant files but has no 'e2e' label, so the suite did not run."
-            echo "::error::Add the 'e2e' label to the PR to run the full test suite before merging."
-            exit 1
-          fi
-
-          # 4. Suite was expected to run — the gating jobs must have succeeded.
-          if [ "${{ needs.api_integration_tests.result }}" == "success" ] && \
+          # 3. Suite was expected to run — the run-scoped binary and all gating
+          #    test jobs must have succeeded.
+          if [ "${{ needs.build_api_binary.result }}" == "success" ] && \
+             [ "${{ needs.api_integration_tests.result }}" == "success" ] && \
              [ "${{ needs.api_query_agent_tests.result }}" == "success" ] && \
-             [ "${{ needs.api_regression_tests.result }}" == "success" ]; then
+             [ "${{ needs.api_regression_tests.result }}" == "success" ] && \
+             [ "${{ needs.api_alerts_pending_tests.result }}" == "success" ]; then
             echo "All API test jobs passed"
             exit 0
           else
-            echo "API tests failed: integration=${{ needs.api_integration_tests.result }}, query_agent=${{ needs.api_query_agent_tests.result }}, regression=${{ needs.api_regression_tests.result }}"
+            echo "API tests failed: build=${{ needs.build_api_binary.result }}, integration=${{ needs.api_integration_tests.result }}, query_agent=${{ needs.api_query_agent_tests.result }}, regression=${{ needs.api_regression_tests.result }}, alerts_pending=${{ needs.api_alerts_pending_tests.result }}"
             exit 1
           fi
 
@@ -591,8 +693,8 @@ jobs:
   # suite=api). Re-runs append one doc per attempt; the dashboard keeps the latest attempt per run_id.
   report_to_openobserve:
     name: Report run metrics to OpenObserve
-    needs: [check_changes, api_integration_tests, api_query_agent_tests, api_regression_tests]
-    if: always()
+    needs: [check_changes, api_integration_tests, api_query_agent_tests, api_regression_tests, api_alerts_pending_tests]
+    if: always() && github.event_name != 'merge_group' && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false))
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -620,12 +722,13 @@ jobs:
           INTEG: ${{ needs.api_integration_tests.result }}
           AGENT: ${{ needs.api_query_agent_tests.result }}
           REG: ${{ needs.api_regression_tests.result }}
+          PEND: ${{ needs.api_alerts_pending_tests.result }}
         run: |
-          if [ "$INTEG" = "skipped" ] && [ "$AGENT" = "skipped" ] && [ "$REG" = "skipped" ]; then
+          if [ "$INTEG" = "skipped" ] && [ "$AGENT" = "skipped" ] && [ "$REG" = "skipped" ] && [ "$PEND" = "skipped" ]; then
             echo "::notice::no API tests ran (no relevant changes) — skipping metrics"; exit 0
           fi
-          if [ "$INTEG" = "failure" ] || [ "$AGENT" = "failure" ] || [ "$REG" = "failure" ]; then CONCLUSION=failure
-          elif [ "$INTEG" = "cancelled" ] || [ "$AGENT" = "cancelled" ] || [ "$REG" = "cancelled" ]; then CONCLUSION=cancelled
+          if [ "$INTEG" = "failure" ] || [ "$AGENT" = "failure" ] || [ "$REG" = "failure" ] || [ "$PEND" = "failure" ]; then CONCLUSION=failure
+          elif [ "$INTEG" = "cancelled" ] || [ "$AGENT" = "cancelled" ] || [ "$REG" = "cancelled" ] || [ "$PEND" = "cancelled" ]; then CONCLUSION=cancelled
           else CONCLUSION=success; fi
           export CONCLUSION STREAM=ci_test_runs SUITE=api
           # Parse junit into per-category + total counts. The TOTAL folds into the

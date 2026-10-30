@@ -30,7 +30,7 @@ export class UserPage {
         this.userRoleField = page.locator('[data-test="user-role-field"]');
         // Add/Edit user dialog footer uses ODialog's built-in primary/secondary
         // buttons; scope to the dialog so they don't collide with other dialogs' btns.
-        this.saveUserButton = page.locator('[data-test="add-user-dialog"] [data-test="o-dialog-primary-btn"]');
+        this.saveUserButton = page.locator('[data-test="add-user-dialog"] [data-test="add-user-submit-btn"]');
         this.cancelUserButton = page.locator('[data-test="add-user-dialog"] [data-test="o-dialog-secondary-btn"]');
         // Change-password toggle in edit mode
         this.userChangePasswordToggle = page.locator('[data-test="user-change-password-field"]');
@@ -81,8 +81,10 @@ export class UserPage {
     }
 
     getEditUserButton(email) {
-        const escapedEmail = email.replace('@', '\\@');
-        return this.page.locator(`[data-test="edit-basic-user-${escapedEmail}"]`);
+        // The edit button is keyed by row index, so it is found inside the row that shows the email.
+        return this.page
+            .locator('tr', { hasText: email })
+            .locator('[data-test^="edit-basic-user-"]:not([data-test$="-menu"])');
     }
 
     getRoleOption(role) {

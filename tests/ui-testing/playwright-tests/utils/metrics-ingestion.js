@@ -1,5 +1,6 @@
 const testLogger = require('./test-logger');
 const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment } = require('./cloud-auth');
+const { ingestBase } = require('./ingest-url.js');
 
 /**
  * OTLP Metrics Ingestion Module for OpenObserve E2E Tests
@@ -20,7 +21,7 @@ class MetricsIngestion {
             // Normalize the endpoint to avoid double slashes
             endpoint = endpoint.replace(/\/+/g, '/').replace('http:/', 'http://').replace('https:/', 'https://');
         } else {
-            endpoint = `${baseUrl}/api/${orgName}/v1/metrics`;
+            endpoint = `${ingestBase(baseUrl)}/api/${orgName}/v1/metrics`;
         }
 
         // On cloud, auth is handled by getAuthHeaders() (email:passcode from cloud-config.json)
@@ -33,6 +34,7 @@ class MetricsIngestion {
 
         this.config = {
             endpoint: endpoint,
+            queryBase: process.env.METRICS_ENDPOINT ? endpoint.replace('/v1/metrics', '') : `${baseUrl}/api/${orgName}`,
             username: process.env.ZO_ROOT_USER_EMAIL || '',
             password: process.env.ZO_ROOT_USER_PASSWORD || '',
             orgId: orgName,
@@ -386,6 +388,38 @@ class MetricsIngestion {
         }
 
         testLogger.error('Metrics endpoint did not become ready after all retries');
+        return false;
+    }
+
+    /**
+     * Poll the PromQL query API until an ingested metric is actually queryable
+     * (WAL indexing lags the ingest ack). Best-effort: returns false on timeout
+     * so callers proceed and let the test's own data assertion fail loudly.
+     */
+    async waitForMetricQueryable(metricName, maxRetries = 30, interval = 1000) {
+        const base = this.config.queryBase;
+        const url = `${base}/prometheus/api/v1/query?query=${encodeURIComponent(metricName)}`;
+        const headers = getAuthHeaders();
+        for (let i = 0; i < maxRetries; i++) {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                const response = await fetch(url, { method: 'GET', headers, signal: controller.signal });
+                clearTimeout(timeoutId);
+                if (response.ok) {
+                    const body = await response.json();
+                    const result = body?.data?.result;
+                    if (Array.isArray(result) && result.length > 0) {
+                        testLogger.info(`Metric "${metricName}" queryable after ${i + 1} poll(s)`, { series: result.length });
+                        return true;
+                    }
+                }
+            } catch (error) {
+                testLogger.debug(`waitForMetricQueryable attempt ${i + 1} error`, { error: error.message });
+            }
+            await new Promise(resolve => setTimeout(resolve, interval));
+        }
+        testLogger.warn(`Metric "${metricName}" not queryable after ${maxRetries} polls`);
         return false;
     }
 

@@ -765,11 +765,9 @@ mod tests {
             start_time: 0,
             end_time: 0,
             track_total_hits: false,
-            query_type: "UI".to_string(),
             uses_zo_fn: false,
             query_fn: "".to_string(),
             skip_wal: false,
-            action_id: "".to_string(),
             histogram_interval: 5,
             timezone: None,
             sampling_ratio: None,
@@ -777,6 +775,20 @@ mod tests {
         Sql::new(&query, "parse_test", StreamType::Logs, None)
             .await
             .unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_sql_limit_overrides_request_size() {
+        assert_eq!(
+            get_sql(r#"SELECT * FROM "default" LIMIT 1000"#).await.limit,
+            1000
+        );
+        assert_eq!(
+            get_sql(r#"SELECT * FROM "default" LIMIT 0"#).await.limit,
+            100
+        );
+        let cte = r#"WITH a AS (SELECT * FROM "default" LIMIT 10) SELECT * FROM a"#;
+        assert_eq!(get_sql(cte).await.limit, 100);
     }
 
     #[tokio::test]

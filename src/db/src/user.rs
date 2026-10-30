@@ -39,6 +39,44 @@ pub fn is_root_user(user_id: &str) -> bool {
 }
 
 pub const USER_RECORD_KEY: &str = "/user_record/";
+
+/// Broadcast marker for a bulk update that touched many user rows at once.
+///
+/// The per-row events behind [`USER_RECORD_KEY`] do not scale to a sweep that can touch every user
+/// on the instance, so a sweep publishes one event here and each node rebuilds its cache instead.
+pub const USER_BULK_REFRESH_KEY: &str = "/user_bulk_refresh/";
+
+/// Tell every node its users cache is stale.
+///
+/// Callers that bypass the per-user write path — bulk `UPDATE`s straight to the table — must call
+/// this, or the change stays invisible to every node until the next restart.
+pub async fn broadcast_bulk_refresh() -> Result<(), anyhow::Error> {
+    put_into_db_coordinator(USER_BULK_REFRESH_KEY, Bytes::new(), true, None)
+        .await
+        .map_err(|e| anyhow::anyhow!("Error broadcasting a users cache refresh: {e}"))
+}
+
+/// Rebuild the users cache whenever a bulk update announces itself.
+pub async fn watch_bulk_refresh() -> Result<(), anyhow::Error> {
+    let cluster_coordinator = db::get_coordinator().await;
+    let mut events = cluster_coordinator.watch(USER_BULK_REFRESH_KEY).await?;
+    let events = Arc::get_mut(&mut events).unwrap();
+    log::info!("Start watching user bulk refresh");
+    loop {
+        let Some(ev) = events.recv().await else {
+            log::error!("watch_user_bulk_refresh: event channel closed");
+            break;
+        };
+        // The key carries no payload; its arrival is the whole message.
+        if matches!(ev, db::Event::Put(_))
+            && let Err(e) = cache().await
+        {
+            log::error!("Error refreshing the users cache after a bulk update: {e}");
+        }
+    }
+    Ok(())
+}
+
 pub async fn get_user_record(email: &str) -> Result<users::UserRecord, anyhow::Error> {
     users::get(email)
         .await
@@ -151,13 +189,19 @@ pub async fn get_db_user(name: &str) -> Result<DBUser, anyhow::Error> {
     })
 }
 
-pub async fn add(db_user: &DBUser) -> Result<(), anyhow::Error> {
-    let key = format!("{USER_RECORD_KEY}{}", db_user.email);
-    let user = users::UserRecord::from(db_user);
-    users::add(user.clone())
+/// Insert a users row and publish the event every node caches it from; a raw table write skips it.
+pub async fn add_record(user: users::UserRecord) -> Result<(), anyhow::Error> {
+    let key = format!("{USER_RECORD_KEY}{}", user.email);
+    users::add(user)
         .await
         .map_err(|e| anyhow::anyhow!("Error adding user: {e}"))?;
     let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
+    Ok(())
+}
+
+pub async fn add(db_user: &DBUser) -> Result<(), anyhow::Error> {
+    let user = users::UserRecord::from(db_user);
+    add_record(user.clone()).await?;
 
     // Add user to orgs
     for org in &db_user.organizations {
@@ -177,12 +221,17 @@ pub async fn add(db_user: &DBUser) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Update a user, then refresh the local cache and the rest of the cluster.
+///
+/// `password_changed` carries through to the row write — see [`users::update`] — and on to the
+/// other clusters, so a password set here does not read as expired everywhere else.
 pub async fn update(
     user_email: &str,
     first_name: &str,
     last_name: &str,
     password: &str,
     password_ext: Option<String>,
+    password_changed: bool,
 ) -> Result<(), anyhow::Error> {
     let key = format!("{USER_RECORD_KEY}{user_email}");
     users::update(
@@ -191,9 +240,14 @@ pub async fn update(
         last_name,
         password,
         password_ext.clone(),
+        password_changed,
     )
     .await
     .map_err(|e| anyhow::anyhow!("Error updating user: {e}"))?;
+    // The watch event is async; a login right after a password change must not see the old hash.
+    if let Ok(record) = get_user_record(user_email).await {
+        cache_user_record(user_email, record);
+    }
     let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
 
     #[cfg(feature = "enterprise")]
@@ -203,6 +257,7 @@ pub async fn update(
         last_name: last_name.to_string(),
         password: password.to_string(),
         password_ext,
+        password_changed,
     })
     .await?;
     Ok(())
@@ -210,24 +265,26 @@ pub async fn update(
 
 pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
     let key = format!("{USER_RECORD_KEY}{name}");
-    // First delete all org_user entries for this user
-    org_users::remove_by_user(name).await?;
-    match users::remove(name).await {
-        Ok(_) => {
-            delete_from_db_coordinator(&key, false, true, None)
-                .await
-                .inspect_err(|e| {
-                    log::error!("error sending delete user to nats {name} : {e}");
-                })?;
-            #[cfg(feature = "enterprise")]
-            super_cluster::delete_user_from_super_cluster(name).await?;
-            Ok(())
-        }
-        Err(e) => {
-            log::error!("Error deleting user: {e}");
-            Err(anyhow::anyhow!("Error deleting user: {}", e))
-        }
-    }
+    // One transaction: a failed notification must not leave a users row whose memberships are gone.
+    users::remove_with_memberships(name).await.map_err(|e| {
+        log::error!("Error deleting user: {e}");
+        anyhow::anyhow!("Error deleting user: {}", e)
+    })?;
+    org_users::notify_removed_by_user(name).await?;
+    delete_from_db_coordinator(&key, false, true, None)
+        .await
+        .inspect_err(|e| {
+            log::error!("error sending delete user to nats {name} : {e}");
+        })?;
+    #[cfg(feature = "enterprise")]
+    super_cluster::delete_user_from_super_cluster(name).await?;
+    Ok(())
+}
+
+/// Evicts a user from every node's cache and leaves its row in place.
+pub async fn evict_cached(name: &str) -> Result<(), anyhow::Error> {
+    delete_from_db_coordinator(&format!("{USER_RECORD_KEY}{name}"), false, true, None).await?;
+    Ok(())
 }
 
 #[cfg(feature = "cloud")]
@@ -274,17 +331,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         }
                     };
 
-                USERS.insert(item_key.to_lowercase(), item_value.clone());
-                if item_value.is_root {
-                    // Root user must be there, it is created when
-                    // openobserve is run for the first time
-                    let mut root = ROOT_USER.get_mut("root").unwrap();
-                    root.first_name = item_value.first_name.clone();
-                    root.last_name = item_value.last_name.clone();
-                    root.password = item_value.password.clone();
-                    root.salt = item_value.salt.clone();
-                    root.password_ext = item_value.password_ext.clone();
-                }
+                cache_user_record(item_key, item_value);
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
@@ -373,6 +420,19 @@ pub async fn get_user_by_email(email: &str) -> Option<DBUser> {
             None
         }
     }
+}
+
+fn cache_user_record(email: &str, record: users::UserRecord) {
+    if record.is_root {
+        // Root is created on first run, so the entry always exists.
+        let mut root = ROOT_USER.get_mut("root").unwrap();
+        root.first_name = record.first_name.clone();
+        root.last_name = record.last_name.clone();
+        root.password = record.password.clone();
+        root.salt = record.salt.clone();
+        root.password_ext = record.password_ext.clone();
+    }
+    USERS.insert(email.to_lowercase(), record);
 }
 
 #[cfg(feature = "enterprise")]
@@ -479,5 +539,49 @@ mod tests {
 
         let resp = delete(email).await;
         assert!(resp.is_ok());
+    }
+
+    // Writing straight to the table skipped the cache event, so `get_cached_user_org` returned
+    // None.
+    #[tokio::test]
+    async fn test_add_record_publishes_cache_event() {
+        infra_db::create_table().await.unwrap();
+        infra_table::create_user_tables().await.unwrap();
+        let email = "add-record-event@example.com";
+        let expected_key = format!("{USER_RECORD_KEY}{email}");
+        let mut events = db::get_coordinator()
+            .await
+            .watch(USER_RECORD_KEY)
+            .await
+            .unwrap();
+        let events = Arc::get_mut(&mut events).unwrap();
+
+        let record = users::UserRecord::from(&DBUser {
+            email: email.to_string(),
+            password: "pass".to_string(),
+            salt: "salt".to_string(),
+            first_name: "add".to_owned(),
+            last_name: "record".to_owned(),
+            is_external: false,
+            organizations: vec![],
+            password_ext: None,
+        });
+        add_record(record).await.unwrap();
+
+        let published = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            while let Some(ev) = events.recv().await {
+                if let db::Event::Put(ev) = ev
+                    && ev.key == expected_key
+                {
+                    return true;
+                }
+            }
+            false
+        })
+        .await
+        .unwrap_or(false);
+        assert!(published, "no {expected_key} put event after add_record");
+
+        delete(email).await.unwrap();
     }
 }

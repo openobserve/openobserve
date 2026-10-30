@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { CardSubstitutions } from "./types";
+import { maskSecret } from "@/composables/useCredentialSnippet";
+import type { CardSubstitutions, RichCardInput } from "./types";
 
-/** Placeholder shown in masked code instead of the base64 token. */
+/** Placeholder shown in masked code while the token is not known yet. */
 export const MASKED_TOKEN = "••••••••••••••••••••••••••••";
 
 /**
@@ -41,7 +42,33 @@ export function applySubs(template: string, subs: CardSubstitutions): string {
     .replaceAll("{token}", subs.token);
 }
 
-/** The masked counterpart of applySubs — same template, token hidden. */
+/** The masked counterpart of applySubs: the token keeps its first and last four characters, as on every snippet. */
 export function applySubsMasked(template: string, subs: CardSubstitutions): string {
-  return applySubs(template, { ...subs, token: MASKED_TOKEN });
+  return applySubs(template, {
+    ...subs,
+    token: subs.token ? maskSecret(subs.token) : MASKED_TOKEN,
+  });
 }
+
+// Single-quoted for POSIX shells, so globs like *app* reach the installer unexpanded.
+export const shellQuote = (v: string) => `'${v.replaceAll("'", "'\\''")}'`;
+
+/** Applies the input's `sanitize` rule to a value before it reaches a command. */
+export const sanitizeInput = (inp: RichCardInput, value: string): string =>
+  inp.sanitize === "slug"
+    ? value
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "")
+    : value;
+
+/** The `{flag:<id>}` expansion; a blank value uses the input's `fallback`, else drops the flag so the script's own default applies. */
+export const cliFlagArg = (
+  inp: RichCardInput,
+  value: string,
+  get: (id: string) => string = () => "",
+): string => {
+  const v = sanitizeInput(inp, value.trim()) || sanitizeInput(inp, inp.fallback?.(get) ?? "");
+  return v && inp.cliFlag ? ` \\\n  ${inp.cliFlag}=${shellQuote(v)}` : "";
+};

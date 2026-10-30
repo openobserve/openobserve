@@ -1,0 +1,10 @@
+appId: com.o2native.ios
+---
+- launchApp:
+    clearState: false
+- assertVisible: "O2 Native iOS"
+- tapOn: "Trigger handled error"
+- tapOn: "Custom action"
+- tapOn: "Go to Details"
+- assertVisible: "Details screen"
+- back

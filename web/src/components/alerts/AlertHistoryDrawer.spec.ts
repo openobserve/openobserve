@@ -22,17 +22,23 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
 // Mock services
-vi.mock("@/services/alerts", () => ({
-  default: {
-    getHistory: vi.fn(),
-  },
-}));
+vi.mock("@/services/alerts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getHistory: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/anomaly_detection", () => ({
-  default: {
-    getConfig: vi.fn().mockResolvedValue({ data: {} }),
-  },
-}));
+vi.mock("@/services/anomaly_detection", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getConfig: vi.fn().mockResolvedValue({ data: {} }),
+    },
+  });
+});
 
 vi.mock("@/utils/alerts/anomalySqlBuilder", () => ({
   buildAnomalyPreviewSql: vi.fn(() => "SELECT * FROM anomalies"),

@@ -24,7 +24,7 @@ use utoipa::ToSchema;
 
 use crate::{
     config::get_config,
-    meta::{search, sql::OrderBy, stream::StreamType},
+    meta::{search, slo::Slo, sql::OrderBy, stream::StreamType},
     utils::{base64, json},
 };
 
@@ -164,15 +164,11 @@ pub struct Query {
     #[serde(default)]
     pub quick_mode: bool,
     #[serde(default)]
-    pub query_type: String,
-    #[serde(default)]
     pub track_total_hits: bool,
     #[serde(default)]
     pub uses_zo_fn: bool,
     #[serde(default)]
     pub query_fn: Option<String>,
-    #[serde(default)]
-    pub action_id: Option<String>,
     #[serde(default)]
     pub skip_wal: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -208,11 +204,9 @@ impl Default for Query {
             start_time: 0,
             end_time: 0,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
-            action_id: None,
             skip_wal: false,
             sampling_config: None,
             sampling_ratio: None,
@@ -267,8 +261,6 @@ pub struct Response {
     pub scan_size: usize,
     pub idx_scan_size: usize,
     pub scan_records: usize,
-    #[serde(skip_serializing_if = "String::is_empty", default)]
-    pub response_type: String,
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
     pub trace_id: String,
@@ -362,7 +354,7 @@ impl ResponseChunkIterator {
                 * mb
         });
 
-        let hits = response.hits.drain(..).collect::<Vec<_>>();
+        let hits = std::mem::take(&mut response.hits);
 
         Self {
             response,
@@ -487,7 +479,6 @@ impl Response {
             scan_records: 0,
             columns: Vec::new(),
             hits: Vec::new(),
-            response_type: "".to_string(),
             trace_id: "".to_string(),
             function_error: Vec::new(),
             is_partial: false,
@@ -527,8 +518,8 @@ impl Response {
             .collect();
     }
 
-    pub fn add_hit(&mut self, hit: &json::Value) {
-        self.hits.push(hit.to_owned());
+    pub fn add_hit(&mut self, hit: json::Value) {
+        self.hits.push(hit);
         self.total += 1;
     }
 
@@ -759,11 +750,9 @@ impl SearchHistoryRequest {
                 start_time: self.start_time,
                 end_time: self.end_time,
                 quick_mode: false,
-                query_type: "".to_string(),
                 track_total_hits: false,
                 uses_zo_fn: false,
                 query_fn: None,
-                action_id: None,
                 skip_wal: false,
                 sampling_config: None,
                 sampling_ratio: None,
@@ -978,7 +967,6 @@ impl From<Query> for cluster_rpc::SearchQuery {
         cluster_rpc::SearchQuery {
             sql: query.sql,
             quick_mode: query.quick_mode,
-            query_type: query.query_type,
             from: query.from as i32,
             size: query.size as i32,
             start_time: query.start_time,
@@ -986,7 +974,6 @@ impl From<Query> for cluster_rpc::SearchQuery {
             track_total_hits: query.track_total_hits,
             uses_zo_fn: query.uses_zo_fn,
             query_fn: query.query_fn.unwrap_or_default(),
-            action_id: query.action_id.unwrap_or_default(),
             skip_wal: query.skip_wal,
             histogram_interval: query.histogram_interval,
             timezone: query.timezone,
@@ -1049,6 +1036,8 @@ pub enum SearchEventType {
     SearchJob,
     Download,
     Insights,
+    #[serde(rename = "public_dashboard")]
+    PublicDashboard,
 }
 
 impl<'de> Deserialize<'de> for SearchEventType {
@@ -1069,7 +1058,9 @@ impl<'de> Deserialize<'de> for SearchEventType {
             where
                 E: serde::de::Error,
             {
-                SearchEventType::try_from(value).map_err(serde::de::Error::custom)
+                value
+                    .parse::<SearchEventType>()
+                    .map_err(serde::de::Error::custom)
             }
         }
 
@@ -1091,13 +1082,14 @@ impl std::fmt::Display for SearchEventType {
             Self::SearchJob => write!(f, "search_job"),
             Self::Download => write!(f, "download"),
             Self::Insights => write!(f, "insights"),
+            Self::PublicDashboard => write!(f, "public_dashboard"),
         }
     }
 }
 
-impl TryFrom<&str> for SearchEventType {
-    type Error = String;
-    fn try_from(s: &str) -> std::result::Result<Self, Self::Error> {
+impl std::str::FromStr for SearchEventType {
+    type Err = String;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "ui" => Ok(Self::UI),
             "dashboards" => Ok(Self::Dashboards),
@@ -1110,8 +1102,9 @@ impl TryFrom<&str> for SearchEventType {
             "search_job" | "searchjob" => Ok(Self::SearchJob),
             "download" => Ok(Self::Download),
             "insights" => Ok(Self::Insights),
+            "public_dashboard" | "publicdashboard" => Ok(Self::PublicDashboard),
             _ => Err(format!(
-                "invalid SearchEventType `{s}`, expected one of `ui`, `dashboards`, `reports`, `alerts`, `values`, `other`, `rum`, `derived_stream`, `search_job`, `insights`"
+                "invalid SearchEventType `{s}`, expected one of `ui`, `dashboards`, `reports`, `alerts`, `values`, `other`, `rum`, `derived_stream`, `search_job`, `insights`, `public_dashboard`"
             )),
         }
     }
@@ -1144,16 +1137,26 @@ pub struct SearchEventContext {
     pub alert_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub derived_stream_key: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", rename = "report_id")]
+    #[serde(skip_serializing_if = "Option::is_none", rename = "report_id", default)]
     pub report_key: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub dashboard_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub dashboard_name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", rename = "folder_id")]
+    #[serde(skip_serializing_if = "Option::is_none", rename = "folder_id", default)]
     pub dashboard_folder_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", rename = "folder_name")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        rename = "folder_name",
+        default
+    )]
     pub dashboard_folder_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub public_dashboard_link_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub range_key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub panel_id: Option<String>,
 }
 
 impl SearchEventContext {
@@ -1174,6 +1177,13 @@ impl SearchEventContext {
     pub fn with_report(report_key: Option<String>) -> Self {
         Self {
             report_key,
+            ..Default::default()
+        }
+    }
+
+    pub fn with_slo(slo: &Slo) -> Self {
+        Self {
+            derived_stream_key: Some(format!("slo/{}/{}/{}", slo.org, slo.name, slo.id)),
             ..Default::default()
         }
     }
@@ -1216,6 +1226,9 @@ impl From<proto::cluster_rpc::SearchEventContext> for SearchEventContext {
             dashboard_name: proto_sec.dashboard_name,
             dashboard_folder_id: proto_sec.dashboard_folder_id,
             dashboard_folder_name: proto_sec.dashboard_folder_name,
+            public_dashboard_link_id: proto_sec.public_dashboard_link_id,
+            range_key: proto_sec.range_key,
+            panel_id: proto_sec.panel_id,
         }
     }
 }
@@ -1231,6 +1244,9 @@ impl From<SearchEventContext> for proto::cluster_rpc::SearchEventContext {
             dashboard_name: sec.dashboard_name,
             dashboard_folder_id: sec.dashboard_folder_id,
             dashboard_folder_name: sec.dashboard_folder_name,
+            public_dashboard_link_id: sec.public_dashboard_link_id,
+            range_key: sec.range_key,
+            panel_id: sec.panel_id,
         }
     }
 }
@@ -1254,10 +1270,17 @@ pub struct MultiSearchPartitionRequest {
     pub histogram_interval: i64,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
-pub struct MultiSearchPartitionResponse {
-    pub success: hashbrown::HashMap<String, SearchPartitionResponse>,
-    pub error: hashbrown::HashMap<String, String>,
+impl MultiSearchPartitionRequest {
+    #[inline]
+    pub fn decode(&mut self) -> Result<(), std::io::Error> {
+        if self.encoding == RequestEncoding::Base64 {
+            for sql in self.sql.iter_mut() {
+                *sql = base64::decode_url(sql)?;
+            }
+        }
+        self.encoding = RequestEncoding::Empty;
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -1292,8 +1315,6 @@ pub struct MultiStreamRequest {
     pub sort_by: Option<String>,
     #[serde(default)]
     pub quick_mode: bool,
-    #[serde(default)]
-    pub query_type: String,
     #[serde(default)]
     pub track_total_hits: bool,
     #[serde(default)]
@@ -1378,11 +1399,9 @@ impl MultiStreamRequest {
                     start_time: query.start_time.unwrap_or(self.start_time),
                     end_time: query.end_time.unwrap_or(self.end_time),
                     quick_mode: self.quick_mode,
-                    query_type: self.query_type.clone(),
                     track_total_hits: self.track_total_hits,
                     uses_zo_fn: self.uses_zo_fn,
                     query_fn,
-                    action_id: None,
                     skip_wal: self.skip_wal,
                     sampling_config: None,
                     sampling_ratio: None,
@@ -1488,6 +1507,10 @@ pub struct ResultSchemaResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub having: Option<HavingNode>,
     pub timeseries_field: Option<String>,
+    #[serde(default)]
+    pub where_clause: String,
+    #[serde(default)]
+    pub where_by_stream: std::collections::HashMap<String, String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cross_links: Option<CrossLinksResponse>,
 }
@@ -1523,10 +1546,6 @@ pub enum Interval {
 impl Interval {
     pub fn get_duration_minutes(&self) -> i64 {
         *self as i64
-    }
-
-    pub fn get_interval_seconds(&self) -> i64 {
-        self.get_duration_minutes() * 60
     }
 
     pub fn get_interval_microseconds(&self) -> i64 {
@@ -1655,23 +1674,38 @@ mod search_history_utils {
             let mut query = format!("SELECT * FROM {search_stream_name} WHERE event='Search'");
 
             if let Some(org_id) = self.org_id.filter(|s| !s.is_empty()) {
-                query.push_str(&format!(" AND org_id = '{org_id}'"));
+                query.push_str(&format!(" AND org_id = {}", quote_sql_literal(&org_id)));
             }
             if let Some(stream_type) = self.stream_type.filter(|s| !s.is_empty()) {
-                query.push_str(&format!(" AND stream_type = '{stream_type}'"));
+                query.push_str(&format!(
+                    " AND stream_type = {}",
+                    quote_sql_literal(&stream_type)
+                ));
             }
             if let Some(stream_name) = self.stream_name.filter(|s| !s.is_empty()) {
-                query.push_str(&format!(" AND stream_name = '{stream_name}'"));
+                query.push_str(&format!(
+                    " AND stream_name = {}",
+                    quote_sql_literal(&stream_name)
+                ));
             }
             if let Some(user_email) = self.user_email.filter(|s| !s.is_empty()) {
-                query.push_str(&format!(" AND user_email = '{user_email}'"));
+                query.push_str(&format!(
+                    " AND user_email = {}",
+                    quote_sql_literal(&user_email)
+                ));
             }
             if let Some(trace_id) = self.trace_id.filter(|s| !s.is_empty()) {
-                query.push_str(&format!(" AND trace_id = '{trace_id}'"));
+                query.push_str(&format!(" AND trace_id = {}", quote_sql_literal(&trace_id)));
             }
 
             query
         }
+    }
+
+    // Escapes single quotes so a value cannot break out of the SQL string literal it is
+    // interpolated into (these fields come from client-controlled request params).
+    fn quote_sql_literal(value: &str) -> String {
+        format!("'{}'", value.replace('\'', "''"))
     }
 
     #[cfg(test)]
@@ -1704,17 +1738,6 @@ mod search_history_utils {
             assert_eq!(
                 query,
                 "SELECT * FROM usage WHERE event='Search' AND stream_type = 'logs'"
-            );
-        }
-
-        #[test]
-        fn test_with_stream_name() {
-            let query = SearchHistoryQueryBuilder::new()
-                .with_stream_name(&Some("streamA".to_string()))
-                .build(SEARCH_STREAM_NAME);
-            assert_eq!(
-                query,
-                "SELECT * FROM usage WHERE event='Search' AND stream_name = 'streamA'"
             );
         }
 
@@ -1773,6 +1796,17 @@ mod search_history_utils {
 
             assert_eq!(query, expected_query);
         }
+
+        #[test]
+        fn test_escapes_single_quotes_in_values() {
+            let query = SearchHistoryQueryBuilder::new()
+                .with_stream_name(&Some("x' OR '1'='1".to_string()))
+                .build(SEARCH_STREAM_NAME);
+            assert_eq!(
+                query,
+                "SELECT * FROM usage WHERE event='Search' AND stream_name = 'x'' OR ''1''=''1'"
+            );
+        }
     }
 }
 
@@ -1800,6 +1834,8 @@ pub enum StreamResponses {
     },
     PromqlResponse {
         data: super::promql::QueryResult,
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        warnings: Vec<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         trace_id: Option<String>,
     },
@@ -2048,7 +2084,7 @@ mod tests {
         let hit = json::json!({"num":12});
         let mut val_map = json::Map::new();
         val_map.insert("id".to_string(), json::json!({"id":1}));
-        res.add_hit(&hit); // total+1
+        res.add_hit(hit); // total+1
         assert_eq!(res.total, 11);
     }
 
@@ -2115,11 +2151,9 @@ mod tests {
         assert_eq!(query.start_time, 0);
         assert_eq!(query.end_time, 0);
         assert!(!query.quick_mode);
-        assert_eq!(query.query_type, "");
         assert!(!query.track_total_hits);
         assert!(!query.uses_zo_fn);
         assert!(query.query_fn.is_none());
-        assert!(query.action_id.is_none());
         assert!(!query.skip_wal);
         assert!(!query.streaming_output);
         assert!(query.streaming_id.is_none());
@@ -2456,19 +2490,19 @@ mod tests {
     #[test]
     fn test_search_event_type_try_from() {
         type Set = SearchEventType; // Saving line too long
-        assert_eq!(Set::try_from("ui").unwrap(), Set::UI);
-        assert_eq!(Set::try_from("dashboards").unwrap(), Set::Dashboards);
-        assert_eq!(Set::try_from("reports").unwrap(), Set::Reports);
-        assert_eq!(Set::try_from("alerts").unwrap(), Set::Alerts);
-        assert_eq!(Set::try_from("values").unwrap(), Set::Values);
-        assert_eq!(Set::try_from("_values").unwrap(), Set::Values);
-        assert_eq!(Set::try_from("other").unwrap(), Set::Other);
-        assert_eq!(Set::try_from("rum").unwrap(), Set::RUM);
-        assert_eq!(Set::try_from("derived_stream").unwrap(), Set::DerivedStream);
-        assert_eq!(Set::try_from("derivedstream").unwrap(), Set::DerivedStream);
-        assert_eq!(Set::try_from("search_job").unwrap(), Set::SearchJob);
-        assert_eq!(Set::try_from("searchjob").unwrap(), Set::SearchJob);
-        assert!(SearchEventType::try_from("invalid").is_err());
+        assert_eq!("ui".parse::<Set>().unwrap(), Set::UI);
+        assert_eq!("dashboards".parse::<Set>().unwrap(), Set::Dashboards);
+        assert_eq!("reports".parse::<Set>().unwrap(), Set::Reports);
+        assert_eq!("alerts".parse::<Set>().unwrap(), Set::Alerts);
+        assert_eq!("values".parse::<Set>().unwrap(), Set::Values);
+        assert_eq!("_values".parse::<Set>().unwrap(), Set::Values);
+        assert_eq!("other".parse::<Set>().unwrap(), Set::Other);
+        assert_eq!("rum".parse::<Set>().unwrap(), Set::RUM);
+        assert_eq!("derived_stream".parse::<Set>().unwrap(), Set::DerivedStream);
+        assert_eq!("derivedstream".parse::<Set>().unwrap(), Set::DerivedStream);
+        assert_eq!("search_job".parse::<Set>().unwrap(), Set::SearchJob);
+        assert_eq!("searchjob".parse::<Set>().unwrap(), Set::SearchJob);
+        assert!("invalid".parse::<SearchEventType>().is_err());
     }
 
     #[test]
@@ -2550,11 +2584,23 @@ mod tests {
     }
 
     #[test]
+    fn test_search_event_context_round_trips_through_cluster_rpc() {
+        let ctx = SearchEventContext {
+            dashboard_id: Some("d1".into()),
+            public_dashboard_link_id: Some("l1".into()),
+            range_key: Some("r3600".into()),
+            panel_id: Some("p1".into()),
+            ..Default::default()
+        };
+        let rpc: cluster_rpc::SearchEventContext = ctx.clone().into();
+        assert_eq!(SearchEventContext::from(rpc), ctx);
+    }
+
+    #[test]
     fn test_query_to_cluster_rpc() {
         let query = Query {
             sql: "SELECT * FROM test".to_string(),
             quick_mode: true,
-            query_type: "test".to_string(),
             from: 10,
             size: 20,
             start_time: 100,
@@ -2562,7 +2608,6 @@ mod tests {
             track_total_hits: true,
             uses_zo_fn: true,
             query_fn: Some("test_fn".to_string()),
-            action_id: Some("action123".to_string()),
             skip_wal: true,
             histogram_interval: 3600,
             ..Default::default()
@@ -2571,7 +2616,6 @@ mod tests {
         let cluster_query: cluster_rpc::SearchQuery = query.into();
         assert_eq!(cluster_query.sql, "SELECT * FROM test");
         assert!(cluster_query.quick_mode);
-        assert_eq!(cluster_query.query_type, "test");
         assert_eq!(cluster_query.from, 10);
         assert_eq!(cluster_query.size, 20);
         assert_eq!(cluster_query.start_time, 100);
@@ -2579,7 +2623,6 @@ mod tests {
         assert!(cluster_query.track_total_hits);
         assert!(cluster_query.uses_zo_fn);
         assert_eq!(cluster_query.query_fn, "test_fn");
-        assert_eq!(cluster_query.action_id, "action123");
         assert!(cluster_query.skip_wal);
         assert_eq!(cluster_query.histogram_interval, 3600);
     }
@@ -2818,7 +2861,6 @@ mod tests {
             end_time: 250,
             sort_by: Some("timestamp".to_string()),
             quick_mode: true,
-            query_type: "test".to_string(),
             track_total_hits: true,
             uses_zo_fn: true,
             query_fn: Some("global_fn".to_string()),
@@ -2842,7 +2884,6 @@ mod tests {
         assert_eq!(first_req.query.from, 5);
         assert_eq!(first_req.query.size, 25);
         assert!(first_req.query.quick_mode);
-        assert_eq!(first_req.query.query_type, "test");
         assert!(first_req.query.track_total_hits);
         assert!(first_req.query.uses_zo_fn);
         assert!(first_req.query.skip_wal);
@@ -3012,40 +3053,6 @@ mod tests {
     }
 
     #[test]
-    fn test_multi_search_partition_response() {
-        let mut response = MultiSearchPartitionResponse::default();
-        let partition_response = SearchPartitionResponse {
-            trace_id: "trace123".to_string(),
-            file_num: 10,
-            records: 100,
-            original_size: 1024,
-            compressed_size: 512,
-            histogram_interval: Some(3600),
-            max_query_range: 24,
-            partitions: vec![[100, 200]],
-            order_by: OrderBy::Asc,
-            limit: 1000,
-            streaming_output: true,
-            streaming_aggs: false,
-            streaming_id: Some("stream123".to_string()),
-            is_histogram_eligible: false,
-            non_ts_order_by_cols: vec![],
-        };
-
-        response
-            .success
-            .insert("query1".to_string(), partition_response);
-        response
-            .error
-            .insert("query2".to_string(), "Error message".to_string());
-
-        assert_eq!(response.success.len(), 1);
-        assert_eq!(response.error.len(), 1);
-        assert!(response.success.contains_key("query1"));
-        assert!(response.error.contains_key("query2"));
-    }
-
-    #[test]
     fn test_query_status_response() {
         let response = QueryStatusResponse {
             status: vec![QueryStatus {
@@ -3100,11 +3107,6 @@ mod tests {
         assert_eq!(Interval::FiveMinutes.get_duration_minutes(), 5);
         assert_eq!(Interval::OneHour.get_duration_minutes(), 60);
         assert_eq!(Interval::OneDay.get_duration_minutes(), 1440);
-
-        // Test duration in seconds
-        assert_eq!(Interval::FiveMinutes.get_interval_seconds(), 300);
-        assert_eq!(Interval::OneHour.get_interval_seconds(), 3600);
-        assert_eq!(Interval::OneDay.get_interval_seconds(), 86400);
 
         // Test duration in microseconds
         assert_eq!(
@@ -3456,20 +3458,46 @@ mod tests {
     #[test]
     fn test_search_event_type_try_from_download_and_insights() {
         assert_eq!(
-            SearchEventType::try_from("download").unwrap(),
+            "download".parse::<SearchEventType>().unwrap(),
             SearchEventType::Download
         );
         assert_eq!(
-            SearchEventType::try_from("insights").unwrap(),
+            "insights".parse::<SearchEventType>().unwrap(),
             SearchEventType::Insights
         );
     }
 
     #[test]
-    fn test_storage_type_equality() {
-        assert_eq!(StorageType::Memory, StorageType::Memory);
-        assert_eq!(StorageType::Wal, StorageType::Wal);
-        assert_ne!(StorageType::Memory, StorageType::Wal);
+    fn public_dashboard_search_type_is_interactive_and_named_on_the_wire() {
+        let t = SearchEventType::PublicDashboard;
+        assert!(!t.is_background());
+        assert_eq!(t.to_string(), "public_dashboard");
+        assert_eq!(serde_json::to_string(&t).unwrap(), r#""public_dashboard""#);
+        assert_eq!(
+            serde_json::from_str::<SearchEventType>(r#""public_dashboard""#).unwrap(),
+            t
+        );
+        assert_eq!(
+            crate::meta::cluster::RoleGroup::from(t),
+            crate::meta::cluster::RoleGroup::Interactive
+        );
+        let ctx = SearchEventContext {
+            public_dashboard_link_id: Some("l1".into()),
+            dashboard_id: Some("d1".into()),
+            range_key: Some("r3600".into()),
+            panel_id: Some("p1".into()),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&ctx).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "public_dashboard_link_id": "l1",
+                "dashboard_id": "d1",
+                "range_key": "r3600",
+                "panel_id": "p1"
+            })
+        );
     }
 
     #[test]
@@ -3596,10 +3624,7 @@ mod tests {
     #[test]
     fn test_interval_seconds_and_microseconds() {
         let h = Interval::OneHour;
-        assert_eq!(h.get_interval_seconds(), 3600);
         assert_eq!(h.get_interval_microseconds(), 3_600_000_000);
-        let five = Interval::FiveMinutes;
-        assert_eq!(five.get_interval_seconds(), 300);
     }
 
     #[test]
@@ -3612,7 +3637,6 @@ mod tests {
         assert!(!obj.contains_key("function_error"));
         assert!(!obj.contains_key("order_by_metadata"));
         // String::is_empty fields
-        assert!(!obj.contains_key("response_type"));
         assert!(!obj.contains_key("trace_id"));
         // Option::is_none fields
         assert!(!obj.contains_key("histogram_interval"));
@@ -3632,7 +3656,6 @@ mod tests {
         let r = Response {
             columns: vec!["col1".to_string()],
             function_error: vec!["err".to_string()],
-            response_type: "json".to_string(),
             trace_id: "t1".to_string(),
             histogram_interval: Some(3600),
             new_start_time: Some(1000),
@@ -3650,7 +3673,6 @@ mod tests {
         let obj = json.as_object().unwrap();
         assert!(obj.contains_key("columns"));
         assert!(obj.contains_key("function_error"));
-        assert!(obj.contains_key("response_type"));
         assert!(obj.contains_key("trace_id"));
         assert!(obj.contains_key("histogram_interval"));
         assert!(obj.contains_key("new_start_time"));

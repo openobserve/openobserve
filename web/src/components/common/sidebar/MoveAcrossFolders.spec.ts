@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import MoveAcrossFolders from "./MoveAcrossFolders.vue";
-import { createI18n } from "vue-i18n";
 import { createStore } from "vuex";
 import { nextTick } from "vue";
 
@@ -109,27 +108,14 @@ const mockStore = createStore({
   },
 });
 
-const mockI18n = createI18n({
-  locale: "en",
-  messages: {
-    en: {
-      dashboard: {
-        currentFolderLabel: "Current Folder",
-        cancel: "Cancel",
-      },
-      common: {
-        move: "Move",
-      },
-    },
-  },
-});
+// No local createI18n on purpose: a mount-level i18n plugin replaces the global
+// one from setupTests.ts, so every key outside the local bag renders empty.
 
 // Factory — single source of truth for mount config
 const createWrapper = (props: Record<string, any> = {}) => {
   return mount(MoveAcrossFolders, {
     props: { open: true, ...props },
     global: {
-      plugins: [mockI18n],
       provide: { store: mockStore },
       mocks: { $store: mockStore },
       stubs: { ODialog: ODialogStub },
@@ -286,6 +272,20 @@ describe("MoveAcrossFolders.vue", () => {
     expect(wrapper.vm.getModuleName()).toBe("alert_ids");
   });
 
+  it("keeps the folder wording for alerts", async () => {
+    wrapper = createWrapper({ activeFolderId: "folder1", moduleId: ["a1"], type: "alerts" });
+    expect(wrapper.findComponent(ODialogStub).props("title")).toBe("Move Alerts To Another Folder");
+    expect(wrapper.text()).toContain("Current Folder");
+    wrapper.vm.selectedFolder = { label: "Folder 2", value: "folder2" };
+    mockMoveModuleToAnotherFolder.mockResolvedValue(true);
+
+    await wrapper.vm.onSubmit.execute();
+
+    expect(mockShowPositiveNotification).toHaveBeenCalledWith("Alerts moved successfully", {
+      timeout: 5000,
+    });
+  });
+
   // Test 11: Successful form submission (migrated — no form validation)
   it("should handle successful form submission", async () => {
     wrapper = createWrapper({
@@ -422,7 +422,6 @@ describe("MoveAcrossFolders.vue", () => {
   it("should use default props when not provided", () => {
     wrapper = mount(MoveAcrossFolders, {
       global: {
-        plugins: [mockI18n],
         provide: { store: mockStore },
         mocks: { $store: mockStore },
         stubs: { ODialog: ODialogStub },
@@ -794,7 +793,7 @@ describe("MoveAcrossFolders.vue", () => {
 
     await wrapper.vm.onSubmit.execute();
 
-    expect(mockShowErrorNotification).toHaveBeenCalledWith("Top level message", {
+    expect(mockShowErrorNotification).toHaveBeenCalledWith("Nested error message", {
       timeout: 5000,
     });
   });

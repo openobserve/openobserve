@@ -25,11 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="h-full w-full">
       <div class="bg-card-glass-bg h-full">
         <div class="h-full overflow-auto pt-0.5">
-          <router-view
-            :title="tabs"
-            :currOrgIdentifier="currOrgIdentifier"
-            :currUserEmail="currentUserEmail"
-          >
+          <router-view :currOrgIdentifier="currOrgIdentifier" :currUserEmail="currentUserEmail">
           </router-view>
         </div>
       </div>
@@ -41,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
@@ -58,7 +54,7 @@ export default defineComponent({
     },
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router: any = useRouter();
     const tabs = ref("");
@@ -102,7 +98,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/sqlserver.png"),
-        label: t("ingestion.sqlserver"),
+        label: raw("SQL Server"),
         contentClass: "tab_content",
       },
       {
@@ -114,7 +110,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/postgres.png"),
-        label: t("ingestion.postgres"),
+        label: raw("Postgres"),
         contentClass: "tab_content",
       },
       {
@@ -126,7 +122,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/mongodb.svg"),
-        label: t("ingestion.mongodb"),
+        label: raw("MongoDB"),
         contentClass: "tab_content",
       },
       {
@@ -138,7 +134,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/redis.svg"),
-        label: t("ingestion.redis"),
+        label: raw("Redis"),
         contentClass: "tab_content",
       },
       // {
@@ -150,7 +146,7 @@ export default defineComponent({
       //     },
       //   },
       //   icon: "img:" + getImageURL("images/ingestion/couchdb.svg"),
-      //   label: t("ingestion.couchdb"),
+      //   label: raw("CouchDB"),
       //   contentClass: "tab_content",
       // },
       // {
@@ -162,7 +158,7 @@ export default defineComponent({
       //     },
       //   },
       //   icon: "img:" + getImageURL("images/ingestion/elasticsearch.svg"),
-      //   label: t("ingestion.elasticsearch"),
+      //   label: raw("Elasticsearch"),
       //   contentClass: "tab_content",
       // },
       {
@@ -178,6 +174,20 @@ export default defineComponent({
         contentClass: "tab_content",
       },
       {
+        name: "mariadb",
+        to: {
+          name: "mariadb",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        // No MariaDB mark ships with the app yet; MySQL's is the honest
+        // stand-in for a fork of MySQL, and beats a broken image.
+        icon: "img:" + getImageURL("images/ingestion/mysql.svg"),
+        label: t("ingestion.mariadb"),
+        contentClass: "tab_content",
+      },
+      {
         name: "oracle",
         to: {
           name: "oracle",
@@ -186,7 +196,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/oracle.svg"),
-        label: t("ingestion.oracle"),
+        label: raw("Oracle"),
         contentClass: "tab_content",
       },
       // {
@@ -210,7 +220,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/snowflake.svg"),
-        label: t("ingestion.snowflake"),
+        label: raw("Snowflake"),
         contentClass: "tab_content",
       },
       {
@@ -222,7 +232,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/zookeeper.png"),
-        label: t("ingestion.zookeeper"),
+        label: raw("Zookeeper"),
         contentClass: "tab_content",
       },
       {
@@ -234,7 +244,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/cassandra.png"),
-        label: t("ingestion.cassandra"),
+        label: raw("Cassandra"),
         contentClass: "tab_content",
       },
       {
@@ -246,7 +256,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/aerospike.svg"),
-        label: t("ingestion.aerospike"),
+        label: raw("Aerospike"),
         contentClass: "tab_content",
       },
       {
@@ -258,7 +268,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/dynamodb.png"),
-        label: t("ingestion.dynamodb"),
+        label: raw("DynamoDB"),
         contentClass: "tab_content",
       },
       {
@@ -270,7 +280,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/databricks.svg"),
-        label: t("ingestion.databricks"),
+        label: raw("Databricks"),
         contentClass: "tab_content",
       },
     ];

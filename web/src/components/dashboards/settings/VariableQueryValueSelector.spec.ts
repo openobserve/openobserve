@@ -24,7 +24,8 @@ import VariableQueryValueSelector from "./VariableQueryValueSelector.vue";
 config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
 // Mock lodash debounce - improved version
-vi.mock("lodash-es", () => ({
+vi.mock("lodash-es", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("lodash-es")>()),
   debounce: vi.fn((fn) => {
     // Return a mock function that can be called immediately for testing
     const mockFn = vi.fn((...args) => {
@@ -79,6 +80,7 @@ describe("VariableQueryValueSelector", () => {
       <div
         data-test="dashboard-variable-query-value-selector"
         class="o-select"
+        :data-disabled="String(!!disabled)"
       >
         <input
           :value="modelValue"
@@ -103,6 +105,7 @@ describe("VariableQueryValueSelector", () => {
       "labelPosition",
       "labelKey",
       "valueKey",
+      "disabled",
     ],
     emits: ["update:modelValue", "search", "open", "close", "keydown"],
     methods: {
@@ -492,6 +495,44 @@ describe("VariableQueryValueSelector", () => {
       }
     });
 
+    it("should show Select All as checked when every option is ticked by hand", () => {
+      wrapper.vm.selectedValue = ["us-east-1", "us-west-1", "eu-west-1"];
+
+      expect(wrapper.vm.isAllSelected).toBe(true);
+      expect(wrapper.vm.selectedValue).toEqual(["us-east-1", "us-west-1", "eu-west-1"]);
+    });
+
+    it("should uncheck Select All again when one hand-picked option is unticked", () => {
+      wrapper.vm.selectedValue = ["us-east-1", "us-west-1", "eu-west-1"];
+      wrapper.vm.selectedValue = ["us-east-1", "eu-west-1"];
+
+      expect(wrapper.vm.isAllSelected).toBe(false);
+    });
+
+    it("should clear the selection when the hand-checked Select All is toggled", async () => {
+      wrapper.vm.selectedValue = ["us-east-1", "us-west-1", "eu-west-1"];
+
+      await wrapper.vm.toggleSelectAll();
+
+      expect(wrapper.vm.selectedValue).toEqual([]);
+    });
+
+    it("should not treat a hand-picked set as all while options are still loading", () => {
+      wrapper = createWrapper({ variableItem: { ...multiSelectVariableItem, isLoading: true } });
+      wrapper.vm.selectedValue = ["us-east-1", "us-west-1", "eu-west-1"];
+
+      expect(wrapper.vm.isAllSelected).toBe(false);
+    });
+
+    it("should ignore custom-value options when deciding every option is ticked", () => {
+      wrapper = createWrapper({
+        variableItem: { ...multiSelectVariableItem, options: customValueOptions },
+      });
+      wrapper.vm.selectedValue = ["standard"];
+
+      expect(wrapper.vm.isAllSelected).toBe(true);
+    });
+
     it("should handle select all with existing selections", async () => {
       if (wrapper.vm.selectedValue !== undefined) {
         wrapper.vm.selectedValue = ["us-east-1"];
@@ -541,9 +582,12 @@ describe("VariableQueryValueSelector", () => {
 
       await wrapper.vm.toggleSelectAll();
 
-      // Dropdown stays open (close not called), but the value is still applied/emitted.
+      // Dropdown stays open and nothing applies until it closes, like any other tick.
       expect(mockRef.close).not.toHaveBeenCalled();
-      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
+      expect(wrapper.vm.selectedValue).toEqual(["_o2_all_"]);
+      expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+
+      wrapper.vm.onPopupHide();
       expect(wrapper.emitted("update:modelValue")!.at(-1)).toEqual([["_o2_all_"]]);
     });
 
@@ -578,6 +622,9 @@ describe("VariableQueryValueSelector", () => {
 
       expect(wrapper.vm.selectedValue).toEqual([]);
       expect(mockRef.close).not.toHaveBeenCalled();
+      expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+
+      wrapper.vm.onPopupHide();
       expect(wrapper.emitted("update:modelValue")!.at(-1)).toEqual([[]]);
     });
   });
@@ -813,6 +860,14 @@ describe("VariableQueryValueSelector", () => {
 
       wrapper.vm.onPopupHide();
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
+    });
+
+    it("multi-select closing without a change emits nothing", () => {
+      wrapper = createWrapper({ variableItem: multiSelectVariableItem });
+
+      wrapper.vm.onPopupHide();
+
+      expect(wrapper.emitted("update:modelValue")).toBeUndefined();
     });
 
     it("should handle popup show without loadOptions callback", () => {
@@ -1172,6 +1227,62 @@ describe("VariableQueryValueSelector", () => {
 
       // Should not throw errors when accessing refs after unmount
       expect(() => wrapper.vm.selectRef).not.toThrow();
+    });
+  });
+  // ── Not-applicable picker (curated-pages design §6.4, pass-4 finding 5) ────
+  // A page-level picker whose active section does not scope on it accepts a
+  // selection and changes nothing — a declared no-op is still a no-op to the
+  // person operating it. Additive prop, default false, so stored dashboards are
+  // unaffected (same posture as the PanelContainer badge).
+  describe("disabled prop forwarding", () => {
+    // The stub's own static `data-test` never reaches the DOM: the component
+    // binds `:data-test="variable-selector-<name>-inner"` on OSelect and a bound
+    // fallthrough attribute OVERWRITES the stub root's static one. So these read
+    // the component's real selector; `data-disabled` is the stub echoing the
+    // forwarded prop either way.
+    const oSelect = () => wrapper.find('[data-test="variable-selector-region-inner"]');
+
+    it("forwards disabled:true to OSelect", () => {
+      wrapper = createWrapper({ disabled: true });
+      expect(oSelect().exists()).toBe(true);
+      expect(oSelect().attributes("data-disabled")).toBe("true");
+    });
+
+    it("defaults to NOT disabled when the prop is omitted — the stored-dashboard guard", () => {
+      wrapper = createWrapper();
+      expect(oSelect().exists()).toBe(true);
+      expect(oSelect().attributes("data-disabled")).toBe("false");
+    });
+
+    it("forwards disabled:false explicitly", () => {
+      wrapper = createWrapper({ disabled: false });
+      expect(oSelect().attributes("data-disabled")).toBe("false");
+    });
+
+    it("renders the disabled-reason tooltip TEXT, with its params interpolated", () => {
+      // Asserting the ATTRIBUTE proved nothing: nothing in web/src consumed
+      // data-tooltip-key, so the reason never reached a user. The pin has to
+      // read the rendered copy, with its params interpolated.
+      wrapper = createWrapper({
+        disabled: true,
+        disabledTooltipKey: "infra.curated.fieldUnresolved",
+        disabledTooltipParams: { display: "Namespace", stream: "k8s_pod_memory_usage" },
+      });
+      const tooltip = wrapper.findComponent({ name: "OTooltip" });
+      expect(tooltip.exists()).toBe(true);
+      const content = tooltip.props("content") as string;
+      expect(content).toBe("No Namespace field found on k8s_pod_memory_usage.");
+      // No unsubstituted placeholder ever reaches the user.
+      expect(content).not.toContain("{display}");
+      expect(content).not.toContain("{stream}");
+    });
+
+    it("renders NO tooltip when the picker is enabled", () => {
+      // Paired with the positive case above so this cannot pass merely because
+      // the affordance does not exist yet — that one must be green for this to
+      // mean anything.
+      wrapper = createWrapper({ disabledTooltipKey: "infra.curated.fieldUnresolved" });
+      expect(wrapper.find('[data-test="variable-disabled-tooltip"]').exists()).toBe(false);
     });
   });
 });

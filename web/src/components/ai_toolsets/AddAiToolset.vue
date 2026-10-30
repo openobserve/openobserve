@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="isEditing ? t('aiToolset.update') : t('aiToolset.add')"
     :back="{
       label: t('aiToolset.header'),
-      onClick: () => $emit('cancel:hideform'),
+      onClick: closeEditor,
       dataTest: 'ai-toolset-back-btn',
     }"
     bleed
@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          button lives inside <OForm> as type="submit", so Enter + click both
          submit natively (no form-id). -->
     <OForm id="add-ai-toolset-form" :form="form" v-slot="{ isSubmitting }">
+      <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
       <div style="height: calc(100vh - 120px)" class="overflow-auto">
         <div class="mx-4 mt-4 max-w-2xl">
           <!-- Name -->
@@ -77,12 +78,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="o2-input mb-4">
               <OFormInput
+                :placeholder="raw('https://api.example.com/mcp/')"
                 data-test="ai-toolset-mcp-url"
                 name="mcp.url"
                 :label="t('aiToolset.mcpUrl')"
                 required
                 class="showLabelOnTop w-full"
-                placeholder="https://api.example.com/mcp/"
               />
             </div>
             <div class="o2-input mb-4">
@@ -118,7 +119,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </template>
               </OFormInput>
-              <OButton variant="ghost-destructive" size="icon-xs-sq" @click="removeHeader(idx)">
+              <OButton
+                :aria-label="t('common.delete')"
+                variant="ghost-destructive"
+                size="icon-xs-sq"
+                @click="removeHeader(idx)"
+              >
                 <OIcon name="delete" size="xs" />
               </OButton>
             </div>
@@ -151,21 +157,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="o2-input mb-4">
               <OFormInput
+                :placeholder="raw('kubectl')"
                 data-test="ai-toolset-cli-command"
                 name="cli.command"
                 :label="t('aiToolset.cliCommand')"
                 required
                 class="showLabelOnTop w-full"
-                placeholder="kubectl"
               />
             </div>
             <div class="o2-input mb-4">
               <OFormInput
+                :placeholder="raw('get, describe, logs')"
                 name="cli.allowed_subcommands_raw"
                 :label="t('aiToolset.allowedSubcommands')"
                 :helpText="t('aiToolset.subcommandsHint')"
                 class="showLabelOnTop w-full"
-                placeholder="get, describe, logs"
               />
             </div>
             <div class="mb-4 flex gap-4">
@@ -221,7 +227,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </template>
               </OFormInput>
-              <OButton variant="ghost-destructive" size="icon-xs-sq" @click="removeEnvVar(idx)">
+              <OButton
+                :aria-label="t('common.delete')"
+                variant="ghost-destructive"
+                size="icon-xs-sq"
+                @click="removeEnvVar(idx)"
+              >
                 <OIcon name="delete" size="xs" />
               </OButton>
             </div>
@@ -240,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OFormInput
                   :name="`cli.credFiles[${idx}].key`"
                   :label="t('aiToolset.credEnvVar')"
-                  helpText="e.g. KUBECONFIG"
+                  :helpText="t('aiToolset.credEnvVarHint', { example: 'KUBECONFIG' })"
                   class="o2-input w-48"
                 />
                 <OButton
@@ -262,6 +273,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :query="cred.value"
                 @update:query="(v: string) => setCredValue(idx, v)"
               />
+              <div
+                v-if="pendingCredFileRows.has(idx)"
+                class="text-status-error-text mt-1 text-xs"
+                :data-test="`ai-toolset-cred-file-reenter-${idx}`"
+              >
+                {{ t("common.editorDraft.reenterField") }}
+              </div>
             </div>
             <OButton variant="outline" size="sm" class="mb-4" @click="addCredFile" icon-left="add">
               {{ t("aiToolset.addCredFile") }}
@@ -309,21 +327,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm-action"
             :disabled="isSubmitting"
-            @click="$emit('cancel:hideform')"
+            @click="closeEditor"
           >
             {{ t("common.cancel") }}
           </OButton>
         </div>
       </div>
     </OForm>
+    <EditorDraftDialogs :draft="toolsetDraft" />
   </OPageLayout>
 </template>
 
 <script lang="ts">
-import { defineAsyncComponent, defineComponent, ref, computed, onMounted } from "vue";
+import {
+  defineAsyncComponent,
+  defineComponent,
+  ref,
+  computed,
+  onMounted,
+  nextTick,
+  shallowRef,
+} from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import aiToolsetsService from "@/services/ai_toolsets";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -334,9 +361,12 @@ import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import { useOForm } from "@/lib/forms/Form/useOForm";
+import { useOForm, type FormFieldPath } from "@/lib/forms/Form/useOForm";
 import type { ToolsetKind } from "@/services/ai_toolsets";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useEditorDraft, useEditorDraftIds } from "@/composables/useEditorDraft";
+import { urlCarriesCredential } from "@/utils/drafts/urlCredentials";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import {
   makeAddAiToolsetSchema,
   addAiToolsetDefaults,
@@ -344,6 +374,22 @@ import {
 } from "./AddAiToolset.schema";
 
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
+
+type SecretPair = { key: string; value: string };
+type SecretRow = { key?: string; value?: string };
+type SecretList = "headers" | "env" | "credFiles";
+type SecretRowsSource = {
+  mcp?: { headers?: SecretRow[] };
+  cli?: { env?: SecretRow[]; credFiles?: SecretRow[] };
+};
+
+interface AiToolsetDraftData extends Omit<AddAiToolsetForm, "mcp" | "cli"> {
+  mcp: Omit<AddAiToolsetForm["mcp"], "headers"> & { headers: SecretPair[] };
+  cli: Omit<AddAiToolsetForm["cli"], "env" | "credFiles"> & {
+    env: SecretPair[];
+    credFiles: SecretPair[];
+  };
+}
 
 export default defineComponent({
   name: "AddAiToolset",
@@ -358,12 +404,13 @@ export default defineComponent({
     OFormSelect,
     OFormSwitch,
     QueryEditor,
+    EditorDraftDialogs,
   },
-  emits: ["cancel:hideform"],
+  emits: ["cancel:hideform", "update:list"],
   setup(_, { emit }) {
     const store = useStore();
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // Co-located Zod schema (factory keeps the messages i18n-driven).
     const addAiToolsetSchema = makeAddAiToolsetSchema(t);
@@ -372,9 +419,9 @@ export default defineComponent({
     const isEditing = ref(false);
 
     const kindOptions = [
-      { label: "MCP Server", value: "mcp" },
-      { label: "CLI Tool", value: "cli" },
-      { label: "Skill", value: "skill" },
+      { label: t("aiToolset.kindMcp"), value: "mcp" },
+      { label: t("aiToolset.kindCli"), value: "cli" },
+      { label: t("aiToolset.kindSkill"), value: "skill" },
     ];
 
     // -----------------------------------------------------------------------
@@ -433,13 +480,14 @@ export default defineComponent({
     // once the whole schema passes (no manual gate). OForm awaits it → auto Save
     // spinner. `value` is the validated payload and the single source of truth.
     const saveToolset = async (value: AddAiToolsetForm) => {
+      if (blockOnPendingReentries()) return;
       const org = store.state.selectedOrganization.identifier;
       const data = buildData(value);
 
       try {
         if (isEditing.value && editingId.value) {
           await aiToolsetsService.update(org, editingId.value, {
-            description: value.description || undefined,
+            description: value.description ? raw(value.description) : undefined,
             data,
           });
           toast({
@@ -450,7 +498,7 @@ export default defineComponent({
           await aiToolsetsService.create(org, {
             name: value.name,
             kind: value.kind as ToolsetKind,
-            description: value.description || undefined,
+            description: value.description ? raw(value.description) : undefined,
             data,
           });
           toast({
@@ -458,11 +506,19 @@ export default defineComponent({
             message: t("aiToolset.createdSuccessfully"),
           });
         }
+        if (leaveSave) {
+          leaveSave.saved = true;
+          emit("update:list");
+          return;
+        }
+        toolsetDraft.markSaved();
         emit("cancel:hideform");
       } catch (err: any) {
         const msg =
           err?.response?.data?.message ||
-          (isEditing.value ? t("aiToolset.updateFailed") : t("aiToolset.createFailed"));
+          (isEditing.value
+            ? t("aiToolset.updateFailed", { product: raw("AI Toolset") })
+            : t("aiToolset.createFailed", { product: raw("AI Toolset") }));
         toast({ variant: "error", message: msg });
       }
     };
@@ -586,7 +642,8 @@ export default defineComponent({
     // Load existing toolset when editing — seed via form.reset (the record
     // arrives async; `:default-values` was read once at creation).
     // -----------------------------------------------------------------------
-    const loadForEdit = async (id: string) => {
+    const toolsetDrafts = useEditorDraftIds("ai_toolset");
+    const loadForEdit = async (id: string): Promise<"loaded" | "gone" | "failed"> => {
       const org = store.state.selectedOrganization.identifier;
       try {
         const res = await aiToolsetsService.get(org, id);
@@ -635,19 +692,224 @@ export default defineComponent({
         // Async-loaded record → form.reset (NOT per-field setFieldValue). The
         // `form.useStore` reads above re-render automatically.
         form.reset(record);
-      } catch {
-        toast({ variant: "error", message: "Failed to load toolset" });
+        serverToolset = toolsetSnapshot();
+        return "loaded";
+      } catch (err: unknown) {
+        const gone = (err as { response?: { status?: number } } | null)?.response?.status === 404;
+        // The draft's own notice replaces the load error for a deleted toolset that has one.
+        if (!gone || !toolsetDrafts.ids.has(id)) {
+          toast({ variant: "error", message: t("toastMessages.aitoolsets.failedToLoadToolset") });
+        }
+        return gone ? "gone" : "failed";
       }
     };
 
-    onMounted(() => {
+    const formValues = form.useStore((s: { values: AddAiToolsetForm }) => s.values);
+    const editId = (): string | null => {
       const query = router.currentRoute.value.query;
-      if (query.action === "edit" && query.id) {
-        loadForEdit(query.id as string);
+      return query.action === "edit" && query.id ? String(query.id) : null;
+    };
+    // The toolset in the form's shape, so the base hash ignores what the form never shows.
+    let serverToolset: AiToolsetDraftData | null = null;
+    // Set while the leave dialog's Save runs, so a successful save does not close the editor itself.
+    let leaveSave: { saved: boolean } | null = null;
+
+    // The password-visibility toggles are view state, so they are neither drafted nor counted as edits.
+    const toolsetSnapshot = (): AiToolsetDraftData => {
+      const values = formValues.value;
+      const pairs = (rows: { key?: string; value?: string }[] | undefined) =>
+        (rows ?? []).map((row) => ({ key: row.key ?? "", value: row.value ?? "" }));
+      return {
+        ...values,
+        mcp: { ...values.mcp, headers: pairs(values.mcp?.headers) },
+        cli: {
+          ...values.cli,
+          env: pairs(values.cli?.env),
+          credFiles: pairs(values.cli?.credFiles),
+        },
+        skill: { ...values.skill },
+      };
+    };
+
+    const SECRET_SECTION: Record<SecretList, "mcp" | "cli"> = {
+      headers: "mcp",
+      env: "cli",
+      credFiles: "cli",
+    };
+    const SECRET_PATH = /^\/(?:mcp|cli)\/(headers|env|credFiles)\/(\d+)\/value$/;
+
+    const secretRows = (data: SecretRowsSource, list: SecretList): SecretRow[] =>
+      (list === "headers" ? data.mcp?.headers : data.cli?.[list]) ?? [];
+
+    const MCP_URL_PATH = "/mcp/url";
+
+    // Header and env values carry auth, credential files are kubeconfigs and a URL can embed a token, so none is drafted.
+    const redactToolsetDraft = (data: AiToolsetDraftData) => {
+      const copy = JSON.parse(JSON.stringify(data)) as AiToolsetDraftData;
+      const paths: string[] = [];
+      if (copy.mcp?.url && urlCarriesCredential(copy.mcp.url)) {
+        copy.mcp.url = "";
+        paths.push(MCP_URL_PATH);
       }
+      for (const list of Object.keys(SECRET_SECTION) as SecretList[]) {
+        secretRows(copy, list).forEach((row, index) => {
+          if (!row.value) return;
+          row.value = "";
+          paths.push(`/${SECRET_SECTION[list]}/${list}/${index}/value`);
+        });
+      }
+      return { data: copy, paths };
+    };
+
+    const rowOf = (path: string, data: AiToolsetDraftData) => {
+      const match = SECRET_PATH.exec(path);
+      if (!match) return null;
+      const list = match[1] as SecretList;
+      return { list, key: secretRows(data, list)[Number(match[2])]?.key ?? "" };
+    };
+
+    const describeRedactedToolset = (paths: string[], data: AiToolsetDraftData): I18nText[] => {
+      const fields = paths.flatMap((path): I18nText[] => {
+        if (path === MCP_URL_PATH) return [t("aiToolset.mcpUrl")];
+        const row = rowOf(path, data);
+        if (!row) return [];
+        if (row.list === "headers") {
+          return [
+            row.key
+              ? t("common.editorDraft.headerField", { name: row.key })
+              : t("common.editorDraft.headersField"),
+          ];
+        }
+        if (!row.key) {
+          return [row.list === "env" ? t("aiToolset.envVars") : t("aiToolset.credentialFiles")];
+        }
+        return [
+          row.list === "env"
+            ? t("common.editorDraft.envVarField", { name: row.key })
+            : t("common.editorDraft.credentialFileField", { name: row.key }),
+        ];
+      });
+      return [...new Set(fields)];
+    };
+
+    // A not-kept row is found again by its key, since rows may have moved since the draft was written.
+    const notKeptRows = shallowRef(new Map<string, { list: SecretList; key: string }>());
+
+    const currentRowIndex = (path: string): number => {
+      const row = notKeptRows.value.get(path);
+      return row ? secretRows(formValues.value, row.list).findIndex((r) => r.key === row.key) : -1;
+    };
+
+    const fieldNameFor = (path: string): FormFieldPath<AddAiToolsetForm> | null => {
+      if (path === MCP_URL_PATH) return "mcp.url";
+      const row = notKeptRows.value.get(path);
+      if (!row) return null;
+      const index = currentRowIndex(path);
+      return index < 0
+        ? null
+        : (`${SECRET_SECTION[row.list]}.${row.list}[${index}].value` as FormFieldPath<AddAiToolsetForm>);
+    };
+
+    const flagReentries = (paths: string[]) => {
+      for (const path of paths) {
+        const name = fieldNameFor(path);
+        const meta = name ? form.getFieldMeta(name) : undefined;
+        if (!name || !meta) continue;
+        form.setFieldMeta(name, {
+          ...meta,
+          errorMap: { ...meta.errorMap, onSubmit: t("common.editorDraft.reenterField") },
+        });
+      }
+    };
+
+    // A secret of a kind the user switched away from is never sent, so it is not asked for.
+    const activePendingReentries = (): string[] =>
+      toolsetDraft
+        .pendingReentries()
+        .filter((path) => path.startsWith(`/${String(selectedKind.value)}/`));
+
+    // The credential file editors are not form fields, so their re-entry note is drawn by hand.
+    const pendingCredFileRows = computed(
+      () =>
+        new Set(
+          activePendingReentries()
+            .filter((path) => notKeptRows.value.get(path)?.list === "credFiles")
+            .map(currentRowIndex)
+            .filter((index) => index >= 0),
+        ),
+    );
+
+    /** A changed secret the draft could not keep must be typed again before saving. */
+    const blockOnPendingReentries = (): boolean => {
+      const pending = activePendingReentries();
+      if (!pending.length) return false;
+      flagReentries(pending);
+      toast({ variant: "error", message: t("common.editorDraft.reenterBeforeSave") });
+      return true;
+    };
+
+    const toolsetDraft = useEditorDraft<AiToolsetDraftData>({
+      kind: "ai_toolset",
+      entityLabel: () => t("common.editorDraft.entities.ai_toolset"),
+      entityId: editId,
+      snapshot: toolsetSnapshot,
+      apply: async (data, { notKeptPaths }) => {
+        const withHidden = (rows: SecretPair[]) => rows.map((row) => ({ ...row, visible: false }));
+        // A saved toolset's name and kind are locked, so the draft can never change them.
+        const locked = isEditing.value
+          ? { name: form.state.values.name, kind: form.state.values.kind }
+          : {};
+        form.reset({
+          ...data,
+          ...locked,
+          mcp: { ...data.mcp, headers: withHidden(data.mcp.headers) },
+          cli: { ...data.cli, env: withHidden(data.cli.env), credFiles: data.cli.credFiles },
+        } as AddAiToolsetForm);
+        notKeptRows.value = new Map(
+          notKeptPaths.flatMap((path) => {
+            const row = rowOf(path, data);
+            return row ? [[path, row] as const] : [];
+          }),
+        );
+        // After the form's own error sweep, which runs on the reset values.
+        await nextTick();
+        flagReentries(notKeptPaths);
+      },
+      base: () => (editId() ? serverToolset : undefined),
+      redactBase: (base) => redactToolsetDraft(base as AiToolsetDraftData).data,
+      save: async () => {
+        const run = { saved: false };
+        leaveSave = run;
+        try {
+          await form.handleSubmit();
+        } finally {
+          leaveSave = null;
+        }
+        return run.saved;
+      },
+      redact: redactToolsetDraft,
+      describeRedacted: describeRedactedToolset,
+      leaveOnRouteUpdate: (to, from) =>
+        to.path !== from.path ||
+        to.query.action !== from.query.action ||
+        to.query.id !== from.query.id,
+    });
+
+    const closeEditor = async () => {
+      if (await toolsetDraft.confirmLeave()) emit("cancel:hideform");
+    };
+
+    onMounted(async () => {
+      const id = editId();
+      const loaded = id ? await loadForEdit(id) : "loaded";
+      if (loaded === "failed") return;
+      // A deleted toolset still starts the draft, so a draft left for it is dropped with a notice.
+      await toolsetDraft.start();
+      if (loaded === "gone") emit("cancel:hideform");
     });
 
     return {
+      raw,
       t,
       // Exposed for the theme-aware footer background (`store.state.theme`).
       store,
@@ -677,6 +939,9 @@ export default defineComponent({
       skillContent,
       setSkillContent,
       skillContentError,
+      toolsetDraft,
+      closeEditor,
+      pendingCredFileRows,
     };
   },
 });

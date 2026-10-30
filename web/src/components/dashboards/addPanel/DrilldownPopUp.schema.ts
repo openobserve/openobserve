@@ -20,8 +20,22 @@
 
 import { z } from "zod";
 
-// Protocol-only URL check.
-const URL_PROTOCOL_REGEX = /^(http|https|ftp|file|mailto|telnet|data|ws|wss):\/\//;
+import { isSafeNavigableUrl } from "@/utils/safeUrl";
+
+/**
+ * A drilldown URL is a TEMPLATE containing `${variable}` placeholders, so it
+ * is validated with the placeholders stripped to a harmless token — the shape
+ * around them still has to be a real http(s) URL.
+ *
+ * This replaces a scheme-prefix regex that allowed `ftp`, `file`, `telnet`,
+ * `data`, `ws` and `wss` by name. `data:` and `file:` are navigable targets
+ * (`usePanelDrilldown` calls `window.open` on this value), and the regex also
+ * passed degenerate values like `http://` that are not URLs at all.
+ */
+export function drilldownUrlIsValid(url: string): boolean {
+  const withoutPlaceholders = url.replace(/\$\{[^}]*\}/g, "x");
+  return isSafeNavigableUrl(withoutPlaceholders);
+}
 
 // Array row — kept loose (no per-row rules).
 export const drilldownVariableRowSchema = z.object({
@@ -73,7 +87,7 @@ export const makeDrilldownPopUpSchema = (t: (_key: string) => string) =>
             path: ["data", "url"],
             message: t("dashboard.urlRequired"),
           });
-        } else if (!URL_PROTOCOL_REGEX.test(url)) {
+        } else if (!drilldownUrlIsValid(url)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["data", "url"],

@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!showDestinationEditor"
       :title="t('pipeline_destinations.header')"
       icon="person-pin-circle"
-      :subtitle="'External targets for pipeline output'"
+      :subtitle="t('settings.pipelineDestinationsDesc')"
     >
       <template #actions>
         <OButton
@@ -34,18 +34,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
         <OTable
+          ref="oTableRef"
           :frame="false"
           data-test="alert-destinations-list-table"
           :data="visibleRows"
           :columns="columns"
           row-key="name"
           :loading="loading"
+          :forbidden="forbidden"
           :selected-ids="selectedDestinationIds"
           selection="multiple"
           pagination="client"
-          :page-size="20"
+          :page-size="pageSize"
           :page-size-options="[5, 10, 20, 50, 100]"
-          :footer-title="t('pipeline_destinations.header')"
+          :current-page="currentPage"
+          :sort-by="sortBy"
+          :sort-order="sortOrder"
+          @update:page-size="pageSize = $event"
+          @update:current-page="currentPage = $event"
+          @update:sort-by="sortBy = $event"
+          @update:sort-order="sortOrder = $event"
           sorting="client"
           :default-columns="false"
           :enable-column-resize="true"
@@ -63,20 +71,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
-              :loading="loading"
+              :last-run-at="lastUpdatedAt"
+              :loading="fetching"
+              shortcut-id="pipelineDestinationsRefresh"
               data-test="pipeline-destination-list-refresh-btn"
-              @click="getDestinations"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="pipelineDestinationsRefresh"
-              />
-            </OButton>
+              @click="refreshDestinations"
+            />
           </template>
           <template #empty>
             <OEmptyState
@@ -109,6 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-row-action="edit"
               variant="ghost"
               size="icon-sm"
+              class="max-md:hidden"
               :title="t('alert_destinations.edit')"
               @click="editDestination(row)"
             >
@@ -119,17 +123,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-row-action="delete"
               variant="ghost"
               size="icon-sm"
+              class="max-md:hidden"
               :title="t('alert_destinations.delete')"
               @click="conformDeleteDestination(row)"
             >
               <OIcon name="delete" size="sm" />
             </OButton>
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  :title="t('dashboard.moreActions')"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="alert-destination-list-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                icon-left="edit"
+                class="md:hidden"
+                :data-test="`alert-destination-list-${row.name}-update-destination-menu`"
+                @select="editDestination(row)"
+              >
+                <span>{{ t("alert_destinations.edit") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="delete"
+                variant="destructive"
+                class="md:hidden"
+                :data-test="`alert-destination-list-${row.name}-delete-destination-menu`"
+                @select="conformDeleteDestination(row)"
+              >
+                <span>{{ t("alert_destinations.delete") }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </template>
 
-          <template v-if="selectedDestinations.length > 0" #bottom>
-            <span class="text-text-secondary text-xs font-medium">
-              {{ selectedDestinations.length }} selected
-            </span>
+          <template #selection-actions>
             <OButton
               data-test="pipeline-destination-list-delete-destinations-btn"
               variant="outline-destructive"
@@ -138,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="bulkDeleteLoading"
               @click="openBulkDeleteDialog"
             >
-              Delete
+              {{ t("common.delete") }}
             </OButton>
           </template>
         </OTable>
@@ -154,16 +186,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <ConfirmDialog
-      title="Delete Destination"
-      message="Are you sure you want to delete destination?"
+      :title="t('alert_destinations.deleteDestinationTitle')"
+      message-keypath="alert_destinations.deleteDestinationMessage"
+      :message-name="confirmDelete.data?.name"
+      ok-variant="destructive"
       @update:ok="deleteDestination"
       @update:cancel="cancelDeleteDestination"
       v-model="confirmDelete.visible"
     />
 
     <ConfirmDialog
-      title="Delete Destinations"
-      :message="`Are you sure you want to delete ${selectedDestinations.length} destination(s)?`"
+      :title="t('alert_destinations.deleteDestinationsTitle')"
+      :message="t('alerts.confirmDeleteDestinations', { count: selectedDestinations.length })"
+      ok-variant="destructive"
       @update:ok="bulkDeleteDestinations"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -171,13 +206,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 </template>
 <script lang="ts">
+import { bulkDeleteDestinationsMutation } from "@/services/alert_destination.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { destinationKeys } from "@/services/alert_destination.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import { ref, onBeforeMount, onActivated, watch, defineComponent, onMounted, computed } from "vue";
 import type { Ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 import PipelineDestinationEditor from "../pipeline/PipelineDestinationEditor.vue";
 import destinationService from "@/services/alert_destination";
-import templateService from "@/services/alert_templates";
+import { templatesQuery } from "@/services/alert_templates.queries";
 import { useStore } from "vuex";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { useRouter } from "vue-router";
@@ -186,15 +227,18 @@ import type { Template } from "@/ts/interfaces/index";
 
 import { useReo } from "@/services/reodotdev_analytics";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { useListViewState } from "@/composables/useListViewState";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -205,30 +249,32 @@ interface ConformDelete {
 }
 
 const formatOutputFormat = (val: any): string => {
-  if (!val) return "N/A";
+  if (!val) return raw("N/A");
   if (typeof val === "string") return val.toUpperCase();
   if (typeof val === "object" && val.esbulk) return "ESBULK";
-  return "N/A";
+  return raw("N/A");
 };
 
 export default defineComponent({
   name: "PageAlerts",
   components: {
     OPageLayout,
+    ORefreshButton,
     PipelineDestinationEditor,
     OEmptyState,
     ConfirmDialog,
     OButton,
-    OTooltip,
     OIcon,
     OTag,
     OSearchInput,
     OTable,
+    ODropdown,
+    ODropdownItem,
   },
   setup() {
     const store = useStore();
     const editingDestination: Ref<DestinationPayload | null> = ref(null);
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { track } = useReo();
     const columns: OTableColumnDef[] = [
       {
@@ -244,7 +290,7 @@ export default defineComponent({
       },
       {
         id: "destination_type",
-        header: "Destination Type",
+        header: t("alert_destinations.destination_type"),
         accessorKey: "destination_type_name",
         sortable: true,
         resizable: true,
@@ -259,12 +305,13 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: COL.url,
-        meta: { align: "left" },
+        // An endpoint URL can carry a key or password, so it never shows on hover.
+        meta: { align: "left", cellOverflowTooltip: false },
       },
       {
         id: "method",
         header: t("alert_destinations.method"),
-        accessorKey: "method",
+        accessorFn: (row: any) => (row.method ?? "").toUpperCase(),
         sortable: true,
         resizable: true,
         hideable: true,
@@ -273,7 +320,7 @@ export default defineComponent({
       },
       {
         id: "output_format",
-        header: "Output Format",
+        header: t("alert_destinations.output_format"),
         accessorKey: "output_format",
         sortable: true,
         resizable: true,
@@ -301,8 +348,37 @@ export default defineComponent({
     const selectedDestinations = ref<any[]>([]);
     const showDestinationEditor = ref(false);
     const router = useRouter();
-    const filterQuery = ref("");
-    const resultTotal = ref(0);
+    const viewState = useListViewState("pipeline-destinations", {
+      filterQuery: "",
+      pageSize: 20,
+      currentPage: 1,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+    });
+    const filterQuery = ref(viewState.filterQuery);
+    const pageSize = ref(viewState.pageSize);
+    const currentPage = ref(viewState.currentPage);
+    const sortBy = ref(viewState.sortBy);
+    const sortOrder = ref(viewState.sortOrder);
+    const oTableRef = ref<any>(null);
+
+    watch([filterQuery, pageSize, currentPage, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        filterQuery: filterQuery.value,
+        pageSize: pageSize.value,
+        currentPage: currentPage.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
+    });
+    // setTimeout(0) runs after TanStack's deferred auto-reset-on-data-change, so the restored page wins.
+    watch(
+      destinations,
+      () => {
+        setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
+      },
+      { once: true },
+    );
 
     const selectedDestinationIds = computed(() =>
       selectedDestinations.value.map((d: any) => d.name),
@@ -334,32 +410,58 @@ export default defineComponent({
     });
 
     const loading = ref(false);
-    const getDestinations = () => {
-      const dismiss = toast({
-        variant: "loading",
-        message: "Please wait while loading destinations...",
-        timeout: 0,
-      });
-      loading.value = true;
-      destinationService
-        .list({
-          page_num: 1,
-          page_size: 100000,
-          sort_by: "name",
-          desc: false,
-          org_identifier: store.state.selectedOrganization.identifier,
-          module: "pipeline",
+    // Request in flight with rows still on screen — the refresh button's
+    // spinner. `loading` is the skeleton, for a cold read only.
+    const fetching = ref(false);
+    const lastUpdatedAt = ref<number | null>(null);
+    const forbidden = ref(false);
+    // Bound to refresh / post-write reloads: always reaches the server.
+    const refreshDestinations = () => getDestinations(true);
+
+    const getDestinations = (force = false) => {
+      const org = store.state.selectedOrganization.identifier;
+      // Only a cold read spins and toasts — the rows stay put on a refresh.
+      const warm = queryClient.getQueryData(destinationKeys.list(org, "pipeline")) !== undefined;
+      const dismiss = warm
+        ? () => {}
+        : toast({
+            variant: "loading",
+            message: t("toastMessages.alerts.pleaseWaitWhileLoadingDestinations"),
+            timeout: 0,
+          });
+
+      const options = destinationsQuery(org, "pipeline");
+      const applyRows = (list: any[]) => {
+        destinations.value = list;
+        updateRoute();
+      };
+      const cached = queryClient.getQueryData<any[]>(options.queryKey);
+      if (cached !== undefined) applyRows(cached);
+      loading.value = cached === undefined;
+      fetching.value = true;
+      forbidden.value = false;
+
+      // TODO: fold into `useQuery` when this list drops its imperative refresh.
+      if (force) {
+        void queryClient.invalidateQueries({
+          queryKey: options.queryKey,
+          exact: true,
+          refetchType: "none",
+        });
+      }
+      return queryClient
+        .fetchQuery(options)
+        .then((list: any[]) => {
+          applyRows(list);
+          lastUpdatedAt.value =
+            queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? Date.now();
         })
-        .then((res) => {
-          resultTotal.value = res.data.length;
-          destinations.value = res.data;
-          updateRoute();
-        })
-        .catch((err) => {
-          if (err.response.status != 403) {
+        .catch((err: any) => {
+          forbidden.value = err?.response?.status === 403;
+          if (!forbidden.value) {
             toast({
               variant: "error",
-              message: "Error while pulling destinations.",
+              message: t("toastMessages.alerts.errorWhilePullingDestinations"),
             });
           }
           dismiss();
@@ -367,19 +469,28 @@ export default defineComponent({
         .finally(() => {
           dismiss();
           loading.value = false;
+          fetching.value = false;
         });
     };
     const getTemplates = () => {
-      templateService
-        .list({
-          org_identifier: store.state.selectedOrganization.identifier,
-        })
-        .then((res) => (templates.value = res.data));
+      queryClient
+        .fetchQuery(templatesQuery(store.state.selectedOrganization.identifier))
+        .then((list: any) => (templates.value = list))
+        // Template read can be denied (403) to users who may still manage destinations.
+        .catch(() => (templates.value = []));
     };
     const updateRoute = () => {
-      if (router.currentRoute.value.query.action === "add") editDestination(null);
-      if (router.currentRoute.value.query.action === "update")
-        editDestination(getDestinationByName(router.currentRoute.value.query.name as string));
+      const action = router.currentRoute.value.query.action;
+      const name = router.currentRoute.value.query.name as string;
+      // No-op when the editor already matches the route; a stale getDestinations().then() resolution re-invokes editDestination() and flips the just-opened editor closed.
+      if (action === "add" && !showDestinationEditor.value) {
+        editDestination(null);
+      } else if (
+        action === "update" &&
+        !(showDestinationEditor.value && editingDestination.value?.name === name)
+      ) {
+        editDestination(getDestinationByName(name));
+      }
     };
     const getDestinationByName = (name: string) => {
       return destinations.value.find((destination) => destination.name === name);
@@ -426,16 +537,19 @@ export default defineComponent({
           .then(() => {
             toast({
               variant: "success",
-              message: `Destination ${confirmDelete.value.data.name} deleted successfully`,
+              message: t("toastMessages.alerts.destinationDeletedSuccessfully", {
+                name: confirmDelete.value.data.name,
+              }),
             });
-            getDestinations();
+            // Forced: nothing invalidates this scope, and an unforced read inside staleTime keeps the deleted row.
+            getDestinations(true);
           })
           .catch((err) => {
             if (err.response.data.code === 409) {
               const message =
                 err.response.data?.message ||
                 err.response.data?.error ||
-                "Error while deleting destination";
+                t("alerts.messages.deleteDestinationFailed");
               toast({
                 variant: "error",
                 message,
@@ -452,34 +566,43 @@ export default defineComponent({
       confirmDelete.value.visible = false;
       confirmDelete.value.data = null;
     };
+    // Returns the navigation so callers can await it: `updateRoute()` reopens the
+    // editor while `?action=` is still on the URL, and a warm list reads it synchronously.
     const toggleDestinationEditor = () => {
       showDestinationEditor.value = !showDestinationEditor.value;
       if (!showDestinationEditor.value)
-        router.push({
+        return router.push({
           name: "pipelineDestinations",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
+      return Promise.resolve();
     };
 
-    const handleDestinationCreated = (destinationName: string) => {
-      toggleDestinationEditor();
-      getDestinations();
+    const handleDestinationCreated = async (destinationName: string) => {
+      await toggleDestinationEditor();
+      // Forced: the create does not expire this scope, so a cached read would drop the new row.
+      getDestinations(true);
 
       toast({
         variant: "success",
-        message: `Destination "${destinationName}" created successfully.`,
+        message: t("toastMessages.alerts.destinationCreatedSuccessfully", {
+          name: destinationName,
+        }),
       });
     };
 
-    const handleDestinationUpdated = (destinationName: string) => {
-      toggleDestinationEditor();
-      getDestinations();
+    const handleDestinationUpdated = async (destinationName: string) => {
+      await toggleDestinationEditor();
+      // Forced: the update does not expire this scope, so a cached read would show the old row.
+      getDestinations(true);
 
       toast({
         variant: "success",
-        message: `Destination "${destinationName}" updated successfully.`,
+        message: t("toastMessages.alerts.destinationUpdatedSuccessfully", {
+          name: destinationName,
+        }),
       });
     };
 
@@ -527,13 +650,8 @@ export default defineComponent({
       return filterData(destinations.value || [], filterQuery.value);
     });
 
-    watch(
-      visibleRows,
-      (newVisibleRows) => {
-        resultTotal.value = newVisibleRows.length;
-      },
-      { immediate: true },
-    );
+    const orgIdForWrites = useOrgId();
+    const bulkDeleteWrite = useMutation(() => bulkDeleteDestinationsMutation(orgIdForWrites.value));
 
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
@@ -543,7 +661,7 @@ export default defineComponent({
       bulkDeleteLoading.value = true;
       const dismiss = toast({
         variant: "loading",
-        message: "Deleting destinations...",
+        message: t("toastMessages.alerts.deletingDestinations"),
         timeout: 0,
       });
 
@@ -551,7 +669,7 @@ export default defineComponent({
         if (selectedDestinations.value.length === 0) {
           toast({
             variant: "error",
-            message: "No destinations selected for deletion",
+            message: t("toastMessages.alerts.noDestinationsSelectedForDeletion"),
           });
           dismiss();
           return;
@@ -561,10 +679,7 @@ export default defineComponent({
           ids: selectedDestinations.value.map((d: any) => d.name),
         };
 
-        const response = await destinationService.bulkDelete(
-          store.state.selectedOrganization.identifier,
-          payload,
-        );
+        const response = await bulkDeleteWrite.mutateAsync(payload.ids);
 
         dismiss();
 
@@ -576,29 +691,37 @@ export default defineComponent({
           if (failCount > 0 && successCount > 0) {
             toast({
               variant: "warning",
-              message: `${successCount} destination(s) deleted successfully, ${failCount} failed`,
+              message: t("toastMessages.alerts.destinationsDeletedWithFailures", {
+                count: successCount,
+                failed: failCount,
+              }),
               timeout: 5000,
             });
           } else if (failCount > 0) {
             toast({
               variant: "error",
-              message: `Failed to delete ${failCount} destination(s)`,
+              message: t("toastMessages.alerts.failedToDeleteDestinations", { count: failCount }),
             });
           } else {
             toast({
               variant: "success",
-              message: `${successCount} destination(s) deleted successfully`,
+              message: t("toastMessages.alerts.destinationsDeletedSuccessfully", {
+                count: successCount,
+              }),
             });
           }
         } else {
           toast({
             variant: "success",
-            message: `${selectedDestinations.value.length} destination(s) deleted successfully`,
+            message: t("toastMessages.alerts.destinationsDeletedSuccessfully", {
+              count: selectedDestinations.value.length,
+            }),
           });
         }
 
         selectedDestinations.value = [];
-        getDestinations();
+        // Forced, same reason as the single delete above.
+        getDestinations(true);
       } catch (error: any) {
         dismiss();
         console.error("Error deleting destinations:", error);
@@ -606,7 +729,7 @@ export default defineComponent({
         const errorMessage =
           error.response?.data?.message ||
           error?.message ||
-          "Error deleting destinations. Please try again.";
+          t("alerts.messages.bulkDeleteDestinationsFailed");
         if (error.response?.status != 403 || error?.status != 403) {
           toast({
             variant: "error",
@@ -624,13 +747,14 @@ export default defineComponent({
       {
         id: "pipelineDestinationsRefresh",
         handler: () => {
-          if (!isInputFocused()) getDestinations();
+          if (!isInputFocused()) refreshDestinations();
         },
       },
     ]);
 
     return {
       t,
+      lastUpdatedAt,
       showDestinationEditor,
       destinations,
       columns,
@@ -638,7 +762,15 @@ export default defineComponent({
       getImageURL,
       conformDeleteDestination,
       loading,
+      fetching,
+      refreshDestinations,
+      forbidden,
       filterQuery,
+      pageSize,
+      currentPage,
+      sortBy,
+      sortOrder,
+      oTableRef,
       filterData,
       editingDestination,
       templates,
@@ -649,7 +781,6 @@ export default defineComponent({
       deleteDestination,
       cancelDeleteDestination,
       confirmDelete,
-      resultTotal,
       routeTo,
       store,
       getTemplates,

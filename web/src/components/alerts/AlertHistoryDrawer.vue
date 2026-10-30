@@ -46,10 +46,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span :class="['text-xs font-semibold', 'text-text-body']">
             {{
               isAnomaly
-                ? "Anomaly Detection"
+                ? t("alerts.anomalyDetection")
                 : alertDetails.is_real_time
-                  ? "Real-time"
-                  : "Scheduled"
+                  ? t("common.realTime")
+                  : t("alerts.scheduled")
             }}
           </span>
         </div>
@@ -63,13 +63,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #icon-left>
               <OIcon name="history" size="sm" />
             </template>
-            History
+            {{ t("alert_list.alert_history") }}
           </OToggleGroupItem>
           <OToggleGroupItem value="condition" size="sm" data-test="alert-history-tab-condition">
             <template #icon-left>
               <OIcon name="code" size="sm" />
             </template>
-            Condition
+            {{ t("common.condition") }}
           </OToggleGroupItem>
         </OToggleGroup>
       </div>
@@ -161,7 +161,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click="toggleFlappingGroup(row.timestamp)"
                       />
                       <span class="text-2xs text-text-secondary truncate">
-                        {{ row._children.length }} rows · {{ row._duration }}
+                        {{ row._children.length }} {{ t("alerts.alertDetails.rowsSeparator") }}
+                        {{ row._duration }}
                       </span>
                     </div>
                     <!-- Normal row -->
@@ -171,14 +172,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :value="row.status"
                         data-test="alert-history-status-chip"
                       />
-                      <OTooltip v-if="row.error" :max-width="'300px'" :content="row.error" />
+                      <OTooltip v-if="row.error" :max-width="'18.75rem'" :content="row.error" />
                     </span>
                   </template>
 
                   <template #cell-timestamp="{ row }">
                     <span
                       class="text-compact whitespace-nowrap tabular-nums"
-                      :class="row._child ? 'pl-5 opacity-70' : ''"
+                      :class="row._child ? 'ps-5 opacity-70' : ''"
                     >
                       {{ formatTimestampFull(row.timestamp) }}
                     </span>
@@ -197,14 +198,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span class="text-text-secondary text-2xs shrink-0">→</span>
                         <OTag type="alertLevel" :value="row.level" class="shrink-0" />
                       </template>
-                      <span
+                      <OTruncatedText
                         v-if="row.group_label"
-                        class="text-2xs text-text-secondary min-w-0 truncate"
+                        class="text-2xs text-text-secondary"
                         data-test="alert-history-group-label"
                       >
                         {{ t("alerts.historyTable.forGroup", { group: row.group_label }) }}
-                        <OTooltip :content="row.group_label" :max-width="'300px'" />
-                      </span>
+                      </OTruncatedText>
                     </div>
                   </template>
 
@@ -236,14 +236,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #cell-error="{ row }">
                     <span class="text-compact">{{ row.error || "—" }}</span>
                   </template>
-
-                  <template #bottom>
-                    <div class="flex h-12 w-full items-center">
-                      <div class="flex w-55 items-center text-xs font-normal">
-                        {{ resultTotal }} {{ t("alerts.alertDetails.results") }}
-                      </div>
-                    </div>
-                  </template>
                 </OTable>
               </div>
             </div>
@@ -264,13 +256,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="'bg-surface-subtle border-border-default'"
                 >
                   <div class="flex items-center gap-1.5">
-                    <span class="text-2xs font-medium" :class="'text-text-secondary'"> SQL </span>
+                    <span class="text-2xs font-medium" :class="'text-text-secondary'">
+                      {{ t("alerts.alertDetails.sql") }}
+                    </span>
                   </div>
                   <OButton
                     v-if="anomalySql"
                     @click="
-                      copyToClipboard(anomalySql, {
-                        successMessage: 'SQL Copied Successfully!',
+                      copyToClipboard(anomalySql, t, {
+                        successMessage: t('common.itemCopiedSuccessfully', { item: 'SQL' }),
                         timeout: 3000,
                       })
                     "
@@ -283,9 +277,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                 </div>
                 <pre
-                  class="text-compact m-0 flex-1 overflow-x-auto overflow-y-auto p-[10px_14px] font-mono leading-relaxed whitespace-pre-wrap"
-                  >{{ anomalySql || t("alerts.alertDetails.noCondition") }}</pre
-                >
+                  class="text-compact m-0 flex-1 overflow-x-auto overflow-y-auto p-[0.625rem_0.875rem] font-mono leading-relaxed whitespace-pre-wrap"
+                  >{{ anomalySql || t("alerts.alertDetails.noCondition") }}</pre>
               </div>
             </template>
 
@@ -307,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ? "SQL"
                           : alertDetails.type === "promql"
                             ? "PromQL"
-                            : "Conditions"
+                            : t("alerts.alertDetails.conditions")
                       }}
                     </span>
                   </div>
@@ -318,13 +311,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       alertDetails.conditions !== '--'
                     "
                     @click="
-                      copyToClipboard(alertDetails.conditions, {
-                        successMessage:
-                          (alertDetails.type === 'sql'
-                            ? t('alerts.alertDetails.sqlQuery')
-                            : alertDetails.type === 'promql'
-                              ? t('alerts.alertDetails.promqlQuery')
-                              : t('alerts.alertDetails.conditions')) + ' Copied Successfully!',
+                      copyToClipboard(alertDetails.conditions, t, {
+                        successMessage: t('common.itemCopiedSuccessfully', {
+                          item:
+                            alertDetails.type === 'sql'
+                              ? t('alerts.alertDetails.sqlQuery')
+                              : alertDetails.type === 'promql'
+                                ? t('alerts.alertDetails.promqlQuery')
+                                : t('alerts.alertDetails.conditions'),
+                        }),
                       })
                     "
                     variant="ghost-muted"
@@ -337,24 +332,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <!-- Code content — scrolls internally -->
                 <pre
-                  class="text-compact m-0 flex-1 overflow-x-auto overflow-y-auto p-[10px_14px] font-mono leading-relaxed whitespace-pre-wrap"
+                  class="text-compact m-0 flex-1 overflow-x-auto overflow-y-auto p-[0.625rem_0.875rem] font-mono leading-relaxed whitespace-pre-wrap"
                   >{{
                     alertDetails.conditions !== "" && alertDetails.conditions !== "--"
                       ? alertDetails.type === "sql" || alertDetails.type === "promql"
                         ? alertDetails.conditions
                         : alertDetails.conditions.length !== 2
-                          ? `if ${alertDetails.conditions}`
+                          ? t("alerts.alertDetails.ifCondition", {
+                              condition: alertDetails.conditions,
+                            })
                           : t("alerts.alertDetails.noCondition")
                       : t("alerts.alertDetails.noCondition")
-                  }}</pre
-                >
+                  }}</pre>
               </div>
             </template>
 
             <!-- Description (only show if exists) -->
             <div v-if="alertDetails.description" class="mt-3 shrink-0">
               <div
-                class="mb-1 flex items-center gap-1.5 text-xs font-semibold tracking-wider uppercase"
+                class="mb-1 flex items-center gap-1.5 text-xs font-semibold"
                 :class="'text-text-secondary'"
               >
                 <OIcon name="info-outline" size="xs" />
@@ -375,12 +371,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { alertHistoryQuery } from "@/services/alerts.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { conditionSummary, isFiringOutcome, isOkOutcome } from "@/utils/alerts/runOutcome";
 import { formatTimestamp } from "@/utils/date";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -392,17 +390,18 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import DateTime from "@/components/DateTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
-import alertsService from "@/services/alerts";
+import type { AlertHistoryQuery } from "@/services/alerts";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import { buildAnomalyPreviewSql } from "@/utils/alerts/anomalySqlBuilder";
 import type { Ref } from "vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import AlertHistoryTimeline from "./AlertHistoryTimeline.vue";
 
 // Composables
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 // Props & Emits
@@ -637,7 +636,7 @@ const onPaginationChange = async (params: { page: number; size: number }) => {
 const alertHistoryColumns = [
   {
     id: "#",
-    header: "#",
+    header: raw("#"),
     accessorFn: () => null,
     sortable: false,
     size: 48,
@@ -697,7 +696,7 @@ const alertHistoryColumns = [
 const anomalyHistoryColumns = [
   {
     id: "#",
-    header: "#",
+    header: raw("#"),
     accessorFn: () => null,
     sortable: false,
     size: 48,
@@ -713,7 +712,7 @@ const anomalyHistoryColumns = [
   },
   {
     id: "status",
-    header: "Result",
+    header: t("alerts.historyTable.result"),
     accessorKey: "status",
     sortable: false,
     size: 120,
@@ -729,7 +728,7 @@ const anomalyHistoryColumns = [
   },
   {
     id: "anomaly_count",
-    header: "Anomalies",
+    header: t("alerts.historyTable.anomalies"),
     accessorKey: "anomaly_count",
     sortable: false,
     size: 120,
@@ -746,7 +745,7 @@ const historyTableColumns = computed(() =>
 const getRowClass = (row: any) => {
   if (row?._flappingGroup) {
     // Violet-tinted highlight for flapping-group rows; token carries the theme.
-    return "!bg-[color-mix(in_srgb,var(--color-sql-accent)_8%,var(--color-surface-base))]";
+    return "!bg-surface-tint-sql";
   }
   if (row?._child) {
     return "!bg-surface-subtle";
@@ -762,7 +761,7 @@ const getRowClass = (row: any) => {
 };
 
 const formatTimestampFull = (timestamp: number) => {
-  if (!timestamp) return "N/A";
+  if (!timestamp) return raw("N/A");
   return formatTimestamp(timestamp, "MMM DD, YYYY HH:mm:ss");
 };
 
@@ -775,7 +774,7 @@ const fetchAlertHistory = async (alertId: string) => {
     const endTime = dateTimeValues.value.endTime;
     const from = (currentPage.value - 1) * selectedPerPage.value;
 
-    const historyParams: Record<string, any> = {
+    const historyParams: AlertHistoryQuery = {
       size: selectedPerPage.value,
       from: from,
       start_time: startTime,
@@ -786,12 +785,13 @@ const fetchAlertHistory = async (alertId: string) => {
     } else {
       historyParams.alert_id = alertId;
     }
-    const response = await alertsService.getHistory(
-      store?.state?.selectedOrganization?.identifier,
-      historyParams,
+    // Same cached page query as the Alert History page — paging back to a page
+    // already fetched keeps its rows instead of blanking.
+    const data = await queryClient.fetchQuery(
+      alertHistoryQuery(store?.state?.selectedOrganization?.identifier, historyParams),
     );
-    alertHistory.value = response.data?.hits || [];
-    resultTotal.value = response.data?.total || 0;
+    alertHistory.value = data?.hits || [];
+    resultTotal.value = data?.total || 0;
   } catch (error: any) {
     alertHistory.value = [];
     resultTotal.value = 0;

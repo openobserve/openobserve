@@ -16,6 +16,9 @@ import {
 } from "reka-ui";
 import { computed, nextTick, ref, useAttrs, useId, useSlots, watch } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18nTyped } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -158,9 +161,10 @@ function onSelect(optionValue: string) {
 // ── Sizes ────────────────────────────────────────────────────────────────────
 const heightClass = computed(() => {
   if (props.labelPosition === "inside" && (props.label || slots.label)) {
-    return props.size === "sm" ? "h-10 text-sm pt-4" : "h-10 text-sm pt-4";
+    return "h-10 text-sm pt-4";
   }
-  return props.size === "sm" ? "h-8 text-sm" : "h-8 text-sm";
+  // Aligned with OInput/OSelect/OButton sm: h-[2.125rem].
+  return "h-[2.125rem] text-sm";
 });
 
 // ── Error ────────────────────────────────────────────────────────────────────
@@ -252,8 +256,9 @@ const hasInsideLabel = computed(
           :class="[
             'z-10001 w-(--reka-combobox-trigger-width) max-w-(--reka-combobox-trigger-width) min-w-(--reka-combobox-trigger-width)',
             'max-h-60 overflow-hidden',
-            'rounded-default border shadow-lg',
-            'bg-select-content-bg border-select-content-border',
+            'max-lg:max-h-[var(--reka-popper-available-height,15rem)]',
+            'rounded-default shadow-overlay border border-transparent',
+            'bg-select-content-bg',
             'p-1',
             // Clip-path reveal: unveiled at full size from its trigger edge (no
             // scale/squish). Wipes down by default; top-placed wipes up. Soft
@@ -264,9 +269,11 @@ const hasInsideLabel = computed(
             'data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_100ms_cubic-bezier(0.4,0,1,1)]',
           ]"
         >
-          <ComboboxViewport class="max-h-56 overflow-y-auto">
+          <ComboboxViewport
+            class="max-h-56 overflow-y-auto max-lg:max-h-[calc(var(--reka-popper-available-height,14rem)-0.5rem)]"
+          >
             <ComboboxEmpty class="text-select-placeholder px-3 py-2 text-center text-sm">
-              No options found
+              {{ t("components.combobox.noOptionsFound") }}
             </ComboboxEmpty>
 
             <ComboboxItem

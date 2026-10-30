@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { computeTrendAnnotation, type IssueStatus } from "@/utils/rum/errorIssueUtils";
 
 const props = defineProps<{
@@ -94,7 +94,7 @@ const emit = defineEmits<{
   visible: [];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 /** Cap the sparkline at this many bars regardless of window resolution. */
 const MAX_BARS = 24;
@@ -128,6 +128,7 @@ onMounted(() => {
       }
     },
     // Prefetch slightly ahead of the fold so scrolling feels instant.
+    // eslint-disable-next-line local/no-hardcoded-px -- IntersectionObserver rootMargin parses px/% only — a rem value throws SyntaxError
     { rootMargin: "200px 0px" },
   );
   observer.observe(rootEl.value);

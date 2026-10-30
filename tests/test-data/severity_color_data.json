@@ -4,7 +4,7 @@
     "job": "test",
     "log": "System is unusable - emergency level",
     "severity": 0,
-    "expected_color": "#dc2626",
+    "expected_color": "#e53935",
     "priority": 0
   },
   {
@@ -12,7 +12,7 @@
     "job": "test",
     "log": "System is unusable - emergency level string",
     "severity": "0",
-    "expected_color": "#dc2626",
+    "expected_color": "#e53935",
     "priority": 0
   },
   {
@@ -36,7 +36,7 @@
     "job": "test",
     "log": "Critical conditions detected",
     "severity": 2,
-    "expected_color": "#d97706",
+    "expected_color": "#f4511e",
     "priority": 2
   },
   {
@@ -44,7 +44,7 @@
     "job": "test",
     "log": "Critical conditions detected string",
     "severity": "2",
-    "expected_color": "#d97706",
+    "expected_color": "#f4511e",
     "priority": 2
   },
   {
@@ -52,7 +52,7 @@
     "job": "test",
     "log": "Error conditions occurred",
     "severity": 3,
-    "expected_color": "#dc2626",
+    "expected_color": "#ef5350",
     "priority": 3
   },
   {
@@ -60,7 +60,7 @@
     "job": "test",
     "log": "Error conditions occurred string",
     "severity": "3",
-    "expected_color": "#dc2626",
+    "expected_color": "#ef5350",
     "priority": 3
   },
   {
@@ -68,7 +68,7 @@
     "job": "test",
     "log": "Warning conditions present",
     "severity": 4,
-    "expected_color": "#eab308",
+    "expected_color": "#dd7b00",
     "priority": 4
   },
   {
@@ -76,7 +76,7 @@
     "job": "test",
     "log": "Warning conditions present string",
     "severity": "4",
-    "expected_color": "#eab308",
+    "expected_color": "#dd7b00",
     "priority": 4
   },
   {
@@ -100,7 +100,7 @@
     "job": "test",
     "log": "Informational messages",
     "severity": 6,
-    "expected_color": "#84a8f6ff",
+    "expected_color": "#1e88e5",
     "priority": 6
   },
   {
@@ -108,7 +108,7 @@
     "job": "test",
     "log": "Informational messages string",
     "severity": "6",
-    "expected_color": "#84a8f6ff",
+    "expected_color": "#1e88e5",
     "priority": 6
   },
   {
@@ -116,7 +116,7 @@
     "job": "test",
     "log": "Debug-level messages",
     "severity": 7,
-    "expected_color": "#6b7280",
+    "expected_color": "#00a3b7",
     "priority": 7
   },
   {
@@ -124,7 +124,7 @@
     "job": "test",
     "log": "Debug-level messages string",
     "severity": "7",
-    "expected_color": "#6b7280",
+    "expected_color": "#00a3b7",
     "priority": 7
   }
 ]

@@ -11,6 +11,7 @@ pub struct Model {
     pub folder_id: String,
     pub name: String,
     pub description: Option<String>,
+    pub icon: Option<String>,
     pub r#type: i16,
 }
 
@@ -56,6 +57,7 @@ mod tests {
             folder_id: "fid-1".to_string(),
             name: "My Folder".to_string(),
             description: Some("test folder".to_string()),
+            icon: Some("o2:redis".to_string()),
             r#type: 1,
         };
         assert_eq!(m.id, "folder-1");

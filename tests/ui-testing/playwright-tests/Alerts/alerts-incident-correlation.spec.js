@@ -29,6 +29,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment } = require('../utils/cloud-auth.js');
+const { ingestBase } = require('../utils/ingest-url.js');
 
 // ============================================================================
 // TEST DATA CONFIGURATION
@@ -106,8 +107,8 @@ const ALERTS = [
 /**
  * Make an API call via page.evaluate (runs in browser context, avoids CORS)
  */
-async function apiCall(page, method, path, body = null) {
-    const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
+async function apiCall(page, method, path, body = null, base = null) {
+    const baseUrl = base || process.env.ZO_BASE_URL || 'http://localhost:5080';
     const headers = getAuthHeaders();
 
     return page.evaluate(async ({ url, method, headers, body }) => {
@@ -157,7 +158,7 @@ async function ingestTestData(page) {
     const org = getOrgIdentifier();
     const records = generateTestData();
 
-    const response = await apiCall(page, 'POST', `/api/${org}/${STREAM_NAME}/_json`, records);
+    const response = await apiCall(page, 'POST', `/api/${org}/${STREAM_NAME}/_json`, records, ingestBase(process.env.ZO_BASE_URL));
     testLogger.info('Ingested test data', { status: response.status, stream: STREAM_NAME, records: records.length });
     return response;
 }

@@ -1,0 +1,83 @@
+[
+  {
+    "id": "instance-bare-ip-kept-port-stripped",
+    "dialect": "mysql",
+    "input": {
+      "attrs": {
+        "db.system": "mysql",
+        "server.address": "10.42.7.19:3306",
+        "db.statement": "SELECT * FROM sessions WHERE token = 'tok_8f13aa'"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT * FROM sessions WHERE token = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "mysql",
+      "namespace": null,
+      "instance": "10.42.7.19",
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mysql_sessions_by_token",
+    "literals": ["tok_8f13aa"],
+    "source": "authored"
+  },
+  {
+    "id": "status-code-pg-deadlock-40p01",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system.name": "postgresql",
+        "db.query.text": "UPDATE accounts SET balance = balance - 125 WHERE id = 3391",
+        "db.response.status_code": "40P01"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "UPDATE accounts SET balance = balance - ? WHERE id = ?",
+      "operation": "UPDATE",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": "40P01",
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_accounts_update",
+    "literals": ["125", "3391"],
+    "source": "authored"
+  },
+  {
+    "id": "status-code-mysql-deadlock-1213",
+    "dialect": "mysql",
+    "input": {
+      "attrs": {
+        "db.system.name": "mysql",
+        "db.query.text": "UPDATE inventory SET qty = qty - 7 WHERE sku = 'SKU-9931'",
+        "db.response.status_code": "1213"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "UPDATE inventory SET qty = qty - ? WHERE sku = ?",
+      "operation": "UPDATE",
+      "stmt_class": "query",
+      "system": "mysql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": "1213",
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mysql_inventory_update",
+    "literals": ["SKU-9931"],
+    "source": "authored"
+  }
+]

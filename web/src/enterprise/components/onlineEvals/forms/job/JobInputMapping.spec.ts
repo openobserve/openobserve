@@ -166,7 +166,7 @@ describe("JobInputMapping", () => {
 
     await wrapper.get('[data-test="job-input-mapping-copy-scorer-1-input"]').trigger("click");
 
-    expect(mocks.copyToClipboard).toHaveBeenCalledWith("{{custom_input}}", {
+    expect(mocks.copyToClipboard).toHaveBeenCalledWith("{{custom_input}}", expect.any(Function), {
       successMessage: "Copied to clipboard",
     });
   });

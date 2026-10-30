@@ -5,7 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
      org's detections; green = enabled detection, hot = fired in window, dashed = not enabled. -->
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -53,7 +53,7 @@ type TechniqueCell = MatrixCell<SigmaRule>;
 
 const STATE_RANK: Record<TechniqueState, number> = { firing: 0, covered: 1, available: 2 };
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
@@ -435,7 +435,7 @@ function openDetections() {
       <SecurityNotices :notices="notices" data-test="security-mitre-notices" />
 
       <OStatStrip
-        compact
+        compact-values
         :items="stats"
         :loading="(rulesLoading && !siemRows.length) || lastRunAt === null"
         selectable

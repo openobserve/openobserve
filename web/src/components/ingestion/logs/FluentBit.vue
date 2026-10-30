@@ -15,13 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <IngestionContent>
-    <CopyContent class="copy-content-container-cls" :content="content" />
+  <IngestionContent :target-stream="targetStream" snippet-kind="config" config-tool="Fluent Bit">
+    <CredentialCodeBlock slug="fluentbit" :content="content" />
     <IngestionDocLink
       href="https://openobserve.ai/blog/how-to-send-kubernetes-logs-using-fluent-bit"
     >
-      to explore the process of sending logs from Kubernetes to OpenObserve using
-      FluentBit.</IngestionDocLink
+      {{ t("ingestion.fluentBitDocLinkText") }}</IngestionDocLink
     >
   </IngestionContent>
 </template>
@@ -31,9 +30,10 @@ import { defineComponent, ref } from "vue";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
 import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincutils";
-import CopyContent from "@/components/CopyContent.vue";
+import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
+import { useI18nTyped } from "@/types/i18n";
 export default defineComponent({
   name: "fluentbit-mechanism",
   props: {
@@ -44,8 +44,9 @@ export default defineComponent({
       type: String,
     },
   },
-  components: { CopyContent, IngestionContent, IngestionDocLink },
+  components: { CredentialCodeBlock, IngestionContent, IngestionDocLink },
   setup() {
+    const { t } = useI18nTyped();
     const store = useStore();
     const endpoint: any = ref({
       url: "",
@@ -57,10 +58,11 @@ export default defineComponent({
 
     const ingestionURL = getIngestionURL();
     endpoint.value = getEndPoint(ingestionURL);
+    const targetStream = "default";
     const content = `[OUTPUT]
   Name http
   Match *
-  URI /api/${store.state.selectedOrganization.identifier}/default/_json
+  URI /api/${store.state.selectedOrganization.identifier}/${targetStream}/_json
   Host ${endpoint.value.host}
   Port ${endpoint.value.port}
   tls ${endpoint.value.tls}
@@ -71,6 +73,8 @@ export default defineComponent({
   HTTP_Passwd [PASSCODE]
   compress gzip`;
     return {
+      targetStream,
+      t,
       store,
       config,
       endpoint,

@@ -1,0 +1,15 @@
+[CRITICAL] CPU "high" & <fire> on web-1
+
+Value 92.5 exceeded 80 — see runbook
+
+<script>alert(1)</script>
+
+host: web-1 & web-2
+cpu: 92.5
+
+host: web-1 | cpu: 92.5
+
+Runbook: https://rb.example/x
+View in OpenObserve: https://o2.example/short/abc
+
+Sent by OpenObserve.

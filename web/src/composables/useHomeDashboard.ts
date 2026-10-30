@@ -13,14 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { settingQuery } from "@/services/settings.queries";
+import { settingKeys } from "@/services/settings.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { fetchInto } from "@/composables/query/fetchInto";
 import { ref, type Ref } from "vue";
 import settings from "@/services/settings";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 
 export interface HomeDashboard {
   dashboardId: string;
   folderId: string;
-  label: string;
+  label: I18nText;
 }
 
 const SETTING_KEY = "home_dashboard";
@@ -30,28 +35,41 @@ const SETTING_CATEGORY = "ui";
 const homeDashboard: Ref<HomeDashboard | null> = ref(null);
 const isLoading = ref(false);
 
-export function useHomeDashboard() {
+export function useHomeDashboard(t: TranslateFn) {
   const isHome = (dashboardId: string) => homeDashboard.value?.dashboardId === dashboardId;
 
-  const load = async (org: string) => {
+  /** Cached read — see useFavoriteDashboards.load for the same rationale. */
+  const load = async (org: string, force = false) => {
     if (!org) return;
-    isLoading.value = true;
-    try {
-      const res = await settings.getSetting(org, SETTING_KEY);
-      const val = res?.data?.setting_value;
+    const apply = (val: any) => {
       homeDashboard.value = val && val.dashboardId ? (val as HomeDashboard) : null;
+    };
+    try {
+      if (force) {
+        isLoading.value = true;
+        const options = settingQuery(org, SETTING_KEY);
+        await queryClient.invalidateQueries({
+          queryKey: options.queryKey,
+          exact: true,
+          refetchType: "none",
+        });
+        apply(await queryClient.fetchQuery(options));
+        return;
+      }
+      // Stale-while-revalidate: the pinned dashboard stays put while the
+      // setting revalidates, so the home button never flickers back to empty.
+      await fetchInto(settingQuery(org, SETTING_KEY), { apply, loading: isLoading });
     } catch {
-      // Missing setting / 404 → no home dashboard for this org.
-      homeDashboard.value = null;
+      // A 404 already arrives as `null` from the query; anything else is transient and must not drop the pin.
     } finally {
       isLoading.value = false;
     }
   };
 
-  const errMessage = (e: any, action: string) =>
-    e?.response?.status === 403
-      ? "You don't have permission to change the home dashboard"
-      : `Couldn't ${action} the home dashboard`;
+  // `fallback` is the already-translated "couldn't do X" line for the caller's
+  // action — passed in rather than composed here, so each action keeps its own key.
+  const errMessage = (e: any, fallback: I18nText) =>
+    e?.response?.status === 403 ? t("dashboard.noPermissionHomeDashboard") : fallback;
 
   const setHomeDashboard = async (org: string, d: HomeDashboard) => {
     if (!org) return; // no org → don't hit the API with an undefined segment
@@ -59,9 +77,13 @@ export function useHomeDashboard() {
     homeDashboard.value = d; // optimistic
     try {
       await settings.setOrgSetting(org, SETTING_KEY, d, SETTING_CATEGORY);
+      queryClient.setQueryData(settingKeys.one(org, SETTING_KEY), d);
     } catch (e: any) {
       homeDashboard.value = prev; // revert
-      toast({ variant: "error", message: errMessage(e, "set") });
+      toast({
+        variant: "error",
+        message: errMessage(e, t("dashboard.homeDashboardSetFailed")),
+      });
     }
   };
 
@@ -71,15 +93,23 @@ export function useHomeDashboard() {
     homeDashboard.value = null; // optimistic
     try {
       await settings.deleteOrgSetting(org, SETTING_KEY);
+      queryClient.setQueryData(settingKeys.one(org, SETTING_KEY), null);
     } catch (e: any) {
       // A 404 means the setting is already gone — this is the desired end state,
       // not a failure. The backend now clears home_dashboard itself when the
       // pinned dashboard is deleted, so the client's delete can race and find it
       // already absent. Treat "already cleared" as success: keep the optimistic
       // null, don't revert, don't toast. Only real errors revert.
-      if (e?.response?.status === 404) return;
+      if (e?.response?.status === 404) {
+        // The cached copy still holds the old pin; without this the next load inside staleTime would revive it.
+        queryClient.setQueryData(settingKeys.one(org, SETTING_KEY), null);
+        return;
+      }
       homeDashboard.value = prev; // revert
-      toast({ variant: "error", message: errMessage(e, "remove") });
+      toast({
+        variant: "error",
+        message: errMessage(e, t("dashboard.homeDashboardRemoveFailed")),
+      });
     }
   };
 
@@ -90,12 +120,15 @@ export function useHomeDashboard() {
   // this session and re-attempts on the next rename; never toast for it.
   const updateLabel = (org: string, dashboardId: string, label: string) => {
     if (homeDashboard.value?.dashboardId === dashboardId && homeDashboard.value.label !== label) {
-      const updated = { ...homeDashboard.value, label };
+      const updated = { ...homeDashboard.value, label: raw(label) };
       homeDashboard.value = updated;
       if (org) {
-        settings.setOrgSetting(org, SETTING_KEY, updated, SETTING_CATEGORY).catch(() => {
-          /* label persist is best-effort; ref already shows the fresh label */
-        });
+        settings
+          .setOrgSetting(org, SETTING_KEY, updated, SETTING_CATEGORY)
+          .then(() => queryClient.setQueryData(settingKeys.one(org, SETTING_KEY), updated))
+          .catch(() => {
+            /* label persist is best-effort; ref already shows the fresh label */
+          });
       }
     }
   };

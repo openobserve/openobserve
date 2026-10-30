@@ -3,12 +3,14 @@ import useNotifications from "../useNotifications";
 import { getDashboard } from "@/utils/commons";
 import { useStore } from "vuex";
 import { getUTCTimestampFromZonedTimestamp } from "@/utils/dashboard/dateTimeUtils";
+import type { TranslateFn } from "@/types/i18n";
 
 export const useAnnotationsData = (
   organization: string,
   dashboardId: string,
   panelId: string,
   folderId: string,
+  t: TranslateFn,
 ) => {
   // show annotation button
   const isAddAnnotationMode = ref(false);
@@ -88,20 +90,20 @@ export const useAnnotationsData = (
   // Watch for annotation mode to show notification
   watch(isAddAnnotationMode, () => {
     if (isAddAnnotationMode.value) {
-      showInfoNotification("Click on the chart data or select a range to add an annotation", {});
+      showInfoNotification(t("toastMessages.dashboard.clickOnTheChartDataOr"), {});
     }
   });
 
   const panelsList = ref<any[]>([]);
+  // h-bar and h-stacked never draw annotations, so they are not offered as targets.
   const chartTypes = [
     "area",
     "area-stacked",
     "bar",
-    "h-bar",
     "line",
     "scatter",
     "stacked",
-    "h-stacked",
+    "state-timeline",
   ];
   const processTabPanels = (dashboardData: any): any[] => {
     if (!dashboardData?.tabs || !Array.isArray(dashboardData.tabs)) {
@@ -111,7 +113,7 @@ export const useAnnotationsData = (
     const allPanels: any[] = [];
 
     dashboardData.tabs.forEach((tab: any) => {
-      const tabName = tab.name?.trim() || "Unnamed Tab";
+      const tabName = tab.name?.trim() || t("dashboard.unnamedTab");
 
       if (tab.panels && Array.isArray(tab.panels)) {
         const tabPanels = tab.panels

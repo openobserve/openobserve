@@ -15,6 +15,7 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { useSearchHistogramManager } from "./useSearchHistogramManager";
+import { gt } from "@/types/i18n";
 import { logsUtils } from "./logsUtils";
 
 // Create a shared mock state
@@ -24,10 +25,6 @@ const createMockState = () => ({
       stream: { selectedStream: ["stream1"] },
       queryResults: { hits: [], aggs: [], histogram_interval: 0 },
       histogramQuery: { query: { sql: "SELECT * FROM stream1" } },
-      histogramInterval: 60000,
-      customDownloadQueryObj: {
-        query: { start_time: 0, end_time: 1000000 },
-      },
     },
     meta: {
       sqlMode: false,
@@ -48,7 +45,6 @@ let mockState: ReturnType<typeof createMockState>;
 const mockHistogramFunctions = {
   resetHistogramWithError: vi.fn(),
   generateHistogramSkeleton: vi.fn(),
-  setMultiStreamHistogramQuery: vi.fn(() => "mocked SQL"),
   isHistogramEnabled: vi.fn(() => true),
 };
 
@@ -79,10 +75,6 @@ vi.mock("./useHistogram", () => ({
   useHistogram: vi.fn(() => mockHistogramFunctions),
 }));
 
-vi.mock("@/utils/date", () => ({
-  convertDateToTimestamp: vi.fn(() => ({ timestamp: 1000000 })),
-}));
-
 describe("useSearchHistogramManager", () => {
   let histogramManager: ReturnType<typeof useSearchHistogramManager>;
 
@@ -92,9 +84,8 @@ describe("useSearchHistogramManager", () => {
     // Reset mock functions
     mockHistogramFunctions.resetHistogramWithError.mockClear();
     mockHistogramFunctions.generateHistogramSkeleton.mockClear();
-    mockHistogramFunctions.setMultiStreamHistogramQuery.mockClear();
     mockHistogramFunctions.isHistogramEnabled.mockReturnValue(true);
-    histogramManager = useSearchHistogramManager();
+    histogramManager = useSearchHistogramManager(gt);
   });
 
   describe("isHistogramDataMissing", () => {
@@ -137,29 +128,14 @@ describe("useSearchHistogramManager", () => {
       expect(result).toBe(true);
     });
 
-    it("should return true for multi-stream non-SQL mode", () => {
+    it("should return false for multi-stream, which has no histogram", () => {
       // Use mockState directly
       mockState.searchObj.data.stream.selectedStream = ["stream1", "stream2"];
       mockState.searchObj.meta.sqlMode = false;
 
       const parsedSQL = {};
       const result = histogramManager.shouldShowHistogram(parsedSQL);
-      expect(result).toBe(true);
-    });
-  });
-
-  describe("resetHistogramResults", () => {
-    it("should clear histogram results", () => {
-      histogramManager.resetHistogramResults();
-      expect(histogramManager.getHistogramResults()).toEqual([]);
-    });
-  });
-
-  describe("getHistogramResults", () => {
-    it("should return current histogram results", () => {
-      histogramManager.resetHistogramResults();
-      const results = histogramManager.getHistogramResults();
-      expect(Array.isArray(results)).toBe(true);
+      expect(result).toBe(false);
     });
   });
 
@@ -190,118 +166,6 @@ describe("useSearchHistogramManager", () => {
     });
   });
 
-  describe("handleHistogramResponse", () => {
-    it("should process histogram response correctly", () => {
-      // Use mockState directly
-      mockState.searchObj.data.queryResults = {
-        aggs: [],
-        scan_size: 0,
-        took: 0,
-        result_cache_ratio: 0,
-        hits: [],
-        histogram_interval: 0,
-      };
-
-      const queryReq = { query: { from: 0, size: 100 } };
-      const response = {
-        content: {
-          results: {
-            hits: [
-              { zo_sql_key: "2024-01-01T00:00:00", zo_sql_num: 100 },
-              { zo_sql_key: "2024-01-01T01:00:00", zo_sql_num: 150 },
-            ],
-            scan_size: 1000,
-            took: 50,
-            result_cache_ratio: 0.5,
-          },
-        },
-      };
-
-      const refreshPagination = vi.fn();
-
-      histogramManager.handleHistogramResponse(
-        queryReq,
-        "trace-123",
-        response,
-        {},
-        refreshPagination,
-      );
-
-      expect(mockState.searchObj.loading).toBe(false);
-      expect(mockState.searchObj.data.queryResults.aggs.length).toBe(2);
-      expect(mockState.searchObj.data.queryResults.scan_size).toBe(1000);
-      expect(mockState.searchObj.data.queryResults.took).toBe(50);
-    });
-
-    it("should initialize aggs array if null", () => {
-      // Use mockState directly
-      mockState.searchObj.data.queryResults = {
-        aggs: null as any,
-        scan_size: 0,
-        took: 0,
-        result_cache_ratio: 0,
-        hits: [],
-        histogram_interval: 0,
-      };
-
-      const queryReq = { query: { from: 0, size: 100 } };
-      const response = {
-        content: {
-          results: {
-            hits: [],
-            scan_size: 0,
-            took: 0,
-            result_cache_ratio: 0,
-          },
-        },
-      };
-
-      histogramManager.handleHistogramResponse(queryReq, "trace-123", response, {}, vi.fn());
-
-      expect(Array.isArray(mockState.searchObj.data.queryResults.aggs)).toBe(true);
-    });
-
-    it("should not call refreshPagination when isHistogramOnly is true", () => {
-      // Use mockState directly
-      mockState.searchObj.data.queryResults = {
-        aggs: [],
-        scan_size: 0,
-        took: 0,
-        result_cache_ratio: 0,
-        hits: [],
-        histogram_interval: 0,
-      };
-
-      const queryReq = { query: { from: 0, size: 100 } };
-      const response = {
-        content: {
-          results: {
-            hits: [],
-            scan_size: 0,
-            took: 0,
-            result_cache_ratio: 0,
-          },
-        },
-      };
-
-      const refreshPagination = vi.fn();
-
-      histogramManager.handleHistogramResponse(
-        queryReq,
-        "trace-123",
-        response,
-        { isHistogramOnly: true },
-        refreshPagination,
-      );
-
-      // The refreshPagination call happens in an async IIFE, so we need to wait
-      // In this case, it shouldn't be called due to isHistogramOnly
-      setTimeout(() => {
-        expect(refreshPagination).not.toHaveBeenCalled();
-      }, 10);
-    });
-  });
-
   describe("processHistogramRequest", () => {
     it("should return early if no query results hits", async () => {
       // Use mockState directly
@@ -321,7 +185,7 @@ describe("useSearchHistogramManager", () => {
       expect(initializeSearchConnection).not.toHaveBeenCalled();
     });
 
-    it("should show error for multi-stream SQL mode", async () => {
+    it("should show the unavailable notice for any multi-stream search", async () => {
       // Use mockState directly
       mockState.searchObj.data.stream.selectedStream = ["stream1", "stream2"];
       mockState.searchObj.meta.sqlMode = true;
@@ -342,8 +206,8 @@ describe("useSearchHistogramManager", () => {
       );
 
       expect(mockHistogramFunctions.resetHistogramWithError).toHaveBeenCalledWith(
-        "Histogram is not available for multi-stream SQL mode search.",
-        0,
+        "Histogram unavailable for CTEs, DISTINCT, UNION, JOIN and LIMIT queries.",
+        -1,
       );
     });
 

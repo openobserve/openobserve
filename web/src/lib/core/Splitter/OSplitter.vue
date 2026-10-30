@@ -42,7 +42,11 @@
       @keydown="!disable && handleKeyDown($event)"
       role="separator"
       :aria-orientation="horizontal ? 'horizontal' : 'vertical'"
-      :aria-label="`${horizontal ? 'Horizontal' : 'Vertical'} splitter`"
+      :aria-label="
+        t('common.splitterLabel', {
+          orientation: horizontal ? t('common.horizontal') : t('common.vertical'),
+        })
+      "
       :aria-valuenow="modelValue"
       :aria-valuemin="limits?.[0] || 0"
       :aria-valuemax="limits?.[1] || 100"
@@ -56,6 +60,7 @@
         'o-splitter__after',
         'relative z-0 flex-1 shrink-0 overflow-hidden',
         horizontal ? 'w-full' : 'h-full',
+        afterClass,
       ]"
     >
       <slot name="after" />
@@ -64,7 +69,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, nextTick } from "vue";
+import { computed, ref, nextTick, watch } from "vue";
 import useResizer from "@/composables/useResizer";
 import type { OSplitterProps, OSplitterEmits } from "./OSplitter.types";
 
@@ -77,6 +82,7 @@ const props = withDefaults(defineProps<OSplitterProps>(), {
   separatorClass: "",
   separatorStyle: () => ({}),
   beforeClass: "",
+  afterClass: "",
 });
 
 const emit = defineEmits<OSplitterEmits>();
@@ -91,8 +97,8 @@ const maxValue = computed(() => props.limits?.[1] || (props.unit === "%" ? 100 :
 const { value: currentValue, onMouseDown } = useResizer({
   direction: !props.horizontal ? "horizontal" : "vertical",
   initialValue: props.modelValue,
-  minValue: minValue.value,
-  maxValue: maxValue.value,
+  minValue: () => minValue.value,
+  maxValue: () => maxValue.value,
   unit: props.unit,
   containerRef,
   throttleMs: 16, // 60fps for smooth movement
@@ -142,7 +148,7 @@ const handleKeyDown = (event: KeyboardEvent) => {
 };
 
 // Watch for external prop changes
-import { watch } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 watch(
   () => props.modelValue,
   (newValue) => {
@@ -150,6 +156,8 @@ watch(
   },
   { immediate: true },
 );
+
+const { t } = useI18nTyped();
 </script>
 
 <style scoped>

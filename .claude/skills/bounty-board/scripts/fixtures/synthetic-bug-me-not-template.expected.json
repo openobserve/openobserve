@@ -1,0 +1,4 @@
+{"item_count":2,"top_priority":"P2","eligible_indexes":[1,2],"items":[
+ {"priority":"P2","checked":false,"title":"Saving an alert twice creates a duplicate","symptom":"Clicking Save quickly twice adds the same alert two times to the list.","where_contains":"does not disable the button while the request is in flight.","proposed_fix_contains":"reset it in `finally`. The same guard exists","how_to_verify":"add a vitest case in `AddAlert.spec.ts` that calls submit twice and expects one `create()` call.","paths":["web/src/components/alerts/AddAlert.vue","web/src/services/alerts.ts"]},
+ {"priority":"P3","title":"The folder name is cut off","where":"`web/src/components/alerts/FolderList.vue` → `render`; the label has `overflow: hidden` and no title.","proposed_fix":"add a `title` binding with the full name.","how_to_verify":"hover a 100-character folder name and see the full name.","paths":["web/src/components/alerts/FolderList.vue"]}
+]}

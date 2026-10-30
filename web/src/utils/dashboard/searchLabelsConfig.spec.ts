@@ -22,6 +22,8 @@ describe("searchLabelsConfig", () => {
     "geographic",
     "legend",
     "data",
+    "stateTimeline",
+    "hostmap",
     "axis",
     "labels",
     "lineStyle",
@@ -29,21 +31,25 @@ describe("searchLabelsConfig", () => {
     "pivotTable",
     "valueTransformations",
     "fieldOverrides",
+    "seriesOverrides",
     "map",
     "gauge",
+    "pie",
     "layout",
     "colors",
     "drilldown",
     "comparison",
     "markLines",
+    "thresholds",
+    "metric",
     "background",
+    "sparkline",
+    "alertList",
+    "flameGraph",
+    "logs",
   ] as const;
 
   describe("ORDERED_SECTION_IDS", () => {
-    it("contains all 20 section IDs", () => {
-      expect(ORDERED_SECTION_IDS).toHaveLength(20);
-    });
-
     it("contains every expected section ID", () => {
       for (const id of EXPECTED_SECTIONS) {
         expect(ORDERED_SECTION_IDS).toContain(id);
@@ -73,8 +79,10 @@ describe("searchLabelsConfig", () => {
       }
     });
 
-    it("has exactly 20 keys", () => {
-      expect(Object.keys(DEFAULT_EXPANDED_SECTIONS)).toHaveLength(20);
+    it("has exactly one key per section", () => {
+      expect(Object.keys(DEFAULT_EXPANDED_SECTIONS).sort()).toEqual(
+        [...ORDERED_SECTION_IDS].sort(),
+      );
     });
 
     it("has no section set to true", () => {

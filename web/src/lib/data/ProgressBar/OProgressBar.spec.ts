@@ -49,6 +49,15 @@ describe("OProgressBar", () => {
       );
     });
 
+    it("applies bg-progress-bar-neutral for variant=neutral", () => {
+      const wrapper = mount(OProgressBar, {
+        props: { value: 0.5, variant: "neutral" },
+      });
+      expect(wrapper.find("[role='progressbar'] div").classes()).toContain(
+        "bg-progress-bar-neutral",
+      );
+    });
+
     it("applies bg-progress-bar-danger for variant=danger", () => {
       const wrapper = mount(OProgressBar, {
         props: { value: 1, variant: "danger" },
@@ -140,6 +149,57 @@ describe("OProgressBar", () => {
       const pb = wrapper.find("[role='progressbar']");
       expect(pb.attributes("aria-valuemin")).toBe("0");
       expect(pb.attributes("aria-valuemax")).toBe("100");
+    });
+  });
+  /**
+   * `w-full` is a default, not a fixed property of the track.
+   *
+   * It was baked into the class list unconditionally, so it silently beat any
+   * consumer asking for a narrower bar: Vue merges the consumer's `class` into
+   * the same attribute, both are utilities of equal specificity, and CSS
+   * source order decided. `class="w-12"` on the DBM coverage line rendered
+   * 1378px instead of 48px and pushed its own sentence off the row.
+   */
+  describe("width override", () => {
+    it("stretches to w-full when the consumer names no width", () => {
+      const wrapper = mount(OProgressBar, { props: { value: 0.5 } });
+      expect(wrapper.find("[role='progressbar']").classes()).toContain("w-full");
+    });
+
+    it("drops w-full when the consumer passes one", () => {
+      const wrapper = mount(OProgressBar, {
+        props: { value: 0.5 },
+        attrs: { class: "w-12 shrink-0" },
+      });
+      const classes = wrapper.find("[role='progressbar']").classes();
+      expect(classes, "w-full would win on source order and ignore w-12").not.toContain("w-full");
+      expect(classes).toContain("w-12");
+    });
+
+    it("also yields to size-, min-w- and max-w- overrides", () => {
+      for (const cls of ["size-8", "min-w-24", "max-w-32"]) {
+        const wrapper = mount(OProgressBar, { props: { value: 0.5 }, attrs: { class: cls } });
+        expect(
+          wrapper.find("[role='progressbar']").classes(),
+          `${cls} must suppress the w-full default`,
+        ).not.toContain("w-full");
+      }
+    });
+  });
+
+  describe("color", () => {
+    it("paints the fill with a category colour instead of the variant class", () => {
+      const wrapper = mount(OProgressBar, { props: { value: 0.5, color: "rgb(1, 2, 3)" } });
+      const fill = wrapper.find("[role='progressbar'] div");
+      expect(fill.attributes("style")).toContain("background-color: rgb(1, 2, 3)");
+      expect(fill.classes()).not.toContain("bg-progress-bar-default");
+    });
+
+    it("keeps the variant class when no colour is given", () => {
+      const wrapper = mount(OProgressBar, { props: { value: 0.5 } });
+      expect(wrapper.find("[role='progressbar'] div").classes()).toContain(
+        "bg-progress-bar-default",
+      );
     });
   });
 });

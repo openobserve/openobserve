@@ -37,6 +37,62 @@ const logData = require("../../../fixtures/log.json");
 const { ingestTestData, sendRequest, getHeaders, getIngestionUrl, waitForFieldValueSearchable } = require('../../utils/data-ingestion.js');
 const { getOrgIdentifier, isCloudEnvironment } = require('../../utils/cloud-auth.js');
 
+// Auto-derives to a bar chart with X+Y populated, so a saved chart type of "line"
+// is provably restored config rather than config re-derived from this query.
+const BUILDER_QUERY =
+  'SELECT histogram(_timestamp) as "x_axis_1", count(*) as "y_axis_1" FROM "e2e_automate" GROUP BY x_axis_1';
+
+/**
+ * Build a chart on the Build tab and save it as a saved view.
+ * The view must be saved while the Build tab is open — SearchBar only persists
+ * buildData when logsVisualizeToggle === 'build'.
+ */
+async function createBuilderSavedView(pm, page, viewName, chartType) {
+  await pm.logsPage.enableSqlModeIfNeeded();
+  await pm.logsPage.setQueryEditorContent(BUILDER_QUERY);
+  await pm.logsPage.runQueryAndWaitForResults();
+
+  await pm.logsPage.clickBuildToggle();
+  const loaded = await pm.logsPage.waitForBuildTabLoaded();
+  expect(loaded, 'Build tab must finish initializing before saving the view').toBeTruthy();
+
+  await pm.logsPage.selectChartType(chartType);
+  await pm.logsPage.verifyChartTypeSelected(chartType);
+
+  // clickSaveViewButton opens the utilities menu itself, so the list dialog is not
+  // opened here — clickSaveViewButton would only have to close it again.
+  await pm.logsPage.clickSaveViewButton();
+  await page.waitForTimeout(500);
+  await pm.logsPage.fillSavedViewName(viewName);
+  await page.waitForTimeout(500);
+  await pm.logsPage.clickSavedViewDialogSave();
+  await page.waitForTimeout(2000);
+  testLogger.info(`Builder saved view created: ${viewName} (chart type ${chartType})`);
+}
+
+async function applySavedViewByName(pm, page, viewName) {
+  await pm.logsPage.clickSavedViewsExpand();
+  await page.waitForTimeout(500);
+  await pm.logsPage.clickSavedViewSearchInput();
+  await pm.logsPage.fillSavedViewSearchInput(viewName);
+  await page.waitForTimeout(1000);
+  await pm.logsPage.waitForSavedViewText(viewName);
+  await pm.logsPage.clickSavedViewByText(viewName);
+  await page.waitForTimeout(3000);
+  testLogger.info(`Applied saved view: ${viewName}`);
+}
+
+async function deleteSavedViewQuietly(pm, page, viewName) {
+  try {
+    await pm.logsPage.clickDeleteSavedViewButton(viewName).catch(() => {});
+    await page.waitForTimeout(500);
+    await pm.logsPage.clickConfirmButton().catch(() => {});
+    testLogger.info(`Cleaned up saved view: ${viewName}`);
+  } catch (cleanupError) {
+    testLogger.debug(`Saved view cleanup skipped: ${viewName}`);
+  }
+}
+
 test.describe("Logs Regression Bug Fixes", () => {
   // Changed from serial to parallel - tests are independent (each gets own page/PM in beforeEach)
   test.describe.configure({ mode: 'parallel' });
@@ -64,37 +120,30 @@ test.describe("Logs Regression Bug Fixes", () => {
   // Bug #9996: Page appears blank midway on scroll
   // https://github.com/openobserve/openobserve/issues/9996
   // ==========================================================================
-  // SKIPPED: Timing out in current test environment (selectStream failures)
-  // TODO: Re-enable when environment is stable
-  test.skip("should maintain table visibility during scroll @bug-9996 @P0 @scroll @regression", async ({ page }) => {
-    test.setTimeout(240000); // 4 minutes timeout for slow environments
+  test("should maintain table visibility during scroll @bug-9996 @P0 @scroll @regression", async ({ page }) => {
     testLogger.info('Test: Verify scroll maintains content visibility (Bug #9996)');
 
-    // Navigate directly to logs page with stream and time parameters
-    const fifteenMinsAgo = Date.now() - (15 * 60 * 1000);
-    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}&stream=e2e_automate&stream_type=logs&from=${fifteenMinsAgo}&to=${Date.now()}`);
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    await page.waitForTimeout(2000);
-
-    // Run query to load data
+    await pm.logsPage.navigateToLogs();
+    await pm.logsPage.selectStream('e2e_automate');
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
-    // STRONG ASSERTION: Table must be visible before scroll
-    await pm.logsPage.expectLogsTableVisible();
-    testLogger.info('✓ Table visible before scroll');
+    // The grid must hold rows before scrolling, or the scroll assertions prove nothing.
+    await pm.logsPage.expectResultsGridSettledWithRows();
 
-    // Scroll multiple times and verify table stays visible
+    const startScrollTop = await pm.logsPage.getResultsScrollTop();
+    expect(startScrollTop, 'results area must expose a scrollable container').not.toBeNull();
+
     for (let i = 0; i < 5; i++) {
-      await page.mouse.wheel(0, 300);
-      await page.waitForTimeout(300);
-      // STRONG ASSERTION: Table must remain visible after each scroll
-      await pm.logsPage.expectLogsTableVisible();
-      testLogger.info(`✓ Table visible after scroll ${i + 1}/5`);
+      await pm.logsPage.scrollResultsGrid();
+      // The reported symptom is a blank grid, so rows are the assertion, not the container.
+      await pm.logsPage.expectResultsGridStillRendersRows();
+      testLogger.info(`Rows still rendered after scroll ${i + 1}/5`);
     }
 
-    testLogger.info('✓ PASSED: Table visible throughout scroll');
+    // Without this the loop would pass on a wheel that never moved the results area.
+    const endScrollTop = await pm.logsPage.getResultsScrollTop();
+    expect(endScrollTop, 'results area must actually scroll, otherwise nothing was tested')
+      .toBeGreaterThan(startScrollTop);
   });
 
   // ==========================================================================
@@ -479,7 +528,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     let includeMenuItem = null;
 
     for (const menuText of possibleMenuTexts) {
-      const menuItem = page.getByText(menuText, { exact: false }).first();
+      const menuItem = pm.logsPage.getMenuItemByText(menuText);
       if (await menuItem.isVisible({ timeout: 1000 }).catch(() => false)) {
         includeMenuItem = menuItem;
         testLogger.info(`✓ Found include menu item with text: ${menuText}`);
@@ -490,7 +539,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     if (!includeMenuItem) {
       // Post-migration the action is on an ODropdown rendered via JsonPreview;
       // its include item carries data-test="log-details-include-field-btn".
-      const anyMenuItem = page.locator('[data-test="log-details-include-field-btn"]').first();
+      const anyMenuItem = pm.logsPage.getIncludeSearchTermMenuItem();
       if (await anyMenuItem.isVisible({ timeout: 1000 }).catch(() => false)) {
         includeMenuItem = anyMenuItem;
         testLogger.info('✓ Using first visible menu item');
@@ -780,11 +829,11 @@ test.describe("Logs Regression Bug Fixes", () => {
       await pm.logsPage.selectStream('e2e_automate');
       await page.waitForTimeout(1000);
 
-      // Step 1: Enable VRL toggle
+      // Not wrapped in a catch: if the editor cannot be opened this test has
+      // nothing to assert, and swallowing that is what made it pass for months
+      // without exercising VRL at all.
       testLogger.info('Step 1: Enabling VRL function toggle');
-      await pm.logsPage.clickVrlToggleButton().catch(() => {
-        testLogger.warn('VRL toggle click failed, trying alternative');
-      });
+      await pm.logsPage.clickVrlToggleButton();
       await page.waitForTimeout(1000);
 
       // Step 2: Enter VRL function in the editor
@@ -849,9 +898,10 @@ test.describe("Logs Regression Bug Fixes", () => {
       // Step 8: Verify VRL function is loaded
       testLogger.info('Step 8: Verifying VRL function loaded');
 
-      // Toggle VRL editor to make it visible (it's collapsed by default after loading saved view)
-      await pm.logsPage.clickVrlToggle();
-      await page.waitForTimeout(1000);
+      // Restoring a saved view that carried a function re-opens the editor by
+      // itself, so this must be idempotent — the old blind toggle closed it and
+      // then waited for it to be visible.
+      await pm.logsPage.ensureVrlEditorOpen();
 
       // Check if VRL editor has content
       const vrlEditorContent = await pm.logsPage.getVrlEditorContent();
@@ -920,19 +970,19 @@ test.describe("Logs Regression Bug Fixes", () => {
   test("should have timestamp column selected by default for multi stream @bug-5894 @P2 @timestamp @multiStream @regression", async ({ page }) => {
     testLogger.info('Test: Verify timestamp default selected for multi stream (Bug #5894)');
 
+    // The stream select's options are fetched when the logs page loads, so the second
+    // stream must exist before that navigation or it never appears in the dropdown.
+    const secondStream = `e2e_multistream_${Date.now()}`;
+    fieldCacheStreamsToCleanup.push(secondStream);
+    testLogger.info(`Ingesting test data into second stream: ${secondStream}`);
+    await ingestTestData(page, secondStream);
+    await pm.logsPage.waitForStreamAvailable(secondStream, 90000, 3000);
+
     await pm.logsPage.clickMenuLinkLogsItem();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await pm.logsPage.selectStream('e2e_automate');
     await page.waitForTimeout(1000);
 
-    // Ingest data into a second stream for multi-stream testing
-    const secondStream = `e2e_multistream_${Date.now()}`;
-    fieldCacheStreamsToCleanup.push(secondStream);
-    testLogger.info(`Ingesting test data into second stream: ${secondStream}`);
-    await ingestTestData(page, secondStream);
-    await page.waitForTimeout(2000);
-
-    // Select second stream for multi-stream mode (without page navigation)
     testLogger.info('Selecting second stream for multi-stream mode');
     await pm.logsPage.addStreamToSelection(secondStream);
     await page.waitForTimeout(1000);
@@ -1073,11 +1123,11 @@ test.describe("Logs Regression Bug Fixes", () => {
     await page.waitForTimeout(3000);
 
     // Check for query-level errors
-    const errorVisible = await page.locator(pm.logsPage.errorMessage).isVisible({ timeout: 3000 }).catch(() => false);
+    const errorVisible = await pm.logsPage.getErrorMessageLocator().isVisible({ timeout: 3000 }).catch(() => false);
     testLogger.info(`Query error message visible: ${errorVisible}`);
 
     // Expand first log detail if available
-    const expandMenu = page.locator(pm.logsPage.tableRowExpandMenu).first();
+    const expandMenu = pm.logsPage.getFirstRowExpandMenu();
     if (await expandMenu.isVisible({ timeout: 5000 }).catch(() => false)) {
       await pm.logsPage.clickTableExpandMenuFirst();
       await page.waitForTimeout(1000);
@@ -1117,7 +1167,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     // Set wide time range to get more records
     await pm.logsPage.clickDateTimeButton();
     await page.waitForTimeout(500);
-    await pm.logsPage.clickRelative6WeeksButton();
+    await pm.logsPage.clickRelative15MinButton();
     await page.waitForTimeout(500);
 
     // Run query
@@ -1193,7 +1243,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     testLogger.info('✓ No partitions-related console errors');
 
     // Verify no error message displayed on page
-    const errorMsg = page.locator(pm.logsPage.errorMessage);
+    const errorMsg = pm.logsPage.getErrorMessageLocator();
     const errorVisible = await errorMsg.isVisible({ timeout: 2000 }).catch(() => false);
     if (errorVisible) {
       const errorText = await errorMsg.textContent();
@@ -1373,7 +1423,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   // Bug #10103: Query execution plan open/close shows "No results found"
   // https://github.com/openobserve/openobserve/issues/10103
   // ==========================================================================
-  test.skip("Opening and closing query execution plan should not clear results @bug-10103 @P2 @regression @logsRegression", async ({ page }) => {
+  test("Opening and closing query execution plan should not clear results @bug-10103 @P2 @regression @logsRegression", async ({ page }) => {
     testLogger.info('Test: Verify Explain Query close does not break results (Bug #10103)');
 
     await pm.logsPage.navigateToLogs();
@@ -1392,23 +1442,21 @@ test.describe("Logs Regression Bug Fixes", () => {
     testLogger.info('Results visible before explain');
 
     // Open hamburger menu → click Explain Query via POM
-    await expect(page.locator(pm.logsPage.moreOptionsBtn), 'More options button should be visible')
+    await expect(pm.logsPage.getMoreOptionsButtonLocator(), 'More options button should be visible')
       .toBeVisible({ timeout: 3000 });
     await pm.logsPage.clickMoreOptionsButton();
     await page.waitForTimeout(1000);
 
-    await expect(page.locator('[data-test="logs-search-bar-explain-query-menu-btn"]'),
+    await expect(pm.logsPage.getExplainQueryMenuBtnLocator(),
       'Explain Query option should be visible').toBeVisible({ timeout: 3000 });
     await pm.logsPage.clickExplainQuery();
-    await page.waitForTimeout(2000);
-    testLogger.info('Opened Explain Query');
+    // Without this the test passes even when the dialog never opens.
+    await pm.logsPage.expectQueryPlanDialogVisible();
 
-    // Close explain via Escape
     await page.keyboard.press('Escape');
-    await page.waitForTimeout(1500);
+    await pm.logsPage.expectQueryPlanDialogHidden();
 
-    // Bug assertion: results must still be visible after closing Explain Query
-    await pm.logsPage.expectLogsTableVisible();
+    await pm.logsPage.expectResultsGridSettledWithRows();
     testLogger.info('PASSED: Explain Query close does not break results');
   });
 
@@ -1422,7 +1470,9 @@ test.describe("Logs Regression Bug Fixes", () => {
     // Ingest data into a second stream so the multi-stream join has two streams
     const orgId = getOrgIdentifier() || 'default';
     const headers = getHeaders();
-    const secondStream = 'e2e_8641_stream';
+    // Per-run unique name — the fixed 'e2e_8641_stream' collided with concurrent shared-org runs
+    // ("Stream not available. Ingestion may have failed."). Keep the e2e_ prefix for cleanup.
+    const secondStream = 'e2e_8641_stream_' + Math.random().toString(36).slice(2, 7);
     await sendRequest(page, getIngestionUrl(orgId, secondStream), [{
       level: 'info', job: 'test_8641', log: 'test message for multi-stream', e2e: '1',
     }], headers);
@@ -1439,7 +1489,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
-    const errorVisible = await page.locator('[class*="error"], [class*="negative"], [role="alert"]')
+    const errorVisible = await pm.logsPage.getGenericErrorLocator()
       .filter({ hasText: /error|failed|invalid/i })
       .first().isVisible({ timeout: 2000 }).catch(() => false);
 
@@ -1462,7 +1512,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     await pm.logsPage.clickMenuLinkLogsItem();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     // Wait for the stream select OSelect to mount before interacting
-    await page.locator('[data-test="log-search-index-list-select-stream"]').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    await pm.logsPage.getStreamDropdown().first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
     await pm.logsPage.selectStream('e2e_automate', 5, 30000, true);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
@@ -1687,7 +1737,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   }, async ({ page }) => {
     testLogger.info('Test: include/exclude search term position (Bug #11606)');
 
-    const orgName = 'default';
+    const orgName = getOrgIdentifier() || 'default';
     await page.goto(`/web/logs?org_identifier=${orgName}&stream=e2e_automate&stream_type=logs`);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
@@ -1730,7 +1780,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   }, async ({ page }) => {
     testLogger.info('Test: Histogram redraws on index list collapse/expand (Bug #9339)');
 
-    const orgName = 'default';
+    const orgName = getOrgIdentifier() || 'default';
     await page.goto(`/web/logs?org_identifier=${orgName}&stream=e2e_automate&stream_type=logs`);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
@@ -1762,7 +1812,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   }, async ({ page }) => {
     testLogger.info('Test: Stream dropdown replaces search term on selection (Bug #7310)');
 
-    const orgName = 'default';
+    const orgName = getOrgIdentifier() || 'default';
     await page.goto(`/web/logs?org_identifier=${orgName}`);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
@@ -1789,13 +1839,15 @@ test.describe("Logs Regression Bug Fixes", () => {
   // ==========================================================================
   // Bug #5277: After moving column, click on query again and position changes back
   // https://github.com/openobserve/openobserve/issues/5277
+  // #4483 is the same defect filed again; both numbers are tagged so a
+  // coverage audit keyed on either one finds this test.
   // ==========================================================================
   test("column positions should persist after re-running query", {
-    tag: ['@bug-5277', '@P2', '@regression', '@logsRegression']
+    tag: ['@bug-5277', '@bug-4483', '@P2', '@regression', '@logsRegression']
   }, async ({ page }) => {
     testLogger.info('Test: Column positions persist after re-query (Bug #5277)');
 
-    const orgName = 'default';
+    const orgName = getOrgIdentifier() || 'default';
     await page.goto(`/web/logs?org_identifier=${orgName}&stream=e2e_automate&stream_type=logs`);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
@@ -1834,7 +1886,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   }, async ({ page }) => {
     testLogger.info('Test: Text wrap toggle and saved view alignment (Bug #4426)');
 
-    const orgName = 'default';
+    const orgName = getOrgIdentifier() || 'default';
     await page.goto(`/web/logs?org_identifier=${orgName}&stream=e2e_automate&stream_type=logs`);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
@@ -1882,7 +1934,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   }, async ({ page }) => {
     testLogger.info('Test: Cancel query available on visualize page (Bug #4091)');
 
-    const orgName = 'default';
+    const orgName = getOrgIdentifier() || 'default';
     await page.goto(`/web/logs?org_identifier=${orgName}&stream=e2e_automate&stream_type=logs`);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
@@ -1913,6 +1965,178 @@ test.describe("Logs Regression Bug Fixes", () => {
     testLogger.info('Bug #4091 verification complete');
   });
 
+
+  // ==========================================================================
+  // Bug #14228: Builder saved view does not apply when already on the Build tab
+  // https://github.com/openobserve/openobserve/issues/14228
+  // ==========================================================================
+  // ==========================================================================
+  // Bug #13990: Builder saved view restores the wrong stream
+  // https://github.com/openobserve/openobserve/issues/13990
+  // ==========================================================================
+  test('Builder saved view restores the stream it was saved with @bug-13990 @P1 @regression @logsRegression @savedViews @queryBuilder', {
+    tag: ['@bug-13990', '@P1', '@regression', '@logsRegression', '@savedViews', '@queryBuilder']
+  }, async ({ page }) => {
+    testLogger.info('Test: Builder saved view restores its own stream (Bug #13990)');
+
+    const savedViewName = `streamslog_build_13990_${Date.now()}`;
+    const otherStream = 'e2e_13990_other_' + Math.random().toString(36).slice(2, 7);
+
+    // A second stream to move away to; without it the assertion would hold
+    // trivially, since the page would never have left the saved stream.
+    const orgId = getOrgIdentifier() || 'default';
+    await sendRequest(page, getIngestionUrl(orgId, otherStream), [{
+      level: 'info', job: 'test_13990', log: 'second stream for saved view restore', e2e: '1',
+    }], getHeaders());
+    fieldCacheStreamsToCleanup.push(otherStream);
+
+    await page.goto(`${logData.logsUrl}?org_identifier=${orgId}`);
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    await pm.logsPage.selectStream('e2e_automate');
+    await pm.logsPage.expectLogsSearchIndexListContainsText('e2e_automate');
+
+    await createBuilderSavedView(pm, page, savedViewName, 'line');
+
+    // The Logs-tab stream picker is hidden while the Build tab is open (issue repro step 3).
+    await pm.logsPage.clickLogsToggle();
+    await pm.logsPage.expectLogsTabSelected();
+    await pm.logsPage.selectStream(otherStream);
+    await pm.logsPage.expectLogsSearchIndexListContainsText(otherStream);
+    testLogger.info(`Moved to ${otherStream} before applying the saved view`);
+
+    await applySavedViewByName(pm, page, savedViewName);
+
+    // The defect restored an unrelated stream, so the stream is the contract here
+    // rather than the chart type that #14228 covers.
+    await pm.logsPage.expectLogsSearchIndexListContainsText('e2e_automate');
+    testLogger.info('Saved view restored its original stream');
+  });
+
+  test("should apply a builder saved view while already on the build tab", {
+    tag: ['@bug-14228', '@P1', '@regression', '@logsRegression', '@savedViews', '@queryBuilder']
+  }, async ({ page }) => {
+    testLogger.info('Test: Builder saved view applies without a tab toggle (Bug #14228)');
+    test.setTimeout(180000);
+
+    // The "streamslog" prefix lets CI saved-view cleanup reap any leak.
+    const savedViewName = `streamslog_build_14228_${Date.now()}`;
+
+    try {
+      await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier() || 'default'}`);
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await pm.logsPage.selectStream('e2e_automate');
+      await page.waitForTimeout(1000);
+
+      await createBuilderSavedView(pm, page, savedViewName, 'line');
+
+      // Diverge the live builder from the saved view. Without this the assertion
+      // would pass even unfixed, since the builder would already show "line".
+      await pm.logsPage.selectChartType('area');
+      await pm.logsPage.verifyChartTypeSelected('area');
+      await pm.logsPage.expectBuildTabSelected();
+      testLogger.info('Builder diverged to area chart before applying the saved view');
+
+      await applySavedViewByName(pm, page, savedViewName);
+
+      // No tab toggle happened, so BuildQueryPage never remounts — the watcher on
+      // searchObj.meta.savedBuildConfig is the only thing that can apply the view.
+      await pm.logsPage.expectBuildTabSelected();
+      await pm.logsPage.verifyChartTypeSelected('line');
+      await pm.logsPage.verifyChartTypeSelected('area', false);
+      testLogger.info('✓ PRIMARY CHECK PASSED: builder re-initialized to the saved chart type');
+
+      const xCount = await pm.logsPage.expectXAxisHasItems();
+      const yCount = await pm.logsPage.expectYAxisHasItems();
+      expect(xCount, 'Bug #14228: X-axis must stay populated after applying the view').toBeGreaterThan(0);
+      expect(yCount, 'Bug #14228: Y-axis must stay populated after applying the view').toBeGreaterThan(0);
+
+    } finally {
+      await deleteSavedViewQuietly(pm, page, savedViewName);
+    }
+
+    testLogger.info('✓ PASSED: Builder saved view applied in place (Bug #14228)');
+  });
+
+  test("should still apply a builder saved view when toggling in from the logs tab", {
+    tag: ['@bug-14228', '@P1', '@regression', '@logsRegression', '@savedViews', '@queryBuilder']
+  }, async ({ page }) => {
+    testLogger.info('Test: Toggle-in path still applies builder saved views (Bug #14228 no-regression)');
+    test.setTimeout(180000);
+
+    const savedViewName = `streamslog_build_14228_toggle_${Date.now()}`;
+
+    try {
+      await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier() || 'default'}`);
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await pm.logsPage.selectStream('e2e_automate');
+      await page.waitForTimeout(1000);
+
+      await createBuilderSavedView(pm, page, savedViewName, 'line');
+
+      await pm.logsPage.clickLogsToggle();
+      await pm.logsPage.expectLogsTabSelected();
+      testLogger.info('Switched back to the Logs tab');
+
+      await applySavedViewByName(pm, page, savedViewName);
+
+      // Here the view flips the toggle to build and BuildQueryPage mounts, so
+      // onMounted applies the config. The watcher must not undo or double-apply it.
+      await pm.logsPage.expectBuildTabSelected();
+      await pm.logsPage.verifyChartTypeSelected('line');
+      testLogger.info('✓ CHECK PASSED: toggle-in path still restores the saved chart type');
+
+    } finally {
+      await deleteSavedViewQuietly(pm, page, savedViewName);
+    }
+
+    testLogger.info('✓ PASSED: Toggle-in path unaffected (Bug #14228)');
+  });
+
+  test("should not re-initialize the builder when applying a non-builder saved view", {
+    tag: ['@bug-14228', '@P2', '@regression', '@logsRegression', '@savedViews', '@queryBuilder']
+  }, async ({ page }) => {
+    testLogger.info('Test: Non-builder saved views do not trigger builder re-init (Bug #14228)');
+    test.setTimeout(180000);
+
+    const savedViewName = `streamslog_logs_14228_${Date.now()}`;
+
+    try {
+      await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier() || 'default'}`);
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await pm.logsPage.selectStream('e2e_automate');
+      await page.waitForTimeout(1000);
+
+      // Saved from the Logs tab, so the view carries no buildData.
+      await pm.logsPage.clickRefreshButton();
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await page.waitForTimeout(2000);
+
+      await pm.logsPage.clickSaveViewButton();
+      await page.waitForTimeout(500);
+      await pm.logsPage.fillSavedViewName(savedViewName);
+      await page.waitForTimeout(500);
+      await pm.logsPage.clickSavedViewDialogSave();
+      await page.waitForTimeout(2000);
+      testLogger.info(`Logs-tab saved view created: ${savedViewName}`);
+
+      await pm.logsPage.clickBuildToggle();
+      await pm.logsPage.waitForBuildTabLoaded();
+      await pm.logsPage.expectBuildTabSelected();
+
+      await applySavedViewByName(pm, page, savedViewName);
+
+      // buildData is null, so the watcher's guard must skip it and the view's own
+      // logs toggle must win.
+      await pm.logsPage.expectLogsTabSelected();
+      await pm.logsPage.expectLogsTableVisible();
+      testLogger.info('✓ CHECK PASSED: non-builder view applied with no builder re-init');
+
+    } finally {
+      await deleteSavedViewQuietly(pm, page, savedViewName);
+    }
+
+    testLogger.info('✓ PASSED: Non-builder saved view handled correctly (Bug #14228)');
+  });
 
   test.afterEach(async () => {
     // Cleanup new stream created by field cache test (e2e_automate is never deleted)

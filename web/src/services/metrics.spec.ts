@@ -440,3 +440,15 @@ describe("Metrics Service", () => {
     });
   });
 });
+
+describe("getMetricUsage", () => {
+  it("GETs the usage route with the metric name encoded and the abort signal", async () => {
+    const get = vi.fn().mockResolvedValue({ data: {} });
+    (http as any).mockReturnValue({ get });
+    const signal = new AbortController().signal;
+
+    await metrics.getMetricUsage({ org_identifier: "test-org", metric: "a:b/c", signal });
+
+    expect(get).toHaveBeenCalledWith("/api/test-org/metrics/a%3Ab%2Fc/usage", { signal });
+  });
+});

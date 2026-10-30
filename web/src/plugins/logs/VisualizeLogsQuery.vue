@@ -31,6 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
       :regionClusterParams="regionClusterParams"
       :allowedChartTypes="allowedChartTypes"
+      :addToDashboardDisabledReason="addToDashboardReason"
       @addToDashboard="addToDashboard"
       @chartApiError="handleChartApiError"
       @searchRequestTraceIdsUpdated="handleSearchRequestTraceIdsUpdated"
@@ -46,15 +47,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, defineAsyncComponent, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import {
+  defineComponent,
+  ref,
+  watch,
+  defineAsyncComponent,
+  computed,
+  provide,
+  inject,
+  toRefs,
+  onActivated,
+} from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
-import { provide, inject, toRefs, onActivated } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import { isSimpleSelectAllQuery } from "@/utils/query/sqlUtils";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { searchState } from "@/composables/useLogs/searchState";
+import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
 import type { PanelEditorVariablesData } from "@/components/dashboards/PanelEditor";
 
@@ -100,16 +111,18 @@ export default defineComponent({
   emits: ["handleChartApiError", "searchRequestTraceIdsUpdated"],
   setup(props, { emit }) {
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "logs");
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
-    const { dashboardPanelData, resetAggregationFunction, validatePanel } =
-      useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData, resetAggregationFunction, validatePanel } = useDashboardPanelData(
+      dashboardPanelDataPageKey,
+      t,
+    );
     const resultMetaData = ref(null);
 
     const { showErrorNotification } = useNotifications();
 
     const { searchObj } = searchState();
-    const { buildSearch } = useSearchStream();
+    const { buildSearch } = useSearchStream(t);
 
     // Logs visualization has no dashboard variables; keep the runtime `{}` value.
     const emptyVariablesData = {} as PanelEditorVariablesData;
@@ -215,7 +228,16 @@ export default defineComponent({
 
     provide("hoveredSeriesState", hoveredSeriesState);
 
+    const autoRun = useLogsAutoRun();
+    const addToDashboardReason = computed(() =>
+      autoRun.persistReason("visualize", "add-to-dashboard"),
+    );
+
     const addToDashboard = () => {
+      if (addToDashboardReason.value) {
+        showErrorNotification(addToDashboardReason.value);
+        return;
+      }
       // Get result metadata from PanelEditor if available
       const panelResultMetaData = panelEditorRef.value?.metaData?.value;
 
@@ -282,6 +304,7 @@ export default defineComponent({
       showAddToDashboardDialog,
       addPanelToDashboard,
       addToDashboard,
+      addToDashboardReason,
       hoveredSeriesState,
       resultMetaData,
       isSimpleSelectAllQuery,

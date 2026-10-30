@@ -6,7 +6,7 @@
 // These tests pin that behavior so the service stops silently returning []
 // if the API contract changes.
 
-import { vi } from "vitest";
+import { vi, describe, it, expect, beforeEach } from "vitest";
 
 const { mockGet, mockPost, mockPut, mockDelete } = vi.hoisted(() => ({
   mockGet: vi.fn(),
@@ -14,6 +14,8 @@ const { mockGet, mockPost, mockPut, mockDelete } = vi.hoisted(() => ({
   mockPut: vi.fn(),
   mockDelete: vi.fn(),
 }));
+
+vi.mock("./product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/services/http", () => ({
   default: () => ({
@@ -24,8 +26,8 @@ vi.mock("@/services/http", () => ({
   }),
 }));
 
-import { describe, it, expect, beforeEach } from "vitest";
 import onlineEvalsService from "./online-evals.service";
+import analytics from "./product_analytics";
 
 beforeEach(() => {
   mockGet.mockReset();
@@ -96,6 +98,41 @@ describe("unwrapList — three response shapes", () => {
 });
 
 describe("URL construction", () => {
+  it("tests inline provider configuration and unwraps the response message", async () => {
+    const payload = {
+      name: "Test provider",
+      providerType: "openai",
+      defaultModel: "gpt-4o-mini",
+      availableModels: ["gpt-4o-mini"],
+      authConfig: { api_key: "test-key" },
+      isDefault: false,
+    };
+    mockPost.mockResolvedValue({ data: { code: 200, message: "Connected" } });
+
+    const result = await onlineEvalsService.providers.testConfig("acme", payload);
+
+    expect(mockPost).toHaveBeenCalledWith("/api/acme/providers/test", payload);
+    expect(result).toBe("Connected");
+  });
+
+  it("includes the stored provider ID when requested", async () => {
+    const payload = {
+      name: "Test provider",
+      providerType: "openai",
+      defaultModel: "gpt-4o-mini",
+      availableModels: ["gpt-4o-mini"],
+      authConfig: { api_key: "" },
+      isDefault: false,
+    };
+    mockPost.mockResolvedValue({ data: { code: 200, message: "Connected" } });
+
+    await onlineEvalsService.providers.testConfig("acme", payload, "provider-1");
+
+    expect(mockPost).toHaveBeenCalledWith("/api/acme/providers/test", {
+      ...payload,
+      providerId: "provider-1",
+    });
+  });
   it("providers.list hits /api/{orgId}/providers", async () => {
     mockGet.mockResolvedValue({ data: [] });
     await onlineEvalsService.providers.list("acme");
@@ -106,6 +143,13 @@ describe("URL construction", () => {
     mockGet.mockResolvedValue({ data: { versions: [] } });
     await onlineEvalsService.scoreConfigs.versions("acme", "sc-42");
     expect(mockGet).toHaveBeenCalledWith("/api/acme/score_configs/sc-42/versions");
+  });
+
+  it("scorers.versions unwraps the history from /api/{orgId}/scorers/{entityId}/versions", async () => {
+    mockGet.mockResolvedValue({ data: { versions: [{ id: "r2", version: 2 }] } });
+    const result = await onlineEvalsService.scorers.versions("acme", "sc-7");
+    expect(mockGet).toHaveBeenCalledWith("/api/acme/scorers/sc-7/versions");
+    expect(result).toEqual([{ id: "r2", version: 2 }]);
   });
 
   it("jobs.list appends a status query when one is provided", async () => {
@@ -181,5 +225,86 @@ describe("mutation endpoints return response.data directly", () => {
     mockDelete.mockResolvedValue({});
     await onlineEvalsService.providers.delete("org-1", "p1");
     expect(mockDelete).toHaveBeenCalledWith("/api/org-1/providers/p1");
+  });
+});
+
+describe("quality APIs", () => {
+  it("quality.list sends snake_case params with whole-µs times and drops empty optionals", async () => {
+    mockGet.mockResolvedValue({ data: { list: [{ configId: "c1" }] } });
+    const result = await onlineEvalsService.quality.list("acme", {
+      start_time: 1791112620869676.5,
+      end_time: 1791199020869676,
+      agent_env: "prod",
+      agent_name: "",
+      agent_id: undefined,
+    });
+    expect(mockGet).toHaveBeenCalledWith("/api/acme/score_configs/quality", {
+      params: { start_time: 1791112620869676, end_time: 1791199020869676, agent_env: "prod" },
+    });
+    expect(result).toEqual([{ configId: "c1" }]);
+  });
+
+  it("quality.scores hits the per-config path with the filter and page params", async () => {
+    const page = { average: null, distribution: [], list: [], total: 0, from: 10, size: 10 };
+    mockGet.mockResolvedValue({ data: page });
+    const result = await onlineEvalsService.quality.scores("acme", "7512827247535849473", {
+      start_time: 1,
+      end_time: 2,
+      scope: "trace",
+      unhealthy_only: true,
+      bucket_from: 3,
+      bucket_to: 5,
+      value: undefined,
+      from: 10,
+      size: 10,
+    });
+    expect(mockGet).toHaveBeenCalledWith("/api/acme/score_configs/7512827247535849473/quality", {
+      params: {
+        start_time: 1,
+        end_time: 2,
+        scope: "trace",
+        unhealthy_only: true,
+        bucket_from: 3,
+        bucket_to: 5,
+        from: 10,
+        size: 10,
+      },
+    });
+    expect(result).toBe(page);
+  });
+
+  it("quality.timeline hits the per-config timeline path with whole-µs times and drops empty optionals", async () => {
+    const body = { timeline: [] };
+    mockGet.mockResolvedValue({ data: body });
+    const result = await onlineEvalsService.quality.timeline("acme", "7512827247535849473", {
+      start_time: 1.5,
+      end_time: 2,
+      scope: "session",
+      agent_name: "",
+      agent_env: "prod",
+    });
+    expect(mockGet).toHaveBeenCalledWith(
+      "/api/acme/score_configs/7512827247535849473/quality/timeline",
+      { params: { start_time: 1, end_time: 2, scope: "session", agent_env: "prod" } },
+    );
+    expect(result).toBe(body);
+  });
+});
+
+describe("jobs.create analytics", () => {
+  beforeEach(() => vi.mocked(analytics.track).mockClear());
+
+  it("tracks llm_eval_job_created once the server confirms", async () => {
+    mockPost.mockResolvedValue({ data: { id: "job-1" } });
+    await expect(onlineEvalsService.jobs.create("org-1", {} as any)).resolves.toEqual({
+      id: "job-1",
+    });
+    expect(analytics.track).toHaveBeenCalledWith("llm_eval_job_created");
+  });
+
+  it("does not track when the create is rejected", async () => {
+    mockPost.mockRejectedValue(new Error("boom"));
+    await expect(onlineEvalsService.jobs.create("org-1", {} as any)).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });

@@ -30,6 +30,7 @@ use hashbrown::HashMap;
 use sqlx::{Executor, QueryBuilder, Row, Sqlite};
 
 use crate::{
+    coordinator::org_status::{STATUS_DELETED, STATUS_DELETING},
     db::{
         IndexStatement,
         sqlite::{CLIENT_RO, CLIENT_RW, add_column, create_index, delete_index, drop_column},
@@ -77,7 +78,6 @@ impl super::FileList for SqliteFileList {
 
     async fn remove(&self, file: &str) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let pool = client.clone();
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
@@ -107,9 +107,12 @@ impl super::FileList for SqliteFileList {
         self.inner_batch_process("file_list", files).await
     }
 
-    async fn update_dump_records(&self, file: &FileKey, dumped_ids: &[i64]) -> Result<()> {
+    async fn update_dump_records(
+        &self,
+        file: &FileKey,
+        dumped_ids: &[(i64, String)],
+    ) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let mut tx = client.begin().await?;
 
         // insert the dump file into file_list table
@@ -119,8 +122,8 @@ impl super::FileList for SqliteFileList {
         let meta = &file.meta;
         let now_ts = now_micros();
 
-        if let Err(e) = sqlx::query(r#"INSERT INTO file_list (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15);"#)
+        if let Err(e) = sqlx::query(r#"INSERT INTO file_list (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, bloom_ver, flattened, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16);"#)
         .bind(&file.account)
         .bind(org_id)
         .bind(stream_key)
@@ -133,6 +136,7 @@ impl super::FileList for SqliteFileList {
         .bind(meta.original_size)
         .bind(meta.compressed_size)
         .bind(meta.index_size)
+        .bind(meta.mindex_size)
         .bind(meta.bloom_ver)
         .bind(meta.flattened)
         .bind(now_ts)
@@ -144,14 +148,14 @@ impl super::FileList for SqliteFileList {
             return Err(e.into());
         }
 
-        // delete the dumped ids from file_list table
+        // delete the dumped ids from file_list table; sqlite is unpartitioned, so no date needed
         for chunk in dumped_ids.chunks(get_config().compact.file_list_deleted_batch_size) {
             if chunk.is_empty() {
                 continue;
             }
             let ids = chunk
                 .iter()
-                .map(|id| id.to_string())
+                .map(|(id, _)| id.to_string())
                 .collect::<Vec<String>>()
                 .join(",");
             let query_str = format!("DELETE FROM file_list WHERE id IN ({ids})");
@@ -183,10 +187,9 @@ impl super::FileList for SqliteFileList {
         for files in chunks {
             // we don't care the id here, because the id is from file_list table not for this table
             let client = CLIENT_RW.clone();
-            let client = client.lock().await;
             let mut tx = client.begin().await?;
             let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
-                "INSERT INTO file_list_deleted (account, org, stream, date, file, index_file, flattened, created_at)",
+                "INSERT INTO file_list_deleted (account, org, stream, date, file, index_file, mindex_file, flattened, created_at)",
             );
             query_builder.push_values(files, |mut b, item| {
                 let (stream_key, date_key, file_name) =
@@ -197,6 +200,7 @@ impl super::FileList for SqliteFileList {
                     .push_bind(date_key)
                     .push_bind(file_name)
                     .push_bind(item.index_file)
+                    .push_bind(item.mindex_file)
                     .push_bind(item.flattened)
                     .push_bind(created_at);
             });
@@ -222,7 +226,6 @@ impl super::FileList for SqliteFileList {
         for files in chunks {
             // get ids of the files
             let client = CLIENT_RW.clone();
-            let client = client.lock().await;
             let pool = client.clone();
             let mut ids = Vec::with_capacity(files.len());
             for file in files {
@@ -267,13 +270,23 @@ impl super::FileList for SqliteFileList {
         Ok(())
     }
 
+    async fn release_deleted(&self, ids: &[i64], created_at: i64) -> Result<()> {
+        let pool = CLIENT_RW.clone();
+        for ids in ids.chunks(100) {
+            let ids = ids.iter().map(i64::to_string).collect::<Vec<_>>().join(",");
+            let sql = format!("UPDATE file_list_deleted SET created_at = $1 WHERE id IN ({ids});");
+            sqlx::query(&sql).bind(created_at).execute(&pool).await?;
+        }
+        Ok(())
+    }
+
     async fn get(&self, file: &str) -> Result<FileMeta> {
         let pool = CLIENT_RO.clone();
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"
-SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened, file, date
+SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, bloom_ver, flattened, file, date
     FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;
             "#,
         )
@@ -305,7 +318,6 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, bloo
 
     async fn update_flattened(&self, file: &str, flattened: bool) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         sqlx::query(
@@ -315,14 +327,13 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, bloo
         .bind(stream_key)
         .bind(date_key)
         .bind(file_name)
-        .execute(&*client)
+        .execute(&client)
         .await?;
         Ok(())
     }
 
     async fn update_compressed_size(&self, file: &str, size: i64) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         sqlx::query(
@@ -332,7 +343,7 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, bloo
         .bind(stream_key)
         .bind(date_key)
         .bind(file_name)
-        .execute(&*client)
+        .execute(&client)
         .await?;
         Ok(())
     }
@@ -342,7 +353,6 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, bloo
             return Ok(());
         }
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         // Chunk in case of very long lists; SQLite caps placeholders at 999
         // and we'd rather not blow it up unexpectedly.
         for chunk in ids.chunks(900) {
@@ -354,7 +364,7 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, bloo
             for id in chunk {
                 q = q.bind(*id);
             }
-            q.execute(&*client).await?;
+            q.execute(&client).await?;
         }
         Ok(())
     }
@@ -383,7 +393,7 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, bloo
     async fn list(&self) -> Result<Vec<FileKey>> {
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::FileRecord>(
-            r#"SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened FROM file_list;"#,
+            r#"SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, bloom_ver, flattened FROM file_list;"#,
         )
         .fetch_all(&pool)
         .await?;
@@ -405,7 +415,7 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, bloo
         let ret = if let Some(flattened) = flattened {
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened
+SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, bloom_ver, flattened
     FROM file_list
     WHERE stream = $1 AND flattened = $2 LIMIT 1000;
                 "#,
@@ -416,10 +426,13 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
             .await
         } else {
             let (time_start, time_end) = time_range;
-            let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
+            let max_ts_upper_bound = super::calculate_max_ts_upper_bound(
+                time_end,
+                super::max_ts_bound_level(org_id, stream_type, stream_name).await,
+            );
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened
+SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, bloom_ver, flattened
     FROM file_list
     WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;
                 "#,
@@ -440,6 +453,7 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
         stream_type: StreamType,
         stream_name: &str,
         date_range: (String, String),
+        max_original_size: i64,
     ) -> Result<Vec<FileKey>> {
         let (date_start, date_end) = date_range;
         if date_start.is_empty() && date_end.is_empty() {
@@ -447,12 +461,10 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
         }
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
 
-        let cfg = get_config();
-        let max_size = cfg.compact.max_file_size as i64 * 95 / 100;
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened
+SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, bloom_ver, flattened
     FROM file_list
     WHERE stream = $1 AND date >= $2 AND date <= $3 AND original_size <= $4;
                 "#,
@@ -460,7 +472,7 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
             .bind(stream_key)
             .bind(date_start)
             .bind(date_end)
-            .bind(max_size)
+            .bind(max_original_size)
             .fetch_all(&pool)
             .await;
         Ok(ret?.iter().map(|r| r.into()).collect())
@@ -477,7 +489,10 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
 
         let pool = CLIENT_RO.clone();
-        let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
+        let max_ts_upper_bound = super::calculate_max_ts_upper_bound(
+            time_end,
+            super::max_ts_bound_level(org_id, stream_type, stream_name).await,
+        );
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"SELECT * FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;"#,
         )
@@ -521,7 +536,7 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
 
         let pool = CLIENT_RO.clone();
         let sql = r#"
-SELECT id, account, stream, date, file, records, index_size FROM file_list WHERE stream = $1 AND date = $2 AND index_size > 0 AND bloom_ver = 0;
+SELECT id, account, stream, date, file, records, index_size, mindex_size FROM file_list WHERE stream = $1 AND date = $2 AND index_size > 0 AND bloom_ver = 0;
                 "#;
         let ret = sqlx::query_as::<_, super::FileRecord>(sql)
             .bind(stream_key)
@@ -555,7 +570,7 @@ SELECT id, account, stream, date, file, records, index_size FROM file_list WHERE
                 .collect::<Vec<String>>()
                 .join(",");
             let query_str = format!(
-                "SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver FROM file_list WHERE id IN ({ids})"
+                "SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, bloom_ver FROM file_list WHERE id IN ({ids})"
             );
             let res = sqlx::query_as::<_, super::FileRecord>(&query_str)
                 .fetch_all(&pool)
@@ -593,13 +608,15 @@ SELECT id, account, stream, date, file, records, index_size FROM file_list WHERE
         };
         log::debug!("file_list day_partitions: {day_partitions:?}");
 
+        let max_ts_level = super::max_ts_bound_level(org_id, stream_type, stream_name).await;
         let mut tasks = Vec::with_capacity(day_partitions.len());
 
         for (time_start, time_end) in day_partitions {
             let stream_key = stream_key.clone();
             tasks.push(tokio::task::spawn(async move {
                 let pool = CLIENT_RO.clone();
-                    let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
+                    let max_ts_upper_bound =
+                        super::calculate_max_ts_upper_bound(time_end, max_ts_level);
                     let query = "SELECT id, records, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts < $4;";
                     sqlx::query_as::<_, super::FileId>(query)
                     .bind(stream_key)
@@ -680,7 +697,10 @@ SELECT id, account, stream, date, file, records, index_size FROM file_list WHERE
 
         let pool = CLIENT_RO.clone();
         let cfg = get_config();
-        let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
+        let max_ts_upper_bound = super::calculate_max_ts_upper_bound(
+            time_end,
+            super::max_ts_bound_level(org_id, stream_type, stream_name).await,
+        );
         let sql = r#"
 SELECT date
     FROM file_list
@@ -714,7 +734,7 @@ SELECT date
         }
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
-            r#"SELECT id, account, stream, date, file, index_file, flattened FROM file_list_deleted WHERE org = $1 AND created_at < $2 ORDER BY created_at ASC LIMIT $3;"#,
+            r#"SELECT id, account, stream, date, file, index_file, mindex_file, flattened FROM file_list_deleted WHERE org = $1 AND created_at < $2 ORDER BY created_at ASC LIMIT $3;"#,
         )
         .bind(org_id)
         .bind(time_max)
@@ -728,6 +748,7 @@ SELECT date
                 account: r.account.to_string(),
                 file: format!("files/{}/{}/{}", r.stream, r.date, r.file),
                 index_file: r.index_file,
+                mindex_file: r.mindex_file,
                 flattened: r.flattened,
             })
             .collect())
@@ -736,7 +757,7 @@ SELECT date
     async fn list_deleted(&self) -> Result<Vec<FileListDeleted>> {
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
-            r#"SELECT id, account, stream, date, file, index_file, flattened FROM file_list_deleted;"#,
+            r#"SELECT id, account, stream, date, file, index_file, mindex_file, flattened FROM file_list_deleted;"#,
         )
         .fetch_all(&pool)
         .await?;
@@ -747,9 +768,46 @@ SELECT date
                 account: r.account.to_string(),
                 file: format!("files/{}/{}/{}", r.stream, r.date, r.file),
                 index_file: r.index_file,
+                mindex_file: r.mindex_file,
                 flattened: r.flattened,
             })
             .collect())
+    }
+
+    async fn remove_deleted_unless_org_deleting(&self, org_id: &str, ids: &[i64]) -> Result<bool> {
+        let pool = CLIENT_RW.clone();
+        let mut tx = pool.begin().await?;
+        let status: Option<String> =
+            sqlx::query_scalar("SELECT status FROM organizations WHERE identifier = $1;")
+                .bind(org_id)
+                .fetch_optional(&mut *tx)
+                .await?;
+        if matches!(status.as_deref(), Some(STATUS_DELETING | STATUS_DELETED)) {
+            tx.rollback().await?;
+            return Ok(false);
+        }
+        for chunk in ids.chunks(100) {
+            let mut query =
+                QueryBuilder::<Sqlite>::new("DELETE FROM file_list_deleted WHERE id IN (");
+            let mut list = query.separated(", ");
+            for id in chunk {
+                list.push_bind(*id);
+            }
+            query.push(")");
+            query.build().execute(&mut *tx).await?;
+        }
+        tx.commit().await?;
+        Ok(true)
+    }
+
+    async fn has_deleted_by_org(&self, org_id: &str) -> Result<bool> {
+        let pool = CLIENT_RO.clone();
+        let any: bool =
+            sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM file_list_deleted WHERE org = $1);")
+                .bind(org_id)
+                .fetch_one(&pool)
+                .await?;
+        Ok(any)
     }
 
     async fn get_min_date(
@@ -800,10 +858,9 @@ SELECT date
 
     async fn clean_by_min_update_at(&self, val: i64) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         sqlx::query("DELETE FROM file_list WHERE updated_at < $1;")
             .bind(val)
-            .execute(&*client)
+            .execute(&client)
             .await?;
         Ok(())
     }
@@ -851,7 +908,8 @@ SELECT
     SUM(records) AS records,
     SUM(original_size) AS original_size,
     SUM(compressed_size) AS compressed_size,
-    SUM(index_size) AS index_size
+    SUM(index_size) AS index_size,
+    SUM(mindex_size) AS mindex_size
 FROM file_list
 WHERE stream = $1 {time_filter}
 GROUP BY stream;
@@ -908,10 +966,9 @@ GROUP BY stream;
     ) -> Result<()> {
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         sqlx::query("DELETE FROM stream_stats WHERE stream = ?;")
             .bind(&stream_key)
-            .execute(&*client)
+            .execute(&client)
             .await?;
         Ok(())
     }
@@ -926,13 +983,12 @@ GROUP BY stream;
     ) -> Result<()> {
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let mut tx = client.begin().await?;
         if let Err(e) = sqlx::query(
             r#"
 INSERT INTO stream_stats
-    (org, stream, file_num, min_ts, max_ts, records, original_size, compressed_size, index_size, is_recent)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    (org, stream, file_num, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, is_recent)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 ON CONFLICT (stream, is_recent)
 DO UPDATE SET
     file_num = EXCLUDED.file_num,
@@ -941,7 +997,8 @@ DO UPDATE SET
     records = EXCLUDED.records,
     original_size = EXCLUDED.original_size,
     compressed_size = EXCLUDED.compressed_size,
-    index_size = EXCLUDED.index_size;
+    index_size = EXCLUDED.index_size,
+    mindex_size = EXCLUDED.mindex_size;
             "#,
         )
         .bind(org_id)
@@ -953,6 +1010,7 @@ DO UPDATE SET
         .bind(stats.storage_size as i64)
         .bind(stats.compressed_size as i64)
         .bind(stats.index_size as i64)
+        .bind(stats.mindex_size as i64)
         .bind(is_recent)
         .execute(&mut *tx)
         .await
@@ -974,9 +1032,8 @@ DO UPDATE SET
 
     async fn reset_stream_stats(&self) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
-        sqlx::query(r#"UPDATE stream_stats SET file_num = 0, min_ts = 0, max_ts = 0, records = 0, original_size = 0, compressed_size = 0, index_size = 0;"#)
-        .execute(&*client)
+        sqlx::query(r#"UPDATE stream_stats SET file_num = 0, min_ts = 0, max_ts = 0, records = 0, original_size = 0, compressed_size = 0, index_size = 0, mindex_size = 0;"#)
+        .execute(&client)
        .await?;
         Ok(())
     }
@@ -1016,7 +1073,6 @@ DO UPDATE SET
     ) -> Result<i64> {
         let stream_key = format!("{org_id}/{stream_type}/{stream}");
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let mut tx = client.begin().await?;
         match sqlx::query(
             "INSERT INTO file_list_jobs (org, stream, offsets, status, node, started_at, updated_at) VALUES ($1, $2, $3, $4, '', 0, 0);",
@@ -1055,8 +1111,18 @@ DO UPDATE SET
                 return Err(e.into());
             }
         };
-        let id = ret.try_get::<i64, &str>("id").unwrap_or_default();
-        let status = ret.try_get::<i64, &str>("status").unwrap_or_default();
+        let (id, status) = match ret
+            .try_get::<i64, &str>("id")
+            .and_then(|id| Ok((id, ret.try_get::<i32, &str>("status")?)))
+        {
+            Ok(v) => v,
+            Err(e) => {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[SQLITE] rollback add job error: {e}");
+                }
+                return Err(e.into());
+            }
+        };
         if id > 0
             && super::FileListJobStatus::from(status) == super::FileListJobStatus::Done
             && let Err(e) =
@@ -1086,7 +1152,6 @@ DO UPDATE SET
         fast_mode: bool,
     ) -> Result<Vec<super::MergeJobRecord>> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let mut tx = client.begin().await?;
 
         // get pending jobs group by stream and order by num desc
@@ -1172,7 +1237,6 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         stream: Option<&str>,
     ) -> Result<u64> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let mut conditions: Vec<String> = Vec::new();
         if !ids.is_empty() {
             conditions.push(format!(
@@ -1199,7 +1263,7 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         };
         let ret = sqlx::query(&sql)
             .bind(super::FileListJobStatus::Pending)
-            .execute(&*client)
+            .execute(&client)
             .await?;
         Ok(ret.rows_affected())
     }
@@ -1207,7 +1271,6 @@ SELECT stream, max(id) as id, COUNT(*) AS num
     async fn set_job_done(&self, ids: &[i64]) -> Result<()> {
         let cfg = get_config();
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let sql = format!(
             "UPDATE file_list_jobs SET status = $1, updated_at = $2, dumped = $3, node = '' WHERE id IN ({});",
             ids.iter()
@@ -1221,14 +1284,13 @@ SELECT stream, max(id) as id, COUNT(*) AS num
             .bind(super::FileListJobStatus::Done)
             .bind(config::utils::time::now_micros())
             .bind(!cfg.compact.file_list_dump_enabled)
-            .execute(&*client)
+            .execute(&client)
             .await?;
         Ok(())
     }
 
     async fn update_running_jobs(&self, ids: &[i64]) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let sql = format!(
             r#"UPDATE file_list_jobs SET updated_at = $1 WHERE id IN ({})"#,
             ids.iter()
@@ -1238,14 +1300,13 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         );
         sqlx::query(&sql)
             .bind(config::utils::time::now_micros())
-            .execute(&*client)
+            .execute(&client)
             .await?;
         Ok(())
     }
 
     async fn check_running_jobs(&self, before_date: i64) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
 
         // reset running jobs status to pending
         let ret = sqlx::query(
@@ -1254,7 +1315,7 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         .bind(super::FileListJobStatus::Pending)
         .bind(super::FileListJobStatus::Running)
         .bind(before_date)
-        .execute(&*client)
+        .execute(&client)
         .await?;
         let rows_affected = ret.rows_affected();
         if rows_affected > 0 {
@@ -1270,7 +1331,7 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         .bind(super::FileListJobStatus::Done)
         .bind(false)
         .bind(before_date)
-        .execute(&*client)
+        .execute(&client)
         .await?;
         let rows_affected = ret.rows_affected();
         if rows_affected > 0 {
@@ -1281,14 +1342,13 @@ SELECT stream, max(id) as id, COUNT(*) AS num
 
     async fn clean_done_jobs(&self, before_date: i64) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let ret = sqlx::query(
             r#"DELETE FROM file_list_jobs WHERE status = $1 AND dumped = $2 AND updated_at < $3;"#,
         )
         .bind(super::FileListJobStatus::Done)
         .bind(true)
         .bind(before_date)
-        .execute(&*client)
+        .execute(&client)
         .await?;
         if ret.rows_affected() > 0 {
             log::warn!("[SQLITE] clean done jobs");
@@ -1336,7 +1396,6 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         limit: i64,
     ) -> Result<Vec<(i64, String, i64)>> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let mut tx = client.begin().await?;
         // get pending dump jobs by updated_at asc
         let ret = match sqlx::query_as::<_, (i64, String, i64)>(
@@ -1393,7 +1452,6 @@ SELECT stream, max(id) as id, COUNT(*) AS num
 
     async fn set_job_dumped_status(&self, ids: &[i64], dumped: bool) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let sql = format!(
             "UPDATE file_list_jobs SET dumped = $1, node = '' WHERE id IN ({});",
             ids.iter()
@@ -1401,7 +1459,7 @@ SELECT stream, max(id) as id, COUNT(*) AS num
                 .collect::<Vec<_>>()
                 .join(",")
         );
-        sqlx::query(&sql).bind(dumped).execute(&*client).await?;
+        sqlx::query(&sql).bind(dumped).execute(&client).await?;
         Ok(())
     }
 
@@ -1410,12 +1468,11 @@ SELECT stream, max(id) as id, COUNT(*) AS num
             parse_file_key_columns(file).expect("parse file key failed");
         let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         sqlx::query(
             r#"
 INSERT INTO file_list_dump_stats
-    (org, stream, date, file, file_num, min_ts, max_ts, records, original_size, compressed_size, index_size)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    (org, stream, date, file, file_num, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 ON CONFLICT (stream, date, file)
 DO UPDATE SET
     file_num = EXCLUDED.file_num,
@@ -1424,7 +1481,8 @@ DO UPDATE SET
     records = EXCLUDED.records,
     original_size = EXCLUDED.original_size,
     compressed_size = EXCLUDED.compressed_size,
-    index_size = EXCLUDED.index_size;
+    index_size = EXCLUDED.index_size,
+    mindex_size = EXCLUDED.mindex_size;
             "#,
         )
         .bind(org_id)
@@ -1438,7 +1496,8 @@ DO UPDATE SET
         .bind(stats.storage_size as i64)
         .bind(stats.compressed_size as i64)
         .bind(stats.index_size as i64)
-        .execute(&*client)
+        .bind(stats.mindex_size as i64)
+        .execute(&client)
         .await?;
         Ok(())
     }
@@ -1447,14 +1506,13 @@ DO UPDATE SET
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).expect("parse file key failed");
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         sqlx::query(
             r#"DELETE FROM file_list_dump_stats WHERE stream = $1 AND date = $2 AND file = $3;"#,
         )
         .bind(stream_key)
         .bind(date_key)
         .bind(file_name)
-        .execute(&*client)
+        .execute(&client)
         .await?;
         Ok(())
     }
@@ -1489,7 +1547,8 @@ SELECT
     SUM(records) AS records,
     SUM(original_size) AS original_size,
     SUM(compressed_size) AS compressed_size,
-    SUM(index_size) AS index_size
+    SUM(index_size) AS index_size,
+    SUM(mindex_size) AS mindex_size
 FROM file_list_dump_stats
 WHERE stream = $1 {time_filter}
 GROUP BY stream;
@@ -1518,29 +1577,109 @@ WHERE org = $1 AND account = $2;"#;
         Ok(ret.unwrap_or_default())
     }
 
-    async fn delete_by_org(&self, org_id: &str) -> Result<()> {
-        let client = CLIENT_RW.clone();
-        let client = client.lock().await;
-        let created_at = now_micros();
-        let mut tx = client.begin().await?;
-        // Move remaining rows into file_list_deleted first so the file GC removes
-        // the backing S3 objects. A bare DELETE would orphan those files in object
-        // store. (Normal per-stream deletion already routes files here; this is the
-        // catch-all for rows whose stream schema is already gone.)
-        sqlx::query(
-            r#"INSERT INTO file_list_deleted (account, org, stream, date, file, index_file, flattened, created_at)
-               SELECT account, org, stream, date, file, index_file, flattened, $2
-               FROM file_list WHERE org = $1;"#,
+    async fn list_stats_streams_by_org(&self, org_id: &str) -> Result<Vec<String>> {
+        let client = CLIENT_RO.clone();
+        let streams =
+            sqlx::query_scalar("SELECT DISTINCT stream FROM stream_stats WHERE org = $1;")
+                .bind(org_id)
+                .fetch_all(&client)
+                .await?;
+        Ok(streams)
+    }
+
+    async fn list_streams_updated_between(
+        &self,
+        org_id: &str,
+        time_range: (i64, i64),
+    ) -> Result<Vec<String>> {
+        let client = CLIENT_RO.clone();
+        let streams = sqlx::query_scalar(
+            r#"SELECT stream FROM file_list WHERE updated_at >= $2 AND updated_at < $3 AND org = $1
+               UNION
+               SELECT stream FROM file_list_history WHERE updated_at >= $2 AND updated_at < $3 AND org = $1;"#,
         )
         .bind(org_id)
-        .bind(created_at)
-        .execute(&mut *tx)
+        .bind(time_range.0)
+        .bind(time_range.1)
+        .fetch_all(&client)
         .await?;
-        sqlx::query("DELETE FROM file_list WHERE org = $1;")
+        Ok(streams)
+    }
+
+    async fn list_org_streams_by_scan(&self, org_id: &str) -> Result<Vec<String>> {
+        let client = CLIENT_RO.clone();
+        let streams = sqlx::query_scalar(
+            r#"SELECT stream FROM file_list WHERE org = $1
+               UNION
+               SELECT stream FROM file_list_history WHERE org = $1
+               UNION
+               SELECT stream FROM file_list_jobs WHERE org = $1;"#,
+        )
+        .bind(org_id)
+        .fetch_all(&client)
+        .await?;
+        Ok(streams)
+    }
+
+    async fn remove_stream_batch(
+        &self,
+        table: super::StreamRowsTable,
+        org_id: &str,
+        stream: &str,
+        limit: i64,
+        to_deleted: bool,
+    ) -> Result<u64> {
+        let table = table.name();
+        let client = CLIENT_RW.clone();
+        let batch =
+            format!("SELECT id FROM {table} WHERE stream = $1 AND org = $2 ORDER BY id LIMIT $3");
+        let mut tx = client.begin().await?;
+        if to_deleted {
+            sqlx::query(&format!(
+                r#"INSERT INTO file_list_deleted (account, org, stream, date, file, index_file, mindex_file, flattened, created_at)
+                   SELECT account, org, stream, date, file, index_size > 0, mindex_size > 0, flattened, $4
+                   FROM {table} WHERE id IN ({batch});"#
+            ))
+            .bind(stream)
             .bind(org_id)
+            .bind(limit)
+            .bind(now_micros())
             .execute(&mut *tx)
             .await?;
+        }
+        let removed = sqlx::query(&format!("DELETE FROM {table} WHERE id IN ({batch});"))
+            .bind(stream)
+            .bind(org_id)
+            .bind(limit)
+            .execute(&mut *tx)
+            .await?
+            .rows_affected();
         tx.commit().await?;
+        Ok(removed)
+    }
+
+    async fn delete_jobs_by_streams(&self, org_id: &str, streams: &[String]) -> Result<()> {
+        if streams.is_empty() {
+            return Ok(());
+        }
+        let client = CLIENT_RW.clone();
+        let mut query = QueryBuilder::<Sqlite>::new("DELETE FROM file_list_jobs WHERE org = ");
+        query.push_bind(org_id).push(" AND stream IN (");
+        let mut list = query.separated(", ");
+        for stream in streams {
+            list.push_bind(stream);
+        }
+        list.push_unseparated(")");
+        query.build().execute(&client).await?;
+        Ok(())
+    }
+
+    async fn delete_stream_stats_by_org(&self, org_id: &str) -> Result<()> {
+        let client = CLIENT_RW.clone();
+        sqlx::query("DELETE FROM stream_stats WHERE org = $1;")
+            .bind(org_id)
+            .execute(&client)
+            .await?;
         Ok(())
     }
 }
@@ -1570,14 +1709,13 @@ impl SqliteFileList {
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         if meta.min_ts == 0 || meta.max_ts == 0 {
             log::warn!("[SQLITE] min_ts or max_ts is 0 for file: {file}");
         }
         match  sqlx::query(
             format!(r#"
-INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16);
+INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, bloom_ver, flattened, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17);
         "#).as_str(),
     )
         .bind(id)
@@ -1593,10 +1731,11 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
         .bind(meta.original_size)
         .bind(meta.compressed_size)
         .bind(meta.index_size)
+        .bind(meta.mindex_size)
         .bind(meta.bloom_ver)
         .bind(meta.flattened)
         .bind(now_ts)
-        .execute(&*client)
+        .execute(&client)
         .await {
             Err(sqlx::Error::Database(e)) => if e.is_unique_violation() {
                   Ok(0)
@@ -1613,30 +1752,42 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
             return Ok(());
         }
 
+        // Ensure partitions exist for all distinct date keys before batch INSERT
+        let add_items = files
+            .iter()
+            .filter(|v| {
+                if v.deleted {
+                    false
+                } else if v.meta.min_ts == 0 || v.meta.max_ts == 0 {
+                    log::warn!("[SQLITE] min_ts or max_ts is 0 for file: {}", v.key);
+                    false
+                } else {
+                    match parse_file_key_columns(&v.key) {
+                        Ok(_) => true,
+                        Err(_) => {
+                            log::error!("[SQLITE] parse file key failed for file: {}", v.key);
+                            false
+                        }
+                    }
+                }
+            })
+            .collect::<Vec<_>>();
+
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let mut tx = client.begin().await?;
 
-        let add_items = files.iter().filter(|f| !f.deleted).collect::<Vec<_>>();
         if !add_items.is_empty() {
             let chunks = add_items.chunks(100);
             for files in chunks {
                 let now_ts = now_micros();
                 let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
-                format!("INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened, updated_at)").as_str(),
+                format!("INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, bloom_ver, flattened, updated_at)").as_str(),
                 );
                 query_builder.push_values(files, |mut b, item| {
                     let id = if item.id > 0 { Some(item.id) } else { None };
-                    let Ok((stream_key, date_key, file_name)) = parse_file_key_columns(&item.key)
-                    else {
-                        log::error!("[SQLITE] parse file key failed for file: {}", item.key);
-                        return;
-                    };
+                    let (stream_key, date_key, file_name) =
+                        parse_file_key_columns(&item.key).unwrap();
                     let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
-                    if item.meta.min_ts == 0 || item.meta.max_ts == 0 {
-                        log::warn!("[SQLITE] min_ts or max_ts is 0 for file: {}", item.key);
-                        return;
-                    }
                     b.push_bind(id)
                         .push_bind(&item.account)
                         .push_bind(org_id)
@@ -1650,6 +1801,7 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
                         .push_bind(item.meta.original_size)
                         .push_bind(item.meta.compressed_size)
                         .push_bind(item.meta.index_size)
+                        .push_bind(item.meta.mindex_size)
                         .push_bind(item.meta.bloom_ver)
                         .push_bind(item.meta.flattened)
                         .push_bind(now_ts);
@@ -1734,7 +1886,6 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
 
 pub async fn create_table() -> Result<()> {
     let client = CLIENT_RW.clone();
-    let client = client.lock().await;
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS file_list
@@ -1753,12 +1904,13 @@ CREATE TABLE IF NOT EXISTS file_list
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
     index_size      BIGINT not null,
+    mindex_size     BIGINT DEFAULT 0 NOT NULL,
     bloom_ver       BIGINT default 0 not null,
     updated_at      BIGINT not null
 );
         "#,
     )
-    .execute(&*client)
+    .execute(&client)
     .await?;
 
     sqlx::query(
@@ -1779,12 +1931,13 @@ CREATE TABLE IF NOT EXISTS file_list_history
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
     index_size      BIGINT not null,
+    mindex_size     BIGINT DEFAULT 0 NOT NULL,
     bloom_ver       BIGINT default 0 not null,
     updated_at      BIGINT not null
 );
         "#,
     )
-    .execute(&*client)
+    .execute(&client)
     .await?;
 
     sqlx::query(
@@ -1798,12 +1951,13 @@ CREATE TABLE IF NOT EXISTS file_list_deleted
     date       VARCHAR not null,
     file       VARCHAR not null,
     index_file BOOLEAN default false not null,
+    mindex_file BOOLEAN DEFAULT FALSE NOT NULL,
     flattened  BOOLEAN default false not null,
     created_at BIGINT not null
 );
         "#,
     )
-    .execute(&*client)
+    .execute(&client)
     .await?;
 
     sqlx::query(
@@ -1822,7 +1976,7 @@ CREATE TABLE IF NOT EXISTS file_list_jobs
 );
         "#,
     )
-    .execute(&*client)
+    .execute(&client)
     .await?;
 
     sqlx::query(
@@ -1839,11 +1993,12 @@ CREATE TABLE IF NOT EXISTS stream_stats
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
     index_size      BIGINT not null,
+    mindex_size     BIGINT DEFAULT 0 NOT NULL,
     is_recent       BOOLEAN default false not null
 );
         "#,
     )
-    .execute(&*client)
+    .execute(&client)
     .await?;
 
     sqlx::query(
@@ -1861,36 +2016,54 @@ CREATE TABLE IF NOT EXISTS file_list_dump_stats
     records         BIGINT default 0 not null,
     original_size   BIGINT default 0 not null,
     compressed_size BIGINT default 0 not null,
-    index_size      BIGINT default 0 not null
+    index_size      BIGINT default 0 not null,
+    mindex_size     BIGINT DEFAULT 0 NOT NULL
 );
         "#,
     )
-    .execute(&*client)
+    .execute(&client)
     .await?;
 
-    // create column flattened for old version <= 0.10.5
+    // create column flattened for version <= 0.10.5
     let column = "flattened";
     let data_type = "BOOLEAN default false not null";
     add_column(&client, "file_list", column, data_type).await?;
     add_column(&client, "file_list_history", column, data_type).await?;
     add_column(&client, "file_list_deleted", column, data_type).await?;
 
-    // create column started_at for old version <= 0.10.8
+    // create column started_at for version <= 0.10.8
     let column = "started_at";
     let data_type = "BIGINT default 0 not null";
     add_column(&client, "file_list_jobs", column, data_type).await?;
 
-    // create column index_size for old version <= 0.13.1
+    // create column index_size for version <= 0.13.1
     let column = "index_size";
     let data_type = "BIGINT default 0 not null";
     add_column(&client, "file_list", column, data_type).await?;
     add_column(&client, "file_list_history", column, data_type).await?;
     add_column(&client, "stream_stats", column, data_type).await?;
+    add_column(&client, "file_list_dump_stats", column, data_type).await?;
+
+    // create column mindex_size for version <=1.0.0
+    let column = "mindex_size";
+    let data_type = "BIGINT default 0 not null";
+    add_column(&client, "file_list", column, data_type).await?;
+    add_column(&client, "file_list_history", column, data_type).await?;
+    add_column(&client, "stream_stats", column, data_type).await?;
+    add_column(&client, "file_list_dump_stats", column, data_type).await?;
+
     let column = "index_file";
     let data_type = "BOOLEAN default false not null";
     add_column(&client, "file_list_deleted", column, data_type).await?;
+    add_column(
+        &client,
+        "file_list_deleted",
+        "mindex_file",
+        "BOOLEAN DEFAULT FALSE NOT NULL",
+    )
+    .await?;
 
-    // create col dumped for file_list_jobs for version <=0.14.0
+    // create column dumped for file_list_jobs for version <=0.14.0
     add_column(
         &client,
         "file_list_jobs",
@@ -2046,10 +2219,9 @@ pub async fn create_table_index() -> Result<()> {
         // delete duplicate records
         log::warn!("[SQLITE] starting delete duplicate records");
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let ret = sqlx::query(
                 r#"SELECT stream, date, file, min(id) as id FROM file_list GROUP BY stream, date, file HAVING COUNT(*) > 1;"#,
-            ).fetch_all(&*client).await?;
+            ).fetch_all(&client).await?;
         log::warn!("[SQLITE] total: {} duplicate records", ret.len());
         for (i, r) in ret.iter().enumerate() {
             let stream = r.get::<String, &str>("stream");
@@ -2058,7 +2230,7 @@ pub async fn create_table_index() -> Result<()> {
             let id = r.get::<i64, &str>("id");
             sqlx::query(
                     r#"DELETE FROM file_list WHERE id != $1 AND stream = $2 AND date = $3 AND file = $4;"#,
-                ).bind(id).bind(stream).bind(date).bind(file).execute(&*client).await?;
+                ).bind(id).bind(stream).bind(date).bind(file).execute(&client).await?;
             if i.is_multiple_of(1000) {
                 log::warn!("[SQLITE] delete duplicate records: {}/{}", i, ret.len());
             }
@@ -2086,9 +2258,8 @@ pub async fn create_table_index() -> Result<()> {
     // delete trigger for old version
     // compatible for old version <= 0.6.4
     let client = CLIENT_RW.clone();
-    let client = client.lock().await;
     sqlx::query(r#"DROP TRIGGER IF EXISTS update_stream_stats_delete;"#)
-        .execute(&*client)
+        .execute(&client)
         .await?;
 
     Ok(())
@@ -2110,6 +2281,7 @@ mod tests {
             compressed_size: 10000,
             flattened: false,
             index_size: 5000,
+            mindex_size: 1700,
             bloom_ver: 0,
         }
     }
@@ -2167,12 +2339,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_batch_add_with_id_unimplemented() {
+    async fn test_batch_add_with_id_skips_invalid_file_key() {
         let sqlite_list = SqliteFileList::new();
         let files = vec![create_test_file_key("account1", "test/key", false)];
 
         let result = sqlite_list.batch_add_with_id(&files).await;
-        assert!(result.is_err());
+        assert!(result.is_ok());
     }
 
     #[tokio::test]
@@ -2401,6 +2573,7 @@ mod tests {
             storage_size: 50000.0,
             compressed_size: 10000.0,
             index_size: 5000.0,
+            mindex_size: 1700.0,
         };
 
         // Set stream stats (should use INSERT OR REPLACE now)
@@ -2420,6 +2593,7 @@ mod tests {
             storage_size: 25000.0,
             compressed_size: 5000.0,
             index_size: 2500.0,
+            mindex_size: 850.0,
         };
 
         let result2 = sqlite_list
@@ -2664,5 +2838,331 @@ mod tests {
         // Conversion to FileMeta must carry the value through.
         let meta = FileMeta::from(&rec);
         assert_eq!(meta.bloom_ver, bv);
+    }
+    #[tokio::test]
+    #[ignore = "Requires an isolated SQL database configured for this backend"]
+    async fn test_mindex_size_sqlite_persistence_and_stats() {
+        let list = SqliteFileList::new();
+        list.create_table().await.unwrap();
+        list.create_table_index().await.unwrap();
+        list.create_table().await.unwrap();
+        let org = format!("mindex_{}", now_micros());
+        let stream = format!("{org}/metrics/test");
+        let date = "2021/01/01/00";
+        let mut first = create_test_file_key(
+            "account",
+            &format!("files/{stream}/{date}/a.parquet"),
+            false,
+        );
+        first.meta.max_ts = first.meta.min_ts + 10;
+        let mut second = first.clone();
+        second.key = format!("files/{stream}/{date}/b.vortex");
+        second.meta.mindex_size = 2300;
+        let id = list
+            .add(&first.account, &first.key, &first.meta)
+            .await
+            .unwrap();
+        list.batch_add(std::slice::from_ref(&second)).await.unwrap();
+        assert_eq!(list.get(&first.key).await.unwrap().mindex_size, 1700);
+        assert_eq!(list.get(&second.key).await.unwrap().mindex_size, 2300);
+        assert_eq!(list.get(&second.key).await.unwrap().index_size, 5000);
+        list.update_compressed_size(&first.key, 9000).await.unwrap();
+        assert_eq!(list.get(&first.key).await.unwrap().mindex_size, 1700);
+        let range = (first.meta.min_ts, first.meta.max_ts);
+        for flattened in [None, Some(false)] {
+            let files = list
+                .query(
+                    &org,
+                    StreamType::Metrics,
+                    "test",
+                    PartitionTimeLevel::Hourly,
+                    range,
+                    flattened,
+                )
+                .await
+                .unwrap();
+            assert_eq!(files.len(), 2);
+            assert_eq!(files.iter().map(|f| f.meta.mindex_size).sum::<i64>(), 4000);
+        }
+        let files = list
+            .query_for_merge(
+                &org,
+                StreamType::Metrics,
+                "test",
+                ("2021/01/01/00".into(), "2021/01/02/00".into()),
+                i64::MAX,
+            )
+            .await
+            .unwrap();
+        assert_eq!(files.iter().map(|f| f.meta.mindex_size).sum::<i64>(), 4000);
+        let files = list
+            .query_for_bloom(&org, StreamType::Metrics, "test", date)
+            .await
+            .unwrap();
+        assert_eq!(files.iter().map(|f| f.meta.mindex_size).sum::<i64>(), 4000);
+        let files = list.query_by_ids(&[id], Some(range)).await.unwrap();
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].meta.mindex_size, 1700);
+        let dumped = list
+            .query_for_dump(&org, StreamType::Metrics, "test", range)
+            .await
+            .unwrap();
+        assert_eq!(dumped.iter().map(|f| f.mindex_size).sum::<i64>(), 4000);
+        list.add_history(&first.account, &first.key, &first.meta)
+            .await
+            .unwrap();
+        list.batch_add_history(std::slice::from_ref(&second))
+            .await
+            .unwrap();
+        let history: Vec<FileRecord> =
+            sqlx::query_as("SELECT * FROM file_list_history WHERE stream = $1")
+                .bind(&stream)
+                .fetch_all(&*CLIENT_RW)
+                .await
+                .unwrap();
+        assert_eq!(history.len(), 2);
+        assert_eq!(history.iter().map(|f| f.mindex_size).sum::<i64>(), 4000);
+        let stats = list
+            .stats_by_date_range(
+                &org,
+                StreamType::Metrics,
+                "test",
+                (String::new(), String::new()),
+            )
+            .await
+            .unwrap();
+        assert_eq!(stats.mindex_size, 4000.0);
+        assert_eq!(stats.index_size, 10000.0);
+        assert_eq!(
+            list.org_stats_by_account(&org, "account").await.unwrap(),
+            (100000, 10000)
+        );
+        list.set_stream_stats(&org, StreamType::Metrics, "test", &stats, false)
+            .await
+            .unwrap();
+        let mut recent = stats;
+        recent.mindex_size = 333.0;
+        recent.index_size = 222.0;
+        list.set_stream_stats(&org, StreamType::Metrics, "test", &recent, true)
+            .await
+            .unwrap();
+        recent.mindex_size = 444.0;
+        list.set_stream_stats(&org, StreamType::Metrics, "test", &recent, true)
+            .await
+            .unwrap();
+        let merged = list
+            .get_stream_stats(&org, Some(StreamType::Metrics), Some("test"))
+            .await
+            .unwrap();
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].1.mindex_size, 4444.0);
+        assert_eq!(merged[0].1.index_size, 10222.0);
+        let org_stats = list.get_stream_stats(&org, None, None).await.unwrap();
+        assert_eq!(org_stats[0].1.mindex_size, 4444.0);
+        let dump_stream = format!("{org}/{}/test_metrics", StreamType::Filelist);
+        let dump_key = format!("files/{dump_stream}/{date}/dump.parquet");
+        list.insert_dump_stats(&dump_key, &recent).await.unwrap();
+        recent.mindex_size = 888.0;
+        list.insert_dump_stats(&dump_key, &recent).await.unwrap();
+        let dump_stats = list
+            .query_dump_stats_by_date_range(
+                &org,
+                StreamType::Metrics,
+                "test",
+                (String::new(), String::new()),
+            )
+            .await
+            .unwrap();
+        assert_eq!(dump_stats.mindex_size, 888.0);
+        assert_eq!(dump_stats.index_size, 222.0);
+        let mut dump_file = first.clone();
+        dump_file.key = dump_key.clone();
+        dump_file.meta.mindex_size = 777;
+        list.update_dump_records(&dump_file, &[(id, date.to_string())])
+            .await
+            .unwrap();
+        assert!(!list.contains(&first.key).await.unwrap());
+        assert_eq!(list.get(&dump_key).await.unwrap().mindex_size, 777);
+        let dumps = list
+            .query_for_dump_by_updated_at((0, now_micros()))
+            .await
+            .unwrap();
+        assert_eq!(
+            dumps
+                .iter()
+                .find(|f| f.stream == dump_stream)
+                .unwrap()
+                .mindex_size,
+            777
+        );
+        list.reset_stream_stats().await.unwrap();
+        let reset = list.get_stream_stats(&org, None, None).await.unwrap();
+        assert_eq!(reset[0].1.mindex_size, 0.0);
+        let rebuilt = list
+            .stats_by_date_range(
+                &org,
+                StreamType::Metrics,
+                "test",
+                (String::new(), String::new()),
+            )
+            .await
+            .unwrap();
+        assert_eq!(rebuilt.mindex_size, 2300.0);
+        list.set_stream_stats(&org, StreamType::Metrics, "test", &rebuilt, false)
+            .await
+            .unwrap();
+        assert_eq!(
+            list.get_stream_stats(&org, None, None).await.unwrap()[0]
+                .1
+                .mindex_size,
+            2300.0
+        );
+        second.deleted = true;
+        list.batch_process(std::slice::from_ref(&second))
+            .await
+            .unwrap();
+        assert_eq!(
+            list.stats_by_date_range(
+                &org,
+                StreamType::Metrics,
+                "test",
+                (String::new(), String::new())
+            )
+            .await
+            .unwrap()
+            .mindex_size,
+            0.0
+        );
+        list.delete_dump_stats(&dump_key).await.unwrap();
+        assert_eq!(
+            list.query_dump_stats_by_date_range(
+                &org,
+                StreamType::Metrics,
+                "test",
+                (String::new(), String::new())
+            )
+            .await
+            .unwrap()
+            .mindex_size,
+            0.0
+        );
+    }
+
+    #[tokio::test]
+    async fn test_mindex_size_sqlite_legacy_upgrade() {
+        let pool = fresh_in_memory_pool().await;
+        let tables = [
+            "file_list",
+            "file_list_history",
+            "file_list_dump_stats",
+            "stream_stats",
+        ];
+        for table in tables {
+            sqlx::query(&format!(
+                "CREATE TABLE {table} (id INTEGER PRIMARY KEY, index_size BIGINT NOT NULL)"
+            ))
+            .execute(&pool)
+            .await
+            .unwrap();
+            sqlx::query(&format!(
+                "INSERT INTO {table} (id, index_size) VALUES (1, 59)"
+            ))
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+        for table in tables {
+            add_column(&pool, table, "mindex_size", "BIGINT DEFAULT 0 NOT NULL")
+                .await
+                .unwrap();
+        }
+        for table in tables {
+            let old: (i64, i64) = sqlx::query_as(&format!(
+                "SELECT index_size, mindex_size FROM {table} WHERE id = 1"
+            ))
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            assert_eq!(old, (59, 0));
+            sqlx::query(&format!(
+                "UPDATE {table} SET mindex_size = 701 WHERE id = 1"
+            ))
+            .execute(&pool)
+            .await
+            .unwrap();
+            sqlx::query(&format!(
+                "INSERT INTO {table} (id, index_size) VALUES (2, 61)"
+            ))
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+        for table in tables {
+            add_column(&pool, table, "mindex_size", "BIGINT DEFAULT 0 NOT NULL")
+                .await
+                .unwrap();
+        }
+        for table in tables {
+            let rows: Vec<(i64, i64)> = sqlx::query_as(&format!(
+                "SELECT index_size, mindex_size FROM {table} ORDER BY id"
+            ))
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+            assert_eq!(rows, vec![(59, 701), (61, 0)]);
+            assert!(
+                sqlx::query(&format!(
+                    "UPDATE {table} SET mindex_size = NULL WHERE id = 1"
+                ))
+                .execute(&pool)
+                .await
+                .is_err()
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_deleted_mindex_file_defaults_to_false_on_upgrade() {
+        let pool = fresh_in_memory_pool().await;
+        sqlx::query(
+            "CREATE TABLE file_list_deleted (id INTEGER PRIMARY KEY, account TEXT NOT NULL, stream TEXT NOT NULL, date TEXT NOT NULL, file TEXT NOT NULL, index_file BOOLEAN NOT NULL, flattened BOOLEAN NOT NULL)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO file_list_deleted (id, account, stream, date, file, index_file, flattened) VALUES (1, 'a', 'org/metrics/cpu', '2026/09/22/10', 'indexed-v1-old.parquet', false, false)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        add_column(
+            &pool,
+            "file_list_deleted",
+            "mindex_file",
+            "BOOLEAN DEFAULT FALSE NOT NULL",
+        )
+        .await
+        .unwrap();
+        for (id, has_index) in [(2, false), (3, true)] {
+            sqlx::query(
+                "INSERT INTO file_list_deleted (id, account, stream, date, file, index_file, mindex_file, flattened) VALUES (?, 'a', 'org/metrics/cpu', '2026/09/22/10', 'indexed-v1-new.parquet', false, ?, false)",
+            )
+            .bind(id)
+            .bind(has_index)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+        let rows: Vec<super::super::FileDeletedRecord> = sqlx::query_as(
+            "SELECT id, account, stream, date, file, index_file, mindex_file, flattened FROM file_list_deleted ORDER BY id",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            rows.iter().map(|row| row.mindex_file).collect::<Vec<_>>(),
+            [false, false, true]
+        );
     }
 }

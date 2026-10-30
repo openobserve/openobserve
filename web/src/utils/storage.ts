@@ -4,6 +4,21 @@ import { ref } from "vue";
 
 const organizationDataLocal: any = ref({});
 
+// Keyed by storage key, so ~107 useLocalStorage() call sites share one listener
+// instead of each leaking its own for the lifetime of the page.
+const storageReaders = new Map<string, () => void>();
+
+let storageListenerAttached = false;
+
+const attachStorageListener = () => {
+  if (storageListenerAttached) return;
+  storageListenerAttached = true;
+  window.addEventListener("storage", (event: StorageEvent) => {
+    if (event.key == null) return;
+    storageReaders.get(event.key)?.();
+  });
+};
+
 const useLocalStorage = (
   key: string,
   defaultValue: unknown,
@@ -22,9 +37,9 @@ const useLocalStorage = (
 
     read();
 
-    window.addEventListener("load", () => {
-      window.addEventListener("storage", read);
-    });
+    // Most recent ref per key wins, which is what keeps the map bounded.
+    storageReaders.set(key, read);
+    attachStorageListener();
 
     const write = () => {
       const val: unknown = isJSONValue ? JSON.stringify(defaultValue) : defaultValue;
@@ -104,10 +119,6 @@ export const useLocalInterestingFields = (val = "", isDelete = false) => {
   return useLocalStorage("interestingFields", val, isDelete, true);
 };
 
-export const useLocalSavedView = (val = "", isDelete = false) => {
-  return useLocalStorage("savedViews", val, isDelete, true);
-};
-
 export const useLocalUserInfo = (val = "", isDelete = false) => {
   const userInfo: any = useLocalStorage("userInfo", val, isDelete);
   return userInfo.value;
@@ -118,7 +129,34 @@ export const useLocalTimezone = (val = "", isDelete = false) => {
   return timezone.value;
 };
 
+/** Applies a linked timezone to the store and its stored key, so the picker and every query use it from now on. */
+export const applyTimezone = (
+  store: { dispatch: (type: string, payload?: unknown) => unknown },
+  zone: string | null | undefined,
+): void => {
+  if (!zone) return;
+  useLocalTimezone(zone);
+  store.dispatch("setTimezone", zone);
+};
+
+/** Applies a shared timezone (a saved view) for this session only; the user's own stored zone is left as it was. */
+export const applySessionTimezone = (
+  store: { dispatch: (type: string, payload?: unknown) => unknown },
+  zone: string | null | undefined,
+): void => {
+  if (zone) store.dispatch("setTimezone", zone);
+};
+
 export const useLocalWrapContent = (val = "", isDelete = false) => {
   const wrapcontent: any = useLocalStorage("wrapContent", val, isDelete);
+  return wrapcontent.value;
+};
+
+/** Wrap preference for the traces/spans table.
+ *
+ *  Its own key rather than sharing `wrapContent` with the logs table: they are
+ *  different views, and a user who wraps one has not asked to wrap the other. */
+export const useLocalWrapTracesContent = (val = "", isDelete = false) => {
+  const wrapcontent: any = useLocalStorage("wrapTracesContent", val, isDelete);
   return wrapcontent.value;
 };

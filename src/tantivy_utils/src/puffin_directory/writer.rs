@@ -23,19 +23,20 @@ use anyhow::{Context, Result};
 use hashbrown::{HashMap, HashSet};
 use tantivy::{
     HasLen,
-    directory::{Directory, MmapDirectory, WatchCallback, WatchHandle, error::OpenReadError},
+    directory::{Directory, WatchCallback, WatchHandle, error::OpenReadError},
 };
 
 use super::{FOOTER_CACHE, footer_cache::build_footer_cache};
 use crate::{
     puffin::{BlobTypes, writer::PuffinBytesWriter},
     puffin_directory::{ALLOWED_FILE_EXT, META_JSON},
+    scratch_directory::ScratchDirectory,
 };
 /// Puffin directory is a puffin file which contains all the tantivy files.
 /// Each tantivy file is stored as a blob in the puffin file, along with their file name.
 #[derive(Debug)]
 pub struct PuffinDirWriter {
-    mmap_directory: Arc<MmapDirectory>,
+    mmap_directory: Arc<ScratchDirectory>,
     /// record all the files paths in the puffin file
     file_paths: Arc<RwLock<HashSet<PathBuf>>>,
     /// file-level puffin properties (written to PuffinMeta.properties)
@@ -62,8 +63,7 @@ impl PuffinDirWriter {
     pub fn new() -> Self {
         PuffinDirWriter {
             mmap_directory: Arc::new(
-                MmapDirectory::create_from_tempdir()
-                    .expect("failed to create temporary mmap directory"),
+                ScratchDirectory::new().expect("failed to create temporary mmap directory"),
             ),
             file_paths: Arc::new(RwLock::new(HashSet::default())),
             properties: Arc::new(RwLock::new(HashMap::default())),
@@ -204,12 +204,6 @@ mod tests {
     };
 
     use super::*;
-
-    #[test]
-    fn test_puffin_dir_writer_new() {
-        let writer = PuffinDirWriter::new();
-        assert!(writer.list_files().is_empty());
-    }
 
     #[test]
     fn test_puffin_dir_writer_default() {

@@ -8,6 +8,6 @@
 //! Shared session-to-trace query contract.
 
 pub use config::meta::traces::session::{
-    SESSION_ID_COLUMNS, escape_sql_string, quote_identifier, session_id_columns, span_rows_sql,
-    trace_id_predicate, trace_ids_from_hits, trace_ids_sql,
+    SESSION_ID_COLUMNS, escape_sql_string, quote_identifier, quote_sql_string, session_id_columns,
+    span_rows_sql, trace_id_predicate, trace_ids_from_hits, trace_ids_sql,
 };

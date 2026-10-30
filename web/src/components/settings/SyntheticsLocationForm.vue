@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="providerOptions"
           :placeholder="t('synthetics.locations.providerPlaceholder')"
           required
+          :disabled="isEdit"
           data-test="synthetics-location-provider-select"
         />
         <OFormInput
@@ -50,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('synthetics.locations.customProviderLabel')"
           :placeholder="t('synthetics.locations.customProviderPlaceholder')"
           required
+          :disabled="isEdit"
           data-test="synthetics-location-custom-provider-input"
         />
         <OFormInput
@@ -57,12 +59,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('synthetics.locations.region')"
           :placeholder="t('synthetics.locations.regionPlaceholder')"
           required
+          :disabled="isEdit"
           data-test="synthetics-location-region-input"
         />
         <OFormInput
           name="label"
           :label="t('synthetics.locations.label')"
-          :placeholder="t('synthetics.locations.labelPlaceholder')"
+          :placeholder="
+            t('synthetics.locations.labelPlaceholder', {
+              product: raw('AWS US East (N. Virginia)'),
+            })
+          "
           required
           data-test="synthetics-location-label-input"
         />
@@ -71,7 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("synthetics.locations.locationId") }}
           </label>
           <div
-            class="text-text-secondary rounded-default border-input-border bg-surface-subtle border px-3 py-2 text-sm"
+            class="text-text-secondary rounded-default border-border-default bg-surface-subtle border px-3 py-2 text-sm"
+            data-test="synthetics-location-id-preview"
           >
             {{ derivedId || "-" }}
           </div>
@@ -88,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, watch, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -127,7 +135,7 @@ export default defineComponent({
     OFormSwitch,
   },
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
 
     const locationFormRef = ref<any>(null);
@@ -135,9 +143,9 @@ export default defineComponent({
 
     // Provider options for the select dropdown.
     const providerOptions = computed(() => [
-      { label: "AWS", value: "aws" },
-      { label: "GCP", value: "gcp" },
-      { label: "Azure", value: "azure" },
+      { label: raw("AWS"), value: "aws" },
+      { label: raw("GCP"), value: "gcp" },
+      { label: raw("Azure"), value: "azure" },
       { label: t("synthetics.locations.providerOther"), value: "custom" },
     ]);
 
@@ -193,6 +201,13 @@ export default defineComponent({
         watch(
           [liveProvider, liveCustomProvider, liveRegion],
           ([p, cp, r]: [string, string, string]) => {
+            // Edit: the id is immutable, so show the persisted one, never a
+            // value recomputed from (read-only) provider/region fields.
+            const persistedId = props.isEdit ? (props.data as any)?.id : undefined;
+            if (persistedId) {
+              derivedId.value = persistedId;
+              return;
+            }
             const provider = p === "custom" ? cp || "custom" : p;
             derivedId.value = provider && r ? `${provider}-${r}` : "";
           },
@@ -236,7 +251,7 @@ export default defineComponent({
         if (e.response?.status != 403) {
           toast({
             message:
-              e.response?.data?.message ||
+              raw(e.response?.data?.message) ||
               (props.isEdit
                 ? t("synthetics.locations.updateFailed")
                 : t("synthetics.locations.createFailed")),
@@ -253,6 +268,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       store,
       locationFormRef,
       locationFormSchema,

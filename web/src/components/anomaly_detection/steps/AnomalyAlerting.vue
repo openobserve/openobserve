@@ -21,10 +21,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- Priority & tags (Feature 2). Anomaly configs appear in the same
            alert list, so they carry the same triage metadata. -->
-      <div class="mb-6! flex items-start pb-0!">
-        <div class="flex h-9 w-47.5 items-center font-semibold">
+      <div class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
+        <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
           {{ t("alerts.priority") }}
-          <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
+          <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
             <OTooltip :content="t('alerts.priorityTooltip')" side="right" />
           </OIcon>
         </div>
@@ -43,10 +43,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div class="mb-6! flex items-start pb-0!">
-        <div class="flex h-9 w-47.5 items-center font-semibold">
+      <div class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
+        <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
           {{ t("alerts.tags") }}
-          <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
+          <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
             <OTooltip :content="t('alerts.tagsTooltip')" side="right" />
           </OIcon>
         </div>
@@ -60,10 +60,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Enable Notifications toggle -->
-      <div class="mb-6! flex items-start pb-0!">
-        <div class="flex items-center font-semibold" style="width: 190px; height: 36px">
+      <div class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
+        <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
           {{ t("alerts.anomaly.notifications") }}
-          <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
+          <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
             <OTooltip :content="t('alerts.anomaly.notificationsTooltip')" side="right" />
           </OIcon>
         </div>
@@ -79,13 +79,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Destination picker (shown when alert_enabled) -->
-      <div v-if="config.alert_enabled" class="mb-6! flex items-start pb-0!">
-        <div class="flex items-center font-semibold" style="width: 190px; height: 36px">
+      <div v-if="config.alert_enabled" class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
+        <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
           {{ t("alerts.destination") }}
-          <span class="text-status-error-text ml-1">*</span>
         </div>
-        <div class="flex flex-col">
-          <div class="flex items-center">
+        <div class="flex min-w-0 flex-1 basis-60 flex-col">
+          <div class="flex flex-wrap items-center gap-y-1">
             <OSelect
               v-model="configModel.alert_destination_ids"
               :options="destinations"
@@ -93,8 +92,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               valueKey="name"
               multiple
               searchable
-              class="h-auto! min-h-auto!"
-              style="min-width: 300px; max-width: 420px"
+              :placeholder="t('alerts.summary.noDestination')"
+              class="h-auto! min-h-auto! max-w-105 min-w-0 flex-1 basis-75"
               data-test="anomaly-destination"
             >
               <template #selected-item="{ index, opt, removeAtIndex }">
@@ -116,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     index === visibleChipCount &&
                     config.alert_destination_ids.length > visibleChipCount
                   "
-                  class="text-compact text-text-secondary ml-1 whitespace-nowrap"
+                  class="text-compact text-text-secondary ms-1 whitespace-nowrap"
                 >
                   +{{ config.alert_destination_ids.length - visibleChipCount }}
                 </span>
@@ -128,22 +127,106 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="ghost"
               size="sm"
-              class="ml-1"
+              class="ms-1"
               :title="t('alerts.alertSettings.refreshDestinations')"
+              data-test="anomaly-refresh-destinations"
               @click="$emit('refresh:destinations')"
               icon-left="refresh"
             />
-            <OButton variant="outline" size="sm" class="ml-2" @click="openAddDestination">
+            <OButton variant="outline" size="sm" class="ms-2" @click="openAddDestination">
               {{ t("alerts.anomaly.addNewDestination") }}
             </OButton>
           </div>
-          <div
-            v-if="config.alert_enabled && config.alert_destination_ids.length === 0"
-            class="text-input-error-text pt-1 text-xs"
-            data-test="anomaly-destination-error"
+          <!-- Same field hint as the alert form's Destination field. -->
+          <p
+            class="text-input-help-text pt-1 text-xs"
+            :data-test="
+              config.alert_destination_ids.length === 0
+                ? 'anomaly-destination-note'
+                : 'anomaly-destination-status'
+            "
           >
-            {{ t("alerts.anomaly.destinationRequired") }}
+            {{ destinationStatus }}
+          </p>
+        </div>
+      </div>
+
+      <div class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
+        <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
+          {{ t("alerts.anomaly.alertDirection") }}
+          <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
+            <OTooltip :content="t('alerts.anomaly.alertDirectionTooltip')" side="right" />
+          </OIcon>
+        </div>
+        <div class="flex h-11 items-center">
+          <OSelect
+            v-model="directionModel"
+            :options="directionOptions"
+            labelKey="label"
+            valueKey="value"
+            :searchable="false"
+            width="sm"
+            data-test="anomaly-alert-direction"
+          />
+        </div>
+      </div>
+
+      <div class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
+        <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
+          {{ t("alerts.anomaly.windowShare") }}
+          <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
+            <OTooltip :content="t('alerts.anomaly.windowShareTooltip')" side="right" />
+          </OIcon>
+        </div>
+        <div class="flex min-w-0 flex-1 basis-60 flex-col gap-1">
+          <div class="flex flex-wrap items-start gap-3">
+            <OInput
+              v-model="configModel.alert_window_buckets"
+              type="number"
+              :model-modifiers="{ number: true }"
+              :label="t('alerts.anomaly.windowBuckets')"
+              :placeholder="raw('1')"
+              :error="!!windowShareErrors.buckets"
+              width="xs"
+              data-test="anomaly-window-buckets"
+            />
+            <OInput
+              v-model="configModel.alert_window_fire_pct"
+              type="number"
+              :model-modifiers="{ number: true }"
+              :label="t('alerts.anomaly.windowFirePct')"
+              :placeholder="raw('100')"
+              :error="!!windowShareErrors.fire"
+              width="xs"
+              data-test="anomaly-window-fire-pct"
+            />
+            <OInput
+              v-model="configModel.alert_window_recover_pct"
+              type="number"
+              :model-modifiers="{ number: true }"
+              :label="t('alerts.anomaly.windowRecoverPct')"
+              :placeholder="t('alerts.anomaly.windowRecoverSameAsFire')"
+              :error="!!windowShareErrors.recover"
+              width="xs"
+              data-test="anomaly-window-recover-pct"
+            />
           </div>
+          <div
+            v-for="message in windowShareMessages"
+            :key="message"
+            class="text-input-error-text text-xs"
+            data-test="anomaly-window-share-error"
+            role="alert"
+          >
+            {{ message }}
+          </div>
+          <span
+            v-if="!windowShareMessages.length"
+            class="text-text-secondary text-xs"
+            data-test="anomaly-window-share-hint"
+          >
+            {{ windowShareHint }}
+          </span>
         </div>
       </div>
 
@@ -162,21 +245,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { computed, defineComponent, type PropType } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import OTagInput from "@/lib/forms/TagInput/OTagInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
+import {
+  ANOMALY_DIRECTION_KEYS,
+  anomalyWindowShareEffective,
+  anomalyWindowShareErrors,
+} from "./AnomalyDetectionConfig.schema";
 
 export default defineComponent({
   name: "AnomalyAlerting",
-  components: { OButton, OSwitch, OSelect, OTagInput, OTooltip, OIcon, OTag },
+  components: { OButton, OSwitch, OSelect, OInput, OTagInput, OTooltip, OIcon, OTag },
 
   props: {
     config: {
@@ -192,7 +281,7 @@ export default defineComponent({
   emits: ["refresh:destinations"],
 
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const store = useStore();
 
@@ -202,7 +291,7 @@ export default defineComponent({
     // Value is the INTEGER storage id so the form holds exactly what the API
     // serializes; "P3" is display only.
     const priorityOptions = [1, 2, 3, 4, 5].map((value) => ({
-      label: `P${value}`,
+      label: raw(`P${value}`),
       value,
     }));
 
@@ -215,6 +304,47 @@ export default defineComponent({
       set: (v: string[]) => {
         configModel.value.tags = v;
       },
+    });
+
+    const directionOptions = computed(() =>
+      Object.entries(ANOMALY_DIRECTION_KEYS).map(([value, key]) => ({
+        label: t(key as any),
+        value,
+      })),
+    );
+
+    // NULL on the wire means both, so an unset row still shows a selected option.
+    const directionModel = computed({
+      get: () => configModel.value.alert_direction ?? "both",
+      set: (v: string) => {
+        configModel.value.alert_direction = v;
+      },
+    });
+
+    const windowShareErrors = computed(() => anomalyWindowShareErrors(props.config));
+    const windowShareMessages = computed(() =>
+      [
+        windowShareErrors.value.buckets,
+        windowShareErrors.value.fire,
+        windowShareErrors.value.recover,
+      ]
+        .filter((key): key is string => key !== null)
+        .map((key) => t(key as any)),
+    );
+
+    const windowShareHint = computed(() =>
+      t("alerts.anomaly.windowShareHint", anomalyWindowShareEffective(props.config)),
+    );
+
+    // One name reads better than "1 destination"; more than one is a count.
+    const destinationStatus = computed(() => {
+      const ids = props.config.alert_destination_ids;
+      if (ids.length === 0) return t("alerts.anomaly.noDestinationNote");
+      const targets =
+        ids.length === 1
+          ? ids[0]
+          : t("alert_dependencies.countDestinations", { count: ids.length }, ids.length);
+      return t("alerts.anomaly.sendsToStatus", { targets });
     });
 
     // Dynamically decide how many chips to show based on text length.
@@ -247,12 +377,19 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       store,
       configModel,
       priorityOptions,
       tagsModel,
       openAddDestination,
       visibleChipCount,
+      destinationStatus,
+      directionOptions,
+      directionModel,
+      windowShareErrors,
+      windowShareMessages,
+      windowShareHint,
     };
   },
 });

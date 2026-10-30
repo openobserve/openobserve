@@ -20,6 +20,8 @@ import ReportList from "./ReportList.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import reports from "@/services/reports";
+import { reportKeys } from "@/services/reports.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import * as vueRouter from "vue-router";
 
 // Mock vue-router
@@ -36,14 +38,17 @@ vi.mock("vue-router", async () => {
 });
 
 // Mock reports service
-vi.mock("@/services/reports", () => ({
-  default: {
-    listByFolderId: vi.fn(),
-    toggleReportStateById: vi.fn(),
-    deleteReportById: vi.fn(),
-    bulkDeleteById: vi.fn(),
-  },
-}));
+vi.mock("@/services/reports", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      listByFolderId: vi.fn(),
+      toggleReportStateById: vi.fn(),
+      deleteReportById: vi.fn(),
+      bulkDeleteById: vi.fn(),
+    },
+  });
+});
 
 // Mock composables that use inject()
 vi.mock("@/composables/useStreams", () => ({
@@ -87,8 +92,8 @@ vi.mock("@/utils/commons", () => ({
   getFoldersListByType: vi.fn(() => Promise.resolve()),
 }));
 
-// Mock segment analytics
-vi.mock("@/services/segment_analytics", () => ({
+// Mock product analytics
+vi.mock("@/services/product_analytics", () => ({
   default: {
     track: vi.fn(),
   },
@@ -279,8 +284,11 @@ describe("ReportList Component", () => {
         }),
       );
 
-      // Clear cache so this mount actually calls the API (not served from beforeEach cache)
-      store.state.organizationData.allReportsListByFolderId = {};
+      // Mark the shared reports query stale so this mount really calls the API
+      // instead of being served from an earlier test's cached result.
+      queryClient.invalidateQueries({
+        queryKey: reportKeys.all(store.state.selectedOrganization.identifier),
+      });
 
       const newWrapper = mount(ReportList, {
         global: {
@@ -554,9 +562,11 @@ describe("ReportList Component", () => {
 
       // Verify dialog is shown with correct message
       expect(wrapper.vm.deleteDialog.show).toBe(true);
-      expect(wrapper.vm.deleteDialog.message).toBe(
-        `Are you sure you want to delete report "${report.name}"`,
-      );
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((c) => c.props("messageKeypath") === "reports.deleteReportNamedMessage");
+      expect(dialog.props("messageName")).toBe(report.name);
+      expect(dialog.props("okVariant")).toBe("destructive");
       expect(wrapper.vm.deleteDialog.data).toEqual({
         report_id: report.report_id,
         name: report.name,
@@ -623,9 +633,11 @@ describe("ReportList Component", () => {
 
       // Verify confirmation dialog is shown
       expect(wrapper.vm.deleteDialog.show).toBe(true);
-      expect(wrapper.vm.deleteDialog.message).toBe(
-        'Are you sure you want to delete report "Test Report 1"',
-      );
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((c) => c.props("messageKeypath") === "reports.deleteReportNamedMessage");
+      expect(dialog.props("messageName")).toBe("Test Report 1");
+      expect(dialog.props("okVariant")).toBe("destructive");
     });
   });
 

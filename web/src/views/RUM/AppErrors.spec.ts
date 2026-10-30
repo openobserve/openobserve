@@ -146,6 +146,7 @@ vi.mock("@/plugins/traces/SyntaxGuide.vue", () => ({
 // Component import (AFTER all vi.mock() calls)
 // ---------------------------------------------------------------------------
 import AppErrors from "./AppErrors.vue";
+import ShareButton from "@/components/common/ShareButton.vue";
 import useErrorTracking from "@/composables/useErrorTracking";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 
@@ -316,7 +317,7 @@ const OBUTTON_STUB = {
 const QUERY_EDITOR_STUB = {
   name: "CodeQueryEditor",
   template: '<div data-test="query-editor-stub" />',
-  props: ["query", "editorId", "debounceTime", "keywords", "suggestions", "class"],
+  props: ["query", "editorId", "debounceTime", "keywords", "suggestions", "class", "filterMode"],
   emits: ["update:query", "focus", "blur"],
 };
 
@@ -751,6 +752,22 @@ describe("AppErrors", () => {
   // URL query parameter restore
   // ─────────────────────────────────────────────────────────────────────────
   describe("URL state restore", () => {
+    it("shares the live URL, so the link carries whatever filters the page pushed", async () => {
+      ({ wrapper, router } = await mountAppErrors({
+        routeQuery: { period: "15m", status: "new" },
+      }));
+      await flushPromises();
+
+      const shareButton = wrapper.findComponent(ShareButton);
+
+      expect(shareButton.exists()).toBe(true);
+      // Not the URL we pushed: the page rewrites it on mount, and the share link
+      // follows that rewrite rather than the stale entry query.
+      expect(shareButton.props("url")).toBe(
+        `${window.location.origin}/?period=15m&query=&status=new&org_identifier=default`,
+      );
+    });
+
     it("restores relativeTimePeriod from route query period param", async () => {
       ({ wrapper, router } = await mountAppErrors({
         routeQuery: { period: "15m" },
@@ -1429,6 +1446,31 @@ describe("AppErrors", () => {
 
       // Behavioral confirmation: component still renders the table after the call
       expect(wrapper.find('[data-test="rum-app-errors-table"]').exists()).toBe(true);
+    });
+  });
+
+  describe("filter editor autocomplete", () => {
+    it("runs the editor in filter mode, since the query is a WHERE fragment", async () => {
+      ({ wrapper, router } = await mountAppErrors());
+      await flushPromises();
+
+      expect(wrapper.findComponent(QUERY_EDITOR_STUB).props("filterMode")).toBe(true);
+    });
+
+    it("hands the query to suggestions after 100 ms, as Logs does", async () => {
+      ({ wrapper, router } = await mountAppErrors());
+      await flushPromises();
+
+      expect(wrapper.findComponent(QUERY_EDITOR_STUB).props("debounceTime")).toBe(100);
+    });
+
+    it("sets the stream context on mount, before anything is typed", async () => {
+      ({ wrapper, router } = await mountAppErrors());
+      await flushPromises();
+
+      expect(wrapper.vm.autoCompleteData.org).toBe(store.state.selectedOrganization.identifier);
+      expect(wrapper.vm.autoCompleteData.streamType).toBe("logs");
+      expect(wrapper.vm.autoCompleteData.streamName).toBe("_rumdata");
     });
   });
 

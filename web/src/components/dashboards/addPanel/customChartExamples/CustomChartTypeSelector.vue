@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="searchQuery"
           :placeholder="t('dashboard.customChartTypeSelector.searchCharts')"
           clearable
-          class="ml-4 w-70 flex-[0_0_17.5rem]"
+          class="ms-4 w-70 flex-[0_0_17.5rem]"
           @clear="searchQuery = ''"
         />
         <div class="flex-1" />
@@ -63,16 +63,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <li
               v-for="(category, index) in chartCategories"
               :key="index"
-              @click="scrollToCategory(category.chartLabel)"
+              @click="scrollToCategory(category.chartLabelKey)"
               class="rounded-default mb-1 flex cursor-pointer items-center px-3 py-2 transition-all duration-200"
               :class="
-                selectedCategory === category.chartLabel
+                selectedCategory === category.chartLabelKey
                   ? 'bg-theme-accent text-text-inverse font-semibold'
                   : 'hover:bg-button-ghost-hover-bg'
               "
               data-test="chart-category-item"
             >
-              <span class="text-sm">{{ category.chartLabel }}</span>
+              <span class="text-sm">{{ t(category.chartLabelKey) }}</span>
             </li>
           </ul>
         </OCard>
@@ -104,11 +104,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="(category, categoryIndex) in filteredCategories"
             :key="categoryIndex"
             class="chart-category-section mb-6 scroll-mt-5"
-            :data-category="category.chartLabel"
+            :data-category="category.chartLabelKey"
             data-test="chart-category-section"
           >
             <div class="mb-3 text-xl font-medium font-semibold">
-              {{ category.chartLabel }}
+              {{ t(category.chartLabelKey) }}
             </div>
             <div class="flex gap-3">
               <div
@@ -117,9 +117,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="col-xs-12 col-sm-6 col-md-4 col-lg-3"
               >
                 <OCard
-                  class="h-full cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_4px_12px_color-mix(in_srgb,var(--color-black)_15%,transparent)]"
+                  class="h-full cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
                   :class="{
-                    'border-theme-accent border-2 shadow-[0_4px_12px_color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)]':
+                    'border-theme-accent shadow-theme-accent/30 border-2 shadow-md':
                       selectedChart?.value === chart.value,
                   }"
                   @click="selectChart(chart)"
@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <img
                         :src="chart.asset"
-                        :alt="chart.label"
+                        :alt="t(chart.labelKey)"
                         class="h-full w-full object-cover"
                         loading="lazy"
                       />
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OCardSection>
                   <OCardSection class="px-2 pt-0 pb-2">
                     <div class="text-center text-xs font-medium">
-                      {{ chart.label }}
+                      {{ t(chart.labelKey) }}
                     </div>
                   </OCardSection>
                 </OCard>
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, nextTick, computed, inject } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import type { ChartType, ChartCategory } from "./customChartExampleTypes";
 import { chartTypesData } from "./customChartExampleTypes";
 import CustomChartConfirmDialog from "@/components/dashboards/addPanel/customChartExamples/CustomChartConfirmDialog.vue";
@@ -189,12 +189,12 @@ export default defineComponent({
   },
   emits: ["close", "select"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const chartCategories = ref<ChartCategory[]>(chartTypesData.data);
-    const selectedCategory = ref<string>(chartCategories.value[0]?.chartLabel || "");
+    const selectedCategory = ref<string>(chartCategories.value[0]?.chartLabelKey || "");
     const selectedChart = ref<ChartType | null>(null);
     const contentArea = ref<HTMLElement | null>(null);
     const confirmChartSelectionDialog = ref<boolean>(false);
@@ -218,8 +218,9 @@ export default defineComponent({
       const filtered: ChartCategory[] = [];
 
       chartCategories.value.forEach((category) => {
+        // Match the resolved name, not the key — users search what they can see.
         const filteredCharts = category.type.filter((chart) =>
-          chart.label.toLowerCase().includes(query),
+          t(chart.labelKey).toLowerCase().includes(query),
         );
 
         if (filteredCharts.length > 0) {
@@ -302,7 +303,7 @@ export default defineComponent({
       nextTick(() => {
         // Set first category as selected by default
         if (chartCategories.value.length > 0) {
-          selectedCategory.value = chartCategories.value[0].chartLabel;
+          selectedCategory.value = chartCategories.value[0].chartLabelKey;
         }
       });
     });

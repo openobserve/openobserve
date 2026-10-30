@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="dateTimePicker"
           size="sm"
           v-model="selectedDate"
+          calendar-presets
           @hide="setTime"
           data-test="pinned-dashboard-date-time-picker"
         />
@@ -59,15 +60,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @trigger="refreshData"
           size="sm"
         />
-        <OButton
-          variant="outline"
-          size="icon-toolbar"
-          icon-left="refresh"
-          data-test="pinned-dashboard-refresh-btn"
-          @click="refreshData"
-        >
-          <OTooltip content="Refresh" />
-        </OButton>
+        <!-- The tooltip would only repeat the visible label, so it shows on phones alone. -->
+        <OTooltip :content="t('common.refresh')" :disabled="!isMobile">
+          <OButton
+            variant="primary"
+            :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
+            icon-left="refresh"
+            :aria-label="t('common.refresh')"
+            data-test="pinned-dashboard-refresh-btn"
+            @click="refreshData"
+          >
+            <template v-if="!isMobile">{{ t("common.refresh") }}</template>
+          </OButton>
+        </OTooltip>
       </div>
       <div class="min-h-0 flex-1 overflow-auto">
         <RenderDashboardCharts
@@ -95,6 +100,11 @@ import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useI18nTyped } from "@/types/i18n";
+import useBreakpoint from "@/composables/useBreakpoint";
+
+const { t } = useI18nTyped();
+const { isMobile } = useBreakpoint();
 
 const props = defineProps<{ dashboardId: string; folderId: string }>();
 const emit = defineEmits<{
@@ -108,7 +118,9 @@ const dashboardData = ref<any>(null);
 // RenderDashboardCharts expects currentTimeObj keyed per-panel, falling back
 // to the "__global" key when no panel-specific override exists. We only
 // ever set the global time here (read-only embedded view, no per-panel UI).
-const currentTimeObj = ref<Record<string, { start_time?: Date; end_time?: Date }>>({});
+const currentTimeObj = ref<
+  Record<string, { start_time?: Date; end_time?: Date; relativeTimePeriod?: string | null }>
+>({});
 const refreshInterval = ref(0);
 const dateTimePicker = ref<any>(null);
 const renderRef = ref<any>(null);
@@ -153,7 +165,7 @@ const resolveWindow = (): { startTime: number; endTime: number } | null => {
   if (!d) return null;
   const type = d.valueType ?? d.type;
   if (type === "relative" && d.relativeTimePeriod) {
-    const rel = getConsumableRelativeTime(d.relativeTimePeriod);
+    const rel = getConsumableRelativeTime(d.relativeTimePeriod, store.state.timezone);
     if (rel?.startTime && rel?.endTime) {
       return { startTime: rel.startTime, endTime: rel.endTime };
     }
@@ -178,6 +190,7 @@ const setTime = () => {
       __global: {
         start_time: new Date(win.startTime),
         end_time: new Date(win.endTime),
+        relativeTimePeriod: selectedDate.value?.relativeTimePeriod,
       },
     };
   }

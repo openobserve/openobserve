@@ -1,13 +1,13 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts">
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useSlots, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const slots = useSlots();
 
 const props = withDefaults(
@@ -24,14 +24,17 @@ const props = withDefaults(
     isFirstPage: boolean;
     isLastPage: boolean;
     position?: "top" | "bottom";
-    title?: string;
-    /** When true, replace count + range text with skeleton bars */
+    /** When true, the range text is a skeleton bar and the start side is withheld. */
     loading?: boolean;
+    /** Rows currently selected; read only when `#selection-actions` is provided. */
+    selectedCount?: number;
+    bordered?: boolean;
   }>(),
   {
     position: "bottom",
-    title: "",
     totalCountExact: true,
+    selectedCount: 0,
+    bordered: true,
   },
 );
 
@@ -57,38 +60,59 @@ const pageSizeSelectOptions = computed(() => {
     if (idx === -1) opts.push(props.pageSize);
     else opts.splice(idx, 0, props.pageSize);
   }
-  return opts.map((n) => ({ label: String(n), value: n }));
+  return opts.map((n) => ({ label: raw(String(n)), value: n }));
+});
+
+const selectionLabel = computed(() => {
+  const selected = props.selectedCount.toLocaleString();
+  // A selection can outlive its rows (filter, refetch), and "5 of 3 selected" reads as a bug.
+  if (props.selectedCount > props.totalCount) {
+    return t("components.table.selectedCount", { selected });
+  }
+  const total = `${props.totalCount.toLocaleString()}${props.totalCountExact ? "" : "+"}`;
+  return t("components.table.selectedOfTotal", { selected, total });
 });
 </script>
 
 <template>
   <div
     :data-test="`o2-table-pagination-${position}`"
-    class="border-border-default flex min-h-10 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t px-3 py-1"
+    :class="[
+      'flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1 max-md:gap-y-2',
+      bordered ? 'border-border-default border-t' : '',
+    ]"
   >
-    <!-- Left: bulk actions slot or row count.
-         The footer-title typography lives on this wrapper so BOTH the default
-         row count and any custom #bottom (actions) slot content inherit it —
-         font-size / weight / line-height are inherited properties. -->
+    <!-- Slot presence is read here, not in a computed: slots are not reactive, so a cached answer would miss a slot the page adds later. -->
     <div
-      class="flex items-center gap-2 text-xs font-normal"
-      data-test="o2-table-pagination-actions"
+      v-if="!loading && selectedCount > 0 && slots['selection-actions']"
+      class="flex min-h-[2.125rem] min-w-0 items-center gap-x-3 gap-y-1 max-md:basis-full max-md:flex-wrap"
+      data-test="o2-table-pagination-selection"
     >
-      <!-- Loading: always skeleton, regardless of slot/count -->
       <span
-        v-if="loading"
-        class="o2-pag-skel rounded-default inline-block h-3 w-24 [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite] [background-size:200%_100%] [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)]"
-        aria-hidden="true"
-        data-test="o2-table-pagination-count-skel"
-      />
-      <slot v-else-if="slots.actions" name="actions" />
-      <span v-else>
-        {{ totalCount.toLocaleString() }}{{ totalCountExact ? "" : "+" }} {{ title }}
-      </span>
+        class="text-text-heading text-xs font-medium whitespace-nowrap"
+        role="status"
+        data-test="o2-table-selected-count"
+        >{{ selectionLabel }}</span
+      >
+      <span class="bg-border-default h-4 w-px shrink-0 max-md:hidden" aria-hidden="true" />
+      <div class="flex min-w-0 flex-wrap items-center gap-2">
+        <slot name="selection-actions" />
+      </div>
     </div>
 
-    <!-- Right: controls -->
-    <div class="flex items-center gap-3">
+    <!-- max-md:contents makes the note's own root the flex item, so a root that is max-md:hidden leaves no row and no gap. -->
+    <div
+      v-else-if="!loading && slots['footer-note']"
+      class="text-text-secondary min-w-0 flex-auto text-xs max-md:contents"
+      data-test="o2-table-pagination-note"
+    >
+      <slot name="footer-note" />
+    </div>
+
+    <!-- min-h is one small control, so a one-row footer keeps its height even when the page-size select is absent. -->
+    <div
+      class="ms-auto flex min-h-[2.125rem] min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1 max-md:basis-full max-md:justify-between max-md:gap-x-2"
+    >
       <span
         v-if="loading"
         class="o2-pag-skel rounded-default inline-block h-3 w-36 [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite] [background-size:200%_100%] [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)]"
@@ -103,23 +127,28 @@ const pageSizeSelectOptions = computed(() => {
         {{ t("search.showing") }} {{ showingFrom }} - {{ showingTo }} {{ t("search.of") }}
         {{ totalCount.toLocaleString() }}{{ totalCountExact ? "" : "+" }}
       </span>
-      <div class="bg-border-default h-4 w-px shrink-0" v-if="pageSizeOptions.length > 0" />
+      <div
+        class="bg-border-default h-4 w-px shrink-0 max-md:hidden"
+        v-if="pageSizeOptions.length > 0"
+      />
       <div v-if="pageSizeOptions.length > 0" class="text-primary flex items-center gap-1.5 text-xs">
-        <span class="whitespace-nowrap">{{ t("search.recordsPerPage") }}</span>
+        <span class="whitespace-nowrap max-md:hidden">{{ t("search.recordsPerPage") }}</span>
         <OSelect
           v-model="pageSizeModel"
           :options="pageSizeSelectOptions"
           :searchable="false"
           size="sm"
+          :aria-label="t('search.recordsPerPage')"
           data-test="o2-table-page-size-select"
         />
       </div>
 
-      <div class="flex items-center gap-1">
+      <nav class="flex items-center gap-1" :aria-label="t('components.pagination.pagination')">
         <OButton
           variant="outline"
           size="icon"
           :disabled="isFirstPage"
+          :aria-label="t('search.firstPage')"
           data-test="o2-table-first-page-btn"
           @click="emit('first-page')"
         >
@@ -129,6 +158,7 @@ const pageSizeSelectOptions = computed(() => {
           variant="outline"
           size="icon"
           :disabled="isFirstPage"
+          :aria-label="t('components.pagination.previousPage')"
           data-test="o2-table-prev-page-btn"
           @click="emit('prev-page')"
         >
@@ -138,6 +168,7 @@ const pageSizeSelectOptions = computed(() => {
           variant="outline"
           size="icon"
           :disabled="isLastPage"
+          :aria-label="t('components.pagination.nextPage')"
           data-test="o2-table-next-page-btn"
           @click="emit('next-page')"
         >
@@ -148,12 +179,13 @@ const pageSizeSelectOptions = computed(() => {
           variant="outline"
           size="icon"
           :disabled="isLastPage"
+          :aria-label="t('search.lastPage')"
           data-test="o2-table-last-page-btn"
           @click="emit('last-page')"
         >
           <OIcon name="last-page" size="sm" />
         </OButton>
-      </div>
+      </nav>
     </div>
   </div>
 </template>

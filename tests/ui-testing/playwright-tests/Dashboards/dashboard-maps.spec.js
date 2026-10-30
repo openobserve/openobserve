@@ -1,5 +1,4 @@
-import { test, expect } from "../baseFixtures.js";
-import { login } from "./utils/dashLogin.js";
+const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
 import { ingestionForMaps } from "./utils/dashIngestion.js";
 
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
@@ -7,7 +6,10 @@ import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 import PageManager from "../../pages/page-manager";
 const testLogger = require('../utils/test-logger.js');
 
-const randomDashboardName =
+// Each test runs in parallel (mode: "parallel" below), so the name must be
+// generated fresh per test — a single shared name causes cross-test races
+// where one test's create/delete collides with another's mid-flight.
+const generateDashboardName = () =>
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
 
 test.describe.configure({ mode: "parallel" });
@@ -15,8 +17,20 @@ test.describe.configure({ mode: "parallel" });
 test.describe("dashboard maps testcases", () => {
   test.beforeEach(async ({ page }) => {
     testLogger.debug("Test setup - beforeEach hook executing");
-    await login(page);
+    await navigateToBase(page);
+    await page.waitForTimeout(1000);
     await ingestionForMaps(page);
+    await page.waitForTimeout(2000);
+
+    // navigateToBase() alone can land on the wrong org's page on cloud (the
+    // stored session's "last active org" wins over the org_identifier query
+    // param on a bare root load) — force the correct org context with an
+    // explicit navigation to a real feature page, same as dashboard.spec.js's
+    // beforeEach does via its post-ingestion page.goto(logsUrl).
+    await page.goto(
+      `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${process.env["ORGNAME"]}&folder=default`
+    );
+    await page.waitForLoadState("domcontentloaded");
   });
 
   test("Should display the correct location when entering latitude and longitude values", async ({
@@ -24,6 +38,7 @@ test.describe("dashboard maps testcases", () => {
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     // select dashboard
     await pm.dashboardList.menuItem("dashboards-item");
@@ -46,20 +61,7 @@ test.describe("dashboard maps testcases", () => {
     await pm.chartTypeSelector.searchAndAddField("country", "filter");
 
     // Apply Country Filter
-    const conditionLabel = page.locator(
-      '[data-test="dashboard-add-condition-label-0-country"]'
-    );
-    await conditionLabel.click();
-    const conditionList = page.locator('[data-test="dashboard-add-condition-list-tab"]');
-    await conditionList.click();
-    // Fill the search input inside the OSelect popover
-    const conditionSearch = page.locator('[data-test="dashboard-add-condition-list-tab-search"]');
-    await conditionSearch.waitFor({ state: "visible", timeout: 5000 });
-    await conditionSearch.fill("India");
-    // Select the matching option via data-test-value
-    const indiaOption = page.locator('[data-test="dashboard-add-condition-list-tab-option"][data-test-value="India"]');
-    await indiaOption.waitFor({ state: "visible", timeout: 5000 });
-    await indiaOption.click();
+    await pm.dashboardFilter.applyListConditionBySearch(0, "country", "India", "India");
 
     // Apply Dashboard Changes
 
@@ -68,9 +70,7 @@ test.describe("dashboard maps testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Click on Map at Specific Position
-    await page
-      .locator("#chart-map canvas")
-      .click({ position: { x: 19.0748, y: 72.8856 } });
+    await pm.chartTypeSelector.clickMapCanvas({ x: 19.0748, y: 72.8856 });
 
     // Save panel
 
@@ -78,7 +78,7 @@ test.describe("dashboard maps testcases", () => {
     await pm.dashboardPanelActions.savePanel();
 
     // Delete Dashboard
-    await page.locator('[data-test="dashboard-back-btn"]').click();
+    await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
 });

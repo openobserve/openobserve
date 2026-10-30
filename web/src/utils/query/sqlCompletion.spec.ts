@@ -103,7 +103,7 @@ describe("A1 — every function is kind Function, never Text", () => {
 
   it("logical/predicate words are kind Keyword", () => {
     for (const kw of ["and", "or", "like", "in", "not in", "between", "is null"]) {
-      const entry = SQL_KEYWORDS.find((k) => k.label === kw);
+      const entry = SQL_KEYWORDS.find((k) => k.name === kw);
       expect(entry, `SQL_KEYWORDS is missing keyword "${kw}"`).toBeDefined();
       expect(entry!.kind, `keyword ${kw}`).toBe("Keyword");
     }
@@ -791,6 +791,23 @@ describe("B1 — keyword ordering is coherent in the raw catalog", () => {
       expect(field.sortText! < k.sortText!, `${k.name} sorts ahead of fields`).toBe(true);
     }
   });
+
+  it("gives every function an explicit sortText, not just keywords/clauses", () => {
+    for (const fn of SQL_FUNCTIONS) {
+      expect(fn.sortText, `${fn.name} needs an explicit sortText`).toBeTruthy();
+    }
+  });
+
+  it("pins match_all ahead of every other function regardless of label", () => {
+    const matchAll = byName("match_all");
+    for (const fn of SQL_FUNCTIONS) {
+      if (fn.name === "match_all") continue;
+      expect(
+        matchAll.sortText! < fn.sortText!,
+        `match_all (${matchAll.sortText}) must sort ahead of ${fn.name} (${fn.sortText})`,
+      ).toBe(true);
+    }
+  });
 });
 
 describe("B1 — clause keywords reach a SQL editor through the fallback", () => {
@@ -914,5 +931,35 @@ describe("buildFieldEntry — the column type has four spellings in this app", (
     ["field_type", { name: "a", field_type: "Int64" }],
   ])("reads the type from `%s`", (_k, field) => {
     expect(buildFieldEntry(field as any).detail).toBe("Int64");
+  });
+});
+
+describe("a function's signature sits after its name, not in the type column", () => {
+  it("moves a Function's (…) detail into the label", () => {
+    const [item] = build({ suggestions: [byName("cast_to_arr")] });
+    expect(item.label).toEqual({ label: "cast_to_arr", detail: "(field)", description: undefined });
+  });
+
+  it("leaves a field's column type as a string label with its detail", () => {
+    const [item] = build({
+      keywords: [{ name: "level", label: "level", kind: "Field", detail: "Utf8" }],
+    });
+    expect(item.label).toBe("level");
+    expect(item.detail).toBe("Utf8");
+  });
+
+  it("keeps a row's own label detail", () => {
+    const [item] = build({
+      keywords: [
+        {
+          name: "str_match",
+          label: "str_match",
+          kind: "Function",
+          detail: "(field, pattern)",
+          labelDetail: "(level, …)",
+        },
+      ],
+    });
+    expect((item.label as any).detail).toBe("(level, …)");
   });
 });

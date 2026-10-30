@@ -5,6 +5,7 @@ import { inject } from "vue";
 import OColor from "./OColor.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
 import { firstFieldError } from "../Form/fieldError";
+import { raw } from "@/types/i18n";
 import type { FormColorProps } from "./OFormColor.types";
 
 defineOptions({ inheritAttrs: false });
@@ -36,7 +37,9 @@ if (import.meta.env.DEV && !form) {
         :model-value="field.state.value"
         :error="field.state.meta.errors.length > 0"
         :error-message="
-          field.state.meta.errors.length > 0 ? firstFieldError(field.state.meta.errors) : undefined
+          field.state.meta.errors.length > 0
+            ? raw(firstFieldError(field.state.meta.errors))
+            : undefined
         "
         @update:model-value="field.handleChange"
         @blur="field.handleBlur"

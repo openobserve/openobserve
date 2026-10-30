@@ -3,17 +3,28 @@ const {
   expect,
   navigateToBase,
 } = require("../utils/enhanced-baseFixtures.js");
+const testLogger = require('../utils/test-logger.js');
 import logData from "../../fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/dashboard-time";
 import PageManager from "../../pages/page-manager";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
+import { answerPanelDraftRestore } from "../../pages/dashboardPages/panel-leave-dialog.js";
 
-const dashboardName = `Dashboard_${Date.now()}`;
+// Every test here runs in parallel (the config sets fullyParallel: true), so the
+// dashboard name must be generated fresh per test. A single shared module-scope
+// name meant several workers created rows with the IDENTICAL title at once, and
+// deleteDashboard() resolves its row with `.first()` — so a finishing test could
+// delete a still-running test's dashboard. It also leaked: this file created 9
+// dashboards and deleted 7, leaving two same-named strays behind on every run
+// (confirmed against alpha). Same fix, and same reason, as dashboard.spec.js.
+const generateDashboardName = () =>
+  "Dashboard_" + Math.random().toString(36).slice(2, 11) + "_" + Date.now();
 
 test.describe("dashboard UI testcases", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     await ingestion(page);
 
@@ -26,7 +37,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
-    const dashboardName = `dashboard-${Date.now()}`;
+    const dashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -57,11 +68,13 @@ test.describe("dashboard UI testcases", () => {
 
     // Apply configuration
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // Set relative time
     await waitForDateTimeButtonToBeEnabled(page);
     await pm.dashboardTimeRefresh.setRelative("4", "w");
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // Save and verify panel
     await pm.dashboardPanelActions.savePanel();
@@ -77,6 +90,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -104,11 +118,13 @@ test.describe("dashboard UI testcases", () => {
     await waitForDateTimeButtonToBeEnabled(page);
     await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // Cancel adding the breakdown field
     // Field "kubernetes_container_name" gets alias "breakdown_1"
     await pm.chartTypeSelector.removeField("breakdown_1", "b");
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // Save and verify panel
     await pm.dashboardPanelActions.addPanelName(panelName);
@@ -125,6 +141,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -158,6 +175,7 @@ test.describe("dashboard UI testcases", () => {
     await waitForDateTimeButtonToBeEnabled(page);
     await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // Change chart types and verify
     await pm.chartTypeSelector.selectChartType("area");
@@ -172,13 +190,16 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.selectChartType("h-stacked");
     await pm.chartTypeSelector.selectChartType("stacked");
 
-    // Save the dashboard panel
+    // Save the dashboard panel. The chart-type switches re-run the query on their
+    // own, so settle before saving even though there is no explicit Apply here.
+    await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.savePanel();
 
     // Switch to Bar chart and apply changes
     await pm.dashboardPanelEdit.editPanel(panelName);
     await pm.chartTypeSelector.selectChartType("bar");
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.savePanel();
 
     // Delete the panel and confirm
@@ -191,6 +212,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -224,6 +246,7 @@ test.describe("dashboard UI testcases", () => {
     await waitForDateTimeButtonToBeEnabled(page);
     await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // Save the dashboard panel
     await pm.dashboardPanelActions.savePanel();
@@ -238,6 +261,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -266,21 +290,36 @@ test.describe("dashboard UI testcases", () => {
     // Set the date-time range
     await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
+    await expect(pm.chartTypeSelector.getBreakdownItem(1)).toBeVisible();
 
     // Refresh the page
     await page.reload();
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState("domcontentloaded");
 
-    // Handle dialog and verify no data is visible
-    page.once("dialog", (dialog) => {
-      dialog.dismiss().catch(() => {});
+    // The reload keeps the edits as a draft; Start fresh drops them and opens a default new panel.
+    expect(await answerPanelDraftRestore(page, { choice: "fresh", timeout: 30000 })).toBe(true);
+    await expect(page.locator('[data-test="dashboard-y-item-y_axis_1"]')).toBeVisible({
+      timeout: 30000,
     });
-    await expect(pm.dashboardPanelActions.getNoDataLocator()).toBeVisible();
+    await expect(page.locator('[data-test="dashboard-y-item-y_axis_1"]')).not.toContainText(
+      "kubernetes_container_name"
+    );
+    await expect(pm.chartTypeSelector.getBreakdownItem(1)).toHaveCount(0);
+
+    // Leave the editor and delete the dashboard — this test created one and never
+    // removed it. NOTE: the dialog handler that used to be registered here
+    // DISMISSED the next dialog, which would cancel the discard below; discardPanel()
+    // installs its own accepting handler, so the stray one had to go.
+    await pm.dashboardPanelActions.discardPanel();
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
   });
   test("should display the correct output when changing relative and absolute times with different timezones after adding a breakdown", async ({
     page,
   }) => {
     const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -320,6 +359,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardTimeRefresh.selectAbsolutetime("1", "1");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // Save the dashboard panel
     await pm.dashboardPanelActions.savePanel();
@@ -334,6 +374,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -361,14 +402,22 @@ test.describe("dashboard UI testcases", () => {
 
     // Apply changes
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
+    // discardPanel() waits for the URL to leave /add_panel, which is the redirect
+    // this test is named for.
     await pm.dashboardPanelActions.discardPanel();
+
+    // Delete the dashboard — this test created one and never removed it.
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
   });
 
   test('should plot the data when adding a "Sort by" filter, a breakdown, and other required fields', async ({
     page,
   }) => {
     const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -401,6 +450,7 @@ test.describe("dashboard UI testcases", () => {
     await waitForDateTimeButtonToBeEnabled(page);
     await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.savePanel();
 
     // Delete the panel and confirm
@@ -413,6 +463,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -449,6 +500,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardPanelConfigs.openConfigPanel();
     await pm.dashboardPanelConfigs.selectNoValueReplace("2");
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // Save the dashboard panel
     await pm.dashboardPanelActions.savePanel();

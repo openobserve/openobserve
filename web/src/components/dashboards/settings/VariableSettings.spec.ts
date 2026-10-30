@@ -50,11 +50,17 @@ vi.mock("../../../utils/zincutils", () => ({
 const mockNotifications = {
   showPositiveNotification: vi.fn(),
   showErrorNotification: vi.fn(),
-  showConfictErrorNotificationWithRefreshBtn: vi.fn(),
 };
 
 vi.mock("@/composables/useNotifications", () => ({
   default: vi.fn(() => mockNotifications),
+}));
+const mockOpenConflict = vi.fn();
+vi.mock("@/composables/dashboard/useDashboardSaveConflict", () => ({
+  useDashboardSaveConflict: () => ({
+    isConflict: (error: any) => error?.response?.status === 409,
+    openConflict: mockOpenConflict,
+  }),
 }));
 
 vi.mock("../../../utils/commons", () => ({
@@ -93,8 +99,8 @@ vi.mock("../../ConfirmDialog.vue", () => ({
   default: {
     name: "ConfirmDialog",
     template:
-      '<div data-test="confirm-dialog-mock" v-if="modelValue"><div>{{title}}</div><div>{{message}}</div></div>',
-    props: ["modelValue", "title", "message"],
+      '<div data-test="confirm-dialog-mock" v-if="modelValue" :data-keypath="messageKeypath" :data-variant="okVariant"><div>{{title}}</div><div>{{message}}</div><b data-test="confirm-dialog-mock-name">{{messageName}}</b></div>',
+    props: ["modelValue", "title", "message", "messageKeypath", "messageName", "okVariant"],
     emits: ["update:ok", "update:cancel"],
   },
 }));
@@ -156,7 +162,7 @@ describe("VariableSettings", () => {
     // Reset notification mocks
     mockNotifications.showPositiveNotification.mockClear();
     mockNotifications.showErrorNotification.mockClear();
-    mockNotifications.showConfictErrorNotificationWithRefreshBtn.mockClear();
+    mockOpenConflict.mockClear();
 
     mockGetDashboard = vi.fn().mockResolvedValue(mockDashboardData);
     mockDeleteVariable = vi.fn().mockResolvedValue({});
@@ -272,6 +278,23 @@ describe("VariableSettings", () => {
       expect(vm.getVariableTypeLabel("custom")).toBe("Custom");
       expect(vm.getVariableTypeLabel("unknown_type")).toBe("unknown_type");
     });
+
+    it("reports which variables a variable depends on", async () => {
+      const vm = wrapper.vm as any;
+      // `pod` references `$namespace` in a filter → depends on namespace.
+      vm.dashboardVariablesList = [
+        { name: "namespace", type: "query_values", query_data: { stream: "logs", filter: [] } },
+        {
+          name: "pod",
+          type: "query_values",
+          query_data: { stream: "logs", filter: [{ value: "$namespace" }] },
+        },
+      ];
+      await nextTick();
+
+      expect(vm.getDependencies({ name: "pod" })).toEqual(["namespace"]);
+      expect(vm.getDependencies({ name: "namespace" })).toEqual([]);
+    });
   });
 
   describe("Add Variable Functionality", () => {
@@ -347,14 +370,19 @@ describe("VariableSettings", () => {
       vm.showDeleteDialogFn({ row: mockRowData });
       await nextTick();
 
-      // Since selectedDelete is not exposed in the component return,
-      // we can only verify that confirmDeleteDialog is set to true
-      // which indicates the function worked (as per the source code)
       expect(vm.confirmDeleteDialog).toBe(true);
+      expect(vm.selectedDelete).toEqual(mockRowData);
+    });
 
-      // The function implementation shows that selectedDelete should be set,
-      // but it's not exposed in the component's return statement.
-      // This is actually a bug in the original component.
+    it("names the variable in the delete dialog with a destructive button", async () => {
+      const vm = wrapper.vm as any;
+      vm.showDeleteDialogFn({ row: { name: "region" } });
+      await nextTick();
+
+      const dialog = wrapper.find('[data-test="confirm-dialog-mock"]');
+      expect(dialog.attributes("data-keypath")).toBe("dashboard.deleteVariableMsg");
+      expect(dialog.attributes("data-variant")).toBe("destructive");
+      expect(wrapper.find('[data-test="confirm-dialog-mock-name"]').text()).toBe("region");
     });
 
     it("should show confirm dialog component when delete dialog is active", async () => {
@@ -399,8 +427,11 @@ describe("VariableSettings", () => {
 
       await vm.deleteVariableFn();
 
-      expect(mockNotifications.showConfictErrorNotificationWithRefreshBtn).toHaveBeenCalledWith(
-        "Conflict error",
+      expect(mockOpenConflict).toHaveBeenCalledWith(
+        expect.objectContaining({
+          dashboardId: "test-dashboard",
+          onResolved: expect.any(Function),
+        }),
       );
       // No positive notification should be called when error occurs
       expect(mockNotifications.showPositiveNotification).not.toHaveBeenCalled();
@@ -475,9 +506,10 @@ describe("VariableSettings", () => {
 
       await vm.handleDragEnd();
 
-      expect(mockNotifications.showConfictErrorNotificationWithRefreshBtn).toHaveBeenCalledWith(
-        "Reorder conflict",
+      expect(mockOpenConflict).toHaveBeenCalledWith(
+        expect.objectContaining({ mine: vm.dashboardVariableData.data }),
       );
+      expect(mockNotifications.showErrorNotification).not.toHaveBeenCalled();
     });
 
     it("should handle drag end error with non-409 status", async () => {

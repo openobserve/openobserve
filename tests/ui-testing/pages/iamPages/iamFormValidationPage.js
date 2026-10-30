@@ -69,11 +69,11 @@ export class IamFormValidationPage {
         this.userPasswordError     = '[data-test="user-password-field-error"]';
         // OSelect data-test="user-role-field" → error span: data-test="user-role-field-error"
         this.userRoleError         = '[data-test="user-role-field-error"]';
-        this.addUserSubmitBtn      = '[data-test="add-user-dialog"] [data-test="o-dialog-primary-btn"]';
+        this.addUserSubmitBtn      = '[data-test="add-user-submit-btn"]';
         this.addUserCancelBtn      = '[data-test="add-user-dialog"] [data-test="o-dialog-secondary-btn"]';
 
         // ── UpdateRole (edit user) dialog ─────────────────────────────────────
-        // Trigger: row action button data-test="edit-basic-user-${email}" which,
+        // Trigger: row action button data-test="edit-basic-user-${index}" which,
         // in OSS / enterprise (non-cloud) mode, opens the AddUser dialog in update
         // mode (data-test="add-user-dialog"). The legacy UpdateRole.vue dialog is
         // not reachable from this edit button in the current build.
@@ -82,12 +82,12 @@ export class IamFormValidationPage {
         // OSelect data-test="user-role-field" → -trigger to open, -error span on validation
         this.updateRoleSelect      = '[data-test="user-role-field-trigger"]';
         this.updateRoleError       = '[data-test="user-role-field-error"]';
-        this.updateRoleSaveBtn     = '[data-test="add-user-dialog"] [data-test="o-dialog-primary-btn"]';
+        this.updateRoleSaveBtn     = '[data-test="add-user-submit-btn"]';
         this.updateRoleCancelBtn   = '[data-test="add-user-dialog"] [data-test="o-dialog-secondary-btn"]';
 
         // ── Add Role "Start from" preset (new) ────────────────────────────────
-        this.roleStartFromCustom   = '[data-test="add-role-start-from-custom-radio"]';
-        this.roleStartFromReadonly = '[data-test="add-role-start-from-readonly-radio"]';
+        this.roleStartFromSelect   = '[data-test="add-role-start-from-select-trigger"]';
+        this.roleStartFromOption   = (value) => `[data-test="add-role-start-from-select-option"][data-test-value="${value}"]`;
 
         // ── Edit Role / Edit Group pages (auto-route + dirty state, new) ───────
         this.editRolePage          = '[data-test="edit-role-page"]';
@@ -225,9 +225,13 @@ export class IamFormValidationPage {
         await this.page.locator(this.roleCancelBtn).click();
     }
 
-    // Select the "Read-only" start-from preset before submitting the role form.
+    async selectRoleStartFrom(value) {
+        await this.page.locator(this.roleStartFromSelect).click();
+        await this.page.locator(this.roleStartFromOption(value)).click();
+    }
+
     async selectRoleStartFromReadonly() {
-        await this.page.locator(this.roleStartFromReadonly).click();
+        await this.selectRoleStartFrom('readonly');
     }
 
     // Delete the first role/group in the list via its row trash icon, keyed by name.
@@ -317,8 +321,8 @@ export class IamFormValidationPage {
     getAddUserDialogLocator()     { return this.page.locator(this.addUserDialog); }
 
     // New-behavior getters (start-from, auto-route, delete banner, dirty dots)
-    getRoleStartFromCustomLocator()   { return this.page.locator(this.roleStartFromCustom); }
-    getRoleStartFromReadonlyLocator() { return this.page.locator(this.roleStartFromReadonly); }
+    getRoleStartFromSelectLocator()   { return this.page.locator(this.roleStartFromSelect); }
+    getRoleStartFromOptionLocator(value) { return this.page.locator(this.roleStartFromOption(value)); }
     getEditRolePageLocator()          { return this.page.locator(this.editRolePage); }
     getEditRolePermsSectionLocator()  { return this.page.locator(this.editRolePermsSection); }
     getEditRolePermsDirtyDotLocator() { return this.page.locator(this.editRolePermsDirtyDot); }
@@ -336,6 +340,7 @@ export class IamFormValidationPage {
     getUpdateRoleErrorLocator()    { return this.page.locator(this.updateRoleError); }
     getUpdateRoleSaveBtnLocator()  { return this.page.locator(this.updateRoleSaveBtn); }
     getUpdateRoleCancelBtnLocator(){ return this.page.locator(this.updateRoleCancelBtn); }
+    getToastSuccessLocator()       { return this.page.locator(this.toastSuccess); }
 
     // Open the UpdateRole (edit user) dialog for the first user visible in the list
     async openUpdateRoleDialogForFirstUser() {
@@ -349,6 +354,12 @@ export class IamFormValidationPage {
     async getEditUserButtonCount() {
         return this.page.locator(this.editBasicUserFirstBtn).count();
     }
+
+    async clickFirstEditUserButton() {
+        await this.page.locator(this.editBasicUserFirstBtn).first().click();
+    }
+
+    getUrlWithUserActionPattern() { return /[?&]action=(update|add)\b|[?&]email=/; }
 
     async navigateToUsersTab() {
         await this.navigateToIam();

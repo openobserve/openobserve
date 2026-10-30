@@ -18,17 +18,43 @@ pub struct Model {
     pub user_type: i16,
     pub created_at: i64,
     pub updated_at: i64,
+    #[sea_orm(default_value = false)]
+    pub must_reset_password: bool,
+    #[sea_orm(nullable)]
+    pub password_reset_reason: Option<String>,
+    #[sea_orm(nullable)]
+    pub flagged_at: Option<i64>,
+    /// NULL only for rows written between the schema migration and the first password change;
+    /// the rotation check treats it as never-expired rather than as the epoch.
+    #[sea_orm(nullable)]
+    pub password_updated_at: Option<i64>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(has_many = "super::org_users::Entity")]
     OrgUsers,
+    #[sea_orm(has_many = "super::user_password_history::Entity")]
+    UserPasswordHistory,
+    #[sea_orm(has_one = "super::user_auth_state::Entity")]
+    UserAuthState,
 }
 
 impl Related<super::org_users::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::OrgUsers.def()
+    }
+}
+
+impl Related<super::user_password_history::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::UserPasswordHistory.def()
+    }
+}
+
+impl Related<super::user_auth_state::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::UserAuthState.def()
     }
 }
 
@@ -52,9 +78,14 @@ mod tests {
             user_type: 0,
             created_at: 1000,
             updated_at: 2000,
+            must_reset_password: false,
+            password_reset_reason: None,
+            flagged_at: None,
+            password_updated_at: Some(1000),
         };
         assert_eq!(m.email, "test@example.com");
         assert!(!m.is_root);
         assert!(m.password_ext.is_none());
+        assert!(!m.must_reset_password);
     }
 }

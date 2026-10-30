@@ -15,25 +15,11 @@
 
 use std::time::Duration;
 
-use config::{
-    meta::promql::value::{EvalContext, Sample, Value},
-    utils::sort::sort_float,
-};
-use datafusion::error::Result;
+use config::{meta::promql::value::Sample, utils::sort::sort_float};
 
 use crate::functions::RangeFunc;
 
-pub(crate) fn max_over_time(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    super::eval_range(data, MaxOverTimeFunc::new(), eval_ctx)
-}
-
 pub struct MaxOverTimeFunc;
-
-impl MaxOverTimeFunc {
-    pub fn new() -> Self {
-        MaxOverTimeFunc {}
-    }
-}
 
 impl RangeFunc for MaxOverTimeFunc {
     fn name(&self) -> &'static str {
@@ -41,10 +27,7 @@ impl RangeFunc for MaxOverTimeFunc {
     }
 
     fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
-        if samples.is_empty() {
-            return None;
-        }
-        Some(samples.iter().map(|s| s.value).max_by(sort_float).unwrap())
+        samples.iter().map(|s| s.value).max_by(sort_float)
     }
 }
 
@@ -52,31 +35,18 @@ impl RangeFunc for MaxOverTimeFunc {
 mod tests {
     use std::time::Duration;
 
-    use config::meta::promql::value::{Labels, RangeValue, TimeWindow};
+    use config::meta::promql::value::{EvalContext, Labels, RangeValue, TimeWindow, Value};
+    use datafusion::error::Result;
 
     use super::*;
+
+    fn max_over_time(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+        crate::functions::eval_range(data, MaxOverTimeFunc, eval_ctx)
+    }
     // Test helper
     fn max_over_time_test_helper(data: Value) -> Result<Value> {
         let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
         max_over_time(data, &eval_ctx)
-    }
-
-    #[test]
-    fn test_max_over_time_value_none_input() {
-        let result = max_over_time_test_helper(Value::None).unwrap();
-        assert!(matches!(result, Value::None));
-    }
-
-    #[test]
-    fn test_max_over_time_invalid_input_returns_err() {
-        let result = max_over_time_test_helper(Value::Float(1.0));
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_max_over_time_exec_empty_samples_returns_none() {
-        let func = MaxOverTimeFunc::new();
-        assert!(func.exec(&[], 0, &Duration::ZERO).is_none());
     }
 
     #[test]

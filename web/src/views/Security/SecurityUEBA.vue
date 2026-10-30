@@ -9,7 +9,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
      these are heuristics over the chosen windows. -->
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -71,7 +71,7 @@ import {
 } from "@/utils/security/severity";
 import { b64EncodeUnicode, formatCompactCount, formatEventCount } from "@/utils/formatters";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
@@ -897,7 +897,7 @@ const noUserSources = computed(
         <template #subheader>
           <div class="px-page-edge border-table-row-divider border-b py-1.5">
             <OStatStrip
-              compact
+              compact-values
               :items="stats"
               :loading="tableLoading"
               selectable
@@ -972,10 +972,10 @@ const noUserSources = computed(
         </template>
         <template #cell-events="{ row }">
           <span class="tabular-nums">{{ formatEventCount(row.current.events) }}</span>
-          <span v-if="row.baseline && row.volumeJudged" class="text-text-secondary ml-1 text-xs">
+          <span v-if="row.baseline && row.volumeJudged" class="text-text-secondary ms-1 text-xs">
             {{ t("siem.ueba.expected", { n: formatEventCount(Math.round(row.expected)) }) }}
           </span>
-          <OTag v-else-if="!row.baseline" variant="blue-soft" size="xs" class="ml-1">{{
+          <OTag v-else-if="!row.baseline" variant="blue-soft" size="xs" class="ms-1">{{
             t("siem.ueba.new")
           }}</OTag>
         </template>
@@ -1173,7 +1173,7 @@ const noUserSources = computed(
               /></span>
             </div>
           </div>
-          <div class="text-text-secondary text-3xs grid grid-cols-24 gap-0.5 pl-30">
+          <div class="text-text-secondary text-3xs grid grid-cols-24 gap-0.5 ps-30">
             <span v-for="h in HOURS" :key="h" class="text-center">{{
               h % 6 === 0 ? String(h).padStart(2, "0") : ""
             }}</span>

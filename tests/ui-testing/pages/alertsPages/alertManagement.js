@@ -65,11 +65,87 @@ export class AlertManagement {
      * @param {string} streamType - Stream type for the cloned alert
      * @param {string} streamName - Stream name for the cloned alert
      */
-    async cloneAlert(alertName, streamType, streamName) {
+    /** The clone dialog, shared by every alert family on the list. */
+    cloneDialog() {
+        return this.page.locator(this.locators.cloneFormDialog);
+    }
+
+    /** Open the clone dialog from a row without submitting it. */
+    async openCloneDialog(alertName) {
+        await this.page.locator(this.locators.alertCloneButton.replace('{alertName}', alertName)).click();
+        await expect(this.cloneDialog()).toBeVisible({ timeout: 10000 });
+    }
+
+    /**
+     * The dialog's Save button.
+     *
+     * Not named `cloneSubmitButton`: that is a locator key, and
+     * _exposeLocators() copies every key onto the page object, replacing any
+     * method of the same name.
+     */
+    cloneSaveButton() {
+        return this.page.locator(this.locators.cloneSubmitButton);
+    }
+
+    async fillCloneName(name) {
+        await this.page.locator(this.locators.cloneAlertNameField).fill(name);
+    }
+
+    async submitCloneDialog() {
+        await this.page.locator(this.locators.cloneSubmitButton).click();
+    }
+
+    async cancelCloneDialog() {
+        await this.page.locator(this.locators.cloneCancelButton).click();
+    }
+
+    async selectCloneStreamType(streamType) {
+        await this.page
+            .locator(`${this.locators.cloneStreamType} ${this.locators.selectTrigger}`)
+            .first()
+            .click();
+        await this.page
+            .locator(this.locators.cloneStreamTypeOption.replace('{streamType}', streamType))
+            .first()
+            .click();
+    }
+
+    /** The row's pause/resume control, whose data-row-action names the state. */
+    rowEnableToggle(alertName) {
+        return this.page.locator(this.locators.pauseStartAlert.replace('{alertName}', alertName));
+    }
+
+    /**
+     * The visible half of a toast. OToast renders its message in three nodes
+     * (sr-only ARIA span, sr-only title, visible message), so matching on text
+     * alone trips strict mode.
+     */
+    toastWithText(text) {
+        return this.page
+            .locator(this.locators.toastMessage)
+            .filter({ hasText: text })
+            .first();
+    }
+
+    /**
+     * Clone an alert from its row.
+     *
+     * @param {string} alertName
+     * @param {string} streamType
+     * @param {string} streamName
+     * @param {{newName?: string, folderId?: string}} [options] `newName` renames
+     *   the copy (the dialog otherwise keeps the source's name, and alert names
+     *   are not unique); `folderId` routes it out of the current folder.
+     */
+    async cloneAlert(alertName, streamType, streamName, options = {}) {
         await this.page.locator(this.locators.alertCloneButton.replace('{alertName}', alertName)).click();
         // The clone ODialog has no dedicated title data-test; wait for the clone
         // name input (`to-be-clone-alert-name`) as the deterministic ready signal.
         await expect(this.page.locator('[data-test="to-be-clone-alert-name"]')).toBeVisible({ timeout: 10000 });
+
+        if (options.newName) {
+            await this.page.locator(this.locators.cloneAlertNameField).fill(options.newName);
+        }
 
         // Stream type is an OSelect: click its -trigger, then the option by data-test-value
         // (the old getByRole('option').locator('div').nth(2) structure no longer exists).
@@ -78,12 +154,30 @@ export class AlertManagement {
         await this.page.locator(`[data-test="to-be-clone-stream-type-option"][data-test-value="${streamType}"]`).first().click();
         await this.page.waitForTimeout(1000);
 
-        // Stream name is a searchable OSelect: open, type to filter, click the match.
+        // Stream name is a searchable OSelect: open, type to filter, click the
+        // match by data-test-value scoped to the popover's own options — not
+        // page-wide getByText, which also matches the box's own pre-filled
+        // display text once the source alert's stream name is carried over.
         await this.page.locator('[data-test="to-be-clone-stream-name"] [data-test$="-trigger"]').first().click();
+        await this.page.locator('[data-test="to-be-clone-stream-name-popover"]').first().waitFor({ state: 'visible', timeout: 5000 });
         await this.page.waitForTimeout(500);
         await this.page.keyboard.type(streamName, { delay: 30 });
         await this.page.waitForTimeout(1000);
-        await this.page.getByText(streamName, { exact: true }).click();
+        await this.page.locator(`[data-test="to-be-clone-stream-name-option"][data-test-value="${streamName}"]`).first().click();
+
+        if (options.folderId) {
+            await this.page
+                .locator(this.locators.cloneFolderPicker)
+                .locator(this.locators.selectTrigger)
+                .first()
+                .click();
+            const folderOption = this.page
+                .locator(this.locators.cloneFolderOption.replace('{folderId}', options.folderId))
+                .first();
+            await expect(folderOption).toBeVisible({ timeout: 10000 });
+            await folderOption.click();
+        }
+
         await this.page.locator(this.locators.cloneSubmitButton).click();
         // Scope cloned-toast to the visible o-toast-message (strict-mode safe).
         await expect(
@@ -187,7 +281,26 @@ export class AlertManagement {
      */
     async deleteAlertByRow(alertName) {
         const kebabButton = this.page.locator(`[data-test="alert-list-${alertName}-more-options"]`).first();
-        await kebabButton.waitFor({ state: 'visible', timeout: 5000 });
+        // Under parallel load the just-created alert's row can be slow to render, or sit below the
+        // fold in a long/unrefreshed list, so a bare wait for its more-options kebab times out
+        // (alerts-ui-operations:71/131). First filter the current folder (client-side) to bring
+        // the row to the top.
+        if (!(await kebabButton.isVisible({ timeout: 3000 }).catch(() => false))) {
+            await this.searchAlert(alertName).catch(() => {});
+        }
+        try {
+            await kebabButton.waitFor({ state: 'visible', timeout: 20000 });
+        } catch (e) {
+            // The in-folder filter runs client-side over the already-fetched list, so if
+            // navigateToFolder resolved on a transient empty-state before the folder's alerts
+            // finished fetching (common under load), the row simply isn't there to filter. Fall
+            // back to an across-folders search, which issues a fresh SERVER-SIDE query and finds
+            // the alert regardless of which folder finished loading.
+            testLogger.warn('Alert kebab not visible after in-folder search; retrying via across-folders search', { alertName });
+            await this.searchAlertAcrossFolders(alertName).catch(() => {});
+            await kebabButton.waitFor({ state: 'visible', timeout: 20000 });
+        }
+        await kebabButton.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
         await kebabButton.click();
 
         // Target the Delete item by data-test (robust to label/shortcut-hint changes)
@@ -231,6 +344,33 @@ export class AlertManagement {
             testLogger.error('Neither table nor no data message found after search', { alertName, error: error.message });
             throw new Error(`Failed to search for alert "${alertName}": Neither table nor empty state appeared`);
         }
+    }
+
+    /**
+     * Search for an alert across ALL folders. The scope toggle switches the search input from a
+     * client-side folder filter (filterQuery) to a SERVER-SIDE query (searchQuery), so this finds
+     * the alert even when the active folder's list hasn't finished fetching under load. Uses the
+     * exact-case name (the backend match is case-insensitive) and is idempotent on the toggle.
+     * @param {string} alertName
+     */
+    async searchAlertAcrossFolders(alertName) {
+        const allScope = this.page.locator('[data-test="alert-list-search-across-folders-toggle"]');
+        const state = await allScope.getAttribute('data-state').catch(() => null);
+        if (state !== 'on' && state !== 'active') {
+            await allScope.click({ force: true }).catch(() => {});
+        }
+        await this.page.waitForTimeout(500);
+
+        const inputField = this.page.locator(this.locators.alertSearchInputField);
+        await inputField.waitFor({ state: 'attached', timeout: 10000 });
+        await inputField.fill('', { force: true });
+        await inputField.fill(alertName, { force: true });
+        await this.page.waitForTimeout(2000);
+
+        await Promise.race([
+            this.page.locator(this.locators.tableLocator).waitFor({ state: 'visible', timeout: 30000 }),
+            this.page.locator('[data-test="o2-empty-state"]').waitFor({ state: 'visible', timeout: 30000 })
+        ]).catch(() => {});
     }
 
     /**
@@ -652,111 +792,17 @@ export class AlertManagement {
     }
 
     // =========================================================================
-    // ALERT EDIT — DEDUPLICATION REGRESSION HELPERS
+    // ALERT EDIT HELPERS
     // =========================================================================
 
     /**
-     * Wait for the alert list page to be ready (canonical landmark).
-     * @param {number} timeout
-     */
-    async waitForAlertListReady(timeout = 30000) {
-        await this.page.locator(this.locators.alertListPage).waitFor({ state: 'visible', timeout });
-    }
-
-    /**
-     * Open the alert edit screen by clicking the alert's update (pencil) button.
-     * The list row exposes `[data-test="alert-list-{name}-update-alert"]` (AlertList.vue:312).
-     * @param {string} alertName
-     */
-    async openAlertEditByName(alertName) {
-        const updateBtn = this.page.locator(`[data-test="alert-list-${alertName}-update-alert"]`).first();
-        await expect(updateBtn).toBeVisible({ timeout: 10000 });
-        await updateBtn.click();
-        // Wait for the AddAlert form to render — `add-alert-submit-btn` is the canonical landmark.
-        await this.page.locator(this.locators.alertSubmitButton).waitFor({ state: 'visible', timeout: 15000 });
-        testLogger.info('Opened alert edit view', { alertName });
-    }
-
-    /**
      * Activate the Advanced tab in the AddAlert v3 wizard.
-     * Deduplication lives in this tab (AddAlert.vue line ~273).
      */
     async openAdvancedTab() {
         const advancedTab = this.page.locator(this.locators.addAlertTabAdvanced);
         await expect(advancedTab).toBeVisible({ timeout: 10000 });
         await advancedTab.click();
-        // Wait for the dedup fingerprint OSelect wrapper to mount in the Advanced tab.
-        await this.page.locator(this.locators.dedupFingerprintFieldsSelect).waitFor({ state: 'visible', timeout: 10000 });
-        testLogger.info('Switched to Advanced tab — deduplication panel visible');
-    }
-
-    /**
-     * Read currently selected fingerprint field values from the OSelect trigger.
-     * OSelect exposes `data-test-selected-value` (comma-joined for multiple).
-     * @returns {Promise<string[]>}
-     */
-    async getSelectedFingerprintFields() {
-        const trigger = this.page.locator(this.locators.dedupFingerprintFieldsTrigger);
-        await expect(trigger).toBeVisible({ timeout: 5000 });
-        const raw = await trigger.getAttribute('data-test-selected-value');
-        if (!raw) return [];
-        return raw.split(',').map(v => v.trim()).filter(Boolean);
-    }
-
-    /**
-     * Remove all currently selected fingerprint fields by opening the OSelect popover
-     * and clicking each previously selected option to toggle it OFF (multi-select).
-     * Returns the number of fields removed.
-     */
-    async removeAllFingerprintFields() {
-        const trigger = this.page.locator(this.locators.dedupFingerprintFieldsTrigger);
-        await expect(trigger).toBeVisible({ timeout: 5000 });
-
-        const selectedBefore = await this.getSelectedFingerprintFields();
-        testLogger.info('Removing fingerprint fields — initial selection', { selected: selectedBefore });
-
-        if (selectedBefore.length === 0) {
-            testLogger.warn('No fingerprint fields selected to remove');
-            return 0;
-        }
-
-        await trigger.click();
-        const popover = this.page.locator(this.locators.dedupFingerprintFieldsPopover);
-        await expect(popover).toBeVisible({ timeout: 5000 });
-
-        let removed = 0;
-        for (const value of selectedBefore) {
-            // Per-value option uses `data-test-value="<value>"`
-            const option = popover.locator(`[data-test="alert-dedup-fingerprint-fields-option"][data-test-value="${value}"]`).first();
-            await expect(option).toBeVisible({ timeout: 5000 });
-            await option.click();
-            removed += 1;
-            // Wait for the trigger's selected-value attribute to no longer include this value.
-            await expect.poll(async () => {
-                const current = await trigger.getAttribute('data-test-selected-value');
-                if (!current) return [];
-                return current.split(',').map(v => v.trim()).filter(Boolean);
-            }, { timeout: 5000 }).not.toContain(value);
-            testLogger.info('Deselected fingerprint option', { value, removed });
-        }
-
-        // Close the popover via keyboard — Escape is the canonical dismissal.
-        await this.page.keyboard.press('Escape');
-        await popover.waitFor({ state: 'hidden', timeout: 5000 });
-
-        return removed;
-    }
-
-    /**
-     * Submit the AddAlert form (Save button) and wait for the success toast.
-     * @returns {Promise<void>}
-     */
-    async submitAlertEdit() {
-        const submitBtn = this.page.locator(this.locators.alertSubmitButton);
-        await expect(submitBtn).toBeEnabled({ timeout: 10000 });
-        await submitBtn.click();
-        // OToast variant=success carries data-test="o-toast-success"; data-test-message holds the text.
-        await this.page.locator(this.locators.oToastSuccess).first().waitFor({ state: 'visible', timeout: 15000 });
-        testLogger.info('Alert update submitted — success toast visible');
+        await this.page.locator(this.locators.advancedTemplateOverrideSelect).waitFor({ state: 'visible', timeout: 10000 });
+        testLogger.info('Switched to Advanced tab');
     }
 }

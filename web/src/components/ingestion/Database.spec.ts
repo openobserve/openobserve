@@ -494,7 +494,17 @@ describe("Database Component", () => {
     it("should expose databaseTabs array", () => {
       expect(wrapper.vm.databaseTabs).toBeDefined();
       expect(Array.isArray(wrapper.vm.databaseTabs)).toBe(true);
-      expect(wrapper.vm.databaseTabs.length).toBe(12);
+      expect(wrapper.vm.databaseTabs.length).toBe(13);
+    });
+
+    // MariaDB shipped a working backend (deadlock canonicalization, the
+    // mariadb_lock_waits recipe) and a verified collector config long before it
+    // had any way in from the UI — no tile, no route, no card. This asserts the
+    // entry point exists, since that was the whole defect.
+    it("offers MariaDB as a reachable data source", () => {
+      const mariadb = wrapper.vm.databaseTabs.find((tab: any) => tab.name === "mariadb");
+      expect(mariadb, "MariaDB tile must exist").toBeDefined();
+      expect(mariadb.to.name).toBe("mariadb");
     });
 
     it("should have databaseTabs with consistent structure", () => {

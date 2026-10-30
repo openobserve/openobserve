@@ -14,16 +14,19 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use sea_orm::{
-    ColumnTrait, EntityTrait, FromQueryResult, QueryFilter, QuerySelect, Set, SqlErr,
+    ColumnTrait, Condition, EntityTrait, FromQueryResult, QueryFilter, QuerySelect, Set, SqlErr,
     TransactionTrait, prelude::Expr,
 };
 use serde::{Deserialize, Serialize};
 
-use super::{entity::source_maps::*, get_lock};
+use super::entity::source_maps::*;
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors,
 };
+
+// Keeps each IN list under the sqlite and postgres bind-parameter limits.
+const DELETE_ID_BATCH: usize = 1000;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum FileType {
@@ -80,6 +83,231 @@ impl From<i32> for FileType {
     }
 }
 
+#[derive(FromQueryResult)]
+struct Value {
+    value: Option<String>,
+}
+
+pub fn get_file_path(org_id: &str, name: &str) -> String {
+    format!("files/{org_id}/sourcemaps/{name}")
+}
+
+/// Only a sourcemap file stored under the requesting org's own prefix may be read back.
+pub fn is_sourcemap_path_for_org(org_id: &str, path: &str) -> bool {
+    use std::path::{Component, Path};
+    let prefix = format!("files/{org_id}/sourcemaps/");
+    path.starts_with(&prefix)
+        && Path::new(path)
+            .components()
+            .all(|c| matches!(c, Component::Normal(_)))
+}
+
+pub async fn add_many(entries: Vec<SourceMap>) -> Result<(), errors::Error> {
+    let models = entries
+        .into_iter()
+        .map(|entry| ActiveModel {
+            org: Set(entry.org),
+            service: Set(entry.service),
+            env: Set(entry.env),
+            version: Set(entry.version),
+            source_file_name: Set(entry.source_file_name),
+            source_map_file_name: Set(entry.source_map_file_name),
+            file_store_id: Set(entry.file_store_id),
+            file_type: Set(entry.file_type.into()),
+            cluster: Set(entry.cluster),
+            created_at: Set(entry.created_at),
+            ..Default::default()
+        })
+        .collect::<Vec<_>>();
+
+    let client = get_orm_client_rw().await;
+
+    let txn = client.begin().await?;
+
+    for model in models {
+        match Entity::insert(model).exec(&txn).await {
+            Ok(_) => {}
+            Err(e) => {
+                txn.rollback().await?;
+                match e.sql_err() {
+                    Some(SqlErr::UniqueConstraintViolation(_)) => {
+                        return Err(errors::Error::DbError(errors::DbError::UniqueViolation));
+                    }
+                    _ => {
+                        return Err(e.into());
+                    }
+                }
+            }
+        }
+    }
+    txn.commit().await?;
+
+    Ok(())
+}
+
+/// Deletes the exact group and returns the removed rows so callers can release their files.
+pub async fn delete_group(
+    org: &str,
+    service: Option<String>,
+    env: Option<String>,
+    version: Option<String>,
+) -> Result<Vec<SourceMap>, errors::Error> {
+    let client = get_orm_client_rw().await;
+
+    let cond = Condition::all()
+        .add(Column::Org.eq(org))
+        .add(service.map_or(Column::Service.is_null(), |s| Column::Service.eq(s)))
+        .add(env.map_or(Column::Env.is_null(), |e| Column::Env.eq(e)))
+        .add(version.map_or(Column::Version.is_null(), |v| Column::Version.eq(v)));
+
+    let txn = client.begin().await?;
+    let rows = Entity::find().filter(cond).all(&txn).await?;
+    // Delete by id: rows committed concurrently stay instead of being removed unreturned.
+    for chunk in rows.chunks(DELETE_ID_BATCH) {
+        Entity::delete_many()
+            .filter(Column::Id.is_in(chunk.iter().map(|m| m.id)))
+            .exec(&txn)
+            .await?;
+    }
+    txn.commit().await?;
+
+    Ok(rows.into_iter().map(|model| model.into()).collect())
+}
+
+pub async fn get_sourcemap_file(
+    org: &str,
+    source_file: &str,
+    service: &Option<String>,
+    env: &Option<String>,
+    version: &Option<String>,
+) -> Result<Option<SourceMap>, errors::Error> {
+    let client = get_orm_client_ro().await;
+
+    let mut stmt = Entity::find()
+        .filter(Column::Org.eq(org))
+        .filter(Column::SourceFileName.eq(source_file));
+
+    if let Some(s) = service.as_ref() {
+        stmt = stmt.filter(Column::Service.eq(s));
+    }
+
+    if let Some(e) = env.as_ref() {
+        stmt = stmt.filter(Column::Env.eq(e));
+    }
+
+    if let Some(v) = version.as_ref() {
+        stmt = stmt.filter(Column::Version.eq(v));
+    }
+
+    let res = stmt.one(client).await?.map(|model| model.into());
+    Ok(res)
+}
+
+pub async fn list_files(
+    org: &str,
+    service: Option<String>,
+    env: Option<String>,
+    version: Option<String>,
+) -> Result<Vec<SourceMap>, errors::Error> {
+    let client = get_orm_client_ro().await;
+
+    let mut stmt = Entity::find().filter(Column::Org.eq(org));
+
+    if let Some(s) = service {
+        stmt = stmt.filter(Column::Service.eq(s));
+    }
+
+    if let Some(e) = env {
+        stmt = stmt.filter(Column::Env.eq(e));
+    }
+
+    if let Some(v) = version {
+        stmt = stmt.filter(Column::Version.eq(v));
+    }
+
+    let res = stmt
+        .all(client)
+        .await?
+        .into_iter()
+        .map(|model| model.into())
+        .collect();
+    Ok(res)
+}
+
+/// Deletes every source map of the org and returns the removed rows, so callers release files.
+pub async fn delete_by_org(org: &str) -> Result<Vec<SourceMap>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let delete = Entity::delete_many().filter(Column::Org.eq(org));
+    let rows = super::delete_returning_models(client, delete).await?;
+    Ok(rows.into_iter().map(SourceMap::from).collect())
+}
+
+pub async fn update_cluster(entry: SourceMap) -> Result<(), errors::Error> {
+    let client = get_orm_client_rw().await;
+
+    Entity::update_many()
+        .filter(Column::Org.eq(entry.org))
+        .filter(Column::FileStoreId.eq(entry.file_store_id))
+        .filter(Column::SourceMapFileName.eq(entry.source_map_file_name))
+        .col_expr(Column::Cluster, Expr::value(entry.cluster))
+        .exec(client)
+        .await?;
+
+    Ok(())
+}
+
+pub async fn get_values(
+    org_id: &str,
+    limit: u64,
+) -> Result<(Vec<String>, Vec<String>, Vec<String>), errors::Error> {
+    let client = get_orm_client_ro().await;
+
+    let services = Entity::find()
+        .filter(Column::Org.eq(org_id))
+        .select_only()
+        .distinct()
+        .column_as(Column::Service, "value")
+        .limit(limit)
+        .into_model::<Value>()
+        .all(client)
+        .await?;
+
+    let envs = Entity::find()
+        .filter(Column::Org.eq(org_id))
+        .select_only()
+        .distinct()
+        .column_as(Column::Env, "value")
+        .limit(limit)
+        .into_model::<Value>()
+        .all(client)
+        .await?;
+
+    let versions = Entity::find()
+        .filter(Column::Org.eq(org_id))
+        .select_only()
+        .distinct()
+        .column_as(Column::Version, "value")
+        .limit(limit)
+        .into_model::<Value>()
+        .all(client)
+        .await?;
+
+    let services: Vec<_> = services
+        .into_iter()
+        .map(|v| v.value.unwrap_or_default())
+        .collect();
+    let envs: Vec<_> = envs
+        .into_iter()
+        .map(|v| v.value.unwrap_or_default())
+        .collect();
+    let versions: Vec<_> = versions
+        .into_iter()
+        .map(|v| v.value.unwrap_or_default())
+        .collect();
+
+    Ok((services, envs, versions))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -129,216 +357,78 @@ mod tests {
         assert_eq!(sm.cluster, "us-east");
         assert!(matches!(sm.file_type, FileType::SourceMap));
     }
-}
 
-#[derive(FromQueryResult)]
-struct Value {
-    value: Option<String>,
-}
+    #[test]
+    fn test_is_sourcemap_path_for_org() {
+        assert!(is_sourcemap_path_for_org(
+            "org1",
+            "files/org1/sourcemaps/abc123"
+        ));
+        assert!(!is_sourcemap_path_for_org(
+            "org1",
+            "files/otherorg/sourcemaps/abc123"
+        ));
+        assert!(!is_sourcemap_path_for_org(
+            "org1",
+            "files/org1/sourcemaps/../../otherorg/sourcemaps/abc123"
+        ));
+        assert!(!is_sourcemap_path_for_org(
+            "org1",
+            "/files/org1/sourcemaps/abc123"
+        ));
+        assert!(!is_sourcemap_path_for_org(
+            "org1",
+            "files/org1/other/abc123"
+        ));
+    }
 
-pub async fn add_many(entries: Vec<SourceMap>) -> Result<(), errors::Error> {
-    let models = entries
-        .into_iter()
-        .map(|entry| ActiveModel {
-            org: Set(entry.org),
-            service: Set(entry.service),
-            env: Set(entry.env),
-            version: Set(entry.version),
-            source_file_name: Set(entry.source_file_name),
-            source_map_file_name: Set(entry.source_map_file_name),
-            file_store_id: Set(entry.file_store_id),
-            file_type: Set(entry.file_type.into()),
-            cluster: Set(entry.cluster),
-            created_at: Set(entry.created_at),
-            ..Default::default()
-        })
-        .collect::<Vec<_>>();
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
-
-    let txn = client.begin().await?;
-
-    for model in models {
-        match Entity::insert(model).exec(&txn).await {
-            Ok(_) => {}
-            Err(e) => {
-                txn.rollback().await?;
-                match e.sql_err() {
-                    Some(SqlErr::UniqueConstraintViolation(_)) => {
-                        return Err(errors::Error::DbError(errors::DbError::UniqueViolation));
-                    }
-                    _ => {
-                        return Err(e.into());
-                    }
-                }
-            }
+    fn source_map(org: &str, file: &str) -> SourceMap {
+        SourceMap {
+            id: 0,
+            org: org.to_string(),
+            service: None,
+            env: None,
+            version: None,
+            source_file_name: file.to_string(),
+            source_map_file_name: format!("{file}.map"),
+            file_store_id: format!("{org}/{file}"),
+            file_type: FileType::SourceMap,
+            created_at: 1,
+            cluster: "c".to_string(),
         }
     }
-    txn.commit().await?;
 
-    Ok(())
-}
+    #[tokio::test]
+    async fn test_org_delete_returns_the_whole_rows_it_removed() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org = crate::table::testing::unique("t_smap");
+        let other = format!("{org}_other");
+        let rows = vec![
+            source_map(&org, "a.js"),
+            source_map(&org, "b.js"),
+            source_map(&other, "a.js"),
+        ];
+        add_many(rows).await.unwrap();
 
-pub async fn delete_group(
-    org: &str,
-    service: Option<String>,
-    env: Option<String>,
-    version: Option<String>,
-) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+        let mut removed = delete_by_org(&org).await.unwrap();
+        removed.sort_by(|x, y| x.source_file_name.cmp(&y.source_file_name));
+        let again = delete_by_org(&org).await.unwrap();
+        let kept = delete_by_org(&other).await.unwrap();
 
-    let mut stmt = Entity::delete_many().filter(Column::Org.eq(org));
-
-    if let Some(s) = service {
-        stmt = stmt.filter(Column::Service.eq(s));
-    } else {
-        stmt = stmt.filter(Column::Service.is_null());
+        let files: Vec<(&str, &str)> = removed
+            .iter()
+            .map(|m| (m.source_file_name.as_str(), m.file_store_id.as_str()))
+            .collect();
+        assert_eq!(files.len(), 2);
+        assert_eq!(files[0].0, "a.js");
+        assert_eq!(files[1].1, format!("{org}/b.js"));
+        assert!(again.is_empty());
+        assert_eq!(
+            kept.len(),
+            1,
+            "another org's source map went with this org's"
+        );
     }
-
-    if let Some(e) = env {
-        stmt = stmt.filter(Column::Env.eq(e));
-    } else {
-        stmt = stmt.filter(Column::Env.is_null());
-    }
-
-    if let Some(v) = version {
-        stmt = stmt.filter(Column::Version.eq(v));
-    } else {
-        stmt = stmt.filter(Column::Version.is_null());
-    }
-
-    stmt.exec(client).await?;
-    Ok(())
-}
-
-pub async fn get_sourcemap_file(
-    org: &str,
-    source_file: &str,
-    service: &Option<String>,
-    env: &Option<String>,
-    version: &Option<String>,
-) -> Result<Option<SourceMap>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
-
-    let mut stmt = Entity::find()
-        .filter(Column::Org.eq(org))
-        .filter(Column::SourceFileName.eq(source_file));
-
-    if let Some(s) = service.as_ref() {
-        stmt = stmt.filter(Column::Service.eq(s));
-    }
-
-    if let Some(e) = env.as_ref() {
-        stmt = stmt.filter(Column::Env.eq(e));
-    }
-
-    if let Some(v) = version.as_ref() {
-        stmt = stmt.filter(Column::Version.eq(v));
-    }
-
-    let res = stmt.one(client).await?.map(|model| model.into());
-    Ok(res)
-}
-
-pub async fn list_files(
-    org: &str,
-    service: Option<String>,
-    env: Option<String>,
-    version: Option<String>,
-) -> Result<Vec<SourceMap>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
-
-    let mut stmt = Entity::find().filter(Column::Org.eq(org));
-
-    if let Some(s) = service {
-        stmt = stmt.filter(Column::Service.eq(s));
-    }
-
-    if let Some(e) = env {
-        stmt = stmt.filter(Column::Env.eq(e));
-    }
-
-    if let Some(v) = version {
-        stmt = stmt.filter(Column::Version.eq(v));
-    }
-
-    let res = stmt
-        .all(client)
-        .await?
-        .into_iter()
-        .map(|model| model.into())
-        .collect();
-    Ok(res)
-}
-
-pub async fn update_cluster(entry: SourceMap) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
-
-    Entity::update_many()
-        .filter(Column::Org.eq(entry.org))
-        .filter(Column::FileStoreId.eq(entry.file_store_id))
-        .filter(Column::SourceMapFileName.eq(entry.source_map_file_name))
-        .col_expr(Column::Cluster, Expr::value(entry.cluster))
-        .exec(client)
-        .await?;
-
-    Ok(())
-}
-
-pub async fn get_values(
-    org_id: &str,
-    limit: u64,
-) -> Result<(Vec<String>, Vec<String>, Vec<String>), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
-
-    let services = Entity::find()
-        .filter(Column::Org.eq(org_id))
-        .select_only()
-        .distinct()
-        .column_as(Column::Service, "value")
-        .limit(limit)
-        .into_model::<Value>()
-        .all(client)
-        .await?;
-
-    let envs = Entity::find()
-        .filter(Column::Org.eq(org_id))
-        .select_only()
-        .distinct()
-        .column_as(Column::Env, "value")
-        .limit(limit)
-        .into_model::<Value>()
-        .all(client)
-        .await?;
-
-    let versions = Entity::find()
-        .filter(Column::Org.eq(org_id))
-        .select_only()
-        .distinct()
-        .column_as(Column::Version, "value")
-        .limit(limit)
-        .into_model::<Value>()
-        .all(client)
-        .await?;
-
-    let services: Vec<_> = services
-        .into_iter()
-        .map(|v| v.value.unwrap_or_default())
-        .collect();
-    let envs: Vec<_> = envs
-        .into_iter()
-        .map(|v| v.value.unwrap_or_default())
-        .collect();
-    let versions: Vec<_> = versions
-        .into_iter()
-        .map(|v| v.value.unwrap_or_default())
-        .collect();
-
-    Ok((services, envs, versions))
 }

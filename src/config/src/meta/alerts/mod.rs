@@ -30,18 +30,29 @@ use crate::{
     },
 };
 
+pub mod ack;
 pub mod aggregation_level;
 pub mod alert;
+pub mod auto_investigate;
 pub mod composite;
-pub mod deduplication;
+pub mod content_spec;
 pub mod dispatch;
 pub mod grouping;
 pub mod incidents;
 pub mod level;
 pub mod priority;
+pub mod prom_rule;
+pub mod rca_runs;
+pub mod rca_steering;
+pub mod recovery;
 pub mod state;
 pub mod state_level;
 pub mod tags;
+
+/// Minimum silence applied to a realtime alert after each notification, even
+/// when the alert's own silence is 0 — without a floor, every matching
+/// ingestion request sends a notification and its db writes.
+const REALTIME_MIN_SILENCE_SECS: i64 = 30;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq, Default)]
 #[serde(default)]
@@ -106,7 +117,7 @@ fn get_timezone_from_string(
         return Ok(tz);
     }
     // Fallback to FixedOffset for backward compatibility
-    Err(FixedOffset::east_opt(fallback_offset * 60).unwrap())
+    Err(fixed_offset(fallback_offset).unwrap_or_else(|| Utc.fix()))
 }
 
 /// Get timezone offset in minutes from a Tz timezone at a specific point in time
@@ -130,7 +141,9 @@ impl TriggerCondition {
         let frequency = if freq_in_secs {
             self.frequency
         } else {
-            self.frequency * 60
+            self.frequency
+                .checked_mul(60)
+                .ok_or_else(|| anyhow::anyhow!("frequency is out of range"))?
         };
         let tolerance = match self.tolerance_in_secs {
             Some(tolerance) if tolerance > 0 => {
@@ -141,9 +154,8 @@ impl TriggerCondition {
             _ => 0,
         };
         let start_utc = start_from.map_or(Ok(Utc::now()), |from| {
-            chrono::DateTime::<Utc>::from_timestamp_micros(from).ok_or(anyhow::anyhow!(
-                "Error converting start_from value to timestamp"
-            ))
+            chrono::DateTime::<Utc>::from_timestamp_micros(from)
+                .ok_or_else(|| anyhow::anyhow!("Error converting start_from value to timestamp"))
         })?;
 
         if self.frequency_type == FrequencyType::Cron {
@@ -164,13 +176,23 @@ impl TriggerCondition {
                 };
 
             // Create FixedOffset with the calculated or provided offset
-            let tz_offset = FixedOffset::east_opt(current_offset_minutes * 60).unwrap();
+            let tz_offset = fixed_offset(current_offset_minutes).ok_or_else(|| {
+                anyhow::anyhow!("timezone offset {current_offset_minutes} minutes is out of range")
+            })?;
 
             if apply_silence {
-                let silence = start_utc + Duration::try_minutes(self.silence).unwrap();
+                let silence = Duration::try_minutes(self.silence)
+                    .and_then(|silence| start_utc.checked_add_signed(silence))
+                    .ok_or_else(|| anyhow::anyhow!("silence is out of range"))?;
                 let silence = silence.with_timezone(&tz_offset);
                 // Check for the cron timestamp after the silence period
-                Ok(schedule.after(&silence).next().unwrap().timestamp_micros() + tolerance)
+                Ok(schedule
+                    .after(&silence)
+                    .next()
+                    .ok_or_else(|| anyhow::anyhow!("cron schedule has no future occurrence"))?
+                    .timestamp_micros()
+                    .checked_add(tolerance)
+                    .ok_or_else(|| anyhow::anyhow!("tolerance is out of range"))?)
             } else {
                 // This is important, if provided start_utc was `Some`, it should use the next run
                 // after the start_utc. If it was `None`, it should use the next run after the
@@ -180,9 +202,10 @@ impl TriggerCondition {
                 Ok(schedule
                     .after(&start_utc)
                     .next()
-                    .unwrap()
+                    .ok_or_else(|| anyhow::anyhow!("cron schedule has no future occurrence"))?
                     .timestamp_micros()
-                    + tolerance)
+                    .checked_add(tolerance)
+                    .ok_or_else(|| anyhow::anyhow!("tolerance is out of range"))?)
             }
         } else if apply_silence {
             // silence is in minutes, frequency is in seconds
@@ -192,20 +215,16 @@ impl TriggerCondition {
             // will run after 10 mins of silence period. To avoid this scenario, we
             // should use the max of (frequency, silence) as the next_run_at.
             // Silence period is in minutes, and the frequency is in seconds.
-            let delta = std::cmp::max(frequency, self.silence * 60);
-            Ok(start_utc.timestamp_micros()
-                + Duration::try_seconds(delta)
-                    .unwrap()
-                    .num_microseconds()
-                    .unwrap()
-                + tolerance)
+            let delta = self
+                .silence
+                .checked_mul(60)
+                .map(|silence| std::cmp::max(frequency, silence));
+            delta
+                .and_then(|delta| micros_after(start_utc.timestamp_micros(), delta, tolerance))
+                .ok_or_else(|| anyhow::anyhow!("frequency/silence is out of range"))
         } else {
-            Ok(start_utc.timestamp_micros()
-                + Duration::try_seconds(frequency)
-                    .unwrap()
-                    .num_microseconds()
-                    .unwrap()
-                + tolerance)
+            micros_after(start_utc.timestamp_micros(), frequency, tolerance)
+                .ok_or_else(|| anyhow::anyhow!("frequency is out of range"))
         }
     }
 
@@ -238,7 +257,9 @@ impl TriggerCondition {
         };
 
         // Convert the timestamp to a DateTime with the calculated timezone offset
-        let timezone = FixedOffset::east_opt(current_offset_minutes * 60).unwrap();
+        let Some(timezone) = fixed_offset(current_offset_minutes) else {
+            return next_run_at;
+        };
         let dt = dt_utc.with_timezone(&timezone);
 
         // Get the minute and second of the next_run_at time
@@ -340,6 +361,20 @@ impl TriggerCondition {
             )
         }
     }
+
+    /// Effective realtime-alert silence in microseconds: the alert's own
+    /// silence (minutes) floored by [`REALTIME_MIN_SILENCE_SECS`].
+    pub fn effective_silence_micros(&self) -> i64 {
+        self.silence
+            .saturating_mul(60)
+            .max(REALTIME_MIN_SILENCE_SECS)
+            .saturating_mul(1_000_000)
+    }
+
+    /// The realtime floor alone, without the alert's own silence.
+    pub fn min_silence_micros() -> i64 {
+        REALTIME_MIN_SILENCE_SECS * 1_000_000
+    }
 }
 
 impl TriggerCondition {
@@ -405,6 +440,8 @@ pub struct TriggerEvalResults {
     /// show "112 vs 100". For count alerts this is a LOWER BOUND once the
     /// search cap is reached (`alerts_2.md` §7.5).
     pub actual_value: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rule_value: Option<String>,
     /// Which group/series produced `actual_value` ("host=b,region=eu"), for
     /// grouped aggregation and PromQL alerts (T-9). `None` for count alerts —
     /// a row count has no group identity.
@@ -425,6 +462,15 @@ pub struct TriggerEvalResults {
     /// count.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub group_classification: Option<grouping::GroupClassification>,
+    /// The evaluation completed but **observed nothing** — an SLO alert whose
+    /// every window was frozen (stale watermark, coverage under the floor,
+    /// superseded generation; `alerts_2.md` §7.6). Categorically different
+    /// from "evaluated and nothing matched": a frozen run must not be recorded
+    /// as `Ok`, or a measurement outage reads as a recovery for every
+    /// burn-rate alert in the org (D34). Only `Slo` evaluations set this, and
+    /// only with `data: None` and `level: None`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub frozen: bool,
 }
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
@@ -496,6 +542,8 @@ pub struct QueryCondition {
     /// alert that happens to be unaggregated.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub promql_multi_alert: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub promql_rule_mode: bool,
     pub aggregation: Option<Aggregation>,
     #[serde(default)]
     pub vrl_function: Option<String>,
@@ -790,9 +838,9 @@ impl std::fmt::Display for AggFunction {
     }
 }
 
-impl TryFrom<&str> for AggFunction {
-    type Error = &'static str;
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
+impl FromStr for AggFunction {
+    type Err = &'static str;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s.to_lowercase().as_str() {
             "avg" => AggFunction::Avg,
             "min" => AggFunction::Min,
@@ -889,6 +937,18 @@ pub enum Operator {
     #[serde(rename = "not_contains")]
     #[serde(alias = "NotContains")]
     NotContains,
+    #[serde(rename = "is_null")]
+    #[serde(alias = "IsNull")]
+    IsNull,
+    #[serde(rename = "is_not_null")]
+    #[serde(alias = "IsNotNull")]
+    IsNotNull,
+    #[serde(rename = "is_empty")]
+    #[serde(alias = "IsEmpty")]
+    IsEmpty,
+    #[serde(rename = "is_not_empty")]
+    #[serde(alias = "IsNotEmpty")]
+    IsNotEmpty,
 }
 
 impl std::fmt::Display for Operator {
@@ -902,6 +962,10 @@ impl std::fmt::Display for Operator {
             Operator::LessThanEquals => write!(f, "<="),
             Operator::Contains => write!(f, "contains"),
             Operator::NotContains => write!(f, "not contains"),
+            Operator::IsNull => write!(f, "is null"),
+            Operator::IsNotNull => write!(f, "is not null"),
+            Operator::IsEmpty => write!(f, "is empty"),
+            Operator::IsNotEmpty => write!(f, "is not empty"),
         }
     }
 }
@@ -1090,6 +1154,21 @@ impl Serialize for AlertConditionParams {
             }
         }
     }
+}
+
+/// Returns `None` for an offset of a full day or more, which `FixedOffset` cannot represent.
+pub fn fixed_offset(offset_minutes: i32) -> Option<FixedOffset> {
+    offset_minutes
+        .checked_mul(60)
+        .and_then(FixedOffset::east_opt)
+}
+
+/// `start_micros + secs + tolerance`, or `None` when any step overflows.
+fn micros_after(start_micros: i64, secs: i64, tolerance: i64) -> Option<i64> {
+    Duration::try_seconds(secs)
+        .and_then(|d| d.num_microseconds())
+        .and_then(|d| start_micros.checked_add(d))
+        .and_then(|t| t.checked_add(tolerance))
 }
 
 #[cfg(test)]
@@ -2378,22 +2457,22 @@ mod test {
 
     #[test]
     fn test_agg_function_try_from_str() {
-        assert_eq!(AggFunction::try_from("avg").unwrap(), AggFunction::Avg);
-        assert_eq!(AggFunction::try_from("AVG").unwrap(), AggFunction::Avg);
-        assert_eq!(AggFunction::try_from("min").unwrap(), AggFunction::Min);
-        assert_eq!(AggFunction::try_from("max").unwrap(), AggFunction::Max);
-        assert_eq!(AggFunction::try_from("sum").unwrap(), AggFunction::Sum);
-        assert_eq!(AggFunction::try_from("count").unwrap(), AggFunction::Count);
+        assert_eq!("avg".parse::<AggFunction>().unwrap(), AggFunction::Avg);
+        assert_eq!("AVG".parse::<AggFunction>().unwrap(), AggFunction::Avg);
+        assert_eq!("min".parse::<AggFunction>().unwrap(), AggFunction::Min);
+        assert_eq!("max".parse::<AggFunction>().unwrap(), AggFunction::Max);
+        assert_eq!("sum".parse::<AggFunction>().unwrap(), AggFunction::Sum);
+        assert_eq!("count".parse::<AggFunction>().unwrap(), AggFunction::Count);
         assert_eq!(
-            AggFunction::try_from("median").unwrap(),
+            "median".parse::<AggFunction>().unwrap(),
             AggFunction::Median
         );
-        assert_eq!(AggFunction::try_from("p50").unwrap(), AggFunction::P50);
-        assert_eq!(AggFunction::try_from("p75").unwrap(), AggFunction::P75);
-        assert_eq!(AggFunction::try_from("p90").unwrap(), AggFunction::P90);
-        assert_eq!(AggFunction::try_from("p95").unwrap(), AggFunction::P95);
-        assert_eq!(AggFunction::try_from("p99").unwrap(), AggFunction::P99);
-        assert!(AggFunction::try_from("unknown").is_err());
+        assert_eq!("p50".parse::<AggFunction>().unwrap(), AggFunction::P50);
+        assert_eq!("p75".parse::<AggFunction>().unwrap(), AggFunction::P75);
+        assert_eq!("p90".parse::<AggFunction>().unwrap(), AggFunction::P90);
+        assert_eq!("p95".parse::<AggFunction>().unwrap(), AggFunction::P95);
+        assert_eq!("p99".parse::<AggFunction>().unwrap(), AggFunction::P99);
+        assert!("unknown".parse::<AggFunction>().is_err());
     }
 
     // ── multi_alert_enabled: one question, two storage locations ────────────
@@ -2944,5 +3023,121 @@ mod test {
         let items: Vec<_> = node.into_iter().collect();
         assert_eq!(items.len(), 1);
         assert!(matches!(items[0], ConditionList::EndCondition(_)));
+    }
+
+    fn cron_trigger(cron: &str) -> TriggerCondition {
+        TriggerCondition {
+            frequency_type: FrequencyType::Cron,
+            cron: cron.to_string(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn get_next_trigger_time_draws_tolerance_below_256_secs_so_i64_max_is_harmless() {
+        let tc = TriggerCondition {
+            frequency: 60,
+            tolerance_in_secs: Some(i64::MAX),
+            ..Default::default()
+        };
+        assert!(tc.get_next_trigger_time(true, 0, false, None).is_ok());
+    }
+
+    #[test]
+    fn get_next_trigger_time_rejects_i64_max_frequency() {
+        let tc = TriggerCondition {
+            frequency: i64::MAX,
+            ..Default::default()
+        };
+        assert!(tc.get_next_trigger_time(true, 0, false, None).is_err());
+        assert!(tc.get_next_trigger_time(false, 0, false, None).is_err());
+    }
+
+    #[test]
+    fn get_next_trigger_time_rejects_i64_max_silence() {
+        let tc = TriggerCondition {
+            frequency: 60,
+            silence: i64::MAX,
+            ..Default::default()
+        };
+        assert!(tc.get_next_trigger_time(true, 0, true, None).is_err());
+    }
+
+    #[test]
+    fn get_next_trigger_time_rejects_i64_max_silence_on_a_cron() {
+        let tc = TriggerCondition {
+            silence: i64::MAX,
+            ..cron_trigger("0 0 * * * *")
+        };
+        assert!(tc.get_next_trigger_time(true, 0, true, None).is_err());
+    }
+
+    #[test]
+    fn get_next_trigger_time_rejects_a_silence_past_the_last_representable_date() {
+        let tc = TriggerCondition {
+            silence: 300_000 * 365 * 24 * 60,
+            ..cron_trigger("0 0 * * * *")
+        };
+        assert!(tc.get_next_trigger_time(true, 0, true, None).is_err());
+    }
+
+    #[test]
+    fn get_next_trigger_time_rejects_a_full_day_tz_offset_on_a_cron() {
+        let tc = cron_trigger("0 0 * * * *");
+        assert!(tc.get_next_trigger_time(true, 1440, false, None).is_err());
+        assert!(
+            tc.get_next_trigger_time(true, i32::MAX, false, None)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn get_next_trigger_time_skips_alignment_for_a_full_day_tz_offset() {
+        let tc = TriggerCondition {
+            frequency: 300,
+            align_time: true,
+            ..Default::default()
+        };
+        let start = 1_700_000_123_000_000;
+        assert_eq!(
+            tc.get_next_trigger_time(true, 1440, false, Some(start))
+                .unwrap(),
+            start + 300_000_000
+        );
+    }
+
+    #[test]
+    fn get_next_trigger_time_rejects_a_cron_with_no_future_occurrence() {
+        let tc = cron_trigger("0 0 0 1 1 * 2020");
+        assert!(tc.get_next_trigger_time(true, 0, false, None).is_err());
+        assert!(tc.get_next_trigger_time(true, 0, true, None).is_err());
+    }
+
+    #[test]
+    fn get_timezone_from_string_falls_back_to_utc_for_a_full_day_offset() {
+        assert_eq!(get_timezone_from_string(None, 1440), Err(Utc.fix()));
+        assert_eq!(get_timezone_from_string(None, i32::MAX), Err(Utc.fix()));
+    }
+    #[test]
+    fn test_rule_mode_is_explicit_and_defaults_off() {
+        let query: QueryCondition =
+            serde_json::from_value(serde_json::json!({"type":"promql","promql":"foo > 0"}))
+                .unwrap();
+        assert!(!query.promql_rule_mode);
+        let query = QueryCondition {
+            promql_rule_mode: true,
+            promql_multi_alert: true,
+            query_type: QueryType::PromQL,
+            ..Default::default()
+        };
+        let serialized = serde_json::to_value(&query).unwrap();
+        assert_eq!(
+            serialized.get("promql_rule_mode"),
+            Some(&serde_json::json!(true))
+        );
+        assert!(serialized.get("prom_rule_mode").is_none());
+        let round_trip: QueryCondition = serde_json::from_value(serialized).unwrap();
+        assert!(round_trip.promql_rule_mode);
+        assert!(round_trip.promql_multi_alert);
     }
 }

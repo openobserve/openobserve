@@ -19,8 +19,14 @@ import {
   getTimeInSecondsBasedOnUnit,
   formatRateInterval,
   processVariableContent,
+  escapeHtmlValue,
   normalizeVariableSyntax,
+  replaceVariablePlaceholders,
+  getReferencedVariableNames,
+  getVariablesReferencedInQueries,
+  withTimeRangeVariables,
 } from "./variablesUtils";
+import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 
 describe("Variables Utils", () => {
   describe("formatInterval", () => {
@@ -212,11 +218,21 @@ describe("Variables Utils", () => {
       expect(processVariableContent(content, mockVariablesData)).toBe(expected);
     });
 
+    // Deliberate: this function only renders HTML/Markdown panel text (its sole callers are
+    // HTMLRenderer.vue and MarkdownRenderer.vue), where a comma list is the readable form.
+    // PromQL/SQL panel queries go through usePanelVariableSubstitution.replaceQueryValue,
+    // which already pipe-joins for promql — do not "fix" this default to `|`.
     it("should handle array values with default comma separation", () => {
       const content = "SELECT * FROM logs WHERE service IN (${service})";
       const expected = "SELECT * FROM logs WHERE service IN (api,web,db)";
 
       expect(processVariableContent(content, mockVariablesData)).toBe(expected);
+    });
+
+    it("keeps the comma default for a regex-shaped placeholder in display text", () => {
+      const content = 'up{service=~"$service"}';
+
+      expect(processVariableContent(content, mockVariablesData)).toBe('up{service=~"api,web,db"}');
     });
 
     it("should handle array values with CSV formatting", () => {
@@ -325,6 +341,24 @@ describe("Variables Utils", () => {
       const specialCharContent = "test ${region} test";
       const result = processVariableContent(specialCharContent, mockVariablesData);
       expect(result).toBe("test us-east-1 test");
+    });
+
+    it("passes each formatted value through escapeValue", () => {
+      const data = {
+        values: [
+          { name: "x", value: '<b a="1">\'&' },
+          { name: "list", value: ["<a>", "b"] },
+          { name: "none", value: null },
+        ],
+      };
+
+      expect(
+        processVariableContent("$x ${list:doublequote} $none", data, undefined, {
+          escapeValue: escapeHtmlValue,
+        }),
+      ).toBe(
+        "&lt;b&#32;a&#61;&quot;1&quot;&gt;&#39;&amp; &quot;&lt;a&gt;&quot;,&quot;b&quot; _o2_all_",
+      );
     });
   });
 
@@ -631,6 +665,329 @@ describe("Variables Utils", () => {
       const processed = processVariableContent(query, variablesData);
 
       expect(processed).toBe("rate(requests[1h]) by (service) where service in ('api','web')");
+    });
+  });
+
+  describe("replaceVariablePlaceholders", () => {
+    const values: Record<string, string> = { traceid: "abc123", traceid_sql: "xyz789" };
+    const resolveFrom =
+      (map: Record<string, string>) =>
+      ({ name }: { name: string }) =>
+        map[name];
+
+    it.each([
+      ["$traceid_sql", "xyz789"],
+      ["${traceid_sql}", "xyz789"],
+      ["{{traceid_sql}}", "xyz789"],
+      ["$traceid", "abc123"],
+    ])("resolves %s to the longest matching variable", (placeholder, expected) => {
+      expect(
+        replaceVariablePlaceholders(placeholder, ["traceid", "traceid_sql"], resolveFrom(values)),
+      ).toBe(expected);
+      expect(
+        replaceVariablePlaceholders(placeholder, ["traceid_sql", "traceid"], resolveFrom(values)),
+      ).toBe(expected);
+    });
+
+    it("keeps concatenating a literal suffix onto the longest defined prefix", () => {
+      expect(
+        replaceVariablePlaceholders("'$env-api' $env_west", ["env"], resolveFrom({ env: "prod" })),
+      ).toBe("'prod-api' prod_west");
+    });
+
+    it("leaves unknown placeholders untouched", () => {
+      expect(
+        replaceVariablePlaceholders("$other ${other} {{other}}", ["traceid"], resolveFrom(values)),
+      ).toBe("$other ${other} {{other}}");
+    });
+
+    it("keeps the placeholder when resolve returns undefined instead of using a shorter name", () => {
+      expect(
+        replaceVariablePlaceholders(
+          "$traceid_sql",
+          ["traceid", "traceid_sql"],
+          resolveFrom({ traceid: "abc123" }),
+        ),
+      ).toBe("$traceid_sql");
+    });
+
+    it("does not rescan substituted values", () => {
+      expect(
+        replaceVariablePlaceholders(
+          "$traceid",
+          ["traceid", "traceid_sql"],
+          resolveFrom({ traceid: "$traceid_sql", traceid_sql: "xyz789" }),
+        ),
+      ).toBe("$traceid_sql");
+    });
+
+    it("inserts replacement-pattern characters literally", () => {
+      expect(replaceVariablePlaceholders("$v", ["v"], () => "$& $1 $$")).toBe("$& $1 $$");
+    });
+
+    it("matches names containing regex metacharacters literally", () => {
+      expect(replaceVariablePlaceholders("$a.b $aXb", ["a.b"], () => "hit")).toBe("hit $aXb");
+    });
+
+    it("passes the format of braced and mustache placeholders", () => {
+      const seen: (string | undefined)[] = [];
+      replaceVariablePlaceholders("${v:csv} {{ v : pipe }} $v", ["v"], ({ format }) => {
+        seen.push(format);
+        return "";
+      });
+      expect(seen).toEqual(["csv", "pipe", undefined]);
+    });
+
+    it("leaves unsupported formats untouched", () => {
+      expect(replaceVariablePlaceholders("${v:json} {{v:json}}", ["v"], () => "hit")).toBe(
+        "${v:json} {{v:json}}",
+      );
+    });
+
+    it("flags placeholders wrapped in single quotes", () => {
+      const quoted: boolean[] = [];
+      replaceVariablePlaceholders("'$v' $v '${v}' '$v-x'", ["v"], (p) => {
+        quoted.push(p.quoted);
+        return "";
+      });
+      expect(quoted).toEqual([true, false, true, false]);
+    });
+
+    it("returns the text unchanged when there are no names", () => {
+      expect(replaceVariablePlaceholders("$v", [], () => "hit")).toBe("$v");
+    });
+  });
+
+  describe("getReferencedVariableNames", () => {
+    it("reports only the longest matching name for each placeholder", () => {
+      expect([
+        ...getReferencedVariableNames(
+          ["WHERE a = '$traceid_sql'", undefined, "{{env}}"],
+          ["traceid", "traceid_sql", "env"],
+        ),
+      ]).toEqual(["traceid_sql", "env"]);
+    });
+  });
+
+  describe("getVariablesReferencedInQueries", () => {
+    it("returns referenced non ad hoc variables in definition order", () => {
+      const variables = [
+        { name: "traceid", type: "textbox" },
+        { name: "traceid_sql", type: "textbox" },
+        { name: "env", type: "dynamic_filters" },
+      ];
+      expect(
+        getVariablesReferencedInQueries(variables, [
+          { query: "WHERE a = '$traceid_sql' AND $env" },
+        ])?.map((v) => v.name),
+      ).toEqual(["traceid_sql"]);
+    });
+
+    it("returns undefined without variables", () => {
+      expect(getVariablesReferencedInQueries(undefined, [{ query: "$a" }])).toBeUndefined();
+    });
+
+    it("includes variables used only in a formula", () => {
+      expect(
+        getVariablesReferencedInQueries(
+          [{ name: "factor", type: "textbox" }],
+          [{ query: "", config: { formula: "A * $factor" } }],
+        )?.map((v) => v.name),
+      ).toEqual(["factor"]);
+    });
+  });
+
+  describe("processVariableContent with shared name prefixes", () => {
+    it("resolves each placeholder to its own variable regardless of definition order", () => {
+      const variablesData = {
+        values: [
+          { name: "traceid", value: "abc123" },
+          { name: "traceid_sql", value: "xyz789" },
+        ],
+      };
+      expect(processVariableContent("$traceid | $traceid_sql", variablesData)).toBe(
+        "abc123 | xyz789",
+      );
+    });
+  });
+
+  describe("processVariableContent URL formats", () => {
+    const data = {
+      values: [
+        { name: "q", value: "a b&c#d" },
+        { name: "hosts", value: ["web 1", "db/2"] },
+        { name: "all", value: [SELECT_ALL_VALUE] },
+        { name: "single_all", value: SELECT_ALL_VALUE },
+        { name: "cleared", value: [] },
+      ],
+    };
+
+    it("percent-encodes scalar and multi values", () => {
+      expect(processVariableContent("?q=${q:percentencode}", data)).toBe("?q=a%20b%26c%23d");
+      expect(processVariableContent("?h={{hosts:percentencode}}", data)).toBe(
+        "?h=web%201%2Cdb%2F2",
+      );
+    });
+
+    it("renders queryparam as one var- pair per value", () => {
+      expect(processVariableContent("?${q:queryparam}", data)).toBe("?var-q=a%20b%26c%23d");
+      expect(processVariableContent("?${hosts:queryparam}", data)).toBe(
+        "?var-hosts=web%201&var-hosts=db%2F2",
+      );
+    });
+
+    it("keeps the All sentinel in URL formats so dashboard links round-trip", () => {
+      const options = { allLabel: "All" };
+      expect(processVariableContent("${all:queryparam}", data, undefined, options)).toBe(
+        `var-all=${SELECT_ALL_VALUE}`,
+      );
+      expect(processVariableContent("${single_all:percentencode}", data, undefined, options)).toBe(
+        SELECT_ALL_VALUE,
+      );
+      expect(processVariableContent("${cleared:queryparam}", data, undefined, options)).toBe(
+        `var-cleared=${SELECT_ALL_VALUE}`,
+      );
+    });
+
+    it("does not parse the content-only formats in query substitution", () => {
+      const resolve = () => "X";
+      expect(replaceVariablePlaceholders("${q:percentencode}", ["q"], resolve)).toBe(
+        "${q:percentencode}",
+      );
+    });
+  });
+
+  describe("processVariableContent listSeparator", () => {
+    const data = { values: [{ name: "h", value: ["a", "b"] }] };
+
+    it("joins an unformatted multi-value with the given separator", () => {
+      expect(processVariableContent("$h", data, undefined, { listSeparator: ", " })).toBe("a, b");
+    });
+
+    it("leaves explicit formats and the default join alone", () => {
+      const options = { listSeparator: ", " };
+      expect(processVariableContent("${h:csv}", data, undefined, options)).toBe("a,b");
+      expect(processVariableContent("${h:pipe}", data, undefined, options)).toBe("a|b");
+      expect(processVariableContent("$h", data)).toBe("a,b");
+    });
+  });
+
+  describe("processVariableContent All and cleared values", () => {
+    const data = {
+      values: [
+        { name: "multi_all", value: [SELECT_ALL_VALUE] },
+        { name: "single_all", value: SELECT_ALL_VALUE },
+        { name: "cleared", value: [] },
+        { name: "unset", value: null },
+      ],
+    };
+
+    it("prints the All label and an empty string with allLabel", () => {
+      const options = { allLabel: "All" };
+      expect(
+        processVariableContent(
+          "$multi_all|${single_all}|${multi_all:doublequote}|$cleared|$unset",
+          data,
+          undefined,
+          options,
+        ),
+      ).toBe('All|All|"All"||');
+    });
+
+    it("keeps the sentinel in a link query value so saved links round-trip", () => {
+      expect(
+        processVariableContent(
+          "[d](/web/dashboards?var-a=$multi_all&var-b={{single_all}}&var-c=${cleared}) $multi_all",
+          data,
+          undefined,
+          { allLabel: "All" },
+        ),
+      ).toBe(
+        `[d](/web/dashboards?var-a=${SELECT_ALL_VALUE}&var-b=${SELECT_ALL_VALUE}&var-c=${SELECT_ALL_VALUE}) All`,
+      );
+    });
+
+    it("keeps the sentinel after an HTML-escaped query separator", () => {
+      expect(
+        processVariableContent("[d](/d?var-a=x&amp;var-b=$multi_all)", data, undefined, {
+          allLabel: "All",
+        }),
+      ).toBe(`[d](/d?var-a=x&amp;var-b=${SELECT_ALL_VALUE})`);
+    });
+
+    it("prints a scalar All unformatted and a multi-select All formatted", () => {
+      expect(
+        processVariableContent(
+          "${single_all:doublequote} ${multi_all:doublequote}",
+          data,
+          undefined,
+          {
+            allLabel: "All",
+          },
+        ),
+      ).toBe('All "All"');
+    });
+
+    it("prints the All label after an = that is not a URL query value", () => {
+      expect(processVariableContent("env=$multi_all", data, undefined, { allLabel: "All" })).toBe(
+        "env=All",
+      );
+    });
+
+    it("prints the All label for the sentinel inside a mixed selection", () => {
+      const mixed = { values: [{ name: "m", value: ["web", SELECT_ALL_VALUE] }] };
+      expect(processVariableContent("$m", mixed, undefined, { allLabel: "All" })).toBe("web,All");
+    });
+
+    it("keeps the sentinel without allLabel", () => {
+      expect(processVariableContent("$multi_all|$single_all|$cleared|$unset", data)).toBe(
+        [SELECT_ALL_VALUE, SELECT_ALL_VALUE, SELECT_ALL_VALUE, SELECT_ALL_VALUE].join("|"),
+      );
+    });
+  });
+
+  describe("withTimeRangeVariables", () => {
+    const time = {
+      start_time: new Date(1_700_000_000_000_000),
+      end_time: new Date(1_700_000_360_000_000),
+    };
+
+    it("appends start_time and end_time in the selected time's unit", () => {
+      const result = withTimeRangeVariables({ values: [{ name: "env", value: "prod" }] }, time);
+      expect(processVariableContent("${start_time}-{{end_time}}", result)).toBe(
+        "1700000000000000-1700000360000000",
+      );
+      expect(result.values[0]).toEqual({ name: "env", value: "prod" });
+    });
+
+    it("keeps an unset scoped variable of the same name unset", () => {
+      const result = withTimeRangeVariables(
+        { values: [{ name: "start_time", scope: "panels", panelId: "p1", value: null }] },
+        time,
+      );
+      expect(result.values).toHaveLength(2);
+      expect(processVariableContent("${start_time}", result, { panelId: "p1" })).toBe(
+        SELECT_ALL_VALUE,
+      );
+    });
+
+    it("lets a dashboard variable of the same name win", () => {
+      const result = withTimeRangeVariables(
+        { values: [{ name: "start_time", value: "mine" }] },
+        time,
+      );
+      expect(processVariableContent("${start_time}", result, { panelId: "p1" })).toBe("mine");
+    });
+
+    it("leaves the placeholder untouched while the range is unset", () => {
+      const data = { values: [] };
+      expect(withTimeRangeVariables(data, undefined)).toBe(data);
+      expect(
+        withTimeRangeVariables(data, { start_time: new Date(NaN), end_time: new Date() }),
+      ).toBe(data);
+      expect(processVariableContent("${start_time}", withTimeRangeVariables(data, undefined))).toBe(
+        "${start_time}",
+      );
     });
   });
 });

@@ -111,22 +111,25 @@ pub async fn del_offset(
         .map_err(Into::into)
 }
 
-pub async fn list_offset() -> Result<Vec<(String, i64)>, anyhow::Error> {
-    let mut items = Vec::new();
-    let key = "/compact/downsampling/";
-    let ret = db::list(key).await?;
-    for (item_key, item_value) in ret {
-        let item_key = item_key.strip_prefix(key).unwrap();
-        let value = String::from_utf8_lossy(&item_value).to_string();
-        let offset = if value.contains(';') {
-            let mut parts = value.split(';');
-            parts.next().unwrap().parse().unwrap()
-        } else {
-            value.parse().unwrap()
-        };
-        items.push((item_key.to_string(), offset));
-    }
-    Ok(items)
+/// Evicts this node's cached offsets first, so a later sync cannot write them back.
+pub async fn delete_by_org(org_id: &str) -> Result<(), anyhow::Error> {
+    let prefix = format!("/compact/downsampling/{org_id}/");
+    CACHES
+        .write()
+        .await
+        .retain(|key, _| !key.starts_with(&prefix));
+    db::delete_if_exists(&prefix, true, db::NO_NEED_WATCH)
+        .await
+        .map_err(Into::into)
+}
+
+/// Evicts this node's cached offsets of every rule of a deleted stream.
+pub async fn evict_stream(org_id: &str, stream_type: StreamType, stream_name: &str) {
+    let prefix = format!("/compact/downsampling/{org_id}/{stream_type}/{stream_name}/");
+    CACHES
+        .write()
+        .await
+        .retain(|key, _| !key.starts_with(&prefix));
 }
 
 pub async fn sync_cache_to_db() -> Result<(), anyhow::Error> {
@@ -184,6 +187,5 @@ mod tests {
             get_offset_from_cache("default", StreamType::Metrics, "compact_file", (0, 100)).await,
             Some((OFFSET, "LOCAL".to_string()))
         );
-        assert!(!list_offset().await.unwrap().is_empty());
     }
 }

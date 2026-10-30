@@ -40,48 +40,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="px-page-edge flex items-center gap-3 py-2"
+    class="px-page-edge flex flex-wrap items-center gap-3 py-2"
     :class="{ 'border-border-default border-b': bordered }"
   >
-    <OToggleGroup
-      :model-value="filterMode"
-      type="single"
-      :data-test="`${dataTest}-filter-mode`"
-      @update:model-value="onFilterModeChange"
-    >
-      <OToggleGroupItem value="agent" size="sm">{{ labels.agent }}</OToggleGroupItem>
-      <OToggleGroupItem value="stream" size="sm">{{ labels.stream }}</OToggleGroupItem>
-    </OToggleGroup>
+    <template v-if="showAgentToggle || agentToggleLockedMessage">
+      <OToggleGroup
+        :model-value="filterMode"
+        type="single"
+        :data-test="`${dataTest}-filter-mode`"
+        @update:model-value="onFilterModeChange"
+      >
+        <!-- Locked case: rendered disabled with a lock suffix rather than
+             omitted, so an OSS caller still advertises Agent mode exists
+             (see `agentToggleLockedMessage`) instead of just disappearing. -->
+        <OToggleGroupItem
+          value="agent"
+          size="sm"
+          :icon-right="!showAgentToggle ? 'lock' : undefined"
+        >
+          {{ labels.agent }}
+        </OToggleGroupItem>
+        <OToggleGroupItem value="stream" size="sm">{{ labels.stream }}</OToggleGroupItem>
+      </OToggleGroup>
+    </template>
 
-    <div
-      v-if="filterMode === 'stream'"
-      :data-test="`${dataTest}-stream-selector`"
-      class="w-64 flex-shrink-0"
-    >
-      <OSkeleton type="text" v-if="showStreamSkeleton && !streamsLoaded" class="h-8.5 w-full" />
-      <OSelect
-        v-else
-        v-model="activeStreamModel"
-        :label="labels.streamLabel"
-        label-position="inside"
-        :options="streamSelectOptions"
-        labelKey="label"
-        valueKey="value"
-        :option-tooltip="streamOptionTooltip"
-        class="rounded-default w-full"
-        @update:model-value="onStreamChange"
+    <!-- Explicit if/else on isStreamMode itself (not on a descendant's own
+         condition) — StreamAgentCountBadge below has its own separate
+         visibility rule, and chaining v-else off of IT rather than off this
+         stream/agent branch previously meant hiding the badge alone could
+         silently fall through to rendering the agent cascade. -->
+    <template v-if="isStreamMode">
+      <div :data-test="`${dataTest}-stream-selector`" class="w-64 flex-shrink-0">
+        <OSkeleton type="text" v-if="showStreamSkeleton && !streamsLoaded" class="h-8.5 w-full" />
+        <OSelect
+          v-else
+          v-model="activeStreamModel"
+          :label="raw(labels.streamLabel)"
+          label-position="inside"
+          :options="streamSelectOptions"
+          labelKey="label"
+          valueKey="value"
+          :option-tooltip="streamOptionTooltip"
+          class="rounded-default w-full"
+          @update:model-value="onStreamChange"
+        />
+      </div>
+      <!-- Meaningless without Agent mode to switch into — an OSS caller with
+           showAgentToggle false has nowhere to act on this count, so it would
+           just be an unexplained number next to the stream picker. -->
+      <StreamAgentCountBadge
+        v-if="showAgentToggle && activeStreamModel"
+        :count="selectedStreamCount"
+        :data-test="countDataTest ?? `${dataTest}-stream-count`"
       />
-    </div>
-    <StreamAgentCountBadge
-      v-if="filterMode === 'stream' && activeStreamModel"
-      :count="selectedStreamCount"
-      :data-test="countDataTest ?? `${dataTest}-stream-count`"
-    />
+    </template>
 
     <!-- Agent mode: the Env→Agent→Version cascade replaces the single grouped
          agent dropdown. The three dropdowns themselves SHOW the current
          selection, so the separate env/version scope badges are gone. The
-         skeleton gate is preserved (LLM gates until agents load). -->
+         skeleton gate is preserved (LLM gates until agents load). Never
+         reachable when `showAgentToggle` is false — there's no control to
+         switch into it and the parent never sets filterMode to "agent". -->
     <template v-else>
       <OSkeleton type="text" v-if="agentSkeleton && !agentsLoaded" class="h-8.5 w-44" />
       <AgentScopeCascade
@@ -109,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { raw, type I18nText } from "@/types/i18n";
 import { computed } from "vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -116,6 +136,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import StreamAgentCountBadge from "@/components/shared/StreamAgentCountBadge.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import AgentScopeCascade from "./AgentScopeCascade.vue";
 
 type FilterMode = "stream" | "agent";
@@ -185,6 +206,18 @@ const props = withDefaults(
         false because its topology is version-agnostic. Forwarded to
         AgentScopeCascade. */
     showVersion?: boolean;
+    /** Show the Stream/Agent toggle as interactive. Agent mode depends on the
+        enterprise-only agent-mapping API, so an OSS caller passes false — the
+        bar is pinned to Stream mode either way (see `isStreamMode` below),
+        and the parent must never set filterMode to "agent" in that case.
+        Defaults to true. */
+    showAgentToggle?: boolean;
+    /** Pitch message for the Agent toggle when `showAgentToggle` is false —
+        renders the toggle anyway with the Agent item disabled + a lock
+        suffix, plus this tooltip, instead of omitting it outright. Leave
+        unset for a caller with truly no Agent concept to advertise (there is
+        none today; every `showAgentToggle: false` caller passes this). */
+    agentToggleLockedMessage?: I18nText;
   }>(),
   {
     allAgents: false,
@@ -194,8 +227,14 @@ const props = withDefaults(
     bordered: true,
     streamOptionTooltip: false,
     showVersion: true,
+    showAgentToggle: true,
+    agentToggleLockedMessage: undefined,
   },
 );
+
+// Stream mode is also the only mode once the Agent toggle is hidden — there's
+// no way for filterMode to legitimately be "agent" then.
+const isStreamMode = computed(() => props.filterMode === "stream" || !props.showAgentToggle);
 
 const emit = defineEmits<{
   (e: "update:filterMode", value: FilterMode): void;
@@ -214,8 +253,17 @@ const activeStreamModel = computed({
   set: (value: string) => emit("update:activeStream", value),
 });
 
+const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+
+// OToggleGroup is controlled (`:model-value`), so refusing to emit the mode
+// change here is what keeps the locked Agent toggle from actually switching —
+// clicking it opens the upgrade dialog instead.
 const onFilterModeChange = (value: unknown) => {
   const mode = value as FilterMode;
+  if (mode === "agent" && !props.showAgentToggle) {
+    openUpgradeDialog();
+    return;
+  }
   emit("update:filterMode", mode);
   emit("filter-mode-change", mode);
 };

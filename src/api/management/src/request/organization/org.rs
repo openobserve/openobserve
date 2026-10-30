@@ -37,7 +37,7 @@ use {
     common::meta::organization::{
         AllOrgListDetails, AllOrganizationResponse, CreateExternalContractRequest,
         EnableOrgStorageRequest, ExtendExternalContractRequest, ExtendTrialPeriodRequest,
-        OrganizationInviteUserRecord, SetAiUsageLimitRequest,
+        OrganizationInviteUserRecord, SetQuotaUsageLimitRequest,
     },
     o2_enterprise::enterprise::cloud::{
         billings::{MeteringProvider, SubscriptionType},
@@ -54,6 +54,16 @@ use crate::common::meta::{
         PasscodeResponse, RumIngestionResponse, THRESHOLD,
     },
 };
+
+#[cfg(not(feature = "cloud"))]
+const NOT_SUPPORTED_HERE: &str = "Not supported on this deployment";
+
+#[derive(serde::Serialize)]
+struct CleanupTaskView {
+    #[serde(flatten)]
+    task: infra::table::org_cleanup_tasks::CleanupTask,
+    exhausted: bool,
+}
 
 /// GetOrganizations
 
@@ -72,8 +82,7 @@ use crate::common::meta::{
         (status = 200, description = "Success", content_type = "application/json", body = inline(OrganizationResponse)),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "Get user organizations", "category": "users"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn organizations(
@@ -93,17 +102,18 @@ pub async fn organizations(
 
     let limit = query
         .get("page_size")
-        .unwrap_or(&"100".to_string())
+        .map(String::as_str)
+        .unwrap_or("100")
         .parse::<i64>()
         .ok();
     let is_root_user = is_root_user(user_id);
     let all_orgs = if is_root_user {
-        let Ok(records) = organization::list_all_orgs(limit).await else {
+        let Ok(records) = organization::list_all_orgs_with_created_at(limit).await else {
             return MetaHttpResponse::internal_error("Something went wrong");
         };
         records
     } else {
-        let Ok(records) = organization::list_orgs_by_user(user_id).await else {
+        let Ok(records) = organization::list_orgs_by_user_with_created_at(user_id).await else {
             return MetaHttpResponse::not_found("Something went wrong");
         };
         records
@@ -120,7 +130,23 @@ pub async fn organizations(
         }
     };
 
-    for org in all_orgs {
+    // Batch-resolve each org's admin/owner (one query for the whole list) so
+    // the frontend can disambiguate two orgs that share a display name, e.g.
+    // two orgs both named "default" — one the user's own, one they were
+    // invited into. Best-effort: an org without a resolvable admin just gets
+    // empty owner fields rather than failing the whole response.
+    let org_ids: Vec<String> = all_orgs.iter().map(|(o, _)| o.identifier.clone()).collect();
+    // `or_insert` keeps the first (lowest-email, per the query's order_by) admin per org.
+    let admin_by_org: HashMap<String, (String, String)> =
+        match infra::table::org_users::get_admins_for_orgs(&org_ids).await {
+            Ok(admins) => admins.into_iter().fold(HashMap::new(), |mut map, a| {
+                map.entry(a.org_id).or_insert((a.email, a.first_name));
+                map
+            }),
+            Err(_) => HashMap::new(),
+        };
+
+    for (org, created_at) in all_orgs {
         // Hide blocked orgs (pending_deletion or deleting) from the regular org
         // list (switcher) so a soft-deleted org feels gone. _meta admins inspect
         // them via the dedicated all_organizations endpoint instead. This matches
@@ -137,6 +163,34 @@ pub async fn organizations(
             .unwrap_or_default();
         #[cfg(not(feature = "cloud"))]
         let org_subscription = 0;
+        let (owner_email, owner_first_name) = admin_by_org
+            .get(&org.identifier)
+            .cloned()
+            .unwrap_or_default();
+        // Gate owner PII behind the same permission /{org_id}/users itself requires.
+        #[cfg(feature = "enterprise")]
+        let (owner_email, owner_first_name) = {
+            use o2_openfga::config::get_config as get_openfga_config;
+            if is_root_user
+                || !get_openfga_config().enabled
+                || check_permissions(
+                    &org.identifier,
+                    &org.identifier,
+                    user_id,
+                    "users",
+                    "GET",
+                    None,
+                    true,
+                    false,
+                    false,
+                )
+                .await
+            {
+                (owner_email, owner_first_name)
+            } else {
+                (String::new(), String::new())
+            }
+        };
         let org = OrgDetails {
             id,
             identifier: org.identifier.clone(),
@@ -147,6 +201,9 @@ pub async fn organizations(
             org_type: org.org_type,
             user_obj: user_detail.clone(),
             plan: org_subscription,
+            owner_email,
+            owner_first_name,
+            created_at,
         };
         if !org_names.contains(&org.identifier) {
             org_names.insert(org.identifier.clone());
@@ -167,15 +224,20 @@ pub async fn organizations(
     tag = "Organizations",
     operation_id = "GetAllOrganizations",
     summary = "Get all organizations (meta only)",
-    description = "Retrieves a comprehensive list of all organizations in the system with detailed information including subscription types, trial periods, and creation dates. Only accessible through the '_meta' organization for administrative purposes.",
+    description = "Retrieves a comprehensive list of all organizations in the system with detailed information including subscription types, trial periods, and creation dates. Only accessible through the '_meta' organization, and only to the root user or a member of '_meta'.",
     security(
         ("Authorization"= [])
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(AllOrganizationResponse)),
+        (status = 403, description = "The caller is neither the root user nor a member of '_meta'", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn all_organizations(
+    Headers(user_email): Headers<UserEmail>,
     Path(org_id): Path<String>,
     Query(query): Query<HashMap<String, String>>,
 ) -> Response {
@@ -183,12 +245,20 @@ pub async fn all_organizations(
     if org != "_meta" {
         return MetaHttpResponse::unauthorized("not authorized to access this resource");
     }
+    let allowed = is_root_user(&user_email.user_id)
+        || openobserve_core::users::get_user(Some(config::META_ORG_ID), &user_email.user_id)
+            .await
+            .is_some();
+    if !allowed {
+        return MetaHttpResponse::forbidden("Not allowed");
+    }
 
     let mut orgs = vec![];
     let mut org_names = HashSet::new();
     let limit = query
         .get("page_size")
-        .unwrap_or(&"100".to_string())
+        .map(String::as_str)
+        .unwrap_or("100")
         .parse::<i64>()
         .ok();
 
@@ -217,6 +287,11 @@ pub async fn all_organizations(
         })
         .collect();
 
+    let quota = openobserve_core::trial_quota::synthetics_quota_for_orgs(
+        all_orgs.iter().map(|org| org.identifier.clone()).collect(),
+    )
+    .await;
+
     let mut id = 1;
     for org in all_orgs {
         let billing_info = all_billing_info.get(&org.identifier);
@@ -230,6 +305,7 @@ pub async fn all_organizations(
         let settings = db::organization::get_org_setting(&org.identifier)
             .await
             .unwrap_or_default();
+        let synthetics = quota.get(&org.identifier).copied().unwrap_or_default();
         let org = AllOrgListDetails {
             id,
             identifier: org.identifier.clone(),
@@ -240,6 +316,12 @@ pub async fn all_organizations(
                 .unwrap_or_default(),
             credits_used: openobserve_core::trial_quota::get_used(&org.identifier),
             credits_limit: openobserve_core::trial_quota::get_limit(&org.identifier),
+            browser_steps_used: synthetics.browser_used,
+            browser_steps_limit: synthetics.browser_limit,
+            protocol_steps_used: synthetics.protocol_used,
+            protocol_steps_limit: synthetics.protocol_limit,
+            status_steps_used: synthetics.status_used,
+            status_steps_limit: synthetics.status_limit,
             created_at: org.created_at,
             updated_at: org.updated_at,
             trial_expires_at: Some(org.trial_ends_at),
@@ -307,7 +389,7 @@ pub async fn org_summary(Path(org_id): Path<String>) -> impl IntoResponse {
     tag = "Organizations",
     operation_id = "GetOrganizationUserIngestToken",
     summary = "Get user's ingestion token",
-    description = "Retrieves the current ingestion token (passcode) for the authenticated user within the specified organization. This token is used to authenticate data ingestion requests and can be used with various ingestion endpoints.",
+    description = "Retrieves the current ingestion token (passcode) for the authenticated user within the specified organization. This token is used to authenticate data ingestion requests and can be used with various ingestion endpoints. Requires Admin or Root role.",
     security(
         ("Authorization"= [])
     ),
@@ -316,6 +398,7 @@ pub async fn org_summary(Path(org_id): Path<String>) -> impl IntoResponse {
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(PasscodeResponse)),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -329,6 +412,12 @@ pub async fn get_user_passcode(
 ) -> Response {
     let org = org_id;
     let user_id = user_email.user_id.as_str();
+    if let Err(resp) =
+        super::require_credential_access(&org, user_id, "read the organization ingestion token")
+            .await
+    {
+        return resp;
+    }
     let mut org_id = Some(org.as_str());
     if is_root_user(user_id) {
         org_id = None;
@@ -348,7 +437,7 @@ pub async fn get_user_passcode(
     tag = "Organizations",
     operation_id = "UpdateOrganizationUserIngestToken",
     summary = "Update user's ingestion token",
-    description = "Generates a new ingestion token (passcode) for the authenticated user within the specified organization. The old token will be invalidated and all ingestion processes using the old token will need to be updated with the new token.",
+    description = "Generates a new ingestion token (passcode) for the authenticated user within the specified organization. The old token will be invalidated and all ingestion processes using the old token will need to be updated with the new token. Requires Admin or Root role.",
     security(
         ("Authorization"= [])
     ),
@@ -357,6 +446,7 @@ pub async fn get_user_passcode(
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(PasscodeResponse)),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -370,6 +460,12 @@ pub async fn update_user_passcode(
 ) -> Response {
     let org = org_id;
     let user_id = user_email.user_id.as_str();
+    if let Err(resp) =
+        super::require_credential_access(&org, user_id, "rotate the organization ingestion token")
+            .await
+    {
+        return resp;
+    }
     let mut org_id = Some(org.as_str());
     if is_root_user(user_id) {
         org_id = None;
@@ -522,7 +618,7 @@ pub async fn create_user_rumtoken(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create an organization", "category": "organizations"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn create_org(
@@ -626,40 +722,223 @@ pub async fn extend_trial_period(
     ret
 }
 
-/// SetAiUsageLimit
+/// Guards and applies a limit change for one pool, shared so the AI and
+/// pool-generic routes cannot drift on who may call them.
+#[cfg(feature = "cloud")]
+async fn set_pool_limit(
+    caller_org: &str,
+    target_org: &str,
+    pool: openobserve_core::trial_quota::TrialQuotaPool,
+    limit: u64,
+) -> Result<openobserve_core::trial_quota::PoolUsageResponse, Response> {
+    if caller_org != "_meta" {
+        return Err(MetaHttpResponse::unauthorized(
+            "not authorized to access this resource",
+        ));
+    }
+    if infra::table::organizations::get(target_org).await.is_err() {
+        return Err(MetaHttpResponse::not_found("organization not found"));
+    }
+    openobserve_core::trial_quota::set_limit_for_pool(target_org, pool, limit)
+        .await
+        .map_err(MetaHttpResponse::internal_error)?;
+    Ok(openobserve_core::trial_quota::get_pool_usage(target_org, pool).await)
+}
+
+/// SetQuotaUsageLimit — pool-generic replacement for `SetAiUsageLimit`.
 #[cfg(feature = "cloud")]
 #[utoipa::path(
     put,
-    path = "/{org_id}/ai/usage_limit",
+    path = "/{org_id}/quota/{pool}/usage_limit",
     context_path = "/api",
     tag = "Organizations",
-    operation_id = "SetAiUsageLimit",
-    summary = "Set an organization's lifetime AI credit limit",
+    operation_id = "SetQuotaUsageLimit",
+    summary = "Set an organization's allowance for one quota pool",
     security(("Authorization" = [])),
-    request_body(content = inline(SetAiUsageLimitRequest), content_type = "application/json"),
+    params(
+        ("org_id" = String, Path, description = "Must be _meta"),
+        ("pool" = String, Path, description = "ai_credits | synthetics_browser_steps | synthetics_protocol_steps | synthetics_status_protocol (the pre-split key `synthetics_steps` is accepted as an alias for the protocol pool)"),
+    ),
+    request_body(content = inline(SetQuotaUsageLimitRequest), content_type = "application/json"),
     responses(
-        (status = 200, description = "Updated AI credit usage", body = openobserve_core::trial_quota::AiUsageResponse),
+        (status = 200, description = "Updated pool usage", body = openobserve_core::trial_quota::PoolUsageResponse),
+        (status = 400, description = "Unknown pool"),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Organization not found"),
     ),
     extensions(("x-o2-mcp" = json!({"enabled": false})))
 )]
-pub async fn set_ai_usage_limit(
-    Path(org_id): Path<String>,
-    Json(req): Json<SetAiUsageLimitRequest>,
+pub async fn set_quota_usage_limit(
+    Path((org_id, pool)): Path<(String, String)>,
+    Json(req): Json<SetQuotaUsageLimitRequest>,
 ) -> Response {
-    if org_id != "_meta" {
-        return MetaHttpResponse::unauthorized("not authorized to access this resource");
+    use openobserve_core::trial_quota::TrialQuotaPool;
+
+    // Rejected rather than defaulted: a fallback would credit the wrong pool.
+    let Some(pool) = TrialQuotaPool::from_key(&pool) else {
+        return MetaHttpResponse::bad_request(unknown_quota_pool_message(&pool));
+    };
+
+    match set_pool_limit(&org_id, &req.org_id, pool, req.limit).await {
+        Ok(usage) => MetaHttpResponse::json(usage),
+        Err(response) => response,
     }
-    if infra::table::organizations::get(&req.org_id).await.is_err() {
-        return MetaHttpResponse::not_found("organization not found");
+}
+
+#[cfg(feature = "cloud")]
+#[derive(Debug, serde::Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PaidOverageUpdateRequest {
+    pub enabled: bool,
+}
+
+#[cfg(feature = "cloud")]
+fn paid_overage_pool(
+    feature: &str,
+) -> Result<openobserve_core::trial_quota::TrialQuotaPool, Response> {
+    use openobserve_core::trial_quota::TrialQuotaPool;
+
+    let Some(pool) = TrialQuotaPool::from_key(feature) else {
+        return Err(MetaHttpResponse::bad_request(unknown_quota_pool_message(
+            feature,
+        )));
+    };
+    if pool != TrialQuotaPool::AiCredits {
+        return Err(MetaHttpResponse::bad_request(format!(
+            "paid overage is not supported for quota feature '{feature}'"
+        )));
+    }
+    Ok(pool)
+}
+
+#[cfg(feature = "cloud")]
+fn paid_overage_unavailable(error: impl std::fmt::Display) -> Response {
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        Json(MetaHttpResponse::error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            error.to_string(),
+        )),
+    )
+        .into_response()
+}
+
+/// GetPaidOverageStatus
+#[cfg(feature = "cloud")]
+#[utoipa::path(
+    get,
+    path = "/{org_id}/quota/{feature}/paid_overage",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "GetPaidOverageStatus",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization identifier"),
+        ("feature" = String, Path, description = "Cumulative quota feature; currently ai_credits"),
+    ),
+    responses(
+        (status = 200, description = "Cumulative paid-overage state", body = openobserve_core::trial_quota::PaidOverageStatus),
+        (status = 400, description = "Unknown or unsupported quota feature"),
+        (status = 503, description = "Billing or quota state unavailable"),
+    ),
+)]
+pub async fn get_paid_overage_status(
+    Path((org_id, feature)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    let pool = match paid_overage_pool(&feature) {
+        Ok(pool) => pool,
+        Err(response) => return response,
+    };
+    match openobserve_core::trial_quota::get_paid_overage_status(&org_id, pool, &user_email.user_id)
+        .await
+    {
+        Ok(status) => MetaHttpResponse::json(status),
+        Err(error) => paid_overage_unavailable(error),
+    }
+}
+
+/// SetPaidOverageStatus
+#[cfg(feature = "cloud")]
+#[utoipa::path(
+    put,
+    path = "/{org_id}/quota/{feature}/paid_overage",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "SetPaidOverageStatus",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization identifier"),
+        ("feature" = String, Path, description = "Cumulative quota feature; currently ai_credits"),
+    ),
+    request_body(content = PaidOverageUpdateRequest, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Updated cumulative paid-overage state", body = openobserve_core::trial_quota::PaidOverageStatus),
+        (status = 400, description = "Unknown or unsupported quota feature"),
+        (status = 403, description = "Only organization administrators may change consent"),
+        (status = 409, description = "Organization is not eligible for paid overage"),
+        (status = 503, description = "Billing or quota state unavailable"),
+    ),
+)]
+pub async fn set_paid_overage_status(
+    Path((org_id, feature)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(request): Json<PaidOverageUpdateRequest>,
+) -> Response {
+    use config::meta::user::UserRole;
+    use openobserve_core::trial_quota::PaidOverageBillingStatus;
+
+    let pool = match paid_overage_pool(&feature) {
+        Ok(pool) => pool,
+        Err(response) => return response,
+    };
+    let is_admin = is_root_user(&user_email.user_id)
+        || matches!(
+            openobserve_core::users::get_user(Some(&org_id), &user_email.user_id).await,
+            Some(user) if matches!(user.role, UserRole::Admin | UserRole::Root)
+        );
+    if !is_admin {
+        return MetaHttpResponse::forbidden(
+            "Only organization administrators can change paid usage consent",
+        );
     }
 
-    if let Err(err) = openobserve_core::trial_quota::set_limit(&req.org_id, req.credits_limit).await
+    let current = match openobserve_core::trial_quota::get_paid_overage_status(
+        &org_id,
+        pool,
+        &user_email.user_id,
+    )
+    .await
     {
-        return MetaHttpResponse::internal_error(err);
+        Ok(status) => status,
+        Err(error) => return paid_overage_unavailable(error),
+    };
+    if request.enabled && current.billing_status != PaidOverageBillingStatus::Eligible {
+        return (
+            StatusCode::CONFLICT,
+            Json(MetaHttpResponse::error(
+                StatusCode::CONFLICT,
+                "organization is not eligible for paid overage",
+            )),
+        )
+            .into_response();
     }
-    MetaHttpResponse::json(openobserve_core::trial_quota::get_usage(&req.org_id).await)
+    // One cumulative flag: the pool owns its backing rows, the API never names them.
+    if let Err(error) = openobserve_core::trial_quota::set_paid_overage_enabled_for_pool(
+        &org_id,
+        pool,
+        request.enabled,
+    )
+    .await
+    {
+        return paid_overage_unavailable(error);
+    }
+    match openobserve_core::trial_quota::get_paid_overage_status(&org_id, pool, &user_email.user_id)
+        .await
+    {
+        Ok(status) => MetaHttpResponse::json(status),
+        Err(error) => paid_overage_unavailable(error),
+    }
 }
 
 /// CreateExternalContract
@@ -942,25 +1221,30 @@ pub async fn enable_org_storage(
     }
 
     let target_org_id = req.org_id;
-
-    let mut org_settings = match db::organization::get_org_setting(&target_org_id).await {
-        Ok(org) => org,
-        Err(e) => {
-            return MetaHttpResponse::not_found(e.to_string());
+    // The target comes from the body, so the blocked-org gate never saw it.
+    match db::org_status::read_active(&target_org_id).await {
+        Ok(true) => {}
+        Ok(false) => {
+            return MetaHttpResponse::bad_request(format!("org {target_org_id} is not active"));
         }
-    };
-    if org_settings.org_storage_enabled {
-        return MetaHttpResponse::bad_request("org storage already enabled for this org");
+        Err(e) => {
+            return MetaHttpResponse::internal_error(format!(
+                "cannot read the status of org {target_org_id}: {e}"
+            ));
+        }
     }
-    org_settings.org_storage_enabled = true;
 
-    if let Err(e) = db::organization::set_org_setting(&target_org_id, &org_settings).await {
-        return MetaHttpResponse::internal_error(format!(
+    let enabled = db::organization::update_org_setting(&target_org_id, |org_settings| {
+        !std::mem::replace(&mut org_settings.org_storage_enabled, true)
+    })
+    .await;
+    match enabled {
+        Ok(true) => MetaHttpResponse::ok("successfully enabled org storage"),
+        Ok(false) => MetaHttpResponse::bad_request("org storage already enabled for this org"),
+        Err(e) => MetaHttpResponse::internal_error(format!(
             "error while saving settings for org {target_org_id} : {e}"
-        ));
+        )),
     }
-
-    MetaHttpResponse::ok("successfully enabled org storage")
 }
 
 /// RenameOrganization
@@ -1364,7 +1648,7 @@ pub async fn resurrect_org_deletion(
 pub async fn resurrect_org_deletion(
     Path((_meta_org, _target_org_id)): Path<(String, String)>,
 ) -> Response {
-    MetaHttpResponse::forbidden("Enterprise feature")
+    MetaHttpResponse::forbidden(NOT_SUPPORTED_HERE)
 }
 
 /// ListOrgCleanupTasks - admin endpoint to inspect cleanup task state for an org
@@ -1379,9 +1663,50 @@ pub async fn list_org_cleanup_tasks(
         return MetaHttpResponse::forbidden("Not allowed");
     }
     match infra::table::org_cleanup_tasks::list_by_org_status(&target_org_id, None).await {
-        Ok(tasks) => MetaHttpResponse::json(tasks),
+        Ok(tasks) => MetaHttpResponse::json(
+            tasks
+                .into_iter()
+                .map(|task| CleanupTaskView {
+                    exhausted: openobserve_core::org_cleanup::is_exhausted(&task),
+                    task,
+                })
+                .collect::<Vec<_>>(),
+        ),
         Err(e) => MetaHttpResponse::bad_request(e),
     }
+}
+
+#[cfg(feature = "cloud")]
+pub async fn retry_org_cleanup(
+    Headers(user_email): Headers<UserEmail>,
+    Path((_org_id, target_org_id)): Path<(String, String)>,
+) -> Response {
+    if !may_retry_cleanup(&user_email.user_id, &target_org_id).await {
+        return MetaHttpResponse::forbidden("Not allowed");
+    }
+    match openobserve_core::org_cleanup::retry(&target_org_id).await {
+        Ok(()) => MetaHttpResponse::ok("Organization cleanup retry scheduled"),
+        Err(e) => MetaHttpResponse::bad_request(e),
+    }
+}
+
+#[cfg(not(feature = "cloud"))]
+pub async fn retry_org_cleanup(
+    Path((_org_id, _target_org_id)): Path<(String, String)>,
+) -> Response {
+    MetaHttpResponse::forbidden(NOT_SUPPORTED_HERE)
+}
+
+/// Root, or an Admin of the org being deleted; the path org plays no part.
+#[cfg(any(feature = "cloud", test))]
+async fn may_retry_cleanup(user_id: &str, target_org_id: &str) -> bool {
+    use config::meta::user::UserRole;
+
+    is_root_user(user_id)
+        || matches!(
+            openobserve_core::users::get_user(Some(target_org_id), user_id).await,
+            Some(user) if user.role == UserRole::Admin
+        )
 }
 
 /// Helper function to collect nodes from the local cluster
@@ -1515,4 +1840,225 @@ async fn get_super_cluster_info(regions: &[String]) -> Result<ClusterInfoRespons
     }
 
     Ok(response)
+}
+
+/// The 400 body for an unrecognised pool, listed from `ALL_POOLS` so none is left out.
+#[cfg(feature = "cloud")]
+fn unknown_quota_pool_message(pool: &str) -> String {
+    let expected = openobserve_core::trial_quota::TrialQuotaPool::ALL_POOLS
+        .iter()
+        .map(|pool| pool.key())
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("unknown quota pool '{pool}' (expected one of: {expected})")
+}
+
+#[cfg(test)]
+mod tests {
+    #[cfg(feature = "cloud")]
+    use openobserve_core::trial_quota::TrialQuotaPool;
+
+    #[cfg(feature = "cloud")]
+    use super::*;
+
+    /// The route accepts every key in `ALL_POOLS`, so a hand-written list leaves an admin who
+    /// typos the pool they want reading a 400 that never names it.
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn the_unknown_pool_message_names_every_accepted_pool() {
+        let message = unknown_quota_pool_message("synthetics_stpes");
+        assert!(message.contains("synthetics_stpes"), "{message}");
+        for pool in TrialQuotaPool::ALL_POOLS {
+            assert!(
+                message.contains(pool.key()),
+                "`{}` is accepted by the route but missing from its own 400: {message}",
+                pool.key(),
+            );
+            assert_eq!(
+                TrialQuotaPool::from_key(pool.key()),
+                Some(*pool),
+                "the message lists a key the route would itself reject",
+            );
+        }
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn paid_overage_api_only_accepts_the_cumulative_ai_feature() {
+        assert_eq!(
+            paid_overage_pool("ai_credits").unwrap(),
+            TrialQuotaPool::AiCredits
+        );
+        assert_eq!(
+            paid_overage_pool("synthetics_browser_steps")
+                .unwrap_err()
+                .status(),
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            paid_overage_pool("ai_chat").unwrap_err().status(),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn paid_overage_update_payload_rejects_extra_fields() {
+        assert!(
+            serde_json::from_value::<PaidOverageUpdateRequest>(
+                serde_json::json!({"enabled": true, "feature": "ai_chat"})
+            )
+            .is_err()
+        );
+    }
+
+    fn join(org_id: &str, email: &str, role: config::meta::user::UserRole) {
+        common::infra::config::USERS.insert(
+            email.to_string(),
+            infra::table::users::UserRecord {
+                email: email.to_string(),
+                first_name: "F".to_string(),
+                last_name: "L".to_string(),
+                password: "hash".to_string(),
+                salt: "salt".to_string(),
+                is_root: false,
+                password_ext: None,
+                user_type: config::meta::user::UserType::Internal,
+                created_at: 0,
+                updated_at: 0,
+                must_reset_password: false,
+                password_reset_reason: None,
+                flagged_at: None,
+                password_updated_at: None,
+            },
+        );
+        common::infra::config::ORG_USERS.insert(
+            format!("{org_id}/{email}"),
+            infra::table::org_users::OrgUserRecord {
+                role,
+                token: "token".to_string(),
+                rum_token: None,
+                org_id: org_id.to_string(),
+                email: email.to_string(),
+                created_at: 0,
+                allow_static_token: true,
+            },
+        );
+    }
+
+    #[tokio::test]
+    async fn cleanup_retry_is_root_or_an_admin_of_the_target_org() {
+        use config::meta::user::UserRole;
+        let (target, other) = ("retry-target-org", "retry-other-org");
+        join(config::DEFAULT_ORG, "root@retry-rule.test", UserRole::Root);
+        join(target, "admin@retry-rule.test", UserRole::Admin);
+        join(target, "editor@retry-rule.test", UserRole::Editor);
+        join(other, "other-admin@retry-rule.test", UserRole::Admin);
+        assert!(super::may_retry_cleanup("root@retry-rule.test", target).await);
+        assert!(super::may_retry_cleanup("admin@retry-rule.test", target).await);
+        assert!(!super::may_retry_cleanup("editor@retry-rule.test", target).await);
+        assert!(!super::may_retry_cleanup("other-admin@retry-rule.test", target).await);
+    }
+
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn non_admin_cannot_change_paid_overage() {
+        let response = set_paid_overage_status(
+            Path(("missing-org".to_string(), "ai_credits".to_string())),
+            Headers(UserEmail {
+                user_id: "not-an-admin@example.invalid".to_string(),
+            }),
+            Json(PaidOverageUpdateRequest { enabled: true }),
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[cfg(feature = "cloud")]
+    async fn add_member(org: &str, email: &str, role: config::meta::user::UserRole) {
+        use config::meta::user::UserType;
+        use infra::table::users::UserRecord;
+
+        infra::table::users::add(UserRecord {
+            email: email.to_string(),
+            first_name: "Org".to_string(),
+            last_name: "Lister".to_string(),
+            password: String::new(),
+            salt: String::new(),
+            is_root: false,
+            password_ext: None,
+            user_type: UserType::Internal,
+            created_at: 0,
+            updated_at: 0,
+            must_reset_password: false,
+            password_reset_reason: None,
+            flagged_at: None,
+            password_updated_at: None,
+        })
+        .await
+        .unwrap();
+        infra::table::org_users::add(org, email, role, "lister-token", None)
+            .await
+            .unwrap();
+    }
+
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn only_root_or_a_meta_member_lists_every_organization() {
+        use common::infra::config::ORG_USERS;
+        use config::meta::{organization::OrganizationType, user::UserRole};
+        use infra::table::org_users::OrgUserRecord;
+
+        for key in [
+            "O2_STRIPE_SECRET_KEY",
+            "O2_STRIPE_WEBHOOK_SECRET",
+            "O2_AZURE_TENANT_ID",
+            "O2_AZURE_CLIENT_ID",
+            "O2_AZURE_CLIENT_SECRET",
+        ] {
+            // SAFETY: placeholders the Cloud config demands before it loads; no test reads them.
+            unsafe { std::env::set_var(key, "test-placeholder") };
+        }
+        infra::db::create_table().await.unwrap();
+        infra::db_init().await.unwrap();
+        infra::table::migrate().await.unwrap();
+        o2_enterprise::enterprise::cloud::migrate().await.unwrap();
+        for org in [config::META_ORG_ID, "acme-lister"] {
+            let _ = infra::table::organizations::add(org, org, OrganizationType::Custom).await;
+        }
+        let root = "org-list-root@example.com";
+        let meta_member = "org-list-meta-viewer@example.com";
+        let org_member = "org-list-acme-admin@example.com";
+        ORG_USERS.insert(
+            format!("{}/{root}", config::DEFAULT_ORG),
+            OrgUserRecord {
+                email: root.to_string(),
+                org_id: config::DEFAULT_ORG.to_string(),
+                role: UserRole::Root,
+                token: String::new(),
+                rum_token: None,
+                created_at: 0,
+                allow_static_token: true,
+            },
+        );
+        add_member(config::META_ORG_ID, meta_member, UserRole::Viewer).await;
+        add_member("acme-lister", org_member, UserRole::Admin).await;
+
+        for (email, expected) in [
+            (org_member, StatusCode::FORBIDDEN),
+            (meta_member, StatusCode::OK),
+            (root, StatusCode::OK),
+        ] {
+            let response = all_organizations(
+                Headers(UserEmail {
+                    user_id: email.to_string(),
+                }),
+                Path(config::META_ORG_ID.to_string()),
+                Query(HashMap::new()),
+            )
+            .await;
+            assert_eq!(response.status(), expected, "{email}");
+        }
+    }
 }

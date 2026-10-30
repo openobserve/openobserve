@@ -24,7 +24,7 @@ import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
 
 // Mock services and utilities
-vi.mock("@/services/segment_analytics", () => ({
+vi.mock("@/services/product_analytics", () => ({
   default: {
     track: vi.fn(),
   },
@@ -110,8 +110,11 @@ describe("IngestLogs Index Component", () => {
         "curl",
         "fluentbit",
         "fluentd",
+        "kinesisfirehose",
         "vector",
+        "gcpLogs",
         "syslogNg",
+        "splunkHec",
         "loongcollector",
       ];
       expect(wrapper.vm.ingestRoutes).toEqual(expectedRoutes);
@@ -162,7 +165,11 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("test content", mockCopyToClipboardOptions);
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        "test content",
+        expect.any(Function),
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle clipboard copy failure", () => {
@@ -175,20 +182,19 @@ describe("IngestLogs Index Component", () => {
       }).not.toThrow();
     });
 
-    it("should track segment analytics on copy", async () => {
+    it("should track product analytics on copy", async () => {
       const mockContent = { innerText: "test content" };
 
-      // Get the mocked segment analytics module
-      const segmentModule = await import("@/services/segment_analytics");
-      const mockSegmentAnalytics = segmentModule.default;
+      // Get the mocked product analytics module
+      const analyticsModule = await import("@/services/product_analytics");
+      const mockAnalytics = analyticsModule.default;
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(mockSegmentAnalytics.track).toHaveBeenCalledWith("Button Click", {
+      expect(mockAnalytics.track).toHaveBeenCalledWith("Button Click", {
         button: "Copy to Clipboard",
         ingestion: wrapper.vm.router.currentRoute.value.name,
         user_org: "default",
-        user_id: "example@gmail.com",
         page: "Ingestion",
       });
     });
@@ -198,7 +204,11 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("", mockCopyToClipboardOptions);
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        "",
+        expect.any(Function),
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle content with whitespace", async () => {
@@ -206,7 +216,11 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("  test content  ", mockCopyToClipboardOptions);
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        "  test content  ",
+        expect.any(Function),
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle content with special characters", async () => {
@@ -216,6 +230,7 @@ describe("IngestLogs Index Component", () => {
 
       expect(copyToClipboard).toHaveBeenCalledWith(
         "test@#$%^&*()content",
+        expect.any(Function),
         mockCopyToClipboardOptions,
       );
     });
@@ -227,6 +242,7 @@ describe("IngestLogs Index Component", () => {
 
       expect(copyToClipboard).toHaveBeenCalledWith(
         "line1\nline2\nline3",
+        expect.any(Function),
         mockCopyToClipboardOptions,
       );
     });
@@ -238,6 +254,7 @@ describe("IngestLogs Index Component", () => {
 
       expect(copyToClipboard).toHaveBeenCalledWith(
         "test &amp; content &lt; &gt;",
+        expect.any(Function),
         mockCopyToClipboardOptions,
       );
     });
@@ -246,13 +263,13 @@ describe("IngestLogs Index Component", () => {
       const mockContent = { innerText: "test" };
       wrapper.vm.router.currentRoute.value.name = "fluentbit";
 
-      // Get the mocked segment analytics module
-      const segmentModule = await import("@/services/segment_analytics");
-      const mockSegmentAnalytics = segmentModule.default;
+      // Get the mocked product analytics module
+      const analyticsModule = await import("@/services/product_analytics");
+      const mockAnalytics = analyticsModule.default;
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(mockSegmentAnalytics.track).toHaveBeenCalledWith(
+      expect(mockAnalytics.track).toHaveBeenCalledWith(
         "Button Click",
         expect.objectContaining({
           ingestion: "fluentbit",
@@ -290,8 +307,11 @@ describe("IngestLogs Index Component", () => {
         "curl",
         "fluentbit",
         "fluentd",
+        "kinesisfirehose",
         "vector",
+        "gcpLogs",
         "syslogNg",
+        "splunkHec",
         "loongcollector",
       ];
 
@@ -419,7 +439,11 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(null, mockCopyToClipboardOptions);
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        null,
+        expect.any(Function),
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle undefined content in copyToClipboardFn", async () => {
@@ -427,7 +451,11 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(undefined, mockCopyToClipboardOptions);
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        undefined,
+        expect.any(Function),
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle missing innerText property", async () => {
@@ -435,7 +463,11 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(undefined, mockCopyToClipboardOptions);
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        undefined,
+        expect.any(Function),
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle very long content", async () => {
@@ -444,7 +476,11 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(longContent, mockCopyToClipboardOptions);
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        longContent,
+        expect.any(Function),
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle rapid successive calls to showUpdateDialogFn", () => {
@@ -463,7 +499,11 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("test", mockCopyToClipboardOptions);
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        "test",
+        expect.any(Function),
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle component updates", async () => {

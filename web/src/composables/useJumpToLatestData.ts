@@ -17,6 +17,7 @@ import { computed } from "vue";
 import { useStore } from "vuex";
 import { DateTime } from "luxon";
 import useTraces from "@/composables/useTraces";
+import type { TranslateFn } from "@/types/i18n";
 import { getConsumableRelativeTime } from "@/utils/date";
 
 const FIFTEEN_MINS_US = 15 * 60 * 1_000_000;
@@ -40,7 +41,7 @@ const TOLERANCE_US = 30_000_000;
  * extractFields() on load and on every stream change, so this stays current
  * without threading props through the panels.
  */
-const useJumpToLatestData = () => {
+const useJumpToLatestData = (t: TranslateFn) => {
   const store = useStore();
   const { searchObj } = useTraces();
 
@@ -98,7 +99,7 @@ const useJumpToLatestData = () => {
     return { from: r.max - FIFTEEN_MINS_US, to: r.max + END_NUDGE_US };
   });
 
-  const jumpTargetSublabel = computed(() => {
+  const jumpTargetSublabel = computed<string>(() => {
     const r = streamDocTimeRange.value;
     if (!jumpTarget.value || !r) return "";
     const tz = store.state.timezone || "UTC";
@@ -109,7 +110,7 @@ const useJumpToLatestData = () => {
     const formatted = DateTime.fromMillis(r.max / 1000)
       .setZone(zone)
       .toFormat("MMM d, yyyy HH:mm:ss");
-    return `Last data: ${formatted} (${zone})`;
+    return t("traces.tracesNoEventsState.lastData", { formatted, zone });
   });
 
   return { jumpTarget, jumpTargetSublabel };

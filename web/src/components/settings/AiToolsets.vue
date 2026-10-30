@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
+  <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
   <div class="p-0" style="min-height: inherit; height: calc(100vh - 88px)">
     <OPageLayout
       v-if="!showAddDialog"
@@ -29,21 +30,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="ai-toolsets-add-btn"
           variant="primary"
           size="sm-action"
+          :aria-label="
+            toolsetDrafts.hasNew
+              ? t('common.editorDraft.newDot', { label: t('aiToolset.add') })
+              : undefined
+          "
           @click="addToolset"
-          >{{ t("aiToolset.add") }}</OButton
-        >
+          >{{ t("aiToolset.add") }}
+          <EditorDraftDot
+            v-if="toolsetDrafts.hasNew"
+            :saved-at="toolsetDrafts.savedAt(null)"
+            corner
+            data-test="ai-toolsets-add-draft-dot"
+        /></OButton>
       </template>
 
       <!-- Table -->
       <div class="bg-card-glass-bg mt-2.5 overflow-hidden">
         <OTable
+          ref="oTableRef"
+          :forbidden="forbidden"
           :frame="false"
           :data="visibleRows"
           :columns="columns"
           row-key="id"
           pagination="client"
-          :page-size="20"
+          :page-size="pageSize"
           :page-size-options="[20, 50, 100]"
+          :current-page="currentPage"
+          :sort-by="sortBy"
+          :sort-order="sortOrder"
+          @update:page-size="pageSize = $event"
+          @update:current-page="currentPage = $event"
+          @update:sort-by="sortBy = $event"
+          @update:sort-order="sortOrder = $event"
           sorting="client"
           :default-columns="false"
           show-index
@@ -55,25 +75,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #toolbar>
             <OSearchInput
               v-model="filterQuery"
-              class="no-border o2-search-input w-64"
+              class="no-border o2-search-input w-64 max-md:w-auto max-md:flex-1"
               :placeholder="t('aiToolset.search')"
             />
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
-              :loading="loading"
+              :last-run-at="lastUpdatedAt"
+              :loading="fetching"
+              shortcut-id="aiToolsetsRefresh"
               data-test="ai-toolsets-list-refresh-btn"
-              @click="getData"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="aiToolsetsRefresh"
-              />
-            </OButton>
+              @click="refreshData"
+            />
           </template>
           <template #empty>
             <OEmptyState
@@ -82,6 +97,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :filtered="!!filterQuery"
               @action="(id) => (id === 'clear-filters' ? (filterQuery = '') : addToolset())"
             />
+          </template>
+
+          <template #cell-name="{ row }">
+            <div class="flex min-w-0 items-center gap-2">
+              <OTruncatedText>{{ row.name }}</OTruncatedText>
+              <EditorDraftDot
+                v-if="toolsetDrafts.ids.has(row.id)"
+                :saved-at="toolsetDrafts.savedAt(row.id)"
+                :data-test="`ai-toolsets-${row.name}-draft-dot`"
+              />
+            </div>
           </template>
 
           <template #cell-kind="{ row }">
@@ -94,6 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-row-action="edit"
               variant="ghost"
               size="icon-sm"
+              class="max-md:hidden"
               :title="t('common.edit')"
               @click="editToolset(row)"
               icon-left="edit"
@@ -103,10 +130,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-row-action="delete"
               variant="ghost-destructive"
               size="icon-sm"
+              class="max-md:hidden"
               :title="t('common.delete')"
               @click="confirmDeleteToolset(row)"
               icon-left="delete"
             />
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  :aria-label="t('common.moreActions')"
+                  icon-left="more-vert"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="ai-toolsets-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                icon-left="edit"
+                class="md:hidden"
+                :data-test="`ai-toolset-${row.name}-edit-menu`"
+                @select="editToolset(row)"
+              >
+                <span>{{ t("common.edit") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="delete"
+                variant="destructive"
+                class="md:hidden"
+                :data-test="`ai-toolset-${row.name}-delete-menu`"
+                @select="confirmDeleteToolset(row)"
+              >
+                <span>{{ t("common.delete") }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </template>
         </OTable>
       </div>
@@ -114,14 +172,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Add / Edit form -->
     <div v-else>
-      <AddAiToolset @cancel:hideform="hideAddDialog" />
+      <AddAiToolset @cancel:hideform="hideAddDialog" @update:list="refreshData" />
     </div>
   </div>
 
   <!-- Delete confirmation -->
   <ConfirmDialog
     :title="t('aiToolset.deleteTitle')"
-    :message="t('aiToolset.deleteMessage', { name: confirmDelete.data?.name ?? '' })"
+    message-keypath="aiToolset.deleteMessage"
+    :message-name="confirmDelete.data?.name"
+    ok-variant="destructive"
     @update:ok="deleteToolset"
     @update:cancel="cancelDelete"
     v-model="confirmDelete.visible"
@@ -129,12 +189,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { aiToolsetsQuery } from "@/services/ai_toolsets.queries";
+import { aiToolsetKeys } from "@/services/ai_toolsets.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useQuery } from "@tanstack/vue-query";
 import { defineComponent, ref, computed, watch, onMounted, onUpdated, Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -144,9 +211,14 @@ import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddAiToolset from "@/components/ai_toolsets/AddAiToolset.vue";
-import aiToolsetsService from "@/services/ai_toolsets";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { useListViewState } from "@/composables/useListViewState";
+import aiToolsetsService from "@/services/ai_toolsets";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 
 export default defineComponent({
   name: "PageAiToolsets",
@@ -156,20 +228,79 @@ export default defineComponent({
     ConfirmDialog,
     AddAiToolset,
     OButton,
-    OTooltip,
+    ODropdown,
+    ODropdownItem,
+    ORefreshButton,
     OTag,
     OSearchInput,
     OTable,
+    OTruncatedText,
+    EditorDraftDot,
   },
   setup() {
     const store = useStore();
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
+    const toolsetDrafts = useEditorDraftIds("ai_toolset");
 
-    const tabledata: any = ref([]);
+    const orgIdForList = useOrgId();
+    const toolsetsList = useQuery(() =>
+      Object.assign(aiToolsetsQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
+    );
+
+    // The list is the query, not a copy: only an observer applies `staleTime` and revalidates on mount.
+    const tabledata: any = computed(() =>
+      (toolsetsList.data.value ?? []).map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        kind: item.kind,
+        description: item.description || "",
+      })),
+    );
     const showAddDialog = ref(false);
-    const loading = ref(false);
-    const filterQuery = ref("");
+    const loading = toolsetsList.isPending;
+    // A request is in flight while rows stay on screen — the refresh button's
+    // spinner. `loading` is the skeleton, which only a cold read wants.
+    const fetching = toolsetsList.isFetching;
+    // Epoch ms of the last successful read — drives the button's "1m ago" label.
+    const lastUpdatedAt = toolsetsList.dataUpdatedAt;
+    // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+    const forbidden = computed(() => {
+      const e: any = toolsetsList.error.value;
+      return e?.status === 403 || e?.response?.status === 403;
+    });
+    const viewState = useListViewState("ai-toolsets", {
+      filterQuery: "",
+      pageSize: 20,
+      currentPage: 1,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+    });
+    const filterQuery = ref(viewState.filterQuery);
+    const pageSize = ref(viewState.pageSize);
+    const currentPage = ref(viewState.currentPage);
+    const sortBy = ref(viewState.sortBy);
+    const sortOrder = ref(viewState.sortOrder);
+    const oTableRef = ref<any>(null);
+
+    watch([filterQuery, pageSize, currentPage, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        filterQuery: filterQuery.value,
+        pageSize: pageSize.value,
+        currentPage: currentPage.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
+    });
+    // setTimeout(0) runs after TanStack's deferred auto-reset-on-data-change, so the restored page wins.
+    watch(
+      loading,
+      (v) => {
+        if (v) return;
+        setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
+      },
+      { once: true, immediate: true },
+    );
 
     const columns: OTableColumnDef[] = [
       {
@@ -242,42 +373,41 @@ export default defineComponent({
     // -----------------------------------------------------------------------
     // Data loading
     // -----------------------------------------------------------------------
-    const getData = () => {
-      loading.value = true;
-      const dismiss = toast({
-        variant: "loading",
-        message: t("common.loading"),
-        timeout: 0,
-      });
+    // Bound to refresh / "list changed" events: always hits the server.
+    const refreshData = () => getData(true);
 
-      aiToolsetsService
-        .list(store.state.selectedOrganization.identifier)
-        .then((res) => {
-          const items = res.data?.toolsets ?? [];
-          tabledata.value = items.map((item: any) => ({
-            id: item.id,
-            name: item.name,
-            kind: item.kind,
-            description: item.description || "",
-          }));
-          resultTotal.value = tabledata.value.length;
-        })
-        .catch((err) => {
-          if (err?.status !== 403) {
-            toast({
-              variant: "error",
-              message: err?.response?.data?.message || t("aiToolset.loadFailed"),
-              timeout: 5000,
-            });
-          }
-        })
-        .finally(() => {
-          loading.value = false;
-          dismiss();
-        });
+    const getData = async (force = false) => {
+      if (force) await toolsetsList.refetch();
     };
 
-    getData();
+    let dismissLoading: (() => void) | null = null;
+    watch(
+      loading,
+      (pending) => {
+        if (pending && !dismissLoading) {
+          dismissLoading = toast({
+            variant: "loading",
+            message: t("common.loading"),
+            timeout: 0,
+          });
+        } else if (!pending && dismissLoading) {
+          dismissLoading();
+          dismissLoading = null;
+        }
+      },
+      { immediate: true },
+    );
+
+    watch(toolsetsList.error, (err: any) => {
+      if (!err || err?.status === 403) return;
+      toast({
+        variant: "error",
+        message:
+          err?.response?.data?.message ||
+          t("aiToolset.loadFailed", { product: raw("AI Toolsets") }),
+        timeout: 5000,
+      });
+    });
 
     // -----------------------------------------------------------------------
     // Filter
@@ -305,7 +435,7 @@ export default defineComponent({
       {
         id: "aiToolsetsRefresh",
         handler: () => {
-          if (!isInputFocused()) getData();
+          if (!isInputFocused()) getData(true);
         },
       },
     ]);
@@ -332,13 +462,14 @@ export default defineComponent({
       });
     };
 
+    // The route goes first: while it still says add/edit, onUpdated would remount the editor and re-offer its draft.
     const hideAddDialog = async () => {
-      showAddDialog.value = false;
-      await getData();
-      router.push({
+      await router.push({
         name: "aiToolsets",
         query: { org_identifier: store.state.selectedOrganization.identifier },
       });
+      showAddDialog.value = false;
+      await getData(true);
     };
 
     // -----------------------------------------------------------------------
@@ -365,14 +496,28 @@ export default defineComponent({
       aiToolsetsService
         .delete(store.state.selectedOrganization.identifier, row.id)
         .then(() => {
+          deleteEditorDraftsFor({
+            kind: "ai_toolset",
+            org: store.state.selectedOrganization.identifier,
+            entityId: row.id,
+          });
           toast({ variant: "success", message: t("aiToolset.deletedSuccessfully") });
-          getData();
+          // Drop the row from the cache first so it disappears now, not when
+          // the refetch lands; the forced reload re-persists the list.
+          queryClient.setQueriesData(
+            { queryKey: aiToolsetKeys.all(store.state.selectedOrganization.identifier) },
+            (list: any) =>
+              Array.isArray(list) ? list.filter((tool: any) => tool.id !== row.id) : list,
+          );
+          getData(true);
         })
         .catch((err) => {
           if (err?.status !== 403) {
             toast({
               variant: "error",
-              message: err?.response?.data?.message || t("aiToolset.deleteFailed"),
+              message:
+                err?.response?.data?.message ||
+                t("aiToolset.deleteFailed", { product: raw("AI Toolset") }),
             });
           }
         })
@@ -383,14 +528,24 @@ export default defineComponent({
     };
 
     return {
+      refreshData,
+      toolsetDrafts,
       t,
       store,
       loading,
+      fetching,
+      lastUpdatedAt,
+      forbidden,
       tabledata,
       columns,
       showAddDialog,
       resultTotal,
       filterQuery,
+      pageSize,
+      currentPage,
+      sortBy,
+      sortOrder,
+      oTableRef,
       visibleRows,
       confirmDelete,
       addToolset,

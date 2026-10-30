@@ -91,7 +91,9 @@ describe("CrossLinkManager Component", () => {
   describe("Props Default Values", () => {
     it("should default title to 'Cross-Links'", () => {
       wrapper = createWrapper({ title: undefined });
-      expect(wrapper.vm.$options.props.title.default).toBe("Cross-Links");
+      // The default is resolved per-render in setup(), not as a prop literal, so
+      // assert on what the user actually sees.
+      expect(wrapper.text()).toContain("Cross-Links");
     });
 
     it("should default subtitle to empty string", () => {

@@ -32,6 +32,15 @@ import { searchState } from "../composables/useLogs/searchState";
 import useNotifications from "../composables/useNotifications";
 
 import store from "../test/unit/helpers/store";
+import i18nInstance from "@/locales";
+import {
+  bindLogsUrlRouter,
+  encodeColumns,
+  resetLogsUrlForTests,
+  shownSearch,
+} from "@/composables/useLogs/useLogsUrl";
+import { columnsFromUrl } from "@/composables/useLogs/useLogPermalink";
+const t = (i18nInstance.global as any).t;
 
 // Mock toast
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
@@ -77,11 +86,14 @@ vi.mock("../../services/search", () => {
   };
 });
 
-vi.mock("../../services/saved_views", () => ({
-  default: {
-    get: vi.fn().mockImplementation(() => Promise.resolve()),
-  },
-}));
+vi.mock("../../services/saved_views", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get: vi.fn().mockImplementation(() => Promise.resolve()),
+    },
+  });
+});
 
 // Mock getStreams and getStream functions
 const mockGetStreams = vi.fn();
@@ -104,6 +116,7 @@ vi.mock("vue-router", () => ({
       },
     },
     push: vi.fn(),
+    replace: vi.fn(),
   }),
 }));
 
@@ -111,9 +124,9 @@ vi.mock("vue-router", () => ({
 const TestComponent = defineComponent({
   template: "<div></div>",
   setup() {
-    const logsComposable = useLogs();
-    const { setDateTime } = useSearchBar();
-    const { buildSearch } = useSearchStream();
+    const logsComposable = useLogs(t);
+    const { setDateTime } = useSearchBar(t);
+    const { buildSearch } = useSearchStream(t);
     const { searchObj, notificationMsg, fieldValues } = searchState();
     const { showErrorNotification } = useNotifications();
     const { updateGridColumns, updateFieldValues } = useStreamFields();
@@ -472,6 +485,7 @@ describe("Use Logs Composable", () => {
             },
           },
           push: vi.fn(),
+          replace: vi.fn(),
         }),
       }));
     });
@@ -481,6 +495,36 @@ describe("Use Logs Composable", () => {
         wrapper.vm.searchObj = undefined;
         wrapper.vm.router.currentRoute.value.query = {};
       }
+    });
+
+    it("restores a valid ft_scan and clears consent when it is absent or malformed (item 1 AC3.9)", async () => {
+      const { restoreUrlQueryParams } = wrapper.vm;
+      const map = { stream1: { fields: ["msg_text"] } };
+      wrapper.vm.router.currentRoute.value.query = {
+        stream: "stream1",
+        period: "15m",
+        query: btoa("timeout"),
+        ft_scan: btoa(JSON.stringify(map)),
+      };
+      await restoreUrlQueryParams();
+      expect(wrapper.vm.searchObj.meta.freeTextScan).toEqual(map);
+
+      wrapper.vm.router.currentRoute.value.query = {
+        stream: "stream1",
+        period: "15m",
+        query: btoa("timeout"),
+      };
+      await restoreUrlQueryParams();
+      expect(wrapper.vm.searchObj.meta.freeTextScan).toEqual({});
+
+      wrapper.vm.router.currentRoute.value.query = {
+        stream: "stream1",
+        period: "15m",
+        query: btoa("timeout"),
+        ft_scan: "%%%",
+      };
+      await restoreUrlQueryParams();
+      expect(wrapper.vm.searchObj.meta.freeTextScan).toEqual({});
     });
 
     it("should handle empty query params", async () => {
@@ -596,6 +640,61 @@ describe("Use Logs Composable", () => {
 
       // Should have returned early
       expect(wrapper.vm.searchObj.shouldIgnoreWatcher).toBe(false);
+    });
+
+    it("writes its own URL with a replace, so opening a link adds no history entry (4c C7b)", async () => {
+      bindLogsUrlRouter(wrapper.vm.router);
+      wrapper.vm.router.replace = vi.fn();
+      wrapper.vm.router.push = vi.fn();
+      wrapper.vm.router.currentRoute.value.query = { stream: "app", period: "15m", log_ts: "1" };
+      await wrapper.vm.restoreUrlQueryParams();
+      expect(wrapper.vm.router.push).not.toHaveBeenCalled();
+      expect(wrapper.vm.router.replace).toHaveBeenCalledTimes(1);
+      expect(wrapper.vm.router.replace.mock.calls[0][0].query).toMatchObject({
+        stream: "app",
+        log_ts: "1",
+      });
+    });
+
+    it("applies rows and columns before the first query and names the opened link (C7)", async () => {
+      bindLogsUrlRouter(wrapper.vm.router);
+      wrapper.vm.router.replace = vi.fn();
+      resetLogsUrlForTests();
+      columnsFromUrl.value = false;
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.meta.resultGrid.rowsPerPage = 50;
+      wrapper.vm.router.currentRoute.value.query = {
+        stream: "app",
+        period: "15m",
+        rows: "25",
+        columns: encodeColumns(["level", "message"]),
+        page: "3",
+      };
+      await wrapper.vm.restoreUrlQueryParams();
+      expect(wrapper.vm.searchObj.meta.resultGrid.rowsPerPage).toBe(25);
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual(["level", "message"]);
+      expect(columnsFromUrl.value).toBe(true);
+      expect(wrapper.vm.searchObj.data.resultGrid.currentPage).not.toBe(3);
+      expect(shownSearch.logs?.inputs.streams).toEqual(["app"]);
+      expect(shownSearch.logs?.page).toBe(3);
+    });
+
+    it("ignores columns in SQL mode and an out-of-range page size (C7)", async () => {
+      bindLogsUrlRouter(wrapper.vm.router);
+      wrapper.vm.router.replace = vi.fn();
+      columnsFromUrl.value = false;
+      wrapper.vm.searchObj.meta.resultGrid.rowsPerPage = 50;
+      wrapper.vm.router.currentRoute.value.query = {
+        stream: "app",
+        period: "15m",
+        sql_mode: "true",
+        query: btoa('SELECT * FROM "app"'),
+        rows: "75",
+        columns: encodeColumns(["level"]),
+      };
+      await wrapper.vm.restoreUrlQueryParams();
+      expect(wrapper.vm.searchObj.meta.resultGrid.rowsPerPage).toBe(50);
+      expect(columnsFromUrl.value).toBe(false);
     });
   });
 
@@ -877,6 +976,17 @@ describe("Use Logs Composable", () => {
   });
 
   describe("SQL Parsing and Query Building Functions", () => {
+    describe("extractValueQuery", () => {
+      it("should keep a -- line inside a string literal", () => {
+        const { extractValueQuery, searchObj } = wrapper.vm;
+        searchObj.meta.sqlMode = true;
+        searchObj.data.query = `SELECT * FROM "logs" WHERE msg = 'a\n-- b'\n-- note`;
+        expect(extractValueQuery()).toEqual({
+          logs: `SELECT * FROM "[INDEX_NAME]" WHERE msg = 'a\n-- b'`,
+        });
+      });
+    });
+
     describe("fnParsedSQL", () => {
       beforeEach(() => {
         // The parser might not be directly accessible, so let's test differently
@@ -1975,8 +2085,6 @@ describe("Use Logs Composable", () => {
       });
     });
 
-    // getActions is not exported, removing these tests
-
     describe("updatedLocalLogFilterField", () => {
       it("should update local log filter field", () => {
         wrapper.vm.searchObj.data.stream.selectedStream = ["test-stream"];
@@ -2498,6 +2606,26 @@ describe("Use Logs Composable", () => {
         "user = 'alice'",
       );
     });
+
+    // Regression: the Logs page's own include/exclude filter builder (distinct
+    // from the sidebar's) must double an embedded single quote too.
+    it("escapes an embedded single quote when including a value", () => {
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      setupStreamSchema("op", "Utf8");
+
+      expect(
+        wrapper.vm.getFilterExpressionByFieldType("op", "notificationHandling's", "include"),
+      ).toBe("op = 'notificationHandling''s'");
+    });
+
+    it("escapes an embedded single quote when excluding a value", () => {
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      setupStreamSchema("op", "Utf8");
+
+      expect(
+        wrapper.vm.getFilterExpressionByFieldType("op", "notificationHandling's", "exclude"),
+      ).toBe("op != 'notificationHandling''s'");
+    });
   });
 
   describe.skip("Utility Helper Functions", () => {
@@ -2578,20 +2706,6 @@ describe("Use Logs Composable", () => {
         const { getFilterExpressionByFieldType } = wrapper.vm;
         expect(typeof getFilterExpressionByFieldType).toBe("function");
         expect(true).toBe(true);
-      });
-    });
-
-    describe("isActionsEnabled", () => {
-      it.skip("should check if actions are enabled", () => {
-        const { isActionsEnabled } = wrapper.vm;
-        expect(typeof isActionsEnabled).toBe("boolean");
-        expect(isActionsEnabled).toBeDefined();
-      });
-
-      it.skip("should handle different action states", () => {
-        const { isActionsEnabled } = wrapper.vm;
-        expect(typeof isActionsEnabled).toBe("boolean");
-        expect(isActionsEnabled).toBeDefined();
       });
     });
 
@@ -2771,5 +2885,42 @@ describe("resolveDefaultColumns", () => {
     const streamFields = [{ name: "_timestamp", ftsKey: false }];
     const result = resolveDefaultColumns(streamFields, []);
     expect(result).toEqual([]);
+  });
+
+  it("puts service_name before the fts column when the stream has it", () => {
+    const streamFields = [
+      { name: "body", ftsKey: true },
+      { name: "service_name", ftsKey: false },
+    ];
+    const hits = [{ body: "hello", service_name: "api" }];
+    expect(resolveDefaultColumns(streamFields, [], hits)).toEqual(["service_name", "body"]);
+    expect(resolveDefaultColumns(streamFields, [])).toEqual(["service_name", "body"]);
+  });
+
+  it("prefers service over service_name", () => {
+    const streamFields = [
+      { name: "body", ftsKey: true },
+      { name: "service_name", ftsKey: false },
+      { name: "service", ftsKey: false },
+    ];
+    const hits = [{ body: "hello", service: "api", service_name: "api" }];
+    expect(resolveDefaultColumns(streamFields, [], hits)).toEqual(["service", "body"]);
+  });
+
+  it("skips a service field that has no values in the hits", () => {
+    const streamFields = [
+      { name: "body", ftsKey: true },
+      { name: "service", ftsKey: false },
+      { name: "service_name", ftsKey: false },
+    ];
+    const hits = [{ body: "hello", service: "", service_name: "api" }];
+    expect(resolveDefaultColumns(streamFields, [], hits)).toEqual(["service_name", "body"]);
+    expect(resolveDefaultColumns(streamFields, [], [{ body: "hello" }])).toEqual(["body"]);
+  });
+
+  it("adds no service column when there is no fts column", () => {
+    const streamFields = [{ name: "service_name", ftsKey: false }];
+    const hits = [{ service_name: "api" }];
+    expect(resolveDefaultColumns(streamFields, [], hits)).toEqual([]);
   });
 });

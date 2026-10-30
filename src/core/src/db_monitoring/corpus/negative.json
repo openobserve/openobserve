@@ -1,0 +1,49 @@
+[
+  {
+    "id": "neg-server-span-not-stamped",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.name": "orders",
+        "db.statement": "SELECT * FROM users WHERE id = $1"
+      },
+      "span_kind": 2
+    },
+    "expect": null,
+    "fingerprint_class": null,
+    "literals": [],
+    "source": "authored"
+  },
+  {
+    "id": "neg-internal-span-not-stamped",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "SELECT * FROM users WHERE id = $1"
+      },
+      "span_kind": 1
+    },
+    "expect": null,
+    "fingerprint_class": null,
+    "literals": [],
+    "source": "authored"
+  },
+  {
+    "id": "neg-client-without-db-attrs",
+    "dialect": null,
+    "input": {
+      "attrs": {
+        "http.request.method": "GET",
+        "url.full": "http://payments.internal/api/v1/charge",
+        "server.address": "payments.internal:8080"
+      },
+      "span_kind": 3
+    },
+    "expect": null,
+    "fingerprint_class": null,
+    "literals": [],
+    "source": "authored"
+  }
+]

@@ -33,7 +33,7 @@ use o2_enterprise::enterprise::{
 use o2_openfga::{
     authorizer::authz::{
         add_tuple_for_pipeline, get_add_user_to_org_tuples, get_org_creation_tuples,
-        get_ownership_all_org_tuple, get_ownership_tuple, update_tuples,
+        get_ownership_all_org_tuple, get_ownership_tuple, get_parent_tuple, update_tuples,
     },
     meta::mapping::{
         LOGS_INSIGHTS_KEY, LOGS_PATTERN_KEY, NON_OWNING_ORG, OFGA_MODELS, OFGAModel,
@@ -42,6 +42,47 @@ use o2_openfga::{
 };
 
 use crate::common::infra::config::{ORG_USERS, ORGANIZATIONS, USERS};
+
+/// Which back-fills the jump from one model version to another still owes.
+#[derive(Default)]
+struct PendingMigrations {
+    pipeline: bool,
+    cipher_keys: bool,
+    alert_folders: bool,
+    ratelimit: bool,
+    service_accounts: bool,
+    ai_chat_permissions: bool,
+    re_pattern_permission: bool,
+    license_permission: bool,
+    sourcemap_permission: bool,
+    logs_pattern_insights: bool,
+    service_streams: bool,
+    ai_toolsets: bool,
+    report_folders: bool,
+    incidents: bool,
+    model_pricing: bool,
+    anomaly_detection: bool,
+    online_eval: bool,
+    billing_group: bool,
+    workflows: bool,
+    synthetics: bool,
+    stream_names: bool,
+    oncall: bool,
+    annotation_queues_datasets: bool,
+    llm_workbench: bool,
+    workflow_folders: bool,
+    synthetic_environments: bool,
+    prompts: bool,
+    prompt_folders: bool,
+    query_history: bool,
+    downtimes: bool,
+    ai_chat_shares: bool,
+    fleet: bool,
+    public_dashboards: bool,
+    incident_integrations: bool,
+    missing_ownership: bool,
+    profiles: bool,
+}
 
 pub async fn init() -> Result<(), anyhow::Error> {
     use o2_openfga::get_all_init_tuples;
@@ -54,27 +95,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     let mut init_tuples = vec![];
     let mut migrate_native_objects = false;
-    let mut need_pipeline_migration = false;
-    let mut need_cipher_keys_migration = false;
-    let mut need_action_scripts_migration = false;
-    let mut need_alert_folders_migration = false;
-    let mut need_ratelimit_migration = false;
-    let mut need_service_accounts_migration = false;
-    let mut need_ai_chat_permissions_migration = false;
-    let mut need_re_pattern_permission_migration = false;
-    let mut need_license_permission_migration = false;
-    let mut need_sourcemap_permission_migration = false;
-    let mut need_logs_pattern_insights_migration = false;
-    let mut need_service_streams_migration = false;
-    let mut need_ai_toolsets_migration = false;
-    let mut need_report_folders_migration = false;
-    let mut need_incidents_migration = false;
-    let mut need_model_pricing_migration = false;
-    let mut need_anomaly_detection_migration = false;
-    let mut need_online_eval_migration = false;
-    let mut need_billing_group_migration = false;
-    let mut need_workflows_migration = false;
-    let mut need_synthetics_migration = false;
 
     let existing_meta: Option<o2_openfga::meta::mapping::OFGAModel> =
         match db::ofga::get_ofga_model().await {
@@ -226,123 +246,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 return Ok(());
             }
 
-            if let Some(existing_model_version) = existing_model_version {
-                log::info!(
-                    "[OFGA:Local] model version changed: {} -> {}",
-                    existing_model_version,
-                    latest_model_version
-                );
-                // Check if ofga migration of index streams are needed
-                let meta_version = version_compare::Version::from(&latest_model_version).unwrap();
-                let existing_model_version =
-                    version_compare::Version::from(&existing_model_version).unwrap();
-                let v0_0_5 = version_compare::Version::from("0.0.5").unwrap();
-                let v0_0_6 = version_compare::Version::from("0.0.6").unwrap();
-                let v0_0_8 = version_compare::Version::from("0.0.8").unwrap();
-                let v0_0_9 = version_compare::Version::from("0.0.9").unwrap();
-                let v0_0_10 = version_compare::Version::from("0.0.10").unwrap();
-                let v0_0_12 = version_compare::Version::from("0.0.12").unwrap();
-                let v0_0_13 = version_compare::Version::from("0.0.13").unwrap();
-                let v0_0_15 = version_compare::Version::from("0.0.15").unwrap();
-                let v0_0_16 = version_compare::Version::from("0.0.16").unwrap();
-                let v0_0_17 = version_compare::Version::from("0.0.17").unwrap();
-                let v0_0_18 = version_compare::Version::from("0.0.18").unwrap();
-                let v0_0_20 = version_compare::Version::from("0.0.20").unwrap();
-                let v0_0_21 = version_compare::Version::from("0.0.21").unwrap();
-                let v0_0_25 = version_compare::Version::from("0.0.25").unwrap();
-                let v0_0_26 = version_compare::Version::from("0.0.26").unwrap();
-                let v0_0_27 = version_compare::Version::from("0.0.27").unwrap();
-                let v0_0_29 = version_compare::Version::from("0.0.29").unwrap();
-                let v0_0_30 = version_compare::Version::from("0.0.30").unwrap();
-                let v0_0_31 = version_compare::Version::from("0.0.31").unwrap();
-                let v0_0_33 = version_compare::Version::from("0.0.33").unwrap();
-                let v0_0_34 = version_compare::Version::from("0.0.34").unwrap();
-                let v0_0_35 = version_compare::Version::from("0.0.35").unwrap();
-                let v0_0_36 = version_compare::Version::from("0.0.36").unwrap();
-                let v0_0_37 = version_compare::Version::from("0.0.37").unwrap();
-
-                if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
-                    need_pipeline_migration = true;
-                }
-                if meta_version > v0_0_8 && existing_model_version < v0_0_9 {
-                    need_cipher_keys_migration = true;
-                }
-                if meta_version > v0_0_9 && existing_model_version < v0_0_10 {
-                    need_action_scripts_migration = true;
-                }
-                if meta_version > v0_0_12 && existing_model_version < v0_0_13 {
-                    log::info!("[OFGA:Local] Alert folders migration needed");
-                    need_alert_folders_migration = true;
-                }
-
-                if meta_version > v0_0_15 && existing_model_version < v0_0_16 {
-                    log::info!("[OFGA:Local] Ratelimit migration needed");
-                    need_ratelimit_migration = true;
-                    need_service_accounts_migration = true;
-                }
-                if meta_version > v0_0_17 && existing_model_version < v0_0_18 {
-                    log::info!("[OFGA:Local] AI chat permissions migration needed");
-                    need_ai_chat_permissions_migration = true;
-                }
-                if existing_model_version < v0_0_20 {
-                    log::info!("[OFGA:Local] re_patterns permissions migration needed");
-                    need_re_pattern_permission_migration = true;
-                }
-
-                if existing_model_version < v0_0_21 {
-                    log::info!("[OFGA:Local] license permissions migration needed");
-                    need_license_permission_migration = true;
-                }
-                if existing_model_version < v0_0_25 {
+            let pending = match &existing_model_version {
+                Some(existing) => {
                     log::info!(
-                        "[OFGA:Local] logs patterns, insights, cache delete permissions migration needed"
+                        "[OFGA:Local] model version changed: {existing} -> {latest_model_version}"
                     );
-                    need_logs_pattern_insights_migration = true;
+                    pending_migrations(&latest_model_version, existing)
                 }
-                if existing_model_version < v0_0_26 {
-                    log::info!("[OFGA:Local] sourcemap permissions migration needed");
-                    need_sourcemap_permission_migration = true;
-                }
-                if existing_model_version < v0_0_27 {
-                    log::info!("[OFGA:Local] service_streams permissions migration needed");
-                    need_service_streams_migration = true;
-                }
-                if existing_model_version < v0_0_29 {
-                    log::info!("[OFGA:Local] ai_toolsets permissions migration needed");
-                    need_ai_toolsets_migration = true;
-                    log::info!("[OFGA:Local] model_pricing permissions migration needed");
-                    need_model_pricing_migration = true;
-                }
-                if existing_model_version < v0_0_30 {
-                    log::info!("[OFGA:Local] report folders migration needed");
-                    need_report_folders_migration = true;
-                }
-                if existing_model_version < v0_0_31 {
-                    log::info!("[OFGA:Local] incidents permissions migration needed");
-                    need_incidents_migration = true;
-                }
-                if existing_model_version < v0_0_33 {
-                    log::info!("[OFGA:Local] anomaly detection permissions migration needed");
-                    need_anomaly_detection_migration = true;
-                }
-
-                if existing_model_version < v0_0_34 {
-                    log::info!("[OFGA:Local] billing group migration needed");
-                    need_billing_group_migration = true;
-                }
-                if existing_model_version < v0_0_35 {
-                    log::info!("[OFGA:Local] online eval permissions migration needed");
-                    need_online_eval_migration = true;
-                }
-                if existing_model_version < v0_0_36 {
-                    log::info!("[OFGA:Local] synthetics permissions migration needed");
-                    need_synthetics_migration = true;
-                }
-                if existing_model_version < v0_0_37 {
-                    log::info!("[OFGA:Local] workflows permissions migration needed");
-                    need_workflows_migration = true;
-                }
-            }
+                None => PendingMigrations::default(),
+            };
 
             let mut tuples = vec![];
             let r = ORGANIZATIONS.read().await;
@@ -400,14 +312,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 }
             } else {
                 log::info!("[OFGA:Local] Migrating index streams");
+                let all_org_keys = all_org_ownership_keys(&pending);
                 for org_name in orgs.iter() {
-                    if need_cipher_keys_migration {
-                        get_ownership_all_org_tuple(org_name, "cipher_keys", &mut tuples);
+                    for key in &all_org_keys {
+                        get_ownership_all_org_tuple(org_name, key, &mut tuples);
                     }
-                    if need_action_scripts_migration {
-                        get_ownership_all_org_tuple(org_name, "actions", &mut tuples);
-                    }
-                    if need_pipeline_migration {
+                    if pending.pipeline {
                         get_ownership_all_org_tuple(org_name, "pipelines", &mut tuples);
                         match infra::pipeline::list_by_org(org_name).await {
                             Ok(pipelines) => {
@@ -422,11 +332,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
                             }
                         }
                     }
-                    if need_alert_folders_migration {
+                    if pending.alert_folders {
                         get_ownership_all_org_tuple(org_name, "alert_folders", &mut tuples);
                         get_ownership_tuple(org_name, "alert_folders", DEFAULT_FOLDER, &mut tuples);
                     }
-                    if need_report_folders_migration {
+                    if pending.report_folders {
                         get_ownership_all_org_tuple(org_name, "report_folders", &mut tuples);
                         get_ownership_tuple(
                             org_name,
@@ -435,94 +345,16 @@ pub async fn init() -> Result<(), anyhow::Error> {
                             &mut tuples,
                         );
                     }
-                    if need_ratelimit_migration {
-                        get_ownership_all_org_tuple(org_name, "ratelimit", &mut tuples);
-                    }
-                    if need_service_accounts_migration {
-                        get_ownership_all_org_tuple(org_name, "service_accounts", &mut tuples);
-                    }
-                    if need_ai_chat_permissions_migration {
-                        get_ownership_all_org_tuple(org_name, "ai", &mut tuples);
-                    }
-                    if need_re_pattern_permission_migration {
-                        get_ownership_all_org_tuple(org_name, "re_patterns", &mut tuples);
-                    }
-                    if need_license_permission_migration {
-                        get_ownership_all_org_tuple(org_name, "license", &mut tuples);
-                    }
-                    if need_sourcemap_permission_migration {
-                        get_ownership_all_org_tuple(org_name, "sourcemaps", &mut tuples);
-                    }
-                    if need_service_streams_migration {
-                        get_ownership_all_org_tuple(org_name, "service_streams", &mut tuples);
-                    }
-                    if need_logs_pattern_insights_migration {
-                        get_ownership_all_org_tuple(org_name, LOGS_INSIGHTS_KEY, &mut tuples);
-                        get_ownership_all_org_tuple(org_name, LOGS_PATTERN_KEY, &mut tuples);
-                        get_ownership_all_org_tuple(org_name, RESULT_LOGS_CACHE_KEY, &mut tuples);
-                    }
-                    if need_ai_toolsets_migration {
-                        get_ownership_all_org_tuple(org_name, "ai_toolsets", &mut tuples);
-                    }
-                    if need_incidents_migration {
-                        get_ownership_all_org_tuple(org_name, "incidents", &mut tuples);
-                    }
-                    if need_model_pricing_migration {
-                        get_ownership_all_org_tuple(org_name, "model_pricing", &mut tuples);
-                    }
-                    if need_online_eval_migration {
-                        get_ownership_all_org_tuple(org_name, "providers", &mut tuples);
-                        get_ownership_all_org_tuple(org_name, "score_configs", &mut tuples);
-                        get_ownership_all_org_tuple(org_name, "scorers", &mut tuples);
-                        get_ownership_all_org_tuple(org_name, "eval_jobs", &mut tuples);
-                    }
-                    if need_billing_group_migration {
-                        get_ownership_all_org_tuple(org_name, "billing_group", &mut tuples);
-                    }
-                    if need_synthetics_migration {
-                        get_ownership_all_org_tuple(org_name, "synthetic_folder", &mut tuples);
-                        get_ownership_all_org_tuple(org_name, "synthetics", &mut tuples);
-                    }
-                    if need_workflows_migration {
-                        get_ownership_all_org_tuple(org_name, "workflows", &mut tuples);
+                    if pending.profiles {
+                        get_parent_tuple(
+                            &format!("_all_{org_name}"),
+                            "stream",
+                            &format!("profiles:_all_{org_name}"),
+                            &mut tuples,
+                        );
                     }
                 }
-                if need_alert_folders_migration {
-                    match migrations::migrate_alert_folders().await {
-                        Ok(_) => {
-                            log::info!("[OFGA:Local] Alert folders migrated to openfga");
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "[OFGA:Local] Error migrating alert folders to openfga: {e}"
-                            );
-                        }
-                    }
-                }
-                if need_report_folders_migration {
-                    match migrations::migrate_report_folders().await {
-                        Ok(_) => {
-                            log::info!("[OFGA:Local] Report folders migrated to openfga");
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "[OFGA:Local] Error migrating report folders to openfga: {e}"
-                            );
-                        }
-                    }
-                }
-                if need_anomaly_detection_migration {
-                    match migrations::migrate_anomaly_detection().await {
-                        Ok(_) => {
-                            log::info!("[OFGA:Local] Anomaly detection migrated to openfga");
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "[OFGA:Local] Error migrating anomaly detection to openfga: {e}"
-                            );
-                        }
-                    }
-                }
+                run_folder_and_data_migrations(&pending).await;
             }
 
             // Check if there are init ofga tuples that needs to be added now
@@ -556,4 +388,521 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("Failed to release lock");
 
     Ok(())
+}
+
+/// Database sweeps a pending back-fill needs beyond its ownership tuples.
+///
+/// Kept out of `init` so that function stays within the cognitive-complexity limit.
+async fn run_folder_and_data_migrations(pending: &PendingMigrations) {
+    if pending.alert_folders {
+        match migrations::migrate_alert_folders().await {
+            Ok(_) => {
+                log::info!("[OFGA:Local] Alert folders migrated to openfga");
+            }
+            Err(e) => {
+                log::error!("[OFGA:Local] Error migrating alert folders to openfga: {e}");
+            }
+        }
+    }
+    if pending.workflow_folders {
+        match migrations::migrate_workflow_folders().await {
+            Ok(_) => {
+                log::info!("[OFGA:Local] Workflow folders migrated to openfga");
+            }
+            Err(e) => {
+                log::error!("[OFGA:Local] Error migrating workflow folders to openfga: {e}");
+            }
+        }
+    }
+    if pending.prompt_folders {
+        match migrations::migrate_prompt_folders().await {
+            Ok(_) => {
+                log::info!("[OFGA:Local] Prompt folders migrated to openfga");
+            }
+            Err(e) => {
+                log::error!("[OFGA:Local] Error migrating prompt folders to openfga: {e}");
+            }
+        }
+    }
+    if pending.report_folders {
+        match migrations::migrate_report_folders().await {
+            Ok(_) => {
+                log::info!("[OFGA:Local] Report folders migrated to openfga");
+            }
+            Err(e) => {
+                log::error!("[OFGA:Local] Error migrating report folders to openfga: {e}");
+            }
+        }
+    }
+    if pending.anomaly_detection {
+        match migrations::migrate_anomaly_detection().await {
+            Ok(_) => {
+                log::info!("[OFGA:Local] Anomaly detection migrated to openfga");
+            }
+            Err(e) => {
+                log::error!("[OFGA:Local] Error migrating anomaly detection to openfga: {e}");
+            }
+        }
+    }
+    if pending.stream_names {
+        match migrations::migrate_stream_names().await {
+            Ok(_) => {
+                log::info!("[OFGA:Local] Stream names migrated to openfga");
+            }
+            Err(e) => {
+                log::error!("[OFGA:Local] Error migrating stream names to openfga: {e}");
+            }
+        }
+    }
+}
+
+/// The resources a pending back-fill needs nothing but an `_all_` org tuple for.
+///
+/// Data rather than control flow. The three that also need a per-object tuple or
+/// a database sweep — pipelines, alert folders, report folders — stay as explicit
+/// branches at the call site.
+fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
+    let mut keys = vec![];
+    if pending.cipher_keys {
+        keys.push("cipher_keys");
+    }
+    if pending.ratelimit {
+        keys.push("ratelimit");
+    }
+    if pending.service_accounts {
+        keys.push("service_accounts");
+    }
+    if pending.ai_chat_permissions {
+        keys.push("ai");
+    }
+    if pending.re_pattern_permission {
+        keys.push("re_patterns");
+    }
+    if pending.license_permission {
+        keys.push("license");
+    }
+    if pending.sourcemap_permission {
+        keys.push("sourcemaps");
+    }
+    if pending.service_streams {
+        keys.push("service_streams");
+    }
+    if pending.logs_pattern_insights {
+        keys.extend([LOGS_INSIGHTS_KEY, LOGS_PATTERN_KEY, RESULT_LOGS_CACHE_KEY]);
+    }
+    if pending.ai_toolsets {
+        keys.push("ai_toolsets");
+    }
+    if pending.incidents {
+        keys.push("incidents");
+    }
+    if pending.model_pricing {
+        keys.push("model_pricing");
+    }
+    if pending.online_eval {
+        keys.extend(["providers", "score_configs", "scorers", "eval_jobs"]);
+    }
+    if pending.llm_workbench {
+        // Playground shipped at 0.0.43, after this gate; the 0.0.58 back-fill covers it.
+        keys.extend([
+            "playground",
+            "annotation_queues",
+            "datasets",
+            "experiments",
+            "remote_tasks",
+        ]);
+    }
+    if pending.billing_group {
+        keys.push("billing_group");
+    }
+    if pending.synthetics {
+        keys.extend(["synthetic_folder", "synthetics"]);
+    }
+    if pending.workflows {
+        keys.push("workflows");
+    }
+    // Without the org-ownership tuple, `viewer from owningOrg` and `allowed_user
+    // from owningOrg` resolve to nothing, so every non-admin in an existing org
+    // would still be denied on-call — the defect this model version fixes.
+    if pending.oncall {
+        keys.extend(["oncall", "oncall_responses"]);
+    }
+    if pending.annotation_queues_datasets {
+        keys.extend(["annotation_queues", "datasets"]);
+    }
+    if pending.workflow_folders {
+        keys.push("workflow_folder");
+    }
+    if pending.synthetic_environments {
+        keys.push("synthetic_environment");
+    }
+    if pending.prompts {
+        keys.extend(["prompts", "prompt_labels"]);
+    }
+    if pending.prompt_folders {
+        keys.push("prompt_folders");
+    }
+    // Members reach their own query history via owningOrg, which needs this tuple.
+    if pending.query_history {
+        keys.push("query_history");
+    }
+    if pending.downtimes {
+        keys.extend(["downtime_folders", "downtimes"]);
+    }
+    if pending.ai_chat_shares {
+        keys.push("ai_chat_shares");
+    }
+    if pending.fleet {
+        keys.extend(["fleet", "fleets"]);
+    }
+    if pending.missing_ownership {
+        keys.extend([
+            "db_monitoring",
+            "search_inspector",
+            "status_page",
+            "mcp",
+            "playground",
+            "model_pricing",
+            LOGS_INSIGHTS_KEY,
+            LOGS_PATTERN_KEY,
+            RESULT_LOGS_CACHE_KEY,
+            "alert_calibration",
+            "slack",
+        ]);
+    }
+    if pending.public_dashboards {
+        keys.push("public_dashboards");
+    }
+    if pending.profiles {
+        keys.push("profiles");
+    }
+    if pending.incident_integrations {
+        keys.push("incident_integrations");
+    }
+    keys
+}
+
+fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
+    let mut pending = PendingMigrations::default();
+
+    let meta_version = version_compare::Version::from(latest).unwrap();
+    let existing_model_version = version_compare::Version::from(existing).unwrap();
+    let v0_0_5 = version_compare::Version::from("0.0.5").unwrap();
+    let v0_0_6 = version_compare::Version::from("0.0.6").unwrap();
+    let v0_0_8 = version_compare::Version::from("0.0.8").unwrap();
+    let v0_0_9 = version_compare::Version::from("0.0.9").unwrap();
+    let v0_0_12 = version_compare::Version::from("0.0.12").unwrap();
+    let v0_0_13 = version_compare::Version::from("0.0.13").unwrap();
+    let v0_0_15 = version_compare::Version::from("0.0.15").unwrap();
+    let v0_0_16 = version_compare::Version::from("0.0.16").unwrap();
+    let v0_0_17 = version_compare::Version::from("0.0.17").unwrap();
+    let v0_0_18 = version_compare::Version::from("0.0.18").unwrap();
+    let v0_0_20 = version_compare::Version::from("0.0.20").unwrap();
+    let v0_0_21 = version_compare::Version::from("0.0.21").unwrap();
+    let v0_0_25 = version_compare::Version::from("0.0.25").unwrap();
+    let v0_0_26 = version_compare::Version::from("0.0.26").unwrap();
+    let v0_0_27 = version_compare::Version::from("0.0.27").unwrap();
+    let v0_0_29 = version_compare::Version::from("0.0.29").unwrap();
+    let v0_0_30 = version_compare::Version::from("0.0.30").unwrap();
+    let v0_0_31 = version_compare::Version::from("0.0.31").unwrap();
+    let v0_0_33 = version_compare::Version::from("0.0.33").unwrap();
+    let v0_0_34 = version_compare::Version::from("0.0.34").unwrap();
+    let v0_0_35 = version_compare::Version::from("0.0.35").unwrap();
+    let v0_0_36 = version_compare::Version::from("0.0.36").unwrap();
+    let v0_0_37 = version_compare::Version::from("0.0.37").unwrap();
+    let v0_0_38 = version_compare::Version::from("0.0.38").unwrap();
+    let v0_0_39 = version_compare::Version::from("0.0.39").unwrap();
+    let v0_0_42 = version_compare::Version::from("0.0.42").unwrap();
+    let v0_0_46 = version_compare::Version::from("0.0.46").unwrap();
+    let v0_0_47 = version_compare::Version::from("0.0.47").unwrap();
+    let v0_0_48 = version_compare::Version::from("0.0.48").unwrap();
+    let v0_0_50 = version_compare::Version::from("0.0.50").unwrap();
+    let v0_0_51 = version_compare::Version::from("0.0.51").unwrap();
+    let v0_0_53 = version_compare::Version::from("0.0.53").unwrap();
+    let v0_0_54 = version_compare::Version::from("0.0.54").unwrap();
+    let v0_0_55 = version_compare::Version::from("0.0.55").unwrap();
+    let v0_0_58 = version_compare::Version::from("0.0.58").unwrap();
+    let v0_0_59 = version_compare::Version::from("0.0.59").unwrap();
+
+    if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
+        pending.pipeline = true;
+    }
+    if meta_version > v0_0_8 && existing_model_version < v0_0_9 {
+        pending.cipher_keys = true;
+    }
+    if meta_version > v0_0_12 && existing_model_version < v0_0_13 {
+        log::info!("[OFGA:Local] Alert folders migration needed");
+        pending.alert_folders = true;
+    }
+    if meta_version > v0_0_15 && existing_model_version < v0_0_16 {
+        log::info!("[OFGA:Local] Ratelimit migration needed");
+        pending.ratelimit = true;
+        pending.service_accounts = true;
+    }
+    if meta_version > v0_0_17 && existing_model_version < v0_0_18 {
+        log::info!("[OFGA:Local] AI chat permissions migration needed");
+        pending.ai_chat_permissions = true;
+    }
+    if existing_model_version < v0_0_20 {
+        log::info!("[OFGA:Local] re_patterns permissions migration needed");
+        pending.re_pattern_permission = true;
+    }
+    if existing_model_version < v0_0_21 {
+        log::info!("[OFGA:Local] license permissions migration needed");
+        pending.license_permission = true;
+    }
+    if existing_model_version < v0_0_25 {
+        log::info!(
+            "[OFGA:Local] logs patterns, insights, cache delete permissions migration needed"
+        );
+        pending.logs_pattern_insights = true;
+    }
+    if existing_model_version < v0_0_26 {
+        log::info!("[OFGA:Local] sourcemap permissions migration needed");
+        pending.sourcemap_permission = true;
+    }
+    if existing_model_version < v0_0_27 {
+        log::info!("[OFGA:Local] service_streams permissions migration needed");
+        pending.service_streams = true;
+    }
+    if existing_model_version < v0_0_29 {
+        log::info!("[OFGA:Local] ai_toolsets permissions migration needed");
+        pending.ai_toolsets = true;
+        log::info!("[OFGA:Local] model_pricing permissions migration needed");
+        pending.model_pricing = true;
+    }
+    if existing_model_version < v0_0_30 {
+        log::info!("[OFGA:Local] report folders migration needed");
+        pending.report_folders = true;
+    }
+    if existing_model_version < v0_0_31 {
+        log::info!("[OFGA:Local] incidents permissions migration needed");
+        pending.incidents = true;
+    }
+    if existing_model_version < v0_0_33 {
+        log::info!("[OFGA:Local] anomaly detection permissions migration needed");
+        pending.anomaly_detection = true;
+    }
+    if existing_model_version < v0_0_34 {
+        log::info!("[OFGA:Local] billing group migration needed");
+        pending.billing_group = true;
+    }
+    if existing_model_version < v0_0_35 {
+        log::info!("[OFGA:Local] online eval permissions migration needed");
+        pending.online_eval = true;
+    }
+    if existing_model_version < v0_0_36 {
+        log::info!("[OFGA:Local] synthetics permissions migration needed");
+        pending.synthetics = true;
+    }
+    if existing_model_version < v0_0_37 {
+        log::info!("[OFGA:Local] workflows permissions migration needed");
+        pending.workflows = true;
+    }
+    if existing_model_version < v0_0_38 {
+        log::info!("[OFGA:Local] stream names migration needed");
+        pending.stream_names = true;
+    }
+    if existing_model_version < v0_0_39 {
+        log::info!("[OFGA:Local] annotation queues and datasets permissions migration needed");
+        pending.annotation_queues_datasets = true;
+    }
+    if existing_model_version < v0_0_42 {
+        log::info!("[OFGA:Local] LLM workbench permissions migration needed");
+        pending.llm_workbench = true;
+    }
+    // Must track the model version on-call actually shipped at. Gating on an
+    // earlier one skips every install already past it — which is every install
+    // upgrading through this release — and leaves them with no `owningOrg`
+    // tuple, so `viewer from owningOrg` denies every non-root user.
+    if existing_model_version < v0_0_46 {
+        log::info!("[OFGA:Local] on-call permissions migration needed");
+        pending.oncall = true;
+    }
+    if existing_model_version < v0_0_47 {
+        log::info!("[OFGA:Local] workflow folders permissions migration needed");
+        pending.workflow_folders = true;
+    }
+    // 0.0.48: 0.0.47 (workflow folders) is the last version enterprise main shipped.
+    if existing_model_version < v0_0_48 {
+        log::info!("[OFGA:Local] synthetic environments permissions migration needed");
+        pending.synthetic_environments = true;
+    }
+    // 0.0.49 shipped `prompt` without a back-fill; 0.0.50 covers it and `prompt_label`.
+    if existing_model_version < v0_0_50 {
+        log::info!("[OFGA:Local] prompt permissions migration needed");
+        pending.prompts = true;
+    }
+    if existing_model_version < v0_0_51 {
+        log::info!("[OFGA:Local] prompt folders permissions migration needed");
+        pending.prompt_folders = true;
+    }
+    // 0.0.52 (`rum_analytics`) relies on explicit grants only, so it needs no back-fill.
+    if existing_model_version < v0_0_53 {
+        log::info!("[OFGA:Local] query history permissions migration needed");
+        pending.query_history = true;
+    }
+    // Gated on the latest model so a 0.0.53 model never back-fills types it lacks.
+    if meta_version >= v0_0_54 && existing_model_version < v0_0_54 {
+        log::info!("[OFGA:Local] downtimes permissions migration needed");
+        pending.downtimes = true;
+    }
+    if meta_version >= v0_0_55 && existing_model_version < v0_0_55 {
+        log::info!("[OFGA:Local] AI chat share permissions migration needed");
+        pending.ai_chat_shares = true;
+    }
+    if meta_version >= v0_0_59 && existing_model_version < v0_0_59 {
+        log::info!("[OFGA:Local] fleet permissions migration needed");
+        pending.fleet = true;
+    }
+    // Earlier arms were gated below the version these eleven types shipped at, or missing.
+    if meta_version >= v0_0_58 && existing_model_version < v0_0_58 {
+        log::info!("[OFGA:Local] missing org-ownership back-fill needed");
+        pending.missing_ownership = true;
+    }
+    let v0_0_60 = version_compare::Version::from("0.0.60").unwrap();
+    if meta_version >= v0_0_60 && existing_model_version < v0_0_60 {
+        log::info!("[OFGA:Local] public dashboards permissions migration needed");
+        pending.public_dashboards = true;
+    }
+    let v0_0_61 = version_compare::Version::from("0.0.61").unwrap();
+    if meta_version >= v0_0_61 && existing_model_version < v0_0_61 {
+        log::info!("[OFGA:Local] profiles stream permissions migration needed");
+        pending.profiles = true;
+    }
+    let v0_0_62 = version_compare::Version::from("0.0.62").unwrap();
+    if meta_version >= v0_0_62 && existing_model_version < v0_0_62 {
+        log::info!("[OFGA:Local] incident integrations permissions migration needed");
+        pending.incident_integrations = true;
+    }
+
+    pending
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_query_history_back_fill_below_0_0_53() {
+        let pending = pending_migrations("0.0.53", "0.0.52");
+        assert!(pending.query_history);
+        assert!(!pending.prompt_folders);
+        assert_eq!(all_org_ownership_keys(&pending), vec!["query_history"]);
+
+        let pending = pending_migrations("0.0.53", "0.0.53");
+        assert!(!pending.query_history);
+        assert!(all_org_ownership_keys(&pending).is_empty());
+    }
+
+    #[test]
+    fn test_downtimes_back_fill_below_0_0_54() {
+        let pending = pending_migrations("0.0.54", "0.0.53");
+        assert!(pending.downtimes);
+        assert!(!pending.query_history);
+        assert_eq!(
+            all_org_ownership_keys(&pending),
+            vec!["downtime_folders", "downtimes"]
+        );
+
+        let pending = pending_migrations("0.0.54", "0.0.52");
+        assert!(pending.downtimes && pending.query_history);
+
+        let pending = pending_migrations("0.0.54", "0.0.54");
+        assert!(!pending.downtimes);
+        assert!(all_org_ownership_keys(&pending).is_empty());
+    }
+
+    #[test]
+    fn test_ai_chat_shares_back_fill_below_0_0_55() {
+        let pending = pending_migrations("0.0.55", "0.0.54");
+        assert!(pending.ai_chat_shares && !pending.downtimes);
+        assert_eq!(all_org_ownership_keys(&pending), vec!["ai_chat_shares"]);
+
+        let pending = pending_migrations("0.0.55", "0.0.53");
+        assert_eq!(
+            all_org_ownership_keys(&pending),
+            vec!["downtime_folders", "downtimes", "ai_chat_shares"]
+        );
+
+        assert!(!pending_migrations("0.0.54", "0.0.53").ai_chat_shares);
+        assert!(all_org_ownership_keys(&pending_migrations("0.0.55", "0.0.55")).is_empty());
+    }
+
+    #[test]
+    fn fleet_ownership_backfill_keys_on_the_version_fleet_ships_at() {
+        assert!(
+            pending_migrations("0.0.59", "0.0.58").fleet,
+            "the Slack grant shipped 0.0.58 without fleet"
+        );
+        assert!(!pending_migrations("0.0.58", "0.0.57").fleet);
+        assert!(!pending_migrations("0.0.59", "0.0.59").fleet);
+        assert!(all_org_ownership_keys(&pending_migrations("0.0.59", "0.0.59")).is_empty());
+        assert!(all_org_ownership_keys(&pending_migrations("0.0.59", "0.0.58")).contains(&"fleet"));
+        assert!(
+            all_org_ownership_keys(&pending_migrations("0.0.59", "0.0.58")).contains(&"fleets")
+        );
+        assert!(OFGA_MODELS.contains_key("fleet"));
+    }
+
+    #[test]
+    fn test_missing_ownership_back_fill_below_0_0_58() {
+        let pending = pending_migrations("0.0.58", "0.0.57");
+        assert!(pending.missing_ownership && !pending.ai_chat_shares);
+        assert_eq!(
+            all_org_ownership_keys(&pending),
+            vec![
+                "db_monitoring",
+                "search_inspector",
+                "status_page",
+                "mcp",
+                "playground",
+                "model_pricing",
+                LOGS_INSIGHTS_KEY,
+                LOGS_PATTERN_KEY,
+                RESULT_LOGS_CACHE_KEY,
+                "alert_calibration",
+                "slack",
+            ]
+        );
+
+        assert!(all_org_ownership_keys(&pending_migrations("0.0.58", "0.0.58")).is_empty());
+        assert!(!pending_migrations("0.0.57", "0.0.57").missing_ownership);
+    }
+
+    #[test]
+    fn public_dashboards_back_fill_runs_once_across_0_0_60() {
+        assert!(pending_migrations("0.0.60", "0.0.59").public_dashboards);
+        assert!(!pending_migrations("0.0.60", "0.0.60").public_dashboards);
+        assert!(!pending_migrations("0.0.59", "0.0.58").public_dashboards);
+        let pending = PendingMigrations {
+            public_dashboards: true,
+            ..Default::default()
+        };
+        assert_eq!(all_org_ownership_keys(&pending), vec!["public_dashboards"]);
+    }
+
+    #[test]
+    fn profiles_back_fill_runs_once_across_0_0_61() {
+        assert!(pending_migrations("0.0.61", "0.0.60").profiles);
+        assert!(!pending_migrations("0.0.61", "0.0.61").profiles);
+        assert!(!pending_migrations("0.0.60", "0.0.59").profiles);
+        assert_eq!(
+            all_org_ownership_keys(&pending_migrations("0.0.61", "0.0.60")),
+            vec!["profiles"]
+        );
+        assert!(OFGA_MODELS.contains_key("profiles"));
+    }
+
+    #[test]
+    fn incident_integrations_back_fill_runs_once_across_0_0_62() {
+        let pending = pending_migrations("0.0.62", "0.0.61");
+        assert!(pending.incident_integrations && !pending.profiles);
+        assert_eq!(
+            all_org_ownership_keys(&pending),
+            vec!["incident_integrations"]
+        );
+        assert!(!pending_migrations("0.0.62", "0.0.62").incident_integrations);
+        assert!(!pending_migrations("0.0.61", "0.0.60").incident_integrations);
+    }
 }

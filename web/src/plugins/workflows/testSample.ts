@@ -24,6 +24,7 @@
 // (start/end time) arrive as real numbers — the backend now types them, so the
 // sample must too. `data[]` rows keep their native column types.
 import { TRIGGER_META_VARS } from "./alertFields";
+import { raw } from "@/types/i18n";
 
 const SAMPLE_TS = 1700000000000000; // microsecond epoch, matches alert timestamps
 
@@ -34,7 +35,7 @@ const NAMED_DEFAULTS: Record<string, string | number> = {
   org_id: "default",
   stream_type: "logs",
   stream_name: "default",
-  alert_name: "High Error Rate",
+  alert_name: raw("High Error Rate"),
   alert_type: "scheduled",
   alert_operator: ">=",
   alert_period: 10,
@@ -78,3 +79,8 @@ export const buildFlatTestSample = (): unknown[] => {
   for (const k of Object.keys(meta)) metaFlat[`meta_${k}`] = meta[k];
   return data.map((row) => ({ ...metaFlat, ...row }));
 };
+
+// The DISPLAY payload: the single event `row` is bound to inside a workflow
+// function, not the wire batch array. The inner data[] stays — those are real
+// query rows the function iterates, unlike the incident sample's empty placeholder.
+export const buildTestDisplaySample = (): unknown => buildTestSample()[0];

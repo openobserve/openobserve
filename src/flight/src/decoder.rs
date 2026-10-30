@@ -189,7 +189,7 @@ mod tests {
         array::{ArrayRef, Int32Array, RecordBatch, StringArray},
         ipc::{
             MessageHeader,
-            writer::{CompressionContext, DictionaryTracker, IpcDataGenerator, IpcWriteOptions},
+            writer::{DictionaryTracker, IpcDataGenerator, IpcWriteContext, IpcWriteOptions},
         },
     };
     use arrow_flight::{FlightData, SchemaAsIpc};
@@ -308,7 +308,7 @@ mod tests {
         let batch = create_test_record_batch();
         let options = IpcWriteOptions::default();
         let data_gen = IpcDataGenerator::default();
-        let mut compress = CompressionContext::default();
+        let mut compress = IpcWriteContext::default();
         let mut dictionary_tracker = DictionaryTracker::new(false);
 
         let (_, encoded_batch) = data_gen

@@ -51,6 +51,20 @@ export class MetricsQueryEditorPage {
     }
 
     /**
+     * The tab's LABEL — the only part of the tab that selects it.
+     *
+     * A tab also carries rename, visibility and remove icons, each of which
+     * stops the click from reaching the tab. Those sit to the right of the
+     * label, so the tab element's own centre lands on the rename icon and a
+     * centre click opens the rename box instead of switching tabs.
+     *
+     * @param {number} zeroIdx - 0-based tab index
+     */
+    getTabNameByIndex(zeroIdx) {
+        return this.page.locator(`[data-test="dashboard-panel-query-tab-name-${zeroIdx}"]`);
+    }
+
+    /**
      * Switch to PromQL Custom mode
      *
      * In the metrics page, there are two toggle groups:
@@ -313,7 +327,9 @@ export class MetricsQueryEditorPage {
                 return true;
             }
 
-            await tabByDataTest.click({ force: true });
+            const tabName = this.getTabNameByIndex(zeroIdx).first();
+            const clickTarget = (await tabName.count()) ? tabName : tabByDataTest;
+            await clickTarget.click({ force: true });
 
             // Deterministic wait for active state
             try {

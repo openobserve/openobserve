@@ -14,68 +14,92 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use sea_orm::{
-    ColumnTrait, EntityTrait, QueryFilter, QuerySelect, TransactionTrait,
-    sea_query::{Expr, Func, OnConflict},
+    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, TransactionTrait,
+    sea_query::{CaseStatement, Expr, Func, OnConflict},
 };
 
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     table::entity::trial_quota_usage,
 };
 
-/// Batch increment quota records by delta. Each tuple is (org_id, feature, delta).
-/// Upserts: if the row exists, adds delta to usage_count; otherwise inserts with
-/// usage_count = delta. Uses sea_orm's on_conflict for atomic upserts.
+pub const SYNTHETICS_BROWSER_FEATURE: &str = "synthetics_browser_steps";
+pub const SYNTHETICS_PROTOCOL_FEATURE: &str = "synthetics_protocol_steps";
+pub const SYNTHETICS_STATUS_FEATURE: &str = "synthetics_status_protocol";
+
+/// The `YYYYMM` a lifetime row carries, meaning the count belongs to no month.
+pub const LIFETIME_PERIOD: i32 = 0;
+
+/// What [`try_spend`] decided; `used` is the pool total after the spend or at refusal.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Spend {
+    Spent { used: i64, limit: i64 },
+    Exhausted { used: i64, limit: i64 },
+}
+
+/// One settled window's free steps per pool. `month` scopes the status pool alone.
+pub struct SyntheticsDeltas {
+    pub browser: i64,
+    pub protocol: i64,
+    pub status: i64,
+    pub month: i32,
+}
+
+/// Additively upsert one `(org_id, feature, delta)` triple per record.
 pub async fn batch_increment(records: Vec<(String, String, i64)>) -> Result<(), sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    // Ahead of `get_orm_client_rw`, which blocks on pool initialisation an idle tick never needs.
+    if records.is_empty() {
+        return Ok(());
+    }
+    batch_increment_in(get_orm_client_rw().await, records).await
+}
+
+/// [`batch_increment`] against a caller-supplied connection.
+async fn batch_increment_in<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    records: Vec<(String, String, i64)>,
+) -> Result<(), sea_orm::DbErr> {
+    if records.is_empty() {
+        return Ok(());
+    }
+    // One transaction for the whole batch: N autocommits take the write lock N times.
+    let txn = conn.begin().await?;
     let now = config::utils::time::now_micros();
 
     for (org_id, feature, delta) in records {
-        let active_model = trial_quota_usage::ActiveModel {
-            org_id: sea_orm::ActiveValue::Set(org_id),
-            feature: sea_orm::ActiveValue::Set(feature),
-            usage_count: sea_orm::ActiveValue::Set(delta),
-            usage_limit: sea_orm::ActiveValue::NotSet,
-            updated_at: sea_orm::ActiveValue::Set(now),
-            notified_checkpoint: sea_orm::ActiveValue::Set(0),
-        };
-
-        trial_quota_usage::Entity::insert(active_model)
-            .on_conflict(
-                OnConflict::columns([
-                    trial_quota_usage::Column::OrgId,
-                    trial_quota_usage::Column::Feature,
-                ])
-                .value(
-                    trial_quota_usage::Column::UsageCount,
-                    Expr::col((
-                        trial_quota_usage::Entity,
-                        trial_quota_usage::Column::UsageCount,
-                    ))
-                    .add(delta),
-                )
-                .value(trial_quota_usage::Column::UpdatedAt, Expr::value(now))
-                .to_owned(),
-            )
-            .exec(db)
-            .await?;
+        increment_lifetime_row(&txn, &org_id, &feature, delta, now).await?;
     }
-    Ok(())
+    txn.commit().await
 }
 
 /// Load all quota records (all features, all orgs).
 /// Called once on node startup to populate the in-memory DashMap.
 pub async fn load_all() -> Result<Vec<trial_quota_usage::Model>, sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_ro().await;
     trial_quota_usage::Entity::find().all(db).await
 }
 
-/// Get total usage across all features for an org (sum of usage_count).
+/// Total usage for an org across the given pool's feature rows. `features`
+/// scopes the sum to ONE pool, or synthetics steps report as AI credits used;
+pub async fn get_total_usage_for_org(
+    org_id: &str,
+    features: &[&str],
+) -> Result<i64, sea_orm::DbErr> {
+    get_total_usage_for_org_in(get_orm_client_ro().await, org_id, features).await
+}
+
+/// [`get_total_usage_for_org`] against a caller-supplied connection.
+///
 /// Note: PostgreSQL SUM(bigint) returns NUMERIC, so we cast to BIGINT for Rust i64 compat.
-pub async fn get_total_usage_for_org(org_id: &str) -> Result<i64, sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let result: Option<Option<i64>> = trial_quota_usage::Entity::find()
+async fn get_total_usage_for_org_in<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    features: &[&str],
+) -> Result<i64, sea_orm::DbErr> {
+    let query = trial_quota_usage::Entity::find()
         .filter(trial_quota_usage::Column::OrgId.eq(org_id))
+        .filter(trial_quota_usage::Column::Feature.is_in(features.iter().copied()));
+    let result: Option<Option<i64>> = query
         .select_only()
         .column_as(
             Expr::expr(Func::cast_as(
@@ -85,15 +109,104 @@ pub async fn get_total_usage_for_org(org_id: &str) -> Result<i64, sea_orm::DbErr
             "total_usage",
         )
         .into_tuple()
-        .one(db)
+        .one(conn)
         .await?;
     Ok(result.flatten().unwrap_or(0))
+}
+
+/// Check and spend a pool's limit in ONE transaction; the seed-row lock serializes spenders.
+pub async fn try_spend(
+    org_id: &str,
+    seed_feature: &str,
+    feature: &str,
+    features: &[&str],
+    cost: i64,
+    default_limit: i64,
+) -> Result<Spend, sea_orm::DbErr> {
+    try_spend_in(
+        get_orm_client_rw().await,
+        org_id,
+        seed_feature,
+        feature,
+        features,
+        cost,
+        default_limit,
+    )
+    .await
+}
+
+/// [`try_spend`] against a caller-supplied connection.
+async fn try_spend_in<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    seed_feature: &str,
+    feature: &str,
+    features: &[&str],
+    cost: i64,
+    default_limit: i64,
+) -> Result<Spend, sea_orm::DbErr> {
+    let txn = conn.begin().await?;
+    let now = config::utils::time::now_micros();
+    // A zero-cost increment: creates the row if missing and locks it either way.
+    increment_lifetime_row(&txn, org_id, seed_feature, 0, now).await?;
+
+    // A refund flushes as a negative delta, so a pool can sum below zero.
+    let used = get_total_usage_for_org_in(&txn, org_id, features)
+        .await?
+        .max(0);
+    let limit = trial_quota_usage::Entity::find()
+        .filter(trial_quota_usage::Column::OrgId.eq(org_id))
+        .filter(trial_quota_usage::Column::Feature.is_in(features.iter().copied()))
+        .select_only()
+        .column_as(trial_quota_usage::Column::UsageLimit.max(), "usage_limit")
+        .into_tuple::<Option<i64>>()
+        .one(&txn)
+        .await?
+        .flatten()
+        .unwrap_or(default_limit);
+
+    if used.saturating_add(cost) > limit {
+        txn.rollback().await?;
+        return Ok(Spend::Exhausted { used, limit });
+    }
+    increment_lifetime_row(&txn, org_id, feature, cost, now).await?;
+    txn.commit().await?;
+    Ok(Spend::Spent {
+        used: used + cost,
+        limit,
+    })
+}
+
+/// Each feature's usage for an org, for the per-feature breakdown.
+pub async fn get_usage_by_feature(
+    org_id: &str,
+    features: &[&str],
+) -> Result<Vec<(String, i64)>, sea_orm::DbErr> {
+    trial_quota_usage::Entity::find()
+        .filter(trial_quota_usage::Column::OrgId.eq(org_id))
+        .filter(trial_quota_usage::Column::Feature.is_in(features.iter().copied()))
+        .select_only()
+        .column(trial_quota_usage::Column::Feature)
+        .column(trial_quota_usage::Column::UsageCount)
+        .into_tuple()
+        .all(get_orm_client_ro().await)
+        .await
+}
+
+/// Every row of the given features, for refreshing a node's usage cache.
+pub async fn load_for_features(
+    features: &[&str],
+) -> Result<Vec<trial_quota_usage::Model>, sea_orm::DbErr> {
+    trial_quota_usage::Entity::find()
+        .filter(trial_quota_usage::Column::Feature.is_in(features.iter().copied()))
+        .all(get_orm_client_ro().await)
+        .await
 }
 
 /// Get the explicitly configured shared usage limit for an organization.
 /// A missing value means the deployment-wide default still applies.
 pub async fn get_usage_limit_for_org(org_id: &str) -> Result<Option<i64>, sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_ro().await;
     let result = trial_quota_usage::Entity::find()
         .filter(trial_quota_usage::Column::OrgId.eq(org_id))
         .select_only()
@@ -104,37 +217,66 @@ pub async fn get_usage_limit_for_org(org_id: &str) -> Result<Option<i64>, sea_or
     Ok(result.flatten())
 }
 
-pub async fn load_all_usage_limits() -> Result<Vec<(String, i64)>, sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let results: Vec<(String, Option<i64>)> = trial_quota_usage::Entity::find()
+/// Every explicit `(org_id, feature, usage_limit)` triple — per FEATURE, not a
+/// per-org maximum: `MAX(usage_limit) GROUP BY org_id` would let a raised AI
+/// credit limit silently raise the one-time synthetics grant.
+pub async fn load_all_usage_limits() -> Result<Vec<(String, String, i64)>, sea_orm::DbErr> {
+    let db = get_orm_client_ro().await;
+    let results: Vec<(String, String, Option<i64>)> = trial_quota_usage::Entity::find()
         .select_only()
         .column(trial_quota_usage::Column::OrgId)
-        .column_as(trial_quota_usage::Column::UsageLimit.max(), "usage_limit")
+        .column(trial_quota_usage::Column::Feature)
+        .column(trial_quota_usage::Column::UsageLimit)
         .filter(trial_quota_usage::Column::UsageLimit.is_not_null())
-        .group_by(trial_quota_usage::Column::OrgId)
         .into_tuple()
         .all(db)
         .await?;
     Ok(results
         .into_iter()
-        .filter_map(|(org_id, limit)| limit.map(|limit| (org_id, limit)))
+        .filter_map(|(org_id, feature, limit)| limit.map(|limit| (org_id, feature, limit)))
         .collect())
 }
 
-/// Set one shared limit on every feature row for an organization. The AI chat
-/// row is upserted first so organizations without prior usage can be configured.
-pub async fn set_usage_limit_for_org(org_id: &str, usage_limit: i64) -> Result<(), sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = super::get_lock().await;
-    let txn = db.begin().await?;
+/// Set one limit on every feature row of ONE POOL for an organization.
+/// `seed_feature` is upserted first so orgs with no prior usage can be
+/// configured; `features` bounds the `UPDATE` so the two pools stay independent.
+pub async fn set_usage_limit_for_org(
+    org_id: &str,
+    seed_feature: &str,
+    features: &[&str],
+    usage_limit: i64,
+) -> Result<(), sea_orm::DbErr> {
+    set_usage_limit_for_org_in(
+        get_orm_client_rw().await,
+        org_id,
+        seed_feature,
+        features,
+        usage_limit,
+    )
+    .await
+}
+
+/// [`set_usage_limit_for_org`] against a caller-supplied connection.
+async fn set_usage_limit_for_org_in<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    seed_feature: &str,
+    features: &[&str],
+    usage_limit: i64,
+) -> Result<(), sea_orm::DbErr> {
+    // Spec §7.4: a crash between the seed and the fan-out leaves the pool on two limits.
+    let txn = conn.begin().await?;
     let now = config::utils::time::now_micros();
     let active_model = trial_quota_usage::ActiveModel {
         org_id: sea_orm::ActiveValue::Set(org_id.to_string()),
-        feature: sea_orm::ActiveValue::Set("ai_chat".to_string()),
+        feature: sea_orm::ActiveValue::Set(seed_feature.to_string()),
         usage_count: sea_orm::ActiveValue::Set(0),
         usage_limit: sea_orm::ActiveValue::Set(Some(usage_limit)),
         updated_at: sea_orm::ActiveValue::Set(now),
         notified_checkpoint: sea_orm::ActiveValue::Set(0),
+        // A raised limit belongs to no month; the monthly row keeps its own period.
+        period: sea_orm::ActiveValue::Set(LIFETIME_PERIOD),
+        paid_overage_enabled: sea_orm::ActiveValue::Set(false),
     };
 
     trial_quota_usage::Entity::insert(active_model)
@@ -153,17 +295,87 @@ pub async fn set_usage_limit_for_org(org_id: &str, usage_limit: i64) -> Result<(
         .exec(&txn)
         .await?;
 
-    trial_quota_usage::Entity::update_many()
-        .filter(trial_quota_usage::Column::OrgId.eq(org_id))
-        .col_expr(
-            trial_quota_usage::Column::UsageLimit,
-            Expr::value(usage_limit),
-        )
-        .col_expr(trial_quota_usage::Column::UpdatedAt, Expr::value(now))
-        .exec(&txn)
-        .await?;
-    txn.commit().await?;
-    Ok(())
+    // `is_in(&[])` is not a reliable "match nothing": an unfiltered fan-out would raise the
+    // limit on every row of the org, across pools.
+    if !features.is_empty() {
+        trial_quota_usage::Entity::update_many()
+            .filter(trial_quota_usage::Column::OrgId.eq(org_id))
+            .filter(trial_quota_usage::Column::Feature.is_in(features.iter().copied()))
+            .col_expr(
+                trial_quota_usage::Column::UsageLimit,
+                Expr::value(usage_limit),
+            )
+            .col_expr(trial_quota_usage::Column::UpdatedAt, Expr::value(now))
+            .exec(&txn)
+            .await?;
+    }
+    txn.commit().await
+}
+
+/// Set paid-overage consent on every exact backing row in one transaction.
+///
+/// Inserts missing rows with zero usage and updates only consent and `updated_at`
+/// on existing rows, so quota accounting and administrator limits survive.
+pub async fn set_paid_overage_enabled_for_features(
+    org_id: &str,
+    features: &[&str],
+    enabled: bool,
+) -> Result<(), sea_orm::DbErr> {
+    set_paid_overage_enabled_for_features_in(get_orm_client_rw().await, org_id, features, enabled)
+        .await
+}
+
+async fn set_paid_overage_enabled_for_features_in<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    features: &[&str],
+    enabled: bool,
+) -> Result<(), sea_orm::DbErr> {
+    if features.is_empty() {
+        return Ok(());
+    }
+    let txn = conn.begin().await?;
+    let now = config::utils::time::now_micros();
+    for feature in features {
+        let active_model = trial_quota_usage::ActiveModel {
+            org_id: sea_orm::ActiveValue::Set(org_id.to_string()),
+            feature: sea_orm::ActiveValue::Set((*feature).to_string()),
+            usage_count: sea_orm::ActiveValue::Set(0),
+            usage_limit: sea_orm::ActiveValue::NotSet,
+            paid_overage_enabled: sea_orm::ActiveValue::Set(enabled),
+            updated_at: sea_orm::ActiveValue::Set(now),
+            notified_checkpoint: sea_orm::ActiveValue::Set(0),
+            period: sea_orm::ActiveValue::Set(LIFETIME_PERIOD),
+        };
+        trial_quota_usage::Entity::insert(active_model)
+            .on_conflict(
+                OnConflict::columns([
+                    trial_quota_usage::Column::OrgId,
+                    trial_quota_usage::Column::Feature,
+                ])
+                .value(
+                    trial_quota_usage::Column::PaidOverageEnabled,
+                    Expr::value(enabled),
+                )
+                .value(trial_quota_usage::Column::UpdatedAt, Expr::value(now))
+                .to_owned(),
+            )
+            .exec(&txn)
+            .await?;
+    }
+    txn.commit().await
+}
+
+/// Load every exact consent row for startup and periodic reconciliation.
+pub async fn load_all_paid_overage() -> Result<Vec<(String, String, bool)>, sea_orm::DbErr> {
+    trial_quota_usage::Entity::find()
+        .select_only()
+        .column(trial_quota_usage::Column::OrgId)
+        .column(trial_quota_usage::Column::Feature)
+        .column(trial_quota_usage::Column::PaidOverageEnabled)
+        .into_tuple()
+        .all(get_orm_client_ro().await)
+        .await
 }
 
 /// Get quota record for a specific org and feature.
@@ -172,7 +384,7 @@ pub async fn get_for_org_feature(
     org_id: &str,
     feature: &str,
 ) -> Result<Option<trial_quota_usage::Model>, sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_ro().await;
     trial_quota_usage::Entity::find()
         .filter(trial_quota_usage::Column::OrgId.eq(org_id))
         .filter(trial_quota_usage::Column::Feature.eq(feature))
@@ -182,7 +394,7 @@ pub async fn get_for_org_feature(
 
 /// Get the highest notified checkpoint for an org (across all feature rows).
 pub async fn get_notified_checkpoint(org_id: &str) -> Result<i16, sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_ro().await;
     let result = trial_quota_usage::Entity::find()
         .filter(trial_quota_usage::Column::OrgId.eq(org_id))
         .column_as(
@@ -195,44 +407,87 @@ pub async fn get_notified_checkpoint(org_id: &str) -> Result<i16, sea_orm::DbErr
     Ok(result.flatten().unwrap_or(0))
 }
 
-/// Atomically update the notified checkpoint for an org.
-/// Only updates rows where the current checkpoint is lower (prevents duplicates
-/// across pods).
+/// Stamp ONE pool's notification watermark, and only where it rises; `features` bounds the
+/// `UPDATE`, or one pool's notification silences every other pool the org has (spec §11.1).
 pub async fn update_notified_checkpoint(
     org_id: &str,
     checkpoint: i16,
+    features: &[&str],
 ) -> Result<bool, sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    update_notified_checkpoint_in(get_orm_client_rw().await, org_id, checkpoint, features).await
+}
+
+/// [`update_notified_checkpoint`] against a caller-supplied connection.
+async fn update_notified_checkpoint_in<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    checkpoint: i16,
+    features: &[&str],
+) -> Result<bool, sea_orm::DbErr> {
+    // No keys, nothing to stamp: consistency with the siblings, not correctness.
+    if features.is_empty() {
+        return Ok(false);
+    }
     let result = trial_quota_usage::Entity::update_many()
         .filter(trial_quota_usage::Column::OrgId.eq(org_id))
+        .filter(trial_quota_usage::Column::Feature.is_in(features.iter().copied()))
         .filter(trial_quota_usage::Column::NotifiedCheckpoint.lt(checkpoint))
         .col_expr(
             trial_quota_usage::Column::NotifiedCheckpoint,
             sea_orm::sea_query::Expr::value(checkpoint),
         )
-        .exec(db)
+        .exec(conn)
         .await?;
     // If rows_affected > 0, this pod won the update (no other pod set it first)
     Ok(result.rows_affected > 0)
 }
 
-pub async fn reset_notified_checkpoint(org_id: &str) -> Result<(), sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = super::get_lock().await;
+/// Re-arm ONE pool's notification watermark; `features` bounds the `UPDATE`, or raising one
+/// grant re-arms every other pool the org has (spec §11.1).
+pub async fn reset_notified_checkpoint(
+    org_id: &str,
+    features: &[&str],
+) -> Result<(), sea_orm::DbErr> {
+    reset_notified_checkpoint_in(get_orm_client_rw().await, org_id, features).await
+}
+
+/// [`reset_notified_checkpoint`] against a caller-supplied connection.
+async fn reset_notified_checkpoint_in<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    features: &[&str],
+) -> Result<(), sea_orm::DbErr> {
+    // No keys, nothing to clear: consistency with the siblings, not correctness.
+    if features.is_empty() {
+        return Ok(());
+    }
     trial_quota_usage::Entity::update_many()
         .filter(trial_quota_usage::Column::OrgId.eq(org_id))
+        .filter(trial_quota_usage::Column::Feature.is_in(features.iter().copied()))
         .col_expr(
             trial_quota_usage::Column::NotifiedCheckpoint,
             Expr::value(0),
         )
-        .exec(db)
+        .exec(conn)
         .await?;
     Ok(())
 }
 
-/// Load all notified checkpoints (one per org, max across features).
-pub async fn load_all_checkpoints() -> Result<Vec<(String, i16)>, sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+/// Each org's notified watermark for ONE pool; `features` bounds the `MAX`, or another pool's
+/// watermark answers for this one and the org is never warned again (spec §11.1).
+pub async fn load_all_checkpoints(features: &[&str]) -> Result<Vec<(String, i16)>, sea_orm::DbErr> {
+    load_all_checkpoints_in(get_orm_client_ro().await, features).await
+}
+
+/// [`load_all_checkpoints`] against a caller-supplied connection.
+async fn load_all_checkpoints_in<C: ConnectionTrait>(
+    conn: &C,
+    features: &[&str],
+) -> Result<Vec<(String, i16)>, sea_orm::DbErr> {
+    // No keys, nothing to read: consistency with the siblings, not correctness.
+    if features.is_empty() {
+        return Ok(Vec::new());
+    }
     let results: Vec<(String, Option<i16>)> = trial_quota_usage::Entity::find()
         .select_only()
         .column(trial_quota_usage::Column::OrgId)
@@ -240,9 +495,10 @@ pub async fn load_all_checkpoints() -> Result<Vec<(String, i16)>, sea_orm::DbErr
             trial_quota_usage::Column::NotifiedCheckpoint.max(),
             "max_checkpoint",
         )
+        .filter(trial_quota_usage::Column::Feature.is_in(features.iter().copied()))
         .group_by(trial_quota_usage::Column::OrgId)
         .into_tuple()
-        .all(db)
+        .all(conn)
         .await?;
     Ok(results
         .into_iter()
@@ -254,10 +510,834 @@ pub async fn load_all_checkpoints() -> Result<Vec<(String, i16)>, sea_orm::DbErr
 /// Deletes all trial quota usage entries for the given org.
 pub async fn delete_by_org(org_id: &str) -> Result<(), sea_orm::DbErr> {
     use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_rw().await;
     trial_quota_usage::Entity::delete_many()
         .filter(trial_quota_usage::Column::OrgId.eq(org_id))
         .exec(db)
         .await?;
     Ok(())
+}
+
+/// One batched read of several orgs' counters, for the features of one pool set.
+///
+/// Both filters early-return on an empty slice: `is_in(&[])` is not a reliable
+/// "match nothing" here, and degrading to an unfiltered read would hand the
+/// caller the whole table.
+pub async fn get_for_orgs<C: ConnectionTrait>(
+    conn: &C,
+    org_ids: &[String],
+    features: &[&str],
+) -> Result<Vec<trial_quota_usage::Model>, sea_orm::DbErr> {
+    if org_ids.is_empty() || features.is_empty() {
+        return Ok(Vec::new());
+    }
+    trial_quota_usage::Entity::find()
+        .filter(trial_quota_usage::Column::OrgId.is_in(org_ids.iter().map(String::as_str)))
+        .filter(trial_quota_usage::Column::Feature.is_in(features.iter().copied()))
+        .all(conn)
+        .await
+}
+
+/// Advance one org's synthetics counters — the CALLER wraps these in the offset's transaction.
+pub async fn apply_synthetics_deltas_in<C: ConnectionTrait>(
+    txn: &C,
+    org_id: &str,
+    deltas: &SyntheticsDeltas,
+    now: i64,
+) -> Result<(), sea_orm::DbErr> {
+    for (feature, delta) in [
+        (SYNTHETICS_BROWSER_FEATURE, deltas.browser),
+        (SYNTHETICS_PROTOCOL_FEATURE, deltas.protocol),
+    ] {
+        // Write amplification: an org that never touched the pool must not acquire a row.
+        if delta != 0 {
+            increment_lifetime_row(txn, org_id, feature, delta, now).await?;
+        }
+    }
+    if deltas.status != 0 {
+        increment_monthly_row(txn, org_id, deltas.status, deltas.month, now).await?;
+    }
+    Ok(())
+}
+
+/// The reset rides the increment, so no pass adds to a month and a later one zeroes it.
+///
+/// A row from an older month starts the new month at this window's draw. A row from a NEWER month
+/// only accumulates: a late replay of an old window must never rewind the period it settled into.
+async fn increment_monthly_row<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    delta: i64,
+    month: i32,
+    now: i64,
+) -> Result<(), sea_orm::DbErr> {
+    let period = Expr::col((trial_quota_usage::Entity, trial_quota_usage::Column::Period));
+    let stale = period.clone().lt(month);
+    let count = CaseStatement::new().case(stale.clone(), delta).finally(
+        Expr::col((
+            trial_quota_usage::Entity,
+            trial_quota_usage::Column::UsageCount,
+        ))
+        .add(delta),
+    );
+    // Stands in for `GREATEST`, which SQLite lacks and Postgres spells as an aggregate.
+    let advance = CaseStatement::new().case(stale, month).finally(period);
+
+    let active_model = trial_quota_usage::ActiveModel {
+        org_id: sea_orm::ActiveValue::Set(org_id.to_string()),
+        feature: sea_orm::ActiveValue::Set(SYNTHETICS_STATUS_FEATURE.to_string()),
+        usage_count: sea_orm::ActiveValue::Set(delta),
+        usage_limit: sea_orm::ActiveValue::NotSet,
+        updated_at: sea_orm::ActiveValue::Set(now),
+        notified_checkpoint: sea_orm::ActiveValue::Set(0),
+        period: sea_orm::ActiveValue::Set(month),
+        paid_overage_enabled: sea_orm::ActiveValue::Set(false),
+    };
+
+    trial_quota_usage::Entity::insert(active_model)
+        .on_conflict(
+            OnConflict::columns([
+                trial_quota_usage::Column::OrgId,
+                trial_quota_usage::Column::Feature,
+            ])
+            .value(trial_quota_usage::Column::UsageCount, count)
+            .value(trial_quota_usage::Column::Period, advance)
+            .value(trial_quota_usage::Column::UpdatedAt, Expr::value(now))
+            .to_owned(),
+        )
+        .exec(conn)
+        .await?;
+    Ok(())
+}
+
+async fn increment_lifetime_row<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    feature: &str,
+    delta: i64,
+    now: i64,
+) -> Result<(), sea_orm::DbErr> {
+    let active_model = trial_quota_usage::ActiveModel {
+        org_id: sea_orm::ActiveValue::Set(org_id.to_string()),
+        feature: sea_orm::ActiveValue::Set(feature.to_string()),
+        usage_count: sea_orm::ActiveValue::Set(delta),
+        usage_limit: sea_orm::ActiveValue::NotSet,
+        updated_at: sea_orm::ActiveValue::Set(now),
+        notified_checkpoint: sea_orm::ActiveValue::Set(0),
+        period: sea_orm::ActiveValue::Set(LIFETIME_PERIOD),
+        paid_overage_enabled: sea_orm::ActiveValue::Set(false),
+    };
+
+    trial_quota_usage::Entity::insert(active_model)
+        .on_conflict(
+            OnConflict::columns([
+                trial_quota_usage::Column::OrgId,
+                trial_quota_usage::Column::Feature,
+            ])
+            .value(
+                trial_quota_usage::Column::UsageCount,
+                Expr::col((
+                    trial_quota_usage::Entity,
+                    trial_quota_usage::Column::UsageCount,
+                ))
+                .add(delta),
+            )
+            .value(trial_quota_usage::Column::UpdatedAt, Expr::value(now))
+            .to_owned(),
+        )
+        .exec(conn)
+        .await?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_orm::{
+        ActiveModelTrait, ActiveValue, ConnectOptions, ConnectionTrait, Database, DatabaseBackend,
+        DatabaseConnection, MockDatabase, MockExecResult, Schema, Transaction,
+    };
+
+    use super::*;
+
+    const ORG: &str = "acme";
+    const STATUS: &str = SYNTHETICS_STATUS_FEATURE;
+    const AI: &str = "ai_chat";
+    const BROWSER: &str = "synthetics_browser_steps";
+    const PROTOCOL: &str = "synthetics_protocol_steps";
+    const SYNTHETICS: &[&str] = &[BROWSER, PROTOCOL];
+    const AI_FEATURES: &[&str] = &[AI, "new_incident", "incident_reanalysis"];
+    /// The pre-split key the protocol pool still counts into, so a reset must name it as well.
+    const LEGACY_STEPS: &str = "synthetics_steps";
+    const PROTOCOL_POOL: &[&str] = &[PROTOCOL, LEGACY_STEPS];
+
+    /// One connection, not a pool: two connections to `sqlite::memory:` are two databases.
+    async fn db() -> DatabaseConnection {
+        let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let db = Database::connect(opts).await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        db.execute(backend.build(&schema.create_table_from_entity(trial_quota_usage::Entity)))
+            .await
+            .unwrap();
+        db
+    }
+
+    async fn seed(db: &DatabaseConnection, org_id: &str, feature: &str, usage_count: i64) {
+        seed_row(db, org_id, feature, usage_count, None).await;
+    }
+
+    fn usage_row(
+        org_id: &str,
+        feature: &str,
+        usage_count: i64,
+        usage_limit: Option<i64>,
+        notified_checkpoint: i16,
+    ) -> trial_quota_usage::ActiveModel {
+        trial_quota_usage::ActiveModel {
+            org_id: ActiveValue::Set(org_id.to_string()),
+            feature: ActiveValue::Set(feature.to_string()),
+            usage_count: ActiveValue::Set(usage_count),
+            usage_limit: ActiveValue::Set(usage_limit),
+            paid_overage_enabled: ActiveValue::Set(false),
+            updated_at: ActiveValue::Set(0),
+            notified_checkpoint: ActiveValue::Set(notified_checkpoint),
+            period: ActiveValue::Set(LIFETIME_PERIOD),
+        }
+    }
+
+    async fn seed_row(
+        db: &DatabaseConnection,
+        org_id: &str,
+        feature: &str,
+        usage_count: i64,
+        usage_limit: Option<i64>,
+    ) {
+        usage_row(org_id, feature, usage_count, usage_limit, 0)
+            .insert(db)
+            .await
+            .unwrap();
+    }
+
+    async fn seed_checkpoint(
+        db: &DatabaseConnection,
+        org_id: &str,
+        feature: &str,
+        notified_checkpoint: i16,
+    ) {
+        usage_row(org_id, feature, 0, None, notified_checkpoint)
+            .insert(db)
+            .await
+            .unwrap();
+    }
+
+    fn deltas(browser: i64, protocol: i64) -> SyntheticsDeltas {
+        SyntheticsDeltas {
+            browser,
+            protocol,
+            status: 0,
+            month: LIFETIME_PERIOD,
+        }
+    }
+
+    fn status_deltas(status: i64, month: i32) -> SyntheticsDeltas {
+        SyntheticsDeltas {
+            browser: 0,
+            protocol: 0,
+            status,
+            month,
+        }
+    }
+
+    async fn apply(db: &DatabaseConnection, org_id: &str, d: SyntheticsDeltas, now: i64) {
+        apply_synthetics_deltas_in(db, org_id, &d, now)
+            .await
+            .unwrap();
+    }
+
+    async fn apply_status(db: &DatabaseConnection, org_id: &str, status: i64, month: i32) {
+        apply_synthetics_deltas_in(db, org_id, &status_deltas(status, month), 0)
+            .await
+            .unwrap();
+    }
+
+    async fn row_of(
+        db: &DatabaseConnection,
+        org_id: &str,
+        feature: &str,
+    ) -> trial_quota_usage::Model {
+        trial_quota_usage::Entity::find()
+            .filter(trial_quota_usage::Column::OrgId.eq(org_id))
+            .filter(trial_quota_usage::Column::Feature.eq(feature))
+            .one(db)
+            .await
+            .unwrap()
+            .expect("the upsert must leave a row behind")
+    }
+
+    async fn checkpoint_of(db: &DatabaseConnection, org_id: &str, feature: &str) -> i16 {
+        row_of(db, org_id, feature).await.notified_checkpoint
+    }
+
+    fn pairs(rows: &[trial_quota_usage::Model]) -> Vec<(String, String, i64)> {
+        let mut out: Vec<(String, String, i64)> = rows
+            .iter()
+            .map(|r| (r.org_id.clone(), r.feature.clone(), r.usage_count))
+            .collect();
+        out.sort();
+        out
+    }
+
+    fn mock_db(backend: DatabaseBackend, writes: usize) -> DatabaseConnection {
+        MockDatabase::new(backend)
+            .append_exec_results(vec![
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 1,
+                };
+                writes
+            ])
+            .into_connection()
+    }
+
+    /// `ConnectionTrait` has no `begin`, so a wrapper that only forwards the pool autocommits.
+    fn assert_one_transaction(log: &[Transaction], writes: usize, what: &str) {
+        assert_eq!(log.len(), 1, "{what} must open ONE transaction: {log:?}");
+        let sql: Vec<&str> = log[0].statements().iter().map(|s| s.sql.as_str()).collect();
+        assert_eq!(sql.first().copied(), Some("BEGIN"), "{what}: {sql:?}");
+        assert_eq!(sql.last().copied(), Some("COMMIT"), "{what}: {sql:?}");
+        assert_eq!(
+            sql.len() - 2,
+            writes,
+            "{what} must hold all {writes} writes inside that one transaction: {sql:?}",
+        );
+    }
+
+    async fn has_no_row(db: &DatabaseConnection, org_id: &str, feature: &str) -> bool {
+        trial_quota_usage::Entity::find()
+            .filter(trial_quota_usage::Column::OrgId.eq(org_id))
+            .filter(trial_quota_usage::Column::Feature.eq(feature))
+            .one(db)
+            .await
+            .unwrap()
+            .is_none()
+    }
+
+    #[tokio::test]
+    async fn paid_overage_bundle_is_atomic_and_preserves_quota_fields() {
+        let db = db().await;
+        seed_row(&db, ORG, AI, 340, Some(10_000)).await;
+
+        set_paid_overage_enabled_for_features_in(&db, ORG, AI_FEATURES, true)
+            .await
+            .unwrap();
+
+        for feature in AI_FEATURES {
+            assert!(row_of(&db, ORG, feature).await.paid_overage_enabled);
+        }
+        let ai = row_of(&db, ORG, AI).await;
+        assert_eq!(ai.usage_count, 340);
+        assert_eq!(ai.usage_limit, Some(10_000));
+    }
+
+    #[tokio::test]
+    async fn revoking_paid_overage_disables_every_backing_row_without_resetting_usage() {
+        let db = db().await;
+        seed_row(&db, ORG, AI, 340, Some(10_000)).await;
+        set_paid_overage_enabled_for_features_in(&db, ORG, AI_FEATURES, true)
+            .await
+            .unwrap();
+
+        set_paid_overage_enabled_for_features_in(&db, ORG, AI_FEATURES, false)
+            .await
+            .unwrap();
+
+        for feature in AI_FEATURES {
+            assert!(!row_of(&db, ORG, feature).await.paid_overage_enabled);
+        }
+        let ai = row_of(&db, ORG, AI).await;
+        assert_eq!(ai.usage_count, 340);
+        assert_eq!(ai.usage_limit, Some(10_000));
+    }
+    #[tokio::test]
+    async fn ordinary_usage_upsert_preserves_paid_overage() {
+        let db = db().await;
+        set_paid_overage_enabled_for_features_in(&db, ORG, &[AI], true)
+            .await
+            .unwrap();
+
+        increment_lifetime_row(&db, ORG, AI, 7, 42).await.unwrap();
+
+        let row = row_of(&db, ORG, AI).await;
+        assert_eq!(row.usage_count, 7);
+        assert!(row.paid_overage_enabled);
+    }
+
+    #[tokio::test]
+    async fn paid_overage_bundle_uses_one_transaction() {
+        let db = mock_db(DatabaseBackend::Sqlite, AI_FEATURES.len());
+
+        set_paid_overage_enabled_for_features_in(&db, ORG, AI_FEATURES, true)
+            .await
+            .unwrap();
+
+        assert_one_transaction(
+            &db.into_transaction_log(),
+            AI_FEATURES.len(),
+            "set_paid_overage_enabled_for_features_in",
+        );
+    }
+
+    /// A leaked org or a leaked feature is a grant spent against the wrong pool.
+    #[tokio::test]
+    async fn get_for_orgs_returns_only_requested_orgs_and_features() {
+        let db = db().await;
+        seed(&db, "acme", BROWSER, 100).await;
+        seed(&db, "acme", PROTOCOL, 200).await;
+        seed(&db, "acme", AI, 5).await;
+        seed(&db, "beta", BROWSER, 7).await;
+        seed(&db, "gamma", BROWSER, 9).await;
+
+        let orgs = vec!["acme".to_string(), "beta".to_string()];
+        let rows = get_for_orgs(&db, &orgs, SYNTHETICS).await.unwrap();
+        assert_eq!(
+            pairs(&rows),
+            vec![
+                ("acme".to_string(), BROWSER.to_string(), 100),
+                ("acme".to_string(), PROTOCOL.to_string(), 200),
+                ("beta".to_string(), BROWSER.to_string(), 7),
+            ],
+            "an unrequested org or an AI-credit row must never reach the synthetics gate",
+        );
+
+        let rows = get_for_orgs(&db, &orgs, &[BROWSER]).await.unwrap();
+        assert_eq!(
+            pairs(&rows),
+            vec![
+                ("acme".to_string(), BROWSER.to_string(), 100),
+                ("beta".to_string(), BROWSER.to_string(), 7),
+            ],
+        );
+
+        assert!(
+            get_for_orgs(&db, &[], SYNTHETICS).await.unwrap().is_empty(),
+            "a tick that claimed nothing must not read the whole table",
+        );
+    }
+
+    /// N autocommits hold the write lock N times and leave a crash mid-batch half applied.
+    #[tokio::test]
+    async fn the_batch_is_one_transaction() {
+        let db = mock_db(DatabaseBackend::Sqlite, 3);
+
+        batch_increment_in(
+            &db,
+            vec![
+                ("acme".to_string(), BROWSER.to_string(), 40),
+                ("acme".to_string(), PROTOCOL.to_string(), 10),
+                ("beta".to_string(), PROTOCOL.to_string(), 5),
+            ],
+        )
+        .await
+        .unwrap();
+
+        assert_one_transaction(&db.into_transaction_log(), 3, "batch_increment_in");
+    }
+
+    /// `is_in(&[])` is not a reliable "match nothing", and on an `update_many` degrading to an
+    /// unfiltered write raises every pool's limit at once.
+    #[tokio::test]
+    async fn an_empty_feature_set_reaches_no_other_pool() {
+        let db = db().await;
+        seed_row(&db, "acme", AI, 340, Some(10_000)).await;
+        seed_row(&db, "acme", PROTOCOL, 100, None).await;
+
+        set_usage_limit_for_org_in(&db, "acme", BROWSER, &[], 5_000)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            row_of(&db, "acme", AI).await.usage_limit,
+            Some(10_000),
+            "an unfiltered fan-out hands the AI pool the synthetics limit",
+        );
+        assert_eq!(
+            row_of(&db, "acme", PROTOCOL).await.usage_limit,
+            None,
+            "the other synthetics pools are not in the set either",
+        );
+        assert_eq!(
+            row_of(&db, "acme", BROWSER).await.usage_limit,
+            Some(5_000),
+            "the seed insert is unconditional — only the fan-out is guarded",
+        );
+    }
+
+    /// Spec §7.4 — a crash between the seed and the fan-out leaves the pool on two limits.
+    #[tokio::test]
+    async fn setting_a_limit_is_one_transaction() {
+        let db = mock_db(DatabaseBackend::Sqlite, 2);
+
+        set_usage_limit_for_org_in(&db, "acme", BROWSER, &[BROWSER, PROTOCOL], 5_000)
+            .await
+            .unwrap();
+
+        assert_one_transaction(&db.into_transaction_log(), 2, "set_usage_limit_for_org_in");
+    }
+
+    /// Spec §11.1: an org at 96% of its AI credits carries `notified_checkpoint = 95` on EVERY
+    /// row, so an admin raising ONE synthetics grant re-emails 80 → 90 → 95 on the next tick
+    /// unless this reset is bounded by the pool whose limit actually moved.
+    #[tokio::test]
+    async fn resetting_one_pool_leaves_every_other_watermark_standing() {
+        let db = db().await;
+        for feature in [AI, "new_incident", BROWSER, PROTOCOL, LEGACY_STEPS] {
+            seed_checkpoint(&db, "acme", feature, 95).await;
+        }
+        seed_checkpoint(&db, "beta", PROTOCOL, 90).await;
+
+        reset_notified_checkpoint_in(&db, "acme", PROTOCOL_POOL)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            checkpoint_of(&db, "acme", AI).await,
+            95,
+            "the AI watermark is gone, so the next 900 s tick re-emails 80, 90 and 95",
+        );
+        assert_eq!(checkpoint_of(&db, "acme", "new_incident").await, 95);
+        for feature in [BROWSER] {
+            assert_eq!(
+                checkpoint_of(&db, "acme", feature).await,
+                95,
+                "{feature}: a pool whose limit never moved is re-armed for notifications it has \
+                 already sent",
+            );
+        }
+        for feature in PROTOCOL_POOL {
+            assert_eq!(
+                checkpoint_of(&db, "acme", feature).await,
+                0,
+                "{feature}: every feature key of the pool whose limit moved must be re-armed",
+            );
+        }
+        assert_eq!(
+            checkpoint_of(&db, "beta", PROTOCOL).await,
+            90,
+            "the org filter is still the outer bound",
+        );
+    }
+
+    /// The working case: raising the AI limit re-arms the AI pool's own rows.
+    #[tokio::test]
+    async fn resetting_the_ai_pool_still_clears_its_own_rows() {
+        let db = db().await;
+        for feature in AI_FEATURES.iter().copied().chain([BROWSER]) {
+            seed_checkpoint(&db, "acme", feature, 95).await;
+        }
+
+        reset_notified_checkpoint_in(&db, "acme", AI_FEATURES)
+            .await
+            .unwrap();
+
+        for feature in AI_FEATURES {
+            assert_eq!(
+                checkpoint_of(&db, "acme", feature).await,
+                0,
+                "{feature}: the reset covers every feature key of the pool, not just the one \
+                 that is named",
+            );
+        }
+        assert_eq!(checkpoint_of(&db, "acme", BROWSER).await, 95);
+    }
+
+    /// An empty slice clears nothing, whether the guard runs or sea-query renders `1 = 2`.
+    #[tokio::test]
+    async fn resetting_no_features_touches_no_row() {
+        let db = db().await;
+        seed_checkpoint(&db, "acme", AI, 95).await;
+
+        reset_notified_checkpoint_in(&db, "acme", &[])
+            .await
+            .unwrap();
+
+        assert_eq!(checkpoint_of(&db, "acme", AI).await, 95);
+    }
+
+    /// Spec §11.1: the watermark is read back as a MAX over the org's rows, so an AI
+    /// notification stamping the synthetics rows answers for the synthetics pool ever after.
+    #[tokio::test]
+    async fn stamping_one_pool_leaves_every_other_watermark_standing() {
+        let db = db().await;
+        for feature in AI_FEATURES
+            .iter()
+            .copied()
+            .chain(SYNTHETICS.iter().copied())
+        {
+            seed_checkpoint(&db, "acme", feature, 0).await;
+        }
+        seed_checkpoint(&db, "beta", AI, 0).await;
+
+        assert!(
+            update_notified_checkpoint_in(&db, "acme", 95, AI_FEATURES)
+                .await
+                .unwrap(),
+            "the pod that moves the watermark is the one that sends the email",
+        );
+
+        for feature in AI_FEATURES {
+            assert_eq!(checkpoint_of(&db, "acme", feature).await, 95);
+        }
+        for feature in SYNTHETICS {
+            assert_eq!(
+                checkpoint_of(&db, "acme", feature).await,
+                0,
+                "{feature}: a pool nobody notified is left claiming it warned the org at 95",
+            );
+        }
+        assert_eq!(
+            checkpoint_of(&db, "beta", AI).await,
+            0,
+            "the org filter is still the outer bound",
+        );
+    }
+
+    /// The AI job's `already_notified` is this MAX, and `pending_checkpoint_from` returns
+    /// `None` for every checkpoint at or below it.
+    #[tokio::test]
+    async fn loading_one_pools_checkpoints_ignores_another_pools_rows() {
+        let db = db().await;
+        seed_checkpoint(&db, "acme", BROWSER, 95).await;
+        seed_checkpoint(&db, "acme", AI, 0).await;
+        seed_checkpoint(&db, "beta", AI, 80).await;
+
+        let loaded = load_all_checkpoints_in(&db, AI_FEATURES).await.unwrap();
+
+        assert_eq!(
+            loaded,
+            vec![("beta".to_string(), 80)],
+            "acme's AI pool is unnotified: only a synthetics watermark, or its own zero, can \
+             put it in this answer",
+        );
+    }
+
+    /// Spec §11.1 end to end: production rows carry 95 on EVERY feature, so an AI grant raised
+    /// after the fix must still leave the AI job seeing an org it can warn again.
+    #[tokio::test]
+    async fn raising_the_ai_grant_re_arms_the_job_a_synthetics_row_would_pin() {
+        let db = db().await;
+        for feature in AI_FEATURES
+            .iter()
+            .copied()
+            .chain(SYNTHETICS.iter().copied())
+        {
+            seed_checkpoint(&db, "acme", feature, 95).await;
+        }
+
+        reset_notified_checkpoint_in(&db, "acme", AI_FEATURES)
+            .await
+            .unwrap();
+
+        assert!(
+            load_all_checkpoints_in(&db, AI_FEATURES)
+                .await
+                .unwrap()
+                .is_empty(),
+            "a synthetics row still at 95 would hold the org's MAX at 95, and the raised AI \
+             grant would never be warned about again",
+        );
+        for feature in SYNTHETICS {
+            assert_eq!(
+                checkpoint_of(&db, "acme", feature).await,
+                95,
+                "{feature}: the synthetics watermark is not the AI reset's to clear",
+            );
+        }
+    }
+
+    /// An empty slice touches nothing, whether the guard runs or sea-query renders `1 = 2`.
+    #[tokio::test]
+    async fn no_features_stamps_no_row_and_reads_nothing() {
+        let db = db().await;
+        seed_checkpoint(&db, "acme", AI, 80).await;
+
+        assert!(
+            !update_notified_checkpoint_in(&db, "acme", 95, &[])
+                .await
+                .unwrap(),
+            "a write that reached no row must not report itself as the winning claim",
+        );
+
+        assert_eq!(checkpoint_of(&db, "acme", AI).await, 80);
+        assert!(load_all_checkpoints_in(&db, &[]).await.unwrap().is_empty(),);
+    }
+
+    /// Write amplification: an org that never touched the pool must not acquire a row for it.
+    #[tokio::test]
+    async fn a_zero_delta_writes_no_row() {
+        let db = db().await;
+
+        apply(&db, "acme", deltas(0, 0), 5).await;
+
+        assert!(has_no_row(&db, "acme", BROWSER).await, "browser");
+        assert!(has_no_row(&db, "acme", PROTOCOL).await, "protocol");
+    }
+
+    #[tokio::test]
+    async fn status_upsert_inserts_with_the_month() {
+        let db = db().await;
+        apply_status(&db, ORG, 40, 202610).await;
+
+        let row = row_of(&db, ORG, STATUS).await;
+        assert_eq!((row.usage_count, row.period), (40, 202610));
+    }
+
+    #[tokio::test]
+    async fn status_upsert_adds_within_month() {
+        let db = db().await;
+        apply_status(&db, ORG, 12_480, 202609).await;
+        apply_status(&db, ORG, 410, 202609).await;
+
+        let row = row_of(&db, ORG, STATUS).await;
+        assert_eq!((row.usage_count, row.period), (12_890, 202609));
+    }
+
+    #[tokio::test]
+    async fn status_upsert_resets_on_a_newer_month() {
+        let db = db().await;
+        apply_status(&db, ORG, 12_890, 202609).await;
+        apply_status(&db, ORG, 90, 202610).await;
+
+        let row = row_of(&db, ORG, STATUS).await;
+        assert_eq!(
+            (row.usage_count, row.period),
+            (90, 202610),
+            "a new month starts the count again instead of adding to the old one",
+        );
+    }
+
+    #[tokio::test]
+    async fn status_upsert_adds_a_late_older_month_to_the_current_month() {
+        let db = db().await;
+        apply_status(&db, ORG, 90, 202610).await;
+        apply_status(&db, ORG, 5, 202609).await;
+
+        let row = row_of(&db, ORG, STATUS).await;
+        assert_eq!(
+            (row.usage_count, row.period),
+            (95, 202610),
+            "a late replay counts against the current month and never rewinds the period",
+        );
+    }
+
+    #[tokio::test]
+    async fn status_upsert_never_touches_usage_limit() {
+        let db = db().await;
+        seed_row(&db, ORG, STATUS, 0, Some(1_000)).await;
+
+        for (draw, month) in [(40, 202609), (10, 202609), (7, 202610), (1, 202608)] {
+            apply_status(&db, ORG, draw, month).await;
+            assert_eq!(
+                row_of(&db, ORG, STATUS).await.usage_limit,
+                Some(1_000),
+                "an administrator override outlives every reset",
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn lifetime_rows_keep_period_at_zero() {
+        let db = db().await;
+        apply(&db, ORG, deltas(10, 20), 0).await;
+        apply(&db, ORG, deltas(5, 5), 1).await;
+
+        for feature in [BROWSER, PROTOCOL] {
+            assert_eq!(row_of(&db, ORG, feature).await.period, LIFETIME_PERIOD);
+        }
+    }
+
+    #[tokio::test]
+    async fn a_zero_status_delta_writes_no_row() {
+        let db = db().await;
+        apply_status(&db, ORG, 0, 202609).await;
+
+        assert!(has_no_row(&db, ORG, STATUS).await);
+    }
+
+    async fn spend(db: &DatabaseConnection, feature: &str, cost: i64) -> Spend {
+        try_spend_in(db, ORG, AI, feature, AI_FEATURES, cost, 50)
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn spend_is_capped_by_the_pool_total_across_features() {
+        let db = db().await;
+        assert_eq!(
+            spend(&db, "new_incident", 20).await,
+            Spend::Spent {
+                used: 20,
+                limit: 50
+            }
+        );
+        assert_eq!(
+            spend(&db, AI, 29).await,
+            Spend::Spent {
+                used: 49,
+                limit: 50
+            }
+        );
+        assert_eq!(
+            spend(&db, "new_incident", 20).await,
+            Spend::Exhausted {
+                used: 49,
+                limit: 50
+            },
+            "the incident row alone is under 50, the pool is not",
+        );
+        assert_eq!(
+            spend(&db, AI, 1).await,
+            Spend::Spent {
+                used: 50,
+                limit: 50
+            }
+        );
+        assert_eq!(
+            spend(&db, AI, 1).await,
+            Spend::Exhausted {
+                used: 50,
+                limit: 50
+            }
+        );
+        assert_eq!(row_of(&db, ORG, "new_incident").await.usage_count, 20);
+    }
+
+    #[tokio::test]
+    async fn spend_reads_an_explicit_limit_over_the_default() {
+        let db = db().await;
+        seed_row(&db, ORG, "new_incident", 50, Some(60)).await;
+
+        assert_eq!(
+            spend(&db, AI, 10).await,
+            Spend::Spent {
+                used: 60,
+                limit: 60
+            }
+        );
+        assert_eq!(
+            spend(&db, AI, 1).await,
+            Spend::Exhausted {
+                used: 60,
+                limit: 60
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn spend_ignores_rows_of_other_pools() {
+        let db = db().await;
+        seed(&db, ORG, BROWSER, 1_000).await;
+
+        assert_eq!(spend(&db, AI, 1).await, Spend::Spent { used: 1, limit: 50 });
+    }
 }

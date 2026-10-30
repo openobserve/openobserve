@@ -18,13 +18,22 @@ import {
   truncateText,
   formatLargeNumber,
   formatCompactCount,
+  formatEventCount,
   formatSizeFromMB,
   addCommasToNumber,
   formatTimeWithSuffix,
+  formatTierRule,
   formatDuration,
   durationFormatter,
   maskText,
   convertToCamelCase,
+  formatMicrosDuration,
+  operatorSymbol,
+  minuteOfDayToHhmm,
+  formatUtcWindows,
+  utcMinuteToTzHhmm,
+  timezoneAbbr,
+  formatUtcWindowsInTz,
 } from "./formatters";
 
 // Buffer-based btoa/atob for jsdom
@@ -302,6 +311,41 @@ describe("formatLargeNumber", () => {
   it("formats numbers >= 1_000_000_000 with B suffix", () => {
     expect(formatLargeNumber(3_000_000_000)).toBe("3.0B");
   });
+
+  it("moves to the next unit when rounding reaches 1000", () => {
+    expect(formatLargeNumber(999_949)).toBe("999.9K");
+    expect(formatLargeNumber(999_950)).toBe("1.0M");
+    expect(formatLargeNumber(999_999)).toBe("1.0M");
+    expect(formatLargeNumber(999_999_999)).toBe("1.0B");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatEventCount
+// ---------------------------------------------------------------------------
+
+describe("formatEventCount", () => {
+  it("prints counts below 100 000 exactly", () => {
+    expect(formatEventCount(99_999)).toBe("99999");
+  });
+
+  it("formats larger counts with one decimal and drops a trailing .0", () => {
+    expect(formatEventCount(123_456)).toBe("123.5K");
+    expect(formatEventCount(2_000_000)).toBe("2M");
+    expect(formatEventCount(2_900_000_000)).toBe("2.9B");
+  });
+
+  it("moves to the next unit when rounding reaches 1000", () => {
+    expect(formatEventCount(999_949)).toBe("999.9K");
+    expect(formatEventCount(999_950)).toBe("1M");
+    expect(formatEventCount(999_999)).toBe("1M");
+    expect(formatEventCount(999_999_999)).toBe("1B");
+    expect(formatEventCount(999_990_000_000)).toBe("1T");
+  });
+
+  it("stays on T past the largest unit", () => {
+    expect(formatEventCount(1e15)).toBe("1000T");
+  });
 });
 
 describe("formatCompactCount", () => {
@@ -521,3 +565,183 @@ describe("convertToCamelCase", () => {
 
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
+
+describe("formatMicrosDuration", () => {
+  // Table-driven: the whole contract is "which units survive at which span".
+  it.each([
+    [45 * 1_000_000, "45s"],
+    [4 * 60 * 1_000_000, "4m"],
+    [(4 * 60 + 12) * 1_000_000, "4m 12s"],
+    [2 * 3600 * 1_000_000, "2h"],
+    [(2 * 3600 + 30 * 60) * 1_000_000, "2h 30m"],
+    [3 * 86400 * 1_000_000, "3d"],
+    [(3 * 86400 + 3600) * 1_000_000, "3d 1h"],
+  ])("formats %i micros as %s", (micros, expected) => {
+    expect(formatMicrosDuration(micros)).toBe(expected);
+  });
+
+  it("renders zero as zero seconds, not an em dash", () => {
+    expect(formatMicrosDuration(0)).toBe("0s");
+  });
+
+  // Clock skew across nodes can produce a negative span; showing "-3s" would
+  // read as a real measurement.
+  it.each([-1, Number.NaN, Number.POSITIVE_INFINITY])("renders an em dash for %s", (micros) => {
+    expect(formatMicrosDuration(micros)).toBe("—");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// operatorSymbol / minuteOfDayToHhmm / formatUtcWindows (model pricing)
+// ---------------------------------------------------------------------------
+
+describe("operatorSymbol", () => {
+  it("maps the six comparison operators to display symbols", () => {
+    expect(operatorSymbol("gt")).toBe(">");
+    expect(operatorSymbol("gte")).toBe("≥");
+    expect(operatorSymbol("lt")).toBe("<");
+    expect(operatorSymbol("lte")).toBe("≤");
+    expect(operatorSymbol("eq")).toBe("=");
+    expect(operatorSymbol("neq")).toBe("≠");
+  });
+
+  it("returns the input unchanged for unknown operators", () => {
+    expect(operatorSymbol("between")).toBe("between");
+  });
+});
+
+describe("minuteOfDayToHhmm", () => {
+  it("formats minutes past midnight as zero-padded HH:MM", () => {
+    expect(minuteOfDayToHhmm(0)).toBe("00:00");
+    expect(minuteOfDayToHhmm(60)).toBe("01:00");
+    expect(minuteOfDayToHhmm(605)).toBe("10:05");
+    expect(minuteOfDayToHhmm(1439)).toBe("23:59");
+  });
+
+  it("renders exactly 1440 as 24:00 (an end-of-day bound, not a wrap)", () => {
+    expect(minuteOfDayToHhmm(1440)).toBe("24:00");
+  });
+
+  it("normalises out-of-range and negative minutes into the day", () => {
+    expect(minuteOfDayToHhmm(1500)).toBe("01:00");
+    expect(minuteOfDayToHhmm(-60)).toBe("23:00");
+  });
+});
+
+describe("formatTierRule", () => {
+  const labels: Record<string, string> = {
+    "modelPricing.ruleOpIn": "is one of",
+    "modelPricing.ruleOpNotIn": "is not one of",
+    "modelPricing.ruleOpExists": "is set",
+    "modelPricing.ruleOpNotExists": "is not set",
+  };
+  const t = (key: string) => labels[key] ?? key;
+
+  it("labels set rules through t and counts extra keys", () => {
+    expect(
+      formatTierRule(
+        {
+          keys: ["openai.response.service_tier", "openai.request.service_tier"],
+          op: "in",
+          values: ["flex", "priority"],
+        },
+        t,
+      ),
+    ).toBe("openai.response.service_tier +1 is one of flex, priority");
+    expect(formatTierRule({ keys: ["speed"], op: "not_in", values: ["fast"] }, t)).toBe(
+      "speed is not one of fast",
+    );
+  });
+
+  it("renders presence and comparison rules", () => {
+    expect(formatTierRule({ keys: ["speed"], op: "exists" }, t)).toBe("speed is set");
+    expect(formatTierRule({ keys: ["speed"], op: "not_exists" }, t)).toBe("speed is not set");
+    expect(formatTierRule({ keys: ["usage.input"], op: "gte", value: 272000 }, t)).toBe(
+      "usage.input ≥ 272000",
+    );
+  });
+
+  it("skips blank keys and tolerates a missing operator", () => {
+    expect(formatTierRule({ keys: [" ", "service_tier"], values: ["flex"] }, t)).toBe(
+      "service_tier is one of flex",
+    );
+  });
+});
+
+describe("formatUtcWindows", () => {
+  it("joins windows as comma-separated ranges with a UTC suffix", () => {
+    expect(
+      formatUtcWindows([
+        { start_minute: 60, end_minute: 240 },
+        { start_minute: 360, end_minute: 600 },
+      ]),
+    ).toBe("01:00–04:00, 06:00–10:00 UTC");
+  });
+
+  it("keeps a midnight-wrapping window as start–end", () => {
+    expect(formatUtcWindows([{ start_minute: 1320, end_minute: 120 }])).toBe("22:00–02:00 UTC");
+  });
+
+  it("returns an empty string for no windows", () => {
+    expect(formatUtcWindows([])).toBe("");
+    expect(formatUtcWindows(undefined as any)).toBe("");
+  });
+});
+
+describe("utcMinuteToTzHhmm", () => {
+  it("converts a UTC minute into the target timezone (fixed-offset zone)", () => {
+    // Asia/Kolkata is UTC+5:30 year-round — no DST flakiness.
+    expect(utcMinuteToTzHhmm(60, "Asia/Kolkata")).toBe("06:30");
+    expect(utcMinuteToTzHhmm(0, "Asia/Kolkata")).toBe("05:30");
+  });
+
+  it("wraps past midnight in the target timezone", () => {
+    // 22:00 UTC = 03:30 next day in Kolkata.
+    expect(utcMinuteToTzHhmm(1320, "Asia/Kolkata")).toBe("03:30");
+  });
+
+  it("is identity for UTC", () => {
+    expect(utcMinuteToTzHhmm(600, "UTC")).toBe("10:00");
+  });
+
+  it("returns empty string for an unknown timezone", () => {
+    expect(utcMinuteToTzHhmm(60, "Not/AZone")).toBe("");
+  });
+});
+
+describe("timezoneAbbr", () => {
+  it("returns a short display name for a valid zone", () => {
+    const abbr = timezoneAbbr("Asia/Kolkata");
+    expect(abbr.length).toBeGreaterThan(0);
+    expect(abbr).not.toBe("Asia/Kolkata");
+  });
+
+  it("falls back to the input for an unknown zone", () => {
+    expect(timezoneAbbr("Not/AZone")).toBe("Not/AZone");
+  });
+});
+
+describe("formatUtcWindowsInTz", () => {
+  it("converts each window and appends the zone abbreviation", () => {
+    const out = formatUtcWindowsInTz(
+      [
+        { start_minute: 60, end_minute: 240 },
+        { start_minute: 360, end_minute: 600 },
+      ],
+      "Asia/Kolkata",
+    );
+    expect(out).toContain("06:30–09:30");
+    expect(out).toContain("11:30–15:30");
+    expect(out).toContain(timezoneAbbr("Asia/Kolkata"));
+  });
+
+  it("returns empty when the zone is UTC-equivalent — nothing to convert", () => {
+    expect(formatUtcWindowsInTz([{ start_minute: 60, end_minute: 240 }], "UTC")).toBe("");
+  });
+
+  it("returns empty for no windows, missing zone, or an unknown zone", () => {
+    expect(formatUtcWindowsInTz([], "Asia/Kolkata")).toBe("");
+    expect(formatUtcWindowsInTz([{ start_minute: 60, end_minute: 240 }], "")).toBe("");
+    expect(formatUtcWindowsInTz([{ start_minute: 60, end_minute: 240 }], "Not/AZone")).toBe("");
+  });
+});

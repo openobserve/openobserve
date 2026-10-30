@@ -26,8 +26,14 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(() => vi.fn()),
   useToast: () => ({ toast: vi.fn(), toasts: [] }),
 }));
-vi.mock("@/services/settings", () => ({ default: {} }));
-vi.mock("@/services/config", () => ({ default: { get_config: vi.fn() } }));
+vi.mock("@/services/settings", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), { default: {} });
+});
+vi.mock("@/services/config", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), { default: { get_config: vi.fn() } });
+});
 vi.mock("@/composables/useLoading", () => ({
   useLoading: (fn: Function) => ({ execute: fn, isLoading: { value: false } }),
 }));
@@ -44,12 +50,17 @@ const summarySpy = vi.fn().mockResolvedValue({
     streams: { num_streams: 18, total_storage_size: 4.2 * 1024 * 1024 },
   },
 });
-vi.mock("@/services/organizations", () => ({
-  default: {
-    post_organization_settings: vi.fn(),
-    get_organization_summary: (...a: any[]) => summarySpy(...a),
-  },
-}));
+const deleteOrgSpy = vi.hoisted(() => vi.fn());
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      post_organization_settings: vi.fn(),
+      get_organization_summary: (...a: any[]) => summarySpy(...a),
+      delete_org: (...a: any[]) => deleteOrgSpy(...a),
+    },
+  });
+});
 
 // Default: two humans + one service account -> "Affects 2 members", caller is an
 // admin. Individual tests override to exercise the role gate.
@@ -59,9 +70,12 @@ const ADMIN_MEMBERS = [
   { email: "svc@o2.ai", role: "admin", is_system: true },
 ];
 const orgUsersSpy = vi.fn();
-vi.mock("@/services/users", () => ({
-  default: { orgUsers: (...a: any[]) => orgUsersSpy(...a) },
-}));
+vi.mock("@/services/users", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { orgUsers: (...a: any[]) => orgUsersSpy(...a) },
+  });
+});
 
 const mockStore = {
   state: {
@@ -70,7 +84,7 @@ const mockStore = {
     tempThemeColors: { light: null, dark: null },
     selectedOrganization: { identifier: "test-org", label: "Acme Production" },
     userInfo: { email: "me@o2.ai" },
-    organizationData: { organizationSettings: { scrape_interval: 30 } },
+    organizationData: { organizationSettings: { scrape_interval: 30, free_trial_expiry: "" } },
     zoConfig: {
       meta_org: "test-org",
       custom_logo_text: "Test Logo Text",
@@ -114,6 +128,13 @@ describe("General settings Danger Zone", () => {
       expect(zone(await mountGeneral())).toBe(true);
     });
 
+    it("shows it to a root user", async () => {
+      orgUsersSpy.mockResolvedValue({
+        data: { data: [{ email: "me@o2.ai", role: "root" }] },
+      });
+      expect(zone(await mountGeneral())).toBe(true);
+    });
+
     it.each(["editor", "viewer", "user", "member"])("hides it from a %s", async (role) => {
       orgUsersSpy.mockResolvedValue({
         data: { data: [{ email: "me@o2.ai", role }] },
@@ -145,10 +166,10 @@ describe("General settings Danger Zone", () => {
     });
 
     it.each([
-      ["zh-cn", "危险区域", "仅限管理员"],
-      ["ja", "危険ゾーン", "管理者のみ"],
-      ["de", "Gefahrenzone", "Nur Administratoren"],
-    ])("renders the panel in %s", async (locale, header, ownerFact) => {
+      ["zh-cn", "危险区域", "删除所有内容"],
+      ["ja", "危険ゾーン", "すべてを削除"],
+      ["de", "Gefahrenzone", "Löscht alles"],
+    ])("renders the panel in %s", async (locale, header, scopeFact) => {
       // Only en-us is bundled; every other locale is a lazy chunk. main.ts awaits
       // this before mounting, so mirror that here rather than assuming the
       // messages are already registered.
@@ -158,10 +179,10 @@ describe("General settings Danger Zone", () => {
       const text = wrapper.find('[data-test="general-settings-danger-zone"]').text();
 
       expect(text).toContain(header);
-      expect(text).toContain(ownerFact);
+      expect(text).toContain(scopeFact);
       // No English fallback leaking through.
       expect(text).not.toContain("Danger Zone");
-      expect(text).not.toContain("Admins only");
+      expect(text).not.toContain("Deletes everything");
       // The plural must still resolve after translation.
       expect(text).not.toContain("|");
       expect(text).not.toContain("{n}");
@@ -180,7 +201,7 @@ describe("General settings Danger Zone", () => {
   it("renders one consequence tile per fact", async () => {
     const wrapper = await mountGeneral();
     expect(wrapper.find('[data-test="general-settings-danger-zone"]').exists()).toBe(true);
-    expect(wrapper.findAll('[data-test^="general-settings-delete-org-fact-"]')).toHaveLength(4);
+    expect(wrapper.findAll('[data-test^="general-settings-delete-org-fact-"]')).toHaveLength(3);
   });
 
   it("names the org in the description and counts only human members", async () => {
@@ -195,25 +216,47 @@ describe("General settings Danger Zone", () => {
     expect(text).not.toContain("{n}");
   });
 
-  it("states the grace period without inventing a duration", async () => {
-    const wrapper = await mountGeneral();
-    const text = wrapper.find('[data-test="general-settings-delete-org-fact-grace"]').text();
+  // org_deletion_grace_period_days comes from /config. It is an env var, so the panel
+  // has to read it rather than hardcode 30, and it has to survive both a backend that
+  // predates the field and the legal 0 value.
+  describe("recovery window duration", () => {
+    const graceText = (w: any) =>
+      w.find('[data-test="general-settings-delete-org-fact-grace"]').text();
+    afterEach(() => {
+      delete (mockStore.state.zoConfig as any).org_deletion_grace_period_days;
+    });
 
-    expect(text).toContain("Grace period");
-    // The real value lives in enterprise config and is not exposed to the
-    // frontend, so no day count may appear here.
-    expect(text).not.toMatch(/\d+\s*(day|days)/i);
-  });
+    it("shows the day count reported by /config", async () => {
+      (mockStore.state.zoConfig as any).org_deletion_grace_period_days = 30;
+      expect(graceText(await mountGeneral())).toContain("30 days");
+    });
 
-  // initiate_org_deletion allows root or UserRole::Admin in this org — and there
-  // is no Owner role in UserRole at all. The copy must name the real requirement,
-  // otherwise it invents a role the user cannot find anywhere in IAM.
-  it("describes the permission as Admin, not a non-existent Owner role", async () => {
-    const wrapper = await mountGeneral();
-    const text = wrapper.find('[data-test="general-settings-delete-org-fact-owner"]').text();
+    it("uses the singular for a one-day window", async () => {
+      (mockStore.state.zoConfig as any).org_deletion_grace_period_days = 1;
+      const text = graceText(await mountGeneral());
 
-    expect(text).toMatch(/admin/i);
-    expect(text).not.toMatch(/owner/i);
+      expect(text).toContain("1 day");
+      expect(text).not.toContain("1 days");
+    });
+
+    // 0 means the org is purged immediately. Rendering "Recovery window" here would
+    // promise a reprieve that does not exist.
+    it("says there is no window when the duration is zero", async () => {
+      (mockStore.state.zoConfig as any).org_deletion_grace_period_days = 0;
+      const text = graceText(await mountGeneral());
+
+      expect(text).toContain("No recovery window");
+      expect(text).toContain("immediate and permanent");
+      expect(text).not.toMatch(/\d+\s*(day|days)/i);
+    });
+
+    // An older backend omits the field entirely; inventing 30 would be a guess.
+    it("states the window without a duration when /config omits the field", async () => {
+      const text = graceText(await mountGeneral());
+
+      expect(text).toContain("Recovery window");
+      expect(text).not.toMatch(/\d+\s*(day|days)/i);
+    });
   });
 
   // Resurrect is _meta-only, and org_blocking locks the actor out of their own
@@ -236,6 +279,136 @@ describe("General settings Danger Zone", () => {
 
     expect(summarySpy).toHaveBeenCalledTimes(1);
     expect((wrapper.vm as any).orgScope).toBe("32 dashboards · 18 streams · 4.20 TB data");
+  });
+
+  // Expired trials keep the Danger Zone and lose everything else on the page.
+  describe("expired trial", () => {
+    const EXPIRED = String((Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000);
+
+    afterEach(() => {
+      (mockStore.state.organizationData.organizationSettings as any).free_trial_expiry = "";
+    });
+
+    const expireTrial = () => {
+      (mockStore.state.organizationData.organizationSettings as any).free_trial_expiry = EXPIRED;
+    };
+
+    it("still renders the delete button for an admin", async () => {
+      expireTrial();
+      const wrapper = await mountGeneral();
+
+      expect(wrapper.find('[data-test="general-settings-delete-org-btn"]').exists()).toBe(true);
+    });
+
+    // These shapes mean "no trial tracked", not a lapsed one.
+    it.each([
+      ["absent", undefined],
+      ["empty", ""],
+      ["zero", 0],
+      ["zero string", "0"],
+    ])("keeps the settings sections when the expiry is %s", async (_label, expiry) => {
+      (mockStore.state.organizationData.organizationSettings as any).free_trial_expiry = expiry;
+      const wrapper = await mountGeneral();
+
+      expect(wrapper.find('[data-test="general-settings-scrape-interval"]').exists()).toBe(true);
+    });
+
+    // Offering these invites edits a lapsed org can no longer act on.
+    it("hides the non-destructive settings sections", async () => {
+      expireTrial();
+      const wrapper = await mountGeneral();
+
+      expect(wrapper.find('[data-test="general-settings-scrape-interval"]').exists()).toBe(false);
+      expect(wrapper.find("#enterpriseFeature").exists()).toBe(false);
+    });
+
+    // The role gate still governs once the route is reachable.
+    it("hides the delete button from a member", async () => {
+      expireTrial();
+      orgUsersSpy.mockResolvedValue({
+        data: { data: [{ email: "me@o2.ai", role: "member" }] },
+      });
+      const wrapper = await mountGeneral();
+
+      expect(wrapper.find('[data-test="general-settings-delete-org-btn"]').exists()).toBe(false);
+    });
+
+    it("renders both the danger zone and the settings sections while the trial is live", async () => {
+      const wrapper = await mountGeneral();
+
+      expect(wrapper.find('[data-test="general-settings-delete-org-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="general-settings-scrape-interval"]').exists()).toBe(true);
+      expect(wrapper.find("#enterpriseFeature").exists()).toBe(true);
+    });
+  });
+
+  // Without these the button can toast success while never calling the API.
+  describe("deleteOrg execution", () => {
+    beforeEach(() => {
+      deleteOrgSpy.mockReset();
+      deleteOrgSpy.mockResolvedValue({});
+    });
+
+    it("calls delete_org with the selected org identifier", async () => {
+      const wrapper = await mountGeneral();
+      await (wrapper.vm as any).deleteOrg();
+
+      expect(deleteOrgSpy).toHaveBeenCalledTimes(1);
+      expect(deleteOrgSpy).toHaveBeenCalledWith("test-org");
+    });
+
+    it("closes the dialog and clears the typed confirmation on success", async () => {
+      const wrapper = await mountGeneral();
+      (wrapper.vm as any).confirmDeleteOrg = true;
+      (wrapper.vm as any).deleteConfirmInput = "Acme Production";
+
+      await (wrapper.vm as any).deleteOrg();
+
+      expect((wrapper.vm as any).confirmDeleteOrg).toBe(false);
+      expect((wrapper.vm as any).deleteConfirmInput).toBe("");
+    });
+
+    // Clearing the org on a failed delete would strand the user on a live org.
+    it("keeps the dialog open and does not clear the org when the API fails", async () => {
+      deleteOrgSpy.mockRejectedValueOnce({
+        response: { data: { message: "Cannot delete this organization" } },
+      });
+      const wrapper = await mountGeneral();
+      (wrapper.vm as any).confirmDeleteOrg = true;
+
+      await (wrapper.vm as any).deleteOrg();
+
+      expect((wrapper.vm as any).confirmDeleteOrg).toBe(true);
+      expect((wrapper.vm as any).deleting).toBe(false);
+    });
+
+    it("does not call the API when no org is selected", async () => {
+      const wrapper = await mountGeneral();
+      const original = mockStore.state.selectedOrganization;
+      (mockStore.state as any).selectedOrganization = {};
+
+      await (wrapper.vm as any).deleteOrg();
+      (mockStore.state as any).selectedOrganization = original;
+
+      expect(deleteOrgSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  // The type-to-confirm gate is the only guard on an irreversible action.
+  describe("deleteConfirmMatches gate", () => {
+    it("is false until the typed name matches, and trims surrounding space", async () => {
+      const wrapper = await mountGeneral();
+
+      expect((wrapper.vm as any).deleteConfirmMatches).toBe(false);
+
+      (wrapper.vm as any).deleteConfirmInput = "acme production";
+      await flushPromises();
+      expect((wrapper.vm as any).deleteConfirmMatches).toBe(false);
+
+      (wrapper.vm as any).deleteConfirmInput = "  Acme Production  ";
+      await flushPromises();
+      expect((wrapper.vm as any).deleteConfirmMatches).toBe(true);
+    });
   });
 
   it("keeps the delete flow usable when /summary fails", async () => {

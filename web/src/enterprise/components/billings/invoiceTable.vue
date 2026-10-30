@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('billing.downloadInvoice')"
         variant="ghost"
         size="icon-sm"
-        class="ml-1"
+        class="ms-1"
       >
         <OIcon name="download" size="sm" />
       </OButton>
@@ -57,11 +57,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import BillingService from "@/services/billings";
 import { onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import NoData from "@/components/shared/grid/NoData.vue";
-import BillingService from "@/services/billings";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -71,13 +71,13 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 const columns: OTableColumnDef[] = [
   {
     id: "id",
-    header: "#",
+    header: raw("#"),
     accessorKey: "id",
     sortable: true,
     meta: { align: "left" },
@@ -160,15 +160,25 @@ interface InvoiceRow {
 
 const invoiceHistory = ref<InvoiceRow[]>([]);
 
+const formatInvoiceAmount = (total: number, currency: string) => {
+  const formatter = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+  });
+  // Stripe amounts are in the currency's minor unit, which is 0 digits for JPY/KRW etc.
+  const minorDigits = formatter.resolvedOptions().maximumFractionDigits ?? 2;
+  return formatter.format(total / 10 ** minorDigits);
+};
+
 const getInvoiceHistory = () => {
   const dismiss = toast({
     variant: "loading",
-    message: "Please wait while loading invoice history...",
+    message: t("toastMessages.billings.pleaseWaitWhileLoadingInvoiceHistory"),
     timeout: 0,
   });
 
   BillingService.list_invoice_history(store.state.selectedOrganization.identifier)
-    .then((res) => {
+    .then((res: any) => {
       dismiss();
       const invoiceList = res.data.invoices;
       if (invoiceList.length > 0) {
@@ -177,8 +187,8 @@ const getInvoiceHistory = () => {
             id: ++index,
             start_date: invoice.period_start,
             end_date: invoice.period_end,
-            paid: invoice.paid ? "Yes" : "No",
-            amount: invoice.total + " " + invoice.currency.toUpperCase(),
+            paid: invoice.paid ? t("common.yes") : t("common.no"),
+            amount: formatInvoiceAmount(invoice.total, invoice.currency),
             amount_paid: invoice.amount_paid,
             amount_due: invoice.amount_due,
             attempt_count: invoice.attempt_count,

@@ -30,13 +30,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ formatEventTimestamp(sourceEvent.timestamp) }}
     </span>
     <OSeparator v-if="sourceEvent.message" vertical class="mx-0" />
-    <span
+    <OTruncatedText
       v-if="sourceEvent.message"
-      class="text-typography-meta line-clamp-2 flex-1 font-mono text-xs leading-[1.4] wrap-break-word text-ellipsis whitespace-normal"
-      :title="sourceEvent.message"
+      :lines="2"
+      class="text-typography-meta flex-1 font-mono text-xs leading-[1.4] wrap-break-word whitespace-normal"
     >
       {{ sourceEvent.message }}
-    </span>
+    </OTruncatedText>
   </div>
 
   <!-- Chips Row -->
@@ -52,7 +52,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="containerRef"
       class="flex min-w-0 flex-1 items-center gap-3 py-2"
     >
-      <span class="text-2! text-typography-meta m-0 shrink-0">Correlated by:</span>
+      <span class="text-2! text-typography-meta m-0 shrink-0">{{
+        t("correlation.correlatedBy")
+      }}</span>
       <div class="flex min-w-0 items-center gap-2 overflow-hidden">
         <ODimensionChip
           v-for="chip in displayedChips"
@@ -73,7 +75,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`correlation-event-header-overflow-${hiddenChipCount}`"
           >
             <template v-if="hiddenChipCount !== contextChips.length">+</template>{{ hiddenChipCount
-            }}<template v-if="hiddenChipCount === contextChips.length"> Fields</template>
+            }}<template v-if="hiddenChipCount === contextChips.length">
+              {{ t("correlation.fieldsLabel") }}</template
+            >
           </OTag>
           <OTooltip side="top" :disabled="hiddenChipCount === 0">
             <template #content>
@@ -97,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Subject chips (View by) — shown when subjectChips are provided -->
     <div v-if="showSubjectSection" class="flex shrink-0 items-center gap-3">
       <OSeparator vertical class="my-2" />
-      <span class="text-2! text-typography-meta m-0">View by:</span>
+      <span class="text-2! text-typography-meta m-0">{{ t("correlation.viewBy") }}</span>
       <OToggleGroup
         :model-value="activeSubject ?? undefined"
         type="single"
@@ -118,10 +122,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`correlation-event-header-subject-${chip.key}`"
         >
           {{ getSubjectButtonLabel ? getSubjectButtonLabel(chip.key) : chip.label }}
-          <OTooltip :content="`${chip.label} = ${chip.value}`" side="top" />
+          <OTooltip :content="raw(`${chip.label} = ${chip.value}`)" side="top" />
           <template v-if="chip.disabled">
             <OTooltip
-              :content="`No metric streams found for this ${chip.label.toLowerCase()}`"
+              :content="t('correlation.noMetricStreamsFor', { kind: chip.label.toLowerCase() })"
               side="top"
             />
           </template>
@@ -140,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Slot for actions co-located with the chip row (e.g. wrap-text button) -->
-    <div v-if="$slots['chip-actions']" class="ml-auto shrink-0">
+    <div v-if="$slots['chip-actions']" class="ms-auto shrink-0">
       <slot name="chip-actions" />
     </div>
   </div>
@@ -153,6 +157,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import type { AcceptableValue } from "reka-ui";
@@ -161,12 +166,15 @@ import {
   convertTimeFromMicroToMilli,
   timestampToTimezoneDate,
 } from "@/utils/zincutils";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 type ChipKind = "context" | "subject";
 
 export type DimensionChip = {
   key: string;
-  label: string;
+  label: I18nText;
   value: string;
   kind: ChipKind;
   active: boolean;
@@ -178,7 +186,7 @@ const props = withDefaults(
     sourceEvent?: {
       timestamp?: number | string;
       severity?: string;
-      message?: string;
+      message?: I18nText;
     };
     contextChips?: DimensionChip[];
     subjectChips?: DimensionChip[];

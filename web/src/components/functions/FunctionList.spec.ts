@@ -13,22 +13,58 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { queryClient } from "@/composables/query/queryClient";
+import { functionKeys } from "@/services/jstransform.querykeys";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import { mount, flushPromises } from "@vue/test-utils";
+import { nextTick } from "vue";
 import FunctionList from "./FunctionList.vue";
+import analytics from "@/services/product_analytics";
 import i18n from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
 import { createStore } from "vuex";
+import {
+  readEditorDraft,
+  writeEditorDraft,
+  type EditorDraftScope,
+} from "@/utils/drafts/editorDraftStore";
 
-const { mockJsTransformList, mockJsTransformDelete, mockBulkDelete, mockGetAssociatedPipelines } =
-  vi.hoisted(() => ({
-    mockJsTransformList: vi.fn(),
-    mockJsTransformDelete: vi.fn(),
-    mockBulkDelete: vi.fn(),
-    mockGetAssociatedPipelines: vi.fn(),
-  }));
+const {
+  mockJsTransformList,
+  mockJsTransformDelete,
+  mockBulkDelete,
+  mockGetAssociatedPipelines,
+  mockToastFn,
+  mockDownloadFile,
+} = vi.hoisted(() => ({
+  mockJsTransformList: vi.fn(),
+  mockJsTransformDelete: vi.fn(),
+  mockBulkDelete: vi.fn(),
+  mockGetAssociatedPipelines: vi.fn(),
+  mockToastFn: vi.fn(() => () => {}),
+  mockDownloadFile: vi.fn(() => true),
+}));
 
-vi.mock("../../services/jstransform", () => ({
+// Export writes the file straight from the list, so the download is what these
+// tests read instead of a dialog's state.
+vi.mock("@/utils/dom", async (importOriginal) => {
+  const actual = await importOriginal<any>();
+  return { ...actual, downloadFile: (...args: any[]) => mockDownloadFile(...args) };
+});
+
+// Only `toast` is spied on; everything else in the module stays real, since the
+// components under this tree reach for the rest of it.
+vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => {
+  const actual = await importOriginal<any>();
+  return { ...actual, toast: (...args: any[]) => mockToastFn(...args) };
+});
+
+// A plain module mock. The query declarations live in `jstransform.queries.ts`
+// and reach the transport through a normal import, so this replacement is what
+// their queryFn calls — no overlay helper, and nothing left pointing at the real
+// endpoint.
+vi.mock("@/services/jstransform", () => ({
   default: {
     list: mockJsTransformList,
     delete: mockJsTransformDelete,
@@ -37,10 +73,14 @@ vi.mock("../../services/jstransform", () => ({
   },
 }));
 
-vi.mock("@/services/segment_analytics", () => ({
+vi.mock("@/services/product_analytics", () => ({
   default: {
     track: vi.fn(),
   },
+}));
+
+vi.mock("@/stores", () => ({
+  default: { state: { selectedOrganization: { identifier: "test-org" } } },
 }));
 
 vi.mock("@/utils/zincutils", () => ({
@@ -101,6 +141,7 @@ describe("FunctionList", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetListViewState();
 
     mockJsTransformList.mockResolvedValue(mockFunctionData);
     mockJsTransformDelete.mockResolvedValue({
@@ -147,6 +188,11 @@ describe("FunctionList", () => {
     it("badges each function with its language and keeps the name intact", async () => {
       const wrapper = mountList();
       await flushPromises();
+      // OTable holds its skeleton for MIN_SKELETON_MS (50ms) after loading
+      // clears, so the row cells — and the badges in them — do not exist until
+      // that hold releases. A real wait is the only way past a real timer.
+      await new Promise((r) => setTimeout(r, 80));
+      await nextTick();
 
       // fixture: func1 + func2 are VRL (transType 0), js_func is JS (transType 1)
       const js = wrapper.findAll('[data-test="function-list-type-badge-js"]');
@@ -220,17 +266,6 @@ describe("FunctionList", () => {
 
       const vm = wrapper.vm as any;
       expect(vm.jsTransforms).toHaveLength(3);
-    });
-
-    it("should set resultTotal after loading", async () => {
-      const wrapper = mount(FunctionList, {
-        global: { plugins: [i18n, store, router], stubs: globalStubs },
-      });
-
-      await flushPromises();
-
-      const vm = wrapper.vm as any;
-      expect(vm.resultTotal).toBe(3);
     });
 
     it("should handle load error for non-403 status", async () => {
@@ -327,6 +362,21 @@ describe("FunctionList", () => {
       expect(vm.selectedDelete.name).toBe("func1");
     });
 
+    it("names the function in the delete dialog with a destructive button", async () => {
+      const wrapper = mount(FunctionList, {
+        global: { plugins: [i18n, store, router], stubs: globalStubs },
+      });
+      await flushPromises();
+
+      (wrapper.vm as any).showDeleteDialogFn({ row: { name: "func1" } });
+      await flushPromises();
+
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((c) => c.props("messageKeypath") === "function.deleteTransformConfirmMessage");
+      expect(dialog?.props()).toMatchObject({ messageName: "func1", okVariant: "destructive" });
+    });
+
     it("should call delete API with correct parameters", async () => {
       const wrapper = mount(FunctionList, {
         global: { plugins: [i18n, store, router], stubs: globalStubs },
@@ -343,6 +393,13 @@ describe("FunctionList", () => {
 
       await flushPromises();
       expect(mockJsTransformDelete).toHaveBeenCalledWith("test-org", "func1");
+      expect(analytics.track).toHaveBeenCalledWith("Button Click", {
+        button: "Delete Function",
+        user_org: "test-org",
+        function_name: "func1",
+        is_ingest_func: false,
+        page: "Functions",
+      });
     });
 
     it("should refresh list after successful delete", async () => {
@@ -494,6 +551,12 @@ describe("FunctionList", () => {
       const vm = wrapper.vm as any;
       vm.openBulkDeleteDialog();
       expect(vm.confirmBulkDelete).toBe(true);
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find(
+          (c: any) => c.props("title") === i18n.global.t("function.deleteFunctionsDialogTitle"),
+        );
+      expect(dialog!.props("okVariant")).toBe("destructive");
     });
 
     it("should call bulkDelete API with selected function names", async () => {
@@ -677,14 +740,12 @@ describe("FunctionList", () => {
       expect(vm.showAddJSTransformDialog).toBe(false);
     });
 
-    it("should refresh list and hide form when refreshList is called", async () => {
+    it("should hide form when refreshList is called", async () => {
       const wrapper = mount(FunctionList, {
         global: { plugins: [i18n, store, router], stubs: globalStubs },
       });
 
       await flushPromises();
-      vi.clearAllMocks();
-      mockJsTransformList.mockResolvedValue(mockFunctionData);
 
       const vm = wrapper.vm as any;
       vm.showAddJSTransformDialog = true;
@@ -692,6 +753,24 @@ describe("FunctionList", () => {
 
       await flushPromises();
       expect(vm.showAddJSTransformDialog).toBe(false);
+    });
+
+    // `refreshList` used to re-call the list endpoint itself. It no longer does:
+    // the write invalidates the scope and the mounted query reloads. This is the
+    // assertion that replaces it — and unlike the old one it fails if a key stops
+    // matching the scope the writes declare.
+    it("should reload the list when the functions scope is invalidated", async () => {
+      mount(FunctionList, {
+        global: { plugins: [i18n, store, router], stubs: globalStubs },
+      });
+
+      await flushPromises();
+      vi.clearAllMocks();
+      mockJsTransformList.mockResolvedValue(mockFunctionData);
+
+      await queryClient.invalidateQueries({ queryKey: functionKeys.all("test-org") });
+      await flushPromises();
+
       expect(mockJsTransformList).toHaveBeenCalled();
     });
   });
@@ -775,21 +854,6 @@ describe("FunctionList", () => {
       const vm = wrapper.vm as any;
       vm.filterQuery = "zzz_no_match_xyz";
       expect(vm.hasVisibleRows).toBe(false);
-    });
-
-    it("should update resultTotal when visibleRows changes", async () => {
-      const wrapper = mount(FunctionList, {
-        global: { plugins: [i18n, store, router], stubs: globalStubs },
-      });
-
-      await flushPromises();
-
-      const vm = wrapper.vm as any;
-      expect(vm.resultTotal).toBe(3);
-
-      vm.filterQuery = "func1";
-      await flushPromises();
-      expect(vm.resultTotal).toBe(1);
     });
   });
 
@@ -917,6 +981,111 @@ describe("FunctionList", () => {
     });
   });
 
+  describe("Page persistence across editor round trip (OTable pagination-reset fix)", () => {
+    // 45 rows / pageSize 20 gives 3 pages, so page 3 is a real target to restore.
+    const manyFunctionsData = {
+      data: {
+        list: Array.from({ length: 45 }, (_, i) => ({
+          name: `func${i + 1}`,
+          function: "identity()",
+          params: "",
+          transType: 0,
+        })),
+      },
+    };
+
+    const mountList = () =>
+      mount(FunctionList, {
+        global: { plugins: [i18n, store, router], stubs: globalStubs },
+      });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("starts loading=true before the initial fetch resolves", () => {
+      mockJsTransformList.mockResolvedValue(manyFunctionsData);
+      const wrapper = mountList();
+      expect((wrapper.vm as any).loading).toBe(true);
+    });
+
+    it("defaults currentPage to 1", async () => {
+      mockJsTransformList.mockResolvedValue(manyFunctionsData);
+      const wrapper = mountList();
+      await flushPromises();
+      expect((wrapper.vm as any).currentPage).toBe(1);
+    });
+
+    it("onPageChange updates currentPage", async () => {
+      mockJsTransformList.mockResolvedValue(manyFunctionsData);
+      const wrapper = mountList();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      vm.onPageChange(3);
+      expect(vm.currentPage).toBe(3);
+    });
+
+    it("restorePageIndex reasserts the page via a macrotask (setTimeout(0))", async () => {
+      mockJsTransformList.mockResolvedValue(manyFunctionsData);
+      const wrapper = mountList();
+      await flushPromises();
+      vi.useFakeTimers();
+      const vm = wrapper.vm as any;
+      vm.currentPage = 3;
+      const restorePage = vi.fn();
+      vm.oTableRef = { restorePage };
+
+      vm.restorePageIndex();
+      expect(restorePage).not.toHaveBeenCalled();
+
+      // Pending only: the refresh button's age interval would make runAllTimers loop forever.
+      vi.runOnlyPendingTimers();
+      expect(restorePage).toHaveBeenCalledWith(3);
+    });
+
+    it("keeps the page after Cancel unmounts and remounts OTable via the AddFunction v-if swap", async () => {
+      mockJsTransformList.mockResolvedValue(manyFunctionsData);
+      const wrapper = mountList();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+
+      vm.onPageChange(3);
+      await flushPromises();
+      expect(vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
+
+      vm.showAddJSTransformDialog = true;
+      await flushPromises();
+      expect(vm.oTableRef).toBeNull();
+
+      vm.hideForm();
+      await flushPromises();
+
+      expect(vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
+    });
+
+    it("keeps the page after Save triggers an async refetch that races TanStack's own reset", async () => {
+      mockJsTransformList.mockResolvedValue(manyFunctionsData);
+      const wrapper = mountList();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+
+      vm.onPageChange(3);
+      await flushPromises();
+      expect(vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
+
+      vm.showAddJSTransformDialog = true;
+      await flushPromises();
+
+      mockJsTransformList.mockResolvedValue(manyFunctionsData);
+      vm.refreshList();
+      await flushPromises();
+      // flush the setTimeout(0) macrotask that restorePageIndex scheduled
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
+    });
+  });
+
   describe("Route Query Action Handling", () => {
     it("should trigger getJSTransforms when route has action=add query param", async () => {
       router.push({
@@ -947,6 +1116,283 @@ describe("FunctionList", () => {
       await flushPromises();
       const vm = wrapper.vm as any;
       expect(vm.isUpdated).toBe(true);
+    });
+  });
+
+  // The list query already carries every field the file needs, so export reads
+  // from it rather than fetching each definition again.
+  describe("Export", () => {
+    const mountList = async () => {
+      const wrapper = mount(FunctionList, {
+        global: { plugins: [i18n, store, router], stubs: globalStubs },
+      });
+      await flushPromises();
+      return wrapper;
+    };
+
+    // The file itself is the product, so these read the download rather than a
+    // dialog's state: there is no dialog, and a preview modal for a one-format
+    // export would only stand between the user and the file.
+    const downloadedPayload = () => JSON.parse(mockDownloadFile.mock.calls.at(-1)![1] as string);
+    const downloadedName = () => mockDownloadFile.mock.calls.at(-1)![0] as string;
+
+    it("writes the row's definition straight to a file named after it", async () => {
+      const wrapper = await mountList();
+      const vm = wrapper.vm as any;
+
+      await vm.exportFunction({ name: "js_func" });
+      await flushPromises();
+
+      expect(downloadedName()).toBe("js_func.json");
+      // A single function is written as an object, not a one-element array —
+      // that is what a hand-written one-function file looks like, and the import
+      // screen takes either.
+      //
+      // `streams` is deliberately absent: the deprecated stream association
+      // names streams that mean nothing in the org this file is imported into.
+      // `numArgs` is absent too: the server derives it from `params`, so
+      // carrying it would put a field in the file that import reads from nowhere.
+      expect(downloadedPayload()).toEqual({
+        name: "js_func",
+        function: "return event;",
+        params: "",
+        transType: 1,
+      });
+      expect(mockToastFn).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+    });
+
+    it("exports every selected row into one dated file", async () => {
+      const wrapper = await mountList();
+      const vm = wrapper.vm as any;
+
+      vm.selectedFunctionIds = ["func1", "js_func"];
+      await nextTick();
+      await vm.exportSelectedFunctions();
+      await flushPromises();
+
+      expect(downloadedPayload().map((fn: any) => fn.name)).toEqual(["func1", "js_func"]);
+      expect(downloadedName()).toMatch(/^functions-\d{4}-\d{2}-\d{2}\.json$/);
+      // Keeping the ticks after the file is written would leave the next press
+      // exporting rows the user believes they are done with.
+      expect(vm.selectedFunctionIds).toEqual([]);
+    });
+
+    // The row is on screen, so a miss means the cache has moved on rather than
+    // that the function is gone. One re-read before giving up.
+    it("re-reads the list once when a row is missing from the cache", async () => {
+      const wrapper = await mountList();
+      const vm = wrapper.vm as any;
+      const callsBefore = mockJsTransformList.mock.calls.length;
+
+      mockJsTransformList.mockResolvedValueOnce({
+        data: { list: [...mockFunctionData.data.list, { name: "late_fn", function: ".a = 1" }] },
+      });
+      await vm.exportFunction({ name: "late_fn" });
+      await flushPromises();
+
+      expect(mockJsTransformList.mock.calls.length).toBe(callsBefore + 1);
+      expect(downloadedPayload()).toMatchObject({ name: "late_fn" });
+    });
+
+    // The selection outlives the rows: selectedFunctions is filtered against the
+    // loaded list, so a function deleted elsewhere used to fall out of the file
+    // with nothing said. Export asks for the ids the user actually ticked.
+    it("names the rows it could not find instead of quietly shortening the file", async () => {
+      const wrapper = await mountList();
+      const vm = wrapper.vm as any;
+
+      vm.selectedFunctionIds = ["func1", "gone_fn"];
+      await nextTick();
+      await vm.exportSelectedFunctions();
+      await flushPromises();
+
+      // One survivor, so the file is the object form rather than a
+      // one-element array.
+      expect(downloadedPayload()).toMatchObject({ name: "func1" });
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "info",
+          message: expect.stringContaining("gone_fn"),
+        }),
+      );
+    });
+
+    it("shows the bulk button busy while the list is being re-read", async () => {
+      const wrapper = await mountList();
+      const vm = wrapper.vm as any;
+
+      expect(vm.exportLoading).toBe(false);
+      vm.selectedFunctionIds = ["func1"];
+      await nextTick();
+      const done = vm.exportSelectedFunctions();
+      expect(vm.exportLoading).toBe(true);
+      await done;
+      await flushPromises();
+      expect(vm.exportLoading).toBe(false);
+    });
+
+    it("reports a row the re-read cannot find instead of writing an empty file", async () => {
+      const wrapper = await mountList();
+      const vm = wrapper.vm as any;
+
+      await vm.exportFunction({ name: "gone_fn" });
+      await flushPromises();
+
+      expect(mockDownloadFile).not.toHaveBeenCalled();
+      expect(mockToastFn).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    });
+
+    // A refused download is not an export. Saying it succeeded would leave the
+    // user looking for a file the browser never wrote.
+    it("reports an error when the browser refuses the download", async () => {
+      const wrapper = await mountList();
+      const vm = wrapper.vm as any;
+      mockDownloadFile.mockReturnValueOnce(false);
+
+      await vm.exportFunction({ name: "func1" });
+      await flushPromises();
+
+      expect(mockToastFn).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+      expect(mockToastFn).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+    });
+  });
+
+  describe("View state restore", () => {
+    const mountList = () =>
+      mount(FunctionList, {
+        global: { plugins: [i18n, store, router], stubs: globalStubs },
+      });
+
+    it("restores search, page, size and sort", () => {
+      useListViewState("functions", {
+        filterQuery: "func",
+        pageSize: 50,
+        currentPage: 2,
+        sortBy: "name",
+        sortOrder: "desc",
+      });
+      const wrapper = mountList();
+      expect(wrapper.vm.filterQuery).toBe("func");
+      expect(wrapper.vm.pageSize).toBe(50);
+      expect(wrapper.vm.currentPage).toBe(2);
+      expect(wrapper.vm.sortBy).toBe("name");
+      expect(wrapper.vm.sortOrder).toBe("desc");
+      wrapper.unmount();
+    });
+
+    it("saves changes to the view state", async () => {
+      const wrapper = mountList();
+      wrapper.vm.filterQuery = "js";
+      wrapper.vm.sortOrder = "desc";
+      await nextTick();
+      const saved: any = useListViewState("functions", {});
+      expect(saved.filterQuery).toBe("js");
+      expect(saved.sortOrder).toBe("desc");
+      wrapper.unmount();
+    });
+  });
+
+  describe("Editor drafts", () => {
+    interface DraftListVm {
+      selectedDelete: { name: string; ingest: boolean };
+      selectedFunctions: { name: string }[];
+      deleteFn: () => void;
+      bulkDeleteFunctions: () => Promise<void>;
+    }
+    const draftScope = (
+      entityId: string | null,
+      userEmail = "test@example.com",
+    ): EditorDraftScope => ({
+      kind: "function",
+      org: "test-org",
+      entityId,
+      userEmail,
+    });
+    const seed = (scope: EditorDraftScope) => writeEditorDraft(scope, { data: {} });
+
+    const mountRows = async () => {
+      const wrapper = mount(FunctionList, {
+        global: { plugins: [i18n, store, router], stubs: globalStubs },
+      });
+      // OTable holds its skeleton for MIN_SKELETON_MS before rows render.
+      await vi.waitFor(() =>
+        expect(wrapper.find('[data-test="function-list-name-cell-func1"]').exists()).toBe(true),
+      );
+      return wrapper;
+    };
+
+    beforeEach(() => localStorage.clear());
+
+    it("dots the rows and the New function button that have drafts", async () => {
+      seed(draftScope("func1"));
+      seed(draftScope(null));
+      seed(draftScope("func2", "other@example.com"));
+      const wrapper = await mountRows();
+
+      const dot = wrapper.get('[data-test="function-list-func1-draft-dot"]');
+      expect(dot.attributes("aria-label")).toMatch(/^Unsaved draft · /);
+      expect(wrapper.find('[data-test="function-list-func2-draft-dot"]').exists()).toBe(false);
+
+      const addButton = wrapper.get('[data-test="function-list-add-function-btn"]');
+      expect(addButton.attributes("aria-label")).toBe("New function · unsaved draft");
+      expect(addButton.find('[data-test="function-list-add-function-draft-dot"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("updates the dots when a draft is written or removed", async () => {
+      const wrapper = await mountRows();
+      expect(wrapper.find('[data-test="function-list-func2-draft-dot"]').exists()).toBe(false);
+      expect(
+        wrapper.get('[data-test="function-list-add-function-btn"]').attributes("aria-label"),
+      ).toBeUndefined();
+
+      seed(draftScope("func2"));
+      await nextTick();
+      expect(wrapper.find('[data-test="function-list-func2-draft-dot"]').exists()).toBe(true);
+    });
+
+    it("drops every user's draft of a deleted function", async () => {
+      seed(draftScope("func1"));
+      seed(draftScope("func1", "other@example.com"));
+      seed(draftScope("func2"));
+      const wrapper = await mountRows();
+      const vm = wrapper.vm as unknown as DraftListVm;
+      vm.selectedDelete = { name: "func1", ingest: false };
+      vm.deleteFn();
+      await flushPromises();
+
+      expect(readEditorDraft(draftScope("func1"))).toBeNull();
+      expect(readEditorDraft(draftScope("func1", "other@example.com"))).toBeNull();
+      expect(readEditorDraft(draftScope("func2"))).not.toBeNull();
+    });
+
+    it("keeps the draft when the delete fails", async () => {
+      mockJsTransformDelete.mockResolvedValue({ data: { code: 500, message: "nope" } });
+      seed(draftScope("func1"));
+      const wrapper = await mountRows();
+      const vm = wrapper.vm as unknown as DraftListVm;
+      vm.selectedDelete = { name: "func1", ingest: false };
+      vm.deleteFn();
+      await flushPromises();
+
+      expect(readEditorDraft(draftScope("func1"))).not.toBeNull();
+    });
+
+    it("drops drafts only of the functions a bulk delete removed", async () => {
+      mockBulkDelete.mockResolvedValue({
+        data: { successful: ["func1"], unsuccessful: ["func2"] },
+      });
+      seed(draftScope("func1"));
+      seed(draftScope("func2"));
+      const wrapper = await mountRows();
+      const vm = wrapper.vm as unknown as DraftListVm;
+      vm.selectedFunctions = [{ name: "func1" }, { name: "func2" }];
+      await vm.bulkDeleteFunctions();
+      await flushPromises();
+
+      expect(readEditorDraft(draftScope("func1"))).toBeNull();
+      expect(readEditorDraft(draftScope("func2"))).not.toBeNull();
     });
   });
 });

@@ -24,6 +24,9 @@ pub mod broadcast;
 pub mod pack;
 pub mod parquet;
 
+/// Age after which an empty WAL hour directory is unlikely to receive late data again.
+pub(crate) const EMPTY_DIR_GRACE_SECS: u64 = 3600;
+
 pub async fn run() -> Result<(), anyhow::Error> {
     if !LOCAL_NODE.is_ingester() {
         return Ok(()); // not an ingester, no need to init job
@@ -45,8 +48,9 @@ async fn clean_empty_dirs() -> Result<(), anyhow::Error> {
         if is_offline() {
             break;
         }
-        tokio::time::sleep(tokio::time::Duration::from_secs(3600)).await;
-        let last_updated = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
+        tokio::time::sleep(tokio::time::Duration::from_secs(EMPTY_DIR_GRACE_SECS)).await;
+        let last_updated =
+            std::time::SystemTime::now() - std::time::Duration::from_secs(EMPTY_DIR_GRACE_SECS);
         let root = format!("{}files/", config::get_config().common.data_wal_dir);
         if let Err(e) = config::utils::async_file::clean_empty_dirs(&root, Some(last_updated)).await
         {

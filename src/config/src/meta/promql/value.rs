@@ -20,7 +20,6 @@ use std::{
     time::Duration,
 };
 
-use hashbrown::HashSet;
 use regex::Regex;
 use serde::{
     Deserialize, Serialize,
@@ -30,8 +29,14 @@ use serde::{
 
 use crate::{
     FxIndexMap,
-    meta::{promql::NAME_LABEL, search::SearchEventType},
-    utils::{json, sort::sort_float},
+    meta::{
+        promql::NAME_LABEL,
+        search::{SearchEventContext, SearchEventType},
+    },
+    utils::{
+        json,
+        sort::{sort_float, sort_float_nan_last},
+    },
 };
 
 // https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels
@@ -180,7 +185,7 @@ impl Serialize for Sample {
     {
         let mut seq = serializer.serialize_seq(Some(2))?;
         seq.serialize_element(&(self.timestamp / 1_000_000))?;
-        seq.serialize_element(&self.value.to_string())?;
+        seq.serialize_element(&SampleValueDisplay(self.value))?;
         seq.end()
     }
 }
@@ -238,6 +243,68 @@ impl Sample {
     }
 }
 
+/// A sample value in the text Prometheus' `jsonutil.MarshalFloat` writes.
+struct SampleValueDisplay(f64);
+
+impl fmt::Display for SampleValueDisplay {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let value = self.0;
+        if value.is_nan() {
+            return f.write_str("NaN");
+        }
+        if value.is_infinite() {
+            return f.write_str(if value > 0.0 { "+Inf" } else { "-Inf" });
+        }
+        let abs = value.abs();
+        if abs == 0.0 || (1e-6..1e21).contains(&abs) {
+            return write!(f, "{value}");
+        }
+        // Go signs the exponent and pads it to two digits: 1e+21, 1e-07
+        let mut text = FloatText::default();
+        fmt::Write::write_fmt(&mut text, format_args!("{value:e}"))?;
+        let (mantissa, exponent) = text.as_str()?.split_once('e').ok_or(fmt::Error)?;
+        let (sign, digits) = match exponent.strip_prefix('-') {
+            Some(digits) => ('-', digits),
+            None => ('+', exponent),
+        };
+        write!(f, "{mantissa}e{sign}{digits:0>2}")
+    }
+}
+
+impl Serialize for SampleValueDisplay {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.collect_str(self)
+    }
+}
+
+/// Stack space for one `{:e}` float; the longest, `-2.2250738585072014e-308`, is 24 bytes.
+#[derive(Default)]
+struct FloatText {
+    bytes: [u8; 32],
+    len: usize,
+}
+
+impl FloatText {
+    fn as_str(&self) -> Result<&str, fmt::Error> {
+        std::str::from_utf8(&self.bytes[..self.len]).map_err(|_| fmt::Error)
+    }
+}
+
+impl fmt::Write for FloatText {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        let end = self.len + s.len();
+        self.bytes
+            .get_mut(self.len..end)
+            .ok_or(fmt::Error)?
+            .copy_from_slice(s.as_bytes());
+        self.len = end;
+        Ok(())
+    }
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct Exemplar {
     /// Time in microseconds
@@ -258,7 +325,7 @@ impl Serialize for Exemplar {
             .map(|l| (l.name.as_str(), l.value.as_str()))
             .collect::<FxIndexMap<_, _>>();
         seq.serialize_field("timestamp", &(self.timestamp / 1_000_000))?;
-        seq.serialize_field("value", &self.value.to_string())?;
+        seq.serialize_field("value", &SampleValueDisplay(self.value))?;
         seq.serialize_field("labels", &labels_map)?;
         seq.end()
     }
@@ -420,6 +487,16 @@ impl EvalContext {
         self.start == self.end
     }
 
+    /// More than one evaluation window, overlapping by a positive duration.
+    /// Reset detection compares adjacent sample pairs, and a pair repeats
+    /// across windows only when two windows share at least two samples.
+    pub fn windows_overlap(&self, range_micros: i64) -> bool {
+        !self.is_instant()
+            && self.step > 0
+            && self.end - self.start >= self.step
+            && self.step < range_micros
+    }
+
     /// Get all evaluation timestamps
     pub fn timestamps(&self) -> Vec<i64> {
         if self.is_instant() {
@@ -443,6 +520,7 @@ pub struct QueryContext {
     pub use_cache: bool,
     pub timeout: u64, // seconds, query timeout
     pub search_event_type: Option<SearchEventType>,
+    pub search_event_context: Option<SearchEventContext>,
     pub regions: Vec<String>,
     pub clusters: Vec<String>,
     pub is_super_cluster: bool,
@@ -457,11 +535,6 @@ pub struct RangeValue {
 }
 
 impl RangeValue {
-    /// Returns the values from the `samples` field as an array of f64
-    pub fn get_sample_values(&self) -> Vec<f64> {
-        self.samples.iter().map(|sample| sample.value).collect()
-    }
-
     pub fn extend(&mut self, other: RangeValue) {
         if !other.samples.is_empty() {
             self.samples.extend(other.samples);
@@ -596,7 +669,7 @@ impl RangeValue {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum ExtrapolationKind {
     /// Calculate the per-second average rate of increase of the time series.
     /// Adjust for breaks in monotonicity (counter resets).
@@ -616,6 +689,13 @@ pub enum ExtrapolationKind {
     ///
     /// See <https://prometheus.io/docs/prometheus/latest/querying/functions/#delta>
     Delta,
+}
+
+impl ExtrapolationKind {
+    /// Counter kinds correct for resets and extrapolate the counter zero point.
+    pub fn is_counter(self) -> bool {
+        matches!(self, Self::Rate | Self::Increase)
+    }
 }
 
 /// `extrapolated_rate` is a utility function for rate/increase/delta.
@@ -644,6 +724,120 @@ pub fn extrapolated_rate(
         return None;
     }
 
+    let first = &samples[0];
+    let last = &samples.last().unwrap();
+    let mut delta = last.value - first.value;
+
+    if kind.is_counter() {
+        // Handle counter resets.
+        let mut prev_value = first.value;
+        for sample in &samples[1..] {
+            if sample.value < prev_value {
+                delta += prev_value;
+            }
+            prev_value = sample.value;
+        }
+    }
+
+    extrapolate_from_delta(samples, delta, eval_ts, range, offset, kind)
+}
+
+/// Per-series counter state for reset-corrected extrapolation across sliding
+/// windows: resets are located once, then each window sums only its own
+/// corrections in scan order, so results are bit-identical to
+/// [`extrapolated_rate`].
+pub struct CounterSeries<'a> {
+    samples: &'a [Sample],
+    // (sample index, value dropped by the reset ending at that index)
+    resets: Vec<(usize, f64)>,
+    kind: ExtrapolationKind,
+}
+
+impl<'a> CounterSeries<'a> {
+    /// Builds the per-series reset state when `kind` is a counter function
+    /// and the one-pass scan can amortize over overlapping windows; `None`
+    /// keeps the caller on the per-window scan.
+    pub fn try_new(
+        samples: &'a [Sample],
+        kind: Option<ExtrapolationKind>,
+        eval_ctx: &EvalContext,
+        range_micros: i64,
+    ) -> Option<Self> {
+        let kind = kind?;
+        eval_ctx
+            .windows_overlap(range_micros)
+            .then(|| Self::new(samples, kind))
+    }
+
+    /// # Panics
+    ///
+    /// Panics if `kind` is not a counter kind.
+    fn new(samples: &'a [Sample], kind: ExtrapolationKind) -> Self {
+        assert!(kind.is_counter(), "CounterSeries requires a counter kind");
+        let mut resets = Vec::new();
+        for i in 1..samples.len() {
+            if samples[i].value < samples[i - 1].value {
+                resets.push((i, samples[i - 1].value));
+            }
+        }
+        Self {
+            samples,
+            resets,
+            kind,
+        }
+    }
+
+    /// [`extrapolated_rate`] for the window `samples[start..end]`.
+    ///
+    /// Returns `None` for windows with fewer than two samples.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `start..end` is out of bounds or the window is not in range.
+    pub fn extrapolate(
+        &self,
+        start: usize,
+        end: usize,
+        eval_ts: i64,
+        range: Duration,
+    ) -> Option<f64> {
+        let window = &self.samples[start..end];
+        if window.len() < 2 {
+            return None;
+        }
+        let mut delta = window[window.len() - 1].value - window[0].value;
+        // Resets strictly inside the window, added in scan order.
+        let from = self.resets.partition_point(|&(index, _)| index <= start);
+        for &(index, correction) in &self.resets[from..] {
+            if index >= end {
+                break;
+            }
+            delta += correction;
+        }
+        extrapolate_from_delta(window, delta, eval_ts, range, Duration::ZERO, self.kind)
+    }
+}
+
+/// Applies Prometheus boundary extrapolation to a counter-corrected delta.
+///
+/// See the diagrams at <https://promlabs.com/blog/2021/01/29/how-exactly-does-promql-calculate-rates/#extrapolation-of-data>
+///
+/// # Panics
+///
+/// Panics if the samples are not in the range.
+fn extrapolate_from_delta(
+    samples: &[Sample],
+    delta: f64,
+    eval_ts: i64,
+    range: Duration,
+    offset: Duration,
+    kind: ExtrapolationKind,
+) -> Option<f64> {
+    if samples.len() < 2 {
+        // Not enough samples.
+        return None;
+    }
+
     let start = {
         let range_plus_offset = range
             .checked_add(offset)
@@ -655,7 +849,6 @@ pub fn extrapolated_rate(
             .checked_sub(range_plus_offset)
             .expect("BUG: overflow")
     };
-    assert!(start > 0);
     let end = eval_ts
         .checked_sub(
             offset
@@ -664,7 +857,6 @@ pub fn extrapolated_rate(
                 .expect("BUG: integer conversion failed"),
         )
         .expect("BUG: overflow");
-    assert!(end > 0);
     assert!(start <= end);
 
     let first = &samples[0];
@@ -675,27 +867,20 @@ pub fn extrapolated_rate(
     assert!(first.timestamp >= start);
     assert!(last.timestamp <= end);
 
-    let mut result = last.value - first.value;
-
-    let is_counter = matches!(kind, ExtrapolationKind::Rate | ExtrapolationKind::Increase);
-    if is_counter {
-        // Handle counter resets.
-        let mut prev_value = first.value;
-        for sample in &samples[1..] {
-            if sample.value < prev_value {
-                result += prev_value;
-            }
-            prev_value = sample.value;
-        }
-    }
+    let mut result = delta;
+    let is_counter = kind.is_counter();
 
     // Duration between first/last samples and boundary of range.
     let mut duration_to_start = (first.timestamp - start) as f64 / 1_000.0;
-    let duration_to_end = (end - last.timestamp) as f64 / 1_000.0;
+    let mut duration_to_end = (end - last.timestamp) as f64 / 1_000.0;
 
     let sampled_interval = (last.timestamp - first.timestamp) as f64 / 1_000.0;
     let avg_duration_between_samples = sampled_interval / (samples.len() - 1) as f64;
 
+    let extrapolation_threshold = avg_duration_between_samples * 1.1;
+    if duration_to_start >= extrapolation_threshold {
+        duration_to_start = avg_duration_between_samples / 2.0;
+    }
     if is_counter && result > 0.0 && first.value >= 0.0 {
         // Counters cannot be negative. If we have any slope at all
         // (i.e. `result` went up), we can extrapolate the zero point
@@ -709,24 +894,10 @@ pub fn extrapolated_rate(
         }
     }
 
-    // If the first/last samples are close to the boundaries of the range,
-    // extrapolate the result. This is as we expect that another sample
-    // will exist given the spacing between samples we've seen thus far,
-    // with an allowance for noise.
-    let extrapolation_threshold = avg_duration_between_samples * 1.1;
-    let mut extrapolate_to_interval = sampled_interval;
-
-    if duration_to_start < extrapolation_threshold {
-        extrapolate_to_interval += duration_to_start;
-    } else {
-        extrapolate_to_interval += avg_duration_between_samples / 2.0;
+    if duration_to_end >= extrapolation_threshold {
+        duration_to_end = avg_duration_between_samples / 2.0;
     }
-    if duration_to_end < extrapolation_threshold {
-        extrapolate_to_interval += duration_to_end;
-    } else {
-        extrapolate_to_interval += avg_duration_between_samples / 2.0;
-    }
-    let factor = extrapolate_to_interval / sampled_interval;
+    let factor = (sampled_interval + duration_to_start + duration_to_end) / sampled_interval;
     if matches!(kind, ExtrapolationKind::Rate) {
         result *= factor / range.as_secs_f64();
     } else {
@@ -764,21 +935,6 @@ impl Value {
         }
     }
 
-    pub fn get_range_values(self) -> Option<Vec<RangeValue>> {
-        match self {
-            Value::Matrix(values) => Some(values),
-            _ => None,
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn get_vector(&self) -> Option<&Vec<InstantValue>> {
-        match self {
-            Value::Vector(values) => Some(values),
-            _ => None,
-        }
-    }
-
     pub fn get_string(&self) -> Option<String> {
         match self {
             Value::String(v) => Some(v.into()),
@@ -786,12 +942,6 @@ impl Value {
         }
     }
 
-    pub fn get_float(&self) -> Option<f64> {
-        match self {
-            Value::Float(f) => Some(*f),
-            _ => None,
-        }
-    }
     pub fn get_type(&self) -> &str {
         match self {
             Value::Instant(_) => "vector",
@@ -825,42 +975,10 @@ impl Value {
         }
     }
 
-    /// Checks if the vector or matrix types contain duplicated label set or
-    /// not. This is an undefined condition, hence caller should raise an
-    /// error in case this evaluates to `true`.
-    pub fn contains_same_label_set(&self) -> bool {
-        match self {
-            Value::Vector(v) => match v.len() {
-                0 | 1 => false,
-                2 => v[0].labels.signature() == v[1].labels.signature(),
-                _ => {
-                    let mut signatures = HashSet::new();
-                    for instant in v.iter() {
-                        // If the set already contained this value, false is returned.
-                        let new = signatures.insert(instant.labels.signature());
-                        if !new {
-                            return true;
-                        }
-                    }
-                    false
-                }
-            },
-            Value::Matrix(v) => match v.len() {
-                0 | 1 => false,
-                2 => v[0].labels.signature() == v[1].labels.signature(),
-                _ => {
-                    let mut signatures = HashSet::new();
-                    for instant in v.iter() {
-                        // If the set already contained this value, false is returned.
-                        let new = signatures.insert(instant.labels.signature());
-                        if !new {
-                            return true;
-                        }
-                    }
-                    false
-                }
-            },
-            _ => false,
+    /// Orders an instant vector the way PromQL `sort`/`sort_desc` does.
+    pub fn sort_by_value(&mut self, descending: bool) {
+        if let Value::Vector(v) = self {
+            v.sort_by(|a, b| sort_float_nan_last(&a.sample.value, &b.sample.value, descending));
         }
     }
 }
@@ -874,10 +992,19 @@ pub fn signature(labels: &Labels) -> u64 {
 /// matching `names`.
 // REFACTORME: make this a method of `Metric`
 pub fn signature_without_labels(labels: &Labels, exclude_names: &[&str]) -> u64 {
+    hash_labels(labels, |name| !exclude_names.contains(&name))
+}
+
+/// [`signature`] of only the labels named in `include_names`.
+pub fn signature_with_labels(labels: &Labels, include_names: &[&str]) -> u64 {
+    hash_labels(labels, |name| include_names.contains(&name))
+}
+
+fn hash_labels(labels: &Labels, include: impl Fn(&str) -> bool) -> u64 {
     let mut hasher = crate::utils::hash::gxhash::new_hasher();
     labels
         .iter()
-        .filter(|item| !exclude_names.contains(&item.name.as_str()))
+        .filter(|item| include(item.name.as_str()))
         .for_each(|item| {
             hasher.write(item.name.as_bytes());
             hasher.write(item.value.as_bytes());
@@ -887,11 +1014,24 @@ pub fn signature_without_labels(labels: &Labels, exclude_names: &[&str]) -> u64 
 
 #[cfg(test)]
 mod tests {
-    use std::f64;
-
     use float_cmp::approx_eq;
 
     use super::*;
+
+    // The serializer before Prometheus formatting; plain decimals must keep its exact text.
+    struct LegacySample<'a>(&'a Sample);
+
+    impl Serialize for LegacySample<'_> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let mut seq = serializer.serialize_seq(Some(2))?;
+            seq.serialize_element(&(self.0.timestamp / 1_000_000))?;
+            seq.serialize_element(&self.0.value.to_string())?;
+            seq.end()
+        }
+    }
 
     fn generate_test_labels() -> Labels {
         let labels: Labels = vec![
@@ -932,6 +1072,16 @@ mod tests {
         assert_eq!(
             sig_without_ac,
             signature_without_labels(&labels, &["a", "c"])
+        );
+
+        let kept: Labels = labels
+            .iter()
+            .filter(|label| label.name == "a" || label.name == "c")
+            .cloned()
+            .collect();
+        assert_eq!(
+            signature_with_labels(&labels, &["a", "c"]),
+            signature(&kept)
         );
     }
 
@@ -999,6 +1149,220 @@ mod tests {
 
         let delta = extrapolate(&samples, ExtrapolationKind::Delta);
         assert!(approx_eq!(f64, delta, 4.0));
+    }
+
+    #[test]
+    fn test_counter_series_reset_locations() {
+        let samples = [
+            Sample::new(1, 90.0),
+            Sample::new(2, 100.0),
+            Sample::new(3, 5.0),
+            Sample::new(4, 15.0),
+        ];
+        let counter = CounterSeries::new(&samples, ExtrapolationKind::Rate);
+        assert_eq!(counter.resets, vec![(2, 100.0)]);
+        assert!(
+            CounterSeries::new(&[], ExtrapolationKind::Rate)
+                .resets
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn test_counter_series_preserves_small_resets_next_to_huge_ones() {
+        const MICROS: i64 = 1_000_000;
+        // A 1e16 reset before the window must not absorb the small reset
+        // inside it: a shared running prefix would round the +1 away.
+        let values = [1e16, 0.0, 0.0, 1.0, 0.0, 2.0];
+        let samples = values
+            .iter()
+            .enumerate()
+            .map(|(i, &value)| Sample::new((20 + 15 * i as i64) * MICROS, value))
+            .collect::<Vec<_>>();
+        let range = Duration::from_secs(60);
+        let eval_ts = 100 * MICROS;
+
+        for kind in [ExtrapolationKind::Rate, ExtrapolationKind::Increase] {
+            let legacy =
+                extrapolated_rate(&samples[2..6], eval_ts, range, Duration::ZERO, kind).unwrap();
+            let counter = CounterSeries::new(&samples, kind);
+            let windowed = counter.extrapolate(2, 6, eval_ts, range).unwrap();
+            assert_eq!(legacy.to_bits(), windowed.to_bits());
+            assert!(legacy.is_finite());
+        }
+    }
+
+    #[test]
+    fn test_counter_series_infinite_reset_outside_window() {
+        const MICROS: i64 = 1_000_000;
+        // The +Inf -> 2.0 reset sits before the window; a shared prefix would
+        // produce inf - inf = NaN where the legacy scan stays finite.
+        let values = [f64::INFINITY, 2.0, 5.0, 9.0];
+        let samples = values
+            .iter()
+            .enumerate()
+            .map(|(i, &value)| Sample::new((20 + 15 * i as i64) * MICROS, value))
+            .collect::<Vec<_>>();
+        let range = Duration::from_secs(60);
+        let eval_ts = 80 * MICROS;
+
+        let legacy = extrapolated_rate(
+            &samples[1..4],
+            eval_ts,
+            range,
+            Duration::ZERO,
+            ExtrapolationKind::Rate,
+        )
+        .unwrap();
+        let counter = CounterSeries::new(&samples, ExtrapolationKind::Rate);
+        let windowed = counter.extrapolate(1, 4, eval_ts, range).unwrap();
+        assert!(legacy.is_finite());
+        assert_eq!(legacy.to_bits(), windowed.to_bits());
+    }
+
+    #[test]
+    fn test_eval_context_windows_overlap() {
+        const MINUTE: i64 = 60 * 1_000_000;
+        let ctx = |end, step| EvalContext::new(MINUTE, MINUTE + end, step, "test".into());
+        // Overlapping windows: 15s step inside a 5m range.
+        assert!(ctx(180 * MINUTE, MINUTE / 4).windows_overlap(5 * MINUTE));
+        // Adjacent windows share at most one sample, so no pair repeats.
+        assert!(!ctx(5 * MINUTE, 5 * MINUTE).windows_overlap(5 * MINUTE));
+        // Disjoint windows (1h step, 5m range) or a single window cannot.
+        assert!(!ctx(7 * 24 * 60 * MINUTE, 60 * MINUTE).windows_overlap(5 * MINUTE));
+        assert!(!ctx(0, MINUTE / 4).windows_overlap(5 * MINUTE));
+        assert!(!ctx(0, 0).windows_overlap(5 * MINUTE));
+        assert!(!ctx(MINUTE, 0).windows_overlap(5 * MINUTE));
+    }
+
+    #[test]
+    #[should_panic(expected = "counter kind")]
+    fn test_counter_series_rejects_non_counter_kind() {
+        CounterSeries::new(&[], ExtrapolationKind::Delta);
+    }
+
+    #[test]
+    fn test_counter_series_window_boundaries() {
+        const MICROS: i64 = 1_000_000;
+        // A reset sits between samples 1 and 2. Windows that include it must
+        // count it; windows starting after it must not.
+        let samples = [
+            Sample::new(23 * MICROS, 90.0),
+            Sample::new(38 * MICROS, 100.0),
+            Sample::new(53 * MICROS, 5.0),
+            Sample::new(68 * MICROS, 15.0),
+        ];
+        let range = Duration::from_secs(60);
+
+        for kind in [ExtrapolationKind::Rate, ExtrapolationKind::Increase] {
+            let counter = CounterSeries::new(&samples, kind);
+
+            // Full window: reset included.
+            let legacy =
+                extrapolated_rate(&samples, 75 * MICROS, range, Duration::ZERO, kind).unwrap();
+            let prefixed = counter.extrapolate(0, 4, 75 * MICROS, range).unwrap();
+            assert_eq!(legacy.to_bits(), prefixed.to_bits());
+
+            // Window starting after the reset: prefix difference must exclude it.
+            let legacy =
+                extrapolated_rate(&samples[2..], 110 * MICROS, range, Duration::ZERO, kind)
+                    .unwrap();
+            let prefixed = counter.extrapolate(2, 4, 110 * MICROS, range).unwrap();
+            assert_eq!(legacy.to_bits(), prefixed.to_bits());
+        }
+
+        // Fewer than two samples yields no result.
+        let counter = CounterSeries::new(&samples, ExtrapolationKind::Rate);
+        assert!(counter.extrapolate(1, 2, 75 * MICROS, range).is_none());
+        assert!(counter.extrapolate(2, 2, 75 * MICROS, range).is_none());
+    }
+
+    #[test]
+    fn test_counter_series_matches_windowed_scan() {
+        const MICROS: i64 = 1_000_000;
+        const BASE: i64 = 1_000_000 * MICROS;
+        let range = Duration::from_secs(300);
+        let range_micros = 300 * MICROS;
+
+        let mut state: u64 = 0x9E3779B97F4A7C15;
+        let mut next = move || {
+            state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            state >> 11
+        };
+
+        for series in 0..20 {
+            // Counter series with growth, resets, timestamp jitter, and gaps;
+            // half the series use huge values to stress float cancellation.
+            let scale = if series % 2 == 0 { 1.0 } else { 1.0e12 };
+            let mut value = (next() % 1000) as f64 * scale;
+            let mut timestamp = BASE;
+            let samples = (0..120)
+                .map(|_| {
+                    let r = next();
+                    timestamp += 15 * MICROS + ((r % 7) as i64 - 3) * MICROS;
+                    if r % 11 == 0 {
+                        timestamp += 60 * MICROS;
+                    }
+                    if r % 29 == 0 {
+                        value += 1.0e16;
+                    }
+                    if r % 13 == 0 {
+                        value = (r % 5) as f64 * scale;
+                    }
+                    value += (r % 97) as f64 * 0.25 * scale;
+                    Sample::new(timestamp, value)
+                })
+                .collect::<Vec<_>>();
+            let mut start_index = 0;
+            let mut end_index = 0;
+            let mut eval_ts = samples[0].timestamp + range_micros;
+            let stop = samples.last().unwrap().timestamp + range_micros;
+            while eval_ts <= stop {
+                while start_index < samples.len()
+                    && samples[start_index].timestamp < eval_ts - range_micros
+                {
+                    start_index += 1;
+                }
+                if end_index < start_index {
+                    end_index = start_index;
+                }
+                while end_index < samples.len() && samples[end_index].timestamp <= eval_ts {
+                    end_index += 1;
+                }
+
+                for kind in [ExtrapolationKind::Rate, ExtrapolationKind::Increase] {
+                    let legacy = extrapolated_rate(
+                        &samples[start_index..end_index],
+                        eval_ts,
+                        range,
+                        Duration::ZERO,
+                        kind,
+                    );
+                    let prefixed = CounterSeries::new(&samples, kind).extrapolate(
+                        start_index,
+                        end_index,
+                        eval_ts,
+                        range,
+                    );
+                    match (legacy, prefixed) {
+                        (None, None) => {}
+                        (Some(legacy), Some(prefixed)) => {
+                            assert_eq!(
+                                legacy.to_bits(),
+                                prefixed.to_bits(),
+                                "series {series} eval_ts {eval_ts} {kind:?}: {legacy} vs {prefixed}",
+                            );
+                        }
+                        (legacy, prefixed) => {
+                            panic!("presence diverged: {legacy:?} vs {prefixed:?}")
+                        }
+                    }
+                }
+                eval_ts += 15 * MICROS;
+            }
+        }
     }
 
     #[test]
@@ -1074,6 +1438,147 @@ mod tests {
         let sample = Sample::new(1_609_459_200_000_000, 42.5); // 2021-01-01 00:00:00 UTC in microseconds
         let json = serde_json::to_string(&sample).unwrap();
         assert_eq!(json, "[1609459200,\"42.5\"]");
+    }
+
+    /// Plain decimals keep the legacy text; infinities and exponent forms follow Prometheus.
+    fn assert_sample_display(sample: Sample) {
+        let context = format!(
+            "timestamp={}, value bits={:016x}",
+            sample.timestamp,
+            sample.value.to_bits()
+        );
+        let text = serde_json::to_string(&sample).unwrap();
+        let legacy = serde_json::to_string(&LegacySample(&sample)).unwrap();
+        let (timestamp, value): (i64, String) = serde_json::from_str(&text).unwrap();
+        let (legacy_timestamp, legacy_value): (i64, String) =
+            serde_json::from_str(&legacy).unwrap();
+        assert_eq!(timestamp, legacy_timestamp, "{context}");
+        let abs = sample.value.abs();
+        if sample.value.is_nan() || abs == 0.0 || (1e-6..1e21).contains(&abs) {
+            assert_eq!(text, legacy, "{context}");
+        } else if sample.value.is_infinite() {
+            let expected = if sample.value > 0.0 { "+Inf" } else { "-Inf" };
+            assert_eq!(value, expected, "{context}");
+        } else {
+            let (_, exponent) = value.split_once('e').expect(&context);
+            assert!(
+                exponent.starts_with(['+', '-']) && exponent.len() >= 3,
+                "{context}: {value}"
+            );
+            assert_ne!(value, legacy_value, "{context}");
+            assert_eq!(
+                value.parse::<f64>().unwrap().to_bits(),
+                sample.value.to_bits(),
+                "{context}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_sample_display_exact_edge_case_text() {
+        let bits = [
+            0,
+            1,
+            0x8000_0000_0000_0000, // negative zero
+            0x8000_0000_0000_0001, // negative smallest subnormal
+            0x000f_ffff_ffff_ffff, // largest subnormal
+            0x0010_0000_0000_0000, // smallest normal
+            0x7fef_ffff_ffff_ffff, // largest finite
+            0xffef_ffff_ffff_ffff,
+            f64::INFINITY.to_bits(),
+            f64::NEG_INFINITY.to_bits(),
+            0x7ff0_0000_0000_0001, // signaling NaN payload
+            0x7ff8_0000_0000_0001,
+            0x7ff8_0000_0000_0042,
+            0xfff8_0000_0000_0042,
+            1.0f64.to_bits(),
+            (-1.0f64).to_bits(),
+            0.1f64.to_bits(),
+            f64::EPSILON.to_bits(),
+            1e-7f64.to_bits(),
+            1e20f64.to_bits(),
+        ];
+        let timestamps = [
+            i64::MIN,
+            -1_000_001,
+            -1_000_000,
+            -999_999,
+            -1,
+            0,
+            1,
+            999_999,
+            1_000_000,
+            1_000_001,
+            1_609_459_200_000_000,
+            i64::MAX,
+        ];
+        for timestamp in timestamps {
+            for bits in bits {
+                assert_sample_display(Sample::new(timestamp, f64::from_bits(bits)));
+            }
+        }
+        assert_eq!(
+            serde_json::to_string(&Sample::new(0, -0.0)).unwrap(),
+            "[0,\"-0\"]"
+        );
+        for (value, expected) in [
+            (f64::INFINITY, "+Inf"),
+            (f64::NEG_INFINITY, "-Inf"),
+            (1e21, "1e+21"),
+            (-1.5e21, "-1.5e+21"),
+            (1e-7, "1e-07"),
+            (1.5e300, "1.5e+300"),
+            (5e-324, "5e-324"),
+            (1e20, "100000000000000000000"),
+            (1e-6, "0.000001"),
+        ] {
+            assert_eq!(
+                serde_json::to_string(&Sample::new(0, value)).unwrap(),
+                format!("[0,\"{expected}\"]")
+            );
+            let parsed: Sample = serde_json::from_str(&format!("[0,\"{expected}\"]")).unwrap();
+            assert_eq!(parsed.value.to_bits(), value.to_bits(), "{expected}");
+        }
+        assert_eq!(
+            serde_json::to_string(&Sample::new(0, f64::NAN)).unwrap(),
+            "[0,\"NaN\"]"
+        );
+    }
+
+    #[test]
+    fn test_sample_display_exact_random_finite_text() {
+        // Deterministic bit-pattern coverage, independent of rand versions.
+        let mut state = 0x9e37_79b9_7f4a_7c15u64;
+        let mut checked = 0;
+        while checked < 10_000 {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            let value = f64::from_bits(state);
+            if value.is_finite() {
+                assert_sample_display(Sample::new(state.rotate_left(19) as i64, value));
+                checked += 1;
+            }
+        }
+    }
+
+    #[test]
+    fn test_sample_display_preserves_point_order_and_pretty_json() {
+        let samples = vec![
+            Sample::new(1_000_000, 0.0),
+            Sample::new(-1_000_001, -0.0),
+            Sample::new(1_000_000, f64::NAN),
+            Sample::new(0, 1.5),
+            Sample::new(i64::MAX, 12_345.678),
+        ];
+        let legacy: Vec<_> = samples.iter().map(LegacySample).collect();
+        let mut direct = Vec::new();
+        serde_json::to_writer(&mut direct, &samples).unwrap();
+        assert_eq!(direct, serde_json::to_vec(&legacy).unwrap());
+        assert_eq!(
+            serde_json::to_string_pretty(&samples).unwrap(),
+            serde_json::to_string_pretty(&legacy).unwrap()
+        );
     }
 
     #[test]
@@ -1173,19 +1678,6 @@ mod tests {
     }
 
     #[test]
-    fn test_range_value_get_sample_values() {
-        let samples = vec![
-            Sample::new(1000, 1.5),
-            Sample::new(2000, 2.5),
-            Sample::new(3000, 3.5),
-        ];
-        let range_value = RangeValue::new(vec![], samples);
-
-        let values = range_value.get_sample_values();
-        assert_eq!(values, vec![1.5, 2.5, 3.5]);
-    }
-
-    #[test]
     fn test_range_value_extend() {
         let mut range_value1 = RangeValue::new(vec![], vec![Sample::new(1000, 1.0)]);
         let range_value2 = RangeValue::new(vec![], vec![Sample::new(2000, 2.0)]);
@@ -1259,18 +1751,13 @@ mod tests {
         let matrix = vec![range_value.clone()];
 
         let value_vector = Value::Vector(vector.clone());
-        assert!(value_vector.get_vector().is_some());
         assert!(value_vector.get_ref_matrix_values().is_none());
 
         let value_matrix = Value::Matrix(matrix.clone());
         assert!(value_matrix.get_ref_matrix_values().is_some());
-        assert!(value_matrix.get_vector().is_none());
 
         let value_string = Value::String("test".to_string());
         assert_eq!(value_string.get_string(), Some("test".to_string()));
-
-        let value_float = Value::Float(1.23);
-        assert_eq!(value_float.get_float(), Some(1.23));
     }
 
     #[test]
@@ -1293,66 +1780,6 @@ mod tests {
         assert_eq!(Value::Float(std::f64::consts::PI).get_type(), "scalar");
         assert_eq!(Value::String("test".to_string()).get_type(), "string");
         assert_eq!(Value::None.get_type(), "scalar");
-    }
-
-    #[test]
-    fn test_value_contains_same_label_set() {
-        let label1 = vec![Arc::new(Label::new("name", "value1"))];
-        let label2 = vec![Arc::new(Label::new("name", "value2"))];
-        let label1_dup = vec![Arc::new(Label::new("name", "value1"))];
-
-        // Test vector with unique labels
-        let vector_unique = Value::Vector(vec![
-            InstantValue {
-                labels: label1.clone(),
-                sample: Sample::new(1000, 1.0),
-            },
-            InstantValue {
-                labels: label2.clone(),
-                sample: Sample::new(2000, 2.0),
-            },
-        ]);
-        assert!(!vector_unique.contains_same_label_set());
-
-        // Test vector with duplicate labels
-        let vector_duplicate = Value::Vector(vec![
-            InstantValue {
-                labels: label1.clone(),
-                sample: Sample::new(1000, 1.0),
-            },
-            InstantValue {
-                labels: label1_dup.clone(),
-                sample: Sample::new(2000, 2.0),
-            },
-        ]);
-        assert!(vector_duplicate.contains_same_label_set());
-
-        // Test matrix with unique labels
-        let matrix_unique = Value::Matrix(vec![
-            RangeValue::new(label1.clone(), vec![Sample::new(1000, 1.0)]),
-            RangeValue::new(label2.clone(), vec![Sample::new(2000, 2.0)]),
-        ]);
-        assert!(!matrix_unique.contains_same_label_set());
-
-        // Test matrix with duplicate labels
-        let matrix_duplicate = Value::Matrix(vec![
-            RangeValue::new(label1.clone(), vec![Sample::new(1000, 1.0)]),
-            RangeValue::new(label1_dup.clone(), vec![Sample::new(2000, 2.0)]),
-        ]);
-        assert!(matrix_duplicate.contains_same_label_set());
-
-        // Test single element cases
-        let single_vector = Value::Vector(vec![InstantValue {
-            labels: label1.clone(),
-            sample: Sample::new(1000, 1.0),
-        }]);
-        assert!(!single_vector.contains_same_label_set());
-
-        let empty_vector = Value::Vector(vec![]);
-        assert!(!empty_vector.contains_same_label_set());
-
-        // Test non-vector/matrix types
-        assert!(!Value::Float(1.0).contains_same_label_set());
     }
 
     #[test]
@@ -1480,6 +1907,37 @@ mod tests {
     }
 
     #[test]
+    fn test_extrapolated_rate_caps_start_before_the_counter_zero_point() {
+        let second = 1_000_000;
+        let samples: Vec<_> = [(70, 1.0), (80, 2.0), (90, 3.0), (100, 4.0)]
+            .into_iter()
+            .map(|(ts, value)| Sample::new(ts * second, value))
+            .collect();
+        let increase = extrapolated_rate(
+            &samples,
+            100 * second,
+            Duration::from_secs(60),
+            Duration::ZERO,
+            ExtrapolationKind::Increase,
+        );
+        assert_eq!(increase, Some(3.5));
+
+        // a window reaching back before epoch 0 is still a window
+        let samples: Vec<_> = [(15, 1.0), (30, 2.0), (45, 3.0), (60, 4.0)]
+            .into_iter()
+            .map(|(ts, value)| Sample::new(ts * second, value))
+            .collect();
+        let rate = extrapolated_rate(
+            &samples,
+            60 * second,
+            Duration::from_secs(300),
+            Duration::ZERO,
+            ExtrapolationKind::Rate,
+        );
+        assert!((rate.unwrap() - 3.5 / 300.0).abs() < 1e-15);
+    }
+
+    #[test]
     fn test_sample_is_nan() {
         let normal = Sample::new(1000, 42.0);
         assert!(!normal.is_nan());
@@ -1517,45 +1975,12 @@ mod tests {
     }
 
     #[test]
-    fn test_value_get_range_values() {
-        let rv = RangeValue::new(vec![], vec![Sample::new(1000, 1.0)]);
-        let val = Value::Matrix(vec![rv]);
-        let result = val.get_range_values();
-        assert!(result.is_some());
-        assert_eq!(result.unwrap().len(), 1);
-
-        assert!(Value::Float(1.0).get_range_values().is_none());
-    }
-
-    #[test]
-    fn test_value_get_vector() {
-        let iv = InstantValue {
-            labels: vec![],
-            sample: Sample::new(1000, 5.0),
-        };
-        let val = Value::Vector(vec![iv]);
-        assert!(val.get_vector().is_some());
-        assert_eq!(val.get_vector().unwrap().len(), 1);
-
-        assert!(Value::Float(1.0).get_vector().is_none());
-    }
-
-    #[test]
     fn test_value_get_string() {
         let val = Value::String("hello".to_string());
         assert_eq!(val.get_string(), Some("hello".to_string()));
 
         assert!(Value::Float(1.0).get_string().is_none());
         assert!(Value::None.get_string().is_none());
-    }
-
-    #[test]
-    fn test_value_get_float() {
-        let val = Value::Float(3.25);
-        assert_eq!(val.get_float(), Some(3.25));
-
-        assert!(Value::String("x".to_string()).get_float().is_none());
-        assert!(Value::None.get_float().is_none());
     }
 
     #[test]
@@ -1595,75 +2020,5 @@ mod tests {
         assert!(!ctx.is_instant());
         let ts = ctx.timestamps();
         assert_eq!(ts, vec![0, 100, 200]);
-    }
-
-    #[test]
-    fn test_contains_same_label_set_vector_three_unique() {
-        let label_a = vec![Arc::new(Label::new("n", "a"))];
-        let label_b = vec![Arc::new(Label::new("n", "b"))];
-        let label_c = vec![Arc::new(Label::new("n", "c"))];
-        let v = Value::Vector(vec![
-            InstantValue {
-                labels: label_a,
-                sample: Sample::new(1, 1.0),
-            },
-            InstantValue {
-                labels: label_b,
-                sample: Sample::new(2, 2.0),
-            },
-            InstantValue {
-                labels: label_c,
-                sample: Sample::new(3, 3.0),
-            },
-        ]);
-        assert!(!v.contains_same_label_set());
-    }
-
-    #[test]
-    fn test_contains_same_label_set_vector_three_with_duplicate() {
-        let label_a = vec![Arc::new(Label::new("n", "a"))];
-        let label_b = vec![Arc::new(Label::new("n", "b"))];
-        let label_a2 = vec![Arc::new(Label::new("n", "a"))]; // dup
-        let v = Value::Vector(vec![
-            InstantValue {
-                labels: label_a,
-                sample: Sample::new(1, 1.0),
-            },
-            InstantValue {
-                labels: label_b,
-                sample: Sample::new(2, 2.0),
-            },
-            InstantValue {
-                labels: label_a2,
-                sample: Sample::new(3, 3.0),
-            },
-        ]);
-        assert!(v.contains_same_label_set());
-    }
-
-    #[test]
-    fn test_contains_same_label_set_matrix_three_unique() {
-        let la = vec![Arc::new(Label::new("n", "a"))];
-        let lb = vec![Arc::new(Label::new("n", "b"))];
-        let lc = vec![Arc::new(Label::new("n", "c"))];
-        let m = Value::Matrix(vec![
-            RangeValue::new(la, vec![]),
-            RangeValue::new(lb, vec![]),
-            RangeValue::new(lc, vec![]),
-        ]);
-        assert!(!m.contains_same_label_set());
-    }
-
-    #[test]
-    fn test_contains_same_label_set_matrix_three_with_duplicate() {
-        let la = vec![Arc::new(Label::new("n", "a"))];
-        let lb = vec![Arc::new(Label::new("n", "b"))];
-        let la2 = vec![Arc::new(Label::new("n", "a"))]; // dup
-        let m = Value::Matrix(vec![
-            RangeValue::new(la, vec![]),
-            RangeValue::new(lb, vec![]),
-            RangeValue::new(la2, vec![]),
-        ]);
-        assert!(m.contains_same_label_set());
     }
 }

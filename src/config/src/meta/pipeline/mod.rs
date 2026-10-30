@@ -95,10 +95,82 @@ impl MemorySize for Pipeline {
     }
 }
 
+/// The author's own label for a node, falling back to its id. Validation errors are
+/// shown verbatim in a toast, and a raw uuid is unreadable and unmatchable against
+/// the canvas; the backend has no i18n, so an unlabelled node keeps its id.
+fn node_display_name<'a>(nodes: &'a [Node], node_id: &'a str) -> &'a str {
+    nodes
+        .iter()
+        .find(|n| n.get_node_id() == node_id)
+        .and_then(|n| n.meta.as_ref())
+        .and_then(|m| m.get("label"))
+        .map(|s| s.as_str())
+        .filter(|s| !s.is_empty())
+        .unwrap_or(node_id)
+}
+
+/// A typo'd handle is silently dropped at runtime (process_branch_node just counts it),
+/// so an unroutable edge has to be rejected at save time instead.
+fn validate_branch_handles(
+    node_id: &str,
+    branch_params: &components::BranchParams,
+    edges: &[Edge],
+    nodes: &[Node],
+) -> Result<(), anyhow::Error> {
+    let name = node_display_name(nodes, node_id);
+    let mut declared: HashSet<&str> = HashSet::new();
+    for case in &branch_params.cases {
+        if !declared.insert(case.handle.as_str()) {
+            return Err(anyhow!(
+                "BranchNode {name} has duplicate case handle \"{}\"",
+                case.handle
+            ));
+        }
+    }
+    if let Some(else_handle) = &branch_params.else_handle
+        && !declared.insert(else_handle.as_str())
+    {
+        return Err(anyhow!(
+            "BranchNode {name}'s else_handle \"{else_handle}\" collides with a case handle"
+        ));
+    }
+
+    for edge in edges.iter().filter(|edge| edge.source == node_id) {
+        let Some(handle) = &edge.source_handle else {
+            return Err(anyhow!(
+                "Edge from BranchNode {name} to {} must declare a source_handle",
+                node_display_name(nodes, &edge.target)
+            ));
+        };
+        if !declared.contains(handle.as_str()) {
+            return Err(anyhow!(
+                "Edge from BranchNode {name} to {} uses source_handle \"{handle}\", which the node does not declare",
+                node_display_name(nodes, &edge.target)
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+/// Whether a dynamic `{field}` stream name always resolves into an internal `_o2_` stream.
+fn is_internal_template(stream_name: &str) -> bool {
+    stream_name
+        .split_once('{')
+        .is_some_and(|(prefix, _)| prefix.to_ascii_lowercase().starts_with("_o2_"))
+}
+
 // TODO YJDoc2: in a separate PR, use this fn in the pipeline validation below, so we have
 // same logic for pipelines and workflows as intended
-pub fn validate_nodes_edges(nodes: &[Node], edges: &[Edge]) -> Result<(), anyhow::Error> {
-    if nodes.len() < 2 || edges.is_empty() {
+pub fn validate_nodes_edges(
+    nodes: &[Node],
+    edges: &[Edge],
+    is_draft: bool,
+) -> Result<(), anyhow::Error> {
+    if nodes.is_empty() {
+        return Err(anyhow!("there must be at least 1 node"));
+    }
+    if !is_draft && (nodes.len() < 2 || edges.is_empty()) {
         return Err(anyhow!(
             "there must be more than 1 node and at least 1 edge"
         ));
@@ -115,9 +187,29 @@ pub fn validate_nodes_edges(nodes: &[Node], edges: &[Edge]) -> Result<(), anyhow
                 return Err(anyhow!("ConditionNode must have non-empty conditions"));
             }
         }
+
+        // a case-less Branch exposes no output handle, so it can never route: reject in draft too
+        if let NodeData::Branch(branch_params) = &node.data {
+            if branch_params.cases.is_empty() {
+                return Err(anyhow!("BranchNode must have at least one case"));
+            }
+            validate_branch_handles(node.get_node_id().as_str(), branch_params, edges, nodes)?;
+        }
+
+        // process_destination_node never forwards to children, so anything wired after a
+        // destination is accepted and then silently never runs. Reject it in draft too.
+        if matches!(&node.data, NodeData::Destination(_)) {
+            let id = node.get_node_id();
+            if edges.iter().any(|e| e.source == id) {
+                return Err(anyhow!(
+                    "Step \"{}\" sends to a destination, which ends the path. Remove the connection leaving it.",
+                    node_display_name(nodes, id.as_str())
+                ));
+            }
+        }
     }
 
-    if edges.len() < nodes.len().saturating_sub(1) {
+    if !is_draft && edges.len() < nodes.len().saturating_sub(1) {
         return Err(anyhow!(
             "Insufficient number of edges to connect all nodes. Need at least {} for {} nodes, but got {}.",
             nodes.len().saturating_sub(1),
@@ -156,6 +248,7 @@ pub fn validate_nodes_edges(nodes: &[Node], edges: &[Edge]) -> Result<(), anyhow
         false,
         false,
         &mut visited,
+        is_draft,
     )?;
 
     Ok(())
@@ -172,22 +265,61 @@ impl Pipeline {
         self.kind == PipelineKind::Evaluation
     }
 
-    pub fn get_cache_key(&self) -> String {
-        match &self.source {
-            PipelineSource::Realtime(stream_params) => {
-                format!("{}/{}", self.org, stream_params)
-            }
-            PipelineSource::Scheduled(_) => {
-                format!("{}/{}", self.org, self.id)
-            }
-        }
-    }
-
     pub fn get_derived_stream(&self) -> Option<DerivedStream> {
         match &self.source {
             PipelineSource::Scheduled(derived_stream) => Some(derived_stream.to_owned()),
             _ => None,
         }
+    }
+
+    /// The first Stream/Query node, else the source, naming another org; empty org is this one.
+    /// [pure]
+    pub fn cross_org(&self) -> Option<CrossOrg<'_>> {
+        let foreign = |org: &str| !org.is_empty() && org != self.org;
+        let node = self.nodes.iter().find_map(|node| match &node.data {
+            NodeData::Stream(params) if foreign(params.org_id.as_ref()) => Some(CrossOrg::Stream {
+                node_id: &node.id,
+                params,
+            }),
+            NodeData::Query(query) if foreign(&query.org_id) => Some(CrossOrg::Query(query)),
+            _ => None,
+        });
+        if node.is_some() {
+            return node;
+        }
+        let source_org: &str = match &self.source {
+            PipelineSource::Realtime(params) => params.org_id.as_ref(),
+            PipelineSource::Scheduled(derived_stream) => &derived_stream.org_id,
+        };
+        foreign(source_org).then_some(CrossOrg::Source(&self.source))
+    }
+
+    /// The refusal for [`Pipeline::cross_org`], naming the stream and both orgs. [pure]
+    pub fn cross_org_refusal(&self) -> Option<String> {
+        let stream = |role: &str, params: &StreamParams| {
+            let what = format!(
+                "{role} stream {}/{}",
+                params.stream_type, params.stream_name
+            );
+            (what, params.org_id.to_string())
+        };
+        let query = |query: &DerivedStream| {
+            let what = format!("scheduled query on {} streams", query.stream_type);
+            (what, query.org_id.clone())
+        };
+        let (what, org) = match self.cross_org()? {
+            CrossOrg::Stream { node_id, params } => {
+                let is_source = self.nodes.first().is_some_and(|first| first.id == node_id);
+                stream(if is_source { "source" } else { "destination" }, params)
+            }
+            CrossOrg::Query(derived_stream) => query(derived_stream),
+            CrossOrg::Source(PipelineSource::Realtime(params)) => stream("source", params),
+            CrossOrg::Source(PipelineSource::Scheduled(derived_stream)) => query(derived_stream),
+        };
+        Some(format!(
+            "Pipeline {what} points at organization {org}; pipeline streams must be in organization {}",
+            self.org
+        ))
     }
 
     /// Verifies the pipeline is valid by:
@@ -229,6 +361,23 @@ impl Pipeline {
                 return Err(anyhow!(
                     "Node {} is not a pipeline compatible node",
                     node.id
+                ));
+            }
+            let NodeData::Stream(params) = &node.data else {
+                continue;
+            };
+            if crate::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(
+                &params.stream_name,
+            ) {
+                return Err(anyhow!(
+                    "Stream {} is internal and cannot be used in a pipeline",
+                    params.stream_name
+                ));
+            }
+            if is_internal_template(&params.stream_name) {
+                return Err(anyhow!(
+                    "Destination {} would write an internal stream",
+                    params.stream_name
                 ));
             }
         }
@@ -297,6 +446,7 @@ impl Pipeline {
             false,
             self.is_evaluation(),
             &mut visited,
+            false, // pipelines are never drafted
         )?;
 
         Ok(())
@@ -400,16 +550,6 @@ impl Pipeline {
         }
     }
 
-    pub fn contains_remote_destination(&self, destination: &str) -> bool {
-        self.nodes.iter().any(|node| {
-            if let NodeData::RemoteStream(dest) = &node.data {
-                dest.destination_name == destination
-            } else {
-                false
-            }
-        })
-    }
-
     pub fn get_metadata_by_stream_params(
         &self,
         other_stream_params: &StreamParams,
@@ -496,6 +636,17 @@ where
     }
 }
 
+/// What in a pipeline names an org other than the pipeline's own.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CrossOrg<'a> {
+    Stream {
+        node_id: &'a str,
+        params: &'a StreamParams,
+    },
+    Query(&'a DerivedStream),
+    Source(&'a PipelineSource),
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct PipelineDependencyItem {
     pub id: String,
@@ -521,6 +672,7 @@ fn dfs_traversal_check(
     mut flattened: bool,
     allow_evaluation_leaf: bool,
     visited: &mut HashSet<String>,
+    is_draft: bool,
 ) -> Result<()> {
     if visited.contains(current_id) {
         return Err(anyhow!("Cyclical pipeline detected."));
@@ -546,7 +698,7 @@ fn dfs_traversal_check(
         // Evaluation pipelines publish durable tasks instead of forwarding to a stream.
         let valid_leaf = current_node.is_a_leaf_node()
             || (allow_evaluation_leaf && matches!(current_node, NodeData::LlmEvaluation(_)));
-        if !valid_leaf {
+        if !valid_leaf && !is_draft {
             return Err(anyhow!(
                 "All terminal nodes must be stream nodes or destination nodes"
             ));
@@ -571,6 +723,7 @@ fn dfs_traversal_check(
             flattened,
             allow_evaluation_leaf,
             visited,
+            is_draft,
         )?;
     }
     visited.remove(current_id);
@@ -582,47 +735,16 @@ pub fn default_status() -> bool {
     true
 }
 
+/// Whether a pipeline must not write `destination`; an internal stream only takes its own records.
+pub fn is_forbidden_destination(source_stream: &str, destination: &str, cross_type: bool) -> bool {
+    crate::meta::self_reporting::usage::is_internal_rollup_stream(destination)
+        && (cross_type || destination != source_stream)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::meta::alerts::{QueryCondition, TriggerCondition};
-
-    #[test]
-    fn test_pipeline_get_cache_key() {
-        let mut pipeline = Pipeline {
-            id: "test_pipeline".to_string(),
-            version: 1,
-            enabled: true,
-            org: "test_org".to_string(),
-            name: "test_pipeline".to_string(),
-            description: "test description".to_string(),
-            source: PipelineSource::Realtime(StreamParams::new(
-                "test_org",
-                "test_stream",
-                StreamType::Logs,
-            )),
-            kind: PipelineKind::User,
-            nodes: vec![],
-            edges: vec![],
-        };
-
-        let cache_key = pipeline.get_cache_key();
-        assert_eq!(cache_key, "test_org/test_org/test_stream/logs");
-
-        // Test scheduled pipeline
-        let derived_stream = DerivedStream {
-            org_id: "test_org".to_string(),
-            stream_type: StreamType::Logs,
-            query_condition: QueryCondition::default(),
-            trigger_condition: TriggerCondition::default(),
-            tz_offset: 0,
-            delay: None,
-            start_at: None,
-        };
-        pipeline.source = PipelineSource::Scheduled(derived_stream);
-        let cache_key = pipeline.get_cache_key();
-        assert_eq!(cache_key, "test_org/test_pipeline");
-    }
 
     #[test]
     fn test_pipeline_get_derived_stream() {
@@ -820,6 +942,7 @@ mod tests {
                     id: "e1-2".to_string(),
                     source: "1".to_string(),
                     target: "2".to_string(),
+                    source_handle: None,
                 },
                 // Missing edge to node 3
             ],
@@ -926,6 +1049,7 @@ mod tests {
                 id: "e1-2".to_string(),
                 source: "1".to_string(),
                 target: "2".to_string(),
+                source_handle: None,
             }],
         };
 
@@ -965,6 +1089,7 @@ mod tests {
                 id: "e1-2".to_string(),
                 source: "invalid_source".to_string(), // Invalid source
                 target: "1".to_string(),
+                source_handle: None,
             }],
         };
 
@@ -1012,6 +1137,7 @@ mod tests {
                         name: "test_function".to_string(),
                         after_flatten: false,
                         num_args: 0,
+                        raw_fn: None,
                     }),
                     200.0,
                     100.0,
@@ -1023,6 +1149,7 @@ mod tests {
                         name: "test_function2".to_string(),
                         after_flatten: true,
                         num_args: 0,
+                        raw_fn: None,
                     }),
                     300.0,
                     100.0,
@@ -1057,6 +1184,7 @@ mod tests {
                         name: "test_function".to_string(),
                         after_flatten: false,
                         num_args: 0,
+                        raw_fn: None,
                     }),
                     100.0,
                     100.0,
@@ -1138,38 +1266,6 @@ mod tests {
         assert_eq!(stream_params.org_id, "test_org");
         assert_eq!(stream_params.stream_name, "test_stream");
         assert_eq!(stream_params.stream_type, StreamType::Logs);
-    }
-
-    #[test]
-    fn test_pipeline_contains_remote_destination() {
-        let pipeline = Pipeline {
-            id: "test_pipeline".to_string(),
-            version: 1,
-            enabled: true,
-            org: "test_org".to_string(),
-            name: "test_pipeline".to_string(),
-            description: "test description".to_string(),
-            source: PipelineSource::Realtime(StreamParams::new(
-                "test_org",
-                "test_stream",
-                StreamType::Logs,
-            )),
-            kind: PipelineKind::User,
-            nodes: vec![Node::new(
-                "1".to_string(),
-                NodeData::RemoteStream(crate::meta::stream::RemoteStreamParams {
-                    org_id: "test_org".to_string().into(),
-                    destination_name: "test_destination".to_string().into(),
-                }),
-                100.0,
-                100.0,
-                "input".to_string(),
-            )],
-            edges: vec![],
-        };
-
-        assert!(pipeline.contains_remote_destination("test_destination"));
-        assert!(!pipeline.contains_remote_destination("nonexistent_destination"));
     }
 
     #[test]
@@ -1265,11 +1361,13 @@ mod tests {
                     id: "e1-2".to_string(),
                     source: "1".to_string(),
                     target: "2".to_string(),
+                    source_handle: None,
                 },
                 Edge {
                     id: "e2-1".to_string(),
                     source: "2".to_string(),
                     target: "1".to_string(), // Creates a cycle
+                    source_handle: None,
                 },
             ],
         };
@@ -1317,6 +1415,7 @@ mod tests {
                         name: "test_function".to_string(),
                         after_flatten: false,
                         num_args: 0,
+                        raw_fn: None,
                     }),
                     300.0,
                     100.0,
@@ -1327,6 +1426,7 @@ mod tests {
                 id: "e1-2".to_string(),
                 source: "1".to_string(),
                 target: "2".to_string(),
+                source_handle: None,
             }],
         };
 
@@ -1427,6 +1527,7 @@ mod tests {
                         name: "test_function1".to_string(),
                         after_flatten: true, // Checked
                         num_args: 0,
+                        raw_fn: None,
                     }),
                     200.0,
                     100.0,
@@ -1438,6 +1539,7 @@ mod tests {
                         name: "test_function2".to_string(),
                         after_flatten: false, // Unchecked after checked
                         num_args: 0,
+                        raw_fn: None,
                     }),
                     300.0,
                     100.0,
@@ -1460,16 +1562,19 @@ mod tests {
                     id: "e1-2".to_string(),
                     source: "1".to_string(),
                     target: "2".to_string(),
+                    source_handle: None,
                 },
                 Edge {
                     id: "e2-3".to_string(),
                     source: "2".to_string(),
                     target: "3".to_string(),
+                    source_handle: None,
                 },
                 Edge {
                     id: "e3-4".to_string(),
                     source: "3".to_string(),
                     target: "4".to_string(),
+                    source_handle: None,
                 },
             ],
         };
@@ -1515,6 +1620,7 @@ mod tests {
                 name: "fn1".to_string(),
                 after_flatten: false,
                 num_args: 0,
+                raw_fn: None,
             }),
         );
         node_map.insert(
@@ -1558,5 +1664,584 @@ mod tests {
 
         let destinations = pipeline.get_all_destination_streams(&node_map, &graph);
         assert!(destinations.is_empty());
+    }
+
+    // --- validate_nodes_edges / is_draft behavior ---
+
+    fn trigger_node(id: &str) -> Node {
+        Node::new(
+            id.to_string(),
+            NodeData::WorkflowTrigger,
+            0.0,
+            0.0,
+            "input".to_string(),
+        )
+    }
+
+    fn function_node(id: &str) -> Node {
+        Node::new(
+            id.to_string(),
+            NodeData::Function(components::FunctionParams {
+                name: "fn1".to_string(),
+                after_flatten: false,
+                num_args: 0,
+                raw_fn: None,
+            }),
+            0.0,
+            0.0,
+            "default".to_string(),
+        )
+    }
+
+    fn destination_node(id: &str) -> Node {
+        Node::new(
+            id.to_string(),
+            NodeData::Destination(components::WorkflowDestination {
+                destination_id: "dest-1".to_string(),
+                template_override: None,
+            }),
+            0.0,
+            0.0,
+            "output".to_string(),
+        )
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_draft_allows_no_edges_strict_rejects() {
+        let nodes = vec![trigger_node("t1"), destination_node("d1")];
+
+        // strict: no edges at all between two nodes is rejected
+        let err = validate_nodes_edges(&nodes, &[], false).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("more than 1 node and at least 1 edge")
+        );
+
+        // draft: same graph, no edges, is tolerated
+        assert!(validate_nodes_edges(&nodes, &[], true).is_ok());
+    }
+
+    // The executor never forwards past a destination, so a chained one is accepted,
+    // published, and then silently never runs. Reject it instead of shipping a no-op.
+    #[test]
+    fn test_validate_nodes_edges_rejects_destination_with_outgoing_edge() {
+        let nodes = vec![
+            trigger_node("t1"),
+            destination_node("d1"),
+            destination_node("d2"),
+        ];
+        let edges = vec![
+            Edge::new("t1".to_string(), "d1".to_string()),
+            Edge::new("d1".to_string(), "d2".to_string()),
+        ];
+
+        let err = validate_nodes_edges(&nodes, &edges, false).unwrap_err();
+        assert!(
+            err.to_string().contains("d1"),
+            "the error must name the offending step, got: {err}"
+        );
+
+        // Rejected in draft too: the canvas exposes no source handle on a destination,
+        // so only an API/import caller can build this — never a mid-edit draft.
+        assert!(validate_nodes_edges(&nodes, &edges, true).is_err());
+
+        // A destination that actually terminates stays valid, draft or not.
+        let ok_nodes = vec![trigger_node("t1"), destination_node("d1")];
+        let ok_edges = vec![Edge::new("t1".to_string(), "d1".to_string())];
+        assert!(validate_nodes_edges(&ok_nodes, &ok_edges, false).is_ok());
+        assert!(validate_nodes_edges(&ok_nodes, &ok_edges, true).is_ok());
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_draft_allows_insufficient_edge_count() {
+        // 3 nodes but only 1 edge (need 2 to connect all of them)
+        let nodes = vec![
+            trigger_node("t1"),
+            function_node("f1"),
+            destination_node("d1"),
+        ];
+        let edges = vec![Edge::new("t1".to_string(), "f1".to_string())];
+
+        let err = validate_nodes_edges(&nodes, &edges, false).unwrap_err();
+        assert!(err.to_string().contains("Insufficient number of edges"));
+
+        assert!(validate_nodes_edges(&nodes, &edges, true).is_ok());
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_draft_allows_non_terminal_leaf() {
+        // Trigger -> Function, where Function dead-ends (not Stream/Destination)
+        let nodes = vec![trigger_node("t1"), function_node("f1")];
+        let edges = vec![Edge::new("t1".to_string(), "f1".to_string())];
+
+        let err = validate_nodes_edges(&nodes, &edges, false).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("All terminal nodes must be stream nodes or destination nodes")
+        );
+
+        assert!(validate_nodes_edges(&nodes, &edges, true).is_ok());
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_draft_still_rejects_cycles() {
+        // t1 -> f1 -> t1 : cyclical, must be rejected even in draft mode
+        let nodes = vec![trigger_node("t1"), function_node("f1")];
+        let edges = vec![
+            Edge::new("t1".to_string(), "f1".to_string()),
+            Edge::new("f1".to_string(), "t1".to_string()),
+        ];
+
+        for is_draft in [false, true] {
+            let err = validate_nodes_edges(&nodes, &edges, is_draft).unwrap_err();
+            assert!(
+                err.to_string().contains("Cyclical pipeline detected"),
+                "is_draft={is_draft}: expected cycle error, got {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_draft_still_rejects_single_node_graph() {
+        // Documents current behavior: a lone Trigger node is rejected by the
+        // `nodes.len() < 2` floor even with is_draft=true, since that check is not
+        // gated on is_draft (only the edges-related checks below it are). This means
+        // testing a graph that's just a freshly-dropped Trigger node - the first
+        // partial-graph scenario - still fails validation today.
+        let nodes = vec![trigger_node("t1")];
+
+        let res = validate_nodes_edges(&nodes, &[], true);
+        assert!(res.is_ok());
+
+        let res = validate_nodes_edges(&nodes, &[], false);
+        assert!(res.is_err_and(|v| {
+            v.to_string()
+                .contains("more than 1 node and at least 1 edge")
+        }));
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_rejects_empty_graph() {
+        assert!(validate_nodes_edges(&[], &[], true).is_err());
+        assert!(validate_nodes_edges(&[], &[], false).is_err());
+    }
+
+    fn branch_node(id: &str, cases: Vec<components::BranchCase>) -> Node {
+        Node::new(
+            id.to_string(),
+            NodeData::Branch(components::BranchParams {
+                cases,
+                else_handle: None,
+            }),
+            0.0,
+            0.0,
+            "default".to_string(),
+        )
+    }
+
+    fn branch_case(handle: &str, column: &str) -> components::BranchCase {
+        components::BranchCase {
+            handle: handle.to_string(),
+            label: None,
+            conditions: Some(components::ConditionParams::V1 {
+                conditions: crate::meta::alerts::ConditionList::EndCondition(
+                    crate::meta::alerts::Condition {
+                        column: column.to_string(),
+                        operator: crate::meta::alerts::Operator::EqualTo,
+                        value: serde_json::json!("x"),
+                        ignore_case: false,
+                    },
+                ),
+            }),
+        }
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_rejects_branch_with_zero_cases() {
+        let nodes = vec![
+            trigger_node("t1"),
+            branch_node("b1", vec![]),
+            destination_node("d1"),
+        ];
+        let edges = vec![
+            Edge::new("t1".to_string(), "b1".to_string()),
+            Edge::new_with_handle("b1".to_string(), "d1".to_string(), "case_0".to_string()),
+        ];
+
+        // a case-less Branch has no output handle, so it can never route: reject in draft too
+        for is_draft in [false, true] {
+            let err = validate_nodes_edges(&nodes, &edges, is_draft).unwrap_err();
+            assert!(
+                err.to_string().contains("BranchNode must have"),
+                "is_draft={is_draft}: expected zero-cases error, got {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_accepts_branch_with_cases() {
+        let nodes = vec![
+            trigger_node("t1"),
+            branch_node("b1", vec![branch_case("case_0", "severity")]),
+            destination_node("d1"),
+        ];
+        let edges = vec![
+            Edge::new("t1".to_string(), "b1".to_string()),
+            Edge::new_with_handle("b1".to_string(), "d1".to_string(), "case_0".to_string()),
+        ];
+
+        assert!(validate_nodes_edges(&nodes, &edges, false).is_ok());
+    }
+
+    fn branch_node_with_else(
+        id: &str,
+        cases: Vec<components::BranchCase>,
+        else_handle: Option<&str>,
+    ) -> Node {
+        Node::new(
+            id.to_string(),
+            NodeData::Branch(components::BranchParams {
+                cases,
+                else_handle: else_handle.map(str::to_string),
+            }),
+            0.0,
+            0.0,
+            "default".to_string(),
+        )
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_rejects_branch_edge_with_unknown_handle() {
+        let nodes = vec![
+            trigger_node("t1"),
+            branch_node("b1", vec![branch_case("case_0", "severity")]),
+            destination_node("d1"),
+        ];
+        let edges = vec![
+            Edge::new("t1".to_string(), "b1".to_string()),
+            Edge::new_with_handle("b1".to_string(), "d1".to_string(), "case_typo".to_string()),
+        ];
+
+        for is_draft in [false, true] {
+            let err = validate_nodes_edges(&nodes, &edges, is_draft).unwrap_err();
+            assert!(
+                err.to_string().contains("case_typo"),
+                "is_draft={is_draft}: expected unknown-handle error, got {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_rejects_branch_edge_without_source_handle() {
+        let nodes = vec![
+            trigger_node("t1"),
+            branch_node("b1", vec![branch_case("case_0", "severity")]),
+            destination_node("d1"),
+        ];
+        let edges = vec![
+            Edge::new("t1".to_string(), "b1".to_string()),
+            Edge::new("b1".to_string(), "d1".to_string()),
+        ];
+
+        for is_draft in [false, true] {
+            let err = validate_nodes_edges(&nodes, &edges, is_draft).unwrap_err();
+            assert!(
+                err.to_string().contains("source_handle"),
+                "is_draft={is_draft}: expected missing-handle error, got {err}"
+            );
+        }
+    }
+
+    // Validation errors surface verbatim in a toast, so a raw uuid ("Edge from
+    // BranchNode 01ba56cc-aa28-…") is unreadable and unmatchable against the
+    // canvas. The node's own label travels in `meta`, so the backend can name it.
+    #[test]
+    fn branch_errors_name_nodes_by_their_label_when_set() {
+        let mut branch = branch_node("b1", vec![branch_case("case_0", "severity")]);
+        branch.meta = Some(HashMap::from([(
+            "label".to_string(),
+            "Severity split".to_string(),
+        )]));
+        let mut dest = destination_node("d1");
+        dest.meta = Some(HashMap::from([(
+            "label".to_string(),
+            "Page on-call".to_string(),
+        )]));
+        let nodes = vec![trigger_node("t1"), branch, dest];
+        let edges = vec![
+            Edge::new("t1".to_string(), "b1".to_string()),
+            Edge::new("b1".to_string(), "d1".to_string()),
+        ];
+
+        let err = validate_nodes_edges(&nodes, &edges, false)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.contains("Severity split"),
+            "expected source label, got {err}"
+        );
+        assert!(
+            err.contains("Page on-call"),
+            "expected target label, got {err}"
+        );
+        assert!(!err.contains("b1"), "raw id leaked into {err}");
+    }
+
+    // Unlabelled is the common case (the author never renamed the node), and the
+    // backend has no i18n — so it falls back to the id rather than inventing a name.
+    #[test]
+    fn branch_errors_fall_back_to_the_id_when_a_node_has_no_label() {
+        let nodes = vec![
+            trigger_node("t1"),
+            branch_node("b1", vec![branch_case("case_0", "severity")]),
+            destination_node("d1"),
+        ];
+        let edges = vec![
+            Edge::new("t1".to_string(), "b1".to_string()),
+            Edge::new("b1".to_string(), "d1".to_string()),
+        ];
+
+        let err = validate_nodes_edges(&nodes, &edges, false)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("b1"), "expected id fallback, got {err}");
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_rejects_branch_with_duplicate_case_handles() {
+        let nodes = vec![
+            trigger_node("t1"),
+            branch_node(
+                "b1",
+                vec![
+                    branch_case("case_0", "severity"),
+                    branch_case("case_0", "level"),
+                ],
+            ),
+            destination_node("d1"),
+        ];
+        let edges = vec![
+            Edge::new("t1".to_string(), "b1".to_string()),
+            Edge::new_with_handle("b1".to_string(), "d1".to_string(), "case_0".to_string()),
+        ];
+
+        for is_draft in [false, true] {
+            let err = validate_nodes_edges(&nodes, &edges, is_draft).unwrap_err();
+            assert!(
+                err.to_string().contains("duplicate"),
+                "is_draft={is_draft}: expected duplicate-handle error, got {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_rejects_else_handle_colliding_with_case_handle() {
+        let nodes = vec![
+            trigger_node("t1"),
+            branch_node_with_else(
+                "b1",
+                vec![branch_case("case_0", "severity")],
+                Some("case_0"),
+            ),
+            destination_node("d1"),
+        ];
+        let edges = vec![
+            Edge::new("t1".to_string(), "b1".to_string()),
+            Edge::new_with_handle("b1".to_string(), "d1".to_string(), "case_0".to_string()),
+        ];
+
+        for is_draft in [false, true] {
+            let err = validate_nodes_edges(&nodes, &edges, is_draft).unwrap_err();
+            assert!(
+                err.to_string().contains("else_handle"),
+                "is_draft={is_draft}: expected else-collision error, got {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_accepts_branch_edge_on_else_handle() {
+        let nodes = vec![
+            trigger_node("t1"),
+            branch_node_with_else("b1", vec![branch_case("case_0", "severity")], Some("else")),
+            destination_node("d1"),
+        ];
+        let edges = vec![
+            Edge::new("t1".to_string(), "b1".to_string()),
+            Edge::new_with_handle("b1".to_string(), "d1".to_string(), "else".to_string()),
+        ];
+
+        assert!(validate_nodes_edges(&nodes, &edges, false).is_ok());
+    }
+
+    #[test]
+    fn test_pipeline_validation_rejects_internal_destination_templates() {
+        let stream = |id: &str, name: &str| {
+            Node::new(
+                id.to_string(),
+                NodeData::Stream(StreamParams::new("test_org", name, StreamType::Logs)),
+                0.0,
+                0.0,
+                "input".to_string(),
+            )
+        };
+        let pipeline = |destination: &str| Pipeline {
+            id: "p".to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "p".to_string(),
+            description: String::new(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "test_org",
+                "src",
+                StreamType::Logs,
+            )),
+            kind: PipelineKind::User,
+            nodes: vec![stream("1", "src"), stream("2", destination)],
+            edges: vec![Edge {
+                id: "e1-2".to_string(),
+                source: "1".to_string(),
+                target: "2".to_string(),
+                source_handle: None,
+            }],
+        };
+        for bad in ["_o2_{kind}", "_O2_ai_{x}"] {
+            let err = pipeline(bad).validate().unwrap_err().to_string();
+            assert!(err.contains("internal stream"), "{bad}: {err}");
+        }
+        for ok in ["logs_{kind}", "{kind}", "_o2"] {
+            assert!(pipeline(ok).validate().is_ok(), "{ok}");
+        }
+    }
+
+    #[test]
+    fn test_internal_streams_take_back_only_their_own_records() {
+        assert!(is_forbidden_destination("app", "_o2_ai_chat_events", false));
+        assert!(is_forbidden_destination(
+            "_o2_dbm_server",
+            "_o2_service_graph",
+            false
+        ));
+        assert!(is_forbidden_destination("app", "_agent_signals", false));
+        assert!(is_forbidden_destination(
+            "_o2_dbm_server",
+            "_o2_dbm_server",
+            true
+        ));
+        assert!(!is_forbidden_destination(
+            "_o2_dbm_server",
+            "_o2_dbm_server",
+            false
+        ));
+        assert!(!is_forbidden_destination("app", "app_copy", true));
+    }
+
+    #[test]
+    fn test_cross_org_refusal() {
+        let stream = |id: &str, org: &str, name: &str| {
+            Node::new(
+                id.to_string(),
+                NodeData::Stream(StreamParams::new(org, name, StreamType::Logs)),
+                0.0,
+                0.0,
+                "default".to_string(),
+            )
+        };
+        let query = |id: &str, org: &str| {
+            Node::new(
+                id.to_string(),
+                NodeData::Query(DerivedStream {
+                    org_id: org.to_string(),
+                    stream_type: StreamType::Metrics,
+                    ..Default::default()
+                }),
+                0.0,
+                0.0,
+                "input".to_string(),
+            )
+        };
+        let refusal = |what: &str, org: &str| {
+            Some(format!(
+                "Pipeline {what} points at organization {org}; pipeline streams must be in organization a"
+            ))
+        };
+        let cases = [
+            (
+                vec![stream("src", "a", "in"), stream("dst", "a", "out")],
+                None,
+            ),
+            (
+                vec![stream("src", "", "in"), stream("dst", "", "out")],
+                None,
+            ),
+            (vec![query("src", ""), stream("dst", "a", "out")], None),
+            (vec![function_node("f"), stream("dst", "a", "out")], None),
+            (
+                vec![stream("src", "b", "in"), stream("dst", "a", "out")],
+                refusal("source stream logs/in", "b"),
+            ),
+            (
+                vec![stream("src", "a", "in"), stream("dst", "c", "out")],
+                refusal("destination stream logs/out", "c"),
+            ),
+            (
+                vec![query("src", "b"), stream("dst", "a", "out")],
+                refusal("scheduled query on metrics streams", "b"),
+            ),
+        ];
+        let pipeline = |source: PipelineSource, nodes| Pipeline {
+            id: "p".to_string(),
+            version: 1,
+            enabled: true,
+            org: "a".to_string(),
+            name: "p".to_string(),
+            description: String::new(),
+            source,
+            kind: PipelineKind::User,
+            nodes,
+            edges: vec![],
+        };
+        for (nodes, expected) in cases {
+            let pipeline = pipeline(PipelineSource::default(), nodes);
+            assert_eq!(
+                pipeline.cross_org_refusal(),
+                expected,
+                "{:?}",
+                pipeline.nodes
+            );
+        }
+        let scheduled = |org: &str| {
+            PipelineSource::Scheduled(DerivedStream {
+                org_id: org.to_string(),
+                stream_type: StreamType::Metrics,
+                ..Default::default()
+            })
+        };
+        let realtime =
+            |org: &str| PipelineSource::Realtime(StreamParams::new(org, "s", StreamType::Logs));
+        let sources = [
+            (scheduled("a"), None),
+            (scheduled(""), None),
+            (
+                scheduled("b"),
+                refusal("scheduled query on metrics streams", "b"),
+            ),
+            (realtime("a"), None),
+            (realtime("b"), refusal("source stream logs/s", "b")),
+        ];
+        for (source, expected) in sources {
+            let pipeline = pipeline(source, vec![query("src", "a"), stream("dst", "a", "out")]);
+            assert_eq!(
+                pipeline.cross_org_refusal(),
+                expected,
+                "{:?}",
+                pipeline.source
+            );
+            assert_eq!(
+                matches!(pipeline.cross_org(), Some(CrossOrg::Source(_))),
+                expected.is_some()
+            );
+        }
     }
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { applyThemeColors, cssToken } from "./theme";
+import { applyThemeColors, cssToken, pickReadableForeground } from "./theme";
 import type { SemanticColors } from "./theme";
 
 describe("cssToken", () => {
@@ -19,6 +19,20 @@ describe("cssToken", () => {
 
   it("returns the fallback when the token is unset", () => {
     expect(cssToken("--color-does-not-exist", "#deadbe")).toBe("#deadbe");
+  });
+
+  it("returns a token set on body, where dark-mode presets are written", () => {
+    document.documentElement.style.setProperty("--color-preset-more", "#abcdef");
+    document.body.style.setProperty("--color-preset-more", "#123456");
+    expect(cssToken("--color-preset-more", "#000000")).toBe("#123456");
+    document.body.style.removeProperty("--color-preset-more");
+    document.documentElement.style.removeProperty("--color-preset-more");
+  });
+
+  it("still returns a token set only on documentElement", () => {
+    document.body.removeAttribute("style");
+    document.documentElement.style.setProperty("--color-root-only", "#654321");
+    expect(cssToken("--color-root-only", "#000000")).toBe("#654321");
   });
 });
 
@@ -82,5 +96,66 @@ describe("applyThemeColors with semanticColors", () => {
     expect(document.documentElement.style.getPropertyValue("--color-status-negative")).toBe(
       "#F45B49",
     );
+  });
+});
+
+describe("applyThemeColors button-primary-foreground contrast", () => {
+  beforeEach(() => {
+    document.documentElement.removeAttribute("style");
+    document.body.removeAttribute("style");
+  });
+
+  it("switches to dark text when the theme color is too light for white text (O2 Signature dark, #8B8DF0 vs white = 2.93:1)", () => {
+    applyThemeColors("#8B8DF0", "dark", false);
+    expect(
+      document.documentElement.style.getPropertyValue("--color-button-primary-foreground"),
+    ).toBe("#171717");
+  });
+
+  it("keeps white text when the theme color is dark enough (O2 Pulse, #3F7994 vs white = 4.8:1)", () => {
+    applyThemeColors("#3F7994", "dark", false);
+    expect(
+      document.documentElement.style.getPropertyValue("--color-button-primary-foreground"),
+    ).toBe("#FFFFFF");
+  });
+
+  it("keeps white text for the default theme's own light color (O2 Signature light, #6B76E3 vs white = 3.94:1, under the 4.5:1 AA bar but above the floor)", () => {
+    applyThemeColors("#6B76E3", "light", false);
+    expect(
+      document.documentElement.style.getPropertyValue("--color-button-primary-foreground"),
+    ).toBe("#FFFFFF");
+  });
+
+  it("clears the override for the default theme so the stylesheet value applies", () => {
+    applyThemeColors("#8B8DF0", "dark", false);
+    applyThemeColors("#8B8DF0", "dark", true);
+    expect(
+      document.documentElement.style.getPropertyValue("--color-button-primary-foreground"),
+    ).toBe("");
+  });
+});
+
+describe("pickReadableForeground", () => {
+  const luminance = (hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((i) => {
+      const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const contrast = (a: string, b: string) => {
+    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+
+  it("keeps AA contrast on every grey, including the mid-tones", () => {
+    for (let v = 0; v < 256; v += 1) {
+      const hex = `#${v.toString(16).padStart(2, "0").repeat(3)}`;
+      expect(contrast(pickReadableForeground(hex), hex)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("uses black where neither white nor grey-900 reaches AA", () => {
+    expect(pickReadableForeground("#7B7B7B")).toBe("#000000");
   });
 });

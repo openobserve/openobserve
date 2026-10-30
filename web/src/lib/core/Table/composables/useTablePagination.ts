@@ -13,6 +13,7 @@ export function useTablePagination<TData>(
     currentPage?: number;
     totalCount?: number;
     data: TData[];
+    rowModelWindowed?: boolean;
   },
   emit: any,
 ) {
@@ -25,6 +26,13 @@ export function useTablePagination<TData>(
   // In client mode, allow the parent to force a specific page by passing currentPage.
   // This lets callers reset to page 1 on filter/search changes without relying on
   // TanStack's autoResetPageIndex (which can't distinguish filter vs expansion changes).
+  // Immediate so a caller seeding currentPage from a persisted/URL value (e.g.
+  // restoring the page a user was on before navigating away) lands there on
+  // first render instead of always starting at TanStack's default page 0. Only
+  // safe for data that's already present at mount — TanStack's own auto-reset
+  // resolves through its own deferred microtask queue on a later data change, so
+  // a caller whose data loads asynchronously must not mount until it has data
+  // (see Dashboards.vue's key-swap) or this gets silently overwritten.
   watch(
     () => props.currentPage,
     (page) => {
@@ -32,6 +40,7 @@ export function useTablePagination<TData>(
         table.setPageIndex(page - 1);
       }
     },
+    { immediate: true },
   );
 
   // Client-side: current page from TanStack state
@@ -54,7 +63,10 @@ export function useTablePagination<TData>(
 
   const totalCount = computed(() => {
     if (isServerMode.value) return props.totalCount ?? 0;
-    return props.data.length;
+    // A windowed row model holds only the visible slice; windowing is off while filters are active.
+    if (props.rowModelWindowed) return props.data.length;
+    // Pages are cut from the filtered rows, so the footer must count those, not the raw data.
+    return table.getFilteredRowModel().rows.length;
   });
 
   const isFirstPage = computed(() => currentPage.value <= 1);
@@ -103,6 +115,14 @@ export function useTablePagination<TData>(
     goToPage(totalPages.value);
   }
 
+  // A stored page can outlive the rows it was chosen for (folder/tab switch resets the table but not the URL/store), so a page past the end falls back to 1 and the parent is told to fix its copy.
+  function restorePage(page: number) {
+    if (!isClientMode.value) return;
+    const target = page >= 1 && page <= totalPages.value ? page : 1;
+    table.setPageIndex(target - 1);
+    if (target !== page) emit("update:currentPage", target);
+  }
+
   return {
     isClientMode,
     isServerMode,
@@ -122,5 +142,6 @@ export function useTablePagination<TData>(
     prevPage,
     firstPage,
     lastPage,
+    restorePage,
   };
 }

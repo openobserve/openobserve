@@ -20,14 +20,12 @@
        "scope chip" pattern across the AI pages. Kept OUT of the dropdown trigger
        so it never overlaps the (truncated) stream name. -->
   <OBadge variant="default-soft" size="sm" class="shrink-0" :data-test="dataTest">
-    {{
-      t(count === 1 ? "traces.agentCountBadgeSingular" : "traces.agentCountBadgePlural", { count })
-    }}
+    {{ t("traces.agentCountBadgeSingular", { count }) }}
   </OBadge>
 </template>
 
 <script setup lang="ts">
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 
 defineProps<{
@@ -36,5 +34,5 @@ defineProps<{
   dataTest?: string;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 </script>

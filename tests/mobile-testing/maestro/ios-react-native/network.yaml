@@ -1,0 +1,12 @@
+# Drives O2RumTester on iOS: a successful and a 404 network request (resource tracking / A4).
+appId: org.reactjs.native.example.O2RumTester
+---
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible: "O2 RUM Tester"
+    timeout: 40000
+- tapOn: "Fetch data (success)"
+- tapOn: "Fetch data (404 error)"
+- waitForAnimationToEnd:
+    timeout: 3000

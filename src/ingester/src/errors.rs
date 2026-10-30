@@ -73,27 +73,35 @@ pub enum Error {
         source: std::string::FromUtf8Error,
     },
     NotImplemented,
+    #[snafu(display("Failed to infer JSON schema: {source}"))]
     InferJsonSchemaError {
         source: arrow::error::ArrowError,
     },
+    #[snafu(display("Failed to merge schema: {source}"))]
     MergeSchemaError {
         source: arrow::error::ArrowError,
     },
+    #[snafu(display("Failed to create arrow writer: {source}"))]
     CreateArrowWriterError {
         source: arrow::error::ArrowError,
     },
+    #[snafu(display("Failed to write arrow record batch: {source}"))]
     WriteArrowRecordBatchError {
         source: arrow::error::ArrowError,
     },
+    #[snafu(display("Failed to create arrow JSON encoder: {source}"))]
     CreateArrowJsonEncoder {
         source: arrow::error::ArrowError,
     },
+    #[snafu(display("Failed to encode records into an arrow record batch: {source}"))]
     ArrowJsonEncodeError {
         source: arrow::error::ArrowError,
     },
+    #[snafu(display("Failed to encode arrow IPC: {source}"))]
     ArrowIpcEncodeError {
         source: arrow::error::ArrowError,
     },
+    #[snafu(display("Failed to decode arrow IPC: {source}"))]
     ArrowIpcDecodeError {
         source: arrow::error::ArrowError,
     },
@@ -127,9 +135,40 @@ pub enum Error {
     },
 }
 
+impl Error {
+    /// True for a transient overload the client should retry later.
+    pub fn is_overload(&self) -> bool {
+        matches!(
+            self,
+            Error::WalError {
+                source: wal::Error::WriteQueueFull { .. }
+            } | Error::MemoryTableOverflowError {}
+                | Error::MemoryCircuitBreakerError {}
+                | Error::DiskCircuitBreakerError {}
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_is_overload() {
+        assert!(
+            Error::WalError {
+                source: wal::Error::WriteQueueFull { idx: 0 }
+            }
+            .is_overload()
+        );
+        assert!(Error::MemoryTableOverflowError {}.is_overload());
+        assert!(
+            !Error::ExternalError {
+                source: "disk failure".into()
+            }
+            .is_overload()
+        );
+    }
 
     #[test]
     fn test_memory_table_overflow_error_display() {

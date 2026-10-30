@@ -1,10 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
-import { createI18n } from "vue-i18n";
 import { createRouter, createWebHistory } from "vue-router";
 import Elasticsearch from "./Elasticsearch.vue";
-import CopyContent from "@/components/CopyContent.vue";
+import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 
 // Mock aws-exports
 vi.mock("../../../aws-exports", () => ({
@@ -49,10 +48,10 @@ vi.mock("@/composables/useIngestion", () => ({
   })),
 }));
 
-// Mock CopyContent component
-vi.mock("@/components/CopyContent.vue", () => ({
+// Mock CredentialCodeBlock component
+vi.mock("@/components/ingestion/CredentialCodeBlock.vue", () => ({
   default: {
-    name: "CopyContent",
+    name: "CredentialCodeBlock",
     template: '<div data-test="copy-content">{{ content }}</div>',
     props: ["content"],
   },
@@ -67,13 +66,6 @@ const mockStore = createStore({
     userInfo: {
       email: "test@example.com",
     },
-  },
-});
-
-const mockI18n = createI18n({
-  locale: "en",
-  messages: {
-    en: {},
   },
 });
 
@@ -105,21 +97,21 @@ describe("Elasticsearch.vue Comprehensive Coverage", () => {
     return mount(Elasticsearch, {
       props: { ...defaultProps, ...props },
       global: {
-        plugins: [mockI18n, mockRouter],
+        plugins: [mockRouter],
         provide: {
           store: mockStore,
         },
         components: {
-          CopyContent,
+          CredentialCodeBlock,
         },
       },
     });
   };
 
   describe("Component Rendering Tests", () => {
-    it("should render CopyContent component", () => {
+    it("should render CredentialCodeBlock component", () => {
       wrapper = createWrapper();
-      const copyContent = wrapper.findComponent(CopyContent);
+      const copyContent = wrapper.findComponent(CredentialCodeBlock);
       expect(copyContent.exists()).toBe(true);
     });
 
@@ -281,16 +273,16 @@ describe("Elasticsearch.vue Comprehensive Coverage", () => {
   });
 
   describe("Component Props Passing Tests", () => {
-    it("should pass content prop to CopyContent component", () => {
+    it("should pass content prop to CredentialCodeBlock component", () => {
       wrapper = createWrapper();
-      const copyContent = wrapper.findComponent(CopyContent);
+      const copyContent = wrapper.findComponent(CredentialCodeBlock);
       expect(copyContent.props("content")).toBeDefined();
       expect(typeof copyContent.props("content")).toBe("string");
     });
 
-    it("should pass processed content to CopyContent", () => {
+    it("should pass processed content to CredentialCodeBlock", () => {
       wrapper = createWrapper();
-      const copyContent = wrapper.findComponent(CopyContent);
+      const copyContent = wrapper.findComponent(CredentialCodeBlock);
       const content = copyContent.props("content");
       expect(content).toContain("elasticsearch");
       expect(content).not.toContain("[STREAM_NAME]");
@@ -381,9 +373,9 @@ describe("Elasticsearch.vue Comprehensive Coverage", () => {
       expect(typeof wrapper.vm).toBe("object");
     });
 
-    it("should register CopyContent component", () => {
+    it("should register CredentialCodeBlock component", () => {
       wrapper = createWrapper();
-      const copyContent = wrapper.findComponent(CopyContent);
+      const copyContent = wrapper.findComponent(CredentialCodeBlock);
       expect(copyContent.exists()).toBe(true);
     });
   });

@@ -35,23 +35,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                the header as a done step but is NOT navigable — there's no going back. -->
           <OStep
             :name="1"
-            title="Choose Type"
+            :title="t('alert_destinations.chooseTypeTitle')"
             icon="edit"
             :done="step > 1"
             :navigable="forcedType ? false : step > 1"
           >
             <div class="mb-3 text-sm font-medium">
-              Select Destination Type <span class="text-status-error-text">*</span>
+              {{ t("alert_destinations.selectDestinationType") }}
+              <span class="text-status-error-text">*</span>
             </div>
-            <div class="mb-4 grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
+            <div class="mb-4 grid grid-cols-[repeat(auto-fill,minmax(8.75rem,1fr))] gap-3">
               <div
                 v-for="destType in destinationTypes"
                 :key="destType.value"
                 :data-test="`destination-type-card-${destType.value}`"
-                class="destination-type-card group rounded-default hover:border-card-glass-border relative flex min-h-30 cursor-pointer flex-col items-center justify-center border-2 px-3 py-5 [transition:all_0.3s_ease] hover:-translate-y-0.5 hover:shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-status-info-text)_15%,transparent)]"
+                class="destination-type-card group rounded-default hover:border-card-glass-border hover:shadow-status-info-text/15 relative flex min-h-30 cursor-pointer flex-col items-center justify-center border-2 px-3 py-5 [transition:all_0.3s_ease] hover:-translate-y-0.5 hover:shadow-md"
                 :class="
                   destinationType === destType.value
-                    ? 'selected border-card-glass-border bg-status-info-bg shadow-[0_0.25rem_1rem_color-mix(in_srgb,var(--color-status-info-text)_20%,transparent)]'
+                    ? 'selected border-card-glass-border bg-status-info-bg shadow-status-info-text/20 shadow-lg'
                     : 'border-border-default bg-surface-base'
                 "
                 @click="form.setFieldValue('destination_type', destType.value)"
@@ -87,12 +88,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Step 2: Connection Details -->
           <OStep
             :name="2"
-            title="Connection"
+            :title="t('alert_destinations.connectionStepTitle')"
             icon="compare-arrows"
             :done="step > 2"
             :navigable="step > 2"
           >
-            <div class="mb-4 text-sm font-medium">Connection Details</div>
+            <div class="mb-4 text-sm font-medium">
+              {{ t("alert_destinations.connectionDetailsTitle") }}
+            </div>
 
             <div class="flex flex-col gap-4">
               <!-- Name is the destination's identifier — it can't be changed once
@@ -112,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 name="url"
                 :label="t('alert_destinations.url')"
                 required
-                help-text="Base URL without trailing slash (e.g., https://your-domain.com)"
+                :help-text="t('alert_destinations.urlHelpText')"
                 tabindex="0"
               />
 
@@ -122,10 +125,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OFormInput
                     data-test="add-destination-openobserve-org-input"
                     name="org"
-                    :label="'Organization'"
+                    :label="t('alert_destinations.organizationLabel')"
                     required
-                    :placeholder="'e.g., default'"
-                    help-text="OpenObserve organization identifier"
+                    :placeholder="t('alert_destinations.defaultPlaceholder')"
+                    :help-text="t('alert_destinations.organizationHelpText')"
                     tabindex="0"
                   />
                 </div>
@@ -133,10 +136,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OFormInput
                     data-test="add-destination-openobserve-stream-input"
                     name="stream"
-                    :label="'Stream Name'"
+                    :label="t('alert_destinations.streamNameLabel')"
                     required
-                    :placeholder="'e.g., default'"
-                    help-text="OpenObserve stream name"
+                    :placeholder="t('alert_destinations.defaultPlaceholder')"
+                    :help-text="t('alert_destinations.streamHelpText')"
                     tabindex="0"
                   />
                 </div>
@@ -145,10 +148,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OFormInput
                 data-test="add-destination-url-endpoint-input"
                 name="url_endpoint"
-                label="Endpoint Path"
+                :label="t('alert_destinations.endpointPathLabel')"
                 :required="destinationType !== 'custom'"
                 :disabled="destinationType !== 'custom'"
-                help-text="Path will be appended to base URL (must start with /)"
+                :help-text="t('alert_destinations.endpointPathHelpText')"
                 tabindex="0"
               />
               <!-- Method field - only shown for Custom destination type -->
@@ -180,10 +183,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="outputFormat === 'esbulk'"
                 data-test="add-destination-esbulk-index-input"
                 name="esbulk_index"
-                :label="'ESBulk Index Name'"
+                :label="t('alert_destinations.esBulkIndexNameLabel')"
                 required
-                :placeholder="'Enter index name (e.g., logs, events)'"
-                help-text="Index name where data will be written in Elasticsearch"
+                :placeholder="t('alert_destinations.esBulkIndexNamePlaceholder')"
+                :help-text="t('alert_destinations.esBulkIndexHelpText')"
                 tabindex="0"
               />
 
@@ -202,34 +205,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Destination-specific Metadata Section -->
             <div v-if="showMetadataFields" class="mt-4 flex flex-col gap-4">
-              <div class="text-input-label w-full text-sm font-bold">Metadata Configuration</div>
+              <div class="text-input-label w-full text-sm font-bold">
+                {{ t("alert_destinations.metadataConfigurationTitle") }}
+              </div>
 
               <!-- Splunk Metadata Fields -->
               <template v-if="destinationType === 'splunk'">
                 <OFormInput
                   data-test="add-destination-metadata-source-input"
                   name="metadata.source"
-                  :label="'Source'"
-                  :placeholder="'Enter source (e.g., http:my_source)'"
-                  help-text="Splunk source field for event metadata"
+                  :label="t('alert_destinations.sourceLabel')"
+                  :placeholder="t('alert_destinations.sourcePlaceholder')"
+                  :help-text="t('alert_destinations.splunkSourceHelpText')"
                   tabindex="0"
                 />
 
                 <OFormInput
                   data-test="add-destination-metadata-sourcetype-input"
                   name="metadata.sourcetype"
-                  :label="'Source Type'"
-                  :placeholder="'Enter source type (e.g., _json)'"
-                  help-text="Splunk sourcetype field for event metadata"
+                  :label="t('alert_destinations.sourceTypeLabel')"
+                  :placeholder="t('alert_destinations.sourceTypePlaceholder')"
+                  :help-text="t('alert_destinations.splunkSourceTypeHelpText')"
                   tabindex="0"
                 />
 
                 <OFormInput
                   data-test="add-destination-metadata-hostname-input"
                   name="metadata.hostname"
-                  :label="'Hostname'"
-                  :placeholder="'Enter hostname (e.g., server01)'"
-                  help-text="Splunk host field for event metadata"
+                  :label="t('alert_destinations.hostnameLabel')"
+                  :placeholder="t('alert_destinations.hostnamePlaceholder')"
+                  :help-text="t('alert_destinations.splunkHostnameHelpText')"
                   tabindex="0"
                 />
               </template>
@@ -239,38 +244,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OFormInput
                   data-test="add-destination-metadata-ddsource-input"
                   name="metadata.ddsource"
-                  :label="'DD Source'"
+                  :label="t('alert_destinations.ddSourceLabel')"
                   required
-                  :placeholder="'Enter source (e.g., nginx, java)'"
-                  help-text="Source attribute for Datadog logs"
+                  :placeholder="t('alert_destinations.ddSourcePlaceholder')"
+                  :help-text="t('alert_destinations.ddSourceHelpText')"
                   tabindex="0"
                 />
 
                 <OFormInput
                   data-test="add-destination-metadata-ddtags-input"
                   name="metadata.ddtags"
-                  :label="'DD Tags'"
+                  :label="t('alert_destinations.ddTagsLabel')"
                   required
-                  :placeholder="'Enter tags (e.g., env:prod,version:1.0)'"
-                  help-text="Comma-separated tags for Datadog logs"
+                  :placeholder="t('alert_destinations.ddTagsPlaceholder')"
+                  :help-text="t('alert_destinations.ddTagsHelpText')"
                   tabindex="0"
                 />
 
                 <OFormInput
                   data-test="add-destination-metadata-service-input"
                   name="metadata.service"
-                  :label="'Service'"
-                  :placeholder="'Enter service name (e.g., api-gateway)'"
-                  help-text="Service name for Datadog logs"
+                  :label="t('alert_destinations.serviceLabel')"
+                  :placeholder="t('alert_destinations.servicePlaceholder')"
+                  :help-text="t('alert_destinations.datadogServiceHelpText')"
                   tabindex="0"
                 />
 
                 <OFormInput
                   data-test="add-destination-metadata-hostname-input"
                   name="metadata.hostname"
-                  :label="'Hostname'"
-                  :placeholder="'Enter hostname (e.g., server01)'"
-                  help-text="Hostname for Datadog logs"
+                  :label="t('alert_destinations.hostnameLabel')"
+                  :placeholder="t('alert_destinations.hostnamePlaceholder')"
+                  :help-text="t('alert_destinations.datadogHostnameHelpText')"
                   tabindex="0"
                 />
               </template>
@@ -280,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 class="o-input-label text-compact text-input-label-text flex items-center leading-tight font-medium"
               >
-                Headers
+                {{ t("alert_destinations.headers") }}
               </div>
               <div class="flex flex-col gap-2">
                 <div v-for="(header, index) in apiHeaders" :key="index" class="flex gap-1">
@@ -337,13 +342,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OCardSection role="body">
                 <div class="mb-2 flex items-center">
-                  <OIcon name="info" size="md" class="mr-2" />
+                  <OIcon name="info" size="md" class="me-2" />
                   <div class="text-sm font-medium">
                     {{ connectionNotes.title }}
                   </div>
                 </div>
                 <div class="text-sm">
-                  <ol class="mb-0 pl-3 leading-[1.8]">
+                  <ol class="mb-0 ps-3 leading-[1.8]">
                     <li
                       v-for="(stepText, index) in connectionNotes.steps"
                       :key="index"
@@ -356,8 +361,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="connectionNotes.example"
                     class="rounded-default text-compact bg-surface-base mt-2 p-2"
                   >
-                    <strong>Example:</strong>
-                    <code class="text-text-link ml-1 bg-transparent p-0 font-mono">{{
+                    <strong>{{ t("alert_destinations.exampleLabel") }}</strong>
+                    <code class="text-text-link ms-1 bg-transparent p-0 font-mono">{{
                       connectionNotes.example
                     }}</code>
                   </div>
@@ -386,7 +391,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="!canProceedStep1"
             @click="nextStep"
           >
-            Continue
+            {{ t("alerts.continue") }}
           </OButton>
         </div>
         <div v-if="step > 1" class="flex gap-2">
@@ -398,7 +403,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="isSubmitting"
             @click="prevStep"
           >
-            Back
+            {{ t("common.back") }}
           </OButton>
           <OButton
             data-test="add-destination-cancel-btn"
@@ -425,12 +430,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
+import { saveDestinationMutation } from "@/services/alert_destination.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
 import { ref, computed, watch } from "vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import { useI18n } from "vue-i18n";
-import destinationService from "@/services/alert_destination";
-import { useStore } from "vuex";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { DestinationData, Headers } from "@/ts/interfaces";
 import { isValidResourceName, getImageURL, getUUID } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -456,65 +462,69 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits(["created", "updated", "cancel"]);
-const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Co-located Zod schema (factory keeps the required message i18n-driven).
 const destinationSchema = makeDestinationSchema(t);
 
 const isEditMode = computed(() => !!props.destination);
 
+const orgIdForWrites = useOrgId();
+const saveDestinationWrite = useMutation(() =>
+  saveDestinationMutation(orgIdForWrites.value, () => isEditMode.value),
+);
+
 const apiMethods = [
-  { label: "GET", value: "get" },
-  { label: "POST", value: "post" },
-  { label: "PUT", value: "put" },
+  { label: raw("GET"), value: "get" },
+  { label: raw("POST"), value: "post" },
+  { label: raw("PUT"), value: "put" },
 ];
 const outputFormats = [
-  { label: "JSON", value: "json" },
-  { label: "NDJSON", value: "ndjson" },
-  { label: "NestedEvent", value: "nestedevent" },
-  { label: "ESBulk", value: "esbulk" },
-  { label: "String Separated", value: "stringseparated" },
+  { label: raw("JSON"), value: "json" },
+  { label: raw("NDJSON"), value: "ndjson" },
+  { label: raw("NestedEvent"), value: "nestedevent" },
+  { label: raw("ESBulk"), value: "esbulk" },
+  { label: t("pipeline.destinationFormatStringSeparated"), value: "stringseparated" },
 ];
 const destinationTypes = [
   {
-    label: "OpenObserve",
+    label: raw("OpenObserve"),
     value: "openobserve",
     icon: "insights",
     image: getImageURL("images/pipeline/openobserve.svg"),
   },
   {
-    label: "Splunk",
+    label: raw("Splunk"),
     value: "splunk",
     icon: "analytics",
     image: getImageURL("images/pipeline/splunk.webp"),
   },
   {
-    label: "Elasticsearch / OpenSearch",
+    label: raw("Elasticsearch / OpenSearch"),
     value: "elasticsearch",
     icon: "search",
     image: getImageURL("images/pipeline/elasticsearch.png"),
   },
   {
-    label: "Datadog",
+    label: raw("Datadog"),
     value: "datadog",
     icon: "pets",
     image: getImageURL("images/pipeline/datadog.png"),
   },
   {
-    label: "Dynatrace",
+    label: raw("Dynatrace"),
     value: "dynatrace",
     icon: "speed",
     image: getImageURL("images/pipeline/dynatrace.png"),
   },
   {
-    label: "Newrelic",
+    label: raw("Newrelic"),
     value: "newrelic",
     icon: "monitor-heart",
     image: getImageURL("images/pipeline/newrelic.png"),
   },
   {
-    label: "Custom",
+    label: t("common.custom"),
     value: "custom",
     icon: "settings",
     image: getImageURL("images/pipeline/custom.png"),
@@ -945,106 +955,109 @@ const prevStep = () => {
 };
 
 // Connection notes for each destination type (form-owned read).
-const connectionNotes = computed(() => {
+// `example` values are literal endpoint/URL samples the user copies verbatim —
+// code tokens, not prose, hence raw().
+const connectionNotes = computed<{ title: I18nText; steps: I18nText[]; example: I18nText }>(() => {
   switch (destinationType.value) {
     case "openobserve":
       return {
-        title: "OpenObserve Connection Details",
+        title: t("pipeline.destinationNotes.openobserveTitle"),
         steps: [
-          "Log in to your OpenObserve instance",
-          "Copy your base URL (e.g., https://your-instance.openobserve.ai)",
-          "The endpoint path is prefilled as: /api/{org}/{stream}/_json",
-          "Replace {org} with your organization identifier",
-          "Replace {stream} with your stream name",
-          "Add authentication header: Authorization: Basic <OpenObserve_Token>",
+          t("pipeline.destinationNotes.openobserveStep1"),
+          t("pipeline.destinationNotes.openobserveStep2"),
+          t("pipeline.destinationNotes.openobserveStep3"),
+          t("pipeline.destinationNotes.openobserveStep4"),
+          t("pipeline.destinationNotes.openobserveStep5"),
+          t("pipeline.destinationNotes.openobserveStep6"),
         ],
-        example:
+        example: raw(
           "Base URL: https://your-instance.openobserve.ai | Endpoint: /api/default/default/_json",
+        ),
       };
     case "splunk":
       return {
-        title: "Splunk HEC Connection Details",
+        title: t("pipeline.destinationNotes.splunkTitle"),
         steps: [
-          "Log in to your Splunk instance as an admin",
-          "Go to Settings → Data Inputs → HTTP Event Collector",
-          "Click 'New Token' to create a new HEC token",
-          "Configure the token settings and save",
-          "Use your Splunk HEC endpoint URL",
-          "Add the HEC token in the Headers section (Authorization: Splunk <token>)",
+          t("pipeline.destinationNotes.splunkStep1"),
+          t("pipeline.destinationNotes.splunkStep2"),
+          t("pipeline.destinationNotes.splunkStep3"),
+          t("pipeline.destinationNotes.splunkStep4"),
+          t("pipeline.destinationNotes.splunkStep5"),
+          t("pipeline.destinationNotes.splunkStep6"),
         ],
-        example: "https://your-splunk.com:8088",
+        example: raw("https://your-splunk.com:8088"),
       };
     case "elasticsearch":
       return {
-        title: "Elasticsearch Connection Details",
+        title: t("pipeline.destinationNotes.elasticsearchTitle"),
         steps: [
-          "Locate your Elasticsearch cluster endpoint",
-          "Ensure the cluster is accessible from this network",
-          "Create an API key or use basic authentication",
-          "For Cloud: Get the endpoint from your cloud console",
-          "For self-hosted: Use your cluster URL with port (typically 9200)",
-          "Add authentication in the Headers section",
+          t("pipeline.destinationNotes.elasticsearchStep1"),
+          t("pipeline.destinationNotes.elasticsearchStep2"),
+          t("pipeline.destinationNotes.elasticsearchStep3"),
+          t("pipeline.destinationNotes.elasticsearchStep4"),
+          t("pipeline.destinationNotes.elasticsearchStep5"),
+          t("pipeline.destinationNotes.elasticsearchStep6"),
         ],
-        example: "https://your-cluster.es.io:9200",
+        example: raw("https://your-cluster.es.io:9200"),
       };
     case "datadog":
       return {
-        title: "Datadog Connection Details",
+        title: t("pipeline.destinationNotes.datadogTitle"),
         steps: [
-          "Log in to your Datadog account",
-          "Navigate to Organization Settings → API Keys",
-          "Create a new API key or copy an existing one",
-          "Use the Datadog intake URL for your region",
-          "US: https://http-intake.logs.datadoghq.com",
-          "EU: https://http-intake.logs.datadoghq.eu",
-          "Add the API key in Headers: DD-API-KEY: <your-key>",
+          t("pipeline.destinationNotes.datadogStep1"),
+          t("pipeline.destinationNotes.datadogStep2"),
+          t("pipeline.destinationNotes.datadogStep3"),
+          t("pipeline.destinationNotes.datadogStep4"),
+          t("pipeline.destinationNotes.datadogStep5"),
+          t("pipeline.destinationNotes.datadogStep6"),
+          t("pipeline.destinationNotes.datadogStep7"),
         ],
-        example: "https://http-intake.logs.datadoghq.com",
+        example: raw("https://http-intake.logs.datadoghq.com"),
       };
     case "dynatrace":
       return {
-        title: "Dynatrace Connection Details",
+        title: t("pipeline.destinationNotes.dynatraceTitle"),
         steps: [
-          "Log in to your Dynatrace environment",
-          "Navigate to Settings → Integration → Dynatrace API",
-          "Create a new API token with logs.ingest permission",
-          "Use your environment URL",
-          "Format: https://{your-environment-id}.live.dynatrace.com",
-          "Add the token in Headers: Authorization: Api-Token <token>",
+          t("pipeline.destinationNotes.dynatraceStep1"),
+          t("pipeline.destinationNotes.dynatraceStep2"),
+          t("pipeline.destinationNotes.dynatraceStep3"),
+          t("pipeline.destinationNotes.dynatraceStep4"),
+          t("pipeline.destinationNotes.dynatraceStep5"),
+          t("pipeline.destinationNotes.dynatraceStep6"),
         ],
-        example: "https://abc12345.live.dynatrace.com",
+        example: raw("https://abc12345.live.dynatrace.com"),
       };
     case "newrelic":
       return {
-        title: "New Relic Connection Details",
+        title: t("pipeline.destinationNotes.newrelicTitle"),
         steps: [
-          "Log in to your New Relic account",
-          "Navigate to API Keys section",
-          "Create or copy a License Key (Ingest - License)",
-          "US endpoint: https://log-api.newrelic.com",
-          "EU endpoint: https://log-api.eu.newrelic.com",
-          "Add the license key in Headers: Api-Key: <your-license-key>",
+          t("pipeline.destinationNotes.newrelicStep1"),
+          t("pipeline.destinationNotes.newrelicStep2"),
+          t("pipeline.destinationNotes.newrelicStep3"),
+          t("pipeline.destinationNotes.newrelicStep4"),
+          t("pipeline.destinationNotes.newrelicStep5"),
+          t("pipeline.destinationNotes.newrelicStep6"),
         ],
-        example: "https://log-api.newrelic.com",
+        example: raw("https://log-api.newrelic.com"),
       };
     case "custom":
       return {
-        title: "Custom Endpoint Connection",
+        title: t("pipeline.destinationNotes.customTitle"),
         steps: [
-          "Enter your custom endpoint URL",
-          "Ensure the endpoint accepts HTTP/HTTPS requests",
-          "Select the appropriate HTTP method (GET, POST, PUT)",
-          "Configure any required headers for authentication",
-          "Choose the output format (JSON or NDJSON)",
-          "Test the connection to verify it works",
+          t("pipeline.destinationNotes.customStep1"),
+          t("pipeline.destinationNotes.customStep2"),
+          t("pipeline.destinationNotes.customStep3"),
+          t("pipeline.destinationNotes.customStep4"),
+          t("pipeline.destinationNotes.customStep5"),
+          t("pipeline.destinationNotes.customStep6"),
         ],
-        example: "https://your-custom-endpoint.com/logs",
+        example: raw("https://your-custom-endpoint.com/logs"),
       };
     default:
       return {
-        title: "Connection Details",
-        steps: ["Select a destination type to see specific instructions"],
-        example: "",
+        title: t("pipeline.destinationNotes.defaultTitle"),
+        steps: [t("pipeline.destinationNotes.defaultStep1")],
+        example: raw(""),
       };
   }
 });
@@ -1067,14 +1080,14 @@ const createDestination = (value?: DestinationForm) => {
   if (!(name && url && v.method)) {
     toast({
       variant: "error",
-      message: "Please fill required fields",
+      message: t("toastMessages.NodeForm.pleaseFillRequiredFields"),
       timeout: 1500,
     });
     return;
   }
   const dismiss = toast({
     variant: "loading",
-    message: "Please wait...",
+    message: t("toastMessages.NodeForm.pleaseWait"),
     timeout: 0,
   });
   // Headers from the form (form-owned array-field). Only non-empty rows persist.
@@ -1144,13 +1157,8 @@ const createDestination = (value?: DestinationForm) => {
   // (its isSubmitting drives the Save button spinner).
   if (isEditMode.value) {
     // Update existing destination
-    return destinationService
-      .update({
-        org_identifier: store.state.selectedOrganization.identifier,
-        destination_name: name,
-        data: payload,
-        module: "pipeline",
-      })
+    return saveDestinationWrite
+      .mutateAsync({ destination_name: name, data: payload, module: "pipeline" })
       .then(() => {
         dismiss();
         emit("updated", name);
@@ -1167,13 +1175,8 @@ const createDestination = (value?: DestinationForm) => {
       });
   } else {
     // Create new destination
-    return destinationService
-      .create({
-        org_identifier: store.state.selectedOrganization.identifier,
-        destination_name: name,
-        data: payload,
-        module: "pipeline",
-      })
+    return saveDestinationWrite
+      .mutateAsync({ destination_name: name, data: payload, module: "pipeline" })
       .then(() => {
         dismiss();
         emit("created", name);

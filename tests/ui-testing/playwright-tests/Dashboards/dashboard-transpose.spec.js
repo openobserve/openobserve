@@ -7,10 +7,8 @@ import PageManager from "../../pages/page-manager";
 import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 import { waitForStreamComplete, waitForTableWithData } from "../utils/streaming-helpers.js";
+import { generateDashboardName } from "./utils/configPanelHelpers.js";
 const testLogger = require('../utils/test-logger.js');
-
-const randomDashboardName =
-  "Dashboard_" + Math.random().toString(36).slice(2, 11);
 
 test.describe.configure({ mode: "parallel" });
 
@@ -26,6 +24,7 @@ test.describe("dashboard UI testcases", () => {
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -67,6 +66,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
@@ -216,6 +216,7 @@ test.describe("dashboard UI testcases", () => {
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -258,16 +259,21 @@ test.describe("dashboard UI testcases", () => {
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
-    // Set up listener to catch console errors
-    let errorMessage = "";
+    // Collect console errors, minus the noise this assertion cannot speak to.
+    // Resource-load failures (403s on assets the shared alpha org's test user
+    // cannot read) say nothing about whether the two toggles render — a bare
+    // "any console error" assertion fails on ~29 of them every run.
+    let consoleErrors = [];
     page.on("console", (msg) => {
-      if (msg.type() === "error") {
-        errorMessage += msg.text() + "\n";
-      }
+      if (msg.type() !== "error") return;
+      const text = msg.text();
+      if (/Failed to load resource/i.test(text)) return;
+      consoleErrors.push(text);
     });
 
     // Navigate to the dashboards list
@@ -292,17 +298,22 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
 
+    // Discard anything logged while building the dashboard/panel — the
+    // assertion below is about the toggle combination, not the setup.
+    consoleErrors = [];
+
     // Open the configuration panel and enable both the Transpose and Dynamic Column toggle buttons
     await pm.dashboardPanelConfigs.openConfigPanel();
     await pm.dashboardPanelConfigs.selectTranspose();
     await pm.dashboardPanelConfigs.selectDynamicColumns();
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // Save the panel
     await pm.dashboardPanelActions.savePanel();
 
-    // Assert no error occurred
-    expect(errorMessage).toBe("");
+    // Assert the toggle combination raised no application error
+    expect(consoleErrors).toEqual([]);
 
     // Delete the created dashboard
     await pm.dashboardCreate.backToDashboardList();
@@ -314,6 +325,7 @@ test.describe("dashboard UI testcases", () => {
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
@@ -337,20 +349,14 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.removeField("x_axis_1", "x");
 
     // Open Custom SQL editor
-    await page.locator('[data-test="dashboard-sql-query-type"]').click();
-    await page.locator('[data-test="dashboard-custom-query-type"]').click();
+    await pm.chartTypeSelector.clickSqlQueryType();
+    await pm.chartTypeSelector.clickCustomQueryType();
 
     // Focus on the editor and enter the custom SQL query
-    await page
-      .locator('[data-test="dashboard-panel-query-editor"]')
-      .getByRole('code')
-      .click();
-    await page
-      .locator('[data-test="dashboard-panel-query-editor"]')
-      .locator(".inputarea")
-      .fill(
-        'SELECT kubernetes_namespace_name as "xAxis", count(kubernetes_namespace_name) as "y_axis_1"  FROM "e2e_automate"  GROUP BY "xAxis"'
-      );
+    await pm.chartTypeSelector.clickQueryEditorCode();
+    await pm.chartTypeSelector.fillQueryEditorInputArea(
+      'SELECT kubernetes_namespace_name as "xAxis", count(kubernetes_namespace_name) as "y_axis_1"  FROM "e2e_automate"  GROUP BY "xAxis"'
+    );
 
     await pm.chartTypeSelector.searchAndAddField("y_axis_1", "x");
     await pm.chartTypeSelector.searchAndAddField("xAxis", "y");

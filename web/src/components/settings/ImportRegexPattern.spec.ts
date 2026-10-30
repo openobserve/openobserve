@@ -31,11 +31,14 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 // Mock services
-vi.mock("@/services/regex_pattern", () => ({
-  default: {
-    create: vi.fn(),
-  },
-}));
+vi.mock("@/services/regex_pattern", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create: vi.fn(),
+    },
+  });
+});
 
 vi.mock("axios", () => ({
   default: {
@@ -76,7 +79,7 @@ describe("ImportRegexPattern", () => {
             setup(_props: any, { expose }: any) {
               const jsonArrayOfObj = ref([]);
               const jsonStr = ref("");
-              const isImporting = ref(false);
+              const isImportingLocal = ref(false);
               const jsonFiles = ref(null);
               const url = ref("");
               const updateJsonArray = (arr: any[]) => {
@@ -86,12 +89,12 @@ describe("ImportRegexPattern", () => {
               expose({
                 jsonArrayOfObj,
                 jsonStr,
-                isImporting,
+                isImportingLocal,
                 jsonFiles,
                 url,
                 updateJsonArray,
               });
-              return { jsonArrayOfObj, jsonStr, isImporting, jsonFiles, url, updateJsonArray };
+              return { jsonArrayOfObj, jsonStr, isImportingLocal, jsonFiles, url, updateJsonArray };
             },
           },
           "app-tabs": {
@@ -503,12 +506,12 @@ describe("ImportRegexPattern", () => {
 
       const baseImportRef = wrapper.vm.$refs.baseImportRef;
       if (baseImportRef) {
-        baseImportRef.isImporting = true;
+        baseImportRef.isImportingLocal = true;
       }
 
       await wrapper.vm.importJson({ jsonStr: "", jsonArray: [] });
 
-      expect(baseImportRef.isImporting).toBe(false);
+      expect(baseImportRef.isImportingLocal).toBe(false);
     });
 
     it("should show error for invalid JSON", async () => {
@@ -536,12 +539,12 @@ describe("ImportRegexPattern", () => {
 
       const baseImportRef = wrapper.vm.$refs.baseImportRef;
       if (baseImportRef) {
-        baseImportRef.isImporting = true;
+        baseImportRef.isImportingLocal = true;
       }
 
       await wrapper.vm.importJson({ jsonStr: "{ invalid json }", jsonArray: [] });
 
-      expect(baseImportRef.isImporting).toBe(false);
+      expect(baseImportRef.isImportingLocal).toBe(false);
     });
 
     it("should not navigate when some imports fail", async () => {

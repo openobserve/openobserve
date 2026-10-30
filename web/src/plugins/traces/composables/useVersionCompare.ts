@@ -21,7 +21,7 @@
 // concurrently, then assembles a CompareResult via buildCompareResult.
 
 import { ref, computed, type Ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
@@ -92,11 +92,13 @@ function windowsEqual(x: CompareWindows | null, y: CompareWindows | null): boole
 
 export function useVersionCompare() {
   const store = useStore();
-  const { t } = useI18n();
-  const { fetchQueryDataWithHttpStream } = useHttpStreaming();
+  const { t } = useI18nTyped();
+  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
 
   const armA = useLLMInsights();
   const armB = useLLMInsights();
+
+  let rawSampleTraceIds: string[] = [];
 
   const a = ref<GenAiAgentListItem | null>(null) as Ref<GenAiAgentListItem | null>;
   const b = ref<GenAiAgentListItem | null>(null) as Ref<GenAiAgentListItem | null>;
@@ -132,6 +134,10 @@ export function useVersionCompare() {
     return (sql: string, startMicros: number, endMicros: number) =>
       new Promise((resolve, reject) => {
         const traceId = generateTraceContext().traceId;
+        rawSampleTraceIds.push(traceId);
+        const untrack = () => {
+          rawSampleTraceIds = rawSampleTraceIds.filter((id) => id !== traceId);
+        };
         const useBase64 = store.state.zoConfig?.sql_base64_enabled;
         const hits: any[] = [];
         fetchQueryDataWithHttpStream(
@@ -165,10 +171,14 @@ export function useVersionCompare() {
                 response?.message ||
                 response?.error ||
                 response?.error_detail ||
-                "Failed to fetch raw sample";
+                t("traces.failedToFetchRawSample");
+              untrack();
               reject(new Error(message));
             },
-            complete: () => resolve(hits),
+            complete: () => {
+              untrack();
+              resolve(hits);
+            },
             reset: () => {},
           },
         );
@@ -251,10 +261,10 @@ export function useVersionCompare() {
     const runner = makeRunner();
 
     const fetchAPromise = armA.fetchAll(stream, queryA.start, queryA.end, va).catch((e: any) => {
-      armA.error.value = e?.message || "Failed to fetch version A";
+      armA.error.value = e?.message || t("traces.failedToFetchVersionA");
     });
     const fetchBPromise = armB.fetchAll(stream, queryB.start, queryB.end, vb).catch((e: any) => {
-      armB.error.value = e?.message || "Failed to fetch version B";
+      armB.error.value = e?.message || t("traces.failedToFetchVersionB");
     });
 
     // Default path: the sketch-merge compare endpoint for latency (p50/p95/
@@ -311,13 +321,13 @@ export function useVersionCompare() {
 
     const sampleAPromise = fetchRawSample(stream, filterA, queryA.start, queryA.end, runner).catch(
       (e: any) => {
-        armA.error.value = armA.error.value || e?.message || "Failed to fetch sample A";
+        armA.error.value = armA.error.value || e?.message || t("traces.failedToFetchSampleA");
         return { durations: [], costs: [] };
       },
     );
     const sampleBPromise = fetchRawSample(stream, filterB, queryB.start, queryB.end, runner).catch(
       (e: any) => {
-        armB.error.value = armB.error.value || e?.message || "Failed to fetch sample B";
+        armB.error.value = armB.error.value || e?.message || t("traces.failedToFetchSampleB");
         return { durations: [], costs: [] };
       },
     );
@@ -343,10 +353,24 @@ export function useVersionCompare() {
     sampledNote.value = t("aiObservability.versionCompare.sampledNote", { cap: SAMPLE_CAP });
   }
 
+  // Both arms plus any in-flight raw-sample fetch outlive the component otherwise; the consumer must call this on unmount.
+  function cancel() {
+    rawSampleTraceIds.forEach((traceId) =>
+      cancelStreamQueryBasedOnRequestId({
+        trace_id: traceId,
+        org_id: store.state.selectedOrganization?.identifier,
+      }),
+    );
+    rawSampleTraceIds = [];
+    armA.cancelAll();
+    armB.cancelAll();
+  }
+
   return {
     setPair,
     align,
     run,
+    cancel,
     kpiA: armA.kpi,
     kpiB: armB.kpi,
     // Sparklines from each arm's own useLLMInsights instance — additive

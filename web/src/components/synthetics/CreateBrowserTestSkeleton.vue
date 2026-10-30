@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 withDefaults(
   defineProps<{
@@ -74,8 +74,8 @@ withDefaults(
     <div class="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <!--
         BrowserJourney Toolbar
-        Real: flex items-center gap-4 mb-3 ml-5.5 px-3
-        ml-5.5 = 1.375rem, px-3 = 0.75rem
+        Real: flex items-center gap-4 mb-3 ms-5.5 px-3
+        ms-5.5 = 1.375rem, px-3 = 0.75rem
       -->
       <div class="flex items-center gap-4 px-3 py-0" style="margin: 0 0 0.75rem 1.375rem">
         <!-- Select-all checkbox -->

@@ -11,11 +11,3 @@ defineSlots<TimelineSlots>();
     <slot />
   </ol>
 </template>
-
-<style scoped>
-/* keep(complex-state): :last-child structural rule hiding the connector line that
-   OTimelineItem renders inside the final item (child DOM → :deep). */
-.o-timeline > li:last-child :deep(.timeline-connector) {
-  display: none;
-}
-</style>

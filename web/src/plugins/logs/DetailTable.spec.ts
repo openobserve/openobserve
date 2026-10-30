@@ -19,9 +19,13 @@ import { copyToClipboard } from "@/utils/clipboard";
 import { nextTick } from "vue";
 
 import DetailTable from "@/plugins/logs/DetailTable.vue";
+import config from "@/aws-exports";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+
+// A plain (non-reactive) object, so tests that change it remount the component.
+const mockStreams = vi.hoisted(() => ({ selected: ["stream1"] }));
 
 // Mock dependencies
 vi.mock("@/composables/useLogs/searchState", () => ({
@@ -34,9 +38,13 @@ vi.mock("@/composables/useLogs/searchState", () => ({
             { name: "kubernetes_container_name", isSchemaField: true, streams: ["stream1"] },
             { name: "kubernetes_container_hash", isSchemaField: true, streams: ["stream1"] },
           ],
-          selectedStream: ["stream1"],
+          selectedStream: [...mockStreams.selected],
           selectedFields: ["_timestamp"],
         },
+      },
+      meta: {
+        // The header's traces-stream picker writes the chosen stream back here.
+        selectedTraceStream: "",
       },
     },
   }),
@@ -63,6 +71,15 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(),
 }));
 
+// The only I/O behind useViewTraceAction is useStreams. Stubbing it here keeps
+// the REAL useViewTraceAction in play, so the View Trace gate under test is the
+// production one rather than a re-implementation.
+const getStreams = vi.hoisted(() => vi.fn());
+
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({ getStreams }),
+}));
+
 // Mock clipboard utils
 vi.mock("@/utils/clipboard", async () => {
   const actual = await vi.importActual("@/utils/clipboard");
@@ -77,7 +94,12 @@ vi.mock("./JsonPreview.vue", () => ({
   default: {
     name: "JsonPreview",
     template: "<div data-test='json-preview'><slot /></div>",
-    props: ["value", "showCopyButton", "mode"],
+    props: {
+      value: { type: null },
+      showCopyButton: { type: Boolean, default: false },
+      mode: { type: String, default: "" },
+      hideViewTrace: { type: Boolean, default: false },
+    },
     emits: [
       "copy",
       "add-field-to-table",
@@ -135,6 +157,82 @@ describe("DetailTable Component", () => {
     streamType: "logs",
   };
 
+  // Shared mount config so extra mounts inside individual tests get exactly the
+  // same stubs as the default wrapper built in beforeEach.
+  const globalMountOptions = {
+    provide: {
+      store: store,
+    },
+    plugins: [i18n, router],
+    stubs: {
+      OTabs: {
+        template: "<div><slot /></div>",
+        props: ["modelValue"],
+        emits: ["update:modelValue"],
+      },
+      OTab: {
+        template:
+          "<div :data-test=\"$attrs['data-test']\" @click=\"$emit('click')\"><slot /></div>",
+        props: ["name", "label"],
+        emits: ["click"],
+      },
+      OTabPanels: {
+        template: "<div :data-test=\"$attrs['data-test']\"><slot /></div>",
+        props: ["modelValue"],
+      },
+      OTabPanel: {
+        template: "<div><slot /></div>",
+        props: ["name"],
+      },
+      OSwitch: {
+        template: '<div :data-test="$attrs[\'data-test\']" @click="toggle"><slot /></div>',
+        props: ["modelValue", "label"],
+        methods: {
+          toggle() {
+            this.$emit("update:modelValue", !this.modelValue);
+          },
+        },
+        emits: ["update:modelValue"],
+      },
+      OButton: {
+        template:
+          '<button @click="$emit(\'click\')" :data-test="$attrs[\'data-test\']" :disabled="$attrs.disabled" :aria-disabled="$attrs.disabled || undefined"><slot /></button>',
+        emits: ["click"],
+      },
+      ODropdown: true,
+      ODropdownItem: true,
+      ODropdownSeparator: true,
+      OSelect: {
+        template:
+          '<select class="o-select" :data-test="$attrs[\'data-test\']" @change="onChange"><option v-for="opt in options" :key="opt" :value="opt">{{ opt }}</option></select>',
+        props: ["modelValue", "options"],
+        methods: {
+          onChange(e: any) {
+            this.$emit("update:modelValue", e.target.value);
+          },
+        },
+        emits: ["update:modelValue"],
+      },
+      OIcon: {
+        template: '<div class="OIcon"><slot /></div>',
+      },
+      OSpinner: true,
+      OSeparator: true,
+      OCardSection: {
+        template: "<div><slot /></div>",
+      },
+      OLogsHighLighting: true,
+      OChunkedContent: true,
+      OTelemetryCorrelationDashboard: true,
+      OCorrelatedLogsTable: true,
+      O2AIContextAddBtn: {
+        template:
+          '<div data-test="o2ai-context-btn" @click="$emit(\'sendToAiChat\')"><slot /></div>',
+        emits: ["sendToAiChat"],
+      },
+    },
+  };
+
   beforeEach(async () => {
     // Clear localStorage before each test
     window.localStorage.clear();
@@ -147,78 +245,7 @@ describe("DetailTable Component", () => {
     wrapper = mount(DetailTable, {
       attachTo: "#app",
       props: defaultProps,
-      global: {
-        provide: {
-          store: store,
-        },
-        plugins: [i18n, router],
-        stubs: {
-          OTabs: {
-            template: "<div><slot /></div>",
-            props: ["modelValue"],
-            emits: ["update:modelValue"],
-          },
-          OTab: {
-            template:
-              "<div :data-test=\"$attrs['data-test']\" @click=\"$emit('click')\"><slot /></div>",
-            props: ["name", "label"],
-            emits: ["click"],
-          },
-          OTabPanels: {
-            template: "<div :data-test=\"$attrs['data-test']\"><slot /></div>",
-            props: ["modelValue"],
-          },
-          OTabPanel: {
-            template: "<div><slot /></div>",
-            props: ["name"],
-          },
-          OSwitch: {
-            template: '<div :data-test="$attrs[\'data-test\']" @click="toggle"><slot /></div>',
-            props: ["modelValue", "label"],
-            methods: {
-              toggle() {
-                this.$emit("update:modelValue", !this.modelValue);
-              },
-            },
-            emits: ["update:modelValue"],
-          },
-          OButton: {
-            template:
-              '<button @click="$emit(\'click\')" :data-test="$attrs[\'data-test\']" :disabled="$attrs.disabled"><slot /></button>',
-          },
-          ODropdown: true,
-          ODropdownItem: true,
-          ODropdownSeparator: true,
-          OSelect: {
-            template:
-              '<select class="o-select" :data-test="$attrs[\'data-test\']" @change="onChange"><option v-for="opt in options" :key="opt" :value="opt">{{ opt }}</option></select>',
-            props: ["modelValue", "options"],
-            methods: {
-              onChange(e: any) {
-                this.$emit("update:modelValue", e.target.value);
-              },
-            },
-            emits: ["update:modelValue"],
-          },
-          OIcon: {
-            template: '<div class="OIcon"><slot /></div>',
-          },
-          OSpinner: true,
-          OSeparator: true,
-          OCardSection: {
-            template: "<div><slot /></div>",
-          },
-          OLogsHighLighting: true,
-          OChunkedContent: true,
-          OTelemetryCorrelationDashboard: true,
-          OCorrelatedLogsTable: true,
-          O2AIContextAddBtn: {
-            template:
-              '<div data-test="o2ai-context-btn" @click="$emit(\'sendToAiChat\')"><slot /></div>',
-            emits: ["sendToAiChat"],
-          },
-        },
-      },
+      global: globalMountOptions,
     });
     await flushPromises();
   });
@@ -377,13 +404,13 @@ describe("DetailTable Component", () => {
 
   it("should disable previous button when currentIndex is 0", () => {
     const prevButton = wrapper.find('[data-test="log-detail-previous-detail-btn"]');
-    expect(prevButton.attributes("disabled")).toBeDefined();
+    expect(prevButton.attributes("aria-disabled")).toBeDefined();
   });
 
   it("should disable next button when at last index", async () => {
     await wrapper.setProps({ currentIndex: 9, totalLength: 10 });
     const nextButton = wrapper.find('[data-test="log-detail-next-detail-btn"]');
-    expect(nextButton.attributes("disabled")).toBeDefined();
+    expect(nextButton.attributes("aria-disabled")).toBeDefined();
   });
 
   it("should emit showPrevDetail when previous button clicked", async () => {
@@ -432,6 +459,58 @@ describe("DetailTable Component", () => {
     await searchButton.trigger("click");
 
     expect(spy).toHaveBeenCalledWith(wrapper.vm.rowData, 10);
+  });
+
+  describe("search around with multiple streams selected", () => {
+    beforeEach(async () => {
+      wrapper.unmount();
+      mockStreams.selected = ["stream1", "stream2"];
+      wrapper = mount(DetailTable, {
+        attachTo: "#app",
+        props: defaultProps,
+        global: globalMountOptions,
+      });
+      await flushPromises();
+    });
+
+    afterEach(() => {
+      mockStreams.selected = ["stream1"];
+    });
+
+    it("should offer search around when the hit carries its stream name", async () => {
+      wrapper.vm.rowData = { _timestamp: 1700000000000000, _stream_name: "stream2" };
+      wrapper.vm.tab = "table";
+      await nextTick();
+
+      expect(wrapper.vm.canSearchAroundStream).toBe(true);
+      expect(wrapper.find('[data-test="logs-detail-table-search-around-btn"]').isVisible()).toBe(
+        true,
+      );
+    });
+
+    it("should hide search around when the hit has no stream name", async () => {
+      wrapper.vm.rowData = { _timestamp: 1700000000000000 };
+      wrapper.vm.tab = "table";
+      await nextTick();
+
+      expect(wrapper.vm.canSearchAroundStream).toBe(false);
+      expect(wrapper.find('[data-test="logs-detail-table-search-around-btn"]').isVisible()).toBe(
+        false,
+      );
+    });
+
+    it("should emit the hit, including its stream name, as the search around body", async () => {
+      const hit = { _timestamp: 1700000000000000, _stream_name: "stream2" };
+      wrapper.vm.rowData = hit;
+      wrapper.vm.tab = "table";
+      await nextTick();
+
+      await wrapper.find('[data-test="logs-detail-table-search-around-btn"]').trigger("click");
+
+      expect(wrapper.emitted()["search:timeboxed"][0]).toEqual([
+        { key: 1700000000000000, size: 10, body: hit },
+      ]);
+    });
   });
 
   it("should update selectedRelativeValue when record size changed", async () => {
@@ -620,10 +699,14 @@ describe("DetailTable Component", () => {
 
     await wrapper.vm.copyContentToClipboard(testData);
 
-    expect(mockCopyToClipboard).toHaveBeenCalledWith(JSON.stringify(testData), {
-      successMessage: "Content Copied Successfully!",
-      timeout: 1000,
-    });
+    expect(mockCopyToClipboard).toHaveBeenCalledWith(
+      JSON.stringify(testData),
+      expect.any(Function),
+      {
+        successMessage: "Content Copied Successfully!",
+        timeout: 1000,
+      },
+    );
   });
 
   it("should emit add:table when addFieldToTable called", () => {
@@ -807,6 +890,7 @@ describe("DetailTable Component", () => {
       "closeTable",
       "show-correlation",
       "load-correlation",
+      "update:tab",
     ];
     expect(componentOptions.emits).toEqual(expectedEmits);
   });
@@ -947,8 +1031,89 @@ describe("DetailTable Component", () => {
       const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
       wrapper.vm.openCrossLink("https://example.com/trace/123");
 
-      expect(openSpy).toHaveBeenCalledWith("https://example.com/trace/123", "_blank");
+      // `noopener,noreferrer` stops the opened tab reaching back via
+      // window.opener and strips the referrer.
+      expect(openSpy).toHaveBeenCalledWith(
+        "https://example.com/trace/123",
+        "_blank",
+        "noopener,noreferrer",
+      );
       openSpy.mockRestore();
+    });
+
+    // The RESOLVED url is guarded, not just the saved template: links stored
+    // before save-time validation existed are still in the DB, and a field
+    // VALUE substituted into a template can carry a hostile scheme.
+    it("does not open a cross-link whose resolved url is unsafe", () => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+
+      for (const hostile of [
+        "javascript:alert(document.cookie)",
+        "data:text/html,<script>alert(1)</script>",
+        "file:///etc/passwd",
+        "http://",
+        "not a url",
+      ]) {
+        wrapper.vm.openCrossLink(hostile);
+      }
+
+      expect(openSpy).not.toHaveBeenCalled();
+      openSpy.mockRestore();
+    });
+
+    it("never puts a held filter's raw text into a cross-link query", () => {
+      store.state.zoConfig.enable_cross_linking = true;
+      const { data, meta } = wrapper.vm.searchObj;
+      const saved = {
+        query: data.query,
+        crossLinkQuery: data.crossLinkQuery,
+        streamResults: data.streamResults,
+        selectedStream: data.stream.selectedStream,
+        sqlMode: meta.sqlMode,
+      };
+      data.crossLinks = {
+        stream_links: [
+          {
+            name: "Query",
+            url: "https://example.com/q?sql=${query}",
+            fields: [{ name: "trace_id", alias: "kubernetes_container_name" }],
+          },
+        ],
+        org_links: [],
+      };
+      data.stream.selectedStream = ["stream1"];
+      data.streamResults = {
+        list: [
+          {
+            name: "stream1",
+            schema: [
+              { name: "body", type: "Utf8" },
+              { name: "status", type: "Int64" },
+              { name: "is_error", type: "Boolean" },
+            ],
+            settings: { full_text_search_keys: ["body"] },
+          },
+        ],
+      };
+      meta.sqlMode = false;
+      data.query = "status=500 -404 AND is_error";
+      data.crossLinkQuery = "";
+      wrapper.vm.rowData = { kubernetes_container_name: "val123" };
+      try {
+        expect(wrapper.vm.getCrossLinksForField("kubernetes_container_name")[0].resolvedUrl).toBe(
+          "https://example.com/q?sql=",
+        );
+        data.query = "status=500";
+        expect(wrapper.vm.getCrossLinksForField("kubernetes_container_name")[0].resolvedUrl).toBe(
+          "https://example.com/q?sql=status%3D500",
+        );
+      } finally {
+        data.query = saved.query;
+        data.crossLinkQuery = saved.crossLinkQuery;
+        data.streamResults = saved.streamResults;
+        data.stream.selectedStream = saved.selectedStream;
+        meta.sqlMode = saved.sqlMode;
+      }
     });
 
     it("should encode URI components in resolved URLs", () => {
@@ -970,6 +1135,426 @@ describe("DetailTable Component", () => {
       const result = wrapper.vm.getCrossLinksForField("kubernetes_container_name");
       expect(result).toHaveLength(1);
       expect(result[0].resolvedUrl).toBe("https://example.com/search?q=hello%20world%26foo%3Dbar");
+    });
+  });
+  // The "View Trace" action used to live inside JsonPreview, i.e. inside the JSON
+  // tab. It now sits in this component's header row next to the wrap toggle so it
+  // stays reachable from every tab, and JsonPreview is told to hide its own copy.
+  describe("View Trace action in the header", () => {
+    const TRACE_ID = "8a3f1c2d9b4e7a60";
+    const TRACES_STREAMS = ["default_traces", "otlp_traces"];
+
+    const SELECT = '[data-test="log-detail-view-trace-stream-select"]';
+    const BUTTON = '[data-test="log-detail-view-trace-btn"]';
+    const WRAP_TOGGLE = '[data-test="log-detail-wrap-values-toggle-btn"]';
+
+    // A record that satisfies the gate: it carries the org's trace id field.
+    const recordWithTraceId = { ...defaultProps.modelValue, trace_id: TRACE_ID };
+
+    let traceWrapper: any;
+
+    const mountDetailTable = (props: Record<string, any> = {}) =>
+      mount(DetailTable, {
+        attachTo: "#app",
+        props: { ...defaultProps, modelValue: recordWithTraceId, ...props },
+        global: globalMountOptions,
+      });
+
+    beforeEach(() => {
+      // Open the gate: traces menu visible, service streams off, trace id field known.
+      store.state.zoConfig.service_streams_enabled = false;
+      store.state.hiddenMenus = [];
+      store.state.organizationData.organizationSettings.trace_id_field_name = "trace_id";
+
+      getStreams.mockResolvedValue({
+        list: TRACES_STREAMS.map((name) => ({ name })),
+      });
+    });
+
+    afterEach(() => {
+      if (traceWrapper) {
+        traceWrapper.unmount();
+        traceWrapper = null;
+      }
+    });
+
+    it("renders the stream picker and the button when the gate passes", async () => {
+      traceWrapper = mountDetailTable();
+      await flushPromises();
+
+      const select = traceWrapper.find(SELECT);
+      expect(select.exists()).toBe(true);
+      expect(select.findAll("option").map((option: any) => option.text())).toEqual(TRACES_STREAMS);
+      expect(traceWrapper.find(BUTTON).exists()).toBe(true);
+    });
+
+    it("writes the picked stream back to searchObj.meta.selectedTraceStream", async () => {
+      traceWrapper = mountDetailTable();
+      await flushPromises();
+
+      const select = traceWrapper.find(SELECT);
+      select.element.value = "otlp_traces";
+      await select.trigger("change");
+
+      expect(traceWrapper.vm.searchObj.meta.selectedTraceStream).toBe("otlp_traces");
+    });
+
+    it("hides the action when the record carries no trace id", async () => {
+      traceWrapper = mountDetailTable({ modelValue: defaultProps.modelValue });
+      await flushPromises();
+
+      expect(traceWrapper.find(SELECT).exists()).toBe(false);
+      expect(traceWrapper.find(BUTTON).exists()).toBe(false);
+    });
+
+    it("hides the action when the traces menu is hidden for the org", async () => {
+      // `hiddenMenus` is seeded as an array by the store helper, not a Set.
+      store.state.hiddenMenus = ["traces"];
+
+      traceWrapper = mountDetailTable();
+      await flushPromises();
+
+      expect(traceWrapper.find(BUTTON).exists()).toBe(false);
+    });
+
+    it("hides the action when service streams are enabled", async () => {
+      store.state.zoConfig.service_streams_enabled = true;
+
+      traceWrapper = mountDetailTable();
+      await flushPromises();
+
+      expect(traceWrapper.find(BUTTON).exists()).toBe(false);
+    });
+
+    it("hides the action when the org has no traces streams to point at", async () => {
+      getStreams.mockResolvedValue({ list: [] });
+
+      traceWrapper = mountDetailTable();
+      await flushPromises();
+
+      // Gate is `showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)`:
+      // once loading settles with an empty list there is nothing to view a trace in.
+      expect(traceWrapper.find(SELECT).exists()).toBe(false);
+      expect(traceWrapper.find(BUTTON).exists()).toBe(false);
+    });
+
+    it("emits view-trace when the header button is clicked", async () => {
+      traceWrapper = mountDetailTable();
+      await flushPromises();
+
+      await traceWrapper.find(BUTTON).trigger("click");
+
+      expect(traceWrapper.emitted()["view-trace"]).toHaveLength(1);
+    });
+
+    it("tells JsonPreview to hide its own copy of the action", async () => {
+      traceWrapper = mountDetailTable();
+      await flushPromises();
+
+      const jsonPreview = traceWrapper.findComponent({ name: "JsonPreview" });
+      expect(jsonPreview.exists()).toBe(true);
+      expect(jsonPreview.props("hideViewTrace")).toBe(true);
+    });
+
+    // REGRESSION: the gate must read `props.modelValue`, which exists during
+    // setup, and not `rowData`, which the async created() hook only fills a
+    // microtask later. Reading rowData left the button permanently hidden.
+    it("shows the action on the first render, before created() has filled rowData", async () => {
+      traceWrapper = mountDetailTable();
+
+      // Nothing has been awaited: created() has not resolved, so rowData is still empty.
+      expect(Object.keys(traceWrapper.vm.rowData)).toHaveLength(0);
+      expect(traceWrapper.find(BUTTON).exists()).toBe(true);
+
+      await flushPromises();
+
+      // rowData arrives later; the action was already there and stays there.
+      expect(Object.keys(traceWrapper.vm.rowData).length).toBeGreaterThan(0);
+      expect(traceWrapper.find(BUTTON).exists()).toBe(true);
+    });
+
+    it("re-evaluates the gate when modelValue changes to a record without a trace id", async () => {
+      traceWrapper = mountDetailTable();
+      await flushPromises();
+      expect(traceWrapper.find(BUTTON).exists()).toBe(true);
+
+      await traceWrapper.setProps({ modelValue: defaultProps.modelValue });
+      await flushPromises();
+
+      expect(traceWrapper.find(BUTTON).exists()).toBe(false);
+    });
+
+    it("keeps the action on every tab, unlike the tab-scoped wrap toggle", async () => {
+      traceWrapper = mountDetailTable();
+      await flushPromises();
+
+      expect(traceWrapper.vm.tab).toBe("json");
+      expect(traceWrapper.find(BUTTON).isVisible()).toBe(true);
+      // Contrast: the wrap toggle is `v-show="tab === 'table'"`, so it is rendered
+      // but hidden on the JSON tab.
+      expect(traceWrapper.find(WRAP_TOGGLE).isVisible()).toBe(false);
+
+      traceWrapper.vm.tab = "table";
+      await nextTick();
+
+      expect(traceWrapper.find(BUTTON).isVisible()).toBe(true);
+      expect(traceWrapper.find(WRAP_TOGGLE).isVisible()).toBe(true);
+    });
+  });
+  describe("severity tag and drawer border (A7)", () => {
+    let sevWrapper: any;
+    const BADGE = '[data-test="log-detail-severity-badge"]';
+    const POPOVER = '[data-test="log-detail-severity-popover"]';
+    const mountWith = (modelValue: Record<string, unknown>, extra: Record<string, unknown> = {}) =>
+      mount(DetailTable, {
+        attachTo: document.body,
+        props: { ...defaultProps, modelValue, ...extra },
+        global: globalMountOptions,
+      });
+
+    afterEach(() => {
+      sevWrapper?.unmount();
+      document.body.querySelectorAll("[data-o-popover-content]").forEach((n) => n.remove());
+    });
+
+    it("AC-A1.3: an inferred row shows an 'inferred' tag and the same solid border", async () => {
+      sevWrapper = mountWith({ message: "2026-10-06 12:00:01 ERROR payment failed" });
+      await flushPromises();
+      const badge = sevWrapper.find(BADGE);
+      expect(badge.exists()).toBe(true);
+      expect(badge.element.tagName).toBe("BUTTON");
+      expect(badge.attributes("data-severity-source")).toBe("message");
+      expect(badge.text()).toContain("inferred");
+      const root = sevWrapper.find('[data-test="dialog-box"]');
+      expect(root.classes()).toEqual(
+        expect.arrayContaining([
+          "border-t-3",
+          "border-log-severity-error-indicator",
+          "border-solid",
+        ]),
+      );
+      expect(root.classes()).not.toContain("border-dashed");
+    });
+
+    it("an HTTP row shows a solid tag and border", async () => {
+      sevWrapper = mountWith({ status: 503 });
+      await flushPromises();
+      const badge = sevWrapper.find(BADGE);
+      expect(badge.attributes("data-severity-source")).toBe("http");
+      expect(badge.text()).not.toContain("inferred");
+      expect(sevWrapper.find('[data-test="dialog-box"]').classes()).toEqual(
+        expect.arrayContaining(["border-log-severity-error-indicator", "border-solid"]),
+      );
+    });
+
+    it("a row with no evidence shows an unknown tag and a neutral border", async () => {
+      sevWrapper = mountWith({ host: "a" });
+      await flushPromises();
+      const badge = sevWrapper.find(BADGE);
+      expect(badge.attributes("data-severity-source")).toBe("none");
+      expect(badge.text()).toBe("Unknown");
+      expect(sevWrapper.find('[data-test="dialog-box"]').classes()).toContain(
+        "border-border-default",
+      );
+    });
+
+    it("is the first item of the header action row", async () => {
+      sevWrapper = mountWith({ level: "warn" });
+      await flushPromises();
+      const html = sevWrapper.html();
+      const ai = html.indexOf("logs-detail-ai-context-btn");
+      expect(ai).toBeGreaterThan(0);
+      expect(html.indexOf("log-detail-severity-badge")).toBeLessThan(ai);
+    });
+
+    it("is hidden, with no border, when embedded", async () => {
+      sevWrapper = mountWith({ message: "[ERROR] x" }, { embedded: true });
+      await flushPromises();
+      expect(sevWrapper.find(BADGE).exists()).toBe(false);
+      expect(sevWrapper.find('[data-test="dialog-box"]').classes()).not.toContain("border-t-3");
+    });
+
+    it("opens its popover from the keyboard with the 'Not searchable' note", async () => {
+      sevWrapper = mountWith({ message: "[ERROR] x" });
+      await flushPromises();
+      const badge = sevWrapper.find(BADGE);
+      (badge.element as HTMLElement).focus();
+      expect(document.activeElement).toBe(badge.element);
+      await badge.trigger("keydown", { key: "Enter" });
+      await flushPromises();
+      const popover = document.body.querySelector(POPOVER);
+      expect(popover).not.toBeNull();
+      expect(popover!.textContent).toContain("Not searchable");
+      expect(popover!.textContent).toContain("message");
+    });
+
+    it("names the field for an explicit row", async () => {
+      sevWrapper = mountWith({ severity_number: 18 });
+      await flushPromises();
+      await sevWrapper.find(BADGE).trigger("click");
+      await flushPromises();
+      const text = document.body.querySelector(POPOVER)?.textContent ?? "";
+      expect(text).toContain("From field");
+      expect(text).toContain("severity_number");
+      expect(text).toContain("(18)");
+    });
+
+    it("says there is no text field to scan for an unknown row without one", async () => {
+      sevWrapper = mountWith({ host: "a" });
+      await flushPromises();
+      await sevWrapper.find(BADGE).trigger("click");
+      await flushPromises();
+      const popover = document.body.querySelector(POPOVER);
+      expect(popover?.textContent).toContain(
+        "No level field on this row, and no text field to scan.",
+      );
+      expect(popover?.querySelector('[data-test="log-detail-severity-no-level-word"]')).toBeNull();
+    });
+
+    it("names the scanned text field for an unknown row with no level word", async () => {
+      sevWrapper = mountWith({ host: "a", body: "heartbeat ok" });
+      await flushPromises();
+      await sevWrapper.find(BADGE).trigger("click");
+      await flushPromises();
+      const line = document.body.querySelector(
+        `${POPOVER} [data-test="log-detail-severity-no-level-word"]`,
+      );
+      expect(line?.textContent?.replace(/\s+/g, " ").trim()).toBe(
+        "No level field on this row, and no level word in body.",
+      );
+      expect(line?.querySelector("code")?.textContent).toBe("body");
+    });
+  });
+
+  describe("J/K footer and page crossing (4a §3.3)", () => {
+    const dashboardStub = {
+      name: "TelemetryCorrelationDashboard",
+      props: ["externalActiveTab", "shortcutsActive"],
+      template: "<div />",
+    };
+
+    const mountFooter = async (props: Record<string, unknown> = {}) => {
+      wrapper?.unmount();
+      wrapper = mount(DetailTable, {
+        attachTo: "#app",
+        props: { ...defaultProps, ...props },
+        global: {
+          ...globalMountOptions,
+          stubs: {
+            ...globalMountOptions.stubs,
+            OButton: false,
+            TelemetryCorrelationDashboard: dashboardStub,
+            CorrelatedLogsTable: true,
+          },
+        },
+      });
+      await flushPromises();
+      return wrapper;
+    };
+
+    const button = (name: "next" | "previous") =>
+      wrapper.find(`[data-test="log-detail-${name}-detail-btn"]`);
+
+    it("shows the J and K keycaps from the registry and opts out of drawer autofocus", async () => {
+      await mountFooter();
+      expect(wrapper.find('[data-test="log-detail-next-detail-btn-kbd"]').text()).toContain("J");
+      expect(wrapper.find('[data-test="log-detail-previous-detail-btn-kbd"]').text()).toContain(
+        "K",
+      );
+      expect(
+        wrapper.find('[data-test="dialog-box"]').attributes("data-no-autofocus"),
+      ).toBeDefined();
+    });
+
+    it("keeps Next enabled on the last row when another page exists", async () => {
+      await mountFooter({ currentIndex: 9, totalLength: 10, hasNextPage: true });
+      expect(button("next").attributes("aria-disabled")).toBeUndefined();
+      await wrapper.setProps({ hasNextPage: false });
+      expect(button("next").attributes("aria-disabled")).toBeDefined();
+      await wrapper.setProps({ currentIndex: 0, hasPrevPage: true });
+      expect(button("previous").attributes("aria-disabled")).toBeUndefined();
+    });
+
+    it("covers the record while a page loads, keeps the footer and blocks record actions", async () => {
+      await mountFooter({
+        currentIndex: 9,
+        totalLength: 10,
+        hasNextPage: true,
+        pageLoading: true,
+        pageLoadingDirection: "next",
+        pageLoadingPage: 2,
+      });
+      const overlay = wrapper.find('[data-test="log-detail-page-loading"]');
+      expect(overlay.exists()).toBe(true);
+      expect(overlay.text()).toContain("Loading page 2…");
+      expect(overlay.element.parentElement?.getAttribute("aria-busy")).toBe("true");
+      expect(button("next").attributes("aria-disabled")).toBeDefined();
+      expect(button("next").attributes("aria-busy")).toBe("true");
+      expect(button("previous").attributes("aria-disabled")).toBeDefined();
+      expect(button("previous").attributes("aria-busy")).toBeUndefined();
+      expect(
+        wrapper.find('[data-test="logs-detail-table-search-around-btn"]').attributes("disabled"),
+      ).toBeDefined();
+    });
+
+    it("disables both buttons with the reason as their tooltip", async () => {
+      await mountFooter({ currentIndex: 3, navDisabledReason: "resultsChanged" });
+      expect(button("next").attributes("aria-disabled")).toBeDefined();
+      expect(button("previous").attributes("aria-disabled")).toBeDefined();
+      expect(wrapper.vm.nextTooltip).toBe("Results changed");
+      await wrapper.setProps({ navDisabledReason: "loading" });
+      expect(wrapper.vm.prevTooltip).toBe("Loading results…");
+      await wrapper.setProps({ navDisabledReason: "notInPage" });
+      expect(wrapper.vm.nextTooltip).toBe("Not in the current page");
+    });
+
+    it("explains a blocked page edge on the edge button only (AC5.7)", async () => {
+      await mountFooter({
+        currentIndex: 9,
+        totalLength: 10,
+        pageEdgeReason: "Run the query to update results",
+      });
+      expect(button("next").attributes("aria-disabled")).toBeDefined();
+      expect(wrapper.vm.nextTooltip).toBe("Run the query to update results");
+      expect(wrapper.vm.prevTooltip).toBe("Previous log");
+    });
+
+    describe("with correlation unlocked", () => {
+      const originalIsEnterprise = config.isEnterprise;
+      beforeEach(() => {
+        (config as any).isEnterprise = "true";
+      });
+      afterEach(() => {
+        (config as any).isEnterprise = originalIsEnterprise;
+      });
+
+      it("emits update:tab on mount, including a correlated initial tab, and on every change", async () => {
+        await mountFooter({ initialTab: "correlated-logs" });
+        expect(wrapper.emitted("update:tab")?.[0]).toEqual(["correlated-logs"]);
+        wrapper.vm.tab = "table";
+        await flushPromises();
+        expect(wrapper.emitted("update:tab")?.at(-1)).toEqual(["table"]);
+      });
+
+      it("lets only the visible correlated-traces tab own the trace shortcuts (AC1.8)", async () => {
+        await mountFooter({ correlationProps: { serviceName: "svc" }, initialTab: "json" });
+        const traces = () =>
+          wrapper
+            .findAllComponents(dashboardStub)
+            .find((c: any) => c.props("externalActiveTab") === "traces");
+        expect(traces()?.props("shortcutsActive")).toBe(false);
+        wrapper.vm.tab = "correlated-traces";
+        await flushPromises();
+        expect(traces()?.props("shortcutsActive")).toBe(true);
+      });
+    });
+
+    it("never emits a locked correlated tab and bounces back from one", async () => {
+      await mountFooter({ initialTab: "json" });
+      wrapper.vm.tab = "correlated-logs";
+      await flushPromises();
+      expect(wrapper.vm.tab).toBe("json");
+      expect(wrapper.emitted("update:tab")?.flat()).not.toContain("correlated-logs");
     });
   });
 });

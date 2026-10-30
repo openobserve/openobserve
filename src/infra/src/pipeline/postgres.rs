@@ -23,7 +23,7 @@ use config::{
 };
 
 use crate::{
-    db::postgres::{CLIENT, CLIENT_DDL, CLIENT_RO, drop_column},
+    db::postgres::{CLIENT_DDL, CLIENT_RO, CLIENT_RW, drop_column},
     errors::{DbError, Error, Result},
 };
 
@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS pipeline
     }
 
     async fn put(&self, pipeline: &Pipeline) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         let mut tx = pool.begin().await?;
 
         if let Err(e) = match &pipeline.source {
@@ -187,7 +187,7 @@ INSERT INTO pipeline (id, version, enabled, name, description, org, source_type,
     }
 
     async fn update(&self, pipeline: &Pipeline) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         let mut tx = pool.begin().await?;
 
         if let Err(e) = match &pipeline.source {
@@ -349,10 +349,20 @@ SELECT * FROM pipeline
         {
             Ok(pipelines) => Ok(pipelines),
             Err(e) => {
-                log::debug!("[POSTGRES] list pipelines by org error: {e}");
-                Ok(vec![])
+                log::error!("[POSTGRES] list pipelines by org error: {e}");
+                Err(e.into())
             }
         }
+    }
+
+    async fn delete_by_org(&self, org: &str) -> Result<Vec<String>> {
+        let pool = CLIENT_RW.clone();
+        Ok(
+            sqlx::query_scalar("DELETE FROM pipeline WHERE org = $1 RETURNING id;")
+                .bind(org)
+                .fetch_all(&pool)
+                .await?,
+        )
     }
 
     async fn list_streams_with_pipeline(&self, org: &str) -> Result<Vec<Pipeline>> {
@@ -375,7 +385,7 @@ SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 ORDER BY id;
     }
 
     async fn delete(&self, pipeline_id: &str) -> Result<Pipeline> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
 
         let pipeline = sqlx::query_as::<_, Pipeline>("SELECT * FROM pipeline WHERE id = $1;")
             .bind(pipeline_id)

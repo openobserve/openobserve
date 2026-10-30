@@ -37,6 +37,7 @@ export class MetricsPage {
 
         // Other UI elements
         this.syntaxGuideButton = '[data-cy="syntax-guide-button"]';
+        this.themeToggleButton = '[data-test="navbar-theme-toggle-btn"]';
 
         // Inline error list locator (DashboardErrors component)
         this.inlineError = page.locator('[data-test="dashboard-error"]');
@@ -125,6 +126,13 @@ export class MetricsPage {
         this.configToggleAllSectionsBtnExpanded = page.locator(
             '[data-test="dashboard-config-toggle-all-sections-btn"][data-test-all-expanded="true"]'
         );
+        this.configToggleAllSectionsTooltip = page
+            .locator('[data-test="o-tooltip-content"]')
+            .filter({ hasText: /(Collapse|Expand) all sections/ });
+        this.panelSidebarExpandedTitle = page
+            .locator('[data-test="panel-sidebar-root"]')
+            .filter({ has: this.configToggleAllSectionsBtn })
+            .locator('[data-test="panel-sidebar-expanded-title"]');
         // All config-panel controls (used by getConfigSectionKeys to enumerate).
         this.allDashboardConfigControls = page.locator('[data-test^="dashboard-config-"]');
         // Metrics page does not yet surface a chart-type picker; this defensive
@@ -148,6 +156,13 @@ export class MetricsPage {
         this.shareSuccessToast = page.locator('[data-test-variant="success"][data-test-message*="Link Copied"]');
         this.shareErrorToast = page.locator('[data-test-variant="error"][data-test-message*="Error shortening link"]');
         this.toastMessage = page.locator('[data-test="o-toast-message"]');
+
+        this.historyButton = page.locator('[data-test="metrics-history-btn"]');
+        this.historyPopover = page.locator('[data-test="recent-searches-popover"]');
+        this.historyViewAll = this.historyPopover.locator('[data-test="recent-searches-view-all"]');
+        this.historyDrawer = page.locator('[data-test="recent-searches-drawer"]');
+        this.historySearch = this.historyDrawer.locator('[data-test="recent-searches-search"] input');
+        this.historyStarredOnly = this.historyDrawer.locator('[data-test="recent-searches-starred-only"]');
     }
 
     /**
@@ -180,6 +195,13 @@ export class MetricsPage {
      */
     getDashboardError() {
         return this.inlineError;
+    }
+
+    /** Assert the panel surfaces a query error (chart-area or inline) and return its text. */
+    async expectQueryErrorVisible(timeout = 15000) {
+        const error = this.chartErrorMessage.or(this.inlineError).first();
+        await expect(error).toBeVisible({ timeout });
+        return (await error.textContent()) ?? '';
     }
 
     /**
@@ -277,6 +299,18 @@ export class MetricsPage {
     }
 
     // New methods using VERIFIED selectors
+    getApplyButtonLocator() {
+        return this.page.locator(this.applyButton);
+    }
+
+    getThemeToggleButtonLocator() {
+        return this.page.locator(this.themeToggleButton);
+    }
+
+    getStreamNameLocator(name) {
+        return this.page.getByText(name).first();
+    }
+
     async clickApplyButton() {
         await this.page.locator(this.applyButton).click();
     }
@@ -307,6 +341,16 @@ export class MetricsPage {
 
     async expectDatePickerVisible() {
         await expect(this.page.locator(this.datePicker)).toBeVisible();
+    }
+
+    /** The auto-apply picker stays open after a pick, and its popover covers controls below it. */
+    async closeDateTimePickerIfOpen() {
+        const panel = this.page.locator('#date-time-menu');
+        if (!(await panel.isVisible().catch(() => false))) return;
+        await this.page.keyboard.press('Escape');
+        const closed = await panel.waitFor({ state: 'hidden', timeout: 2000 }).then(() => true).catch(() => false);
+        if (!closed) await this.page.locator(this.datePicker).click();
+        await expect(panel).toBeHidden({ timeout: 5000 });
     }
 
     async setAutoRefreshInterval() {
@@ -935,37 +979,7 @@ export class MetricsPage {
         return count > 0;
     }
 
-    async getMetricValue() {
-        // Metric text chart displays a large numeric value
-        const metricSelectors = [
-            '.metric-value',
-            '.metric-text',
-            '.single-stat-value',
-            '[class*="metric"] .value',
-            '.apexcharts-text.apexcharts-datalabel-value'
-        ];
 
-        for (const selector of metricSelectors) {
-            const element = this.page.locator(selector).first();
-            if (await element.isVisible({ timeout: 1000 }).catch(() => false)) {
-                const text = await element.textContent();
-                if (text && text.trim()) {
-                    return text.trim();
-                }
-            }
-        }
-
-        // Fallback: look for any large text that might be a metric value
-        const largeText = this.page.locator('text, tspan, div').filter({
-            has: this.page.locator('[style*="font-size"]')
-        }).first();
-
-        if (await largeText.isVisible({ timeout: 1000 }).catch(() => false)) {
-            return await largeText.textContent();
-        }
-
-        return null;
-    }
 
     async getBarElementCount() {
         return await this.page.locator('svg rect[class*="bar"], svg rect[class*="column"]').count();
@@ -985,8 +999,7 @@ export class MetricsPage {
             // Portal element animation re-mount: fall back to dispatchEvent
             await last15Min.dispatchEvent('click').catch(() => {});
           }
-          // Wait for date picker popover to close (deterministic wait)
-          await last15Min.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+          await this.closeDateTimePickerIfOpen();
           return true;
         }
         // Dismiss the date picker via Escape if the option was not found
@@ -1162,6 +1175,9 @@ export class MetricsPage {
         await this.configToggleAllSectionsBtnExpanded
             .waitFor({ state: 'visible', timeout: 5000 })
             .catch(() => {});
+        // The toggle's tooltip stays open while the pointer rests on it and covers the sidebar collapse button.
+        await this.panelSidebarExpandedTitle.hover();
+        await expect(this.configToggleAllSectionsTooltip).toBeHidden({ timeout: 5000 });
         // Wait for the sections' open (height) animations to finish — clicking
         // an OSelect while sections are still animating dismisses the dropdown.
         await this.page
@@ -1203,6 +1219,8 @@ export class MetricsPage {
     async closeConfigSidebar() {
         const btn = this.dashboardSidebarCollapseButton;
         if (await btn.isVisible({ timeout: 500 }).catch(() => false)) {
+            // A config-control toggle can leave an OSelect popover open over the header, intercepting this click.
+            await this.dismissOverlay();
             await btn.click();
             await this.panelSidebarExpandedHeader.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
         }
@@ -1382,7 +1400,7 @@ export class MetricsPage {
 
             if (await dateTimeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
                 await dateTimeBtn.click();
-                await this.page.waitForTimeout(500);
+                await this.closeDateTimePickerIfOpen();
                 return true;
             }
         }
@@ -1391,6 +1409,7 @@ export class MetricsPage {
         const rangeOption = this.page.locator(`[role="option"]:has-text("${range}"), button:has-text("${range}")`).first();
         if (await rangeOption.isVisible({ timeout: 3000 }).catch(() => false)) {
             await rangeOption.click();
+            await this.closeDateTimePickerIfOpen();
             return true;
         }
 
@@ -1398,6 +1417,7 @@ export class MetricsPage {
         const relativeOption = this.page.locator('button').filter({ hasText: range }).first();
         if (await relativeOption.isVisible({ timeout: 3000 }).catch(() => false)) {
             await relativeOption.click();
+            await this.closeDateTimePickerIfOpen();
             return true;
         }
 
@@ -2771,4 +2791,49 @@ export class MetricsPage {
         return await loader.isVisible({ timeout: 1000 }).catch(() => false);
     }
 
+
+    async openQueryHistory() {
+        await this.historyButton.click();
+        await this.historyViewAll.click();
+        await this.historyDrawer.waitFor({ state: 'visible', timeout: 15000 });
+    }
+
+    /** Resolves once the filtered list answers: a click landing mid-re-render is lost. */
+    async searchQueryHistory(text) {
+        const listed = this.page.waitForResponse(
+            (res) => res.url().includes('/query_history?') && res.url().includes(`q=${encodeURIComponent(text)}`),
+        );
+        await this.historySearch.fill(text);
+        await listed;
+    }
+
+    /** The drawer row whose query text contains `query`. */
+    historyRow(query) {
+        return this.historyDrawer.locator('[data-test^="recent-searches-drawer-row-"]').filter({
+            has: this.page.locator('[data-test="recent-searches-drawer-query"]', { hasText: query }),
+        });
+    }
+
+    /** A row's star toggle; its data-test carries the entry id, so match the prefix. */
+    historyStarButton(query) {
+        return this.historyRow(query).locator('[data-test^="recent-searches-star-"]');
+    }
+
+    /** Picks `action` (load, delete, copy-link, copy-query) from a row's "More" menu. */
+    async historyRowAction(query, action) {
+        const rowTest = await this.historyRow(query).getAttribute('data-test');
+        const id = rowTest.replace('recent-searches-drawer-row-', '');
+        await this.historyRow(query).locator(`[data-test="recent-searches-more-${id}"]`).click();
+        await this.page.locator(`[data-test="recent-searches-${action}-${id}"]`).click();
+    }
+
+    /** The DELETE is sent once the row's Undo toast closes, so callers wait for it. */
+    async deleteHistoryEntry(query) {
+        await this.historyRowAction(query, 'delete');
+    }
+
+    /** Loads the entry into the editor without running it. */
+    async loadHistoryEntry(query) {
+        await this.historyRowAction(query, 'load');
+    }
 }

@@ -1,0 +1,130 @@
+[
+  {
+    "case": "daily 09:00 New York, half an hour after a handover in EDT (review repro)",
+    "timezone": "America/New_York",
+    "members": [
+      "a",
+      "b",
+      "c"
+    ],
+    "shift_micros": 86400000000,
+    "anchor_micros": 1767621600000000,
+    "at_micros": 1773149400000000,
+    "holder": "b",
+    "next_holder": "c",
+    "shift_start": 1773147600000000,
+    "next_handover": 1773234000000000
+  },
+  {
+    "case": "daily 09:00 New York, half an hour before that handover",
+    "timezone": "America/New_York",
+    "members": [
+      "a",
+      "b",
+      "c"
+    ],
+    "shift_micros": 86400000000,
+    "anchor_micros": 1767621600000000,
+    "at_micros": 1773145800000000,
+    "holder": "a",
+    "next_holder": "b",
+    "shift_start": 1773061200000000,
+    "next_handover": 1773147600000000
+  },
+  {
+    "case": "weekly New York, second 01:15 of the fall back",
+    "timezone": "America/New_York",
+    "members": [
+      "a",
+      "b",
+      "c"
+    ],
+    "shift_micros": 604800000000,
+    "anchor_micros": 1792906200000000,
+    "at_micros": 1793513700000000,
+    "holder": "b",
+    "next_holder": "c",
+    "shift_start": 1793511000000000,
+    "next_handover": 1794119400000000
+  },
+  {
+    "case": "weekly New York, just after the spring gap",
+    "timezone": "America/New_York",
+    "members": [
+      "a",
+      "b",
+      "c"
+    ],
+    "shift_micros": 604800000000,
+    "anchor_micros": 1772350200000000,
+    "at_micros": 1772953500000000,
+    "holder": "b",
+    "next_holder": "c",
+    "shift_start": 1772953200000000,
+    "next_handover": 1773556200000000
+  },
+  {
+    "case": "weekly UTC team",
+    "timezone": "UTC",
+    "members": [
+      "a",
+      "b",
+      "c"
+    ],
+    "shift_micros": 604800000000,
+    "anchor_micros": 1767603600000000,
+    "at_micros": 1782907200000000,
+    "holder": "b",
+    "next_holder": "c",
+    "shift_start": 1782723600000000,
+    "next_handover": 1783328400000000
+  },
+  {
+    "case": "daily Asia/Kolkata, a zone with no DST",
+    "timezone": "Asia/Kolkata",
+    "members": [
+      "a",
+      "b",
+      "c"
+    ],
+    "shift_micros": 86400000000,
+    "anchor_micros": 1767583800000000,
+    "at_micros": 1782878400000000,
+    "holder": "a",
+    "next_holder": "b",
+    "shift_start": 1782876600000000,
+    "next_handover": 1782963000000000
+  },
+  {
+    "case": "weekly Lord Howe, the 30-minute fall back",
+    "timezone": "Australia/Lord_Howe",
+    "members": [
+      "a",
+      "b",
+      "c"
+    ],
+    "shift_micros": 604800000000,
+    "anchor_micros": 1806158700000000,
+    "at_micros": 1806764400000000,
+    "holder": "b",
+    "next_holder": "c",
+    "shift_start": 1806763500000000,
+    "next_handover": 1807370100000000
+  },
+  {
+    "case": "weekly New York, ten days before the anchor",
+    "timezone": "America/New_York",
+    "members": [
+      "a",
+      "b",
+      "c"
+    ],
+    "shift_micros": 604800000000,
+    "anchor_micros": 1780318800000000,
+    "at_micros": 1779454800000000,
+    "holder": "b",
+    "next_holder": "c",
+    "shift_start": 1779109200000000,
+    "next_handover": 1779714000000000
+  }
+]

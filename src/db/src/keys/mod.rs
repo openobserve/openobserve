@@ -104,30 +104,43 @@ pub async fn update(entry: CipherEntry) -> Result<(), errors::Error> {
 
 pub async fn remove(org: &str, kind: EntryKind, name: &str) -> Result<(), errors::Error> {
     infra::table::cipher::remove(org, kind, name).await?;
-
     if kind == EntryKind::CipherKey {
-        get_coordinator()
-            .await
-            .delete(
-                &format!("{CIPHER_KEY_PREFIX}{org}/{name}"),
-                false,
-                true,
-                None,
-            )
-            .await?;
+        forget_cipher_key(org, name).await?;
+    }
+    Ok(())
+}
 
-        let config = o2_enterprise::enterprise::common::config::get_config();
-        if config.super_cluster.enabled {
-            match o2_enterprise::enterprise::super_cluster::queue::keys_delete(org, name).await {
-                Ok(_) => log::info!(
-                    "successfully sent cipher key delete notification to super cluster queue for {org}/{name}"
-                ),
-                Err(e) => log::error!(
-                    "error in sending cipher key delete notification to super cluster queue for {org}/{name} : {e}"
-                ),
-            }
+/// Org teardown: one delete of the org's user cipher keys, then each one's events, as `remove`.
+pub async fn remove_cipher_keys_by_org(org: &str) -> Result<(), errors::Error> {
+    // Leaves every system row, so the DEK the provider rows need stays for step 850.
+    for name in infra::table::cipher::delete_non_system_by_org(org, EntryKind::CipherKey).await? {
+        forget_cipher_key(org, &name).await?;
+    }
+    Ok(())
+}
+
+/// Tells every node and region that a deleted cipher key is gone.
+async fn forget_cipher_key(org: &str, name: &str) -> Result<(), errors::Error> {
+    get_coordinator()
+        .await
+        .delete(
+            &format!("{CIPHER_KEY_PREFIX}{org}/{name}"),
+            false,
+            true,
+            None,
+        )
+        .await?;
+
+    let config = o2_enterprise::enterprise::common::config::get_config();
+    if config.super_cluster.enabled {
+        match o2_enterprise::enterprise::super_cluster::queue::keys_delete(org, name).await {
+            Ok(_) => log::info!(
+                "successfully sent cipher key delete notification to super cluster queue for {org}/{name}"
+            ),
+            Err(e) => log::error!(
+                "error in sending cipher key delete notification to super cluster queue for {org}/{name} : {e}"
+            ),
         }
     }
-
     Ok(())
 }

@@ -62,7 +62,7 @@ async fn cache_stream_stats() -> Option<tokio::task::JoinHandle<()>> {
     if !LOCAL_NODE.is_ingester()
         && !LOCAL_NODE.is_querier()
         && !LOCAL_NODE.is_compactor()
-        && !LOCAL_NODE.is_alert_manager()
+        && !LOCAL_NODE.is_scheduler()
     {
         return None;
     }

@@ -14,28 +14,46 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div v-if="variablesData.values?.length > 0" class="mt-1 flex flex-wrap">
+  <div v-if="variablesData.values?.length > 0" class="mt-1 flex flex-wrap gap-y-1">
     <div
       v-for="(item, index) in variablesData.values"
+      v-show="!isVariableOffTab(item)"
       :key="item.name + index"
       :data-test="`dashboard-variable-${item.name}-container`"
     >
-      <div v-if="item.type == 'query_values'" class="max-w-[40rem] min-w-37.5">
+      <div
+        v-if="item.type == 'query_values'"
+        class="max-w-[40rem] min-w-37.5"
+        v-show="!isVariableOmitted(item)"
+      >
         <VariableQueryValueSelector
-          class="mt-1 mr-4"
+          class="me-4 mt-1"
           v-show="!item.hideOnDashboard"
           v-model="item.value"
           :variableItem="item"
+          :clearable="isVariableClearable(item)"
           @update:model-value="onVariablesValueUpdated(Number(index))"
           :loadOptions="loadVariableOptions"
           @search="onVariableSearch(Number(index), $event)"
           :data-test="`variable-selector-${item.name}`"
         />
+        <div
+          v-if="isVariableCapped(item)"
+          class="text-text-muted text-xs"
+          :data-test="`variable-values-capped-${item.name}`"
+        >
+          {{
+            t("infra.curated.valuesCapped", {
+              count: item.query_data?.max_record_size ?? 0,
+              parent: item.curatedNarrowBy || item.label || item.name,
+            })
+          }}
+        </div>
       </div>
       <div v-else-if="item.type == 'constant'" class="max-w-[40rem] min-w-37.5">
         <OInput
           v-show="!item.hideOnDashboard"
-          class="mt-1 mr-4 max-w-37.5!"
+          class="me-4 mt-1 max-w-37.5!"
           v-model="item.value"
           :label="item.label || item.name"
           label-position="inside"
@@ -47,8 +65,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else-if="item.type == 'textbox'" class="max-w-[40rem] min-w-37.5">
         <OInput
           v-show="!item.hideOnDashboard"
-          class="mt-1 mr-4 max-w-37.5!"
-          :debounce="1000"
+          class="me-4 mt-1 max-w-37.5!"
+          :debounce="textboxDebounce"
           v-model="item.value"
           :label="item.label || item.name"
           label-position="inside"
@@ -59,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else-if="item.type == 'custom'" class="max-w-[40rem] min-w-37.5">
         <VariableCustomValueSelector
           v-show="!item.hideOnDashboard"
-          class="mt-1 mr-4"
+          class="me-4 mt-1"
           v-model="item.value"
           :variableItem="item"
           @update:model-value="onVariablesValueUpdated(Number(index))"
@@ -68,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-else-if="item.type == 'dynamic_filters'" class="max-w-max">
         <VariableAdHocValueSelector
-          class="mt-1 mr-4"
+          class="me-4 mt-1"
           v-model="item.value"
           :variableItem="item"
           @update:model-value="onVariablesValueUpdated(Number(index))"
@@ -77,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <!-- Add Variable Button -->
-    <div v-if="showAddVariableButton" class="mt-1 ml-1">
+    <div v-if="showAddVariableButton" class="ms-1 mt-1">
       <OButton
         variant="outline"
         size="sm"
@@ -92,10 +110,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { onMounted, onUnmounted, ref, watch, PropType, inject, computed, nextTick } from "vue";
-import { defineComponent, reactive } from "vue";
+import {
+  onMounted,
+  onUnmounted,
+  ref,
+  watch,
+  PropType,
+  inject,
+  computed,
+  nextTick,
+  defineComponent,
+  reactive,
+} from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import VariableQueryValueSelector from "./settings/VariableQueryValueSelector.vue";
 import VariableCustomValueSelector from "./settings/VariableCustomValueSelector.vue";
 import VariableAdHocValueSelector from "./settings/VariableAdHocValueSelector.vue";
@@ -105,10 +133,16 @@ import { isInvalidDate } from "@/utils/date";
 import { addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
 import { b64EncodeUnicode, escapeSingleQuotes, generateTraceContext } from "@/utils/zincutils";
 import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/variablesDependencyUtils";
-import { normalizeVariableSyntax } from "@/utils/dashboard/variables/variablesUtils";
+import {
+  normalizeVariableSyntax,
+  replaceVariablePlaceholders,
+} from "@/utils/dashboard/variables/variablesUtils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
-import { getVariableKey } from "@/composables/dashboard/useVariablesManager";
+import {
+  getVariableKey,
+  LIVE_COMMIT_DEBOUNCE_MS,
+} from "@/composables/dashboard/useVariablesManager";
 import { useVariablesWatcher, variableLog } from "@/composables/dashboard/useVariableDebugger";
 
 export default defineComponent({
@@ -167,7 +201,7 @@ export default defineComponent({
   },
   setup(props: any, { emit }) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     // Alias preserves the same prop reference for in-place mutation.
     const initialVariableValuesModel = computed(() => props.initialVariableValues);
     // Try to inject variablesManager from parent (for backward compatibility)
@@ -176,6 +210,10 @@ export default defineComponent({
 
     // Determine if we're using the new manager-based approach
     const useManager = !!manager;
+
+    const textboxDebounce = computed(() =>
+      manager?.isLiveMode?.value ? LIVE_COMMIT_DEBOUNCE_MS : 1000,
+    );
 
     // Computed property to get filtered variables from manager
     const managerVariables = computed(() => {
@@ -289,8 +327,11 @@ export default defineComponent({
       }
     };
 
+    let isUnmounted = false;
+
     // onUnmounted want to cancel the values api call for all http2, and streaming
     onUnmounted(() => {
+      isUnmounted = true;
       // Cancel all active trace IDs for all variables
       Object.keys(traceIdMapper.value).forEach((field) => {
         cancelTraceId(field);
@@ -301,7 +342,31 @@ export default defineComponent({
       Object.keys(currentlyExecutingPromises).forEach((key) => {
         currentlyExecutingPromises[key] = null;
       });
+
+      // A cancelled stream may never call back, and a variable left loading is never fetched again.
+      variablesData.values.forEach((v: any) => {
+        if (v.isLoading && !v.isVariablePartialLoaded) v.isLoading = false;
+      });
     });
+
+    // A load that ended without a stream still running counts as finished, so it never holds panels back.
+    const markLoadEnded = (variableObject: any) => {
+      // Unmounting released this load, and a late callback must not touch the next selector's load.
+      if (isUnmounted) return;
+      if (traceIdMapper.value[variableObject.name]?.length) return;
+      variableObject.isLoading = false;
+      variableObject.isVariableLoadingPending = false;
+      if (!useManager || !manager || variableObject.isVariablePartialLoaded) return;
+      variableObject.isVariablePartialLoaded = true;
+      manager.onVariablePartiallyLoaded(
+        getVariableKey(
+          variableObject.name,
+          variableObject.scope || "global",
+          variableObject.tabId,
+          variableObject.panelId,
+        ),
+      );
+    };
 
     const handleSearchClose = (payload: any, response: any, variableObject: any) => {
       variableObject.isLoading = false;
@@ -325,6 +390,7 @@ export default defineComponent({
       }
 
       removeTraceId(variableObject.name, payload.traceId);
+      markLoadEnded(variableObject);
     };
 
     const handleSearchError = (request: any, err: any, variableObject: any) => {
@@ -334,7 +400,7 @@ export default defineComponent({
       removeTraceId(variableObject.name, request.traceId);
 
       // Mark as done on error so manager's isLoading resolves and panels are not blocked
-      if (!variableObject.isVariablePartialLoaded) {
+      if (!isUnmounted && !variableObject.isVariablePartialLoaded) {
         variableObject.isVariablePartialLoaded = true;
         if (useManager && manager) {
           const variableKey = getVariableKey(
@@ -371,11 +437,13 @@ export default defineComponent({
       // Check if this operation was cancelled before processing
       if (currentlyExecutingPromises[variableObject.name] === null) {
         removeTraceId(variableObject.name, payload.traceId);
+        markLoadEnded(variableObject);
         return;
       }
 
       if (response.type === "cancel_response") {
         removeTraceId(variableObject.name, response.content.trace_id);
+        markLoadEnded(variableObject);
         return;
       }
 
@@ -399,17 +467,19 @@ export default defineComponent({
         if (valueChanged) {
           // Update oldVariablesData
           oldVariablesData[variableObject.name] = currentValue;
+        }
 
-          // Notify manager if using manager mode - this ensures children get updated even with no data
-          if (useManager && manager) {
-            const variableKey = getVariableKey(
-              variableObject.name,
-              variableObject.scope || "global",
-              variableObject.tabId,
-              variableObject.panelId,
-            );
-            manager.onVariablePartiallyLoaded(variableKey);
-          }
+        // Notified on COMPLETION, not on a changed value: an all-sentinel parent
+        // holds `_o2_all_` across its own fetch, so gating this left its children
+        // never triggered and their pickers permanently empty.
+        if (useManager && manager) {
+          const variableKey = getVariableKey(
+            variableObject.name,
+            variableObject.scope || "global",
+            variableObject.tabId,
+            variableObject.panelId,
+          );
+          manager.onVariablePartiallyLoaded(variableKey);
         }
 
         finalizeVariableLoading(variableObject, true);
@@ -565,20 +635,22 @@ export default defineComponent({
                 // Update oldVariablesData ONLY when value changes
                 // This prevents duplicate child loads when value hasn't actually changed
                 oldVariablesData[variableObject.name] = variableObject.value;
+              }
 
-                // Notify manager if using manager mode
-                if (useManager && manager) {
-                  const variableKey = getVariableKey(
-                    variableObject.name,
-                    variableObject.scope || "global",
-                    variableObject.tabId,
-                    variableObject.panelId,
-                  );
-                  manager.onVariablePartiallyLoaded(variableKey);
-                } else {
-                  // Only use legacy child loading if not using manager
-                  finalizePartialVariableLoading(variableObject, true);
-                }
+              // Same completion-not-change rule as the streaming path above: an
+              // all-sentinel parent never changes value, and its children would
+              // otherwise never be told the options had arrived.
+              if (useManager && manager) {
+                const variableKey = getVariableKey(
+                  variableObject.name,
+                  variableObject.scope || "global",
+                  variableObject.tabId,
+                  variableObject.panelId,
+                );
+                manager.onVariablePartiallyLoaded(variableKey);
+              } else if (hasValueChanged) {
+                // Only use legacy child loading if not using manager
+                finalizePartialVariableLoading(variableObject, true);
               }
             }
           } else {
@@ -657,6 +729,7 @@ export default defineComponent({
 
       // Check if this operation was cancelled before proceeding
       if (currentlyExecutingPromises[variableObject.name] === null) {
+        markLoadEnded(variableObject);
         return;
       }
 
@@ -697,8 +770,7 @@ export default defineComponent({
         initializeStreamingConnection(wsPayload, variableObject);
         addTraceId(variableObject.name, wsPayload.traceId);
       } catch (error) {
-        variableObject.isLoading = false;
-        variableObject.isVariableLoadingPending = false;
+        markLoadEnded(variableObject);
       }
     };
 
@@ -854,7 +926,7 @@ export default defineComponent({
         variablesData.values.push({
           name: "Dynamic filters",
           type: "dynamic_filters",
-          label: "Dynamic filters",
+          label: t("dashboard.dashboards.dynamicFilters"),
           value: initialValue,
           isLoading: false,
           isVariableLoadingPending: false,
@@ -914,7 +986,14 @@ export default defineComponent({
         // we MUST clear oldVariablesData immediately, otherwise the old value will be
         // restored when API response arrives
         // HOWEVER: If variable has custom/all default, set it to that value instead
+        // A variable the manager has just scheduled to load is NOT a reset to be
+        // undone: restoring its all-default here also cleared isVariableLoadingPending
+        // and marked it loaded, cancelling that load, so a chained child never
+        // queried and its picker stayed empty forever.
+        const managerScheduledLoad = v.isVariableLoadingPending === true || v.isLoading === true;
+
         const managerHasResetValue =
+          !managerScheduledLoad &&
           (currentValue === null || (Array.isArray(currentValue) && currentValue.length === 0)) &&
           oldValue !== undefined &&
           oldValue !== null &&
@@ -1860,49 +1939,35 @@ export default defineComponent({
       // Normalize spaces inside variable syntax before replacement
       queryContext = normalizeVariableSyntax(queryContext);
 
+      const variablesByName = new Map<string, any>();
       for (const variable of variablesToResolve) {
-        // Skip dynamic_filters as they don't participate in standard variable replacement
-        // and their value structure (array of objects) causes issues with escapeSingleQuotes
-        if (variable.type === "dynamic_filters") continue;
-
-        if (variable.isVariablePartialLoaded) {
-          // Escape special regex characters in variable name
-          const escapedVarName = variable.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-          // Replace array values
-          if (Array.isArray(variable.value)) {
-            const arrayValues = variable.value
-              .map((value: any) => `'${escapeSingleQuotes(value)}'`)
-              .join(", ");
-
-            // Mustache patterns: {{variable}} and {{variable:format}}
-            const mustachePattern = new RegExp(`\\{\\{${escapedVarName}(?::[a-zA-Z]+)?\\}\\}`, "g");
-            queryContext = queryContext.replace(mustachePattern, arrayValues);
-
-            // Dollar-sign patterns (existing)
-            // Pattern 1: Unquoted placeholder like IN($variable) -> IN('val1', 'val2')
-            const unquotedPattern = new RegExp(`\\$${escapedVarName}(?!')`, "g");
-            // Pattern 2: Quoted placeholder like '$variable' -> 'val1', 'val2'
-            const quotedPattern = new RegExp(`'\\$${escapedVarName}'`, "g");
-
-            // First replace unquoted patterns (for IN clauses)
-            queryContext = queryContext.replace(unquotedPattern, arrayValues);
-            // Then replace quoted patterns
-            queryContext = queryContext.replace(quotedPattern, arrayValues);
-          } else if (variable.value !== null && variable.value !== undefined) {
-            // Replace single values with regex to replace all occurrences
-            const replacedValue = escapeSingleQuotes(variable.value);
-
-            // Mustache pattern
-            const mustachePattern = new RegExp(`\\{\\{${escapedVarName}(?::[a-zA-Z]+)?\\}\\}`, "g");
-            queryContext = queryContext.replace(mustachePattern, replacedValue);
-
-            // Dollar-sign pattern (existing)
-            const pattern = new RegExp(`\\$${escapedVarName}`, "g");
-            queryContext = queryContext.replace(pattern, replacedValue);
-          }
+        // dynamic_filters values are arrays of objects, never placeholder values
+        if (variable.type === "dynamic_filters" || !variable.name) continue;
+        const existing = variablesByName.get(variable.name);
+        if (!existing || (!existing.isVariablePartialLoaded && variable.isVariablePartialLoaded)) {
+          variablesByName.set(variable.name, variable);
         }
       }
+
+      queryContext = replaceVariablePlaceholders(
+        queryContext,
+        variablesByName.keys(),
+        ({ name, quoted }) => {
+          const variable = variablesByName.get(name);
+          // an unloaded variable keeps its placeholder rather than resolving as a shorter name
+          if (!variable.isVariablePartialLoaded) return undefined;
+
+          if (Array.isArray(variable.value)) {
+            const values = variable.value.map((value: any) => escapeSingleQuotes(value));
+            // '$name' already supplies the outer quotes: '$name' -> 'a', 'b'
+            return quoted
+              ? values.join("', '")
+              : values.map((value: any) => `'${value}'`).join(", ");
+          }
+          if (variable.value === null || variable.value === undefined) return undefined;
+          return `${escapeSingleQuotes(variable.value)}`;
+        },
+      );
 
       // Base64 encode the query context
       return b64EncodeUnicode(queryContext);
@@ -1949,8 +2014,7 @@ export default defineComponent({
         // Emit updated data
         emitVariablesData();
       } else {
-        variableObject.isLoading = false;
-        variableObject.isVariableLoadingPending = false;
+        markLoadEnded(variableObject);
       }
     };
 
@@ -2287,9 +2351,73 @@ export default defineComponent({
       );
     };
 
+    // ACCEPTED, not enforced: the dashboard import path does not strip unknown
+    // config keys, so a hand-edited JSON carrying curated* on a stored dashboard
+    // gets curated behaviour. Import is already a trusted-JSON path (author and
+    // victim are the same person) and filtering it risks dropping legitimate
+    // forward-compatible keys, so the invariant is documented rather than policed.
+    //
+    // No truncation signal exists in the response (`no_count: true`), so an
+    // exactly-at-cap list is the only inference available and it errs to disclosure.
+    const isVariableCapped = (item: any) => {
+      const cap = item?.query_data?.max_record_size ?? 0;
+      // `>=`, not `===`: options accumulate across paged responses (:505 merges the
+      // previous page in) and the selected value is appended when absent, so a
+      // capped list can exceed the cap — where `===` silently dropped the notice.
+      return Boolean(item?.curatedCapNotice && cap && (item?.options?.length ?? 0) >= cap);
+    };
+
+    // The all-sentinel is the absence of a scope choice, so it is not a held value.
+    const holdsSelection = (item: any) => {
+      const value = item?.value;
+      if (Array.isArray(value))
+        return value.some((entry) => entry !== "" && entry != null && entry !== SELECT_ALL_VALUE);
+      return value !== "" && value != null && value !== SELECT_ALL_VALUE;
+    };
+
+    // Schema presence is not resolvability, so a zero-values picker is removed
+    // rather than left enabled and blank — but only once its load has settled.
+    // "Settled" is the codebase's own three-flag test (useVariablesManager.ts:221),
+    // not isLoading alone: a parent change clears a chained child's options WITH
+    // isLoading already false (:643/:650, :695-706), so a one-flag test read that
+    // reload window as "genuinely empty" and flickered the Pod picker out of the
+    // DOM on every Namespace change.
+    const isVariableOmitted = (item: any) =>
+      Boolean(
+        item?.curatedOmitWhenValuesEmpty &&
+        !item?.isLoading &&
+        !item?.isVariableLoadingPending &&
+        item?.isVariablePartialLoaded &&
+        Array.isArray(item?.options) &&
+        item.options.length === 0 &&
+        // loadFromUrl marks a URL-restored picker loaded WITHOUT fetching options
+        // (useVariablesManager :880-885), so on a hard refresh a held value is
+        // indistinguishable from a settled-empty list — and hiding it strands a
+        // filter the user cannot see or undo.
+        !holdsSelection(item),
+      );
+
+    // Curated pickers only: a stored dashboard's variables are authored state, and
+    // clearing one there would silently diverge the view from the saved dashboard.
+    const isVariableClearable = (item: any) => Boolean(item?.curatedOmitWhenValuesEmpty);
+
+    // `curatedTabs` narrows a GLOBAL variable to the tabs that declare it, so an
+    // inapplicable picker is not rendered rather than shown disabled. It gates
+    // RENDERING only: the variable stays in variablesData.values so it still
+    // loads and still feeds panel queries on the tabs that do use it.
+    const isVariableOffTab = (item: any) =>
+      Boolean(
+        Array.isArray(item?.curatedTabs) && props.tabId && !item.curatedTabs.includes(props.tabId),
+      );
+
     return {
       t,
       props,
+      textboxDebounce,
+      isVariableCapped,
+      isVariableOmitted,
+      isVariableOffTab,
+      isVariableClearable,
       variablesData,
       changeInitialVariableValues,
       onVariablesValueUpdated,

@@ -14,10 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::alerts::incidents::IncidentEvent;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, QueryFilter,
+    QuerySelect, Select, Set, TransactionTrait, sea_query::LockType,
+};
 
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     table::entity::incident_events,
 };
 
@@ -111,7 +114,7 @@ fn decode_events(org_id: &str, incident_id: &str, raw: &serde_json::Value) -> Ve
 
 /// Initialize events row for a new incident with a Created event
 pub async fn init(org_id: &str, incident_id: &str) -> Result<(), sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_rw().await;
     let event = IncidentEvent::created();
     let events_json = encode_events(&[event])?;
 
@@ -126,7 +129,7 @@ pub async fn init(org_id: &str, incident_id: &str) -> Result<(), sea_orm::DbErr>
 
 /// Get all events for an incident
 pub async fn get(org_id: &str, incident_id: &str) -> Result<Vec<IncidentEvent>, sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_ro().await;
     let row = incident_events::Entity::find()
         .filter(incident_events::Column::OrgId.eq(org_id))
         .filter(incident_events::Column::IncidentId.eq(incident_id))
@@ -222,7 +225,8 @@ pub async fn reconstruct_if_empty(
     org_id: &str,
     incident_id: &str,
 ) -> Result<Option<usize>, sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_rw().await;
+
     let txn = db.begin().await?;
 
     let row = incident_events::Entity::find()
@@ -295,14 +299,30 @@ pub async fn append(
     incident_id: &str,
     event: IncidentEvent,
 ) -> Result<(), sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let txn = db.begin().await?;
+    append_with(get_orm_client_rw().await, org_id, incident_id, event).await
+}
 
-    let row = incident_events::Entity::find()
-        .filter(incident_events::Column::OrgId.eq(org_id))
-        .filter(incident_events::Column::IncidentId.eq(incident_id))
-        .one(&txn)
-        .await?;
+/// [append] on a given connection, in its own transaction (a savepoint when `db` is one).
+pub async fn append_with<C: TransactionTrait>(
+    db: &C,
+    org_id: &str,
+    incident_id: &str,
+    event: IncidentEvent,
+) -> Result<(), sea_orm::DbErr> {
+    let txn = db.begin().await?;
+    append_in(&txn, org_id, incident_id, event).await?;
+    txn.commit().await?;
+    Ok(())
+}
+
+/// [append] inside the caller's transaction, so the event commits or rolls back with it.
+pub async fn append_in(
+    txn: &DatabaseTransaction,
+    org_id: &str,
+    incident_id: &str,
+    event: IncidentEvent,
+) -> Result<(), sea_orm::DbErr> {
+    let row = locked_row(txn, org_id, incident_id).one(txn).await?;
 
     match row {
         Some(model) => {
@@ -312,7 +332,7 @@ pub async fn append(
 
             let mut active: incident_events::ActiveModel = model.into();
             active.events = Set(events_json);
-            active.update(&txn).await?;
+            active.update(txn).await?;
         }
         None => {
             // Row doesn't exist yet (incident created before events table)
@@ -322,12 +342,26 @@ pub async fn append(
                 incident_id: Set(incident_id.to_string()),
                 events: Set(events_json),
             };
-            model.insert(&txn).await?;
+            model.insert(txn).await?;
         }
     }
-
-    txn.commit().await?;
     Ok(())
+}
+
+/// Row lock so concurrent rewrites cannot drop each other's event; SQLite has no `FOR UPDATE`.
+fn locked_row(
+    txn: &DatabaseTransaction,
+    org_id: &str,
+    incident_id: &str,
+) -> Select<incident_events::Entity> {
+    let query = incident_events::Entity::find()
+        .filter(incident_events::Column::OrgId.eq(org_id))
+        .filter(incident_events::Column::IncidentId.eq(incident_id));
+    if txn.get_database_backend() == sea_orm::DatabaseBackend::Sqlite {
+        query
+    } else {
+        query.lock(LockType::Update)
+    }
 }
 
 /// Record an alert event with compaction.
@@ -341,14 +375,11 @@ pub async fn record_alert(
     alert_name: &str,
     triggered_at: i64,
 ) -> Result<(), sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_rw().await;
+
     let txn = db.begin().await?;
 
-    let row = incident_events::Entity::find()
-        .filter(incident_events::Column::OrgId.eq(org_id))
-        .filter(incident_events::Column::IncidentId.eq(incident_id))
-        .one(&txn)
-        .await?;
+    let row = locked_row(&txn, org_id, incident_id).one(&txn).await?;
 
     match row {
         Some(model) => {
@@ -398,7 +429,8 @@ pub async fn record_alert(
 /// Deletes all incident event entries belonging to the given org.
 pub async fn delete_by_org(org_id: &str) -> Result<(), sea_orm::DbErr> {
     use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let db = get_orm_client_rw().await;
     incident_events::Entity::delete_many()
         .filter(incident_events::Column::OrgId.eq(org_id))
         .exec(db)
@@ -562,6 +594,68 @@ mod tests {
                 .iter()
                 .any(|e| matches!(e.event_type, IncidentEventType::Unknown(_))),
             "reconstructed events must decode as known types"
+        );
+    }
+
+    /// `append` and `append_in` write identical rows, with and without an existing row.
+    #[tokio::test]
+    async fn append_and_append_in_write_identical_rows() {
+        use sea_orm::{ConnectOptions, Database, Schema};
+
+        let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let db = Database::connect(opts).await.unwrap();
+        let backend = db.get_database_backend();
+        db.execute(
+            backend.build(&Schema::new(backend).create_table_from_entity(incident_events::Entity)),
+        )
+        .await
+        .unwrap();
+
+        let seed = encode_events(&[IncidentEvent::created()]).unwrap();
+        let read = |incident_id: &'static str| {
+            let db = &db;
+            async move {
+                incident_events::Entity::find()
+                    .filter(incident_events::Column::OrgId.eq("acme"))
+                    .filter(incident_events::Column::IncidentId.eq(incident_id))
+                    .one(db)
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .events
+            }
+        };
+        for incident_id in ["inc-a", "inc-b"] {
+            incident_events::ActiveModel {
+                org_id: Set("acme".to_string()),
+                incident_id: Set(incident_id.to_string()),
+                events: Set(seed.clone()),
+            }
+            .insert(&db)
+            .await
+            .unwrap();
+        }
+
+        let event = IncidentEvent::ai_analysis_begin();
+        for (via_append, via_append_in) in [("inc-a", "inc-b"), ("new-a", "new-b")] {
+            append_with(&db, "acme", via_append, event.clone())
+                .await
+                .unwrap();
+            let txn = db.begin().await.unwrap();
+            append_in(&txn, "acme", via_append_in, event.clone())
+                .await
+                .unwrap();
+            txn.commit().await.unwrap();
+            assert_eq!(read(via_append).await, read(via_append_in).await);
+        }
+        assert_eq!(
+            decode_events("acme", "inc-a", &read("inc-a").await).len(),
+            2
+        );
+        assert_eq!(
+            decode_events("acme", "new-a", &read("new-a").await).len(),
+            1
         );
     }
 }

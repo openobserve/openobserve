@@ -30,20 +30,23 @@ const mockGetFilterExpressionByFieldType = vi.fn(() => "field = 'value'");
 const mockFetchQueryDataWithHttpStream = vi.fn();
 const mockCancelStreamQueryBasedOnRequestId = vi.fn();
 
-vi.mock("@/services/search", () => ({
-  default: {
-    partition: vi.fn(() => {
-      return Promise.resolve({
-        data: {
-          partitions: [
-            [1, 2],
-            [3, 4],
-          ],
-        },
-      });
-    }),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      partition: vi.fn(() => {
+        return Promise.resolve({
+          data: {
+            partitions: [
+              [1, 2],
+              [3, 4],
+            ],
+          },
+        });
+      }),
+    },
+  });
+});
 
 vi.mock("@/composables/useLogs", () => {
   const mockSearchObj = {
@@ -116,7 +119,6 @@ vi.mock("@/composables/useLogs", () => {
       selectedTraceStream: "",
       showSearchScheduler: false,
       toggleFunction: false, // DEPRECATED use showTransformEditor instead
-      isActionsEnabled: false,
       resetPlotChart: false,
     },
     data: {
@@ -206,7 +208,6 @@ vi.mock("@/composables/useLogs", () => {
       searchWebSocketTraceIds: <string[]>[],
       isOperationCancelled: false,
       searchRetriesCount: <{ [key: string]: number }>{},
-      actionId: null,
     },
     organizationIdentifier: "",
     runQuery: false,
@@ -482,7 +483,7 @@ describe("Index List", async () => {
   it("handles multi stream selection correctly", async () => {
     wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
     wrapper.vm.handleStreamSelection(wrapper.vm.searchObj.data.stream.selectedStream);
-    expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("");
+    expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("", { origin: "selector" });
   });
 
   it("resets selected fields correctly", async () => {
@@ -564,7 +565,7 @@ describe("Index List", async () => {
   it("handles multiple stream selection", async () => {
     wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
     wrapper.vm.handleStreamSelection(wrapper.vm.searchObj.data.stream.selectedStream);
-    expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("");
+    expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("", { origin: "selector" });
   });
 
   it("validates stream field values structure", async () => {
@@ -990,7 +991,7 @@ describe("Index List", async () => {
 
       wrapper.vm.handleStreamSelection(wrapper.vm.searchObj.data.stream.selectedStream);
 
-      expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("");
+      expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("", { origin: "selector" });
     });
   });
 
@@ -1525,7 +1526,7 @@ describe("Index List", async () => {
   it("handles multi stream selection correctly", async () => {
     wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
     wrapper.vm.handleStreamSelection(wrapper.vm.searchObj.data.stream.selectedStream);
-    expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("");
+    expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("", { origin: "selector" });
   });
 
   it("resets selected fields correctly", async () => {
@@ -1627,7 +1628,7 @@ describe("Index List", async () => {
   it("handles multiple stream selection", async () => {
     wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
     wrapper.vm.handleStreamSelection(wrapper.vm.searchObj.data.stream.selectedStream);
-    expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("");
+    expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("", { origin: "selector" });
   });
 
   it("validates stream field values structure", async () => {
@@ -2053,7 +2054,7 @@ describe("Index List", async () => {
 
       wrapper.vm.handleStreamSelection(wrapper.vm.searchObj.data.stream.selectedStream);
 
-      expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("");
+      expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("", { origin: "selector" });
     });
   });
 
@@ -2951,5 +2952,83 @@ describe("Back to Logs control", () => {
     const spy = vi.spyOn(wrapper.vm, "onStreamTypeChange").mockResolvedValue(undefined);
     await wrapper.find(BTN).trigger("click");
     expect(spy).toHaveBeenCalledWith("logs");
+  });
+});
+
+describe("Index List — field values query for pipe-bearing filters", () => {
+  let wrapper: any;
+
+  const mountList = () =>
+    mount(IndexList, {
+      attachTo: "#app",
+      global: {
+        provide: { store },
+        plugins: [i18n, router],
+      },
+    });
+
+  const expandField = async (fieldName: string) => {
+    await wrapper.vm.openFilterCreator(
+      {},
+      { name: fieldName, ftsKey: false, streams: ["e2e_automate"] },
+    );
+    await flushPromises();
+  };
+
+  /** The SQL actually sent for the values request, decoded from the payload. */
+  const lastValuesSql = () => {
+    const call = mockFetchQueryDataWithHttpStream.mock.calls.at(-1);
+    return b64DecodeUnicode(call[0].queryReq.sql);
+  };
+
+  /** Everything before the FROM keyword — i.e. the projected column list. */
+  const selectListOf = (sql: string) => sql.slice(0, sql.toUpperCase().indexOf(" FROM ")).trim();
+
+  beforeEach(async () => {
+    wrapper = mountList();
+    await flushPromises();
+
+    mockFetchQueryDataWithHttpStream.mockClear();
+
+    wrapper.vm.searchObj.meta.sqlMode = false;
+    wrapper.vm.searchObj.data.stream.selectedStream = ["e2e_automate"];
+    wrapper.vm.searchObj.data.stream.selectedStreamFields = [{ name: "kubernetes_namespace_name" }];
+    wrapper.vm.searchObj.data.datetime = {
+      type: "absolute",
+      startTime: 1700000000000000,
+      endTime: 1700003600000000,
+    };
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.clearAllMocks();
+  });
+
+  it("projects only * when the filter contains a pipe inside a quoted term", async () => {
+    wrapper.vm.searchObj.data.query = "match_all('text | error')";
+
+    await expandField("kubernetes_namespace_name");
+
+    expect(selectListOf(lastValuesSql())).toBe("SELECT *");
+  });
+
+  it("keeps the whole match_all term in the WHERE clause when it contains a pipe", async () => {
+    wrapper.vm.searchObj.data.query = "match_all('text | error')";
+
+    await expandField("kubernetes_namespace_name");
+
+    const sql = lastValuesSql();
+    expect(sql.slice(sql.toUpperCase().indexOf(" FROM "))).toContain("match_all('text | error')");
+  });
+
+  it("projects only * for a match_all term without a pipe", async () => {
+    wrapper.vm.searchObj.data.query = "match_all('error')";
+
+    await expandField("kubernetes_namespace_name");
+
+    const sql = lastValuesSql();
+    expect(selectListOf(sql)).toBe("SELECT *");
+    expect(sql.slice(sql.toUpperCase().indexOf(" FROM "))).toContain("match_all('error')");
   });
 });

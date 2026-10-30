@@ -16,12 +16,18 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 // Mock dashboard service
-vi.mock("@/services/dashboards", () => ({
-  default: {
-    create: vi.fn(),
-    update: vi.fn(),
-  },
-}));
+vi.mock("@/services/dashboards", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create: vi.fn(),
+      update: vi.fn(),
+    },
+  });
+});
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
 
 // Mock commons utility
 vi.mock("@/utils/commons", () => ({
@@ -230,6 +236,21 @@ describe("AddDashboard", () => {
       );
     });
 
+    it("should create the dashboard with dynamic filters hidden", async () => {
+      wrapper = createWrapper();
+
+      await wrapper.vm.onSubmit({ name: "New Dashboard", description: "" });
+      await flushPromises();
+
+      expect(dashboardService.create).toHaveBeenCalledWith(
+        "test-org",
+        expect.objectContaining({
+          variables: { list: [], showDynamicFilters: false },
+        }),
+        "default",
+      );
+    });
+
     it("should emit 'updated' after a successful submission", async () => {
       wrapper = createWrapper();
 
@@ -280,6 +301,27 @@ describe("AddDashboard", () => {
 
       expect(dashboardService.create).not.toHaveBeenCalled();
       expect(wrapper.emitted("updated")).toBeFalsy();
+    });
+  });
+
+  describe("product analytics", () => {
+    it("tracks dashboard_created once the new dashboard is created", async () => {
+      wrapper = createWrapper();
+      await wrapper.vm.onSubmit({ name: "Test Dashboard", description: "" });
+      await flushPromises();
+
+      expect(analytics.track).toHaveBeenCalledWith("dashboard_created");
+    });
+
+    it("does not track dashboard_created when creation fails", async () => {
+      vi.mocked(dashboardService.create).mockRejectedValueOnce(new Error("Creation failed"));
+      vi.mocked(analytics.track).mockClear();
+
+      wrapper = createWrapper();
+      await wrapper.vm.onSubmit({ name: "Test Dashboard", description: "" });
+      await flushPromises();
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 

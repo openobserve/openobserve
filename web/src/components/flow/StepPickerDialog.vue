@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          the canvas, so the graph stays readable while choosing. -->
     <div class="fixed inset-0 z-6000" :data-test="testPrefix + '-backdrop'" @click="emit('close')">
       <div
-        class="rounded-surface border-border-default bg-card-bg absolute top-[var(--sp-y)] left-[var(--sp-x)] flex max-h-96 w-80 flex-col overflow-hidden border shadow-[0_0.5rem_1.5rem_color-mix(in_srgb,var(--color-black)_18%,transparent)]"
+        class="rounded-surface border-border-default bg-card-bg absolute top-[var(--sp-y)] left-[var(--sp-x)] flex max-h-96 w-80 flex-col overflow-hidden border shadow-lg"
         :style="{ '--sp-x': panelX + 'px', '--sp-y': panelY + 'px' }"
         :data-test="testPrefix + '-dialog'"
         @click.stop
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSearchInput
             ref="searchRef"
             v-model="search"
-            :placeholder="placeholderText"
+            :placeholder="raw(placeholderText)"
             clearable
             class="w-full"
             :data-test="testPrefix + '-search'"
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="item in filtered"
             :key="item.key"
             type="button"
-            class="flow-step-card rounded-default flex cursor-pointer items-center gap-2.5 bg-transparent p-2 text-left transition-colors duration-[120ms] hover:bg-[color-mix(in_srgb,var(--color-primary-600)_8%,transparent)]"
+            class="flow-step-card rounded-default hover:bg-accent/8 flex cursor-pointer items-center gap-2.5 bg-transparent p-2 text-left transition-colors duration-[120ms]"
             :data-test="`${testPrefix}-${item.key}`"
             @click="emit('pick', item)"
           >
@@ -103,14 +103,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 
 interface StepItem {
   key: string;
-  title: string;
-  description?: string;
+  title: I18nText;
+  description?: I18nText;
   icon?: string;
   iconTint?: string;
   [k: string]: any;
@@ -119,8 +119,8 @@ interface StepItem {
 const props = withDefaults(
   defineProps<{
     items: StepItem[];
-    searchPlaceholder?: string;
-    noMatchText?: string;
+    searchPlaceholder?: I18nText;
+    noMatchText?: I18nText;
     testPrefix?: string;
     /** Viewport point to open at (usually the click). Null = screen-centred. */
     anchor?: { x: number; y: number } | null;
@@ -130,8 +130,8 @@ const props = withDefaults(
     // Empty, not English: t() cannot run at module scope (no setup context), so
     // the locale fallback lives in the computeds below. A caller may still pass
     // its own already-translated string.
-    searchPlaceholder: "",
-    noMatchText: "",
+    searchPlaceholder: raw(""),
+    noMatchText: raw(""),
     testPrefix: "flow-step",
   },
 );
@@ -141,7 +141,7 @@ const emit = defineEmits<{
   (e: "close"): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const placeholderText = computed(() => props.searchPlaceholder || (t("common.search") as string));
 const emptyText = computed(() => props.noMatchText || (t("common.noMatches") as string));

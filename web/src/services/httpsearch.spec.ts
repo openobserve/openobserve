@@ -184,7 +184,7 @@ describe("httpsearch service", () => {
         await expect(errorHandler(error)).rejects.toEqual(error);
       });
 
-      it("should JSON-stringify the error message for 400", async () => {
+      it("should surface the raw server error message for 400", async () => {
         const error = {
           response: { status: 400, data: { error: "Some bad request detail" } },
         };
@@ -222,13 +222,22 @@ describe("httpsearch service", () => {
         expect(store.dispatch).toHaveBeenCalledWith("logout");
       });
 
-      it("should clear localStorage", async () => {
-        const clearSpy = vi.spyOn(Storage.prototype, "clear");
+      it("clears localStorage but keeps every user's drafts", async () => {
+        localStorage.setItem("userInfo", "token");
+        localStorage.setItem("o2_draft:function:o:f:me%40x.io", "{}");
+        localStorage.setItem("o2_draft_index", "{}");
+        localStorage.setItem("o2_panel_draft:me@x.io:o:d:p", "{}");
         const error = { response: { status: 401, data: {} } };
 
         await expect(errorHandler(error)).rejects.toEqual(error);
 
-        expect(clearSpy).toHaveBeenCalled();
+        expect(localStorage.getItem("userInfo")).toBeNull();
+        expect(Object.keys(localStorage).sort()).toEqual([
+          "o2_draft:function:o:f:me%40x.io",
+          "o2_draft_index",
+          "o2_panel_draft:me@x.io:o:d:p",
+        ]);
+        localStorage.clear();
       });
 
       it("should show the notification in the bottom-right with progress", async () => {
@@ -261,7 +270,7 @@ describe("httpsearch service", () => {
     });
 
     describe("500 Internal Server Error", () => {
-      it("should show JSON-stringified error message notification", async () => {
+      it("should show the server error message notification", async () => {
         const error = {
           response: { status: 500, data: { error: "Database connection failed" } },
         };
@@ -275,7 +284,7 @@ describe("httpsearch service", () => {
         await expect(errorHandler(error)).rejects.toEqual(error);
       });
 
-      it("should JSON-stringify the error message for 500", async () => {
+      it("should surface the raw server error message for 500", async () => {
         const error = {
           response: { status: 500, data: { error: "Something went wrong" } },
         };

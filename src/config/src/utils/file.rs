@@ -131,12 +131,17 @@ pub async fn scan_files_with_channel(
 ) -> Result<(), std::io::Error> {
     let limit = limit.unwrap_or_default();
     let mut files = Vec::with_capacity(std::cmp::max(16, limit));
-    let dir = std::fs::read_dir(root).map_err(|e| {
-        std::io::Error::other(format!(
-            "Error reading directory: {}, err: {e}",
-            root.display(),
-        ))
-    })?;
+    let dir = match std::fs::read_dir(root) {
+        Ok(dir) => dir,
+        // the upload workers drop emptied directories while this scan is running
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => {
+            return Err(std::io::Error::other(format!(
+                "Error reading directory: {}, err: {e}",
+                root.display(),
+            )));
+        }
+    };
     for entry in dir {
         let path = entry?.path();
         if !path.is_file() {
@@ -413,6 +418,16 @@ mod tests {
         )
         .unwrap();
         assert_eq!(end_content, b"");
+    }
+
+    #[tokio::test]
+    async fn test_scan_files_with_channel_missing_dir_is_empty() {
+        let temp_dir = TempDir::new().unwrap();
+        let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+        scan_files_with_channel(&temp_dir.path().join("gone"), "parquet", None, tx)
+            .await
+            .unwrap();
+        assert!(rx.recv().await.is_none());
     }
 
     #[test]

@@ -46,11 +46,53 @@ fn scorer_uses_provider(scorer: &table::scorers::Scorer, provider_id: &str) -> b
     scorer.params.get("provider_id").and_then(|v| v.as_str()) == Some(provider_id)
 }
 
+fn resolve_updated_auth_config(
+    requested: &serde_json::Value,
+    existing: &serde_json::Value,
+) -> serde_json::Value {
+    let has_new_api_key = requested
+        .get("api_key")
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .is_some_and(|value| !value.is_empty());
+
+    if has_new_api_key {
+        requested.clone()
+    } else {
+        existing.clone()
+    }
+}
+
 #[cfg(feature = "enterprise")]
 fn validate_provider_config(provider: &table::providers::Provider) -> Result<(), ProviderError> {
-    o2_enterprise::enterprise::llm_evaluations::provider::PreparedProvider::parse(provider.into())
+    o2_enterprise::enterprise::llm_evaluations::providers::PreparedProvider::parse(provider.into())
         .map(|_| ())
         .map_err(|e| ProviderError::InvalidConfig(e.to_string()))
+}
+
+/// A blank endpoint stays `None` so a changed default still reaches providers that never set one.
+#[cfg(feature = "enterprise")]
+fn normalize_provider_endpoint(
+    provider: &mut table::providers::Provider,
+) -> Result<(), ProviderError> {
+    let configured = provider
+        .endpoint
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let Some(configured) = configured else {
+        provider.endpoint = None;
+        return Ok(());
+    };
+
+    let resolved =
+        o2_enterprise::enterprise::llm_evaluations::providers::resolve_endpoint_for_type(
+            &provider.provider_type,
+            Some(configured),
+        )
+        .map_err(|e| ProviderError::InvalidConfig(e.to_string()))?;
+    provider.endpoint = Some(resolved);
+    Ok(())
 }
 
 #[tracing::instrument(skip(provider))]
@@ -67,6 +109,8 @@ pub async fn save_provider(
         provider.id = ider::generate();
     }
 
+    #[cfg(feature = "enterprise")]
+    normalize_provider_endpoint(&mut provider)?;
     #[cfg(feature = "enterprise")]
     validate_provider_config(&provider)?;
 
@@ -99,6 +143,8 @@ pub async fn update_provider(
     if existing.org_id != org_id {
         return Err(ProviderError::NotFound);
     }
+    provider.auth_config =
+        resolve_updated_auth_config(&provider.auth_config, &existing.auth_config);
 
     // Check name uniqueness excluding self
     let all = table::providers::get_all_by_org(org_id).await?;
@@ -111,6 +157,8 @@ pub async fn update_provider(
 
     provider.id = provider_id.to_string();
     provider.created_at = existing.created_at;
+    #[cfg(feature = "enterprise")]
+    normalize_provider_endpoint(&mut provider)?;
     #[cfg(feature = "enterprise")]
     validate_provider_config(&provider)?;
     table::providers::update(&provider).await?;
@@ -266,6 +314,43 @@ mod tests {
         assert!(matches!(provider_in_use, ProviderError::ProviderInUse(_)));
     }
 
+    // Rows stored before base URLs were accepted hold the full completions URL already.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_normalize_keeps_a_legacy_full_url_and_completes_a_base_url() {
+        let mut provider = table::providers::Provider {
+            id: "p1".to_string(),
+            org_id: "org".to_string(),
+            name: "OpenAI".to_string(),
+            provider_type: "openai".to_string(),
+            endpoint: Some("https://api.openai.com/v1/chat/completions".to_string()),
+            default_model: "gpt-4o".to_string(),
+            available_models: vec![],
+            auth_config: serde_json::json!({"api_key": "k"}),
+            rate_limits: None,
+            is_default: false,
+            created_at: 0,
+            updated_at: 0,
+        };
+        normalize_provider_endpoint(&mut provider).unwrap();
+        normalize_provider_endpoint(&mut provider).unwrap();
+        assert_eq!(
+            provider.endpoint.as_deref(),
+            Some("https://api.openai.com/v1/chat/completions")
+        );
+
+        provider.endpoint = Some("https://api.openai.com/v1".to_string());
+        normalize_provider_endpoint(&mut provider).unwrap();
+        assert_eq!(
+            provider.endpoint.as_deref(),
+            Some("https://api.openai.com/v1/chat/completions")
+        );
+
+        provider.endpoint = Some("   ".to_string());
+        normalize_provider_endpoint(&mut provider).unwrap();
+        assert!(provider.endpoint.is_none());
+    }
+
     #[test]
     fn test_provider_name_trimming() {
         let name = "  OpenAI  ";
@@ -295,5 +380,24 @@ mod tests {
 
         assert!(scorer_uses_provider(&scorer, "provider-1"));
         assert!(!scorer_uses_provider(&scorer, "provider-2"));
+    }
+
+    #[test]
+    fn test_blank_updated_api_key_preserves_existing_auth_config() {
+        let existing = serde_json::json!({"api_key": "sk-existing"});
+        let requested = serde_json::json!({"api_key": "  "});
+
+        assert_eq!(resolve_updated_auth_config(&requested, &existing), existing);
+    }
+
+    #[test]
+    fn test_non_empty_updated_api_key_replaces_existing_auth_config() {
+        let existing = serde_json::json!({"api_key": "sk-existing"});
+        let requested = serde_json::json!({"api_key": "sk-new"});
+
+        assert_eq!(
+            resolve_updated_auth_config(&requested, &existing),
+            requested
+        );
     }
 }

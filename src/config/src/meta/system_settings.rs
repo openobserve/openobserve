@@ -96,6 +96,8 @@ pub enum SettingCategory {
     Ingestion,
     /// General/miscellaneous settings
     General,
+    /// Authentication and access-control settings
+    Security,
 }
 
 impl SettingCategory {
@@ -108,6 +110,7 @@ impl SettingCategory {
             SettingCategory::Search => "search",
             SettingCategory::Ingestion => "ingestion",
             SettingCategory::General => "general",
+            SettingCategory::Security => "security",
         }
     }
 }
@@ -130,6 +133,7 @@ impl std::str::FromStr for SettingCategory {
             "search" => Ok(SettingCategory::Search),
             "ingestion" => Ok(SettingCategory::Ingestion),
             "general" => Ok(SettingCategory::General),
+            "security" => Ok(SettingCategory::Security),
             _ => Err(format!("Invalid setting category: {}", s)),
         }
     }
@@ -163,6 +167,8 @@ pub mod keys {
     pub const LIGHT_MODE_THEME_COLOR: &str = "light_mode_theme_color";
     /// Dark mode theme color
     pub const DARK_MODE_THEME_COLOR: &str = "dark_mode_theme_color";
+    /// Instance-wide authentication policy for native users
+    pub const PASSWORD_POLICY: &str = "password_policy";
 }
 
 /// A system setting record
@@ -359,16 +365,6 @@ fn default_include_defaults() -> bool {
     true
 }
 
-/// Response containing resolved settings
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct ResolvedSettings {
-    /// The resolved settings (most specific value for each key)
-    pub settings: std::collections::HashMap<String, serde_json::Value>,
-    /// Source information for each setting (which level it came from)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub sources: Option<std::collections::HashMap<String, SettingScope>>,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -417,6 +413,7 @@ mod tests {
         assert_eq!(SettingCategory::Search.as_str(), "search");
         assert_eq!(SettingCategory::Ingestion.as_str(), "ingestion");
         assert_eq!(SettingCategory::General.as_str(), "general");
+        assert_eq!(SettingCategory::Security.as_str(), "security");
     }
 
     #[test]
@@ -454,6 +451,10 @@ mod tests {
         assert_eq!(
             "general".parse::<SettingCategory>().unwrap(),
             SettingCategory::General
+        );
+        assert_eq!(
+            "security".parse::<SettingCategory>().unwrap(),
+            SettingCategory::Security
         );
         assert!("unknown".parse::<SettingCategory>().is_err());
     }
@@ -630,30 +631,6 @@ mod tests {
         let obj = json.as_object().unwrap();
         assert!(obj.contains_key("setting_category"));
         assert!(obj.contains_key("description"));
-    }
-
-    #[test]
-    fn test_resolved_settings_sources_skip_serializing_if() {
-        let mut settings = std::collections::HashMap::new();
-        settings.insert("key1".to_string(), serde_json::json!("val"));
-
-        let no_sources = ResolvedSettings {
-            settings: settings.clone(),
-            sources: None,
-        };
-        let json = serde_json::to_value(&no_sources).unwrap();
-        assert!(!json.as_object().unwrap().contains_key("sources"));
-
-        let with_sources = ResolvedSettings {
-            settings,
-            sources: Some({
-                let mut m = std::collections::HashMap::new();
-                m.insert("key1".to_string(), SettingScope::System);
-                m
-            }),
-        };
-        let json = serde_json::to_value(&with_sources).unwrap();
-        assert!(json.as_object().unwrap().contains_key("sources"));
     }
 
     #[test]

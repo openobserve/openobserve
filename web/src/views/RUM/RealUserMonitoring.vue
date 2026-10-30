@@ -37,7 +37,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #tabs>
           <OTabs v-model="activeTab" align="left" @change="changeTab">
-            <OTab v-for="tab in tabs" :key="tab.value" :name="tab.value" :label="tab.label" />
+            <OTab
+              v-for="tab in tabs"
+              :key="tab.value"
+              :name="tab.value"
+              :label="tab.label"
+              :data-test="`rum-tab-${tab.value.replace('_', '-')}`"
+            />
           </OTabs>
         </template>
       </OPageHeader>
@@ -62,58 +68,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </router-view>
     </template>
-    <template v-else>
-      <OEmptyState illustration="radar" size="hero" :hide-action="true">
-        <template #title>{{ t("rum.emptyState.title") }}</template>
-        <template #description><span v-html="t('rum.emptyState.description')" /></template>
-
-        <template #actions>
-          <!-- Instrument a web app -->
-          <EmptyStateIngestionCard
-            icon="devices"
-            :label="t('rum.emptyState.webApp')"
-            :sublabel="t('rum.emptyState.webAppDesc')"
-            icon-variant="blue"
-            data-test="rum-empty-web-card"
-            @click="getStarted"
-          />
-
-          <!-- Session Replay -->
-          <EmptyStateIngestionCard
-            icon="play-circle"
-            :label="t('rum.emptyState.sessionReplay')"
-            :sublabel="t('rum.emptyState.sessionReplayDesc')"
-            icon-variant="purple"
-            data-test="rum-empty-session-card"
-            @click="getStarted"
-          />
-        </template>
-
-        <template #extra>
-          <div class="flex flex-wrap items-center justify-center gap-2">
-            <span class="text-text-secondary mr-1 text-sm font-semibold">
-              {{ t("rum.emptyState.learnMore") }}
-            </span>
-            <EmptyStateIngestionChip
-              icon="bolt"
-              href="https://openobserve.ai/frontend-monitoring/#quick-implementation"
-              data-test="rum-empty-quickstart-btn"
-              >{{ t("rum.emptyState.quickImpl") }}</EmptyStateIngestionChip
-            >
-            <EmptyStateIngestionChip
-              icon="menu-book"
-              href="https://openobserve.ai/blog/frontend-monitoring-basics/"
-              data-test="rum-empty-blog-btn"
-              >{{ t("rum.emptyState.blogPost") }}</EmptyStateIngestionChip
-            >
-          </div>
-        </template>
-      </OEmptyState>
-    </template>
+    <RumNoDataState v-else />
   </div>
 </template>
 
 <script setup lang="ts">
+import { overviewStateOnly } from "@/utils/rum/performanceOverview";
 import { computed, nextTick, onActivated, onMounted, ref, watch, onUpdated } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -122,15 +82,13 @@ import useErrorTracking from "@/composables/useErrorTracking";
 import usePerformance from "@/composables/rum/usePerformance";
 
 import { b64EncodeUnicode } from "@/utils/zincutils";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import useStreams from "@/composables/useStreams";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
-import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
+import RumNoDataState from "@/components/rum/RumNoDataState.vue";
 
 /**
  * COMPONENT names (not route names) that <keep-alive> retains — the RUM views whose
@@ -167,12 +125,12 @@ const showTabs = computed(() => {
   return routes.includes(router.currentRoute.value.name?.toString() || "");
 });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const isLoading = ref<boolean[]>([]);
 const { sessionState } = useSession();
 const { errorTrackingState } = useErrorTracking();
 const { performanceState } = usePerformance();
-const { getStream } = useStreams();
+const { getStream } = useStreams(t);
 
 const activeTab = ref<string>("performance");
 const tabs = [
@@ -210,6 +168,9 @@ onMounted(async () => {
 
   await getSchema();
 
+  // The awaits above can outlast a click elsewhere; redirecting now would undo it.
+  if (!router.currentRoute.value.matched.some((r: { name?: unknown }) => r.name === "RUM")) return;
+
   const routeNameMapping: { [key: string]: string } = {
     SessionViewer: "sessions",
     ErrorTracking: "error_tracking",
@@ -230,7 +191,9 @@ onMounted(async () => {
   // So on routing to sessionViewer, this hook is called triggered and it routes to Session page again
   const ignoreRoutes = ["SessionViewer", "ErrorViewer", "UploadSourceMaps"];
 
-  if (!ignoreRoutes.includes(routeName.value as string)) changeTab(activeTab.value);
+  if (ignoreRoutes.includes(routeName.value as string)) return;
+  if (keepsOwnTimeRange()) return;
+  changeTab(activeTab.value);
 });
 
 onUpdated(async () => {
@@ -287,6 +250,12 @@ const updateTabOnRouteChange = () => {
   }
 };
 
+// Product analytics opens Sessions with its own range and filter; re-pushing the shared range would drop both.
+const keepsOwnTimeRange = () => {
+  const { name, query } = router.currentRoute.value;
+  return name === "Sessions" && Boolean(query.period || (query.from && query.to));
+};
+
 const checkIfRumEnabled = async () => {
   await nextTick();
   return new Promise((resolve) => {
@@ -338,6 +307,7 @@ const changeTab = (tab: string | number) => {
       name: "rumPerformanceSummary",
       query: {
         ...getQueryParams(performanceState.data.datetime, ""),
+        ...overviewStateOnly(router.currentRoute.value.query),
         org_identifier: store.state.selectedOrganization.identifier,
       },
     });
@@ -371,13 +341,6 @@ const changeTab = (tab: string | number) => {
   }
 };
 
-const getStarted = () => {
-  router.push({
-    name: "frontendMonitoring",
-    query: { org_identifier: store.state.selectedOrganization.identifier },
-  });
-};
-
 const getSchema = async () => {
   return new Promise((resolve) => {
     getSessionReplayFields().finally(() => {
@@ -401,6 +364,8 @@ const getSessionReplayFields = () => {
           performanceState.data.streams["_sessionreplay"]["schema"][field.name] = field;
         });
       })
+      // An org without replay data has no _sessionreplay stream; it just stays absent.
+      .catch(() => {})
       .finally(() => {
         resolve(true);
         isLoading.value.pop();
@@ -421,6 +386,8 @@ const getRumDataFields = () => {
           performanceState.data.streams["_rumdata"]["schema"][field.name] = field;
         });
       })
+      // An org without RUM data has no _rumdata stream; it just stays absent.
+      .catch(() => {})
       .finally(() => {
         resolve(true);
         isLoading.value.pop();

@@ -1,7 +1,9 @@
 <template>
   <div data-test="loading-container" class="flex h-[100vh] flex-col items-center justify-center">
     <OSpinner size="lg" data-test="spinner" />
-    <div data-test="message" class="text-text-secondary text-base">Redirecting...</div>
+    <div data-test="message" class="text-text-secondary text-base">
+      {{ t("common.shortUrl.redirecting") }}
+    </div>
   </div>
 </template>
 
@@ -11,6 +13,7 @@ import { useRouter } from "vue-router";
 import shortURL from "@/services/short_url";
 import { useStore } from "vuex";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
   name: "ShortUrl",
@@ -24,6 +27,7 @@ export default defineComponent({
   setup(props) {
     const router = useRouter();
     const store = useStore();
+    const { t } = useI18nTyped();
 
     const routeToHome = () => {
       router.replace({
@@ -32,15 +36,10 @@ export default defineComponent({
     };
 
     const handleOriginalUrl = (url: string) => {
-      const urlArray = url.split("/");
-
-      // if the url contains web, then route to the original url
-
-      if (urlArray.includes("web")) {
-        routeToOriginalUrl(urlArray.slice(4).join("/"));
-      } else {
-        routeToOriginalUrl(urlArray.slice(3).join("/"));
-      }
+      const { pathname, search, hash } = new URL(url, window.location.origin);
+      // Everything up to the first /web/ is the deployment's base path (ZO_BASE_URI), as in getPath().
+      const webPos = `${pathname}/`.indexOf("/web/");
+      routeToOriginalUrl((webPos > -1 ? pathname.slice(webPos + 4) : pathname) + search + hash);
     };
 
     const routeToOriginalUrl = (url: string) => {
@@ -70,6 +69,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       routeToHome,
       handleOriginalUrl,
       routeToOriginalUrl,

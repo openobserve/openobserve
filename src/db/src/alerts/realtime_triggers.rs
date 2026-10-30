@@ -98,7 +98,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     match handle_format_conversion(item_key, &org_id, &module_key).await {
                         Ok(result) => result,
                         Err(e) => {
-                            log::error!("Error handling format conversion: {e}");
+                            log::error!(
+                                "Error handling format conversion: org_id: {org_id}, error: {e}"
+                            );
                             continue;
                         }
                     };
@@ -111,7 +113,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     match json::from_slice(val) {
                         Ok(val) => val,
                         Err(e) => {
-                            log::error!("Error parsing trigger value: {e}");
+                            log::error!(
+                                "Error parsing trigger value: org_id: {org_id}, error: {e}"
+                            );
                             continue;
                         }
                     }
@@ -125,7 +129,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     {
                         Ok(val) => val,
                         Err(e) => {
-                            log::error!("Error getting value: {e}");
+                            log::error!("Error getting value: org_id: {org_id}, error: {e}");
                             continue;
                         }
                     }
@@ -145,7 +149,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     match handle_format_conversion(item_key, &org_id, &module_key).await {
                         Ok(result) => result,
                         Err(e) => {
-                            log::error!("Error handling format conversion: {e}");
+                            log::error!(
+                                "Error handling format conversion: org_id: {org_id}, error: {e}"
+                            );
                             continue;
                         }
                     };

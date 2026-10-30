@@ -2,6 +2,7 @@ import { onActivated, onMounted, ref, Ref } from "vue";
 import { useStore } from "vuex";
 import organizationService from "@/services/organizations";
 import { useLocalOrganization } from "@/utils/zincutils";
+import { withDisambiguatedOrgLabels } from "@/utils/organizationLabel";
 
 const MainLayoutOpenSourceMixin = {
   setup() {
@@ -15,7 +16,12 @@ const MainLayoutOpenSourceMixin = {
      * @returns linksList.value
      */
     const leftNavigationLinks = (linksList: any, t: any) => {
-      linksList.value.splice(5, 0, {
+      if (linksList.value.some((link: any) => link.name === "pipeline")) {
+        return linksList.value;
+      }
+      const dashboardIndex = linksList.value.findIndex((link: any) => link.name === "dashboards");
+      const insertAt = dashboardIndex === -1 ? linksList.value.length : dashboardIndex;
+      linksList.value.splice(insertAt, 0, {
         title: t("menu.pipeline"),
         icon: "graph-2",
         link: "/pipeline",
@@ -32,8 +38,17 @@ const MainLayoutOpenSourceMixin = {
       await organizationService.os_list(0, 100000, "id", false, "", "default").then((res: any) => {
         store.dispatch("setOrganizations", res.data.data);
         const localOrg: any = useLocalOrganization();
-        orgOptions.value = res.data.data.map(
-          (data: { id: any; name: any; type: any; identifier: any; UserObj: any }) => {
+        const labeledOrgs = withDisambiguatedOrgLabels(res.data.data);
+        orgOptions.value = labeledOrgs.map(
+          (data: {
+            id: any;
+            name: any;
+            type: any;
+            identifier: any;
+            UserObj: any;
+            label: string;
+          }) => {
+            // `label` is the real name here; the disambiguated string is applied only to the dropdown copy returned below.
             const optiondata: any = {
               label: data.name,
               id: data.id,
@@ -54,7 +69,7 @@ const MainLayoutOpenSourceMixin = {
               useLocalOrganization(selectedOrg.value);
               store.dispatch("setSelectedOrganization", selectedOrg.value);
             }
-            return optiondata;
+            return { ...optiondata, label: data.label };
           },
         );
       });

@@ -20,17 +20,14 @@ import QueryList from "@/components/queries/QueryList.vue";
 import { timestampToTimezoneDate, durationFormatter } from "@/utils/zincutils";
 import { getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { createI18n } from "vue-i18n";
+import enLocale from "@/locales/languages/en-US.json";
 
+// Real en-US messages, not a stub bag: a local i18n shadows the global one from
+// setupTests.ts, so a sparse catalogue makes every other t() echo its key path.
 const i18n = createI18n({
   locale: "en-us",
   allowComposition: true,
-  messages: {
-    "en-us": {
-      queries: {
-        queryList: "Query List",
-      },
-    },
-  },
+  messages: { "en-us": enLocale },
 });
 
 // Mock utility functions

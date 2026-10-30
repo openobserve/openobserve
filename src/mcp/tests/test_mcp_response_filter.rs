@@ -646,6 +646,7 @@ fn test_search_sql_token_reduction() {
     assert!(parsed.get("from").is_some());
     assert!(parsed.get("size").is_some());
     assert!(parsed.get("scan_size").is_some());
+    assert_eq!(parsed["is_partial"], false);
 
     // Dropped fields
     assert!(parsed.get("took_detail").is_none());
@@ -654,14 +655,13 @@ fn test_search_sql_token_reduction() {
     assert!(parsed.get("scan_files").is_none());
     assert!(parsed.get("scan_records").is_none());
     assert!(parsed.get("trace_id").is_none());
-    assert!(parsed.get("is_partial").is_none());
     assert!(parsed.get("peak_memory_usage").is_none());
     assert!(parsed.get("work_group").is_none());
     assert!(parsed.get("order_by").is_none());
 }
 
 #[test]
-fn test_search_sql_hit_cap_at_100() {
+fn test_search_sql_summary_keeps_every_hit() {
     init_test_configs();
     let mut fixture: Value = serde_json::from_str(&search_sql_fixture()).unwrap();
     // Expand hits to 150
@@ -678,9 +678,9 @@ fn test_search_sql_hit_cap_at_100() {
     let summary = filter_response("SearchSQL", &full, &DetailLevel::Summary);
     let parsed: Value = serde_json::from_str(&summary).unwrap();
 
-    assert_eq!(parsed["hits"].as_array().unwrap().len(), 100);
-    assert!(parsed.get("_hits_capped").is_some());
-    assert_eq!(parsed["_hits_capped"]["original"], 150);
+    assert_eq!(parsed["hits"].as_array().unwrap().len(), 150);
+    assert!(parsed.get("_hits_capped").is_none());
+    assert_eq!(parsed["total"], 150);
 }
 
 #[test]

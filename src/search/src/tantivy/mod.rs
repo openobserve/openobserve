@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod aggregate;
 pub mod cache;
 mod partition;
 mod pruner;
@@ -54,7 +55,6 @@ use tantivy_utils::puffin_directory::{
     reader::PuffinDirReader,
 };
 use tokio::sync::Semaphore;
-use tokio_stream::StreamExt as _;
 
 use self::{
     cache::{self as tantivy_result_cache, CacheEntry},
@@ -102,16 +102,7 @@ pub async fn tantivy_search(
         &query.trace_id,
         &index_file_names
             .iter()
-            .map(|(ttv_file, f)| {
-                (
-                    f.id,
-                    &f.account,
-                    ttv_file,
-                    f.meta.index_size,
-                    f.meta.max_ts,
-                    f.meta.records,
-                )
-            })
+            .map(|(ttv_file, f)| (f.id, &f.account, ttv_file, f.meta.index_size, f.meta.max_ts))
             .collect_vec(),
         &mut scan_stats,
         "index",
@@ -220,6 +211,7 @@ pub async fn tantivy_search(
             let index_condition_clone = index_condition.clone();
             let idx_optimize_rule_clone = idx_optimize_mode.clone();
             let semaphore_clone = semaphore.clone();
+            let file_key = file.key.clone();
             let task = tokio::task::spawn(async move {
                 let permit = semaphore_clone.acquire_owned().await.unwrap();
                 let ret = search_tantivy_index(
@@ -243,24 +235,18 @@ pub async fn tantivy_search(
                     }
                 }
             });
-            tasks.push(task)
+            tasks.push(async move {
+                task.await.unwrap_or_else(|e| {
+                    Err(anyhow::anyhow!("index task for {file_key} failed: {e}"))
+                })
+            })
         }
 
         // if more than cpu_num's file returned many row_ids, we skip tantivy search
         let mut threshold_num = cfg.limit.cpu_num;
         let mut total_row_ids_percent = 0;
         let mut tasks = stream::iter(tasks).buffer_unordered(target_partitions);
-        while let Some(result) = match tasks.try_next().await {
-            Err(e) => {
-                let took = start.elapsed().as_millis() as usize;
-                log::error!(
-                    "[trace_id {trace_id}] search->tantivy: error filtering via index, error: {e:?}, took: {took} ms",
-                );
-                // search error, need add filter back
-                return Ok((took, true, TantivyMultiResult::RowNums(0)));
-            }
-            Ok(result) => result,
-        } {
+        while let Some(result) = tasks.next().await {
             // Each result corresponds to a file in the file list
             match result {
                 Ok((file_name, result, has_skipped_conditions)) => {
@@ -425,7 +411,7 @@ async fn search_tantivy_index(
         parquet_file.meta.min_ts >= start_time && parquet_file.meta.max_ts < end_time;
     let cfg = get_config();
     let mut cache_key = String::new();
-    if cfg.common.inverted_index_result_cache_enabled && file_in_range {
+    if cfg.search.inverted_index_result_cache_enabled && file_in_range {
         metrics::TANTIVY_RESULT_CACHE_REQUESTS_TOTAL
             .with_label_values::<&str>(&[])
             .inc();
@@ -479,9 +465,22 @@ async fn search_tantivy_index(
 
     // generate the tantivy query
     let condition: IndexCondition =
-        index_condition.ok_or(anyhow::anyhow!("IndexCondition not found"))?;
+        index_condition.ok_or_else(|| anyhow::anyhow!("IndexCondition not found"))?;
     let (mut query, has_skipped_conditions) =
         condition.to_tantivy_query(trace_id, tantivy_schema.clone(), fts_field)?;
+
+    if let Some(mode) = idx_optimize_rule
+        .as_ref()
+        .filter(|mode| mode.is_aggregate())
+    {
+        anyhow::ensure!(
+            !has_skipped_conditions,
+            "aggregate query skipped index conditions"
+        );
+        for field in mode.referenced_fields() {
+            tantivy_schema.get_field(&field)?;
+        }
+    }
 
     if !file_in_range && let Ok(ts_field) = tantivy_schema.get_field(TIMESTAMP_COL_NAME) {
         let ts_range = RangeQuery::new(
@@ -600,7 +599,7 @@ async fn search_tantivy_index(
 
     if !cache_key.is_empty()
         && !has_skipped_conditions
-        && result.get_memory_size() < cfg.limit.inverted_index_result_cache_max_entry_size
+        && result.get_memory_size() < cfg.search.inverted_index_result_cache_max_entry_size
     {
         let entry = get_cache_entry(result.clone());
         tantivy_result_cache::GLOBAL_CACHE.put(cache_key, entry);
@@ -621,7 +620,7 @@ fn guard_matched_rows(
     if matched == 0 || parquet_file.meta.records == 0 {
         return Ok(Some(TantivyResult::NoMatch));
     }
-    let skip_threshold = get_config().limit.inverted_index_skip_threshold;
+    let skip_threshold = get_config().search.inverted_index_skip_threshold;
     let row_ids_percent = matched as f64 / parquet_file.meta.records as f64 * 100.0;
     if skip_threshold > 0 && row_ids_percent > skip_threshold as f64 {
         log::info!(

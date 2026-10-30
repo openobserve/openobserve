@@ -23,10 +23,7 @@ use config::{
         synthetics::ListSyntheticsParams,
     },
 };
-use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
-    table,
-};
+use infra::{db::get_orm_client_rw, table};
 #[cfg(feature = "enterprise")]
 use o2_openfga::meta::mapping::OFGA_MODELS;
 
@@ -76,16 +73,35 @@ pub enum FolderError {
     #[error("Folder contains synthetics. Please move/delete synthetics from folder.")]
     DeleteWithSynthetics,
 
+    /// An error that occurs when trying to delete a folder that contains workflows.
+    #[error("Folder contains workflows. Please move/delete workflows from folder.")]
+    DeleteWithWorkflows,
+    /// An error that occurs when trying to delete a folder that contains prompts.
+    #[error("Folder contains prompts. Please move/delete prompts from folder.")]
+    DeleteWithPrompts,
+
+    /// An error that occurs when trying to delete a folder that contains downtimes.
+    #[error("Folder contains downtimes. Please move/delete downtimes from folder.")]
+    DeleteWithDowntimes,
+
+    /// A fleet still places or holds collectors, or is the default one.
+    #[error("{0}")]
+    DeleteFleet(String),
+
+    /// A fleet's revisions kept changing while it was being deleted.
+    #[error("{0}")]
+    FleetChanged(String),
+
     /// An error that occurs when trying to delete a folder that cannot be found.
     #[error("Folder not found")]
     NotFound,
 
-    /// An error occured trying to get the list of permitted folders in
+    /// An error occurred trying to get the list of permitted folders in
     /// enterprise mode because no user_id was provided.
     #[error("user_id required to get permitted folders in enterprise mode")]
     PermittedFoldersMissingUser,
 
-    /// An error occured trying to get the list of permitted folders in
+    /// An error occurred trying to get the list of permitted folders in
     /// enterprise mode using the validator.
     #[error("PermittedFoldersValidator# {0}")]
     PermittedFoldersValidator(String),
@@ -120,19 +136,57 @@ pub async fn save_folder(
     }
 
     let (_id, folder) = table::folders::put(org_id, None, folder, folder_type).await?;
-    let folder_type_ofga = match folder_type {
-        FolderType::Dashboards => "folders",
-        FolderType::Alerts => "alert_folders",
-        FolderType::Reports => "report_folders",
-        FolderType::Synthetics => "synthetic_folder",
-    };
+    let folder_type_ofga = folder_type_ofga_name(folder_type);
     set_ownership(org_id, folder_type_ofga, Authz::new(&folder.folder_id)).await;
 
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::config::get_config()
-        .super_cluster
-        .enabled
-    {
+    if publishes(folder_type) {
+        let _ = o2_enterprise::enterprise::super_cluster::queue::folders_create(
+            org_id,
+            _id,
+            &folder.folder_id,
+            folder_type,
+            &folder.name,
+            Some(folder.description.as_str()).filter(|d| !d.is_empty()),
+        )
+        .await;
+    }
+
+    Ok(folder)
+}
+
+/// Returns the org's default folder of the given type, creating it if this is the first use.
+///
+/// Safe to call concurrently: the folder is created idempotently, so a request that loses the race
+/// still gets the folder rather than a unique-constraint failure. Ownership and the super-cluster
+/// event only fire for the caller that actually inserted it.
+#[tracing::instrument]
+pub async fn ensure_default_folder(
+    org_id: &str,
+    folder_type: FolderType,
+) -> Result<Folder, FolderError> {
+    let default_folder = Folder {
+        folder_id: DEFAULT_FOLDER.to_owned(),
+        name: DEFAULT_FOLDER.to_owned(),
+        description: DEFAULT_FOLDER.to_owned(),
+        icon: None,
+    };
+
+    let (_id, folder, created) =
+        table::folders::get_or_create(org_id, default_folder, folder_type).await?;
+    if !created {
+        return Ok(folder);
+    }
+
+    set_ownership(
+        org_id,
+        folder_type_ofga_name(folder_type),
+        Authz::new(&folder.folder_id),
+    )
+    .await;
+
+    #[cfg(feature = "enterprise")]
+    if publishes(folder_type) {
         let _ = o2_enterprise::enterprise::super_cluster::queue::folders_create(
             org_id,
             _id,
@@ -167,10 +221,7 @@ pub async fn update_folder(
     let (_, folder) = table::folders::put(org_id, None, folder, folder_type).await?;
 
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::config::get_config()
-        .super_cluster
-        .enabled
-    {
+    if publishes(folder_type) {
         let _ = o2_enterprise::enterprise::super_cluster::queue::folders_update(
             org_id,
             folder_id,
@@ -198,6 +249,10 @@ pub async fn list_folders(
         FolderType::Alerts => OFGA_MODELS.get("alert_folders").unwrap().key,
         FolderType::Reports => OFGA_MODELS.get("report_folders").unwrap().key,
         FolderType::Synthetics => OFGA_MODELS.get("synthetic_folder").unwrap().key,
+        FolderType::Workflows => OFGA_MODELS.get("workflow_folder").unwrap().key,
+        FolderType::Downtimes => OFGA_MODELS.get("downtime_folders").unwrap().key,
+        FolderType::Prompts => OFGA_MODELS.get("prompt_folders").unwrap().key,
+        FolderType::Fleets => OFGA_MODELS.get("fleets").unwrap().key,
     };
     #[cfg(not(feature = "enterprise"))]
     let folder_ofga_model = "";
@@ -249,8 +304,22 @@ pub async fn delete_folder(
     folder_id: &str,
     folder_type: FolderType,
 ) -> Result<(), FolderError> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     match folder_type {
+        // D27: one transaction of its own, which also removes the folder; then only ownership.
+        #[cfg(feature = "enterprise")]
+        FolderType::Fleets => {
+            delete_fleet(org_id, folder_id).await?;
+            remove_ownership(
+                org_id,
+                folder_type_ofga_name(folder_type),
+                Authz::new(folder_id),
+            )
+            .await;
+            return Ok(());
+        }
+        #[cfg(not(feature = "enterprise"))]
+        FolderType::Fleets => {}
         FolderType::Dashboards => {
             let params = ListDashboardsParams::new(org_id).with_folder_id(folder_id);
             let dashboards = table::dashboards::list(params).await?;
@@ -296,6 +365,58 @@ pub async fn delete_folder(
                 }
             }
         }
+        FolderType::Workflows => {
+            // `folder_id` is the user-facing id from the URL; the workflows
+            // table stores the folder's primary key, so translate before
+            // counting. A missing folder falls through to the `exists` check
+            // below, which reports NotFound.
+            if let Some(folder_pk) =
+                table::folders::get_pk_by_name(org_id, folder_id, folder_type).await?
+                && table::workflows::count_by_folder(org_id, &folder_pk).await? > 0
+            {
+                return Err(FolderError::DeleteWithWorkflows);
+            }
+        }
+        FolderType::Downtimes => {
+            if let Some(folder_pk) =
+                table::folders::get_pk_by_name(org_id, folder_id, folder_type).await?
+                && !table::downtimes::release_folder(org_id, &folder_pk).await?
+            {
+                return Err(FolderError::DeleteWithDowntimes);
+            }
+        }
+        FolderType::Prompts => {
+            if let Some(folder_pk) =
+                table::folders::get_pk_by_name(org_id, folder_id, folder_type).await?
+            {
+                use sea_orm::{
+                    ConnectionTrait, TryGetable,
+                    sea_query::{Alias, Expr, Func, Query},
+                };
+                let query = Query::select()
+                    .expr_as(
+                        Func::count(Expr::col(Alias::new("entity_id"))),
+                        Alias::new("count"),
+                    )
+                    .from(Alias::new("llm_prompts"))
+                    .and_where(Expr::col(Alias::new("org_id")).eq(org_id))
+                    .and_where(Expr::col(Alias::new("folder_id")).eq(folder_pk))
+                    .to_owned();
+                let statement = client.get_database_backend().build(&query);
+                let count = match client
+                    .query_one(statement)
+                    .await
+                    .map_err(infra::errors::Error::from)?
+                {
+                    Some(row) => i64::try_get(&row, "", "count")
+                        .map_err(|error| infra::errors::Error::Message(format!("{error:?}")))?,
+                    None => 0,
+                };
+                if count > 0 {
+                    return Err(FolderError::DeleteWithPrompts);
+                }
+            }
+        }
     };
 
     if !table::folders::exists(org_id, folder_id, folder_type).await? {
@@ -303,28 +424,77 @@ pub async fn delete_folder(
     }
 
     table::folders::delete(org_id, folder_id, folder_type).await?;
-    let folder_type_ofga = match folder_type {
+    forget_folder(org_id, folder_id, folder_type).await;
+    Ok(())
+}
+
+/// Org teardown: every folder without the emptiness checks, its ownership before its row.
+pub async fn delete_by_org(org_id: &str) -> Result<(), FolderError> {
+    let folder_types = [
+        FolderType::Dashboards,
+        FolderType::Alerts,
+        FolderType::Reports,
+        FolderType::Synthetics,
+        FolderType::Workflows,
+        FolderType::Prompts,
+        FolderType::Downtimes,
+    ];
+    for folder_type in folder_types {
+        for folder in table::folders::list_folders(org_id, folder_type).await? {
+            forget_folder(org_id, &folder.folder_id, folder_type).await;
+            table::folders::delete(org_id, &folder.folder_id, folder_type).await?;
+        }
+    }
+    // Also catches rows whose type no variant above maps, which the typed listing cannot see.
+    for (folder_id, folder_type) in table::folders::delete_by_org(org_id).await? {
+        if let Some(folder_type) = table::folders::folder_type_from_i16(folder_type) {
+            forget_folder(org_id, &folder_id, folder_type).await;
+        }
+    }
+    Ok(())
+}
+
+/// A downtime folder travels with the rows filed in it, so it waits for downtime replication too.
+#[cfg(feature = "enterprise")]
+fn publishes(folder_type: FolderType) -> bool {
+    // Fleet data is region-local, so its fleets never replicate (D2).
+    o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+        && folder_type != FolderType::Fleets
+        && (folder_type != FolderType::Downtimes || crate::downtimes::replicates())
+}
+
+/// OpenFGA object type that owns folders of the given kind.
+fn folder_type_ofga_name(folder_type: FolderType) -> &'static str {
+    match folder_type {
         FolderType::Dashboards => "folders",
         FolderType::Alerts => "alert_folders",
         FolderType::Reports => "report_folders",
         FolderType::Synthetics => "synthetic_folder",
-    };
-    remove_ownership(org_id, folder_type_ofga, Authz::new(folder_id)).await;
-
-    #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::config::get_config()
-        .super_cluster
-        .enabled
-    {
-        let _ = o2_enterprise::enterprise::super_cluster::queue::folders_delete(
-            org_id,
-            folder_id,
-            folder_type,
-        )
-        .await;
+        FolderType::Workflows => "workflow_folder",
+        FolderType::Downtimes => "downtime_folders",
+        FolderType::Prompts => "prompt_folders",
+        FolderType::Fleets => "fleets",
     }
+}
 
-    Ok(())
+#[cfg(feature = "enterprise")]
+async fn delete_fleet(org_id: &str, folder_id: &str) -> Result<(), FolderError> {
+    use o2_enterprise::enterprise::fleet::service::FleetError;
+
+    let Err(e) = o2_enterprise::enterprise::fleet::fleets::delete_fleet(org_id, folder_id).await
+    else {
+        return Ok(());
+    };
+    Err(match e.downcast_ref::<FleetError>() {
+        Some(FleetError::FleetNotFound(_)) => FolderError::NotFound,
+        Some(FleetError::Invalid(message)) => FolderError::DeleteFleet(message.clone()),
+        Some(FleetError::RolloutState { .. }) => {
+            FolderError::FleetChanged(format!("fleet {folder_id} is changing; retry"))
+        }
+        _ => FolderError::InfraError(infra::errors::Error::Message(e.to_string())),
+    })
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -359,6 +529,19 @@ async fn permitted_folders(
             OFGA_MODELS.get("synthetic_folder").unwrap().key,
             OFGA_MODELS.get("synthetics").unwrap().key,
         ),
+        FolderType::Workflows => (
+            OFGA_MODELS.get("workflow_folder").unwrap().key,
+            OFGA_MODELS.get("workflows").unwrap().key,
+        ),
+        FolderType::Downtimes => (
+            OFGA_MODELS.get("downtime_folders").unwrap().key,
+            OFGA_MODELS.get("downtimes").unwrap().key,
+        ),
+        // Prompt grants are plain `prompt:{id}` with no folder prefix, so there is no
+        // individual grant to lift a folder into view: only folder `GET` counts.
+        FolderType::Prompts => (OFGA_MODELS.get("prompt_folders").unwrap().key, ""),
+        // Collectors have no grants of their own (D17), so likewise only folder `GET` counts.
+        FolderType::Fleets => (OFGA_MODELS.get("fleets").unwrap().key, ""),
     };
 
     let Some(user_id) = user_id else {
@@ -369,6 +552,10 @@ async fn permitted_folders(
     let mut folder_list = list_objects_for_user(org_id, user_id, "GET", folder_ofga_model)
         .await
         .map_err(|err| FolderError::PermittedFoldersValidator(err.to_string()))?;
+
+    if child_ofga_model.is_empty() {
+        return Ok(folder_list);
+    }
 
     // In some cases, there might not be direct `GET` permission on the folder.
     // So, we need to check if the user has `GET` permission on any of the dashboards
@@ -404,9 +591,26 @@ async fn permitted_folders(
             folder_list = Some(folder_list_with_roles);
         }
     }
-    log::info!("folder_list: {folder_list:?}");
-
     Ok(folder_list)
+}
+
+/// Drops the folder's ownership tuples and tells other regions; both only log a failure.
+async fn forget_folder(org_id: &str, folder_id: &str, folder_type: FolderType) {
+    remove_ownership(
+        org_id,
+        folder_type_ofga_name(folder_type),
+        Authz::new(folder_id),
+    )
+    .await;
+    #[cfg(feature = "enterprise")]
+    if publishes(folder_type) {
+        let _ = o2_enterprise::enterprise::super_cluster::queue::folders_delete(
+            org_id,
+            folder_id,
+            folder_type,
+        )
+        .await;
+    }
 }
 
 #[cfg(test)]
@@ -474,6 +678,7 @@ mod tests {
             folder_id: "test_folder".to_string(),
             name: "Test Folder".to_string(),
             description: "Test description".to_string(),
+            icon: None,
         };
 
         assert_eq!(folder.folder_id, "test_folder");

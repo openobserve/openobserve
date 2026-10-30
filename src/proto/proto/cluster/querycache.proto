@@ -8,6 +8,8 @@ package cluster;
 
 service QueryCache {
     rpc DeleteResultCache (DeleteResultCacheRequest) returns (DeleteResultCacheResponse) {}
+    // Per-range state of public dashboard links from the querier holding their result files.
+    rpc PublicDashboardStatus (PublicDashboardStatusRequest) returns (PublicDashboardStatusResponse) {}
 }
 
 message DeleteResultCacheRequest {
@@ -17,4 +19,15 @@ message DeleteResultCacheRequest {
 
 message DeleteResultCacheResponse {
     bool deleted = 1;  
+}
+
+message PublicDashboardStatusRequest {
+    string org_id = 1;
+    repeated string link_ids = 2;
+    bool with_sources = 3;
+}
+
+message PublicDashboardStatusResponse {
+    // JSON list of link status reports.
+    string reports = 1;
 }

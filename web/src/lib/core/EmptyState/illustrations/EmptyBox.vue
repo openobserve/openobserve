@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
     role="img"
-    aria-label="Nothing here yet"
+    :aria-label="t('emptyState.noData.title')"
     :class="['es-root', { 'es-static': !animated }]"
   >
     <ellipse cx="120" cy="150" rx="62" ry="9" fill="var(--color-primary-900)" opacity="0.1" />
@@ -136,22 +136,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </g>
 
     <!-- sparkles -->
-    <g class="es-spark es-spark-a" transform="translate(168 60)">
-      <path
-        d="M0 -6 L1.4 -1.4 L6 0 L1.4 1.4 L0 6 L-1.4 1.4 L-6 0 L-1.4 -1.4 Z"
-        fill="var(--color-primary-400)"
-      />
+    <!-- The twinkle keyframes set a CSS transform, which would replace a translate on the same element. -->
+    <g transform="translate(168 60)">
+      <g class="es-spark es-spark-a">
+        <path
+          d="M0 -6 L1.4 -1.4 L6 0 L1.4 1.4 L0 6 L-1.4 1.4 L-6 0 L-1.4 -1.4 Z"
+          fill="var(--color-primary-400)"
+        />
+      </g>
     </g>
-    <g class="es-spark es-spark-b" transform="translate(64 70)">
-      <path
-        d="M0 -5 L1.2 -1.2 L5 0 L1.2 1.2 L0 5 L-1.2 1.2 L-5 0 L-1.2 -1.2 Z"
-        fill="var(--color-primary-300)"
-      />
+    <g transform="translate(64 70)">
+      <g class="es-spark es-spark-b">
+        <path
+          d="M0 -5 L1.2 -1.2 L5 0 L1.2 1.2 L0 5 L-1.2 1.2 L-5 0 L-1.2 -1.2 Z"
+          fill="var(--color-primary-300)"
+        />
+      </g>
     </g>
   </svg>
 </template>
 
 <script setup lang="ts">
+import { useI18nTyped } from "@/types/i18n";
+
+const { t } = useI18nTyped();
+
 withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 260, animated: true });
 </script>
 

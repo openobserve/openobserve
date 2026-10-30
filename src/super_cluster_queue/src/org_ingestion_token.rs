@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use bytes::Bytes;
-use config::utils::json;
+use config::utils::{json, str::mask_secret};
 use infra::{
     db::{delete_from_db_coordinator, put_into_db_coordinator},
     errors::{Error, Result},
@@ -59,8 +59,8 @@ async fn put(msg: Message) -> Result<()> {
         return Err(e);
     }
 
-    // Mirror the originating cluster's coordinator event so local watchers
-    // refresh their cache: enabled tokens are cached, disabled ones evicted.
+    // The local watcher rebuilds the Splunk map from the row it re-reads, so
+    // only the coordinator event below is needed to drive it.
     if record.enabled {
         let _ = put_into_db_coordinator(&msg.key, Bytes::new(), msg.need_watch, None).await;
     } else {
@@ -79,8 +79,10 @@ async fn delete(msg: Message) -> Result<()> {
         .ok_or_else(|| Error::Message("Invalid org ingestion token key".to_string()))?;
 
     if let Err(e) = org_ingestion_tokens::remove_by_token(org_id, token).await {
+        // Never log the token itself: this line is the credential in plaintext.
         log::error!(
-            "[SUPER_CLUSTER:sync] Failed to delete org ingestion token: {org_id}/{token}, error: {e}"
+            "[SUPER_CLUSTER:sync] Failed to delete org ingestion token: org: {org_id}, token: {}, error: {e}",
+            mask_secret(token)
         );
         return Err(e);
     }

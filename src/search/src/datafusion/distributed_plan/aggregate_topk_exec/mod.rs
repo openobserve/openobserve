@@ -17,9 +17,9 @@ use std::{fmt::Debug, sync::Arc};
 
 use arrow::datatypes::SchemaRef;
 use datafusion::{
-    common::Result,
+    common::{Result, internal_err, tree_node::TreeNodeRecursion},
     execution::{SendableRecordBatchStream, TaskContext},
-    physical_expr::EquivalenceProperties,
+    physical_expr::{EquivalenceProperties, PhysicalExpr},
     physical_plan::{
         DisplayAs, DisplayFormatType, ExecutionPlan, ExecutionPlanProperties, Partitioning,
         PlanProperties,
@@ -42,37 +42,36 @@ pub struct AggregateTopkExec {
 }
 
 impl AggregateTopkExec {
-    /// Create a new AggregateMergeExec with explicit cache strategy
-    pub fn new(
+    /// Create a new AggregateTopkExec; errors when the input has no field for `sort_field`.
+    pub fn try_new(
         input: Arc<dyn ExecutionPlan>,
         sort_field: &str,
         descending: bool,
         limit: u64,
-    ) -> Self {
+    ) -> Result<Self> {
         // Partial or no cache: cached partitions + input partitions
         let target_partitions = input.output_partitioning().partition_count();
         let cache = Self::compute_properties(Arc::clone(&input.schema()), target_partitions);
-        let sort_field = input
-            .schema()
-            .fields()
-            .iter()
-            .find(|f| {
-                // field name like count(*)[count]
-                f.name() == sort_field
-                    || f.name().split('[').next().is_some_and(|v| v == sort_field)
-            })
-            .unwrap()
-            .name()
-            .to_string();
+        let schema = input.schema();
+        let Some(field) = schema.fields().iter().find(|f| {
+            // State fields are `<name>[count]`; the name itself may hold `[`, e.g. an IN list.
+            f.name() == sort_field
+                || f.name()
+                    .rsplit_once('[')
+                    .is_some_and(|(name, _)| name == sort_field)
+        }) else {
+            return internal_err!("AggregateTopkExec: no input field for {sort_field}");
+        };
+        let sort_field = field.name().to_string();
 
-        Self {
+        Ok(Self {
             input,
             cache,
             target_partitions,
             sort_field,
             descending,
             limit,
-        }
+        })
     }
 
     fn output_partitioning_helper(n_partitions: usize) -> Partitioning {
@@ -128,6 +127,13 @@ impl DisplayAs for AggregateTopkExec {
 }
 
 impl ExecutionPlan for AggregateTopkExec {
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(&Arc<dyn PhysicalExpr>) -> Result<TreeNodeRecursion>,
+    ) -> Result<TreeNodeRecursion> {
+        Ok(TreeNodeRecursion::Continue)
+    }
+
     fn name(&self) -> &'static str {
         "AggregateTopkExec"
     }
@@ -147,12 +153,12 @@ impl ExecutionPlan for AggregateTopkExec {
         if children.is_empty() {
             return Ok(self);
         }
-        Ok(Arc::new(Self::new(
+        Ok(Arc::new(Self::try_new(
             children[0].clone(),
             &self.sort_field,
             self.descending,
             self.limit,
-        )))
+        )?))
     }
 
     fn execute(
@@ -166,8 +172,8 @@ impl ExecutionPlan for AggregateTopkExec {
         // heap is more memory effecient and performant when the K <= 200 range, but as the range
         // increases the performance takes a hit. In such cases, giving up on memory and
         // prioritizing performance make more sense.
-        let can_use_top_k_heap =
-            cfg.common.use_agg_topk_heap && self.limit <= cfg.common.agg_topk_heap_max_limit;
+        let can_use_top_k_heap = cfg.search.aggregation_topk_heap_enabled
+            && self.limit <= cfg.search.aggregation_topk_heap_max_limit;
 
         let pinned_stream: SendableRecordBatchStream = if can_use_top_k_heap {
             // we use inflated limit here to calculate topK values on partial aggregation results

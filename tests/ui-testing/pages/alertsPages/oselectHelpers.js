@@ -24,3 +24,41 @@ export async function openOSelectDropdown(page, rootLocator, { retries = 5, sett
         await page.waitForTimeout(settleMs);
     }
 }
+
+function dataTestName(selector) {
+    const m = selector.match(/\[data-test="([^"]+)"\]/);
+    if (!m) throw new Error(`Not a data-test selector: ${selector}`);
+    return m[1];
+}
+
+// Picks `value` in the OSelect at `rootSelector` (optionally under `scope`) and confirms the trigger committed it.
+export async function selectOSelectOption(page, rootSelector, value, { retries = 4, scope = null } = {}) {
+    const name = dataTestName(rootSelector);
+    const root = (scope ?? page).locator(rootSelector);
+    const trigger = root.locator(`[data-test="${name}-trigger"]`).first();
+    const option = page.locator(`[data-test="${name}-option"][data-test-value="${value}"]`).first();
+
+    const committed = async () => {
+        const attr = await trigger.getAttribute('data-test-selected-value').catch(() => null);
+        if (attr !== null) return attr === String(value);
+        const label = await option.getAttribute('data-test-label').catch(() => null);
+        const text = ((await trigger.textContent().catch(() => '')) ?? '').trim();
+        return !!label && text.includes(label.trim());
+    };
+
+    for (let i = 0; i < retries; i++) {
+        await openOSelectDropdown(page, root);
+        try {
+            await option.waitFor({ state: 'visible', timeout: 5000 });
+            await option.click();
+        } catch {
+            continue;
+        }
+        if (await committed()) return;
+    }
+    const offered = await page
+        .locator(`[data-test="${name}-option"]`)
+        .evaluateAll((nodes) => nodes.map((n) => n.getAttribute('data-test-value')))
+        .catch(() => []);
+    throw new Error(`OSelect "${name}" never committed "${value}"; offered: ${JSON.stringify(offered)}`);
+}

@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { IllustrationName } from "@/lib/core/EmptyState/illustrations";
 
@@ -48,11 +49,11 @@ withDefaults(
     /** data-test emitted on the empty state (each page keeps its own value). */
     dataTest: string;
     /** Resolved title string. */
-    title: string;
+    title: I18nText;
     /** Resolved description string. */
-    description: string;
+    description: I18nText;
     /** Resolved action-label string. Omit for pages with no action (Graph). */
-    actionLabel?: string;
+    actionLabel?: I18nText;
     /** Empty-state illustration. Defaults to `constellation` (Sessions);
         Agent Graph passes `service-graph`. */
     illustration?: IllustrationName;

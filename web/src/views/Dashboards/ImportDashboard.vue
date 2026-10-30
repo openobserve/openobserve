@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="outline"
         size="sm-action"
+        class="max-md:hidden"
         @click="goToCommunityDashboards"
         data-test="dashboard-panel-tutorial-btn"
         >{{ t("dashboard.communityDashboard") }}</OButton
@@ -48,11 +49,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <div class="flex min-h-0 w-full flex-1">
       <div class="flex min-h-0 w-full min-w-0">
-        <OSplitter v-model="splitterModel" class="h-full min-h-0 w-full min-w-0">
+        <OSplitter
+          v-model="splitterModel"
+          :horizontal="stackPanes"
+          class="h-full min-h-0 w-full min-w-0"
+        >
           <template #before>
             <OForm id="import-dashboard-form" :form="form" class="flex h-full min-h-0 flex-col">
               <div class="flex h-full min-h-0 w-full flex-col">
-                <div class="bg-card-glass-bg px-page-edge mb-1 shrink-0 py-2.5">
+                <div
+                  class="bg-card-glass-bg px-page-edge mb-1 shrink-0 py-2.5 max-md:flex max-md:flex-wrap max-md:items-center max-md:justify-between max-md:gap-2"
+                >
                   <div class="app-tabs-container h-9 w-fit">
                     <AppTabs
                       data-test="dashboard-import-type-tabs"
@@ -62,25 +69,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:active-tab="updateActiveTab"
                     />
                   </div>
+                  <OButton
+                    variant="outline"
+                    size="sm-action"
+                    class="md:hidden"
+                    @click="goToCommunityDashboards"
+                    data-test="dashboard-panel-tutorial-btn-mobile"
+                    >{{ t("dashboard.communityDashboard") }}</OButton
+                  >
                 </div>
                 <div
                   v-if="activeTab == 'import_json_url'"
                   class="editor-container-url bg-card-glass-bg flex min-h-0 flex-1 flex-col py-1"
                 >
                   <div class="mx-2 mt-1 mb-1 flex min-h-0 flex-1 flex-col">
-                    <div class="flex w-[calc(100%_-_0.625rem)] w-full shrink-0 items-center gap-2">
-                      <div data-test="dashboard-import-url-input" class="w-[69%]">
+                    <div
+                      class="flex w-[calc(100%_-_0.625rem)] w-full shrink-0 items-center gap-2 max-md:flex-wrap"
+                    >
+                      <div data-test="dashboard-import-url-input" class="w-[69%] max-md:w-full">
                         <OFormInput
                           data-test="dashboard-import-url-control"
                           name="url"
-                          label="URL"
+                          :label="t('common.url')"
                           :placeholder="t('dashboard.addURL')"
                         />
                       </div>
 
                       <div
                         data-test="dashboard-folder-dropdown"
-                        class="import-folder-dropdown-container w-[calc(30%)]"
+                        class="import-folder-dropdown-container w-[calc(30%)] max-md:w-full"
                       >
                         <SelectFolderDropdown
                           @folder-selected="selectedFolder = $event"
@@ -104,8 +121,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="dashboard-import-json-container bg-card-glass-bg flex min-h-0 flex-1 flex-col py-1"
                 >
                   <div class="mx-2 mt-1 mb-1 flex min-h-0 flex-1 flex-col">
-                    <div class="flex w-[calc(100%_-_0.625rem)] w-full shrink-0 items-center gap-2">
-                      <div data-test="dashboard-import-file-input" class="w-[69%]">
+                    <div
+                      class="flex w-[calc(100%_-_0.625rem)] w-full shrink-0 items-center gap-2 max-md:flex-wrap"
+                    >
+                      <div data-test="dashboard-import-file-input" class="w-[69%] max-md:w-full">
                         <OFormFile
                           data-test="dashboard-import-file-control"
                           name="jsonFiles"
@@ -117,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :disabled="!!isLoading"
                         />
                       </div>
-                      <div class="import-folder-dropdown-container w-[calc(30%)]">
+                      <div class="import-folder-dropdown-container w-[calc(30%)] max-md:w-full">
                         <SelectFolderDropdown
                           @folder-selected="selectedFolder = $event"
                           :activeFolderId="selectedFolder.value"
@@ -141,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               data-test="dashboard-import-error-container"
-              class="bg-card-glass-bg border-border-default flex h-full min-h-0 flex-col border-l"
+              class="bg-card-glass-bg border-border-default flex h-full min-h-0 flex-col border-s"
             >
               <div class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold">
                 {{ t("dashboard.importDashboardPage.errorValidations") }}
@@ -249,18 +268,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 // @ts-nocheck
 import {
+  computed,
   defineComponent,
   ref,
-  computed,
   onMounted,
-  onActivated,
-  onDeactivated,
-  onUnmounted,
   reactive,
   watch,
+  defineAsyncComponent,
 } from "vue";
-import { useI18n } from "vue-i18n";
-import { getAllDashboards, getFoldersList } from "../../utils/commons.js";
+import { useI18nTyped } from "@/types/i18n";
+import { getAllDashboards, getFoldersList, dedupeDashboardIds } from "../../utils/commons.js";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import dashboardService from "../../services/dashboards.js";
@@ -282,14 +299,14 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeImportDashboardSchema, importDashboardDefaults } from "./ImportDashboard.schema";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
-import { defineAsyncComponent } from "vue";
+import useBreakpoint from "@/composables/useBreakpoint";
+import analytics from "@/services/product_analytics";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
-import stream from "@/services/stream.js";
 export default defineComponent({
   name: "Import Dashboard",
   props: ["dashboardId"],
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
     const route = useRoute();
@@ -321,14 +338,25 @@ export default defineComponent({
     const activeTab = ref("import_json_file");
 
     const dashboardErrorsToDisplay = ref([]);
+    const { lgUp } = useBreakpoint();
+    const stackPanes = computed(() => !lgUp.value);
     const splitterModel = ref(60);
+
+    watch(
+      [stackPanes, () => dashboardErrorsToDisplay.value.length],
+      ([stacked, errCount]) => {
+        if (stacked) splitterModel.value = errCount > 0 ? 55 : 100;
+        else if (splitterModel.value === 100) splitterModel.value = 60;
+      },
+      { immediate: true },
+    );
 
     // holds the value of the loading for any of the import type
     const isLoading = ref(false);
     const queryEditorPlaceholderFlag = ref(true);
     const dashboardTitles = reactive({});
     const streamTypes = reactive({});
-    const streamTypeOptions = ["logs", "metrics", "traces"];
+    const streamTypeOptions = ["logs", "metrics", "traces", "enrichment_tables"];
     const streamTypeSelectOptions = streamTypeOptions.map((t) => ({ label: t, value: t }));
     // import type values
     const ImportType = {
@@ -453,6 +481,19 @@ export default defineComponent({
     });
 
     //import dashboard from the json
+    const migrateSchema = (dashboard: any) => {
+      const converted = convertDashboardSchemaVersion(dashboard);
+      try {
+        dedupeDashboardIds(converted);
+      } catch (e) {
+        console.error("Failed to dedupe dashboard ids on import", e);
+      }
+      return converted;
+    };
+
+    // Counts confirmed creates for the running import action; a later refresh failure must not hide them.
+    let createdInAction = 0;
+
     const importDashboardFromJSON = async (jsonObj: any, selectedFolder: any) => {
       const data =
         typeof jsonObj == "string"
@@ -471,9 +512,11 @@ export default defineComponent({
         data,
         selectedFolder.value,
       );
+      analytics.track("dashboard_created");
+      createdInAction++;
 
       //update store
-      await getAllDashboards(store, selectedFolder.value);
+      await getAllDashboards(store, selectedFolder.value, true);
 
       //return new dashboard
       return newDashboard;
@@ -497,6 +540,7 @@ export default defineComponent({
         return;
       }
 
+      createdInAction = 0;
       const data = jsonStr.value.map((parsedContent, fileIndex) => {
         return new Promise((resolve, reject) => {
           (async () => {
@@ -518,10 +562,10 @@ export default defineComponent({
                 //it will convert the dashboard schema version to the latest version
 
                 try {
-                  const convertedSchema = convertDashboardSchemaVersion(dashboard);
+                  const convertedSchema = migrateSchema(dashboard);
 
                   // Validate the converted schema before importing
-                  const validationErrors = validateDashboardJson(convertedSchema);
+                  const validationErrors = validateDashboardJson(t, convertedSchema);
                   if (validationErrors.length > 0) {
                     const errorMessage = validationErrors.join("; ");
                     results.push({
@@ -562,6 +606,9 @@ export default defineComponent({
 
       Promise.allSettled(data).then(async (results) => {
         filesImportResults.value = results;
+        if (createdInAction > 0) {
+          analytics.track("dashboard_imported", { source: "file", count: createdInAction });
+        }
 
         const successfulImports = results.filter((r) => r.status === "fulfilled").length;
 
@@ -618,6 +665,7 @@ export default defineComponent({
     //import dashboard from url
     const importFromUrl = async () => {
       isLoading.value = ImportType.URL;
+      createdInAction = 0;
       try {
         const urlData = url.value.trim();
 
@@ -634,10 +682,10 @@ export default defineComponent({
 
         const importPromises = dashboards.map((dashboard, index) => {
           try {
-            const converted = convertDashboardSchemaVersion(dashboard);
+            const converted = migrateSchema(dashboard);
 
             // Validate the converted schema before importing
-            const validationErrors = validateDashboardJson(converted);
+            const validationErrors = validateDashboardJson(t, converted);
             if (validationErrors.length > 0) {
               const errorMessage = validationErrors.join("; ");
               return Promise.reject({ index, error: new Error(errorMessage) });
@@ -653,6 +701,9 @@ export default defineComponent({
 
         const successCount = results.filter((r) => r.status === "fulfilled").length;
         const failedCount = results.length - successCount;
+        if (createdInAction > 0) {
+          analytics.track("dashboard_imported", { source: "url", count: createdInAction });
+        }
 
         if (successCount > 0) {
           await resetAndRefresh(ImportType.URL, selectedFolder.value);
@@ -681,14 +732,15 @@ export default defineComponent({
     // import dashboard from json string
     const importFromJsonStr = async () => {
       isLoading.value = ImportType.JSON_STRING;
+      createdInAction = 0;
       try {
         // get the dashboard
 
         const oldImportedSchema = JSON.parse(jsonStr.value);
-        const convertedSchema = convertDashboardSchemaVersion(oldImportedSchema);
+        const convertedSchema = migrateSchema(oldImportedSchema);
 
         // Validate the converted schema before importing
-        const validationErrors = validateDashboardJson(convertedSchema);
+        const validationErrors = validateDashboardJson(t, convertedSchema);
         if (validationErrors.length > 0) {
           const errorMessage = validationErrors.join("; ");
           showErrorNotification(
@@ -697,7 +749,7 @@ export default defineComponent({
           return;
         }
 
-        await importDashboardFromJSON(convertedSchema, selectedFolder.value).then((res) => {
+        await importDashboardFromJSON(convertedSchema, selectedFolder.value).then((_res) => {
           resetAndRefresh(ImportType.JSON_STRING, selectedFolder.value);
           filesImportResults.value = [];
           jsonStr.value = "";
@@ -709,6 +761,9 @@ export default defineComponent({
       } catch (error) {
         showErrorNotification(t("dashboard.importDashboardPage.pleaseEnterJsonObject"));
       } finally {
+        if (createdInAction > 0) {
+          analytics.track("dashboard_imported", { source: "json", count: createdInAction });
+        }
         isLoading.value = false;
       }
     };
@@ -740,12 +795,12 @@ export default defineComponent({
         if (Array.isArray(jsonObj)) {
           jsonObj.forEach((input, index) => {
             // migrate to new schema
-            const convertedSchema = convertDashboardSchemaVersion(input);
+            const convertedSchema = migrateSchema(input);
             validateBasicInputs(convertedSchema, index);
           });
         } else {
           // migrate to new schema
-          const convertedSchema = convertDashboardSchemaVersion(jsonObj);
+          const convertedSchema = migrateSchema(jsonObj);
           validateBasicInputs(convertedSchema);
         }
         if (dashboardErrorsToDisplay.value.length > 0) {
@@ -777,7 +832,7 @@ export default defineComponent({
       }
 
       // Comprehensive dashboard validation using validateDashboardJson
-      const validationErrors = validateDashboardJson(input);
+      const validationErrors = validateDashboardJson(t, input);
       if (validationErrors.length > 0) {
         validationErrors.forEach((error) => {
           dashboardErrorsToDisplay.value.push({
@@ -845,6 +900,7 @@ export default defineComponent({
       activeTab,
       dashboardErrorsToDisplay,
       splitterModel,
+      stackPanes,
       updateActiveTab,
       queryEditorPlaceholderFlag,
       importDashboard,

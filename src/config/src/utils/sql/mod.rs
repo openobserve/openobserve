@@ -16,21 +16,23 @@
 mod complex_query;
 mod eligible_for_histogram;
 mod explain_query;
+mod group_by_query;
 mod helpers;
 mod simple_aggregate_query;
-mod simple_distinct_query;
 mod timestamp_selected;
 mod visitors;
+mod where_fragment;
 
 pub use complex_query::{is_complex_query, is_complex_query_stmt};
 pub use eligible_for_histogram::is_eligible_for_histogram;
 pub use explain_query::is_explain_query;
+pub use group_by_query::is_group_by_query;
 pub use simple_aggregate_query::is_simple_aggregate_query;
-pub use simple_distinct_query::is_simple_distinct_query;
 pub use timestamp_selected::is_timestamp_selected;
 pub use visitors::TimestampVisitor;
+pub use where_fragment::{validate_optional_where_fragment, validate_where_fragment};
 
-pub const AGGREGATE_UDF_LIST: [&str; 17] = [
+pub const AGGREGATE_UDF_LIST: [&str; 19] = [
     "min",
     "max",
     "avg",
@@ -48,4 +50,18 @@ pub const AGGREGATE_UDF_LIST: [&str; 17] = [
     "approx_percentile_cont_with_weight",
     "approx_topk",
     "approx_topk_distinct",
+    "sequence_depth",
+    "sequence_step_times",
 ];
+
+pub fn quote_identifier(value: &str) -> String {
+    format!("\"{}\"", value.replace('"', "\"\""))
+}
+
+pub fn quote_sql_string(value: &str) -> String {
+    format!("'{}'", escape_sql_string(value))
+}
+
+pub fn escape_sql_string(value: &str) -> String {
+    value.replace('\'', "''")
+}

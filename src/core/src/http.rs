@@ -66,7 +66,7 @@ impl From<AlertError> for Response {
             AlertError::AlertNameMissing
             | AlertError::AlertNameOfgaUnsupported
             | AlertError::AlertNameContainsForwardSlash
-            | AlertError::AlertDestinationMissing
+            | AlertError::ProtectedStream(_)
             | AlertError::TemplateNotConfigured { .. }
             | AlertError::RealtimeMissingCustomQuery
             // Both are user input errors -> 400, same as the other
@@ -78,12 +78,47 @@ impl From<AlertError> for Response {
             | AlertError::WarningOnCoverageGate { .. }
             | AlertError::PromqlWarningWithoutCondition
             | AlertError::InvalidTag(_)
+            // Feature 5: every variant names its own bound, so the body is
+            // actionable. A dangling `slo_id` is user input too — the alert
+            // being saved is what is wrong, not a missing resource the caller
+            // asked for.
+            | AlertError::InvalidSloAlert(_)
             | AlertError::SqlMissingQuery
             | AlertError::SqlContainsSelectStar
+            | AlertError::PromRuleStreamMissing(_)
             | AlertError::PromqlMissingQuery
+            | AlertError::SqlUnsupportedQueryType { .. }
             | AlertError::PeriodExceedsMaxQueryRange { .. }
-            | AlertError::AlertIdMissing => MetaHttpResponse::bad_request(value),
-            AlertError::CreateAlreadyExists => MetaHttpResponse::conflict(value),
+            | AlertError::AlertIdMissing
+            | AlertError::PendingPeriodOnRealtimeAlert
+            | AlertError::NegativePendingPeriod
+            | AlertError::KeepFiringForOutOfRange
+            | AlertError::FrequencyOutOfRange
+            | AlertError::SilenceOutOfRange
+            | AlertError::ToleranceOutOfRange
+            | AlertError::TzOffsetOutOfRange
+            | AlertError::CronHasNoFutureOccurrence { .. }
+            | AlertError::RecoveryOnRealtimeAlert
+            | AlertError::RepeatSuppressionOnRealtimeAlert
+            | AlertError::RecoveryDestinationsWithoutRecovery
+            | AlertError::RecoveryDestinationIsPlatform { .. }
+            | AlertError::RecoveryNeedsJsonPayload { .. }
+            | AlertError::RecoveryNeedsRoutingKey { .. }
+            | AlertError::MultiAlertGroupingError(_)
+            | AlertError::GroupByColumnNotFound { .. } => MetaHttpResponse::bad_request(value),
+            // S-16 PR 4. A conflict, not a bad request: the alert being sent is
+            // fine on its own terms — it is the SLOs that already exist and
+            // measure from it that the request collides with. Both messages
+            // name them, so the 409 body says what to change.
+            AlertError::CreateAlreadyExists
+            | AlertError::AlertSourceOfSlos { .. }
+            | AlertError::AlertReferencedByComposites { .. }
+            | AlertError::AlertSourceEditBreaksSlos { .. } => MetaHttpResponse::conflict(value),
+            AlertError::CompositeGraphLockUnavailable(_) => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(MetaHttpResponse::error(StatusCode::SERVICE_UNAVAILABLE, value)),
+            )
+                .into_response(),
             AlertError::CreateFolderNotFound
             | AlertError::MoveDestinationFolderNotFound
             | AlertError::AlertNotFound
@@ -111,11 +146,16 @@ impl From<AlertError> for Response {
 
 pub fn destination_error_response(value: DestinationError) -> Response {
     match &value {
-        DestinationError::UsedByAlert(_) | DestinationError::UsedByPipeline(_) => {
-            MetaHttpResponse::conflict(value)
-        }
+        DestinationError::InUse(_) => MetaHttpResponse::conflict(value),
         DestinationError::InfraError(err) => MetaHttpResponse::internal_error(err),
         DestinationError::NotFound => MetaHttpResponse::not_found(value),
+        DestinationError::SlackAppNeedsEnterprise => MetaHttpResponse::forbidden(value),
+        DestinationError::SlackApp(refusal) => {
+            use axum::response::IntoResponse;
+            let status = axum::http::StatusCode::from_u16(refusal.status)
+                .unwrap_or(axum::http::StatusCode::BAD_REQUEST);
+            (status, axum::Json(refusal.clone())).into_response()
+        }
         other_err => MetaHttpResponse::bad_request(other_err),
     }
 }
@@ -183,6 +223,12 @@ impl From<DashboardError> for Response {
             DashboardError::PanelAlreadyExists(panel_id, tab_id) => MetaHttpResponse::conflict(
                 format!("Panel with id {panel_id} already exists in tab {tab_id}"),
             ),
+            DashboardError::TooManyAnnotationSources(max) => MetaHttpResponse::bad_request(
+                format!("A dashboard can have at most {max} annotation sources"),
+            ),
+            DashboardError::InvalidAnnotationSource(reason) => {
+                MetaHttpResponse::bad_request(reason)
+            }
         }
     }
 }
@@ -198,10 +244,14 @@ impl From<ReportError> for Response {
             | ReportError::NameIsEmpty
             | ReportError::NameContainsForwardSlash
             | ReportError::CreateReportNameAlreadyUsed
+            | ReportError::OrgMismatch
             | ReportError::NoDashboards
             | ReportError::InlineAttachmentTypeNotSupportedForPdf
             | ReportError::NoDashboardTabs
-            | ReportError::NoDestinations => MetaHttpResponse::bad_request(value),
+            | ReportError::NoDestinations
+            | ReportError::TzOffsetOutOfRange
+            | ReportError::CronHasNoFutureOccurrence { .. }
+            | ReportError::NegativeInterval => MetaHttpResponse::bad_request(value),
             ReportError::ReportNotFound
             | ReportError::DashboardTabNotFound
             | ReportError::FolderNotFound => MetaHttpResponse::not_found(value),
@@ -219,6 +269,7 @@ impl From<PipelineError> for Response {
             PipelineError::InfraError(err) => MetaHttpResponse::internal_error(err),
             PipelineError::NotFound(_) => MetaHttpResponse::not_found(value),
             PipelineError::Modified(_) => MetaHttpResponse::conflict(value),
+            PipelineError::Refused(refusal) => refusal.into_response(),
             error => MetaHttpResponse::bad_request(error),
         }
     }

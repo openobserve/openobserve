@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { PrebuiltConfig } from "./types";
+import { raw } from "@/types/i18n";
+import { PrebuiltConfig, PrebuiltType } from "./types";
 
 /**
  * Discord prebuilt destination configuration
@@ -24,7 +25,7 @@ export const discordTemplate = {
     {
       username: "OpenObserve Alerts",
       avatar_url: "https://openobserve.ai/favicon.ico",
-      content: "🚨 **Alert: {alert_name}**",
+      content: "[{alert_status}] **{alert_name}**",
       embeds: [
         {
           title: "{alert_name}",
@@ -43,7 +44,7 @@ export const discordTemplate = {
             },
             {
               name: "Status",
-              value: "🔴 Firing",
+              value: "{alert_status}",
               inline: true,
             },
             {
@@ -83,25 +84,13 @@ export const discordConfig: PrebuiltConfig = {
     "Content-Type": "application/json",
   },
   method: "post",
-  urlValidator: (url: string) => {
-    try {
-      const parsed = new URL(url);
-      const hostname = parsed.hostname.toLowerCase();
-      return (
-        (hostname === "discord.com" || hostname.endsWith(".discord.com")) &&
-        parsed.pathname.startsWith("/api/webhooks/")
-      );
-    } catch {
-      return false;
-    }
-  },
   credentialFields: [
     {
       key: "webhookUrl",
       labelKey: "alerts.prebuiltDestinations.discordWebhookUrl",
       type: "text",
       required: true,
-      hint: "Get your webhook URL from Discord channel settings",
+      hintKey: "alerts.prebuiltDestinations.discordWebhookUrlHint",
       validator: (url: string) => {
         const invalid = { key: "alerts.prebuiltDestinations.invalidDiscordWebhookUrl" };
         try {
@@ -122,17 +111,18 @@ export const discordConfig: PrebuiltConfig = {
       labelKey: "alerts.prebuiltDestinations.discordUsername",
       type: "text",
       required: false,
-      hint: "Custom username for the webhook bot",
+      hintKey: "alerts.prebuiltDestinations.discordUsernameHint",
+      persistInMetadata: true,
     },
   ],
 };
 
 import discordLogo from "@/assets/images/alerts/destinations/discord.png";
 
-export const discordDestinationType = {
+export const discordDestinationType: PrebuiltType = {
   id: "discord",
-  name: "Discord",
-  description: "Send notifications to Discord channels",
+  name: raw("Discord"),
+  descriptionKey: "alert_destinations.prebuilt.discordDescription",
   icon: "discord",
   image: discordLogo,
   popular: true,

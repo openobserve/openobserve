@@ -19,7 +19,7 @@
     :open="open"
     side="right"
     :width="55"
-    :title="title"
+    :title="raw(title)"
     data-test="agent-signal-detail-panel"
     @update:open="(v: boolean) => emit('update:open', v)"
   >
@@ -70,6 +70,8 @@
           data-test="agent-signal-detail-errors"
           :data="errorRows"
           :columns="errorColumns"
+          :loading="loading"
+          :empty-message="t('aiObservability.behavior.detail.noErrors')"
           :default-columns="false"
           :frame="false"
           wrap
@@ -100,11 +102,6 @@
             </div>
           </template>
         </OTable>
-        <OEmptyState
-          v-if="!loading && errorRows.length === 0"
-          preset="no-data"
-          :title="t('aiObservability.behavior.detail.noErrors')"
-        />
       </section>
 
       <!-- LOOP / COST: the worst traces, ranked by what makes them bad -->
@@ -123,6 +120,8 @@
           data-test="agent-signal-detail-traces"
           :data="traceRows"
           :columns="traceColumns"
+          :loading="loading"
+          :empty-message="t('aiObservability.behavior.detail.noTraces')"
           :default-columns="false"
           :frame="false"
           pagination="client"
@@ -132,20 +131,17 @@
           <!-- Trace id renders with an "open in new tab" icon so it's clear the
                row opens the trace in a new browser tab, not in place. -->
           <template #cell-trace_id="{ row }">
-            <span
-              class="text-text-link inline-flex items-center gap-1 hover:underline"
-              :title="t('aiObservability.behavior.detail.openInNewTab')"
-            >
-              <OIcon name="open-in-new" size="xs" class="opacity-70" />
-              <span class="truncate font-mono">{{ row.trace_id }}</span>
+            <span class="text-text-link inline-flex max-w-full items-center gap-1 hover:underline">
+              <OIcon
+                name="open-in-new"
+                size="xs"
+                class="opacity-70"
+                :title="t('aiObservability.behavior.detail.openInNewTab')"
+              />
+              <OTruncatedText class="font-mono">{{ row.trace_id }}</OTruncatedText>
             </span>
           </template>
         </OTable>
-        <OEmptyState
-          v-if="!loading && traceRows.length === 0"
-          preset="no-data"
-          :title="t('aiObservability.behavior.detail.noTraces')"
-        />
       </section>
     </section>
   </ODrawer>
@@ -153,19 +149,19 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OAgentBadges from "@/components/shared/OAgentBadges.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import searchService from "@/services/search";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
 import { buildAgentClimbFilter } from "./agentClimbFilter";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 interface SignalRow {
   signalType: "loop" | "failure" | "cost";
@@ -196,13 +192,13 @@ const props = defineProps<{
 
 const emit = defineEmits<{ (e: "update:open", v: boolean): void }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 
 const errorRows = ref<
   Array<{
-    message: string;
+    message: I18nText;
     full: string;
     occurrences: number;
     traces: number;
@@ -488,7 +484,7 @@ const fetchDetails = async () => {
       ).map((h: any) => ({
         // `message` is the condensed one-line gist (scannable); `full` is the
         // raw text, revealed on demand via the expand toggle.
-        message: condenseError(h.message),
+        message: raw(condenseError(h.message)),
         full: h.message,
         occurrences: h.occurrences,
         traces: h.traces,

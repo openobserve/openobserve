@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Section header -->
         <div class="section-header border-border-default flex items-center border-b px-3 py-2.5">
           <div
-            class="section-header-accent rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0"
+            class="section-header-accent rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0"
           />
           <span class="section-header-title text-compact text-text-heading font-semibold">{{
             t("alerts.additional_settings")
@@ -54,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex items-center gap-2">
               <OFormSelect
                 name="template"
+                :aria-label="t('alerts.template')"
                 :options="formattedTemplates"
                 clearable
                 :placeholder="t('alerts.advanced.selectTemplate')"
@@ -129,11 +130,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="alert-variables-delete-variable-btn"
                   variant="ghost"
                   size="icon-circle-sm"
+                  :aria-label="t('common.delete')"
                   @click="removeVariable(index)"
                 >
                   <OIcon name="delete-outline" size="sm" />
                 </OButton>
                 <OButton
+                  :aria-label="t('common.add')"
                   data-test="alert-variables-add-variable-btn"
                   v-if="index === variableRows.length - 1"
                   variant="ghost"
@@ -153,25 +156,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="subsection-label text-text-secondary mb-2 flex items-center text-xs font-semibold"
               >
                 <span>{{ t("alerts.priority") }}</span>
-                <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
+                <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
                 <OTooltip :content="t('alerts.priorityTooltip')" side="right" />
               </div>
               <OFormSelect
                 name="priority"
+                :aria-label="t('alerts.priority')"
                 :options="priorityOptions"
                 :searchable="false"
                 clearable
                 width="xs"
-                :placeholder="t('alerts.priorityUnset')"
+                :placeholder="
+                  oncallEnabled ? t('alerts.priorityUnsetPagesAs') : t('alerts.priorityUnset')
+                "
                 data-test="alert-priority-select"
               />
+            </div>
+            <!-- The escape hatch for an alert whose identity dimensions cannot
+                 express its owner. Normally routing works it out. -->
+            <div v-if="oncallEnabled">
+              <div
+                class="subsection-label text-text-secondary mb-2 flex items-center text-xs font-semibold"
+              >
+                <span>{{ t("alerts.oncallTeam") }}</span>
+                <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
+                <OTooltip :content="t('alerts.oncallTeamTooltip')" side="right" />
+              </div>
+              <OFormSelect
+                name="oncall_team"
+                :aria-label="t('alerts.oncallTeam')"
+                :options="oncallTeamOptions"
+                clearable
+                width="md"
+                :placeholder="t('alerts.oncallTeamPlaceholder')"
+                data-test="alert-oncall-team-select"
+              >
+                <template #empty>{{ t("alerts.oncallTeamNoTeams") }}</template>
+              </OFormSelect>
             </div>
             <div>
               <div
                 class="subsection-label text-text-secondary mb-2 flex items-center text-xs font-semibold"
               >
                 <span>{{ t("alerts.tags") }}</span>
-                <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
+                <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
                 <OTooltip :content="t('alerts.tagsTooltip')" side="right" />
               </div>
               <OFormTagInput
@@ -237,6 +265,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="rowTemplatePlaceholder"
               :rows="4"
             />
+            <span
+              v-if="isForecastMode"
+              class="text-text-secondary mt-1 block text-xs"
+              data-test="add-alert-row-forecast-hint"
+              >{{ t("alerts.forecast.rowTemplateHint") }}</span
+            >
           </div>
         </div>
       </div>
@@ -259,8 +293,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, inject, type PropType, type Ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, computed, inject, onMounted, type PropType, type Ref } from "vue";
+import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { getUUID } from "@/utils/zincutils";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -274,6 +308,9 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import AlertSettingsHelpDrawer from "@/components/alerts/AlertSettingsHelpDrawer.vue";
+import { queryClient } from "@/composables/query/queryClient";
+import { oncallTeamsQuery } from "@/services/oncall.queries";
+import type { OnCallTeam } from "@/ts/interfaces/oncall";
 
 export interface Variable {
   id: string;
@@ -309,8 +346,8 @@ export default defineComponent({
       default: () => [],
     },
     description: {
-      type: String,
-      default: "",
+      type: String as unknown as PropType<I18nText>,
+      default: raw(""),
     },
     rowTemplate: {
       type: String,
@@ -358,7 +395,7 @@ export default defineComponent({
     "update:rowTemplateType",
   ],
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
 
     // DESCENDANT step (Rule ③): the AddAlert orchestrator provides
@@ -368,7 +405,7 @@ export default defineComponent({
     // Priority options (PT-1). Value is the INTEGER storage id so the form
     // holds exactly what the API serializes — the `P3` form is display only.
     const priorityOptions = [1, 2, 3, 4, 5].map((value) => ({
-      label: `P${value}`,
+      label: raw(`P${value}`),
       value,
     }));
 
@@ -380,11 +417,33 @@ export default defineComponent({
     const templateValue = form.useStore((s: any) => (s.values?.template ?? "") as string);
     const descriptionValue = form.useStore((s: any) => (s.values?.description ?? "") as string);
     const rowTemplateValue = form.useStore((s: any) => (s.values?.row_template ?? "") as string);
+    const isForecastMode = form.useStore((s: any) => !!s.values?._ui?.forecast);
     const rowTemplateTypeValue = form.useStore(
       (s: any) => (s.values?.row_template_type ?? "String") as string,
     );
 
     const formattedTemplates = computed(() => props.templates.map((tpl: any) => tpl.name));
+
+    // Hidden entirely when on-call is off, so an OSS build never shows a
+    // control that cannot page anybody.
+    const oncallEnabled = computed(() => store.state.zoConfig?.oncall_enabled === true);
+    const oncallTeams = ref<OnCallTeam[]>([]);
+    const oncallTeamOptions = computed(() =>
+      oncallTeams.value.map((team) => ({ label: raw(team.name), value: team.id })),
+    );
+
+    // A failed lookup leaves the picker empty rather than blocking the save:
+    // the field is optional, and routing still resolves from ownership.
+    onMounted(async () => {
+      if (!oncallEnabled.value) return;
+      try {
+        oncallTeams.value = await queryClient.fetchQuery(
+          oncallTeamsQuery(store.state.selectedOrganization.identifier),
+        );
+      } catch {
+        oncallTeams.value = [];
+      }
+    });
 
     // NOTE: these two messages contain `{name}` / `{timestamp}` — END-USER row
     // template syntax, NOT i18n params. Their braces are escaped in en.json
@@ -451,13 +510,17 @@ export default defineComponent({
     };
 
     return {
+      raw,
       priorityOptions,
+      oncallEnabled,
+      oncallTeamOptions,
       t,
       store,
       variableRows,
       templateValue,
       descriptionValue,
       rowTemplateValue,
+      isForecastMode,
       rowTemplateTypeValue,
       formattedTemplates,
       rowTemplatePlaceholder,

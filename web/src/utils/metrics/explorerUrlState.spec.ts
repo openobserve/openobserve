@@ -147,4 +147,116 @@ describe("explorerUrlState", () => {
     });
     expect(out).toEqual({});
   });
+
+  describe("metric detail view keys", () => {
+    it("owns metric, tab and breakdown_label — and never stream", () => {
+      // `stream` is an editor key that redirects /metrics to the editor.
+      expect(EXPLORER_FILTER_PARAM_KEYS).toEqual(
+        expect.arrayContaining(["metric", "tab", "breakdown_label"]),
+      );
+      expect(EXPLORER_FILTER_PARAM_KEYS).not.toContain("stream");
+    });
+
+    it("round-trips metric, tab and breakdown_label", () => {
+      const query = explorerFiltersToQuery({
+        ...defaults(),
+        metric: "http_requests_total",
+        tab: "breakdown",
+        breakdownLabel: "route",
+      });
+      expect(query).toEqual({
+        metric: "http_requests_total",
+        tab: "breakdown",
+        breakdown_label: "route",
+      });
+      expect(queryToExplorerFilters(query)).toEqual({
+        metric: "http_requests_total",
+        tab: "breakdown",
+        breakdownLabel: "route",
+      });
+    });
+
+    it("round-trips the used_in tab", () => {
+      const query = explorerFiltersToQuery({ ...defaults(), metric: "up", tab: "used_in" });
+      expect(query).toEqual({ metric: "up", tab: "used_in" });
+      expect(queryToExplorerFilters(query)).toEqual({ metric: "up", tab: "used_in" });
+    });
+
+    it("never emits stream, whatever the detail state", () => {
+      const query = explorerFiltersToQuery({
+        ...defaults(),
+        mode: "workspace",
+        metric: "node_load1",
+        tab: "related",
+      });
+      expect(query).not.toHaveProperty("stream");
+      expect(Object.keys(query).sort()).toEqual(["metric", "mode", "tab"]);
+    });
+
+    it("writes tab and breakdown_label only alongside a metric", () => {
+      // Without a metric there is no detail view for them to describe.
+      expect(
+        explorerFiltersToQuery({ ...defaults(), tab: "related", breakdownLabel: "route" }),
+      ).toEqual({});
+      expect(queryToExplorerFilters({ tab: "related", breakdown_label: "route" })).toEqual({});
+    });
+
+    it("round-trips compare, and owns its key", () => {
+      expect(EXPLORER_FILTER_PARAM_KEYS).toContain("compare");
+      for (const compare of ["1h", "1d", "1w"] as const) {
+        const query = explorerFiltersToQuery({ ...defaults(), metric: "up", compare });
+        expect(query).toEqual({ metric: "up", compare });
+        expect(queryToExplorerFilters(query)).toEqual({ metric: "up", compare });
+      }
+    });
+
+    it("round-trips forecast and forecast_h, and owns both keys", () => {
+      expect(EXPLORER_FILTER_PARAM_KEYS).toEqual(
+        expect.arrayContaining(["forecast", "forecast_h"]),
+      );
+      const query = explorerFiltersToQuery({
+        ...defaults(),
+        metric: "up",
+        forecast: "smoothed",
+        forecastHorizon: "6h",
+      });
+      expect(query).toEqual({ metric: "up", forecast: "smoothed", forecast_h: "6h" });
+      expect(queryToExplorerFilters(query)).toEqual({
+        metric: "up",
+        forecast: "smoothed",
+        forecastHorizon: "6h",
+      });
+    });
+
+    it("rejects other forecast methods and horizons, and both without a metric", () => {
+      expect(queryToExplorerFilters({ metric: "up", forecast: "arima", forecast_h: "2h" })).toEqual(
+        { metric: "up" },
+      );
+      expect(
+        queryToExplorerFilters({ metric: "up", forecast: "linear", forecast_h: "1mo" }),
+      ).toEqual({ metric: "up", forecast: "linear" });
+      expect(queryToExplorerFilters({ forecast: "linear", forecast_h: "1h" })).toEqual({});
+    });
+
+    it("reads and writes forecast_h only alongside a forecast", () => {
+      expect(queryToExplorerFilters({ metric: "up", forecast_h: "1w" })).toEqual({ metric: "up" });
+      expect(
+        explorerFiltersToQuery({ ...defaults(), metric: "up", forecastHorizon: "1w" }),
+      ).toEqual({ metric: "up" });
+    });
+
+    it("rejects any compare value outside the three presets, and compare without a metric", () => {
+      for (const compare of ["2h", "1mo", "1D", "", "1d,1w"]) {
+        expect(queryToExplorerFilters({ metric: "up", compare })).toEqual({ metric: "up" });
+      }
+      expect(queryToExplorerFilters({ compare: "1d" })).toEqual({});
+      expect(explorerFiltersToQuery({ ...defaults(), compare: "1d" })).toEqual({});
+    });
+
+    it("drops an unknown tab and a malformed label name", () => {
+      expect(
+        queryToExplorerFilters({ metric: "up", tab: "bogus", breakdown_label: "1bad" }),
+      ).toEqual({ metric: "up" });
+    });
+  });
 });

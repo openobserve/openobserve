@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="text-text-body flex items-center justify-between gap-2 text-sm"
             :data-test="`version-error-diff-row-introduced-${row.fail_class}`"
           >
-            <span class="truncate">{{ row.fail_class }}</span>
+            <OTruncatedText>{{ row.fail_class }}</OTruncatedText>
             <span class="text-error-600 shrink-0 font-medium tabular-nums">+{{ row.count }}</span>
           </li>
         </ul>
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="text-text-body flex items-center justify-between gap-2 text-sm"
             :data-test="`version-error-diff-row-fixed-${row.fail_class}`"
           >
-            <span class="truncate">{{ row.fail_class }}</span>
+            <OTruncatedText>{{ row.fail_class }}</OTruncatedText>
             <span class="text-success-600 shrink-0 font-medium tabular-nums">−{{ row.count }}</span>
           </li>
         </ul>
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="text-text-body flex items-center justify-between gap-2 text-sm"
             :data-test="`version-error-diff-row-shared-${row.fail_class}`"
           >
-            <span class="truncate">{{ row.fail_class }}</span>
+            <OTruncatedText>{{ row.fail_class }}</OTruncatedText>
             <span class="inline-flex shrink-0 items-center gap-1 tabular-nums">
               <span class="text-accent font-medium">{{ row.count_a }}</span>
               <span class="text-text-muted">/</span>
@@ -145,10 +145,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import type { ErrorDiff } from "@/services/gen-ai-agent-mapping.service";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -160,7 +161,7 @@ const props = withDefaults(
   { versionA: "", versionB: "" },
 );
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Human labels for the two arms — the real version when known, else the generic
 // "Version A/B" fallback so the panel is never blank.

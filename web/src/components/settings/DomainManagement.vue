@@ -30,11 +30,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("settings.claimParserFunction") }}
         </div>
         <div class="text-text-secondary mb-3 text-sm">
-          {{ t("settings.claimParserFunctionDescription") }}
+          {{
+            t("settings.claimParserFunctionDescription", {
+              product1: raw("VRL"),
+              product2: raw("JavaScript"),
+            })
+          }}
         </div>
 
         <div class="flex items-end gap-3">
-          <div class="claim-parser-select col-auto min-w-100">
+          <div class="claim-parser-select col-auto min-w-100 max-md:w-full max-md:min-w-0">
             <OSelect
               v-model="claimParserFunction"
               :options="functionOptions"
@@ -86,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="rounded-default bg-surface-subtle mb-4 p-4">
               <div class="mb-2 font-medium">{{ t("settings.claimParserFunctionOutputTitle") }}</div>
               <div class="mb-2">{{ t("settings.claimParserFunctionOutputDescription") }}</div>
-              <div class="ml-4">
+              <div class="ms-4">
                 <div class="mb-1">{{ t("settings.claimParserFunctionOutputExample1") }}</div>
                 <div>{{ t("settings.claimParserFunctionOutputExample2") }}</div>
               </div>
@@ -95,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Recent Errors Section -->
             <div
               v-if="claimParserFunction"
-              class="rounded-default bg-surface-subtle border-l-status-negative border-l-[3px] p-4"
+              class="rounded-default bg-surface-subtle border-s-status-negative border-s-3 p-4"
             >
               <div class="mb-2 flex items-center">
                 <div class="flex-1 font-medium">{{ t("settings.claimParserRecentErrors") }}</div>
@@ -124,10 +129,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="(error, index) in recentErrors.slice(0, 3)"
                   :key="index"
-                  class="rounded-default bg-status-error-bg border-l-status-negative mb-1 border-l-2 p-2"
+                  class="rounded-default bg-status-error-bg border-s-status-negative mb-1 border-s-2 p-2"
                 >
                   <div class="mb-1 flex items-start">
-                    <OIcon name="error" size="xs" class="mt-1 mr-1" />
+                    <OIcon name="error" size="xs" class="me-1 mt-1" />
                     <div class="flex-1">
                       <div class="text-xs font-medium">{{ error.error_type }}</div>
                       <div class="text-text-muted text-xs">
@@ -182,12 +187,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-slot="{ isSubmitting }"
           class="flex items-start gap-x-2"
         >
-          <div class="w-[18.75rem] shrink-0">
+          <div class="w-[18.75rem] shrink-0 max-md:w-auto max-md:min-w-0 max-md:flex-1">
             <OFormInput
               data-test="domain-management-new-domain-input"
               name="newDomain"
               class="domain-input"
-              :placeholder="t('settings.domainPlaceholder')"
+              :placeholder="t('settings.domainPlaceholder', { example: raw('example.com') })"
             />
           </div>
           <OButton
@@ -283,7 +288,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Specific allowed users section -->
-              <div v-if="domain.policy === 'allow_specific'" class="specific-users-section ml-6">
+              <div v-if="domain.policy === 'allow_specific'" class="specific-users-section ms-6">
                 <OForm
                   :ref="(el) => setEmailFormRef(domain.name, el)"
                   :schema="getEmailSchema(domain.name)"
@@ -335,7 +340,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Specific blocked users section (mirrors the allow-email OForm pattern) -->
-              <div v-if="domain.policy === 'block_specific'" class="specific-users-section ml-6">
+              <div v-if="domain.policy === 'block_specific'" class="specific-users-section ms-6">
                 <OForm
                   :ref="(el) => setBlockedEmailFormRef(domain.name, el)"
                   :schema="getEmailSchema(domain.name)"
@@ -447,12 +452,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('common.confirm')"
     :secondary-button-label="t('confirmDialog.cancel')"
     :primary-button-label="t('confirmDialog.ok')"
+    primary-button-variant="destructive"
     @click:secondary="confirmRemoveDomainOpen = false"
     @click:primary="doRemoveDomain"
   >
-    <p v-if="pendingRemoveDomainIndex !== null">
-      {{ t("settings.confirmRemoveDomain", { domain: domains[pendingRemoveDomainIndex]?.name }) }}
-    </p>
+    <i18n-t
+      keypath="settings.confirmRemoveDomain"
+      tag="p"
+      data-test="domain-management-remove-domain-message"
+    >
+      <template #domain
+        ><span class="text-text-heading font-semibold break-all">{{
+          pendingRemoveDomainName
+        }}</span></template
+      >
+    </i18n-t>
   </ODialog>
 
   <!-- Confirm remove email dialog -->
@@ -462,22 +476,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('common.confirm')"
     :secondary-button-label="t('confirmDialog.cancel')"
     :primary-button-label="t('confirmDialog.ok')"
-    @click:secondary="confirmRemoveEmailOpen = false"
+    :primary-button-variant="shownRemoveEmail.blocked ? 'primary' : 'destructive'"
+    @click:secondary="cancelRemoveEmail"
     @click:primary="doRemoveEmail"
   >
-    <p v-if="pendingRemoveEmail !== null">
-      {{
-        pendingRemoveEmail.blocked
-          ? t("settings.confirmRemoveBlockedEmail", { email: pendingRemoveEmail.email })
-          : t("settings.confirmRemoveEmail", { email: pendingRemoveEmail.email })
-      }}
-    </p>
+    <i18n-t
+      :keypath="
+        shownRemoveEmail.blocked
+          ? 'settings.confirmRemoveBlockedEmail'
+          : 'settings.confirmRemoveEmail'
+      "
+      tag="p"
+      data-test="domain-management-remove-email-message"
+    >
+      <template #email
+        ><span class="text-text-heading font-semibold break-all">{{
+          shownRemoveEmail.email
+        }}</span></template
+      >
+    </i18n-t>
   </ODialog>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, onActivated, watch, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -492,7 +515,8 @@ import domainManagement from "@/services/domainManagement";
 import { useRouter } from "vue-router";
 import { formatDistanceToNow } from "date-fns";
 import jstransform from "@/services/jstransform";
-import organizations from "@/services/organizations";
+import { updateOrgSettingsMutation } from "@/services/organizations.queries";
+import { useMutation } from "@tanstack/vue-query";
 import searchService from "@/services/search";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
@@ -517,11 +541,13 @@ interface Domain {
   blockedEmails: string[];
 }
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Dialog state for domain/email removal confirmations
 const confirmRemoveDomainOpen = ref(false);
 const pendingRemoveDomainIndex = ref<number | null>(null);
+// Set on open and never cleared, so the closing fade keeps the name.
+const pendingRemoveDomainName = ref("");
 const confirmRemoveEmailOpen = ref(false);
 const pendingRemoveEmail = ref<{
   domain: any;
@@ -529,8 +555,15 @@ const pendingRemoveEmail = ref<{
   email: string;
   blocked: boolean;
 } | null>(null);
+// Display copy set on open and never cleared, so the fade keeps the text while pending is cleared.
+const shownRemoveEmail = ref({ email: "", blocked: false });
 const store = useStore();
 const router = useRouter();
+
+// Domain settings live on the meta org, not the selected one.
+const updateMetaOrgSettings = useMutation(() =>
+  updateOrgSettingsMutation(store.state.zoConfig.meta_org),
+);
 
 const domains = reactive<Domain[]>([]);
 const saving = ref(false);
@@ -728,6 +761,7 @@ const addDomain = (value?: AddDomainForm) => {
 
 const removeDomain = (index: number) => {
   pendingRemoveDomainIndex.value = index;
+  pendingRemoveDomainName.value = domains[index]?.name ?? "";
   confirmRemoveDomainOpen.value = true;
 };
 
@@ -772,6 +806,7 @@ const removeEmail = (domain: Domain, emailIndex: number) => {
     email: domain.allowedEmails[emailIndex],
     blocked: false,
   };
+  shownRemoveEmail.value = { email: domain.allowedEmails[emailIndex], blocked: false };
   confirmRemoveEmailOpen.value = true;
 };
 
@@ -801,6 +836,7 @@ const removeBlockedEmail = (domain: Domain, emailIndex: number) => {
     email: domain.blockedEmails[emailIndex],
     blocked: true,
   };
+  shownRemoveEmail.value = { email: domain.blockedEmails[emailIndex], blocked: true };
   confirmRemoveEmailOpen.value = true;
 };
 
@@ -809,9 +845,20 @@ const doRemoveEmail = () => {
   if (!pending) return;
   const list = pending.blocked ? pending.domain.blockedEmails : pending.domain.allowedEmails;
   list.splice(pending.emailIndex, 1);
+  // Cleared so a second OK click during the fade cannot splice the next email.
   pendingRemoveEmail.value = null;
   confirmRemoveEmailOpen.value = false;
 };
+
+const cancelRemoveEmail = () => {
+  pendingRemoveEmail.value = null;
+  confirmRemoveEmailOpen.value = false;
+};
+
+// Escape and the close button bypass cancelRemoveEmail, so they must drop the pending row too.
+watch(confirmRemoveEmailOpen, (open) => {
+  if (!open) pendingRemoveEmail.value = null;
+});
 
 // Load VRL functions from _meta org
 const loadFunctions = async () => {
@@ -850,10 +897,7 @@ const saveClaimParserFunction = async () => {
       claim_parser_function: claimParserFunction.value || "",
     };
 
-    await organizations.post_organization_settings(
-      store.state.zoConfig.meta_org,
-      orgSettingsPayload,
-    );
+    await updateMetaOrgSettings.mutateAsync(orgSettingsPayload);
 
     // Update store with new settings
     const updatedSettings: any = {

@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex justify-end">
       <div class="my-1">
         <OButton
-          class="mr-2"
+          class="me-2"
           variant="ghost"
           size="sm"
           :disabled="
@@ -37,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <DateTime
             data-test="logs-search-bar-date-time-dropdown"
             auto-apply
+            calendar-presets
             :default-type="searchObj.data.datetime.type"
             :default-absolute-time="{
               startTime: searchObj.data.datetime.startTime,
@@ -46,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @on:date-change="updateDateTime"
           />
         </div>
-        <div class="float-left mr-2 pl-2">
+        <div class="float-left me-2 ps-2">
           <OButton
             data-test="logs-search-bar-refresh-btn"
             data-cy="search-bar-refresh-button"
@@ -59,9 +60,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div class="flex h-[calc(100%-40px)]!">
+    <div class="flex h-[calc(100%-2.5rem)]!">
       <div class="border-border-default flex h-25 flex-col border-t">
-        <b>Query Editor:</b>
+        <b>{{ t("search.queryEditorLabel") }}</b>
         <CodeQueryEditor
           editor-id="logsStreamQueryEditor"
           ref="queryEditorRef"
@@ -77,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 // @ts-nocheck
 import { defineComponent, ref, onBeforeMount } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import DateTime from "@/components/DateTime.vue";
@@ -115,11 +116,11 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const btnRefreshInterval = ref(null);
 
-    const { searchObj } = useLogs();
+    const { searchObj } = useLogs(t);
     const queryEditorRef = ref(null);
 
     const functionOptions = ref(searchObj.data.transforms);

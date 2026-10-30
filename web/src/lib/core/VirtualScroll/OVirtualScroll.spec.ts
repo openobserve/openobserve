@@ -4,6 +4,7 @@ import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { h, ref, nextTick } from "vue";
 import OVirtualScroll from "./OVirtualScroll.vue";
+import { useVirtualizer } from "@tanstack/vue-virtual";
 
 // @tanstack/vue-virtual uses DOM measurements that jsdom doesn't support.
 // We mock useVirtualizer to return predictable virtual items.
@@ -28,6 +29,7 @@ vi.mock("@tanstack/vue-virtual", () => ({
       getTotalSize: () => count * estimateSize,
       scrollToIndex: vi.fn(),
       measure: vi.fn(),
+      measureElement: vi.fn(),
     });
   }),
 }));
@@ -186,6 +188,41 @@ describe("OVirtualScroll", () => {
     it("applies o2-virtual-scroll__content class to spacer", () => {
       const wrapper = mount(OVirtualScroll, { props: { items: makeItems(2) } });
       expect(wrapper.find(".o2-virtual-scroll__content").exists()).toBe(true);
+    });
+  });
+
+  // ── Delegated scroller ─────────────────────────────────────────
+
+  describe("delegated scroller", () => {
+    const lastVirtualizer = () => {
+      const results = vi.mocked(useVirtualizer).mock.results;
+      return results[results.length - 1]?.value.value;
+    };
+
+    // Regression: a patterns re-run remeasured rows and TanStack's default compensation pushed the shared logs scroller mid-way
+    it("keeps a delegated scroller's offset stable when rows are remeasured", () => {
+      mount(OVirtualScroll, {
+        props: {
+          items: makeItems(3),
+          scrollTarget: document.createElement("div"),
+          dynamicRowHeight: true,
+        },
+      });
+      const shouldAdjust = lastVirtualizer()?.shouldAdjustScrollPositionOnItemSizeChange;
+      expect(shouldAdjust).toBeTypeOf("function");
+      expect(shouldAdjust?.()).toBe(false);
+    });
+
+    it("retains the virtualizer's default anchoring for an internal scroller", () => {
+      mount(OVirtualScroll, { props: { items: makeItems(3), dynamicRowHeight: true } });
+      expect(lastVirtualizer()?.shouldAdjustScrollPositionOnItemSizeChange).toBeUndefined();
+    });
+
+    it("retains the default anchoring for a delegated scroller with fixed row heights", () => {
+      mount(OVirtualScroll, {
+        props: { items: makeItems(3), scrollTarget: document.createElement("div") },
+      });
+      expect(lastVirtualizer()?.shouldAdjustScrollPositionOnItemSizeChange).toBeUndefined();
     });
   });
 });

@@ -58,7 +58,7 @@ fn create_table_stmt() -> TableCreateStatement {
         .col(
             ColumnDef::new(TimedAnnotationPanels::TimedAnnotationId)
                 .char_len(27)
-                .not_null()
+                .not_null(),
         )
         .col(
             ColumnDef::new(TimedAnnotationPanels::PanelId)
@@ -68,7 +68,10 @@ fn create_table_stmt() -> TableCreateStatement {
         .foreign_key(
             ForeignKey::create()
                 .name(TIMED_ANNOTATION_PANELS_ANNOTATION_ID_FK)
-                .from(TimedAnnotationPanels::Table, TimedAnnotationPanels::TimedAnnotationId)
+                .from(
+                    TimedAnnotationPanels::Table,
+                    TimedAnnotationPanels::TimedAnnotationId,
+                )
                 .to(TimedAnnotations::Table, TimedAnnotations::Id)
                 .on_delete(ForeignKeyAction::Cascade),
         )

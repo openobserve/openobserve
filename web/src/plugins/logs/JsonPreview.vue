@@ -3,7 +3,7 @@
     <div class="copy-log-btn flex justify-start px-3 pb-1">
       <AppTabs
         v-if="filteredTabs.length"
-        class="border-card-glass-border rounded-default mr-2 mb-1.5 h-fit overflow-hidden border-t border-r border-l border-solid"
+        class="border-card-glass-border rounded-default me-2 mb-1.5 h-fit overflow-hidden border-s border-e border-t border-solid"
         data-test="logs-json-preview-tabs"
         :tabs="filteredTabs"
         v-model:active-tab="activeTab"
@@ -14,9 +14,9 @@
         :label="t('common.copyToClipboard')"
         size="xs"
         variant="outline"
-        class="mr-2 mb-1.5"
+        class="me-2 mb-1.5"
         @click="copyLogToClipboard"
-        ><OIcon name="content-copy" size="xs" class="mr-1" />{{
+        ><OIcon name="content-copy" size="xs" class="me-1" />{{
           t("common.copyToClipboard")
         }}</OButton
       >
@@ -24,53 +24,66 @@
         v-if="showViewRelatedBtn"
         size="xs"
         variant="outline"
-        class="mr-2 mb-1.5"
+        class="me-2 mb-1.5"
         @click="openCorrelation"
         data-test="log-correlation-btn"
       >
-        <OIcon name="link" size="xs" class="mr-1" />{{ t("search.viewRelated") }}
-        <OTooltip :content="t('search.viewRelatedTooltip')" />
+        <OIcon name="link" size="xs" class="me-1" />{{ t("search.viewRelated") }}
+        <OIcon
+          v-if="!correlationAccess.allowed"
+          name="lock"
+          size="xs"
+          class="text-warning-600 ms-1"
+        />
+        <OTooltip v-if="correlationAccess.allowed" :content="t('search.viewRelatedTooltip')" />
       </OButton>
+      <!-- Stream picker and its action read as one control, sized to sit level
+           with the toolbar buttons above rather than towering over them. -->
       <div
-        v-if="showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)"
-        class="o2-input logs-trace-selector flex items-center"
+        v-if="
+          !hideViewTrace && showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)
+        "
+        class="mb-1.5 flex items-center gap-2"
       >
         <OSelect
+          :aria-label="t('search.selectStream')"
           data-test="log-search-index-list-select-stream"
           v-model="searchObj.meta.selectedTraceStream"
           :options="tracesStreams"
-          class="w-[auto] flex-shrink-0"
+          class="w-auto shrink-0"
           :loading="isTracesStreamsLoading"
           :disabled="isTracesStreamsLoading"
           size="sm"
         />
         <OButton
           data-test="trace-view-logs-btn"
-          class="traces-view-logs-btn"
-          size="sm-action"
+          size="xs"
           variant="outline"
+          icon-left="account-tree"
           @click="redirectToTraces"
-          ><OIcon name="account-tree" size="sm" class="mr-1" />{{ t("search.viewTrace") }}</OButton
+          >{{ t("search.viewTrace") }}</OButton
         >
       </div>
     </div>
-    <div v-show="activeTab === 'unflattened'" class="pl-3">
+    <div v-show="activeTab === 'unflattened'" class="ps-3">
       <OSpinner size="md" />
       <div v-if="!loading">
         <!-- Editor sizing is inlined (not scoped CSS) so it doesn't leak onto
              every .monaco-editor app-wide. The focus-border is left off so this
              editor stays borderless like the others. -->
+        <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
         <CodeQueryEditor
           v-model:query="unflattendData"
           ref="queryEditorRef"
           :editor-id="`logs-json-preview-unflattened-json-editor-${previewId}`"
-          class="w-[calc(100%-16px)]!"
+          class="w-[calc(100%-1rem)]!"
           :class="[mode, mode === 'expanded' ? 'h-75! max-w-256!' : 'h-[calc(100vh-250px)]!']"
           language="json"
         />
+        <!-- eslint-enable local/no-hardcoded-px -->
       </div>
     </div>
-    <div v-show="activeTab !== 'unflattened'" class="pl-3">
+    <div v-show="activeTab !== 'unflattened'" class="ps-3">
       {
       <div
         class="log_json_content flex font-mono text-xs whitespace-pre-wrap"
@@ -89,20 +102,14 @@
               data-test="log-details-include-exclude-field-btn"
               size="xs"
               variant="ghost"
-              class="ml-2 h-5! min-h-5! w-5! min-w-5! p-0! align-middle"
+              class="ms-2 h-5! min-h-5! w-5! min-w-5! p-0! align-middle"
               :aria-label="t('logs.jsonPreview.addIcon')"
             >
               <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
             </OButton>
           </template>
           <ODropdownItem
-            v-if="
-              !hideSearchTermActions &&
-              searchObj.data.stream.selectedStreamFields.some((item: any) =>
-                item.name === key ? item.isSchemaField : '',
-              ) &&
-              multiStreamFields.includes(key)
-            "
+            v-if="!hideSearchTermActions && canFilterOnField(key)"
             data-test="log-details-include-field-btn"
             @select.stop="addSearchTerm(key, value[key], 'include')"
           >
@@ -110,13 +117,7 @@
             {{ t("common.includeSearchTerm") }}
           </ODropdownItem>
           <ODropdownItem
-            v-if="
-              !hideSearchTermActions &&
-              searchObj.data.stream.selectedStreamFields.some((item: any) =>
-                item.name === key ? item.isSchemaField : '',
-              ) &&
-              multiStreamFields.includes(key)
-            "
+            v-if="!hideSearchTermActions && canFilterOnField(key)"
             data-test="log-details-exclude-field-btn"
             @select.stop="addSearchTerm(key, value[key], 'exclude')"
           >
@@ -124,7 +125,7 @@
             {{ t("common.excludeSearchTerm") }}
           </ODropdownItem>
           <ODropdownItem
-            v-if="key !== store.state.zoConfig.timestamp_column"
+            v-if="key !== store.state.zoConfig.timestamp_column && !hideAddFieldToTable"
             data-test="log-details-add-field-btn"
             @select.stop="addFieldToTable(key)"
             icon-left="visibility"
@@ -145,7 +146,7 @@
             </ODropdownItem>
           </template>
           <ODropdownItem
-            v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+            v-if="store.state.zoConfig.ai_enabled"
             data-test="send-to-ai-chat-btn"
             @select.stop="sendToAiChat(JSON.stringify({ [key]: value[key] }))"
           >
@@ -153,9 +154,11 @@
               <img :src="getBtnLogo" width="14" height="14" alt="" />
             </template>
             {{ t("logs.jsonPreview.sendToAiChat") }}
+            <template v-if="!aiAssistantAccess.allowed" #icon-right>
+              <OIcon name="lock" size="xs" class="text-warning-600 shrink-0" />
+            </template>
           </ODropdownItem>
           <ODropdownItem
-            v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
             data-test="redirect-to-regex-pattern-btn"
             @select.stop="createRegexPatternFromLogs(key, value[key])"
           >
@@ -163,10 +166,13 @@
               <img :src="regexIcon" width="14" height="14" alt="" />
             </template>
             {{ t("regex_patterns.create_regex_pattern_field") }}
+            <template v-if="!regexPatternsAccess.allowed" #icon-right>
+              <OIcon name="lock" size="xs" class="text-warning-600 shrink-0" />
+            </template>
           </ODropdownItem>
         </ODropdown>
 
-        <span class="pl-1" :data-test="`log-expand-detail-key-${key}`">
+        <span class="min-w-0 ps-1" :data-test="`log-expand-detail-key-${key}`">
           <span class="log-key">{{ key }}</span
           ><span class="log-separator">: </span
           ><span
@@ -174,12 +180,12 @@
               v-if="getContentSize(value[key]) > 50000"
               :data="value[key]"
               :field-key="`json_preview_${key}`"
-              :query-string="highlightQuery"
+              :query-string="scopeHighlightQuery(highlightQuery, String(key))"
               :simple-mode="false" /><LogsHighLighting
               v-else
               :data="getDisplayValue(key, value[key])"
               :show-braces="false"
-              :query-string="highlightQuery" /></span
+              :query-string="scopeHighlightQuery(highlightQuery, String(key))" /></span
           ><span v-if="index < Object.keys(value).length - 1">,</span>
         </span>
       </div>
@@ -198,7 +204,7 @@
           class="hover:bg-dropdown-item-hover-bg flex cursor-pointer items-center px-3 py-1.5 [transition:background-color_0.2s]"
           @click="copySelectedText"
         >
-          <OIcon name="content-copy" size="sm" class="mr-2" />
+          <OIcon name="content-copy" size="sm" class="me-2" />
           {{ t("logs.jsonPreview.copy") }}
         </div>
         <div
@@ -207,8 +213,8 @@
         >
           <img
             :src="regexIconForContextMenu"
-            class="mr-2"
-            style="width: 14px; height: 14px"
+            class="me-2"
+            style="width: 0.875rem; height: 0.875rem"
             alt=""
           />
           {{ t("logs.jsonPreview.createRegexPattern") }}
@@ -217,7 +223,7 @@
     </div>
     <ODialog
       data-test="json-preview-regex-pattern-dialog"
-      v-if="config.isEnterprise == 'true'"
+      v-if="regexPatternsAccess.allowed"
       v-model:open="typeOfRegexPattern"
       size="lg"
       :title="t('logs.jsonPreview.regexPatternTypeTitle')"
@@ -248,21 +254,25 @@ import {
 } from "vue";
 import { getImageURL, getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
+import { scopeHighlightQuery } from "@/composables/useTextHighlighter";
 import { useTheme } from "@/composables/useTheme";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useRouter } from "vue-router";
-import useStreams from "@/composables/useStreams";
 import AppTabs from "@/components/common/AppTabs.vue";
 import searchService from "@/services/search";
 import { generateTraceContext } from "@/utils/zincutils";
 import { defineAsyncComponent } from "vue";
 import config from "@/aws-exports";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 import { searchState } from "@/composables/useLogs/searchState";
+import { crossLinkQueryText } from "@/composables/useLogs/freeTextSearch";
+import useViewTraceAction from "@/composables/useLogs/useViewTraceAction";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -276,6 +286,8 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { isSafeNavigableUrl } from "@/utils/safeUrl";
+import { isFilterableLogField, STREAM_NAME_FIELD } from "@/utils/logs/streamNameColumn";
 
 export default {
   name: "JsonPreview",
@@ -307,11 +319,23 @@ export default {
       type: Boolean,
       default: false,
     },
+    // Set by DetailTable's drawer, which renders the View Trace action in its
+    // own header row instead so it stays reachable from every tab.
+    hideViewTrace: {
+      type: Boolean,
+      default: false,
+    },
     hideSearchTermActions: {
       type: Boolean,
       default: false,
     },
     hideFieldOptions: {
+      type: Boolean,
+      default: false,
+    },
+    // Hide only the "Add field to the table" action (not the whole field menu) —
+    // used where there is no logs results table to add columns to.
+    hideAddFieldToTable: {
       type: Boolean,
       default: false,
     },
@@ -344,24 +368,16 @@ export default {
     "show-correlation",
   ],
   setup(props: any, { emit }: any) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
     const activeTab = ref("flattened");
 
     const streamSearchValue = ref<string>("");
 
-    const { getStreams } = useStreams();
-
-    const filteredTracesStreamOptions = ref([]);
-
     const router = useRouter();
 
-    const tracesStreams = ref([]);
-
     const queryEditorRef = ref<any>();
-
-    const isTracesStreamsLoading = ref(false);
 
     const typeOfRegexPattern = ref(false);
     const regexPatternType = ref("");
@@ -408,6 +424,20 @@ export default {
       emit("addFieldToTable", value);
     };
     const { searchObj, searchAggData } = searchState();
+
+    // Shared with DetailTable's drawer header so both renderings of the
+    // View Trace action apply the same rules. See useViewTraceAction.
+    const {
+      tracesStreams,
+      filteredTracesStreamOptions,
+      isTracesStreamsLoading,
+      showViewTraceBtn,
+      getTracesStreams,
+      setViewTraceBtn: setViewTraceBtnFor,
+      filterStreamFn,
+    } = useViewTraceAction(t, searchObj);
+
+    const setViewTraceBtn = () => setViewTraceBtnFor(props.value);
 
     // Cross-linking: get all matching cross-links for a field using result_schema data
     const getCrossLinksForField = (
@@ -466,7 +496,7 @@ export default {
     ): string => {
       const startTime = searchObj.data.datetime?.startTime || 0;
       const endTime = searchObj.data.datetime?.endTime || 0;
-      const query = searchObj.data.crossLinkQuery || searchObj.data.query || "";
+      const query = crossLinkQueryText(searchObj, store.state.zoConfig);
 
       return urlTemplate
         .replace(/\$\{field\.__name\}/g, encodeURIComponent(String(fieldName)))
@@ -481,13 +511,34 @@ export default {
     const crossLinkDropdownVisible = ref(false);
 
     const openCrossLink = (url: string) => {
-      window.open(url, "_blank");
+      // Guard the RESOLVED url, not just the saved template: links stored
+      // before save-time validation existed are still in the DB, and a field
+      // VALUE substituted into the template can carry a hostile scheme too.
+      if (!isSafeNavigableUrl(url)) {
+        crossLinkDropdownVisible.value = false;
+        return;
+      }
+      window.open(url, "_blank", "noopener,noreferrer");
       crossLinkDropdownVisible.value = false;
     };
     let multiStreamFields: any = ref([]);
 
-    const showViewTraceBtn = ref(false);
     const showViewRelatedBtn = ref(false);
+    // Shown locked (not hidden) in builds that don't unlock it — clicking
+    // opens the enterprise upgrade dialog instead of the real action.
+    const correlationAccess = computed(() =>
+      checkFeatureAccess("correlation", buildFeatureGateContext(store.state.zoConfig)),
+    );
+    // Same locked-visible treatment for the per-field "Send to AI Chat" and
+    // "Create regex pattern" menu items below — `ai_enabled` is a separate
+    // runtime toggle layered on top (hide, not lock) for the AI item only.
+    const aiAssistantAccess = computed(() =>
+      checkFeatureAccess("aiAssistant", buildFeatureGateContext(store.state.zoConfig)),
+    );
+    const regexPatternsAccess = computed(() =>
+      checkFeatureAccess("regexPatterns", buildFeatureGateContext(store.state.zoConfig)),
+    );
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
     // Initialize service correlation composable
     const { isCorrelationAvailable } = useServiceCorrelation();
@@ -496,62 +547,47 @@ export default {
     // The actual metric availability check happens when the button is clicked (in SearchResult.vue)
     onMounted(async () => {
       try {
-        // Gate correlation feature behind enterprise check to avoid 403 errors
-        if (config.isEnterprise !== "true") {
+        // Show button if we're in detail view (sidebar or expanded) AND
+        // service_streams is enabled in config AND hideViewRelated prop is
+        // not set (used by DetailTable drawer to hide the button).
+        // Mode can be 'sidebar' (when opened from sidebar) or 'expanded' (when log row is expanded in table)
+        const isDetailView = props.mode === "sidebar" || props.mode === "expanded";
+        const serviceStreamsEnabled = store.state.zoConfig.service_streams_enabled !== false; // Default to true if not set
+        const wantsButton = isDetailView && serviceStreamsEnabled && !props.hideViewRelated;
+
+        if (!wantsButton) {
           showViewRelatedBtn.value = false;
           return;
         }
 
-        // Show button if correlation is available AND we're in detail view (sidebar or expanded)
-        // AND service_streams is enabled in config
-        // AND hideViewRelated prop is not set (used by DetailTable drawer to hide the button)
-        // Mode can be 'sidebar' (when opened from sidebar) or 'expanded' (when log row is expanded in table)
-        const isDetailView = props.mode === "sidebar" || props.mode === "expanded";
-        const serviceStreamsEnabled = store.state.zoConfig.service_streams_enabled !== false; // Default to true if not set
-
-        if (isDetailView && serviceStreamsEnabled) {
-          const available = await isCorrelationAvailable();
-          showViewRelatedBtn.value =
-            available && isDetailView && serviceStreamsEnabled && !props.hideViewRelated;
+        if (!correlationAccess.value.allowed) {
+          // Locked — show it locked, but skip the correlation-availability
+          // probe entirely: that call hits a backend route an OSS build 403s
+          // on, so there's nothing useful to check before unlocking.
+          showViewRelatedBtn.value = true;
+          return;
         }
+
+        const available = await isCorrelationAvailable();
+        showViewRelatedBtn.value = available;
       } catch (err) {
         console.error("[JsonPreview] Error checking correlation availability:", err);
         showViewRelatedBtn.value = false;
       }
     });
 
-    const getTracesStreams = async () => {
-      isTracesStreamsLoading.value = true;
-      try {
-        getStreams("traces", false)
-          .then((res: any) => {
-            tracesStreams.value = res.list.map((option: any) => option.name);
-            filteredTracesStreamOptions.value = JSON.parse(JSON.stringify(tracesStreams.value));
-
-            if (!searchObj.meta.selectedTraceStream.length)
-              searchObj.meta.selectedTraceStream = tracesStreams.value[0];
-          })
-          .catch(() => Promise.reject())
-          .finally(() => {
-            isTracesStreamsLoading.value = false;
-          });
-      } catch (err: any) {
-        isTracesStreamsLoading.value = false;
-        console.error("Failed to get traces streams", err);
-      }
-    };
-
-    const setViewTraceBtn = () => {
-      // Hide view traces button when service_streams_enabled is true
-      const serviceStreamsEnabled = store.state.zoConfig.service_streams_enabled !== false;
-
-      showViewTraceBtn.value =
-        !store.state.hiddenMenus.has("traces") && // Check if traces menu is hidden
-        !serviceStreamsEnabled && // Hide when service streams is enabled
-        props.value[store.state.organizationData?.organizationSettings?.trace_id_field_name];
-
-      if (showViewTraceBtn.value && !filteredTracesStreamOptions.value.length) getTracesStreams();
-    };
+    // `value` can arrive after this component mounts: DetailTable fills its
+    // `rowData` in an async created() hook, so the row-detail drawer's preview
+    // mounts with `{}`. The onBeforeMount check below then ran against an empty
+    // record, left `showViewTraceBtn` false and never fetched the traces
+    // streams, so the drawer's View Trace button stayed hidden for good.
+    // Re-evaluate whenever the previewed record changes.
+    watch(
+      () => props.value,
+      () => {
+        setViewTraceBtn();
+      },
+    );
 
     onBeforeMount(() => {
       setViewTraceBtn();
@@ -667,6 +703,12 @@ export default {
       }
     };
 
+    // `_stream_name` is in no schema; a filter on it is rewritten per stream.
+    const canFilterOnField = (key: string) =>
+      key === STREAM_NAME_FIELD ||
+      (isFilterableLogField(key, searchObj.data.stream.selectedStreamFields) &&
+        multiStreamFields.value.includes(key));
+
     const updateMultiStreamFields = () => {
       searchObj.data.stream.selectedStreamFields.forEach((item: any) => {
         if (item.streams?.length == searchObj.data.stream.selectedStream.length) {
@@ -692,17 +734,19 @@ export default {
       },
     );
 
-    const filterStreamFn = (val: any = "") => {
-      filteredTracesStreamOptions.value = tracesStreams.value.filter((stream: any) => {
-        return stream.toLowerCase().indexOf(val.toLowerCase()) > -1;
-      });
-    };
-
+    // The previewed log rides along with the event: a listener bound by
+    // reference (`@view-trace="handler"`) otherwise receives `undefined` and
+    // throws on `log[timestamp_column]` (issue #13708). Same contract as
+    // `show-correlation` below.
     const redirectToTraces = () => {
-      emit("view-trace");
+      emit("view-trace", props.value);
     };
 
     const openCorrelation = () => {
+      if (!correlationAccess.value.allowed) {
+        openUpgradeDialog();
+        return;
+      }
       emit("show-correlation", props.value);
     };
 
@@ -735,6 +779,10 @@ export default {
     };
 
     const sendToAiChat = (value: string, append: boolean = true) => {
+      if (!aiAssistantAccess.value.allowed) {
+        openUpgradeDialog();
+        return;
+      }
       emit("closeTable");
       emit("sendToAiChat", value, append);
     };
@@ -760,8 +808,15 @@ export default {
     });
 
     const createRegexPatternFromLogs = (key: string, value: string) => {
+      if (!regexPatternsAccess.value.allowed) {
+        openUpgradeDialog();
+        return;
+      }
       emit("closeTable");
-      const promptToBeAdded = `Create a regex pattern for ${key} field that contains the following value: "${value}" from the ${searchObj.data.stream.selectedStream[0]} stream`;
+      // Prompt text handed to the assistant — model input, deliberately English.
+      const promptToBeAdded = raw(
+        `Create a regex pattern for ${key} field that contains the following value: "${value}" from the ${searchObj.data.stream.selectedStream[0]} stream`,
+      );
 
       router.push({
         path: "/settings/regex_patterns",
@@ -785,7 +840,9 @@ export default {
       emit("closeTable");
       // inputMessage.value = `Create a regex pattern for ${store.state.organizationData.customRegexPatternFromLogs.key} field that contains the following value: "${store.state.organizationData.customRegexPatternFromLogs.value}" which should be a type of ${store.state.organizationData.customRegexPatternFromLogs.type} from the ${store.state.organizationData.customRegexPatternFromLogs.stream} stream`;
 
-      const PromptToBeAdded = `Create a regex pattern for the following value: "${selectedText.value}" which should be a type of ${regexPatternType.value} from the ${searchObj.data.stream.selectedStream[0]} stream`;
+      const PromptToBeAdded = raw(
+        `Create a regex pattern for the following value: "${selectedText.value}" which should be a type of ${regexPatternType.value} from the ${searchObj.data.stream.selectedStream[0]} stream`,
+      );
 
       store.state.organizationData.regexPatternPrompt = PromptToBeAdded;
       store.state.organizationData.regexPatternTestValue = selectedText.value;
@@ -801,7 +858,7 @@ export default {
 
     const copySelectedText = () => {
       if (selectedText.value) {
-        copyToClipboard(selectedText.value, {
+        copyToClipboard(selectedText.value, t, {
           successMessage: t("logs.jsonPreview.textCopiedToClipboard"),
           errorMessage: t("logs.jsonPreview.failedToCopyText"),
           timeout: 1500,
@@ -848,6 +905,7 @@ export default {
     };
 
     return {
+      scopeHighlightQuery,
       t,
       copyLogToClipboard,
       getImageURL,
@@ -857,6 +915,7 @@ export default {
       store,
       searchObj,
       multiStreamFields,
+      canFilterOnField,
       redirectToTraces,
       openCorrelation,
       filteredTracesStreamOptions,
@@ -865,6 +924,9 @@ export default {
       activeTab,
       showViewTraceBtn,
       showViewRelatedBtn,
+      correlationAccess,
+      aiAssistantAccess,
+      regexPatternsAccess,
       queryEditorRef,
       previewId,
       loading,

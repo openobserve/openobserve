@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { computed, ref, shallowRef } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import alertsService from "@/services/alerts";
 import type { DetectionMeta } from "@/utils/security/detection";
@@ -24,7 +24,7 @@ export function invalidateSiemDetections(orgId?: string) {
 }
 
 export function useSiemDetections() {
-  const { t } = useI18n();
+  const { t } = useI18nTyped();
   const alerts = shallowRef<Record<string, any>[]>([]);
   const loading = ref(false);
   const error = ref("");

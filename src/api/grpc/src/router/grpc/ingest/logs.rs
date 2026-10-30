@@ -33,7 +33,8 @@ impl LogsService for LogsServer {
         request: Request<ExportLogsServiceRequest>,
     ) -> Result<Response<ExportLogsServiceResponse>, Status> {
         let start = std::time::Instant::now();
-        let (metadata, extensions, message) = request.into_parts();
+        let (mut metadata, extensions, message) = request.into_parts();
+        super::strip_http_framing_headers(&mut metadata);
 
         let cfg = config::get_config();
         // basic validation

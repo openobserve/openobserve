@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { ref, computed, reactive } from "vue";
+import type { I18nText, TranslateFn } from "@/types/i18n";
+
+import { ref, computed, reactive, watch, getCurrentScope, onScopeDispose } from "vue";
+import { cloneDeep, isEqual } from "lodash-es";
 import {
   buildScopedDependencyGraph,
   detectCyclesInScopedGraph,
@@ -21,9 +24,11 @@ import {
 } from "@/utils/dashboard/variables/variablesDependencyUtils";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 
+export const LIVE_COMMIT_DEBOUNCE_MS = 300;
+
 export interface VariableConfig {
   name: string;
-  label?: string;
+  label?: I18nText;
   type: "query_values" | "custom" | "constant" | "textbox" | "dynamic_filters";
   scope: "global" | "tabs" | "panels";
   tabs?: string[];
@@ -43,11 +48,17 @@ export interface VariableConfig {
     }>;
   };
   options?: Array<{
-    label: string;
+    label: I18nText;
     value: string;
     selected?: boolean;
   }>;
   selectAllValueForMultiSelect?: "first" | "all" | "custom";
+  /**
+   * Load options even when an "all" default already fixes the value. Dashboards
+   * built at runtime have no saved `options` to fall back on, so without this the
+   * picker renders its select-all label over an empty list.
+   */
+  loadOptionsWithAllDefault?: boolean;
   customMultiSelectValue?: string[];
   isVariableLoadingPending?: boolean;
   isLoading?: boolean;
@@ -175,7 +186,7 @@ const expandVariablesForScopes = (variables: VariableConfig[]): VariableRuntimeS
   return expanded;
 };
 
-export const useVariablesManager = () => {
+export const useVariablesManager = (t: TranslateFn) => {
   // ========== STATE ==========
   // TWO-TIER STATE ARCHITECTURE (like __global mechanism)
 
@@ -278,6 +289,29 @@ export const useVariablesManager = () => {
     return false;
   });
 
+  // Keys a requested commit waits on; null means every visible variable.
+  const settleKeys = ref<Set<string> | null>(new Set());
+
+  // True while a variable the pending commit waits on is fetching or can start fetching.
+  const isSettling = computed(() => {
+    const scope = settleKeys.value;
+    if (scope !== null && scope.size === 0) return false;
+    const allVars = getAllVariablesFlat();
+    return allVars.some((v) => {
+      const key = getVariableKey(v.name, v.scope, v.tabId, v.panelId);
+      if (scope !== null && !scope.has(key)) return false;
+      return isVariableVisible(v) && isVariableBusy(v, key, allVars);
+    });
+  });
+
+  const isLiveMode = ref(false);
+  const autoCommitListeners = new Set<() => void>();
+  let liveCommitTimer: ReturnType<typeof setTimeout> | null = null;
+  const commitRequested = ref(false);
+  const pendingLiveKeys = new Set<string>();
+  // Value each parent's children were last loaded against, so a reload that keeps it leaves them alone.
+  const childrenLoadedAgainst = new Map<string, any>();
+
   // ========== HELPER FUNCTIONS ==========
   const areVariableArraysEqual = (
     arr1: VariableRuntimeState[],
@@ -338,6 +372,63 @@ export const useVariablesManager = () => {
     return false;
   };
 
+  const hasUsableValue = (value: any) =>
+    value !== null &&
+    value !== undefined &&
+    value !== "" &&
+    (!Array.isArray(value) || value.length > 0);
+
+  const areParentsReady = (key: string, allVars: VariableRuntimeState[]): boolean => {
+    const parents = dependencyGraph.value[key]?.parents || [];
+    return parents.every((parentKey) => {
+      const parentVar = findVariableByKey(parentKey, allVars);
+      return parentVar?.isVariablePartialLoaded === true && hasUsableValue(parentVar.value);
+    });
+  };
+
+  // Still owed a load: fetching now, or waiting on parents that are themselves loading or hold a value.
+  // A parent that finished with no value blocks it for good, so it never counts as busy.
+  const isVariableBusy = (
+    v: VariableRuntimeState,
+    key: string,
+    allVars: VariableRuntimeState[],
+    path: Set<string> = new Set(),
+  ): boolean => {
+    if (v.isLoading) return true;
+    if (v.type !== "query_values") return false;
+    if (v.isVariableLoadingPending !== true && v.isVariablePartialLoaded === true) return false;
+    const nextPath = new Set(path).add(key);
+    return (dependencyGraph.value[key]?.parents || []).every((parentKey) => {
+      const parent = findVariableByKey(parentKey, allVars);
+      if (!parent || nextPath.has(parentKey)) return false;
+      if (isVariableBusy(parent, parentKey, allVars, nextPath)) return true;
+      return parent.isVariablePartialLoaded === true && hasUsableValue(parent.value);
+    });
+  };
+
+  const collectDescendants = (keys: string[]): Set<string> => {
+    const result = new Set<string>();
+    const queue = [...keys];
+    while (queue.length) {
+      const key = queue.shift()!;
+      (dependencyGraph.value[key]?.children || []).forEach((child) => {
+        if (result.has(child)) return;
+        result.add(child);
+        queue.push(child);
+      });
+    }
+    return result;
+  };
+
+  // A value ready without a fetch never reaches onVariablePartiallyLoaded, so its first fetch would look like a change.
+  const recordLoadedAgainst = (vars: (VariableRuntimeState | undefined)[]) => {
+    vars.forEach((v) => {
+      if (!v) return;
+      const key = getVariableKey(v.name, v.scope, v.tabId, v.panelId);
+      childrenLoadedAgainst.set(key, cloneDeep(v.value));
+    });
+  };
+
   const canVariableLoad = (variable: VariableRuntimeState): boolean => {
     const key = getVariableKey(variable.name, variable.scope, variable.tabId, variable.panelId);
 
@@ -351,33 +442,8 @@ export const useVariablesManager = () => {
       return false;
     }
 
-    // Check 3: All parents ready?
-    const parents = dependencyGraph.value[key]?.parents || [];
-    const allVars = getAllVariablesFlat();
-
-    const allParentsReady = parents.every((parentKey) => {
-      const parentVar = findVariableByKey(parentKey, allVars);
-      // Parent MUST be marked as partially loaded - this is the authoritative flag
-      // that indicates the variable is ready to be used in queries
-      if (!parentVar) {
-        return false;
-      }
-
-      if (parentVar.isVariablePartialLoaded !== true) {
-        return false;
-      }
-
-      // Additionally check that parent has a valid value
-      const hasValue =
-        parentVar.value !== null &&
-        parentVar.value !== undefined &&
-        parentVar.value !== "" &&
-        (!Array.isArray(parentVar.value) || parentVar.value.length > 0);
-
-      return hasValue;
-    });
-
-    return allParentsReady;
+    // Check 3: All parents loaded with a usable value?
+    return areParentsReady(key, getAllVariablesFlat());
   };
 
   const buildPanelTabMapping = (dashboard: any) => {
@@ -401,6 +467,8 @@ export const useVariablesManager = () => {
     dashboard: any,
     extraPanelTabMapping?: Record<string, string>,
   ) => {
+    cancelPendingCommit();
+    childrenLoadedAgainst.clear();
     currentDashboard.value = dashboard;
     panelTabMapping.value = {
       ...buildPanelTabMapping(dashboard),
@@ -418,7 +486,7 @@ export const useVariablesManager = () => {
       migratedConfig.push({
         name: "Dynamic filters",
         type: "dynamic_filters",
-        label: "Dynamic filters",
+        label: t("dashboard.dynamicFilters"),
         scope: "global",
         value: [],
         options: [],
@@ -449,6 +517,16 @@ export const useVariablesManager = () => {
       }
     });
 
+    // Only defaults that never fetch on their own; anything else still owes its children a first load.
+    recordLoadedAgainst(
+      expandedVars.filter(
+        (v) =>
+          v.type === "query_values" &&
+          v.isVariablePartialLoaded &&
+          v.loadOptionsWithAllDefault !== true,
+      ),
+    );
+
     // Step 3: Build dependency graph
     dependencyGraph.value = buildScopedDependencyGraph(expandedVars, panelTabMapping.value);
 
@@ -478,7 +556,11 @@ export const useVariablesManager = () => {
         const hasCustomOrAllDefault =
           v.selectAllValueForMultiSelect === "custom" || v.selectAllValueForMultiSelect === "all";
 
-        if (!hasCustomOrAllDefault) {
+        // An "all" default fixes the VALUE without an API call but leaves the
+        // OPTION list empty, so the picker renders its select-all label over
+        // nothing until the user's own interaction refetches it. Opt-in, because
+        // every saved dashboard uses the "first" default and never hits this.
+        if (!hasCustomOrAllDefault || v.loadOptionsWithAllDefault === true) {
           v.isVariableLoadingPending = true;
         }
       }
@@ -512,12 +594,16 @@ export const useVariablesManager = () => {
           // Parent is non-API type if:
           // - It's a custom type variable (custom, constant, textbox, dynamic_filters)
           // - OR it's a query_values with custom/all default (no API call needed)
+          // loadOptionsWithAllDefault makes an "all" parent genuinely fetch, so it
+          // is NOT synchronous: pre-marking its child races the parent's response
+          // and ships the child's filter with the parent placeholder unsubstituted.
           const parentIsNonAPIType =
             parentVar.type === "custom" ||
             parentVar.type === "constant" ||
             parentVar.type === "textbox" ||
             parentVar.type === "dynamic_filters" ||
             (parentVar.type === "query_values" &&
+              parentVar.loadOptionsWithAllDefault !== true &&
               (parentVar.selectAllValueForMultiSelect === "custom" ||
                 parentVar.selectAllValueForMultiSelect === "all"));
 
@@ -586,6 +672,78 @@ export const useVariablesManager = () => {
     }
   };
 
+  const cancelPendingCommit = () => {
+    if (liveCommitTimer !== null) {
+      clearTimeout(liveCommitTimer);
+      liveCommitTimer = null;
+    }
+    commitRequested.value = false;
+    pendingLiveKeys.clear();
+    settleKeys.value = new Set();
+  };
+
+  const flushRequestedCommit = () => {
+    // Wait for a change still in its debounce, or its dependents get applied half-loaded.
+    if (!commitRequested.value || isSettling.value || liveCommitTimer !== null) return;
+    commitRequested.value = false;
+    settleKeys.value = new Set();
+    commitAll();
+    autoCommitListeners.forEach((listener) => listener());
+  };
+
+  /** Commits once the changed keys and all their dependents resolve (all visible ones when no keys are given). */
+  const commitWhenSettled = (changedKeys?: string[]) => {
+    commitRequested.value = true;
+    const current = settleKeys.value;
+    if (!changedKeys || current === null) {
+      settleKeys.value = null;
+    } else {
+      settleKeys.value = new Set([...current, ...changedKeys, ...collectDescendants(changedKeys)]);
+    }
+    flushRequestedCommit();
+  };
+
+  const scheduleLiveCommit = (changedKey: string) => {
+    pendingLiveKeys.add(changedKey);
+    if (liveCommitTimer !== null) clearTimeout(liveCommitTimer);
+    liveCommitTimer = setTimeout(() => {
+      liveCommitTimer = null;
+      const keys = [...pendingLiveKeys];
+      pendingLiveKeys.clear();
+      commitWhenSettled(keys);
+    }, LIVE_COMMIT_DEBOUNCE_MS);
+  };
+
+  const setLiveMode = (on: boolean) => {
+    if (isLiveMode.value === on) return;
+    isLiveMode.value = on;
+    if (!on) {
+      cancelPendingCommit();
+      return;
+    }
+    if (variablesData.isInitialized && hasUncommittedChanges.value) commitWhenSettled();
+  };
+
+  /** Registers a callback run after each settled commit; returns the unsubscribe. */
+  const onAutoCommit = (listener: () => void) => {
+    autoCommitListeners.add(listener);
+    return () => autoCommitListeners.delete(listener);
+  };
+
+  watch(
+    () => commitRequested.value && !isSettling.value,
+    (ready) => {
+      if (ready) flushRequestedCommit();
+    },
+  );
+
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      cancelPendingCommit();
+      autoCommitListeners.clear();
+    });
+  }
+
   // ========== LOADING STATE MANAGEMENT ==========
   /**
    * Called by VariablesValueSelector when a variable completes loading
@@ -599,6 +757,11 @@ export const useVariablesManager = () => {
 
     // Mark as partially loaded
     variable.isVariablePartialLoaded = true;
+
+    const valueUnchanged =
+      childrenLoadedAgainst.has(variableKey) &&
+      isEqual(childrenLoadedAgainst.get(variableKey), variable.value);
+    childrenLoadedAgainst.set(variableKey, cloneDeep(variable.value));
 
     // Check if parent has null value (no data found)
     const parentHasNullValue =
@@ -636,7 +799,8 @@ export const useVariablesManager = () => {
             // This is critical for scoped variables that need fresh data
             if (childVar.type === "query_values") {
               // Only reset if not already loading/pending
-              if (!childVar.isLoading && !childVar.isVariableLoadingPending) {
+              const keepsLoadedChild = valueUnchanged && childVar.isVariablePartialLoaded;
+              if (!childVar.isLoading && !childVar.isVariableLoadingPending && !keepsLoadedChild) {
                 childVar.isVariablePartialLoaded = false;
                 childVar.isLoading = false;
                 // Reset value and options to force fresh load
@@ -712,6 +876,7 @@ export const useVariablesManager = () => {
     // Start the cascade from the changed variable
     const variableKey = getVariableKey(name, scope, tabId, panelId);
     resetDescendants(variableKey);
+    childrenLoadedAgainst.set(variableKey, cloneDeep(newValue));
 
     // After resetting all descendants, trigger ONLY the immediate children
     // that are ready to load (i.e. all their parents are now ready)
@@ -731,6 +896,11 @@ export const useVariablesManager = () => {
         childVar.isVariableLoadingPending = true;
       }
     });
+
+    if (!isLiveMode.value) return;
+    // The textbox input already waited the live debounce, so a second one would stack.
+    if (variable.type === "textbox") commitWhenSettled([variableKey]);
+    else scheduleLiveCommit(variableKey);
   };
 
   // ========== VISIBILITY ==========
@@ -846,8 +1016,30 @@ export const useVariablesManager = () => {
   };
 
   // ========== URL SYNCHRONIZATION ==========
+  // A URL-restored value is marked loaded WITHOUT a fetch, and only a completed
+  // fetch notifies children, so a restored parent's chain would never start.
+  const scheduleChildrenOfRestored = (restoredKeys: string[]) => {
+    if (restoredKeys.length === 0) return;
+
+    const allVars = getAllVariablesFlat();
+    const restored = new Set(restoredKeys);
+
+    restoredKeys.forEach((parentKey) => {
+      (dependencyGraph.value[parentKey]?.children || []).forEach((childKey) => {
+        // The URL carried this child too, so its value stands and a fetch would overwrite it.
+        if (restored.has(childKey)) return;
+        const childVar = findVariableByKey(childKey, allVars);
+        if (!childVar || childVar.type !== "query_values") return;
+        if (childVar.isVariablePartialLoaded || childVar.isVariableLoadingPending) return;
+        if (!canVariableLoad(childVar)) return;
+        childVar.isVariableLoadingPending = true;
+      });
+    });
+  };
+
   const loadFromUrl = (route: any) => {
     const query = route.query;
+    const restoredKeys: string[] = [];
 
     Object.entries(query).forEach(([key, value]) => {
       if (!key.startsWith("var-")) return;
@@ -867,6 +1059,7 @@ export const useVariablesManager = () => {
           variable.isVariablePartialLoaded = true;
           variable.isVariableLoadingPending = false;
           variable.isLoading = false;
+          restoredKeys.push(getVariableKey(parsed.name, "global"));
         }
 
         // ALSO apply to all tab/panel instances of same name (drilldown compatibility)
@@ -879,6 +1072,7 @@ export const useVariablesManager = () => {
             tabVar.isVariablePartialLoaded = true;
             tabVar.isVariableLoadingPending = false;
             tabVar.isLoading = false;
+            restoredKeys.push(getVariableKey(tabVar.name, "tabs", tabVar.tabId));
           }
         });
 
@@ -891,6 +1085,9 @@ export const useVariablesManager = () => {
             panelVar.isVariablePartialLoaded = true;
             panelVar.isVariableLoadingPending = false;
             panelVar.isLoading = false;
+            restoredKeys.push(
+              getVariableKey(panelVar.name, "panels", panelVar.tabId, panelVar.panelId),
+            );
           }
         });
       } else {
@@ -903,9 +1100,16 @@ export const useVariablesManager = () => {
           variable.isVariablePartialLoaded = true;
           variable.isVariableLoadingPending = false;
           variable.isLoading = false;
+          restoredKeys.push(
+            getVariableKey(parsed.name, parsed.scope, parsed.tabId, parsed.panelId),
+          );
         }
       }
     });
+
+    const allVars = getAllVariablesFlat();
+    recordLoadedAgainst(restoredKeys.map((key) => findVariableByKey(key, allVars)));
+    scheduleChildrenOfRestored(restoredKeys);
   };
 
   interface ParsedUrlKey {
@@ -1034,12 +1238,18 @@ export const useVariablesManager = () => {
     tabsVisibility: computed(() => tabsVisibility.value),
     panelsVisibility: computed(() => panelsVisibility.value),
     isLoading,
+    isSettling,
+    isLiveMode: computed(() => isLiveMode.value),
     hasUncommittedChanges,
 
     // Methods
     initialize,
     commitAll,
     commitScope,
+    commitWhenSettled,
+    cancelPendingCommit,
+    setLiveMode,
+    onAutoCommit,
     onVariablePartiallyLoaded,
     updateVariableValue,
     setTabVisibility,

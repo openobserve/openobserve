@@ -154,8 +154,230 @@ mod m20260730_000001_add_alert_state_to_synthetics_monitors;
 mod m20260730_000002_create_incident_integrations;
 mod m20260730_000003_create_external_alerts;
 mod m20260730_000004_add_alert_kind_to_incident_alerts;
+mod m20260731_000001_create_llm_annotation_queue_tables;
+mod m20260731_000003_create_llm_dataset_tables;
+mod m20260802_000001_add_template_kind;
 mod m20260803_000001_add_destinations_to_incident_integrations;
 mod m20260803_000001_add_down_notified_at_to_synthetics_locations;
+mod m20260804_000001_create_workflow_drafts_table;
+mod m20260806_000001_create_oncall_tables;
+mod m20260807_000001_create_oncall_ownership;
+mod m20260809_000001_create_alert_eval_intervals_table;
+mod m20260811_000001_create_llm_experiments;
+mod m20260811_000001_create_oncall_unrouted_signals;
+mod m20260812_000001_add_provider_rate_limits;
+mod m20260812_000001_create_composite_alerts;
+mod m20260812_000001_create_oncall_routing_config;
+mod m20260812_000002_create_oncall_overrides;
+mod m20260812_000003_create_oncall_contacts_and_reads;
+mod m20260813_000001_create_oncall_unavailability;
+mod m20260818_000001_create_llm_idempotency_records;
+mod m20260818_000002_create_llm_remote_tasks;
+mod m20260820_000001_add_icon_to_folders;
+mod m20260820_000003_create_llm_secrets;
+mod m20260822_000001_create_status_pages_tables;
+mod m20260824_000001_add_incident_acknowledged_columns;
+mod m20260824_000001_create_llm_playground_snapshots;
+mod m20260825_000001_add_alert_pending_period_col;
+mod m20260825_000001_add_steps_configured_to_synthetics_jobs;
+mod m20260825_000001_create_status_page_custom_domains;
+mod m20260827_000001_drop_table_action_scripts;
+mod m20260831_000001_add_exhausted_at_to_oncall_responses;
+mod m20260901_000001_reset_anomaly_detection_retries;
+mod m20260903_000001_add_anomaly_last_failed_at;
+mod m20260906_000001_add_anomaly_last_alert_fired_at;
+mod m20260908_000001_create_synthetics_refs;
+mod m20260910_000001_add_folder_id_to_workflows;
+mod m20260911_000001_add_splunk_token_to_org_ingestion_tokens;
+mod m20260912_000001_add_anomaly_alert_budget;
+mod m20260912_000002_add_anomaly_last_recovery_notified_at;
+mod m20260915_000001_add_profiles_streams_to_service_streams;
+mod m20260916_000001_add_folder_id_to_workflow_drafts;
+mod m20260917_000001_add_env_to_synthetics_jobs;
+mod m20260917_000001_create_llm_experiment_slot_retries;
+mod m20260917_000001_create_synthetics_shared_variables;
+mod m20260918_000001_create_oncall_response_reports;
+mod m20260920_000001_add_anomaly_level_half_width;
+mod m20260921_000001_add_input_preview_to_llm_annotation_queue_items;
+mod m20260922_000001_add_password_policy_columns_to_users;
+mod m20260922_000002_create_user_password_history_table;
+mod m20260922_000003_create_user_auth_state_table;
+mod m20260923_000001_create_ai_chat_sessions;
+mod m20260923_000001_create_llm_prompts;
+mod m20260924_000001_add_recovery_episode_columns;
+mod m20260928_000001_add_alert_recovery_destinations;
+mod m20261001_000001_add_anomaly_band_settings;
+mod m20261003_000001_create_rum_pa_tables;
+mod m20261004_000001_create_query_history;
+mod m20261005_000001_create_fleet;
+mod m20261006_000001_create_ai_chat_shares;
+mod m20261007_000001_create_ai_chat_turns;
+mod m20261007_000001_scope_alert_dedup_state_by_org;
+mod m20261007_000002_add_redact_tools_to_ai_chat_shares;
+mod m20261008_000001_add_name_to_rum_pa_tombstones;
+mod m20261009_000001_add_promql_rule_mode;
+mod m20261009_000001_create_downtimes;
+mod m20261009_000002_add_muted_by_downtime_id_to_alert_incidents;
+mod m20261009_000003_add_last_downtime_id_to_alert_states;
+mod m20261009_000004_add_kind_to_slo_backfill_jobs;
+mod m20261009_000005_create_downtime_notifications;
+mod m20261012_000001_create_alert_calibration_configs;
+mod m20261013_000001_create_oncall_phone_verifications;
+mod m20261013_000002_create_org_telephony;
+mod m20261015_000001_reports_add_last_run_columns;
+mod m20261016_000001_create_rca_runs;
+mod m20261016_000001_create_rum_pa_app_settings;
+mod m20261017_000001_add_rca_run_progress_columns;
+mod m20261018_000001_create_rca_steering;
+mod m20261018_000001_create_slack_tables;
+mod m20261020_000001_create_eval_job_states_tables;
+mod m20261021_000001_create_public_dashboards;
+mod m20261021_000001_status_pages_add_favicon_img;
+mod m20261021_000002_add_search_type_to_search_queue;
+mod m20261024_000001_add_lease_to_org_cleanup_tasks;
+mod m20261025_000001_add_firing_started_at_to_alert_states;
+mod m20261025_000002_create_alert_acks;
+mod m20261025_000003_add_mute_targets_to_downtimes;
+mod m20261025_000004_create_slack_alert_messages;
+mod m20261025_000005_add_held_action_to_slack_link_requests;
+mod m20261026_000001_backfill_v1_rca_pointer;
+mod m20261027_000001_alter_query_history;
+mod m20261028_000001_add_group_label_set_to_alert_states;
+mod m20261029_000001_widen_alert_dedup_fingerprint;
+mod m20261030_000001_add_suppress_repeats_to_alerts;
+/// Shared body of the two `folder_id` migrations above; not a migration itself.
+mod workflow_folder_id;
+
+pub(crate) use m20261021_000001_create_public_dashboards::forget_draft_migrations;
+
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) async fn create_public_dashboards_schema_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    m20261021_000001_create_public_dashboards::Migration
+        .up(&SchemaManager::new(db))
+        .await
+}
+
+/// The search queue as migrations 109 and earlier leave it.
+#[cfg(test)]
+pub(crate) async fn create_search_queue_schema_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    let manager = SchemaManager::new(db);
+    m20241204_143100_create_table_search_queue::Migration
+        .up(&manager)
+        .await?;
+    m20251219_000001_add_org_id_to_search_queue::Migration
+        .up(&manager)
+        .await?;
+    m20261021_000002_add_search_type_to_search_queue::Migration
+        .up(&manager)
+        .await
+}
+
+#[cfg(any(test, feature = "test-utils"))]
+pub async fn create_fleet_collectors_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    use sea_orm::ConnectionTrait;
+
+    let manager = SchemaManager::new(db);
+    m20261005_000001_create_fleet::Migration
+        .up(&manager)
+        .await?;
+    // Folder rows are what fleet writes lock, so the fleet tests need the shared table too.
+    let backend = db.get_database_backend();
+    let mut folders =
+        sea_orm::Schema::new(backend).create_table_from_entity(super::entity::folders::Entity);
+    db.execute(backend.build(folders.if_not_exists())).await?;
+    Ok(())
+}
+
+#[cfg(test)]
+pub(crate) async fn create_llm_prompt_schema_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    m20260923_000001_create_llm_prompts::Migration
+        .up(&SchemaManager::new(db))
+        .await
+}
+
+#[cfg(test)]
+pub(crate) async fn create_scheduled_jobs_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    let manager = SchemaManager::new(db);
+    manager
+        .create_table(
+            Table::create()
+                .table(Alias::new("scheduled_jobs"))
+                .if_not_exists()
+                .col(
+                    ColumnDef::new(Alias::new("id"))
+                        .big_integer()
+                        .not_null()
+                        .primary_key()
+                        .auto_increment(),
+                )
+                // The scheduler owns `claim_epoch` (see infra::scheduler's
+                // idempotent bootstrap); the test helper mirrors that so the
+                // composite migration never has to add it.
+                .col(
+                    ColumnDef::new(Alias::new("claim_epoch"))
+                        .big_integer()
+                        .not_null()
+                        .default(0),
+                )
+                .to_owned(),
+        )
+        .await
+}
+
+#[cfg(test)]
+pub(crate) async fn create_composite_alert_tables_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    use m20260825_000001_add_alert_pending_period_col as update;
+    use sea_orm_migration::MigrationTrait;
+
+    create_scheduled_jobs_for_test(db).await?;
+    let manager = SchemaManager::new(db);
+    m20260812_000001_create_composite_alerts::Migration
+        .up(&manager)
+        .await?;
+    manager
+        .alter_table(update::get_update_stmt_composites())
+        .await?;
+    Ok(())
+}
+
+#[cfg(test)]
+pub(crate) fn composite_alert_migration_sql_for_test(
+    backend: sea_orm::DatabaseBackend,
+) -> Vec<String> {
+    use m20260812_000001_create_composite_alerts as migration;
+    use m20260825_000001_add_alert_pending_period_col as update;
+
+    let mut sql = vec![
+        backend
+            .build(&migration::composites_statement())
+            .to_string(),
+        backend.build(&migration::children_statement()).to_string(),
+        backend
+            .build(&migration::reverse_index_statement())
+            .to_string(),
+        backend
+            .build(&update::get_update_stmt_composites())
+            .to_string(),
+    ];
+    sql.extend(
+        migration::composite_indexes()
+            .iter()
+            .map(|statement| backend.build(statement).to_string()),
+    );
+    sql
+}
 
 /// Apply **only** the SLO tables, for targeted integration tests.
 ///
@@ -171,6 +393,126 @@ pub(crate) async fn create_slo_tables_for_test(
     use sea_orm_migration::MigrationTrait;
     let manager = SchemaManager::new(db);
     m20260727_000001_create_slo_tables::Migration
+        .up(&manager)
+        .await?;
+    m20261009_000004_add_kind_to_slo_backfill_jobs::Migration
+        .up(&manager)
+        .await
+}
+
+#[cfg(test)]
+pub(crate) async fn create_downtime_notifications_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    use sea_orm_migration::MigrationTrait;
+    m20261009_000005_create_downtime_notifications::Migration
+        .up(&SchemaManager::new(db))
+        .await
+}
+
+#[cfg(test)]
+pub(crate) async fn create_alert_calibration_configs_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    m20261012_000001_create_alert_calibration_configs::Migration
+        .up(&SchemaManager::new(db))
+        .await
+}
+
+/// Apply only the RUM Product Analytics tables, idempotently, for tests in any crate.
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) async fn create_rum_pa_tables(db: &sea_orm::DatabaseConnection) -> Result<(), DbErr> {
+    use sea_orm_migration::MigrationTrait;
+    let manager = SchemaManager::new(db);
+    m20261003_000001_create_rum_pa_tables::Migration
+        .up(&manager)
+        .await?;
+    m20261008_000001_add_name_to_rum_pa_tombstones::Migration
+        .up(&manager)
+        .await?;
+    m20261016_000001_create_rum_pa_app_settings::Migration
+        .up(&manager)
+        .await
+}
+
+/// Apply only the Slack app tables, idempotently, for tests in any crate.
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) async fn create_slack_tables<C: sea_orm::ConnectionTrait>(db: &C) -> Result<(), DbErr> {
+    m20261018_000001_create_slack_tables::create_all(db).await?;
+    m20261025_000004_create_slack_alert_messages::create_all(db).await?;
+    m20261025_000005_add_held_action_to_slack_link_requests::add_column(db).await
+}
+
+/// Apply only `alert_acks`, idempotently, for tests in any crate.
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) async fn create_alert_acks_table<C: sea_orm::ConnectionTrait>(
+    db: &C,
+) -> Result<(), DbErr> {
+    m20261025_000002_create_alert_acks::create_all(db).await
+}
+
+#[cfg(test)]
+pub(crate) async fn create_alert_states_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    use sea_orm_migration::MigrationTrait;
+    let manager = SchemaManager::new(db);
+    m20260725_000001_create_alert_states_tables::Migration
+        .up(&manager)
+        .await?;
+    m20261025_000001_add_firing_started_at_to_alert_states::Migration
+        .up(&manager)
+        .await?;
+    m20261028_000001_add_group_label_set_to_alert_states::Migration
+        .up(&manager)
+        .await
+}
+
+/// Tables the Phase 2 migrations alter; `downtimes` is bare to skip its folder key.
+#[cfg(test)]
+pub(crate) async fn create_alert_slack_prerequisites_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    use sea_orm::ConnectionTrait;
+    use sea_orm_migration::MigrationTrait;
+    m20260725_000001_create_alert_states_tables::Migration
+        .up(&SchemaManager::new(db))
+        .await?;
+    m20261018_000001_create_slack_tables::create_all(db).await?;
+    db.execute_unprepared("CREATE TABLE IF NOT EXISTS downtimes (id varchar(27) PRIMARY KEY)")
+        .await?;
+    Ok(())
+}
+
+#[cfg(test)]
+pub(crate) fn alert_slack_migrations_for_test() -> Vec<Box<dyn MigrationTrait>> {
+    vec![
+        Box::new(m20261025_000001_add_firing_started_at_to_alert_states::Migration),
+        Box::new(m20261025_000002_create_alert_acks::Migration),
+        Box::new(m20261025_000003_add_mute_targets_to_downtimes::Migration),
+        Box::new(m20261025_000004_create_slack_alert_messages::Migration),
+        Box::new(m20261025_000005_add_held_action_to_slack_link_requests::Migration),
+    ]
+}
+
+/// Run the v1 run-pointer backfill over the current rows, for tests in any crate.
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) async fn backfill_v1_rca_pointer(db: &sea_orm::DatabaseConnection) -> Result<(), DbErr> {
+    m20261026_000001_backfill_v1_rca_pointer::Migration
+        .up(&SchemaManager::new(db))
+        .await
+}
+
+/// Apply the query_history table and its columns, idempotently, for tests in any crate.
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) async fn create_query_history_table(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    let manager = SchemaManager::new(db);
+    m20261004_000001_create_query_history::Migration
+        .up(&manager)
+        .await?;
+    m20261027_000001_alter_query_history::Migration
         .up(&manager)
         .await
 }
@@ -317,8 +659,97 @@ impl MigratorTrait for Migrator {
             Box::new(m20260730_000002_create_incident_integrations::Migration),
             Box::new(m20260730_000003_create_external_alerts::Migration),
             Box::new(m20260730_000004_add_alert_kind_to_incident_alerts::Migration),
+            Box::new(m20260731_000001_create_llm_annotation_queue_tables::Migration),
+            Box::new(m20260731_000003_create_llm_dataset_tables::Migration),
+            Box::new(m20260802_000001_add_template_kind::Migration),
             Box::new(m20260803_000001_add_down_notified_at_to_synthetics_locations::Migration),
             Box::new(m20260803_000001_add_destinations_to_incident_integrations::Migration),
+            Box::new(m20260804_000001_create_workflow_drafts_table::Migration),
+            Box::new(m20260809_000001_create_alert_eval_intervals_table::Migration),
+            Box::new(m20260811_000001_create_llm_experiments::Migration),
+            Box::new(m20260812_000001_add_provider_rate_limits::Migration),
+            Box::new(m20260812_000001_create_composite_alerts::Migration),
+            Box::new(m20260818_000001_create_llm_idempotency_records::Migration),
+            Box::new(m20260818_000002_create_llm_remote_tasks::Migration),
+            Box::new(m20260820_000001_add_icon_to_folders::Migration),
+            Box::new(m20260820_000003_create_llm_secrets::Migration),
+            Box::new(m20260822_000001_create_status_pages_tables::Migration),
+            Box::new(m20260824_000001_create_llm_playground_snapshots::Migration),
+            Box::new(m20260825_000001_add_steps_configured_to_synthetics_jobs::Migration),
+            Box::new(m20260825_000001_add_alert_pending_period_col::Migration),
+            Box::new(m20260825_000001_create_status_page_custom_domains::Migration),
+            Box::new(m20260827_000001_drop_table_action_scripts::Migration),
+            Box::new(m20260806_000001_create_oncall_tables::Migration),
+            Box::new(m20260807_000001_create_oncall_ownership::Migration),
+            Box::new(m20260811_000001_create_oncall_unrouted_signals::Migration),
+            Box::new(m20260812_000001_create_oncall_routing_config::Migration),
+            Box::new(m20260812_000002_create_oncall_overrides::Migration),
+            Box::new(m20260812_000003_create_oncall_contacts_and_reads::Migration),
+            Box::new(m20260813_000001_create_oncall_unavailability::Migration),
+            Box::new(m20260824_000001_add_incident_acknowledged_columns::Migration),
+            Box::new(m20260831_000001_add_exhausted_at_to_oncall_responses::Migration),
+            Box::new(m20260901_000001_reset_anomaly_detection_retries::Migration),
+            Box::new(m20260903_000001_add_anomaly_last_failed_at::Migration),
+            Box::new(m20260906_000001_add_anomaly_last_alert_fired_at::Migration),
+            Box::new(m20260910_000001_add_folder_id_to_workflows::Migration),
+            Box::new(m20260911_000001_add_splunk_token_to_org_ingestion_tokens::Migration),
+            Box::new(m20260912_000001_add_anomaly_alert_budget::Migration),
+            Box::new(m20260912_000002_add_anomaly_last_recovery_notified_at::Migration),
+            Box::new(m20260915_000001_add_profiles_streams_to_service_streams::Migration),
+            Box::new(m20260916_000001_add_folder_id_to_workflow_drafts::Migration),
+            Box::new(m20260917_000001_create_llm_experiment_slot_retries::Migration),
+            Box::new(m20260917_000001_create_synthetics_shared_variables::Migration),
+            Box::new(m20260917_000001_add_env_to_synthetics_jobs::Migration),
+            Box::new(m20260921_000001_add_input_preview_to_llm_annotation_queue_items::Migration),
+            Box::new(m20260922_000001_add_password_policy_columns_to_users::Migration),
+            Box::new(m20260922_000002_create_user_password_history_table::Migration),
+            Box::new(m20260922_000003_create_user_auth_state_table::Migration),
+            Box::new(m20260920_000001_add_anomaly_level_half_width::Migration),
+            Box::new(m20260923_000001_create_llm_prompts::Migration),
+            Box::new(m20260924_000001_add_recovery_episode_columns::Migration),
+            Box::new(m20260928_000001_add_alert_recovery_destinations::Migration),
+            Box::new(m20260918_000001_create_oncall_response_reports::Migration),
+            Box::new(m20260908_000001_create_synthetics_refs::Migration),
+            Box::new(m20261001_000001_add_anomaly_band_settings::Migration),
+            Box::new(m20261003_000001_create_rum_pa_tables::Migration),
+            Box::new(m20261004_000001_create_query_history::Migration),
+            Box::new(m20261007_000001_scope_alert_dedup_state_by_org::Migration),
+            Box::new(m20261008_000001_add_name_to_rum_pa_tombstones::Migration),
+            Box::new(m20261009_000001_add_promql_rule_mode::Migration),
+            Box::new(m20261009_000001_create_downtimes::Migration),
+            Box::new(m20261009_000002_add_muted_by_downtime_id_to_alert_incidents::Migration),
+            Box::new(m20261009_000003_add_last_downtime_id_to_alert_states::Migration),
+            Box::new(m20261009_000004_add_kind_to_slo_backfill_jobs::Migration),
+            Box::new(m20261009_000005_create_downtime_notifications::Migration),
+            Box::new(m20261012_000001_create_alert_calibration_configs::Migration),
+            Box::new(m20260923_000001_create_ai_chat_sessions::Migration),
+            Box::new(m20261006_000001_create_ai_chat_shares::Migration),
+            Box::new(m20261007_000001_create_ai_chat_turns::Migration),
+            Box::new(m20261007_000002_add_redact_tools_to_ai_chat_shares::Migration),
+            Box::new(m20261013_000001_create_oncall_phone_verifications::Migration),
+            Box::new(m20261013_000002_create_org_telephony::Migration),
+            Box::new(m20261015_000001_reports_add_last_run_columns::Migration),
+            Box::new(m20261016_000001_create_rum_pa_app_settings::Migration),
+            Box::new(m20261020_000001_create_eval_job_states_tables::Migration),
+            Box::new(m20261018_000001_create_slack_tables::Migration),
+            Box::new(m20261016_000001_create_rca_runs::Migration),
+            Box::new(m20261017_000001_add_rca_run_progress_columns::Migration),
+            Box::new(m20261018_000001_create_rca_steering::Migration),
+            Box::new(m20261021_000001_status_pages_add_favicon_img::Migration),
+            Box::new(m20261005_000001_create_fleet::Migration),
+            Box::new(m20261024_000001_add_lease_to_org_cleanup_tasks::Migration),
+            Box::new(m20261021_000001_create_public_dashboards::Migration),
+            Box::new(m20261021_000002_add_search_type_to_search_queue::Migration),
+            Box::new(m20261026_000001_backfill_v1_rca_pointer::Migration),
+            Box::new(m20261025_000001_add_firing_started_at_to_alert_states::Migration),
+            Box::new(m20261025_000002_create_alert_acks::Migration),
+            Box::new(m20261025_000003_add_mute_targets_to_downtimes::Migration),
+            Box::new(m20261025_000004_create_slack_alert_messages::Migration),
+            Box::new(m20261025_000005_add_held_action_to_slack_link_requests::Migration),
+            Box::new(m20261028_000001_add_group_label_set_to_alert_states::Migration),
+            Box::new(m20261029_000001_widen_alert_dedup_fingerprint::Migration),
+            Box::new(m20261027_000001_alter_query_history::Migration),
+            Box::new(m20261030_000001_add_suppress_repeats_to_alerts::Migration),
         ]
     }
 }
@@ -342,5 +773,290 @@ mod tests {
     #[test]
     fn test_get_text_type_returns_text() {
         assert_eq!(get_text_type(), "text");
+    }
+
+    /// Newest migration per `DB_SCHEMA_VERSION`: `init_db` skips upgrades on version match.
+    const VERSION_COVERAGE: &[(u64, &str)] = &[
+        (78, "m20260827_000001_drop_table_action_scripts"),
+        (79, "m20260831_000001_add_exhausted_at_to_oncall_responses"),
+        (
+            80,
+            "m20260911_000001_add_splunk_token_to_org_ingestion_tokens",
+        ),
+        (81, "m20260912_000002_add_anomaly_last_recovery_notified_at"),
+        (
+            82,
+            "m20260915_000001_add_profiles_streams_to_service_streams",
+        ),
+        (83, "m20260910_000001_add_folder_id_to_workflows"),
+        (84, "m20260916_000001_add_folder_id_to_workflow_drafts"),
+        (85, "m20260917_000001_create_llm_experiment_slot_retries"),
+        (86, "m20260917_000001_create_synthetics_shared_variables"),
+        (
+            87,
+            "m20260921_000001_add_input_preview_to_llm_annotation_queue_items",
+        ),
+        (88, "m20260922_000003_create_user_auth_state_table"),
+        (89, "m20260920_000001_add_anomaly_level_half_width"),
+        (90, "m20260923_000001_create_llm_prompts"),
+        (91, "m20260924_000001_add_recovery_episode_columns"),
+        (92, "m20260928_000001_add_alert_recovery_destinations"),
+        (93, "m20260918_000001_create_oncall_response_reports"),
+        (94, "m20260908_000001_create_synthetics_refs"),
+        (95, "m20261001_000001_add_anomaly_band_settings"),
+        (96, "m20261003_000001_create_rum_pa_tables"),
+        (97, "m20261004_000001_create_query_history"),
+        (98, "m20261007_000001_scope_alert_dedup_state_by_org"),
+        (99, "m20261008_000001_add_name_to_rum_pa_tombstones"),
+        (100, "m20261009_000001_add_promql_rule_mode"),
+        (101, "m20261009_000004_add_kind_to_slo_backfill_jobs"),
+        (102, "m20261009_000005_create_downtime_notifications"),
+        (103, "m20261012_000001_create_alert_calibration_configs"),
+        (104, "m20260923_000001_create_ai_chat_sessions"),
+        (105, "m20261006_000001_create_ai_chat_shares"),
+        (106, "m20261007_000001_create_ai_chat_turns"),
+        (107, "m20261007_000002_add_redact_tools_to_ai_chat_shares"),
+        (108, "m20261013_000002_create_org_telephony"),
+        (109, "m20261015_000001_reports_add_last_run_columns"),
+        (110, "m20261016_000001_create_rum_pa_app_settings"),
+        (111, "m20261020_000001_create_eval_job_states_tables"),
+        (112, "m20261018_000001_create_slack_tables"),
+        (113, "m20261016_000001_create_rca_runs"),
+        (114, "m20261017_000001_add_rca_run_progress_columns"),
+        (115, "m20261018_000001_create_rca_steering"),
+        (116, "m20261021_000001_status_pages_add_favicon_img"),
+        (117, "m20261005_000001_create_fleet"),
+        (118, "m20261024_000001_add_lease_to_org_cleanup_tasks"),
+        (119, "m20261021_000001_create_public_dashboards"),
+        (120, "m20261021_000002_add_search_type_to_search_queue"),
+        (121, "m20261026_000001_backfill_v1_rca_pointer"),
+        (
+            122,
+            "m20261025_000001_add_firing_started_at_to_alert_states",
+        ),
+        (123, "m20261025_000002_create_alert_acks"),
+        (124, "m20261025_000003_add_mute_targets_to_downtimes"),
+        (125, "m20261025_000004_create_slack_alert_messages"),
+        (
+            126,
+            "m20261025_000005_add_held_action_to_slack_link_requests",
+        ),
+        (127, "m20261028_000001_add_group_label_set_to_alert_states"),
+        (128, "m20261029_000001_widen_alert_dedup_fingerprint"),
+        (129, "m20261027_000001_alter_query_history"),
+        (130, "m20261030_000001_add_suppress_repeats_to_alerts"),
+    ];
+
+    // Two branches that each claim the next version merge cleanly, so a reused number must fail
+    // here.
+    #[test]
+    fn version_coverage_claims_each_version_once_up_to_db_schema_version() {
+        let mut seen = std::collections::HashSet::new();
+        for (version, name) in VERSION_COVERAGE {
+            assert!(
+                seen.insert(*version),
+                "version {version} is claimed twice (again by `{name}`)"
+            );
+        }
+        assert_eq!(
+            VERSION_COVERAGE.iter().map(|(v, _)| *v).max(),
+            Some(config::DB_SCHEMA_VERSION),
+            "the highest VERSION_COVERAGE entry must equal DB_SCHEMA_VERSION"
+        );
+    }
+
+    #[test]
+    fn db_schema_version_covers_every_registered_migration() {
+        let newest = Migrator::migrations()
+            .into_iter()
+            .map(|migration| migration.name().to_string())
+            .max()
+            .expect("at least one migration is registered");
+
+        let (required, _) = VERSION_COVERAGE
+            .iter()
+            .find(|(_, name)| *name == newest)
+            .unwrap_or_else(|| {
+                panic!(
+                    "migration `{newest}` is registered but no DB_SCHEMA_VERSION claims to cover \
+                     it.\nYou added a migration: bump DB_SCHEMA_VERSION in \
+                     src/config/src/config.rs to {}, then add ({}, \"{newest}\") to \
+                     VERSION_COVERAGE here.\nWithout the bump `init_db` skips the upgrade on any \
+                     database already stamped at the current version and the new column is never \
+                     created.",
+                    config::DB_SCHEMA_VERSION + 1,
+                    config::DB_SCHEMA_VERSION + 1,
+                )
+            });
+
+        assert!(
+            config::DB_SCHEMA_VERSION >= *required,
+            "DB_SCHEMA_VERSION is {} but migration `{newest}` requires at least {required}.\nBump \
+             DB_SCHEMA_VERSION in src/config/src/config.rs to {required} so `init_db` actually \
+             runs the upgrade on existing databases.",
+            config::DB_SCHEMA_VERSION,
+        );
+    }
+
+    #[test]
+    fn each_migration_is_registered_once_and_after_the_schema_it_builds_on() {
+        let names: Vec<String> = Migrator::migrations()
+            .into_iter()
+            .map(|migration| migration.name().to_string())
+            .collect();
+        let position = |name: &str| {
+            let found: Vec<usize> = names
+                .iter()
+                .enumerate()
+                .filter(|(_, n)| n.as_str() == name)
+                .map(|(i, _)| i)
+                .collect();
+            assert_eq!(found.len(), 1, "{name} is registered {} times", found.len());
+            found[0]
+        };
+
+        let unique: std::collections::HashSet<&String> = names.iter().collect();
+        assert_eq!(unique.len(), names.len(), "a migration is registered twice");
+
+        // Registration alone is what makes a migration run at all.
+        position("m20260812_000001_create_composite_alerts");
+        position("m20260923_000001_create_ai_chat_sessions");
+
+        for (earlier, later) in [
+            (
+                "m20260707_000003_create_synthetics_jobs",
+                "m20260917_000001_add_env_to_synthetics_jobs",
+            ),
+            (
+                "m20260917_000001_create_synthetics_shared_variables",
+                "m20260917_000001_add_env_to_synthetics_jobs",
+            ),
+            (
+                "m20260812_000001_create_composite_alerts",
+                "m20260825_000001_create_status_page_custom_domains",
+            ),
+            (
+                "m20260921_000001_add_input_preview_to_llm_annotation_queue_items",
+                "m20260922_000001_add_password_policy_columns_to_users",
+            ),
+            (
+                "m20260725_000001_create_alert_states_tables",
+                "m20260924_000001_add_recovery_episode_columns",
+            ),
+            (
+                "m20260725_000001_create_alert_states_tables",
+                "m20261028_000001_add_group_label_set_to_alert_states",
+            ),
+            (
+                "m20250109_092400_recreate_tables_with_ksuids",
+                "m20261009_000001_create_downtimes",
+            ),
+            (
+                "m20251204_000001_create_alert_incidents_table",
+                "m20261009_000002_add_muted_by_downtime_id_to_alert_incidents",
+            ),
+            (
+                "m20260725_000001_create_alert_states_tables",
+                "m20261009_000003_add_last_downtime_id_to_alert_states",
+            ),
+            (
+                "m20260727_000001_create_slo_tables",
+                "m20261009_000004_add_kind_to_slo_backfill_jobs",
+            ),
+            (
+                "m20261007_000001_scope_alert_dedup_state_by_org",
+                "m20261009_000001_create_downtimes",
+            ),
+            (
+                "m20261007_000001_scope_alert_dedup_state_by_org",
+                "m20261029_000001_widen_alert_dedup_fingerprint",
+            ),
+            (
+                "m20261009_000001_create_downtimes",
+                "m20261009_000005_create_downtime_notifications",
+            ),
+            (
+                "m20260923_000001_create_ai_chat_sessions",
+                "m20261006_000001_create_ai_chat_shares",
+            ),
+            (
+                "m20261006_000001_create_ai_chat_shares",
+                "m20261007_000002_add_redact_tools_to_ai_chat_shares",
+            ),
+            (
+                "m20260923_000001_create_ai_chat_sessions",
+                "m20261007_000001_create_ai_chat_turns",
+            ),
+            (
+                "m20251204_000001_create_alert_incidents_table",
+                "m20261016_000001_create_rca_runs",
+            ),
+            (
+                "m20261016_000001_create_rca_runs",
+                "m20261017_000001_add_rca_run_progress_columns",
+            ),
+            (
+                "m20261016_000001_create_rca_runs",
+                "m20261018_000001_create_rca_steering",
+            ),
+            (
+                "m20260725_000001_create_alert_states_tables",
+                "m20261025_000001_add_firing_started_at_to_alert_states",
+            ),
+            (
+                "m20261009_000001_create_downtimes",
+                "m20261025_000003_add_mute_targets_to_downtimes",
+            ),
+            (
+                "m20261018_000001_create_slack_tables",
+                "m20261025_000004_create_slack_alert_messages",
+            ),
+            (
+                "m20261018_000001_create_slack_tables",
+                "m20261025_000005_add_held_action_to_slack_link_requests",
+            ),
+        ] {
+            assert!(
+                position(earlier) < position(later),
+                "{later} must be registered after {earlier}"
+            );
+        }
+    }
+
+    const APP_SETTINGS_MIGRATION: &str = "m20261016_000001_create_rum_pa_app_settings";
+
+    #[test]
+    fn p1_r4_app_settings_migration_is_registered_after_alert_dedup_scope() {
+        let names: Vec<String> = Migrator::migrations()
+            .into_iter()
+            .map(|migration| migration.name().to_string())
+            .collect();
+        let at = |name: &str| names.iter().position(|n| n == name);
+        let settings =
+            at(APP_SETTINGS_MIGRATION).expect("the app-settings migration is registered");
+        let dedup = at("m20261007_000001_scope_alert_dedup_state_by_org").unwrap();
+        assert!(dedup < settings);
+    }
+
+    #[test]
+    fn p1_r5_schema_version_110_covers_the_app_settings_migration() {
+        assert!(VERSION_COVERAGE.contains(&(110, APP_SETTINGS_MIGRATION)));
+    }
+
+    #[tokio::test]
+    async fn p1_r4_the_rum_pa_test_helper_also_builds_app_settings() {
+        let mut opts = sea_orm::ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let db = sea_orm::Database::connect(opts).await.unwrap();
+        create_rum_pa_tables(&db).await.unwrap();
+        create_rum_pa_tables(&db).await.unwrap();
+        let manager = SchemaManager::new(&db);
+        assert!(manager.has_table("rum_pa_app_settings").await.unwrap());
+        assert!(
+            manager
+                .has_column("rum_pa_funnels", "rules_hash")
+                .await
+                .unwrap()
+        );
     }
 }

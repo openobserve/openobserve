@@ -58,6 +58,29 @@ describe("CustomDateTimePicker.vue", () => {
     });
   });
 
+  describe("Fixed-length units only", () => {
+    const periodValues = (vm: any) => ({
+      rows: vm.relativePeriods.map((p: any) => p.value),
+      select: vm.relativePeriodsSelect.map((p: any) => p.value),
+    });
+
+    it("offers the month unit by default", () => {
+      wrapper = createWrapper({ modelValue: "1d" });
+      const { rows, select } = periodValues(wrapper.vm);
+      expect(rows).toContain("M");
+      expect(select).toContain("M");
+    });
+
+    it("leaves the month unit out when excludeMonths is set", () => {
+      wrapper = createWrapper({ modelValue: "1d", excludeMonths: true });
+      const { rows, select } = periodValues(wrapper.vm);
+      expect(rows).not.toContain("M");
+      expect(select).not.toContain("M");
+      expect(rows).toEqual(expect.arrayContaining(["m", "h", "d", "w"]));
+      expect(select).toEqual(expect.arrayContaining(["m", "h", "d", "w"]));
+    });
+  });
+
   describe("Model Value Handling", () => {
     it("parses modelValue correctly on initialization", () => {
       wrapper = createWrapper({ modelValue: "10m" });
@@ -115,11 +138,42 @@ describe("CustomDateTimePicker.vue", () => {
       expect(vm.getTrimmedDisplayValue()).toBe("Past 5 Minutes");
     });
 
+    it("getTrimmedDisplayValue uses the singular unit for a count of one", () => {
+      wrapper = createWrapper({ modelValue: "1h" });
+      const vm = wrapper.vm as any;
+
+      expect(vm.getTrimmedDisplayValue()).toBe("Past 1 Hour");
+    });
+
     it("getDisplayValue works with hours", () => {
       wrapper = createWrapper({ modelValue: "2h" });
       const vm = wrapper.vm as any;
 
       expect(vm.getDisplayValue()).toBe("2 Hours ago");
+    });
+
+    it("getDisplayValue uses the singular unit for a count of one", () => {
+      wrapper = createWrapper({ modelValue: "1h" });
+      const vm = wrapper.vm as any;
+
+      expect(vm.getDisplayValue()).toBe("1 Hour ago");
+    });
+
+    it.each([
+      ["1s", "1 Second ago"],
+      ["1m", "1 Minute ago"],
+      ["1d", "1 Day ago"],
+      ["1w", "1 Week ago"],
+      ["1M", "1 Month ago"],
+      ["30s", "30 Seconds ago"],
+      ["3d", "3 Days ago"],
+      ["2w", "2 Weeks ago"],
+      ["6M", "6 Months ago"],
+    ])("getDisplayValue pluralises %s as %s", (modelValue, expected) => {
+      wrapper = createWrapper({ modelValue });
+      const vm = wrapper.vm as any;
+
+      expect(vm.getDisplayValue()).toBe(expected);
     });
 
     it("getTrimmedDisplayValue works with days", () => {

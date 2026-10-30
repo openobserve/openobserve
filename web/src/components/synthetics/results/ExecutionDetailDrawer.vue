@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import type {
@@ -25,7 +25,7 @@ import type {
   StepResult,
 } from "@/composables/synthetics/syntheticResultsSchema";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   execution: RunLocationResult | null;
@@ -35,10 +35,10 @@ const props = defineProps<{
 const emit = defineEmits<{ close: [] }>();
 
 const STATUS_COLOR: Record<string, string> = {
-  passed: "text-[var(--color-success-600)]",
-  warning: "text-[var(--color-warning-500)]",
-  failed: "text-[var(--color-error-500)]",
-  error: "text-[var(--color-warning-600)]",
+  passed: "text-success-600",
+  warning: "text-warning-500",
+  failed: "text-error-500",
+  error: "text-warning-600",
 };
 
 const DEVICE_ICON: Record<string, string> = {
@@ -55,7 +55,8 @@ const mergedSteps = computed(() => {
   const ex = props.execution;
   if (!ex) return [];
   const nameMap = new Map<string, RecordedStep>(ex.recordedSteps.map((s) => [s.id, s]));
-  if (ex.steps.length) {
+  // A failed start load ran no Step, and a Step that never ran is not a failed one.
+  if (ex.steps.length || ex.startLoad) {
     return ex.steps.map((s: StepResult) => ({
       ...s,
       name: nameMap.get(s.stepId)?.name ?? s.stepId,
@@ -94,7 +95,7 @@ function fmtDuration(ms: number) {
 
         <!-- Drawer panel -->
         <div
-          class="border-border-default bg-surface-base relative z-10 flex h-full w-full max-w-2xl flex-col overflow-hidden border-l shadow-lg"
+          class="border-border-default bg-surface-base relative z-10 flex h-full w-full max-w-2xl flex-col overflow-hidden border-s shadow-lg"
         >
           <!-- Header -->
           <div class="border-border-default flex shrink-0 items-center gap-3 border-b px-5 py-4">
@@ -102,7 +103,7 @@ function fmtDuration(ms: number) {
               <span
                 class="material-symbols-outlined text-text-muted text-base normal-case not-italic"
               >
-                {{ DEVICE_ICON[execution.device] ?? "devices" }}
+                {{ DEVICE_ICON[execution.device] ?? raw("devices") }}
               </span>
               <span class="text-text-heading font-semibold capitalize">
                 {{ execution.browserEngine }} · {{ execution.device.replace(/_/g, " ") }}
@@ -123,6 +124,7 @@ function fmtDuration(ms: number) {
                 trace.zip
               </a>
               <OButton
+                :aria-label="t('common.close')"
                 variant="ghost"
                 size="icon-sm"
                 icon-left="close"
@@ -135,49 +137,101 @@ function fmtDuration(ms: number) {
           <!-- Error banner (probe crash) -->
           <div
             v-if="execution.error && !execution.steps.length"
-            class="rounded-default mx-5 mt-4 shrink-0 border border-[var(--color-warning-500)]/30 bg-[var(--color-warning-500)]/10 px-4 py-3"
+            class="rounded-default border-warning-500/30 bg-warning-500/10 mx-5 mt-4 shrink-0 border px-4 py-3"
           >
-            <p class="mb-1 text-xs font-semibold text-[var(--color-warning-600)]">
+            <p class="text-warning-600 mb-1 text-xs font-semibold">
               {{ t("synthetics.executionDetail.probeError") }}
             </p>
-            <p
-              class="font-mono text-xs leading-relaxed whitespace-pre-wrap text-[var(--color-warning-600)]"
-            >
+            <p class="text-warning-600 font-mono text-xs leading-relaxed whitespace-pre-wrap">
               {{ execution.error }}
             </p>
           </div>
 
           <!-- Steps -->
           <div class="flex-1 overflow-y-auto px-5 py-4">
-            <p v-if="!mergedSteps.length" class="text-text-muted text-xs italic">
+            <p
+              v-if="!mergedSteps.length && !execution.startLoad"
+              class="text-text-muted text-xs italic"
+            >
               {{ t("synthetics.executionDetail.noStepData") }}
             </p>
 
             <div v-else class="flex flex-col gap-3">
+              <!-- Row 0: the Starting URL, above the numbered Steps and counted in none of them. -->
+              <div
+                v-if="execution.startLoad"
+                class="rounded-default overflow-hidden border"
+                :class="
+                  execution.startLoad.status === 'fail'
+                    ? 'border-error-500/40'
+                    : 'border-border-default'
+                "
+                data-test="synthetics-execution-detail-start-row"
+              >
+                <div
+                  class="flex items-start gap-3 px-3 py-2.5"
+                  :class="
+                    execution.startLoad.status === 'fail' ? 'bg-error-500/10' : 'bg-surface-panel'
+                  "
+                >
+                  <span
+                    class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-white"
+                    :class="
+                      execution.startLoad.status === 'fail' ? 'bg-error-500' : 'bg-success-600'
+                    "
+                  >
+                    <OIcon name="language" size="xs" aria-hidden="true" />
+                  </span>
+                  <p
+                    class="text-text-heading min-w-0 flex-1 truncate text-sm font-medium"
+                    :title="execution.startLoad.url"
+                  >
+                    {{ t("synthetics.runDetail.startLoadLabel", { url: execution.startLoad.url }) }}
+                  </p>
+                  <span class="text-text-muted mt-0.5 shrink-0 text-xs tabular-nums">
+                    {{ fmtDuration(execution.startLoad.durationMs) }}
+                  </span>
+                </div>
+                <div
+                  v-if="execution.startLoad.error"
+                  class="border-error-500/20 bg-error-500/5 border-t px-3 py-2"
+                >
+                  <p class="text-error-600 font-mono text-xs leading-relaxed whitespace-pre-wrap">
+                    {{ execution.startLoad.error }}
+                  </p>
+                </div>
+                <div
+                  v-if="execution.startLoad.screenshotKey"
+                  class="border-border-default border-t"
+                >
+                  <a
+                    :href="artifactUrlFn(execution.startLoad.screenshotKey)"
+                    target="_blank"
+                    class="block"
+                  >
+                    <img
+                      :src="artifactUrlFn(execution.startLoad.screenshotKey)"
+                      :alt="t('synthetics.runDetail.screenshotAlt')"
+                      class="max-h-64 w-full object-contain"
+                      loading="lazy"
+                    />
+                  </a>
+                </div>
+              </div>
               <div
                 v-for="(step, i) in mergedSteps"
                 :key="step.stepId"
                 class="rounded-default overflow-hidden border"
-                :class="
-                  step.status === 'fail'
-                    ? 'border-[var(--color-error-500)]/40'
-                    : 'border-border-default'
-                "
+                :class="step.status === 'fail' ? 'border-error-500/40' : 'border-border-default'"
               >
                 <!-- Step header -->
                 <div
                   class="flex items-start gap-3 px-3 py-2.5"
-                  :class="
-                    step.status === 'fail' ? 'bg-[var(--color-error-500)]/10' : 'bg-surface-panel'
-                  "
+                  :class="step.status === 'fail' ? 'bg-error-500/10' : 'bg-surface-panel'"
                 >
                   <span
                     class="text-3xs mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-bold text-white"
-                    :class="
-                      step.status === 'fail'
-                        ? 'bg-[var(--color-error-500)]'
-                        : 'bg-[var(--color-success-600)]'
-                    "
+                    :class="step.status === 'fail' ? 'bg-error-500' : 'bg-success-600'"
                     >{{ i + 1 }}</span
                   >
                   <div class="min-w-0 flex-1">
@@ -199,11 +253,9 @@ function fmtDuration(ms: number) {
                 <!-- Step error -->
                 <div
                   v-if="step.error"
-                  class="border-t border-[var(--color-error-500)]/20 bg-[var(--color-error-500)]/5 px-3 py-2"
+                  class="border-error-500/20 bg-error-500/5 border-t px-3 py-2"
                 >
-                  <p
-                    class="font-mono text-xs leading-relaxed whitespace-pre-wrap text-[var(--color-error-600)]"
-                  >
+                  <p class="text-error-600 font-mono text-xs leading-relaxed whitespace-pre-wrap">
                     {{ step.error }}
                   </p>
                 </div>

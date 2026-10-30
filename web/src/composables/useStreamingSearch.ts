@@ -14,11 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref } from "vue";
+import { gt } from "@/types/i18n";
 import type { SearchRequestPayload } from "@/ts/interfaces";
 import authService from "@/services/auth";
 import store from "@/stores";
-import { getUUID, useLocalCurrentUser, useLocalUserInfo } from "@/utils/zincutils";
+import { getUUID } from "@/utils/zincutils";
+import { expireSession } from "@/utils/sessionServices";
 import { attemptTokenRefresh } from "@/services/http";
+import { patchLargeNumbersInJson } from "@/utils/nsFieldsPatch";
 
 // Create and manage stream workers
 let streamWorker: Worker | null = null;
@@ -31,17 +34,30 @@ const createStreamWorker = () => {
   return streamWorker;
 };
 
+// Chrome, Safari and Firefox wordings of a fetch body read that lost its connection.
+const NETWORK_FAILURE_PATTERN = /network error|Load failed|Failed to fetch|NetworkError/i;
+const isNetworkFailure = (error: unknown): boolean =>
+  error instanceof TypeError && NETWORK_FAILURE_PATTERN.test(error.message);
+
+// Status and message sit on prototypes of a Response or Error, which the error spread would drop.
+const withErrorFields = (error: unknown): unknown =>
+  error instanceof Response
+    ? { status: error.status, message: error.statusText || `HTTP ${error.status}` }
+    : error instanceof Error
+      ? { ...error, message: error.message }
+      : error;
+
 // Type definitions similar to WebSocket but for HTTP/2 streaming
 type StreamHandler = (data: any, traceId: string) => void;
 type ErrorHandler = (error: any, traceId: string) => void;
 type CompleteHandler = (traceId: string) => void;
-type ResetHandler = (data: any, traceId: string) => void;
+type ActivityHandler = () => void;
 
 type TraceRecord = {
   data: StreamHandler[];
   error: ErrorHandler[];
   complete: CompleteHandler[];
-  reset: ResetHandler[];
+  activity: ActivityHandler[];
   isInitiated: boolean;
   streamId: string | null;
   abortController: AbortController | null;
@@ -77,7 +93,7 @@ const useHttpStreaming = () => {
     }
 
     if (typeof response === "string") {
-      response = JSON.parse(response);
+      response = JSON.parse(patchLargeNumbersInJson(response));
     }
 
     const wsResponse = wsMapper[type as StreamResponseType](traceId, response, type);
@@ -116,7 +132,10 @@ const useHttpStreaming = () => {
       data: (data: any, response: any) => void;
       error: (data: any, response: any) => void;
       complete: (data: any, response: any) => void;
-      reset: (data: any, response: any) => void;
+      // Accepted for caller compatibility only: an HTTP stream never resets, so nothing dispatches it.
+      reset?: (data: any, response: any) => void;
+      // Fires on every raw chunk read, before any parsing, so a caller can time out a silent stream.
+      onActivity?: () => void;
     },
   ) => {
     const { traceId } = data;
@@ -126,7 +145,7 @@ const useHttpStreaming = () => {
         data: [],
         error: [],
         complete: [],
-        reset: [],
+        activity: [],
         isInitiated: false,
         streamId: null,
         abortController: null,
@@ -138,7 +157,7 @@ const useHttpStreaming = () => {
     traceMap.value[traceId].data.push((res) => handlers.data(data, res));
     traceMap.value[traceId].error.push((err) => handlers.error(data, err));
     traceMap.value[traceId].complete.push((_) => handlers.complete(data, _));
-    traceMap.value[traceId].reset.push((res) => handlers.reset(data, res));
+    if (handlers.onActivity) traceMap.value[traceId].activity.push(handlers.onActivity);
 
     // If the stream connection is already initiated for this trace, exit early
     if (traceMap.value[traceId].isInitiated) {
@@ -195,12 +214,6 @@ const useHttpStreaming = () => {
         url += `&fallback_order_by_col=${meta?.fallback_order_by_col}`;
       if (clear_cache) url += `&clear_cache=${clear_cache}`;
       if (meta?.is_ui_histogram) url += `&is_ui_histogram=${meta?.is_ui_histogram}`;
-
-      if (type === "histogram") {
-        let is_multi_stream_search = false;
-        if (queryReq.query?.sql.indexOf(" UNION ALL ") !== -1) is_multi_stream_search = true;
-        url += `&is_multi_stream_search=${is_multi_stream_search}`;
-      }
     } else if (type === "values") {
       url = `/_values_stream`;
       if (meta?.keyword) url += `?keyword=${encodeURIComponent(meta.keyword)}`;
@@ -382,6 +395,8 @@ const useHttpStreaming = () => {
 
               const { done, value } = await reader.read();
 
+              for (const handler of traceMap.value[traceId]?.activity ?? []) handler();
+
               if (done) {
                 worker.postMessage({
                   action: "endStream",
@@ -415,14 +430,16 @@ const useHttpStreaming = () => {
                 // Refresh succeeded but stream is broken — signal error so UI can retry
                 onError(traceId, {
                   status: 401,
-                  message: "Session refreshed, please retry search",
+                  message: gt("search.sessionRefreshedRetrySearch"),
                 });
               } catch {
                 // Refresh failed — logout/reload already handled inside attemptTokenRefresh
               }
             } else {
-              console.error("Error reading stream:", error);
-              onError(traceId, error);
+              // A dropped connection (offline, sleep, tab freeze) is not an app fault.
+              if (isNetworkFailure(error)) console.warn("Error reading stream:", error);
+              else console.error("Error reading stream:", error);
+              onError(traceId, withErrorFields(error));
             }
           } finally {
             // Always release the reader lock to prevent resource leaks
@@ -442,18 +459,15 @@ const useHttpStreaming = () => {
       activeStreamId.value = traceId;
     } catch (error) {
       if ((error as any).name === "AbortError") {
-        // console.error('Stream was canceled');
+        // An aborted stream reaches no completion handler, so release it here.
+        cleanUpListeners(traceId);
       } else if ((error as any).status === 401) {
         // A refresh was already attempted in Path 1 (initial fetch 401 handler).
         // Reaching here means the refresh didn't help or json() parsing failed
         // on a 401 response — fall back to logout.
-        store.dispatch("logout");
-        useLocalCurrentUser("", true);
-        useLocalUserInfo("", true);
-        sessionStorage.clear();
-        window.location.reload();
+        expireSession(store);
       } else {
-        onError(traceId, error);
+        onError(traceId, withErrorFields(error));
       }
     }
   };
@@ -486,6 +500,11 @@ const useHttpStreaming = () => {
   const cleanUpListeners = (traceId: string) => {
     if (traceMap.value[traceId]) {
       delete traceMap.value[traceId];
+    }
+    // Also release the controller: leaving it here after a normal completion
+    // leaked it (and the panel state its abort listeners hold) for the session.
+    if (abortControllers.value[traceId]) {
+      delete abortControllers.value[traceId];
     }
   };
 

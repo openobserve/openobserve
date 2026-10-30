@@ -20,13 +20,13 @@ O2 overlay primitives (Dialog, Drawer, Dropdown, Popover, Tooltip) and navigatio
 
 ## Overlay decision guide
 
-| If you need… | Use | Not |
-|---|---|---|
-| A hover/focus hint describing an element (no interaction inside) | **OTooltip** | Popover — a tooltip is dismissable-free and passive |
-| A menu of **actions** (Edit, Duplicate, Delete) triggered by a button | **ODropdown** + items | Popover — dropdown gives menu semantics (arrow-key nav, typeahead, `role="menu"`) |
-| **Freeform** floating content (filter form, color picker, mini info card) | **OPopover** | Dropdown — popover keeps normal Tab order and frees arrow keys for the content |
-| A focused **modal task** centred on screen (create/edit form, confirm) | **ODialog** | Drawer — dialog is for short, self-contained tasks |
-| A **side panel** task (details inspector, long form, contextual editor) | **ODrawer** | Dialog — drawer slides from an edge and can stay `seamless` (page still usable) |
+| If you need…                                                              | Use                   | Not                                                                               |
+| ------------------------------------------------------------------------- | --------------------- | --------------------------------------------------------------------------------- |
+| A hover/focus hint describing an element (no interaction inside)          | **OTooltip**          | Popover — a tooltip is dismissable-free and passive                               |
+| A menu of **actions** (Edit, Duplicate, Delete) triggered by a button     | **ODropdown** + items | Popover — dropdown gives menu semantics (arrow-key nav, typeahead, `role="menu"`) |
+| **Freeform** floating content (filter form, color picker, mini info card) | **OPopover**          | Dropdown — popover keeps normal Tab order and frees arrow keys for the content    |
+| A focused **modal task** centred on screen (create/edit form, confirm)    | **ODialog**           | Drawer — dialog is for short, self-contained tasks                                |
+| A **side panel** task (details inspector, long form, contextual editor)   | **ODrawer**           | Dialog — drawer slides from an edge and can stay `seamless` (page still usable)   |
 
 Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything freeform, Dialog/Drawer = modal task.** Dialog and Drawer share the exact same surface, header/footer, built-in footer buttons, and `formId` auto-loading — choose by placement (center vs edge), not capability.
 
@@ -35,10 +35,12 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 ## Overlay
 
 ### ODialog
+
 **Import:** `@/lib/overlay/Dialog/ODialog.vue`
 **Use when:** A user must complete a short, self-contained task without leaving the page — create/edit forms, confirmations, focused settings.
 **Don't use for:** Long or contextual side-panel work (use **ODrawer**); a menu of actions (use **ODropdown**); a passive hint (use **OTooltip**).
 **Key props:**
+
 - `open` (boolean — controlled, use `v-model:open`)
 - `size` (`"xs"|"sm"|"md"|"lg"|"xl"|"full"` — default `"md"`; xs=320px, sm=480px, md=640px, lg=800px, xl=1024px, full=screen)
 - `width` (number 1–100 → `vw`; overrides `size` width entirely)
@@ -77,16 +79,21 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 ---
 
 ### ODrawer
+
 **Import:** `@/lib/overlay/Drawer/ODrawer.vue`
 **Use when:** A contextual or longer task belongs in a panel sliding from a viewport edge — details inspectors, long forms, side editors. Can stay `seamless` so the page underneath remains interactive.
 **Don't use for:** A short centred task or confirmation (use **ODialog**); a compact action menu (use **ODropdown**).
 **Key props:** (superset of ODialog — same header/footer/formId/built-in buttons) plus:
+
 - `side` (`"right"|"left"` — default `"right"`)
 - `size` (`"sm"|"md"|"lg"|"xl"|"full"` — default `"md"`; sm=360px, md=480px, lg=640px, xl=800px, full=100vw)
 - `width` (number 1–100 → `vw`, or `%` when `portalTarget` set; overrides `size`)
 - `seamless` (boolean — default `false`; hides the backdrop so the page stays interactive)
 - `lazy` (boolean — default `true`; body slot mounts on open and is destroyed on close — set `false` to preserve child state across open/close)
 - `portalTarget` (string selector | HTMLElement | null — scope the drawer to a container with `position:absolute`; the target needs `position:relative; overflow:hidden`)
+- `anchor` (string selector | HTMLElement — the drawer and its backdrop start at this element's edge instead of the viewport top, so a mobile side panel opens from its trigger's row; re-measured on open and resize)
+- `anchorEdge` (`"top"|"bottom"` — default `"top"`; use `"bottom"` when the trigger lives in the header itself)
+- Below md a `width` is clamped to at least 88% so a "40%" drawer is still usable on a phone. See [responsive § Side panels](responsive.md#side-panels-open-from-their-own-row).
 - Shared with ODialog: `open`, `persistent`, `title`, `subTitle`, `showClose`, `formId`, all `…ButtonLabel`/`…ButtonVariant`/`…ButtonDisabled`/`…ButtonLoading`
 
 **Slots:** `trigger`, `header`, `header-left`, `header-right`, `default`, `footer` (identical to ODialog)
@@ -116,6 +123,7 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 ---
 
 ### ODropdown
+
 **Import:** `@/lib/overlay/Dropdown/ODropdown.vue`
 **Use when:** A trigger (icon button, "•••", "Actions") opens a menu of discrete actions. Gives full menu semantics — arrow-key navigation, typeahead, `role="menu"`.
 **Don't use for:** Freeform content like forms or pickers (use **OPopover**); a persistent tab strip (use **OTabs**).
@@ -141,6 +149,7 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 ---
 
 ### ODropdownItem
+
 **Import:** `@/lib/overlay/Dropdown/ODropdownItem.vue`
 **Use when:** A single selectable action row inside an ODropdown.
 **Don't use for:** A section heading (use **ODropdownGroup**'s `label`); a visual divider (use **ODropdownSeparator**).
@@ -150,7 +159,11 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 **Example:**
 
 ```vue
-<ODropdownItem icon-left="download" shortcut-id="export.csv" @select="exportCsv">
+<ODropdownItem
+  icon-left="download"
+  shortcut-id="export.csv"
+  @select="exportCsv"
+>
   Export CSV
 </ODropdownItem>
 ```
@@ -160,6 +173,7 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 ---
 
 ### ODropdownGroup
+
 **Import:** `@/lib/overlay/Dropdown/ODropdownGroup.vue`
 **Use when:** Grouping related items under an optional label inside an ODropdown.
 **Don't use for:** A plain divider without a heading (use **ODropdownSeparator**).
@@ -180,6 +194,7 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 ---
 
 ### ODropdownSeparator
+
 **Import:** `@/lib/overlay/Dropdown/ODropdownSeparator.vue`
 **Use when:** A thin visual divider between groups of dropdown items.
 **Don't use for:** A labelled section (use **ODropdownGroup**).
@@ -197,35 +212,100 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 ---
 
 ### OPopover
+
 **Import:** `@/lib/overlay/Popover/OPopover.vue`
 **Use when:** Floating content that isn't a list of actions — filter forms, pickers, info cards, mini editors. Keeps normal Tab order; arrow keys belong to the content. Non-modal by default. Descendant overlays (OSelect / OCombobox / nested dropdowns) opened inside won't dismiss it.
 **Don't use for:** A menu of actions (use **ODropdown** for menu semantics); a passive text hint (use **OTooltip**); a large modal task (use **ODialog**/**ODrawer**).
 **Key props:** `open` (boolean, `v-model:open`) · `modal` (boolean — default `false`; traps focus + blocks outside pointer events) · `side` (`"top"|"right"|"bottom"|"left"` — default `"bottom"`) · `align` (`"start"|"center"|"end"` — default `"start"`) · `sideOffset` (number — default `4`) · `hideWhenDetached` (boolean — default `true`; hide when trigger scrolls out of view) · `ariaLabel` (string) · `zIndex` (number — default `6000`) · `contentClass` (string)
 **Slots:** `trigger` (as-child), `default` (content)
 **Emits:** `update:open` (boolean)
-**Example:**
+
+**Info-popover recipe.** Explanatory copy that would otherwise be a paragraph or a
+truncated sentence (copy-and-values.md § A sentence cut by an ellipsis): a ghost
+info button labelled with what it explains, placed beside the control it qualifies,
+icon-only on phones with the label kept for screen readers; the body is one `meta`
+paragraph capped to the viewport.
 
 ```vue
-<OPopover align="end">
+<OPopover v-model:open="noteOpen" side="bottom" align="start" :aria-label="t('dbm.metrics.load.about')">
   <template #trigger>
-    <OButton variant="outline" icon="filter">Filters</OButton>
+    <OButton variant="ghost" size="xs" icon-left="info-outline" data-test="dbm-metrics-load-hint-trigger">
+      <span class="max-md:sr-only">{{ t("dbm.metrics.load.about") }}</span>
+    </OButton>
   </template>
-  <div class="flex flex-col gap-2 p-3">
-    <OSelect v-model="status" :options="statusOptions" label="Status" />
-    <OInput v-model="search" label="Contains" />
+  <p class="w-96 max-w-[calc(100vw-1.5rem)] p-3 leading-5" data-test="dbm-metrics-load-hint">
+    <OText variant="meta">{{ t("dbm.metrics.load.hint") }}</OText>
+  </p>
+</OPopover>
+```
+
+Use `align="start"` when the button sits at the start of its row; an `OTooltip` is
+not a substitute — it is hover-only and never opens on touch.
+
+**Filter-popover recipe.** A "Filters" / "Narrow results" popover is not a loose
+stack of selects — build it as **one panel you fill in and dismiss**: a title, a
+column of **labelled** fields, then a **pinned action row**. Three rules:
+
+- **Every field carries a label**, even when its placeholder names the dimension
+  (`ENGINE` label above an `All engines` placeholder). The label is the axis; the
+  placeholder is the *unset* state. Prefer the field component's own `label` prop
+  (it wires `for`/`id` + a11y); drop to a hand-rolled micro-label
+  (`text-text-label text-3xs font-semibold tracking-wide uppercase`) only when the
+  label must match a string shown elsewhere (e.g. a toolbar chip) and be cased up.
+- **A pinned action row** at the bottom, divided by `border-t border-border-default`,
+  holding **Clear all** (`variant="outline"`, `:disabled` when nothing is set so its
+  place never shifts). **No Done/Apply button when filters apply live** — each
+  `@update` already commits, so there is nothing to submit, and the popover
+  dismisses on outside-click. Add a primary Done only if the popover *stages*
+  changes and commits on close.
+- **Don't reserve/hide the reset by presence** — keep Clear all in the layout and
+  toggle `:disabled`, so opening the popover doesn't shift the fields upward.
+
+```vue
+<OPopover v-model:open="open" align="end">
+  <template #trigger>
+    <OButton variant="outline" icon-left="filter-list">{{ t("dbm.filters.scope") }}</OButton>
+  </template>
+  <div class="flex w-72 flex-col">
+    <div class="flex flex-col gap-2.5 p-3">
+      <p class="text-text-primary text-sm font-semibold">{{ t("dbm.filters.popoverTitle") }}</p>
+      <OSelect
+        v-for="f in filters"
+        :key="f.key"
+        :label="f.dimension"
+        :model-value="f.value"
+        :options="f.options"
+        size="sm"
+        clearable
+        :placeholder="f.placeholder"
+        @update:model-value="f.onChange"
+      />
+    </div>
+    <div class="border-border-default flex items-center border-t px-3 py-2.5">
+      <OButton variant="outline" size="sm" :disabled="!activeCount" @click="clear">
+        {{ t("dbm.filters.clearScope") }}
+      </OButton>
+    </div>
   </div>
 </OPopover>
 ```
+
+Reference implementation: `web/src/components/dbm/DbmScopeFilters.vue` (adds the
+set dimensions back to the toolbar as removable `ODimensionChip`s, so an
+unfiltered page spends one button and a filtered one shows its scope as chips).
 
 **Family:** ODropdown (menu sibling — shares overlay coordination).
 
 ---
 
 ### OTooltip
+
 **Import:** `@/lib/overlay/Tooltip/OTooltip.vue`
-**Use when:** A passive hover/focus hint describing an element — icon-button labels, truncated text, disabled-state explanations. Two modes: **wrapper** (default slot wraps the trigger) or **child** (no default slot — attaches to its parent element as its tooltip).
+**Use when:** A passive hover/focus hint describing an element — icon-button labels, disabled-state explanations, a hint that adds information. Two modes: **wrapper** (default slot wraps the trigger) or **child** (no default slot).
+**Cut text ("…") is not a hand-wired `OTooltip`:** use **`OTruncatedText`** ([core-display](core-display.md#otruncatedtext)), which shows the full text only while it is cut; in an `OTable` cell the table already does it. Never add an `OTooltip` (or a `title`) that just repeats the visible text.
+**Child mode binds to the nearest previous VISIBLE ELEMENT SIBLING, and only falls back to the parent when there is none** — it is not simply "the parent". So put a child-mode `OTooltip` **first** inside the element you want as the trigger; placed after an `<OIcon>` it silently binds to that icon, and only the icon becomes hoverable. Text nodes do not count as siblings, so `<OIcon/> {{ count }} <OTooltip/>` binds to the icon and leaves the count dead. This shipped in the alert-dependency count chips, where the tooltip fired on a 12px glyph inside a 52px chip.
 **Don't use for:** Anything the user interacts with inside the bubble (use **OPopover**); an action menu (use **ODropdown**).
-**Key props:** `content` (string — plain-text shorthand for `#content`) · `side` (`"top"|"right"|"bottom"|"left"` — default `"top"`) · `align` (`"start"|"center"|"end"` — default `"center"`) · `sideOffset` (number — default `4`) · `alignOffset` (number — default `0`) · `delay` (number ms — default `700`) · `maxWidth` (string — default `"320px"`) · `disabled` (boolean) · `open` (boolean — controlled) · `contentClass` (string) · `shortcut` (`string | string[]`) · `shortcutId` (string — prefer over `shortcut`)
+**Key props:** `content` (string — plain-text shorthand for `#content`) · `side` (`"top"|"right"|"bottom"|"left"` — default `"top"`) · `align` (`"start"|"center"|"end"` — default `"center"`) · `sideOffset` (number — default `4`) · `alignOffset` (number — default `0`) · `delay` (number ms — default `700`) · `maxWidth` (string — default `"320px"`) · `disabled` (boolean) · `open` (boolean — controlled) · `contentClass` (string) · `shortcut` (`string | string[]`) · `shortcutId` (string — prefer over `shortcut`) · `overflowOnly` (boolean — open only while the trigger's text is actually cut; without `content` it shows that text. `OTruncatedText` is built on this — reach for it first) · `anchor` (`HTMLElement | null` — position against a given element; one tooltip shared by many targets, visibility follows `open` alone)
 **Slots:** `default` (trigger — single focusable element; omit for child mode), `content` (rich content, overrides `content` prop)
 **Emits:** none
 **Example:**
@@ -250,6 +330,7 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 ## Navigation
 
 ### OPagination
+
 **Import:** `@/lib/navigation/Pagination/OPagination.vue`
 **Use when:** Navigating a paged list/table — a centred window of page-number buttons with prev/next.
 **Don't use for:** Switching between content sections (use **OTabs**); a linear multi-step flow (use **OStepper**).
@@ -267,6 +348,7 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 ---
 
 ### OStepper
+
 **Import:** `@/lib/navigation/Stepper/OStepper.vue`
 **Use when:** A guided linear flow across multiple steps — a wizard, or (with `expanded`) a progress checklist/timeline. Root container owns the active-step state and only the active step's panel shows by default.
 **Don't use for:** Peer content sections switched in any order (use **OTabs**); paging a list (use **OPagination**).
@@ -294,6 +376,7 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 ---
 
 ### OStep
+
 **Import:** `@/lib/navigation/Stepper/OStep.vue`
 **Use when:** One step within an OStepper — registers itself and renders its content when active.
 **Don't use for:** Standalone use — must be a child of OStepper.
@@ -303,7 +386,13 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 **Example:**
 
 ```vue
-<OStep :name="2" title="Transform" description="Optional" :done="step > 2" :error="hasError">
+<OStep
+  :name="2"
+  title="Transform"
+  description="Optional"
+  :done="step > 2"
+  :error="hasError"
+>
   <TransformConfig />
 </OStep>
 ```
@@ -313,6 +402,7 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 ---
 
 ### OTabs
+
 **Import:** `@/lib/navigation/Tabs/OTabs.vue`
 **Use when:** The tab-bar container for switching between peer content sections. Owns the active-tab state; pair with OTabPanels/OTabPanel for the content area.
 **Don't use for:** A linear wizard (use **OStepper**); route-per-tab navigation without a shared panel area — use **ORouteTab** children instead of OTab.
@@ -325,6 +415,7 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 ---
 
 ### OTab
+
 **Import:** `@/lib/navigation/Tabs/OTab.vue`
 **Use when:** A single **content-switching** tab trigger inside OTabs — clicking it just changes the active tab (via OTabs' `v-model`), no routing.
 **Don't use for:** A tab that should navigate to a route (use **ORouteTab**).
@@ -342,6 +433,7 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 ---
 
 ### ORouteTab
+
 **Import:** `@/lib/navigation/Tabs/ORouteTab.vue`
 **Use when:** A tab that is **route-driven** — clicking navigates via Vue Router (`to`), and the active tab auto-syncs when the route matches `name`. Use for URL-addressable sections (deep links, back-button support).
 **Don't use for:** In-place content switching with no URL change (use **OTab**).
@@ -362,6 +454,7 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 ---
 
 ### OTabPanels
+
 **Import:** `@/lib/navigation/Tabs/OTabPanels.vue`
 **Use when:** The container that shows the correct OTabPanel for the active tab. Keep its `modelValue` in sync with OTabs' `v-model`.
 **Don't use for:** The tab strip itself (use **OTabs**).
@@ -374,6 +467,7 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 ---
 
 ### OTabPanel
+
 **Import:** `@/lib/navigation/Tabs/OTabPanel.vue`
 **Use when:** The content area for one tab, shown when its `name` matches the active tab.
 **Don't use for:** Standalone use — must be a child of OTabPanels.
@@ -384,8 +478,8 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 
 ```vue
 <script setup lang="ts">
-import { ref } from 'vue'
-const activeTab = ref('logs')
+import { ref } from "vue";
+const activeTab = ref("logs");
 </script>
 
 <template>

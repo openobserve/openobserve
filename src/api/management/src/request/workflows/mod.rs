@@ -25,26 +25,36 @@ use common::utils::sql::escape_like;
 use config::{
     ider,
     meta::{
+        folder::DEFAULT_FOLDER,
         search::{Query as SearchQuery, Request as SearchRequest},
         self_reporting::{error::NodeErrors, usage::TRIGGERS_STREAM},
         stream::StreamType,
     },
     utils::time::now_micros,
 };
-use db::workflows::WorkflowTriggerType;
+use db::workflows::{AssociationDeleteEvent, WorkflowTriggerType};
 use infra::table::workflows::{
     Workflow, WorkflowAssociation, WorkflowRunErrors, WorkflowTriggerEntity,
 };
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
+#[cfg(feature = "enterprise")]
+use openobserve_core::auth::check_permissions;
 use search_service::{self as SearchService, query_range::get_settings_max_query_range};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use utoipa::ToSchema;
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id},
-    service::workflows::{self, InputMap},
+    service::{
+        auth::check_folder_write_permissions,
+        workflows::{self, InputMap},
+    },
 };
+
+/// Bounded because a move runs one OpenFGA check per id before authorizing anything.
+const MAX_MOVE_WORKFLOWS: usize = 100;
 
 #[derive(Deserialize)]
 pub struct WorkflowTestInput {
@@ -52,12 +62,16 @@ pub struct WorkflowTestInput {
     workflow: Workflow,
     #[serde(default)]
     from_node: Option<String>,
+    /// Defaults to true so a client that omits the field cannot page on-call by testing.
+    #[serde(default = "default_suppress_destinations")]
+    suppress_destinations: bool,
 }
 
 #[derive(Serialize)]
 pub struct WorkflowTestResult {
     errors: HashMap<String, NodeErrors>,
     inputs: HashMap<String, Vec<Value>>,
+    outputs: HashMap<String, Vec<Value>>,
 }
 
 #[derive(Serialize)]
@@ -109,12 +123,67 @@ pub struct WorkflowListItem {
     associations: Vec<WorkflowAssociation>,
     #[serde(flatten)]
     workflow: Workflow,
+    is_draft: bool,
+    /// The owning folder's URL slug. Overrides the flattened workflow's
+    /// `folder_id`, which is the primary key — the browser puts this in the URL,
+    /// and a primary key there addresses nothing.
+    folder_id: Option<String>,
+    /// Display name of the owning folder. The row stores the primary key, which
+    /// is meaningless to a client, so the name is resolved here.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    folder_name: Option<String>,
+}
+
+/// Resolves a folder primary key to its `(slug, display name)`, memoized so a
+/// cross-folder listing hits the folders table once per folder, not once per row.
+async fn resolve_folder(
+    cache: &mut HashMap<String, Option<(String, String)>>,
+    folder_pk: &str,
+) -> Option<(String, String)> {
+    if let Some(hit) = cache.get(folder_pk) {
+        return hit.clone();
+    }
+    let resolved = infra::table::folders::get_name_and_display_name_by_pk(folder_pk)
+        .await
+        .ok()
+        .flatten();
+    cache.insert(folder_pk.to_string(), resolved.clone());
+    resolved
 }
 
 #[derive(Deserialize)]
 pub struct WorkflowCreatePayload {
     trigger_type: WorkflowTriggerType,
     workflow: Workflow,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum WorkflowDeleteOutcome {
+    DeletePublished,
+    DraftOnly,
+    NotFound,
+}
+
+fn default_suppress_destinations() -> bool {
+    true
+}
+
+/// An unqualified delete must not report success for an id it never removed, so a draft-only
+/// id is named as such rather than silently matching zero published rows.
+fn workflow_delete_outcome(published_exists: bool, draft_exists: bool) -> WorkflowDeleteOutcome {
+    match (published_exists, draft_exists) {
+        (true, _) => WorkflowDeleteOutcome::DeletePublished,
+        (false, true) => WorkflowDeleteOutcome::DraftOnly,
+        (false, false) => WorkflowDeleteOutcome::NotFound,
+    }
+}
+
+fn lookup_error(e: anyhow::Error) -> Response {
+    if e.downcast_ref::<db::workflows::NotFound>().is_some() {
+        MetaHttpResponse::not_found(e)
+    } else {
+        MetaHttpResponse::internal_error(e)
+    }
 }
 
 /// CreateWorkflow
@@ -132,56 +201,92 @@ pub struct WorkflowCreatePayload {
     ),
     params(
         ("org_id" = String, Path, description = "Organization id"),
+        ("folder" = Option<String>, Query, description = "Destination folder id, defaults to the org's default folder. Applies to drafts too."),
+        ("draft" = Option<bool>, Query, description = "Save to the drafts table, skipping graph validation"),
     ),
     request_body(content = inline(Object), description = "Workflow data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 403, description = "No write access to the destination folder", content_type = "application/json", body = ()),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "create"})),
     )
 )]
 pub async fn save_workflow(
     Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
+    Query(query): Query<HashMap<String, String>>,
     Json(payload): Json<WorkflowCreatePayload>,
 ) -> Response {
     let mut workflow = payload.workflow;
     workflow.name = workflow.name.trim().to_lowercase();
     workflow.org_id = org_id.clone();
     workflow.id = ider::generate();
-    workflow.created_by = user_email.user_id;
+    workflow.created_by = user_email.user_id.clone();
 
     let id = workflow.id.to_string();
     let name = workflow.name.clone();
-    match workflows::save_workflow(workflow).await {
-        Ok(()) => {
-            if payload.trigger_type == WorkflowTriggerType::IncidentEvent
-                && let Err(e) = db::workflows::associate_workflow(
-                    &org_id,
-                    &id,
-                    "system",
-                    WorkflowTriggerEntity::Incident.to_string(),
-                    WorkflowTriggerType::IncidentEvent.to_string(),
-                )
-                .await
-            {
-                log::error!(
-                    "error in associating workflow to incident after successful creation of workflow : {org_id}/{id} : {e}"
-                );
-                MetaHttpResponse::internal_error(format!(
-                    "workflow created successfully , but failed to save the association : {e}"
-                ))
-            } else {
-                MetaHttpResponse::json(
-                    MetaHttpResponse::message(StatusCode::OK, "Workflow created successfully")
-                        .with_id(id)
-                        .with_name(name),
-                )
+
+    let is_draft = match query.get("draft") {
+        Some(v) => v.as_str(),
+        None => "false",
+    };
+
+    let is_draft: bool = is_draft.parse().unwrap_or(true);
+
+    // The query parameter is authoritative so one request cannot name two
+    // different destinations. Normalized so the slug authorized below is the one
+    // the save resolves to.
+    let folder = workflows::normalize_folder_slug(query.get("folder").map(|s| s.as_str()));
+
+    // Drafts are folder-scoped too, so the same check gates both branches.
+    if !check_folder_write_permissions(&org_id, &user_email.user_id, "workflow_folder", folder)
+        .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
+
+    if !is_draft {
+        match workflows::save_workflow(workflow, Some(folder)).await {
+            Ok(()) => {
+                if payload.trigger_type == WorkflowTriggerType::IncidentEvent
+                    && let Err(e) = db::workflows::associate_workflow(
+                        &org_id,
+                        &id,
+                        "system",
+                        WorkflowTriggerEntity::Incident.to_string(),
+                        WorkflowTriggerType::IncidentEvent.to_string(),
+                    )
+                    .await
+                {
+                    log::error!(
+                        "error in associating workflow to incident after successful creation of workflow : {org_id}/{id} : {e}"
+                    );
+                    MetaHttpResponse::internal_error(format!(
+                        "workflow created successfully , but failed to save the association : {e}"
+                    ))
+                } else {
+                    MetaHttpResponse::json(
+                        MetaHttpResponse::message(StatusCode::OK, "Workflow created successfully")
+                            .with_id(id)
+                            .with_name(name),
+                    )
+                }
             }
+            Err(e) => MetaHttpResponse::bad_request(e),
         }
-        Err(e) => MetaHttpResponse::bad_request(e),
+    } else {
+        match workflows::save_draft(workflow, Some(folder)).await {
+            Ok(()) => MetaHttpResponse::json(
+                MetaHttpResponse::message(StatusCode::OK, "draft saved successfully")
+                    .with_id(id)
+                    .with_name(name),
+            ),
+            Err(e) => MetaHttpResponse::bad_request(e),
+        }
     }
 }
 
@@ -200,49 +305,77 @@ pub async fn save_workflow(
     ),
     params(
         ("org_id" = String, Path, description = "Organization id"),
+        ("folder" = Option<String>, Query, description = "Folder ID to list within. The default folder is used when absent."),
+        ("all_folders" = Option<bool>, Query, description = "List across every folder the caller may see. Overrides `folder`."),
+        ("search_substring" = Option<String>, Query, description = "Case-insensitive substring the workflow name or description must contain."),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = inline(Object)),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<Object>),
+        (status = 403, description = "The caller's workflow listing was refused", content_type = "application/json", body = ()),
+        (status = 404, description = "The folder does not exist", content_type = "application/json", body = ()),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "list"})),
     )
 )]
 pub async fn list_workflows(
     Path(org_id): Path<String>,
     Headers(_user_email): Headers<UserEmail>,
+    Query(query): Query<HashMap<String, String>>,
 ) -> Response {
-    let mut _permitted = None;
     // Get List of allowed objects
-    #[cfg(feature = "enterprise")]
+    use o2_openfga::meta::mapping::OFGA_MODELS;
+
+    let permitted = match openobserve_api_common::auth::validator::list_objects_for_user(
+        &org_id,
+        &_user_email.user_id,
+        "GET",
+        OFGA_MODELS
+            .get("workflows")
+            .map_or("workflows", |model| model.key),
+    )
+    .await
     {
-        use o2_openfga::meta::mapping::OFGA_MODELS;
-
-        match openobserve_api_common::auth::validator::list_objects_for_user(
-            &org_id,
-            &_user_email.user_id,
-            "GET",
-            OFGA_MODELS
-                .get("workflows")
-                .map_or("workflows", |model| model.key),
-        )
-        .await
-        {
-            Ok(list) => {
-                _permitted = list;
-            }
-            Err(e) => {
-                return common::meta::http::HttpResponse::forbidden(e.to_string());
-            }
+        Ok(list) => list,
+        Err(e) => {
+            return common::meta::http::HttpResponse::forbidden(e.to_string());
         }
-        // Get List of allowed objects ends
-    }
-
-    let workflows = match workflows::list_workflows(&org_id, _permitted).await {
-        Ok(workflows) => workflows,
-        Err(e) => return MetaHttpResponse::internal_error(e),
     };
+    // Get List of allowed objects ends
+
+    // `all_folders=true` lists across every folder. A `folder=all` sentinel
+    // would instead be authorized against a folder that does not exist; rows
+    // still pass the per-item permission filter below either way.
+    let across_folders = query
+        .get("all_folders")
+        .is_some_and(|v| v.eq_ignore_ascii_case("true"));
+    let folder = if across_folders {
+        None
+    } else {
+        Some(
+            query
+                .get("folder")
+                .map(|s| s.as_str())
+                .unwrap_or(DEFAULT_FOLDER),
+        )
+    };
+
+    // Matched in the database rather than in the browser, so a cross-folder
+    // search does not depend on every workflow having been fetched first.
+    let search_substring = query.get("search_substring").map(|s| s.as_str());
+
+    let workflows =
+        match workflows::list_workflows(&org_id, permitted.clone(), folder, search_substring).await
+        {
+            Ok(workflows) => workflows,
+            Err(e) => return lookup_error(e),
+        };
+
     let mut ret = Vec::with_capacity(workflows.len());
+    // Resolved once per distinct folder rather than per row.
+    let mut folders: HashMap<String, Option<(String, String)>> = HashMap::new();
+
     for w in workflows {
         let associations = match workflows::get_workflow_associations(&org_id, &w.id).await {
             Ok(v) => v,
@@ -254,15 +387,147 @@ pub async fn list_workflows(
                 continue;
             }
         };
+
+        let folder = resolve_folder(&mut folders, &w.folder_id).await;
+
         ret.push(WorkflowListItem {
             workflow: w,
             associations,
+            is_draft: false,
+            folder_id: folder.as_ref().map(|(slug, _)| slug.clone()),
+            folder_name: folder.map(|(_, display)| display),
         });
     }
+
+    let drafts = match workflows::list_drafts(&org_id, permitted, folder).await {
+        Ok(workflows) => workflows,
+        Err(e) => return lookup_error(e),
+    };
+
+    // The draft rows come straight from the table rather than through the same
+    // LIKE as the published ones, so the term is applied here: the browser stops
+    // filtering locally once the search is server-side.
+    let needle = search_substring
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_lowercase);
+    for draft in drafts {
+        if let Some(needle) = needle.as_deref()
+            && !draft.name.to_lowercase().contains(needle)
+            && !draft.description.to_lowercase().contains(needle)
+        {
+            continue;
+        }
+        let folder = resolve_folder(&mut folders, &draft.folder_id).await;
+        ret.push(WorkflowListItem {
+            workflow: draft,
+            associations: vec![],
+            is_draft: true,
+            folder_id: folder.as_ref().map(|(slug, _)| slug.clone()),
+            folder_name: folder.map(|(_, display)| display),
+        });
+    }
+
     MetaHttpResponse::json(ret)
 }
 
-/// DeleteWorkflows
+/// MoveWorkflows
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct MoveWorkflowsRequestBody {
+    /// IDs of the workflows to move.
+    pub workflow_ids: Vec<String>,
+    /// Destination folder id.
+    pub dst_folder_id: String,
+}
+
+#[utoipa::path(
+    patch,
+    path = "/v2/{org_id}/workflows/move",
+    context_path = "/api",
+    tag = "Workflows",
+    operation_id = "MoveWorkflows",
+    summary = "Move workflows to a different folder",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization id"),
+    ),
+    request_body(content = MoveWorkflowsRequestBody, description = "IDs and destination folder", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Moved"),
+        (status = 400, description = "No workflow ids, too many ids, or an empty destination folder", content_type = "application/json", body = ()),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "A workflow or the destination folder does not exist", content_type = "application/json", body = ()),
+        (status = 500, description = "Error", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "update"})),
+    )
+)]
+pub async fn move_workflows(
+    Path(org_id): Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<MoveWorkflowsRequestBody>,
+) -> Response {
+    if body.workflow_ids.is_empty() {
+        return MetaHttpResponse::bad_request("workflow_ids cannot be empty");
+    }
+    if body.workflow_ids.len() > MAX_MOVE_WORKFLOWS {
+        return MetaHttpResponse::bad_request(format!(
+            "workflow_ids cannot exceed {MAX_MOVE_WORKFLOWS} entries"
+        ));
+    }
+    if body.dst_folder_id.trim().is_empty() {
+        return MetaHttpResponse::bad_request("dst_folder_id cannot be empty");
+    }
+
+    // This route is bypass:true in the permission table, so the writes are
+    // authorized here: PUT on every workflow being moved, plus write access to
+    // the destination folder. Without both, a list+delete role could relocate
+    // workflows between folders it cannot write.
+    // Gated because the OSS `check_permissions` stub denies unconditionally, which
+    // would 403 every caller instead of skipping RBAC.
+    #[cfg(feature = "enterprise")]
+    {
+        let checks = body.workflow_ids.iter().map(|id| {
+            check_permissions(
+                id,
+                &org_id,
+                &user_email.user_id,
+                "workflows",
+                "PUT",
+                None,
+                false,
+                true,
+                false,
+            )
+        });
+        if !futures::future::join_all(checks).await.iter().all(|ok| *ok) {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+    }
+
+    if !check_folder_write_permissions(
+        &org_id,
+        &user_email.user_id,
+        "workflow_folder",
+        &body.dst_folder_id,
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden("Forbidden");
+    }
+
+    match workflows::move_workflows(&org_id, &body.workflow_ids, &body.dst_folder_id).await {
+        Ok(()) => MetaHttpResponse::ok("workflows moved"),
+        Err(e) => {
+            log::error!("[workflows] move_workflows: {e}");
+            lookup_error(e)
+        }
+    }
+}
 
 #[utoipa::path(
     delete,
@@ -277,21 +542,101 @@ pub async fn list_workflows(
     ),
     params(
         ("org_id" = String, Path, description = "Organization id"),
-        ("workflow_id" = String, Path, description = "Workflow id"),
+        ("id" = String, Path, description = "Workflow id"),
+        ("draft" = Option<bool>, Query, description = "Target the draft instead of the published workflow, defaults to false"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Object)),
+        (status = 400, description = "Workflow is still associated with entities", content_type = "application/json", body = ()),
+        (status = 404, description = "No published workflow with that id", content_type = "application/json", body = ()),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "delete"})),
     )
 )]
-pub async fn delete_workflows(Path((org_id, id)): Path<(String, String)>) -> Response {
-    match workflows::delete_workflow(&org_id, &id).await {
-        Ok(_) => MetaHttpResponse::ok("deleted successfully"),
-        Err(e) => {
-            log::error!("error deleting workflow {org_id}/{id} : {e}");
-            MetaHttpResponse::internal_error(e)
+pub async fn delete_workflows(
+    Path((org_id, id)): Path<(String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    let is_draft = match query.get("draft") {
+        Some(v) => v.as_str(),
+        None => "false",
+    };
+
+    let is_draft: bool = is_draft.parse().unwrap_or(false);
+
+    if !is_draft {
+        let published_exists = match workflows::get_workflow_by_id(&org_id, &id).await {
+            Ok(v) => v.is_some(),
+            Err(e) => {
+                log::error!("error getting workflow {org_id}/{id} before delete : {e}");
+                return MetaHttpResponse::internal_error(e);
+            }
+        };
+        let draft_exists = match workflows::get_draft_by_id(&org_id, &id).await {
+            Ok(v) => v.is_some(),
+            Err(e) => {
+                log::error!("error getting draft {org_id}/{id} before delete : {e}");
+                return MetaHttpResponse::internal_error(e);
+            }
+        };
+
+        match workflow_delete_outcome(published_exists, draft_exists) {
+            WorkflowDeleteOutcome::NotFound => {
+                return MetaHttpResponse::not_found(format!(
+                    "workflow with id {id} does not exist"
+                ));
+            }
+            WorkflowDeleteOutcome::DraftOnly => {
+                return MetaHttpResponse::not_found(format!(
+                    "no published workflow with id {id}; it is a draft, delete it with ?draft=true"
+                ));
+            }
+            WorkflowDeleteOutcome::DeletePublished => {}
+        }
+
+        let associations = match db::workflows::get_workflow_associations(&org_id, &id).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!(
+                    "error listing workflow associations before delete for {org_id}/{id} : {e}"
+                );
+                return MetaHttpResponse::internal_error(e);
+            }
+        };
+        if associations
+            .iter()
+            .any(|a| a.trigger_type != WorkflowTriggerType::IncidentEvent.to_string())
+        {
+            return MetaHttpResponse::bad_request(
+                "workflow is still associated with entities, must remove the connection first",
+            );
+        }
+        match workflows::delete_workflow(&org_id, &id).await {
+            Ok(_) => MetaHttpResponse::ok("deleted successfully"),
+            Err(e) => {
+                log::error!("error deleting workflow {org_id}/{id} : {e}");
+                MetaHttpResponse::internal_error(e)
+            }
+        }
+    } else {
+        let draft_exists = match workflows::get_draft_by_id(&org_id, &id).await {
+            Ok(v) => v.is_some(),
+            Err(e) => {
+                log::error!("error getting draft {org_id}/{id} before delete : {e}");
+                return MetaHttpResponse::internal_error(e);
+            }
+        };
+        if !draft_exists {
+            return MetaHttpResponse::bad_request("draft workflow with given id not found");
+        }
+        match workflows::delete_draft(&org_id, &id).await {
+            Ok(_) => MetaHttpResponse::ok("deleted successfully"),
+            Err(e) => {
+                log::error!("error deleting workflow {org_id}/{id} : {e}");
+                MetaHttpResponse::internal_error(e)
+            }
         }
     }
 }
@@ -311,18 +656,22 @@ pub async fn delete_workflows(Path((org_id, id)): Path<(String, String)>) -> Res
     ),
     params(
         ("org_id" = String, Path, description = "Organization id"),
-        ("workflow_id" = String, Path, description = "Workflow id"),
+        ("id" = String, Path, description = "Workflow id"),
+        ("draft" = Option<bool>, Query, description = "Target the draft instead of the published workflow, defaults to false"),
     ),
     request_body(content = inline(Object), description = "Workflow data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Object)),
+        (status = 400, description = "Id mismatch, no such workflow or draft, or an invalid workflow", content_type = "application/json", body = ()),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "update"})),
     )
 )]
 pub async fn update_workflows(
     Path((org_id, id)): Path<(String, String)>,
+    Query(query): Query<HashMap<String, String>>,
     Json(payload): Json<WorkflowCreatePayload>,
 ) -> Response {
     let mut workflow = payload.workflow;
@@ -333,26 +682,109 @@ pub async fn update_workflows(
         return MetaHttpResponse::bad_request("id mismatch in payload and path");
     }
 
-    match workflows::get_workflow_by_id(&org_id, &id).await {
-        Err(e) => {
-            log::error!("error getting workflow {org_id}/{id} : {e}");
-            return MetaHttpResponse::internal_error(e);
-        }
-        Ok(None) => {
-            return MetaHttpResponse::bad_request("workflow with given id does not exist");
-        }
-        _ => {}
+    let is_draft = match query.get("draft") {
+        Some(v) => v.as_str(),
+        None => "false",
     };
+
+    let is_draft: bool = is_draft.parse().unwrap_or(false);
 
     let id = workflow.id.to_string();
     let name = workflow.name.clone();
-    match workflows::update_workflow(workflow).await {
-        Ok(()) => MetaHttpResponse::json(
+
+    if !is_draft {
+        match workflows::get_workflow_by_id(&org_id, &id).await {
+            Err(e) => {
+                log::error!("error getting workflow {org_id}/{id} : {e}");
+                return MetaHttpResponse::internal_error(e);
+            }
+            Ok(None) => {
+                return MetaHttpResponse::bad_request("workflow with given id does not exist");
+            }
+            _ => {}
+        };
+        let existing_associations = match workflows::get_workflow_associations(&org_id, &id).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("error getting workflow associations for {org_id}/{id} : {e}");
+                return MetaHttpResponse::internal_error(e);
+            }
+        };
+
+        let incident_association_exists = existing_associations
+            .iter()
+            .any(|v| v.trigger_type == WorkflowTriggerType::IncidentEvent.to_string());
+
+        // this means that originally this was a incident workflow and now we have made it an alert
+        // workflow
+        if incident_association_exists
+            && payload.trigger_type == WorkflowTriggerType::AlertFired
+            && let Err(e) = db::workflows::delete_workflow_association(
+                AssociationDeleteEvent::TriggerWorkflow {
+                    org_id: org_id.clone(),
+                    trigger: WorkflowTriggerType::IncidentEvent.to_string(),
+                    workflow_id: id.clone(),
+                },
+            )
+            .await
+        {
+            log::error!(
+                "error deleting incident trigger for workflow {org_id}/{id} after update : {e}"
+            );
+            return MetaHttpResponse::internal_error(e);
+        };
+
+        if let Err(e) = workflows::update_workflow(workflow).await {
+            log::error!("error updating workflow {org_id}/{id} : {e}");
+            return MetaHttpResponse::bad_request(e);
+        };
+
+        // there is no existing incident association, but the new trigger type is incident,
+        // so we add an incident association. No reason to remove existing ones as workflows
+        // themselves as trigger type agnostic
+        if !incident_association_exists
+            && payload.trigger_type == WorkflowTriggerType::IncidentEvent
+            && let Err(e) = db::workflows::associate_workflow(
+                &org_id,
+                &id,
+                "system",
+                WorkflowTriggerEntity::Incident.to_string(),
+                WorkflowTriggerType::IncidentEvent.to_string(),
+            )
+            .await
+        {
+            log::error!(
+                "error in associating workflow to incident after successful updating of workflow : {org_id}/{id} : {e}"
+            );
+            return MetaHttpResponse::internal_error(format!(
+                "workflow updated successfully , but failed to save the association : {e}"
+            ));
+        }
+        MetaHttpResponse::json(
             MetaHttpResponse::message(StatusCode::OK, "Workflow updated successfully")
                 .with_id(id)
                 .with_name(name),
-        ),
-        Err(e) => MetaHttpResponse::bad_request(e),
+        )
+    } else {
+        match workflows::get_draft_by_id(&org_id, &id).await {
+            Err(e) => {
+                log::error!("error getting draft {org_id}/{id} : {e}");
+                return MetaHttpResponse::internal_error(e);
+            }
+            Ok(None) => {
+                return MetaHttpResponse::bad_request("draft with given id does not exist");
+            }
+            _ => {}
+        };
+
+        match workflows::update_draft(workflow).await {
+            Ok(()) => MetaHttpResponse::json(
+                MetaHttpResponse::message(StatusCode::OK, "Draft updated successfully")
+                    .with_id(id)
+                    .with_name(name),
+            ),
+            Err(e) => MetaHttpResponse::bad_request(e),
+        }
     }
 }
 
@@ -371,6 +803,7 @@ pub async fn update_workflows(
     ),
     params(
         ("org_id" = String, Path, description = "Organization id"),
+        ("draft" = Option<bool>, Query, description = "Test as a draft, defaults to false"),
     ),
     request_body(content = inline(Object), description = "Workflow inputs", content_type = "application/json"),
     responses(
@@ -378,20 +811,46 @@ pub async fn update_workflows(
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "create"})),
     )
 )]
 pub async fn test_workflow(
+    Headers(user_email): Headers<UserEmail>,
     Path(org_id): Path<String>,
+    Query(query): Query<HashMap<String, String>>,
     Json(inputs): Json<WorkflowTestInput>,
 ) -> Response {
     let mut workflow = inputs.workflow;
     workflow.org_id = org_id.clone();
+    // the run executes under a synthetic id; core keys history on this id only if it verifies
+    let workflow_id = workflow.id.clone();
     workflow.id = format!("test-{}", config::ider::uuid());
-    match workflows::test_workflow(&org_id, workflow, inputs.inputs, inputs.from_node).await {
+
+    let is_draft = match query.get("draft") {
+        Some(v) => v.as_str(),
+        None => "false",
+    };
+
+    let is_draft: bool = is_draft.parse().unwrap_or(false);
+
+    match workflows::test_workflow(
+        &org_id,
+        &workflow_id,
+        workflow,
+        inputs.inputs,
+        inputs.from_node,
+        workflows::TestWorkflowOptions {
+            is_draft,
+            suppress_destinations: inputs.suppress_destinations,
+        },
+        &user_email.user_id,
+    )
+    .await
+    {
         Ok(v) => MetaHttpResponse::json(WorkflowTestResult {
             errors: v.errors,
             inputs: v.inputs,
+            outputs: v.outputs,
         }),
         Err(e) => MetaHttpResponse::bad_request(e),
     }
@@ -414,13 +873,13 @@ pub async fn test_workflow(
         ("org_id" = String, Path, description = "Organization id"),
         ("id" = String, Path, description = "Workflow id"),
     ),
-    request_body(content = inline(Object), description = "Workflow inputs", content_type = "application/json"),
+    request_body(content = Vec<serde_json::Value>, description = "Workflow inputs, one JSON value per input event", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "create"})),
     )
 )]
 pub async fn trigger_workflow(
@@ -453,13 +912,15 @@ pub async fn trigger_workflow(
     params(
         ("org_id" = String, Path, description = "Organization id"),
         ("id" = String, Path, description = "Workflow id"),
+        ("run_id" = String, Path, description = "Workflow run id"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "get"})),
     )
 )]
 pub async fn get_workflow_errors(
@@ -525,7 +986,7 @@ pub async fn get_workflow_errors(
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "create"})),
     )
 )]
 pub async fn retry_workflow(
@@ -536,6 +997,7 @@ pub async fn retry_workflow(
         Ok(v) => MetaHttpResponse::json(WorkflowTestResult {
             errors: v.errors,
             inputs: v.inputs,
+            outputs: v.outputs,
         }),
         Err(e) => MetaHttpResponse::bad_request(e),
     }
@@ -557,14 +1019,14 @@ pub async fn retry_workflow(
     params(
         ("org_id" = String, Path, description = "Organization id"),
         ("id" = String, Path, description = "Workflow id"),
+        ("value" = Option<bool>, Query, description = "true enables and false disables the workflow, defaults to true"),
     ),
-    request_body(content = inline(Object), description = "retry details", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "update"})),
     )
 )]
 pub async fn enable_workflow(
@@ -600,13 +1062,16 @@ pub async fn enable_workflow(
     params(
         ("org_id" = String, Path, description = "Organization id"),
         ("id" = String, Path, description = "Workflow id"),
+        ("start_time" = Option<i64>, Query, description = "Start time in Unix timestamp microseconds, defaults to 7 days before now"),
+        ("end_time" = Option<i64>, Query, description = "End time in Unix timestamp microseconds, defaults to now"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<Object>),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "get"})),
     )
 )]
 pub async fn get_workflow_history(
@@ -640,8 +1105,8 @@ pub async fn get_workflow_history(
     }
 
     // Validate time range
-    if start_time >= end_time {
-        return MetaHttpResponse::bad_request("start_time must be before end_time");
+    if let Err(msg) = openobserve_api_common::request::validate_time_range(start_time, end_time) {
+        return MetaHttpResponse::bad_request(msg);
     }
 
     let trace_id = get_or_create_trace_id(req.headers(), &tracing::Span::current());
@@ -712,22 +1177,243 @@ pub async fn get_workflow_history(
     let ret: Vec<_> = parsed_results
         .into_iter()
         .map(|mut v| {
-            let key_splits: Vec<_> = v.key.split("/").collect();
-
-            if key_splits.len() < 4 {
+            let Some((event_type, source_id, run_id)) = parse_workflow_history_key(&v.key) else {
                 log::warn!(
                     "unexpected key for workflow history of {org_id}/{workflow_id} : {}",
                     v.key
                 );
                 return v;
-            }
+            };
 
-            v.run_id = key_splits[3].to_string();
-            v.source_id = key_splits[2].to_string();
-            v.event_type = WorkflowTriggerType::from(key_splits[1]);
+            v.run_id = run_id;
+            v.source_id = source_id;
+            v.event_type = event_type;
             v
         })
         .collect();
 
     MetaHttpResponse::json(ret)
+}
+
+/// PromoteDraftWorkflow
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/workflows/promote/{id}",
+    context_path = "/api",
+    tag = "Workflows",
+    operation_id = "promoteDraftWorkflow",
+    summary = "Promote draft to workflows",
+    description = "",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization id"),
+        ("id" = String, Path, description = "Workflow id"),
+        ("trigger_type" = Option<String>, Query, description = "Trigger type of the promoted workflow; IncidentEvent also associates it with incidents. Defaults to AlertFired"),
+        ("folder" = Option<String>, Query, description = "Folder to publish into. The draft's own folder is used when absent."),
+    ),
+    responses(
+        (status = 201, description = "Created", content_type = "application/json", body = inline(Object)),
+        (status = 400, description = "No draft with that id, or the graph is still invalid", content_type = "application/json", body = ()),
+        (status = 403, description = "No write access to the destination folder", content_type = "application/json", body = ()),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "update"})),
+    )
+)]
+pub async fn promote_draft(
+    Path((org_id, id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    let trigger_type = match query.get("trigger_type") {
+        Some(v) => v.as_str(),
+        None => "AlertFired",
+    };
+
+    let trigger_type: WorkflowTriggerType = trigger_type.into();
+
+    // Publishing is a create into the destination folder, so authorize it like one.
+    // A NAMED destination is checked ahead of the lookup, so a denied caller cannot
+    // probe which draft ids exist; an absent one means "publish in place" and can
+    // only be resolved once the draft is loaded.
+    let folder = query
+        .get("folder")
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty());
+    if let Some(folder) = folder
+        && !check_folder_write_permissions(&org_id, &user_email.user_id, "workflow_folder", folder)
+            .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
+
+    let draft = match workflows::get_draft_by_id(&org_id, &id).await {
+        Err(e) => {
+            log::error!("error getting draft {org_id}/{id} : {e}");
+            return MetaHttpResponse::internal_error(e);
+        }
+        Ok(None) => {
+            return MetaHttpResponse::bad_request("draft with given id does not exist");
+        }
+        Ok(Some(v)) => v,
+    };
+
+    // Checking the default folder instead would 403 every draft that lives
+    // anywhere else, whatever grants its own folder carries.
+    if folder.is_none() {
+        let own = infra::table::folders::get_name_by_pk(&draft.folder_id)
+            .await
+            .ok()
+            .flatten();
+        if !check_folder_write_permissions(
+            &org_id,
+            &user_email.user_id,
+            "workflow_folder",
+            workflows::normalize_folder_slug(own.as_deref()),
+        )
+        .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
+    }
+
+    if let Err(e) = workflows::promote_draft(&org_id, draft, folder).await {
+        return MetaHttpResponse::bad_request(format!(
+            "error in promoting draft to workflow : {e}"
+        ));
+    }
+
+    if trigger_type == WorkflowTriggerType::IncidentEvent
+        && let Err(e) = db::workflows::associate_workflow(
+            &org_id,
+            &id,
+            "system",
+            WorkflowTriggerEntity::Incident.to_string(),
+            WorkflowTriggerType::IncidentEvent.to_string(),
+        )
+        .await
+    {
+        log::error!(
+            "error in associating promoted workflow to incident after successful promotion of draft : {org_id}/{id} : {e}"
+        );
+        return MetaHttpResponse::internal_error(format!(
+            "draft promoted successfully , but failed to save the association : {e}"
+        ));
+    };
+
+    MetaHttpResponse::created("converted to workflow successfully")
+}
+
+/// Splits the 4-part run-history key. `rsplit_once` on the tail, not a
+/// left-to-right split: a source_id may itself contain '/' (a user email or an
+/// org/name pair), which would otherwise shift run_id into a source fragment.
+fn parse_workflow_history_key(key: &str) -> Option<(WorkflowTriggerType, String, String)> {
+    let mut parts = key.splitn(3, '/');
+    let workflow_id = parts.next()?;
+    let trigger_type = parts.next()?;
+    let rest = parts.next()?;
+    let (source_id, run_id) = rest.rsplit_once('/')?;
+    if workflow_id.is_empty()
+        || trigger_type.is_empty()
+        || source_id.is_empty()
+        || run_id.is_empty()
+    {
+        return None;
+    }
+    Some((
+        WorkflowTriggerType::from(trigger_type),
+        source_id.to_string(),
+        run_id.to_string(),
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn missing_folder_or_workflow_is_404_and_other_errors_stay_500() {
+        let missing = lookup_error(db::workflows::NotFound("folder not found: x".into()).into());
+        assert_eq!(missing.status(), StatusCode::NOT_FOUND);
+        let failed = lookup_error(anyhow::anyhow!("db down"));
+        assert_eq!(failed.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[test]
+    fn history_key_parses_into_trigger_type_source_id_and_run_id() {
+        let (trigger_type, source_id, run_id) =
+            parse_workflow_history_key("wf123/AlertFired/alert456/run789").unwrap();
+        assert_eq!(trigger_type, WorkflowTriggerType::AlertFired);
+        assert_eq!(source_id, "alert456");
+        assert_eq!(run_id, "run789");
+    }
+
+    #[test]
+    fn history_key_survives_a_source_id_containing_slashes() {
+        // A manual run's source_id is a user email or an org/name pair, both of which can
+        // contain '/', so a left-to-right split shifts run_id into a source_id fragment.
+        let (trigger_type, source_id, run_id) =
+            parse_workflow_history_key("wf123/AlertFired/myorg/my_alert/run789").unwrap();
+        assert_eq!(trigger_type, WorkflowTriggerType::AlertFired);
+        assert_eq!(source_id, "myorg/my_alert");
+        assert_eq!(run_id, "run789");
+    }
+
+    #[test]
+    fn history_key_for_a_manual_run_reports_manual_and_the_firing_user() {
+        let (trigger_type, source_id, run_id) =
+            parse_workflow_history_key("wf123/Manual/user@example.com/run789").unwrap();
+        assert_eq!(trigger_type, WorkflowTriggerType::Manual);
+        assert_eq!(source_id, "user@example.com");
+        assert_eq!(run_id, "run789");
+    }
+
+    #[test]
+    fn history_key_with_too_few_parts_is_rejected() {
+        assert!(parse_workflow_history_key("wf123/AlertFired/alert456").is_none());
+        assert!(parse_workflow_history_key("wf123/AlertFired").is_none());
+        assert!(parse_workflow_history_key("").is_none());
+    }
+
+    #[test]
+    fn history_key_round_trips_a_source_id_with_a_slash() {
+        let source_id = "myorg/my alert";
+        let key = format!("wf123/{}/{source_id}/run789", WorkflowTriggerType::Retry);
+        let (trigger_type, parsed_source, run_id) = parse_workflow_history_key(&key).unwrap();
+        assert_eq!(trigger_type, WorkflowTriggerType::Retry);
+        assert_eq!(parsed_source, source_id);
+        assert_eq!(run_id, "run789");
+    }
+
+    #[test]
+    fn unqualified_delete_of_a_missing_workflow_is_not_reported_as_deleted() {
+        assert_eq!(
+            workflow_delete_outcome(false, false),
+            WorkflowDeleteOutcome::NotFound
+        );
+    }
+
+    #[test]
+    fn unqualified_delete_of_an_id_that_names_only_a_draft_reports_draft_only() {
+        assert_eq!(
+            workflow_delete_outcome(false, true),
+            WorkflowDeleteOutcome::DraftOnly
+        );
+    }
+
+    #[test]
+    fn unqualified_delete_of_a_published_workflow_deletes_it() {
+        assert_eq!(
+            workflow_delete_outcome(true, false),
+            WorkflowDeleteOutcome::DeletePublished
+        );
+        assert_eq!(
+            workflow_delete_outcome(true, true),
+            WorkflowDeleteOutcome::DeletePublished
+        );
+    }
 }

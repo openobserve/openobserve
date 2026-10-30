@@ -14,13 +14,26 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { defineComponent, h, KeepAlive, reactive, ref } from "vue";
+import { defineComponent, h, KeepAlive, nextTick, reactive, ref } from "vue";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import Index from "@/plugins/traces/Index.vue";
+import DateTime from "@/components/DateTime.vue";
+import QueryErrorState from "@/components/common/QueryErrorState.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import * as useDurationPercentilesModule from "@/composables/useDurationPercentiles";
+import { buildViewTracesFilter } from "@/plugins/traces/viewTracesHandoff";
+import analytics from "@/services/product_analytics";
+import queryHistory from "@/services/query_history";
+import type { QueryHistoryEntry } from "@/services/query_history";
+import { openRecentOnItsPage, takeRecentLanding } from "@/utils/queryHistory/routes";
+import { landingRouter, landWithoutRestore } from "@/test/unit/helpers/recentLanding";
+import {
+  announceTracesRowNav,
+  tracesRowNavAnnouncement,
+} from "@/plugins/traces/composables/tracesRowNav";
 
 // Create DOM node for mounting
 const node = document.createElement("div");
@@ -152,13 +165,18 @@ const mockSearchObj = {
     showQuery: true,
     showHistogram: true,
     sqlMode: false,
-    searchMode: "traces" as "traces" | "spans" | "service-graph",
+    searchMode: "traces" as "traces" | "spans" | "service-graph" | "services-catalog",
     resultGrid: {
       rowsPerPage: 25,
       sortBy: "start_time" as string,
       sortOrder: "desc" as "asc" | "desc",
+      navigation: {
+        currentRowIndex: 0 as number | null,
+        selectionActive: false,
+        pendingPageSelection: null as any,
+        lastOpenedId: null as string | null,
+      },
     },
-    refreshInterval: 0,
     liveMode: false,
     serviceColors: {},
     metricsRangeFilters: new Map(),
@@ -187,6 +205,8 @@ const mockSearchObj = {
     resultGrid: {
       currentPage: 0,
       columns: [],
+      pageRequest: null as any,
+      pageLoad: null as any,
     },
     datetime: {
       startTime: new Date().getTime() * 1000 - 900000000,
@@ -212,9 +232,9 @@ vi.mock("@/composables/useTraces", () => ({
     formatTracesMetaData: vi.fn((hits) => hits),
     setServiceColors: mockSetServiceColors,
     loadLocalLogFilterField: vi.fn(),
-    updatedLocalLogFilterField: vi.fn(),
+    updatedLocalLogFilterField: mockUpdatedLocalLogFilterField,
     loadTracesParser: vi.fn().mockResolvedValue(undefined),
-    tracesParser: { value: { astify: vi.fn() } },
+    tracesParser: { value: trackTracesParser({ astify: vi.fn(() => ({ where: null })) }) },
   }),
 }));
 
@@ -229,6 +249,25 @@ const { mockGetStreams, mockGetStream, mockSetServiceColors } = vi.hoisted(() =>
   mockGetStream: vi.fn(),
   mockSetServiceColors: vi.fn(),
 }));
+
+const { mockUpdatedLocalLogFilterField, mockToast } = vi.hoisted(() => ({
+  mockUpdatedLocalLogFilterField: vi.fn(),
+  mockToast: vi.fn(),
+}));
+
+vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
+  ...((await importOriginal()) as any),
+  toast: mockToast,
+}));
+
+// Each mount gets its own parser, so a spy call's parser argument identifies which test's mount made it.
+const { createdTracesParsers, trackTracesParser } = vi.hoisted(() => {
+  const createdTracesParsers: unknown[] = [];
+  return {
+    createdTracesParsers,
+    trackTracesParser: <T extends object>(p: T): T => (createdTracesParsers.push(p), p),
+  };
+});
 
 // Hoisted so tests can assert resetSearchObj was called by the component lifecycle.
 const { mockResetSearchObj } = vi.hoisted(() => ({
@@ -261,12 +300,20 @@ const { mockCancelStreamQueryBasedOnRequestId, mockFetchQueryDataWithHttpStream 
   }),
 );
 
-vi.mock("@/composables/useStreamingSearch", () => ({
-  default: () => ({
-    fetchQueryDataWithHttpStream: mockFetchQueryDataWithHttpStream,
-    cancelStreamQueryBasedOnRequestId: mockCancelStreamQueryBasedOnRequestId,
-  }),
-}));
+// The owning instance becomes the call's `this`, so tests can tell their search from a leftover instance's.
+vi.mock("@/composables/useStreamingSearch", async () => {
+  const { getCurrentInstance } = await import("vue");
+  return {
+    default: () => {
+      const owner = getCurrentInstance();
+      return {
+        fetchQueryDataWithHttpStream: (...args: unknown[]) =>
+          mockFetchQueryDataWithHttpStream.apply(owner, args),
+        cancelStreamQueryBasedOnRequestId: mockCancelStreamQueryBasedOnRequestId,
+      };
+    },
+  };
+});
 
 vi.mock("@/composables/useDurationPercentiles", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
@@ -278,7 +325,9 @@ vi.mock("@/composables/useDurationPercentiles", async (importOriginal) => {
 
 // Hoisted so tests can assert on the spy and override its return value per test.
 const { mockParseSpanKindWhereClause } = vi.hoisted(() => ({
-  mockParseSpanKindWhereClause: vi.fn((whereClause: string) => whereClause),
+  mockParseSpanKindWhereClause: vi.fn(
+    (whereClause: string, _parser?: unknown, _streamName?: string) => whereClause,
+  ),
 }));
 
 // Use importOriginal so SPAN_KIND_MAP and SPAN_KIND_LABEL_TO_KEY remain available,
@@ -292,19 +341,25 @@ vi.mock("@/utils/traces/constants", async (importOriginal) => {
 });
 
 // Mock services
-vi.mock("@/services/search", () => ({
-  default: {
-    get_traces: vi.fn(() => Promise.resolve({ data: mockTracesResponse })),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_traces: vi.fn(() => Promise.resolve({ data: mockTracesResponse })),
+    },
+  });
+});
 
-vi.mock("@/services/jstransform", () => ({
-  default: {
-    list: vi.fn(() => Promise.resolve({ data: mockFunctions })),
-  },
-}));
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(() => Promise.resolve({ data: mockFunctions })),
+    },
+  });
+});
 
-vi.mock("@/services/segment_analytics", () => ({
+vi.mock("@/services/product_analytics", () => ({
   default: {
     track: vi.fn(),
   },
@@ -355,6 +410,7 @@ describe("Index.vue (Main Traces Page)", () => {
     mockSearchObj.data.queryResults = { hits: [] };
     mockSearchObj.data.errorMsg = "";
     mockSearchObj.data.editorValue = "";
+    createdTracesParsers.length = 0;
 
     // Reset hoisted mocks to safe defaults for each test
     mockResetSearchObj.mockReset();
@@ -372,9 +428,16 @@ describe("Index.vue (Main Traces Page)", () => {
     if (wrapper) {
       wrapper.unmount();
     }
-    // Drain all pending microtasks/promises before clearing mocks so
-    // lingering async chains from the current test cannot contaminate the
-    // next test's beforeEach or mount lifecycle.
+    // Drain pending async before clearing mocks so lingering chains from this
+    // test cannot contaminate the next one. `flushPromises` alone only drains
+    // microtasks; the field-grouping path awaits the query client, whose
+    // scheduling spans a few macrotask hops, so the loop alternates the two.
+    // Bounded and deterministic — no arbitrary sleep. Two iterations were not
+    // always enough; three are.
+    for (let i = 0; i < 3; i++) {
+      await flushPromises();
+      await new Promise((r) => setTimeout(r, 0));
+    }
     await flushPromises();
     vi.clearAllMocks();
   });
@@ -393,6 +456,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -402,27 +466,6 @@ describe("Index.vue (Main Traces Page)", () => {
 
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.find("#tracePage").exists()).toBe(true);
-    });
-
-    it("should initialize with search tab active by default", async () => {
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-
-      await flushPromises();
-
-      expect(wrapper.vm.activeTab).toBe("search");
     });
 
     it("should load stream list on mount", async () => {
@@ -436,6 +479,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -454,37 +498,6 @@ describe("Index.vue (Main Traces Page)", () => {
   });
 
   describe("Tab Navigation", () => {
-    it("should switch to service-graph tab on enterprise", async () => {
-      routerCurrentRouteSpy.mockReturnValue({
-        value: {
-          query: { tab: "service-graph" },
-          name: "traces",
-          path: "/traces",
-        },
-      } as any);
-
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-
-      await flushPromises();
-
-      // onBeforeMount sets searchMode from URL; activeTab computed reflects it
-      expect(mockSearchObj.meta.searchMode).toBe("service-graph");
-      expect(wrapper.vm.activeTab).toBe("service-graph");
-    });
-
     it("should update URL with tab=service-graph when searchMode changes to service-graph", async () => {
       wrapper = mount(Index, {
         attachTo: node,
@@ -496,6 +509,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -518,8 +532,9 @@ describe("Index.vue (Main Traces Page)", () => {
     });
 
     it("should update URL with tab=traces when searchMode changes to traces", async () => {
-      // Start in service-graph mode so switching to traces is an actual change
-      mockSearchObj.meta.searchMode = "service-graph";
+      routerCurrentRouteSpy.mockReturnValue({
+        value: { query: { tab: "service-graph" }, name: "traces", path: "/traces" },
+      } as any);
 
       wrapper = mount(Index, {
         attachTo: node,
@@ -531,6 +546,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -550,10 +566,16 @@ describe("Index.vue (Main Traces Page)", () => {
         }),
       );
     });
-  });
 
-  describe("Stream Selection", () => {
-    it("should not select the stream with latest data by default", async () => {
+    it("should update URL with tab=spans when searchMode changes to spans", async () => {
+      routerCurrentRouteSpy.mockReturnValue({
+        value: {
+          query: { tab: "traces", search_mode: "spans" },
+          name: "traces",
+          path: "/traces",
+        },
+      } as any);
+
       wrapper = mount(Index, {
         attachTo: node,
         global: {
@@ -564,6 +586,314 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+      routerReplaceSpy.mockClear();
+
+      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
+      await searchBarEl.vm.$emit("update:searchMode", "spans");
+      await flushPromises();
+
+      expect(routerReplaceSpy).toHaveBeenCalledWith({ query: { tab: "spans" } });
+    });
+
+    it("should switch to spans when the tab query changes on the mounted Traces route", async () => {
+      const currentRoute = ref({
+        query: { tab: "traces" },
+        name: "traces",
+        path: "/traces",
+      }) as typeof router.currentRoute;
+      routerCurrentRouteSpy.mockReturnValue(currentRoute);
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+      routerReplaceSpy.mockClear();
+
+      currentRoute.value = {
+        ...currentRoute.value,
+        query: { tab: "spans" },
+      };
+      await flushPromises();
+
+      expect(mockSearchObj.meta.searchMode).toBe("spans");
+      expect(routerReplaceSpy).not.toHaveBeenCalled();
+    });
+
+    it("should restore the spans default when the tab query is removed", async () => {
+      const currentRoute = ref({
+        query: { tab: "spans" },
+        name: "traces",
+        path: "/traces",
+      }) as typeof router.currentRoute;
+      routerCurrentRouteSpy.mockReturnValue(currentRoute);
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+      routerReplaceSpy.mockClear();
+
+      currentRoute.value = {
+        ...currentRoute.value,
+        query: {},
+      };
+      await flushPromises();
+
+      expect(mockSearchObj.meta.searchMode).toBe("spans");
+      expect(routerReplaceSpy).toHaveBeenCalledWith({ query: { tab: "spans" } });
+    });
+
+    it("should switch to service-graph tab from ?tab= on enterprise", async () => {
+      routerCurrentRouteSpy.mockReturnValue({
+        value: {
+          query: { tab: "service-graph" },
+          name: "traces",
+          path: "/traces",
+        },
+      } as any);
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+
+      // onBeforeMount sets searchMode from URL; activeTab computed reflects it
+      expect(mockSearchObj.meta.searchMode).toBe("service-graph");
+      expect(wrapper.vm.activeTab).toBe("service-graph");
+    });
+  });
+
+  describe("In-page tab rendering", () => {
+    const mountIndex = () =>
+      mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+    it("should render the ServiceGraph stub inline in service-graph mode (enterprise)", async () => {
+      routerCurrentRouteSpy.mockReturnValue({
+        value: { query: { tab: "service-graph" }, name: "traces", path: "/traces" },
+      } as any);
+      wrapper = mountIndex();
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "service-graph" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "services-catalog" }).exists()).toBe(false);
+    });
+
+    it("should render the ServicesCatalog stub inline in services-catalog mode", async () => {
+      routerCurrentRouteSpy.mockReturnValue({
+        value: { query: { tab: "services-catalog" }, name: "traces", path: "/traces" },
+      } as any);
+      wrapper = mountIndex();
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "services-catalog" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "service-graph" }).exists()).toBe(false);
+    });
+
+    it("should apply the built filter and switch mode on view-traces from the graph", async () => {
+      routerCurrentRouteSpy.mockReturnValue({
+        value: { query: { tab: "service-graph" }, name: "traces", path: "/traces" },
+      } as any);
+      wrapper = mountIndex();
+      await flushPromises();
+
+      const payload = {
+        serviceName: "cart-service",
+        operationName: "GET /cart",
+        mode: "traces",
+        stream: "default",
+      };
+      const graphEl = wrapper.findComponent({ name: "service-graph" });
+      expect(graphEl.exists()).toBe(true);
+      await graphEl.vm.$emit("view-traces", payload);
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toBe(buildViewTracesFilter(payload));
+      expect(mockSearchObj.data.editorValue).toBe(
+        "service_name = 'cart-service' AND operation_name = 'GET /cart'",
+      );
+      expect(mockSearchObj.meta.searchMode).toBe("traces");
+      expect(mockSearchObj.data.stream.selectedStream).toEqual({
+        label: "default",
+        value: "default",
+      });
+    });
+
+    it("should hydrate the handoff ?filter= into the editor on mount", async () => {
+      routerCurrentRouteSpy.mockReturnValue({
+        value: {
+          query: { filter: "service_name = 'checkout'" },
+          name: "traces",
+          path: "/traces",
+        },
+      } as any);
+      mockSearchObj.meta.sqlMode = true;
+
+      wrapper = mountIndex();
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toBe("service_name = 'checkout'");
+      expect(mockSearchObj.meta.sqlMode).toBe(false);
+    });
+
+    it("clears a stale editor for an empty handoff ?filter= (unfiltered RCA evidence)", async () => {
+      routerCurrentRouteSpy.mockReturnValue(
+        ref({
+          query: { filter: "" },
+          name: "traces",
+          path: "/traces",
+        }) as typeof router.currentRoute,
+      );
+      mockSearchObj.data.editorValue = "service_name = 'stale'";
+
+      wrapper = mountIndex();
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toBe("");
+    });
+  });
+
+  describe("Auto Run off (#14760)", () => {
+    const mountTraces = () =>
+      mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+    beforeEach(() => localStorage.setItem("oo_toggle_auto_run", "false"));
+
+    afterEach(() => {
+      delete store.state.zoConfig.auto_query_enabled;
+      localStorage.removeItem("oo_toggle_auto_run");
+    });
+
+    it("restores the last stream on page load without running a search", async () => {
+      store.state.zoConfig.auto_query_enabled = true;
+      mockSearchObj.meta.liveMode = false;
+      mockRestoreTracesStream.mockReturnValue("default");
+      wrapper = mountTraces();
+      await vi.waitFor(() =>
+        expect(mockSearchObj.data.stream.selectedStream.value).toBe("default"),
+      );
+      await flushPromises();
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+    });
+
+    it("does not run when the stream changes, and runs once Auto Run is on", async () => {
+      store.state.zoConfig.auto_query_enabled = true;
+      mockSearchObj.meta.liveMode = false;
+      wrapper = mountTraces();
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+      await flushPromises();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      await wrapper.vm.onChangeStream();
+      await flushPromises();
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+
+      mockSearchObj.meta.liveMode = true;
+      localStorage.setItem("oo_toggle_auto_run", "true");
+      await wrapper.vm.onChangeStream();
+      await flushPromises();
+      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+    });
+
+    it("still loads a shared link's stream with Auto Run off", async () => {
+      store.state.zoConfig.auto_query_enabled = true;
+      mockSearchObj.meta.liveMode = false;
+      routerCurrentRouteSpy.mockReturnValue({
+        value: { query: { stream: "default" }, name: "traces", path: "/traces" },
+      } as any);
+      wrapper = mountTraces();
+      await vi.waitFor(() => expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled(), {
+        timeout: 3000,
+      });
+    });
+  });
+
+  describe("Stream Selection", () => {
+    it("should select the default stream automatically", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -574,7 +904,7 @@ describe("Index.vue (Main Traces Page)", () => {
       // getStreamList uses an un-awaited .then() chain; poll until it resolves
       await vi.waitFor(
         () => {
-          expect(mockSearchObj.data.stream.selectedStream.value).toBeFalsy();
+          expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
         },
         { timeout: 2000 },
       );
@@ -599,6 +929,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -629,6 +960,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -663,6 +995,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -684,6 +1017,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -715,6 +1049,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -729,94 +1064,254 @@ describe("Index.vue (Main Traces Page)", () => {
     });
   });
 
-  describe("Error Handling", () => {
-    it("should display error message when query fails", async () => {
-      mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
-      mockSearchObj.data.errorMsg = "Query failed";
-      mockSearchObj.data.errorCode = 429; // Non-zero code → real error, not "no data"
-      mockSearchObj.loading = false;
+  describe("Heatmap selection across searches", () => {
+    const mockClearOriginalTimeRange = vi.fn();
+    // Mirrors applyFilterTerm's append, so the Error Only toggle edits the editor text.
+    const mockApplyFiltersAppend = vi.fn((terms: string[]) => {
+      mockSearchObj.data.editorValue = `${mockSearchObj.data.editorValue} and ${terms.join(" and ")}`;
+    });
+    const composed = "(service_name = 'a') and duration >= '100ms' and duration < '500ms'";
+    const APPLIED = { startTime: 1_700_000_000_000_000, endTime: 1_700_000_060_000_000 };
+    const heatmapEntry = (overrides: Record<string, unknown> = {}) => ({
+      panelTitle: "Duration",
+      start: 100_000,
+      end: 500_000,
+      timeStart: APPLIED.startTime,
+      timeEnd: APPLIED.endTime,
+      appliedStart: APPLIED.startTime,
+      appliedEnd: APPLIED.endTime,
+      baselineFilter: "service_name = 'a'",
+      stream: "default",
+      searchMode: "traces",
+      ...overrides,
+    });
+    const savedDatetime = { ...mockSearchObj.data.datetime };
+    const filters = mockSearchObj.meta.metricsRangeFilters as Map<string, any>;
 
+    const mountPage = async () => {
       wrapper = mount(Index, {
         attachTo: node,
         global: {
           plugins: [i18n, router],
           provide: { store: store },
           stubs: {
-            "search-bar": true,
-            "index-list": true,
+            "search-bar": {
+              template: "<div />",
+              setup() {
+                return {
+                  applyFilters: mockApplyFiltersAppend,
+                  removeFilterByField: vi.fn(),
+                  setEditorValue: vi.fn(),
+                };
+              },
+            },
             "search-result": true,
+            "index-list": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
       });
-
       await flushPromises();
-
-      expect(wrapper.find('[data-test="traces-search-error-message"]').exists()).toBe(true);
-    });
-
-    it("should show no traces found when errorCode is 0", async () => {
-      mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
-      mockSearchObj.data.errorMsg = "No data found";
-      mockSearchObj.data.errorCode = 0;
-      mockSearchObj.loading = false;
-
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-
-      await flushPromises();
-
-      expect(wrapper.find('[data-test="traces-search-error-text"]').exists()).toBe(true);
-    });
-
-    it("should display error code 20003 with configuration link", async () => {
-      mockSearchObj.data.stream.streamLists = [{ label: "test-stream", value: "test-stream" }];
-      mockSearchObj.data.stream.selectedStream = {
-        label: "test-stream",
-        value: "test-stream",
+      // SearchResult is not rendered before a search has run, so its ref is set the way the drill-down test does.
+      wrapper.vm.searchResultRef = {
+        metricsDashboardRef: { clearOriginalTimeRange: mockClearOriginalTimeRange },
+        getDashboardData: vi.fn(),
       };
-      mockSearchObj.data.errorMsg = "Full text search not configured";
-      mockSearchObj.data.errorCode = 20003;
-      mockSearchObj.loading = false;
+      // The state a heatmap box leaves behind, set after mount so page loading cannot disturb it.
+      mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      mockSearchObj.meta.searchMode = "traces";
+      mockSearchObj.data.editorValue = composed;
+      Object.assign(mockSearchObj.data.datetime, APPLIED, { type: "absolute" });
+      filters.clear();
+      mockClearOriginalTimeRange.mockClear();
+    };
 
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
+    afterEach(() => {
+      Object.assign(mockSearchObj.data.datetime, savedDatetime);
+      filters.clear();
+    });
 
+    it("keeps a matching Duration entry across the search", async () => {
+      await mountPage();
+      filters.set("heatmap", heatmapEntry());
+
+      wrapper.vm.searchData();
       await flushPromises();
 
-      expect(wrapper.find('[data-test="traces-search-error-20003"]').exists()).toBe(true);
+      expect([...filters.keys()]).toEqual(["heatmap"]);
+      expect(mockClearOriginalTimeRange).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["Errors", "(service_name = 'a') and span_status = 'ERROR'"],
+      ["Rate", "service_name = 'a'"],
+    ])("keeps a current %s entry across the search it triggers", async (panelTitle, editor) => {
+      await mountPage();
+      mockSearchObj.data.editorValue = editor;
+      filters.set("brush", heatmapEntry({ panelTitle, start: null, end: null }));
+
+      wrapper.vm.searchData();
+      await flushPromises();
+
+      expect([...filters.keys()]).toEqual(["brush"]);
+      expect(mockClearOriginalTimeRange).not.toHaveBeenCalled();
+    });
+
+    it.each(["Errors", "Rate"])(
+      "drops a stale %s entry and its original range",
+      async (panelTitle) => {
+        await mountPage();
+        mockSearchObj.data.editorValue = "service_name = 'b'";
+        filters.set("brush", heatmapEntry({ panelTitle, start: null, end: null }));
+
+        wrapper.vm.searchData();
+        await flushPromises();
+
+        expect(filters.size).toBe(0);
+        expect(mockClearOriginalTimeRange).toHaveBeenCalled();
+      },
+    );
+
+    it.each([
+      ["applied range", { appliedEnd: APPLIED.endTime - 1_000_000 }],
+      ["editor text", { baselineFilter: "service_name = 'b'" }],
+      ["stream", { stream: "test-stream" }],
+      ["search mode", { searchMode: "spans" }],
+    ])("drops a Duration entry whose %s no longer matches", async (_label, overrides) => {
+      await mountPage();
+      filters.set("heatmap", heatmapEntry(overrides));
+
+      wrapper.vm.searchData();
+      await flushPromises();
+
+      expect(filters.size).toBe(0);
+      expect(mockClearOriginalTimeRange).toHaveBeenCalled();
+    });
+
+    it("drops the entry when Error Only is toggled before the next search", async () => {
+      await mountPage();
+      filters.set("heatmap", heatmapEntry());
+
+      wrapper.vm.onErrorOnlyToggled(true);
+      wrapper.vm.searchData();
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toBe(`${composed} and span_status = 'ERROR'`);
+      expect(filters.size).toBe(0);
+    });
+
+    it("drops an entry captured in spans mode on a switch to traces mode", async () => {
+      await mountPage();
+      mockSearchObj.meta.searchMode = "spans";
+      filters.set("heatmap", heatmapEntry({ searchMode: "spans" }));
+
+      wrapper.vm.onSearchModeChange("traces");
+      await flushPromises();
+
+      expect(filters.size).toBe(0);
+      expect(mockClearOriginalTimeRange).toHaveBeenCalled();
+    });
+
+    it("drops an entry captured on another stream on a stream change", async () => {
+      await mountPage();
+      filters.set("heatmap", heatmapEntry({ stream: "test-stream" }));
+
+      await wrapper.vm.onChangeStream();
+      await flushPromises();
+
+      expect(filters.size).toBe(0);
+      expect(mockClearOriginalTimeRange).toHaveBeenCalled();
+    });
+
+    it("runs exactly one search for a comparison filter, with live mode off", async () => {
+      await mountPage();
+      mockSearchObj.meta.liveMode = false;
+      mockSearchObj.meta.searchMode = "spans";
+      mockFetchQueryDataWithHttpStream.mockClear();
+      vi.mocked(analytics.track).mockClear();
+
+      wrapper.vm.onMetricsEditorFilterRun("(service_name = 'a') and http_method = 'GET'");
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toBe("(service_name = 'a') and http_method = 'GET'");
+      const runs = vi
+        .mocked(analytics.track)
+        .mock.calls.filter(([event]: any[]) => event === "traces_search_run");
+      expect(runs).toHaveLength(1);
+      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+    });
+
+    it("drops an entry made stale by an unsearched filter edit on a sort", async () => {
+      await mountPage();
+      filters.set("heatmap", heatmapEntry());
+      mockSearchObj.data.editorValue = `${composed} and service_name = 'b'`;
+
+      wrapper.vm.runQueryOnSort();
+      await flushPromises();
+
+      expect(filters.size).toBe(0);
+      expect(mockClearOriginalTimeRange).toHaveBeenCalled();
+    });
+
+    it("keeps the entry on a page fetch after an unsearched filter edit, as the page keeps page 1's filter", async () => {
+      await mountPage();
+      filters.set("heatmap", heatmapEntry());
+      mockSearchObj.data.editorValue = `${composed} and service_name = 'b'`;
+
+      wrapper.vm.getQueryData(true);
+      await flushPromises();
+
+      expect([...filters.keys()]).toEqual(["heatmap"]);
+      expect(mockClearOriginalTimeRange).not.toHaveBeenCalled();
+    });
+
+    it("sorts an unsearched manual-mode box over its own window and keeps it", async () => {
+      await mountPage();
+      // The last search ran over the wider pre-box range; the box moved the picker and the editor only.
+      mockSearchObj.data.queryPayload = {
+        query: {
+          start_time: APPLIED.startTime - 600_000_000,
+          end_time: APPLIED.endTime + 600_000_000,
+        },
+      };
+      filters.set("heatmap", heatmapEntry());
+      mockFetchQueryDataWithHttpStream.mockClear();
+
+      wrapper.vm.runQueryOnSort();
+      await flushPromises();
+
+      const req: any = mockFetchQueryDataWithHttpStream.mock.calls.at(-1)?.[0];
+      const query = req.queryReq.query ?? req.queryReq;
+      expect([query.start_time, query.end_time]).toEqual([APPLIED.startTime, APPLIED.endTime]);
+      expect([...filters.keys()]).toEqual(["heatmap"]);
+    });
+
+    it("keeps a current entry across a sort", async () => {
+      await mountPage();
+      filters.set("heatmap", heatmapEntry());
+
+      wrapper.vm.runQueryOnSort();
+      await flushPromises();
+
+      expect([...filters.keys()]).toEqual(["heatmap"]);
+    });
+
+    it("clears the original range on Reset", async () => {
+      await mountPage();
+
+      wrapper.vm.onFiltersReset();
+
+      expect(mockClearOriginalTimeRange).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe("Field List Management", () => {
-    it("should toggle field list visibility", async () => {
-      mockSearchObj.meta.showFields = true;
-
+  describe("Error Handling", () => {
+    const mountForErrors = async () => {
+      mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
       wrapper = mount(Index, {
         attachTo: node,
         global: {
@@ -827,49 +1322,122 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
-            SanitizedHtmlRenderer: true,
+            "services-catalog": true,
           },
         },
       });
-
       await flushPromises();
-
-      // collapseFieldList is exposed directly; there is no collapse button in the
-      // current template, so we call the method rather than triggering a DOM click.
-      await wrapper.vm.collapseFieldList();
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
       await flushPromises();
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+    };
 
-      expect(mockSearchObj.meta.showFields).toBe(false);
+    // searchObj.data is a plain object in this suite, so the page and its splitter slots re-render by hand.
+    const rerender = async () => {
+      wrapper.vm.$forceUpdate();
+      wrapper.findAllComponents(OSplitter).forEach((splitter) => splitter.vm.$forceUpdate());
+      await nextTick();
+    };
+
+    const failSearch = async (err: unknown) => {
+      const handlers: any[] = [];
+      mockFetchQueryDataWithHttpStream.mockImplementation(function (
+        this: unknown,
+        _req: unknown,
+        h: any,
+      ) {
+        if (this === wrapper.vm.$) handlers.push(h);
+      });
+      await wrapper.vm.getQueryData();
+      await rerender();
+      handlers[handlers.length - 1].error({}, err);
+      await rerender();
+    };
+
+    const errorState = () =>
+      wrapper.find('[data-test="traces-search-error-message"] [data-test="query-error-state"]');
+
+    afterEach(() => {
+      mockFetchQueryDataWithHttpStream.mockReset();
+      mockSearchObj.data.errorCode = 0;
+      mockSearchObj.data.errorDetail = "";
     });
 
-    it("should update splitter model when fields are collapsed", async () => {
-      mockSearchObj.meta.showFields = true;
-      mockSearchObj.config.splitterModel = 20;
-      mockSearchObj.config.lastSplitterPosition = 20;
+    it("renders a planning error with its raw detail hidden", async () => {
+      await mountForErrors();
 
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            SanitizedHtmlRenderer: true,
-          },
+      await failSearch({
+        content: {
+          message: "Search SQL execute error",
+          code: 400,
+          error_detail: "Error during planning: No field named foo",
         },
       });
 
+      expect(errorState().exists()).toBe(true);
+      expect(wrapper.find('[data-test="error-detail-summary"]').text()).toContain(
+        "Search SQL execute error",
+      );
+      expect(wrapper.find('[data-test="error-detail-body"]').exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("Error during planning");
+      expect(wrapper.findComponent(QueryErrorState).props("errorCode")).toBe(0);
+    });
+
+    it("hides the details again on a later error after they were opened", async () => {
+      await mountForErrors();
+      const planningError = {
+        content: { message: "Search SQL execute error", code: 400, error_detail: "raw planner" },
+      };
+
+      await failSearch(planningError);
+      await wrapper.find('[data-test="error-detail-toggle-btn"]').trigger("click");
+      expect(wrapper.find('[data-test="error-detail-body"]').text()).toContain("raw planner");
+
+      await failSearch(planningError);
+
+      expect(errorState().exists()).toBe(true);
+      expect(wrapper.find('[data-test="error-detail-body"]').exists()).toBe(false);
+    });
+
+    it("shows the summary of an unauthorized error", async () => {
+      await mountForErrors();
+
+      await failSearch({ content: { message: "Unauthorized Access", code: 403 } });
+
+      expect(errorState().exists()).toBe(true);
+      expect(wrapper.find('[data-test="error-detail-summary"]').text()).toBe("Unauthorized Access");
+    });
+
+    it("shows generic text for a network error without a code", async () => {
+      await mountForErrors();
+
+      await failSearch({});
+
+      expect(errorState().exists()).toBe(true);
+      expect(errorState().text()).toContain(i18n.global.t("queryError.generic"));
+      expect(wrapper.find('[data-test="error-detail-summary"]').text()).toBe(
+        i18n.global.t("traces.index.errorProcessingRequest"),
+      );
+    });
+
+    it("keeps the J/K live region outside the results the error state replaces", async () => {
+      await mountForErrors();
+
+      await failSearch({ content: { message: "boom", code: 500 } });
+      announceTracesRowNav("Couldn't load page 2");
       await flushPromises();
 
-      // Call collapseFieldList and verify showFields changed
-      await wrapper.vm.collapseFieldList();
-      await flushPromises();
+      expect(errorState().exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-row-nav-live"]').text()).toBe("Couldn't load page 2");
+      tracesRowNavAnnouncement.value = "";
+    });
 
-      // The watcher will set splitterModel to 0 when showFields is false
-      expect(mockSearchObj.meta.showFields).toBe(false);
+    it("keeps an application error code for the shared error state", async () => {
+      await mountForErrors();
+
+      await failSearch({ content: { message: "Full text search not configured", code: 20003 } });
+
+      expect(wrapper.findComponent(QueryErrorState).props("errorCode")).toBe(20003);
     });
   });
 
@@ -899,6 +1467,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -932,6 +1501,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -950,7 +1520,6 @@ describe("Index.vue (Main Traces Page)", () => {
         label: "default",
         value: "default",
       };
-      mockSearchObj.meta.refreshInterval = 0;
 
       wrapper = mount(Index, {
         attachTo: node,
@@ -962,6 +1531,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -977,10 +1547,447 @@ describe("Index.vue (Main Traces Page)", () => {
     });
   });
 
+  describe("Streaming page writes (issue #14317)", () => {
+    // The shared beforeEach does not reset currentPage, so it would leak into later tests.
+    afterEach(() => {
+      mockSearchObj.data.resultGrid.currentPage = 0;
+    });
+
+    const meta = (hits: any[] = []) => ({
+      type: "search_response_metadata",
+      content: { results: { hits } },
+    });
+    const chunk = (hits: any[]) => ({
+      type: "search_response_hits",
+      content: { results: { hits } },
+    });
+    const spans = (prefix: string, n: number) =>
+      Array.from({ length: n }, (_, i) => ({
+        span_id: `${prefix}-${i}`,
+        trace_id: `t-${prefix}-${i}`,
+        service_name: "svc",
+        operation_name: "op",
+        _timestamp: 1700000000000000 + i,
+      }));
+
+    const mountPage = async () => {
+      mockSearchObj.meta.searchMode = "spans";
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+      await flushPromises();
+      // Mounting runs loadPageData, which can reset the stream selection.
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      // getQueryData derives `from` from currentPage, so this is what makes it page 2.
+      mockSearchObj.data.resultGrid.currentPage = 1;
+      mockSearchObj.meta.resultGrid.rowsPerPage = 25;
+      mockSearchObj.data.queryPayload = {
+        query: {
+          sql: "",
+          start_time: 1700000000000000,
+          end_time: 1700003600000000,
+          from: 0,
+          size: 25,
+        },
+      };
+      return wrapper;
+    };
+
+    const lastCallbacks = () => {
+      const calls = mockFetchQueryDataWithHttpStream.mock.calls;
+      return calls[calls.length - 1][1];
+    };
+
+    it("records a Run in recent searches once it completes, and never a page fetch", async () => {
+      const record = vi.spyOn(queryHistory, "record").mockResolvedValue({ data: {} } as never);
+      await mountPage();
+      mockSearchObj.data.resultGrid.currentPage = 0;
+      mockSearchObj.data.editorValue = "service_name = 'cart'";
+      wrapper.vm.runQueryFn();
+      await flushPromises();
+      lastCallbacks().complete({});
+      await flushPromises();
+      expect(record).toHaveBeenCalledTimes(1);
+      expect(record.mock.calls[0][1]).toMatchObject({
+        source: "traces",
+        query: "service_name = 'cart'",
+        streams: ["default"],
+        status: "ok",
+        context: { page: { stream: "default", tab: "spans" } },
+      });
+
+      record.mockClear();
+      await wrapper.vm.getMoreData();
+      lastCallbacks().complete({});
+      await flushPromises();
+      expect(record).not.toHaveBeenCalled();
+      record.mockRestore();
+    });
+
+    it("records a query error as failed and a cancel not at all", async () => {
+      const record = vi.spyOn(queryHistory, "record").mockResolvedValue({ data: {} } as never);
+      await mountPage();
+      mockSearchObj.data.editorValue = "nosuch = 1";
+      wrapper.vm.runQueryFn();
+      await flushPromises();
+      lastCallbacks().error({}, { content: { code: 20004, message: "field not found" } });
+      await flushPromises();
+      expect(record.mock.calls[0][1]).toMatchObject({
+        status: "error",
+        context: { error: "field not found" },
+      });
+
+      record.mockClear();
+      wrapper.vm.runQueryFn();
+      await flushPromises();
+      lastCallbacks().error({}, { content: { code: 20009, message: "cancelled" } });
+      await flushPromises();
+      expect(record).not.toHaveBeenCalled();
+      record.mockRestore();
+    });
+
+    describe("page landings and restores from another page", () => {
+      const restoredEntry: QueryHistoryEntry = {
+        id: "t1",
+        source: "traces",
+        query: "service_name = 'cart'",
+        query_key: "k",
+        streams: ["default"],
+        context: { page: { stream: "default", tab: "spans" } },
+        status: "ok",
+        starred: false,
+        run_count: 1,
+        created_at: 1,
+        updated_at: 2,
+      };
+      const landWith = async (run: boolean | null) => {
+        mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
+        mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+        if (run !== null) {
+          await openRecentOnItsPage(landingRouter().router, restoredEntry, "now", "default", run);
+        }
+        mockSearchObj.data.editorValue = "service_name = 'cart'";
+        const before = mockFetchQueryDataWithHttpStream.mock.calls.length;
+        await wrapper.vm.loadPageData();
+        await flushPromises();
+        mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
+        mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+        return mockFetchQueryDataWithHttpStream.mock.calls.length - before;
+      };
+
+      it("runs a plain landing without recording it", async () => {
+        const record = vi.spyOn(queryHistory, "record").mockResolvedValue({ data: {} } as never);
+        await mountPage();
+        record.mockClear();
+        expect(await landWith(null)).toBe(1);
+        lastCallbacks().complete({});
+        await flushPromises();
+        expect(record).not.toHaveBeenCalled();
+        record.mockRestore();
+      });
+
+      it("runs and records a restore that asked to run", async () => {
+        const record = vi.spyOn(queryHistory, "record").mockResolvedValue({ data: {} } as never);
+        await mountPage();
+        record.mockClear();
+        expect(await landWith(true)).toBe(1);
+        lastCallbacks().complete({});
+        await flushPromises();
+        expect(record).toHaveBeenCalledTimes(1);
+        record.mockRestore();
+      });
+
+      it("claims a restore that finds no stream, so a later landing is not taken for it", async () => {
+        await mountPage();
+        await openRecentOnItsPage(landingRouter().router, restoredEntry, "now", "default", true);
+        mockGetStreams.mockResolvedValueOnce({ list: [] });
+        mockSearchObj.data.stream.streamLists = [];
+        mockSearchObj.data.stream.selectedStream = { label: "", value: "" };
+        const before = mockFetchQueryDataWithHttpStream.mock.calls.length;
+        await wrapper.vm.loadPageData();
+        await flushPromises();
+        expect(mockSearchObj.data.stream.selectedStream.value || "").toBe("");
+        expect(mockFetchQueryDataWithHttpStream.mock.calls.length).toBe(before);
+        expect(takeRecentLanding("traces")).toBeNull();
+        landWithoutRestore();
+      });
+
+      it("remembers the query each search ran with, so the Run button can tell when the editor moved on", async () => {
+        await mountPage();
+        mockSearchObj.data.editorValue = "service_name = 'cart'";
+        wrapper.vm.runQueryFn();
+        await flushPromises();
+        expect(mockSearchObj.data.appliedEditorValue).toBe("service_name = 'cart'");
+        mockSearchObj.data.editorValue = "service_name = 'checkout'";
+        await wrapper.vm.getMoreData();
+        await flushPromises();
+        expect(mockSearchObj.data.appliedEditorValue).toBe("service_name = 'cart'");
+      });
+
+      it("only loads a restore that asked not to run", async () => {
+        const record = vi.spyOn(queryHistory, "record").mockResolvedValue({ data: {} } as never);
+        await mountPage();
+        record.mockClear();
+        expect(await landWith(false)).toBe(0);
+        await flushPromises();
+        expect(record).not.toHaveBeenCalled();
+        record.mockRestore();
+      });
+    });
+
+    describe("J/K page crossing signals (4a §3.4)", () => {
+      const navigation = () => mockSearchObj.meta.resultGrid.navigation;
+      const pend = () => {
+        navigation().pendingPageSelection = { page: 2, position: "first", requestId: null };
+      };
+      const sentTraceId = () => {
+        const calls = mockFetchQueryDataWithHttpStream.mock.calls;
+        return calls[calls.length - 1][0].traceId;
+      };
+
+      afterEach(() => {
+        navigation().pendingPageSelection = null;
+        navigation().selectionActive = false;
+        navigation().currentRowIndex = 0;
+        mockSearchObj.data.resultGrid.pageRequest = null;
+        mockSearchObj.data.resultGrid.pageLoad = null;
+      });
+
+      it("binds the crossing to the page request it sends and records its completion", async () => {
+        await mountPage();
+        mockFetchQueryDataWithHttpStream.mockClear();
+        pend();
+        await wrapper.vm.getQueryData(true);
+        const traceId = sentTraceId();
+        expect(navigation().pendingPageSelection?.requestId).toBe(traceId);
+        expect(mockSearchObj.data.resultGrid.pageRequest).toEqual({ requestId: traceId });
+
+        lastCallbacks().complete(null);
+        expect(mockSearchObj.data.resultGrid.pageLoad).toEqual({
+          requestId: traceId,
+          ok: true,
+          reason: "done",
+        });
+      });
+
+      it("records `error` from the page request's error callback", async () => {
+        await mountPage();
+        mockFetchQueryDataWithHttpStream.mockClear();
+        pend();
+        await wrapper.vm.getQueryData(true);
+        lastCallbacks().error(null, { content: { message: "boom", code: 500 } });
+        expect(mockSearchObj.data.resultGrid.pageLoad).toEqual({
+          requestId: sentTraceId(),
+          ok: false,
+          reason: "error",
+        });
+      });
+
+      it("records `error` when the request throws after it was bound (outer catch)", async () => {
+        await mountPage();
+        mockFetchQueryDataWithHttpStream.mockImplementationOnce(() => {
+          throw new Error("init");
+        });
+        pend();
+        await wrapper.vm.getQueryData(true);
+        const bound = navigation().pendingPageSelection?.requestId;
+        expect(bound).toBeTruthy();
+        expect(mockSearchObj.data.resultGrid.pageLoad).toEqual({
+          requestId: bound,
+          ok: false,
+          reason: "error",
+        });
+      });
+
+      it("records `cancelled` when the user cancels the bound page request", async () => {
+        await mountPage();
+        mockFetchQueryDataWithHttpStream.mockClear();
+        pend();
+        await wrapper.vm.getQueryData(true);
+        wrapper.vm.cancelSearch();
+        expect(mockSearchObj.data.resultGrid.pageLoad).toEqual({
+          requestId: sentTraceId(),
+          ok: false,
+          reason: "cancelled",
+        });
+      });
+
+      it("a new search drops the selection and any crossing", async () => {
+        await mountPage();
+        pend();
+        navigation().selectionActive = true;
+        navigation().currentRowIndex = 7;
+        await wrapper.vm.getQueryData(false);
+        expect(navigation()).toMatchObject({
+          selectionActive: false,
+          currentRowIndex: null,
+          pendingPageSelection: null,
+        });
+      });
+    });
+
+    it("replaces the previous page when the stream opens with an empty batch", async () => {
+      await mountPage();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      await wrapper.vm.getQueryData(true);
+      await flushPromises();
+
+      const page1 = spans("p1", 25);
+      mockSearchObj.data.queryResults.hits = [...page1];
+
+      const cb = lastCallbacks();
+      const page2 = spans("p2", 25);
+      // The backend opens every page past the first with an empty batch.
+      cb.data(null, meta([]));
+      cb.data(null, chunk([]));
+      cb.data(null, meta([]));
+      cb.data(null, chunk(page2));
+
+      const ids = mockSearchObj.data.queryResults.hits.map((h: any) => h.span_id);
+      expect(ids).toHaveLength(25);
+      expect(ids).toEqual(page2.map((h) => h.span_id));
+      expect(ids.some((id: string) => id.startsWith("p1-"))).toBe(false);
+    });
+
+    it("joins batches within one page instead of replacing them", async () => {
+      await mountPage();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      await wrapper.vm.getQueryData(true);
+      await flushPromises();
+
+      const cb = lastCallbacks();
+      const first = spans("a", 5);
+      const second = spans("b", 20);
+      cb.data(null, meta([]));
+      cb.data(null, chunk(first));
+      cb.data(null, meta([]));
+      cb.data(null, chunk(second));
+
+      const ids = mockSearchObj.data.queryResults.hits.map((h: any) => h.span_id);
+      expect(ids).toEqual([...first, ...second].map((h) => h.span_id));
+    });
+
+    it("clears the grid when a page streams no rows at all", async () => {
+      await mountPage();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      await wrapper.vm.getQueryData(true);
+      await flushPromises();
+
+      mockSearchObj.data.queryResults.hits = spans("p1", 25);
+
+      const cb = lastCallbacks();
+      cb.data(null, meta([]));
+      cb.data(null, chunk([]));
+      cb.complete(null);
+
+      expect(mockSearchObj.data.queryResults.hits).toEqual([]);
+    });
+
+    // Logs shows its error banner over the last results rather than blanking; traces matches it.
+    it("keeps the previous rows when a page fails before writing any", async () => {
+      await mountPage();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      await wrapper.vm.getQueryData(true);
+      await flushPromises();
+
+      const page1 = spans("p1", 25);
+      mockSearchObj.data.queryResults.hits = [...page1];
+
+      const cb = lastCallbacks();
+      cb.data(null, meta([]));
+      cb.data(null, chunk([]));
+      cb.error(null, { content: { message: "boom", code: 500 } });
+
+      const ids = mockSearchObj.data.queryResults.hits.map((h: any) => h.span_id);
+      expect(ids).toEqual(page1.map((h) => h.span_id));
+    });
+
+    it("ignores batches from a request that a newer search superseded", async () => {
+      await mountPage();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      await wrapper.vm.getQueryData(true);
+      await flushPromises();
+      const stale = lastCallbacks();
+
+      // A second search cancels the first and takes ownership of the grid.
+      await wrapper.vm.getQueryData(true);
+      await flushPromises();
+      const current = lastCallbacks();
+
+      const fresh = spans("new", 25);
+      current.data(null, meta([]));
+      current.data(null, chunk(fresh));
+
+      stale.data(null, meta([]));
+      stale.data(null, chunk(spans("old", 25)));
+      stale.complete(null);
+
+      const ids = mockSearchObj.data.queryResults.hits.map((h: any) => h.span_id);
+      expect(ids).toEqual(fresh.map((h) => h.span_id));
+    });
+
+    it("tracks traces_search_completed when a new search completes", async () => {
+      await mountPage();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      await wrapper.vm.getQueryData(false);
+      await flushPromises();
+      vi.mocked(analytics.track).mockClear();
+
+      const { data, complete } = lastCallbacks();
+      data(null, meta([]));
+      data(null, chunk(spans("a", 7)));
+      complete(null);
+
+      expect(analytics.track).toHaveBeenCalledWith("traces_search_completed", { hits: 7 });
+    });
+
+    it("reports zero hits when the search writes no rows", async () => {
+      await mountPage();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      await wrapper.vm.getQueryData(false);
+      await flushPromises();
+      vi.mocked(analytics.track).mockClear();
+      mockSearchObj.data.queryResults.hits = spans("old", 5);
+
+      lastCallbacks().complete(null);
+
+      expect(analytics.track).toHaveBeenCalledWith("traces_search_completed", { hits: 0 });
+    });
+
+    it("does not track traces_search_completed when a page completes", async () => {
+      await mountPage();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      await wrapper.vm.getQueryData(true);
+      await flushPromises();
+      vi.mocked(analytics.track).mockClear();
+
+      lastCallbacks().complete(null);
+
+      const events = vi.mocked(analytics.track).mock.calls.map((c) => c[0]);
+      expect(events).not.toContain("traces_search_completed");
+    });
+  });
+
   describe("Metrics Filters Integration", () => {
     // Spies for SearchBar ref methods exposed via stub
     const mockApplyFilters = vi.fn();
     const mockRemoveFilterByField = vi.fn();
+    const mockSetEditorValue = vi.fn();
 
     function mountWithSearchBarStub() {
       return mount(Index, {
@@ -995,12 +2002,14 @@ describe("Index.vue (Main Traces Page)", () => {
                 return {
                   applyFilters: mockApplyFilters,
                   removeFilterByField: mockRemoveFilterByField,
+                  setEditorValue: mockSetEditorValue,
                 };
               },
             },
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1010,45 +2019,78 @@ describe("Index.vue (Main Traces Page)", () => {
     beforeEach(() => {
       mockApplyFilters.mockReset();
       mockRemoveFilterByField.mockReset();
+      mockSetEditorValue.mockReset();
       mockSearchObj.data.editorValue = "";
       mockSearchObj.meta.metricsRangeFilters.clear();
       // Reset auto_query_enabled to undefined for each test
       delete store.state.zoConfig.auto_query_enabled;
     });
 
-    it("should call applyFilters with all filter terms when metrics filters are updated", async () => {
+    it("should render the drill-down target in the search tab", async () => {
       wrapper = mountWithSearchBarStub();
       await flushPromises();
 
-      wrapper.vm.onMetricsFiltersUpdated(["duration >= 100", "service_name = 'test'"]);
-      await flushPromises();
-
-      expect(mockApplyFilters).toHaveBeenCalledWith(["duration >= 100", "service_name = 'test'"]); // applyFilters owns the single trigger; no skipSearch arg
+      expect(wrapper.vm.activeTab).toBe("search");
+      expect(wrapper.find("#traces-drill-down-page").exists()).toBe(true);
     });
 
-    it("should append error filter to applyFilters call when span_status = 'ERROR' is in the query", async () => {
-      mockSearchObj.data.editorValue = "span_status = 'ERROR'";
+    it("should open the analysis dashboard on SearchResult when SearchBar emits drill-down", async () => {
       wrapper = mountWithSearchBarStub();
       await flushPromises();
+      const openComparison = vi.fn();
+      wrapper.vm.searchResultRef = { openComparison };
 
-      wrapper.vm.onMetricsFiltersUpdated(["duration >= 100"]);
+      wrapper.findComponent('[data-test="logs-search-bar"]').vm.$emit("drill-down");
       await flushPromises();
 
-      expect(mockApplyFilters).toHaveBeenCalledWith(["duration >= 100", "span_status = 'ERROR'"]); // applyFilters owns the single trigger; no skipSearch arg
+      expect(openComparison).toHaveBeenCalledTimes(1);
     });
 
-    it("should not duplicate error filter when it is already present in incoming filters", async () => {
-      mockSearchObj.data.editorValue = "span_status = 'ERROR'";
+    it("has no filters-updated handler: brushes write the editor through editor-filter-set", async () => {
       wrapper = mountWithSearchBarStub();
       await flushPromises();
+      expect(wrapper.vm.onMetricsFiltersUpdated).toBeUndefined();
+    });
 
-      // Error panel brush already emitted span_status filter
-      wrapper.vm.onMetricsFiltersUpdated(["duration >= 100", "span_status = 'ERROR'"]);
-      await flushPromises();
+    describe("onMetricsEditorFilterSet", () => {
+      const searchDataRuns = () =>
+        vi
+          .mocked(analytics.track)
+          .mock.calls.filter(([event]: any[]) => event === "traces_search_run").length;
 
-      // span_status = 'ERROR' must appear exactly once
-      const calledWith = mockApplyFilters.mock.calls[0][0] as string[];
-      expect(calledWith.filter((f) => f === "span_status = 'ERROR'")).toHaveLength(1);
+      beforeEach(() => {
+        mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
+        mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      });
+
+      it("sets the editor text and runs exactly one search in live mode", async () => {
+        mockSearchObj.meta.liveMode = true;
+        store.state.zoConfig.auto_query_enabled = true;
+        wrapper = mountWithSearchBarStub();
+        await flushPromises();
+        vi.mocked(analytics.track).mockClear();
+
+        wrapper.vm.onMetricsEditorFilterSet("(a = '1') and duration < '1ms'");
+
+        expect(mockSearchObj.data.editorValue).toBe("(a = '1') and duration < '1ms'");
+        expect(mockSetEditorValue).toHaveBeenCalledWith("(a = '1') and duration < '1ms'");
+        expect(searchDataRuns()).toBe(1);
+      });
+
+      it("sets the editor text and runs no search with live mode off", async () => {
+        store.state.zoConfig.auto_query_enabled = true;
+        wrapper = mountWithSearchBarStub();
+        await flushPromises();
+        // Mount derives liveMode from auto_query_enabled, so switch it off afterwards.
+        mockSearchObj.meta.liveMode = false;
+        vi.mocked(analytics.track).mockClear();
+
+        wrapper.vm.onMetricsEditorFilterSet("duration < '1ms'");
+
+        expect(mockSearchObj.data.editorValue).toBe("duration < '1ms'");
+        expect(mockSetEditorValue).toHaveBeenCalledWith("duration < '1ms'");
+        expect(searchDataRuns()).toBe(0);
+      });
     });
 
     it("should call applyFilters with error condition when error only toggle is turned on", async () => {
@@ -1070,442 +2112,6 @@ describe("Index.vue (Main Traces Page)", () => {
 
       expect(mockRemoveFilterByField).toHaveBeenCalledWith("span_status");
     });
-
-    // Index no longer branches on liveMode / passes a skipSearch flag — it always
-    // calls applyFilters with just the filters; the live-mode search-gating now
-    // lives inside SearchBar.applyFilters (covered in SearchBar.spec).
-    it("should call applyFilters with only the filters when live mode is ON", async () => {
-      mockSearchObj.meta.liveMode = true;
-      store.state.zoConfig.auto_query_enabled = true;
-      wrapper = mountWithSearchBarStub();
-      await flushPromises();
-
-      const testFilters = ["duration > 100ms", 'service_name = "api"'];
-      wrapper.vm.onMetricsFiltersUpdated(testFilters);
-      await flushPromises();
-
-      expect(mockApplyFilters).toHaveBeenCalledWith(testFilters);
-    });
-
-    it("should call applyFilters with only the filters when live mode is OFF", async () => {
-      mockSearchObj.meta.liveMode = false;
-      wrapper = mountWithSearchBarStub();
-      await flushPromises();
-
-      const testFilters = ['span_status = "ERROR"'];
-      wrapper.vm.onMetricsFiltersUpdated(testFilters);
-      await flushPromises();
-
-      expect(mockApplyFilters).toHaveBeenCalledWith(testFilters);
-    });
-
-    it("should call applyFilters with only the filters when liveMode is undefined", async () => {
-      mockSearchObj.meta.liveMode = undefined;
-      wrapper = mountWithSearchBarStub();
-      await flushPromises();
-
-      const testFilters = ['http_method = "POST"'];
-      wrapper.vm.onMetricsFiltersUpdated(testFilters);
-      await flushPromises();
-
-      expect(mockApplyFilters).toHaveBeenCalledWith(testFilters);
-    });
-
-    it("should handle searchBarRef not available", async () => {
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true, // No exposed methods
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-      await flushPromises();
-
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-
-      wrapper.vm.onMetricsFiltersUpdated(["test"]);
-      await flushPromises();
-
-      expect(consoleSpy).toHaveBeenCalledWith("SearchBar not ready for filter application");
-      consoleSpy.mockRestore();
-    });
-  });
-
-  describe("Service Graph Integration", () => {
-    it("should set searchMode to traces when viewing traces from service graph", async () => {
-      // Start in service-graph mode
-      mockSearchObj.meta.searchMode = "service-graph";
-
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-
-      await flushPromises();
-
-      const serviceGraphData = {
-        stream: "default",
-        serviceName: "test-service",
-        mode: "spans" as const,
-        timeRange: {
-          startTime: 1755853746625720,
-          endTime: 1755853746725720,
-        },
-      };
-
-      wrapper.vm.handleServiceGraphViewTraces(serviceGraphData);
-      await flushPromises();
-
-      // handleServiceGraphViewTraces sets searchMode from data.mode
-      expect(mockSearchObj.meta.searchMode).toBe("spans");
-      expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
-      expect(mockSearchObj.data.editorValue).toContain("test-service");
-    });
-
-    it("should escape single quotes in service name filter", async () => {
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-
-      await flushPromises();
-
-      const serviceGraphData = {
-        stream: "default",
-        serviceName: "test'service",
-        timeRange: {
-          startTime: 1755853746625720,
-          endTime: 1755853746725720,
-        },
-      };
-
-      wrapper.vm.handleServiceGraphViewTraces(serviceGraphData);
-      await flushPromises();
-
-      // SQL-style escaping uses double quotes: test'service becomes test''service
-      expect(mockSearchObj.data.editorValue).toContain("test''service");
-    });
-
-    it("should not write searchObj.data.query on view-traces (no duplicate trigger)", async () => {
-      // The redirect used to set searchObj.data.query, which tripped a query
-      // watcher in addition to its own runQueryFn() → duplicate search. The
-      // watcher and that write are removed; only editorValue is set now.
-      mockSearchObj.data.query = "";
-
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-
-      await flushPromises();
-
-      wrapper.vm.handleServiceGraphViewTraces({
-        stream: "default",
-        serviceName: "checkout",
-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
-      });
-      await flushPromises();
-
-      expect(mockSearchObj.data.editorValue).toContain("checkout");
-      expect(mockSearchObj.data.query).toBe("");
-    });
-
-    function mountIndexComponent() {
-      return mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-    }
-
-    it("should include operationName in filter query when provided", async () => {
-      wrapper = mountIndexComponent();
-      await flushPromises();
-
-      wrapper.vm.handleServiceGraphViewTraces({
-        stream: "default",
-        serviceName: "svc",
-        operationName: "GET /api/health",
-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
-      });
-      await flushPromises();
-
-      expect(mockSearchObj.data.editorValue).toContain("AND operation_name = 'GET /api/health'");
-    });
-
-    it("should include nodeName in filter query when provided", async () => {
-      wrapper = mountIndexComponent();
-      await flushPromises();
-
-      wrapper.vm.handleServiceGraphViewTraces({
-        stream: "default",
-        serviceName: "svc",
-        nodeName: "node-1",
-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
-      });
-      await flushPromises();
-
-      expect(mockSearchObj.data.editorValue).toContain("AND service_k8s_node_name = 'node-1'");
-    });
-
-    it("should include podName in filter query when provided", async () => {
-      wrapper = mountIndexComponent();
-      await flushPromises();
-
-      wrapper.vm.handleServiceGraphViewTraces({
-        stream: "default",
-        serviceName: "svc",
-        podName: "pod-abc",
-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
-      });
-      await flushPromises();
-
-      expect(mockSearchObj.data.editorValue).toContain("AND service_k8s_pod_name = 'pod-abc'");
-    });
-
-    it("should append span_status = 'ERROR' when errorsOnly is true", async () => {
-      wrapper = mountIndexComponent();
-      await flushPromises();
-
-      wrapper.vm.handleServiceGraphViewTraces({
-        stream: "default",
-        serviceName: "svc",
-        errorsOnly: true,
-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
-      });
-      await flushPromises();
-
-      expect(mockSearchObj.data.editorValue).toContain("AND span_status = 'ERROR'");
-    });
-
-    it("should include minDurationMicros in filter when greater than zero", async () => {
-      wrapper = mountIndexComponent();
-      await flushPromises();
-
-      wrapper.vm.handleServiceGraphViewTraces({
-        stream: "default",
-        serviceName: "svc",
-        minDurationMicros: 5000,
-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
-      });
-      await flushPromises();
-
-      expect(mockSearchObj.data.editorValue).toContain("AND duration >= 5000");
-    });
-
-    it("should include maxDurationMicros in filter when greater than zero", async () => {
-      wrapper = mountIndexComponent();
-      await flushPromises();
-
-      wrapper.vm.handleServiceGraphViewTraces({
-        stream: "default",
-        serviceName: "svc",
-        maxDurationMicros: 20000,
-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
-      });
-      await flushPromises();
-
-      expect(mockSearchObj.data.editorValue).toContain("AND duration <= 20000");
-    });
-
-    it("should combine all optional filter fields when all are provided", async () => {
-      wrapper = mountIndexComponent();
-      await flushPromises();
-
-      wrapper.vm.handleServiceGraphViewTraces({
-        stream: "default",
-        serviceName: "svc",
-        operationName: "POST /ingest",
-        nodeName: "node-2",
-        podName: "pod-xyz",
-        errorsOnly: true,
-        minDurationMicros: 1000,
-        maxDurationMicros: 9000,
-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
-      });
-      await flushPromises();
-
-      const query = mockSearchObj.data.editorValue;
-      expect(query).toContain("service_name = 'svc'");
-      expect(query).toContain("AND operation_name = 'POST /ingest'");
-      expect(query).toContain("AND service_k8s_node_name = 'node-2'");
-      expect(query).toContain("AND service_k8s_pod_name = 'pod-xyz'");
-      expect(query).toContain("AND span_status = 'ERROR'");
-      expect(query).toContain("AND duration >= 1000");
-      expect(query).toContain("AND duration <= 9000");
-    });
-
-    it("should omit optional fields from filter when they are not provided", async () => {
-      wrapper = mountIndexComponent();
-      await flushPromises();
-
-      wrapper.vm.handleServiceGraphViewTraces({
-        stream: "default",
-        serviceName: "svc",
-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
-      });
-      await flushPromises();
-
-      const query = mockSearchObj.data.editorValue;
-      expect(query).toBe("service_name = 'svc'");
-      expect(query).not.toContain("operation_name");
-      expect(query).not.toContain("service_k8s_node_name");
-      expect(query).not.toContain("service_k8s_pod_name");
-      expect(query).not.toContain("span_status");
-      expect(query).not.toContain("duration");
-    });
-
-    it("should not include duration filters when minDurationMicros and maxDurationMicros are zero", async () => {
-      wrapper = mountIndexComponent();
-      await flushPromises();
-
-      wrapper.vm.handleServiceGraphViewTraces({
-        stream: "default",
-        serviceName: "svc",
-        minDurationMicros: 0,
-        maxDurationMicros: 0,
-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
-      });
-      await flushPromises();
-
-      expect(mockSearchObj.data.editorValue).not.toContain("duration");
-    });
-
-    it("should set searchMode from data.mode when navigating via handleServiceGraphViewTraces", async () => {
-      mockSearchObj.meta.searchMode = "service-graph";
-
-      wrapper = mountIndexComponent();
-      await flushPromises();
-
-      wrapper.vm.handleServiceGraphViewTraces({
-        stream: "default",
-        serviceName: "svc",
-        mode: "traces",
-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
-      });
-      await flushPromises();
-
-      expect(mockSearchObj.meta.searchMode).toBe("traces");
-    });
-
-    it("should append resourceFilter to query when data.resourceFilter is provided", async () => {
-      wrapper = mountIndexComponent();
-      await flushPromises();
-
-      wrapper.vm.handleServiceGraphViewTraces({
-        stream: "default",
-        serviceName: "svc",
-        mode: "spans",
-        resourceFilter: { field: "service.name", value: "my-service" },
-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
-      });
-      await flushPromises();
-
-      expect(mockSearchObj.data.editorValue).toContain("AND service.name = 'my-service'");
-    });
-
-    it("should escape single quotes in resourceFilter value", async () => {
-      wrapper = mountIndexComponent();
-      await flushPromises();
-
-      wrapper.vm.handleServiceGraphViewTraces({
-        stream: "default",
-        serviceName: "svc",
-        mode: "spans",
-        resourceFilter: { field: "service.name", value: "it's here" },
-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
-      });
-      await flushPromises();
-
-      expect(mockSearchObj.data.editorValue).toContain("AND service.name = 'it''s here'");
-    });
-
-    it("should call loadServiceGraph on serviceGraphRef when service-graph-refresh event fires from SearchBar", async () => {
-      const mockLoadServiceGraph = vi.fn();
-
-      // Start in service-graph mode so the ServiceGraph stub is rendered
-      mockSearchObj.meta.searchMode = "service-graph";
-
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": {
-              name: "search-bar",
-              template: "<div />",
-              emits: ["service-graph-refresh"],
-            },
-            "index-list": true,
-            "search-result": true,
-            "service-graph": {
-              name: "service-graph",
-              template: "<div />",
-              setup() {
-                return { loadServiceGraph: mockLoadServiceGraph };
-              },
-            },
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-
-      await flushPromises();
-
-      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
-      expect(searchBarEl.exists()).toBe(true);
-      await searchBarEl.vm.$emit("service-graph-refresh");
-      await flushPromises();
-
-      expect(mockLoadServiceGraph).toHaveBeenCalledTimes(1);
-    });
   });
 
   describe("Splitter Behavior", () => {
@@ -1522,6 +2128,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1548,6 +2155,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1569,6 +2177,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1591,6 +2200,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1612,6 +2222,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1651,6 +2262,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1677,6 +2289,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1702,6 +2315,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1714,9 +2328,7 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(result).toBeUndefined();
     });
 
-    it("should handle refresh interval of 0 correctly", async () => {
-      mockSearchObj.meta.refreshInterval = 5;
-
+    it("getMoreData fetches the next page", async () => {
       wrapper = mount(Index, {
         attachTo: node,
         global: {
@@ -1727,18 +2339,63 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
       });
+      await flushPromises();
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      mockFetchQueryDataWithHttpStream.mockClear();
 
+      await wrapper.vm.getMoreData();
       await flushPromises();
 
-      // Should not call getQueryData when refresh interval is not 0
-      await wrapper.vm.getMoreData();
+      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
+    });
 
-      // No error should be thrown
-      expect(wrapper.vm).toBeTruthy();
+    it("tracks traces_search_run and traces_more_rows_loaded without user or page fields", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+      mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      mockSearchObj.meta.showQuery = true;
+      mockSearchObj.meta.showHistogram = false;
+      mockSearchObj.meta.sqlMode = false;
+      mockSearchObj.meta.showFields = true;
+      vi.mocked(analytics.track).mockClear();
+
+      wrapper.vm.searchData();
+      await wrapper.vm.getMoreData();
+      await flushPromises();
+
+      expect(analytics.track).toHaveBeenCalledWith("traces_search_run", {
+        stream_name: "default",
+        show_query: true,
+        show_histogram: false,
+        sql_mode: false,
+        show_fields: true,
+      });
+      expect(analytics.track).toHaveBeenCalledWith("traces_more_rows_loaded", {
+        stream_name: "default",
+      });
+      expect(analytics.track).not.toHaveBeenCalledWith("Button Click", expect.anything());
     });
   });
 
@@ -1754,6 +2411,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1847,6 +2505,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1891,6 +2550,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1919,6 +2579,8 @@ describe("Index.vue (Main Traces Page)", () => {
     });
 
     it("should not call cancelStreamQueryBasedOnRequestId when there is no active trace id", async () => {
+      // With a stream list, mount starts a search a variable number of macrotask hops later; no streams means none.
+      mockGetStreams.mockResolvedValueOnce({ list: [] });
       wrapper = mount(Index, {
         attachTo: node,
         global: {
@@ -1929,17 +2591,26 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
       });
 
-      await flushPromises();
+      for (let i = 0; i < 3; i++) {
+        await flushPromises();
+        await new Promise((r) => setTimeout(r, 0));
+      }
+      // Unmounted instances from earlier tests can still search on the shared mocks, so only this instance counts.
+      const ownSearches = mockFetchQueryDataWithHttpStream.mock.contexts.filter(
+        (owner) => owner === wrapper.vm.$,
+      );
+      expect(ownSearches).toHaveLength(0);
 
+      // cancelSearch is synchronous, so bracketing it keeps a leftover instance's cancel out of the count.
+      const cancelsBefore = mockCancelStreamQueryBasedOnRequestId.mock.calls.length;
       wrapper.vm.cancelSearch();
-      await flushPromises();
-
-      expect(mockCancelStreamQueryBasedOnRequestId).not.toHaveBeenCalled();
+      expect(mockCancelStreamQueryBasedOnRequestId.mock.calls.length).toBe(cancelsBefore);
     });
 
     it.skip("should call cancelStreamQueryBasedOnRequestId with trace id and org id when a search is in-flight", async () => {
@@ -1972,6 +2643,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -2028,6 +2700,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -2058,6 +2731,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -2091,6 +2765,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -2101,20 +2776,28 @@ describe("Index.vue (Main Traces Page)", () => {
       await wrapper.vm.searchData();
       await flushPromises();
 
+      // Guards the parser filter below from going vacuous if the parser argument stops being passed.
+      expect(parseSpy.mock.calls.some(([, parser]) => createdTracesParsers.includes(parser))).toBe(
+        true,
+      );
+
       // parseDurationWhereClause returns the input unchanged for empty strings (no-op)
       // Either it was not called, or if called, it was with an empty string and returned it
       const callsWithNonEmpty = parseSpy.mock.calls.filter(
-        ([clause]) => typeof clause === "string" && clause.trim() !== "",
+        ([clause, parser]) =>
+          createdTracesParsers.includes(parser) &&
+          typeof clause === "string" &&
+          clause.trim() !== "",
       );
       expect(callsWithNonEmpty.length).toBe(0);
     });
 
-    it("should pass only the WHERE-clause portion to parseDurationWhereClause when editorValue contains a pipe prefix", async () => {
+    it("should pass a match_all term containing a pipe to parseDurationWhereClause in full", async () => {
       const parseSpy = vi.mocked(useDurationPercentilesModule.parseDurationWhereClause);
       parseSpy.mockReturnValue("duration >= 1500");
 
-      // editorValue with a query-functions prefix before the pipe
-      mockSearchObj.data.editorValue = "someFunc | duration >= '1.50ms'";
+      // A pipe inside a quoted search term is part of the term, not a separator.
+      mockSearchObj.data.editorValue = "match_all('text | error') and duration >= '1.50ms'";
 
       wrapper = mount(Index, {
         attachTo: node,
@@ -2126,6 +2809,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -2136,15 +2820,14 @@ describe("Index.vue (Main Traces Page)", () => {
       await wrapper.vm.searchData();
       await flushPromises();
 
-      // parseDurationWhereClause must be called with only the part after the pipe,
-      // NOT with the full "someFunc | duration >= '1.50ms'" string.
+      // The whole editor value is the where clause — the match_all term must reach
+      // parseDurationWhereClause intact rather than truncated at the pipe.
       const calls = parseSpy.mock.calls.filter(
         ([clause]) => typeof clause === "string" && clause.trim() !== "",
       );
       expect(calls.length).toBeGreaterThan(0);
       for (const [clause] of calls) {
-        expect(clause).not.toContain("|");
-        expect(clause).not.toContain("someFunc");
+        expect(clause).toContain("match_all('text | error')");
       }
     });
 
@@ -2167,6 +2850,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -2207,14 +2891,6 @@ describe("Index.vue (Main Traces Page)", () => {
       });
     }
 
-    it("should restore tab=services-catalog from URL params", async () => {
-      mockSearchObj.meta.searchMode = "services-catalog";
-      wrapper = mountWithServicesCatalogStub();
-      await flushPromises();
-
-      expect(wrapper.vm.activeTab).toBe("services-catalog");
-    });
-
     it("should set searchMode and early-return without resetting sortBy when switching to services-catalog", async () => {
       // Set a non-default sortBy to prove it was not reset
       mockSearchObj.meta.resultGrid.sortBy = "operation_name";
@@ -2232,71 +2908,6 @@ describe("Index.vue (Main Traces Page)", () => {
     });
   });
 
-  describe("Services Catalog — handleServicesCatalogViewTraces", () => {
-    function mountWithServicesCatalogStub() {
-      return mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            "services-catalog": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-    }
-
-    it("should set editorValue with service_name filter when viewing traces from services catalog", async () => {
-      wrapper = mountWithServicesCatalogStub();
-      await flushPromises();
-
-      wrapper.vm.handleServicesCatalogViewTraces("my-service");
-      await flushPromises();
-
-      expect(mockSearchObj.data.editorValue).toBe("service_name = 'my-service'");
-    });
-
-    it("should set searchMode to 'traces' when handling services catalog view traces", async () => {
-      mockSearchObj.meta.searchMode = "services-catalog";
-
-      wrapper = mountWithServicesCatalogStub();
-      await flushPromises();
-
-      wrapper.vm.handleServicesCatalogViewTraces("test-svc");
-      await flushPromises();
-
-      expect(mockSearchObj.meta.searchMode).toBe("traces");
-    });
-
-    it("should escape single quotes in service name when building filter", async () => {
-      wrapper = mountWithServicesCatalogStub();
-      await flushPromises();
-
-      wrapper.vm.handleServicesCatalogViewTraces("test's-service");
-      await flushPromises();
-
-      // escapeSingleQuotes uses SQL-style escaping: ' → ''
-      expect(mockSearchObj.data.editorValue).toBe("service_name = 'test''s-service'");
-    });
-
-    it("should set sqlMode to false when handling services catalog view traces", async () => {
-      mockSearchObj.meta.sqlMode = true;
-
-      wrapper = mountWithServicesCatalogStub();
-      await flushPromises();
-
-      wrapper.vm.handleServicesCatalogViewTraces("test-svc");
-      await flushPromises();
-
-      expect(mockSearchObj.meta.sqlMode).toBe(false);
-    });
-  });
-
   describe("parseSpanKindWhereClause integration", () => {
     // Shared mount factory — keeps stub config in one place.
     function mountIndexStubbed() {
@@ -2310,6 +2921,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -2374,16 +2986,26 @@ describe("Index.vue (Main Traces Page)", () => {
       await wrapper.vm.searchData();
       await flushPromises();
 
+      // Guards the parser filter below from going vacuous if the parser argument stops being passed.
+      expect(
+        mockParseSpanKindWhereClause.mock.calls.some(([, parser]) =>
+          createdTracesParsers.includes(parser),
+        ),
+      ).toBe(true);
+
       // parseSpanKindWhereClause is guarded by `whereClause.trim() != ""` in buildSearch;
       // for an empty editorValue the spy must not have been called with a non-empty string.
       const callsWithNonEmpty = mockParseSpanKindWhereClause.mock.calls.filter(
-        ([clause]) => typeof clause === "string" && clause.trim() !== "",
+        ([clause, parser]) =>
+          createdTracesParsers.includes(parser) &&
+          typeof clause === "string" &&
+          clause.trim() !== "",
       );
       expect(callsWithNonEmpty.length).toBe(0);
     });
 
-    it("should pass only the WHERE-clause portion to parseSpanKindWhereClause when editorValue contains a pipe prefix", async () => {
-      mockSearchObj.data.editorValue = "someFunc | span_kind='Consumer'";
+    it("should pass a match_all term containing a pipe to parseSpanKindWhereClause in full", async () => {
+      mockSearchObj.data.editorValue = "match_all('text | error') and span_kind='Consumer'";
 
       wrapper = mountIndexStubbed();
       await flushPromises();
@@ -2396,9 +3018,8 @@ describe("Index.vue (Main Traces Page)", () => {
       );
       expect(nonEmptyCalls.length).toBeGreaterThan(0);
       for (const [clause] of nonEmptyCalls) {
-        // The pipe-prefix (function expression) must not be forwarded.
-        expect(clause).not.toContain("|");
-        expect(clause).not.toContain("someFunc");
+        // The quoted term is forwarded intact rather than truncated at the pipe.
+        expect(clause).toContain("match_all('text | error')");
       }
     });
   });
@@ -2418,6 +3039,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -2472,6 +3094,7 @@ describe("Index.vue (Main Traces Page)", () => {
               "index-list": true,
               "search-result": true,
               "service-graph": true,
+              "services-catalog": true,
               SanitizedHtmlRenderer: true,
             },
           },
@@ -2662,6 +3285,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -2695,6 +3319,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -2708,14 +3333,13 @@ describe("Index.vue (Main Traces Page)", () => {
       );
     });
 
-    it("should select persisted stream (Priority 3) when no URL stream and no previously selected", async () => {
+    it("should select persisted stream when auto query is disabled", async () => {
       mockSearchObj.data.stream.selectedStream = { label: "", value: "" };
       mockRestoreTracesStream.mockReturnValue("persisted-stream");
 
-      // Enable auto_query so the persisted-stream branch is entered.
       store.state.zoConfig = {
         ...store.state.zoConfig,
-        auto_query_enabled: true,
+        auto_query_enabled: false,
       };
 
       routerCurrentRouteSpy.mockReturnValue({
@@ -2732,6 +3356,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -2743,15 +3368,9 @@ describe("Index.vue (Main Traces Page)", () => {
         },
         { timeout: 2000 },
       );
-
-      // Restore zoConfig to its original shape.
-      store.state.zoConfig = {
-        ...store.state.zoConfig,
-        auto_query_enabled: false,
-      };
     });
 
-    it("should leave selectedStream empty when no priority matches", async () => {
+    it("should select the first stream when no preferred or default stream exists", async () => {
       mockSearchObj.data.stream.selectedStream = { label: "", value: "" };
       mockRestoreTracesStream.mockReturnValue("");
 
@@ -2774,6 +3393,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -2786,7 +3406,7 @@ describe("Index.vue (Main Traces Page)", () => {
         { timeout: 2000 },
       );
 
-      expect(mockSearchObj.data.stream.selectedStream.value).toBe("");
+      expect(mockSearchObj.data.stream.selectedStream.value).toBe("url-stream");
     });
   });
 
@@ -2805,6 +3425,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -3055,41 +3676,549 @@ describe("Index.vue (Main Traces Page)", () => {
       // Stream must remain unchanged — the cancel did not apply the pending change
       expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
     });
+  });
 
-    it("should trigger onChildStreamChangeRequest when service-graph emits request:stream-change", async () => {
-      mockSearchObj.data.editorValue = "duration >= 500";
+  describe("apply-saved-view", () => {
+    const originalDatetime = { ...mockSearchObj.data.datetime };
 
-      wrapper = mountIndexStubbed();
-      await flushPromises();
-
-      const serviceGraphEl = wrapper.findComponent({ name: "service-graph" });
-      expect(serviceGraphEl.exists()).toBe(true);
-
-      await serviceGraphEl.vm.$emit("request:stream-change", "graph-stream");
-      await flushPromises();
-
-      // Non-empty editorValue → dialog must be shown
-      expect(wrapper.vm.streamChangeDialog.show).toBe(true);
-      expect(wrapper.vm.streamChangeDialog.pendingStream).toBe("graph-stream");
+    const savedView = (overrides: Record<string, unknown> = {}) => ({
+      version: 1,
+      stream: { label: "default", value: "default" },
+      editorValue: "service_name = 'checkout'",
+      datetime: { type: "absolute", relativeTimePeriod: "15m", startTime: 111, endTime: 222 },
+      searchMode: "spans",
+      sortBy: "duration",
+      sortOrder: "asc",
+      selectedFields: ["service_name", "http_method"],
+      ...overrides,
     });
 
-    it("should trigger onChildStreamChangeRequest when services-catalog emits request:stream-change", async () => {
-      mockSearchObj.data.editorValue = "span_status = 'ERROR'";
-      mockSearchObj.meta.searchMode = "services-catalog";
+    // Unmounted instances from earlier tests can still land a mount search on the shared mock.
+    const ownSearches = () =>
+      mockFetchQueryDataWithHttpStream.mock.contexts.filter((owner) => owner === wrapper.vm.$);
 
-      wrapper = mountIndexStubbed();
-      await flushPromises();
+    // Field grouping inside extractFields awaits across macrotasks.
+    const drain = async () => {
+      for (let i = 0; i < 3; i++) {
+        await flushPromises();
+        await new Promise((r) => setTimeout(r, 0));
+      }
+    };
 
-      const servicesCatalogEl = wrapper.findComponent({
-        name: "services-catalog",
+    const mountPage = async (searchBar: any = true) => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": searchBar,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
       });
-      expect(servicesCatalogEl.exists()).toBe(true);
+      await flushPromises();
+      await vi.waitFor(
+        () => expect(mockSearchObj.data.stream.selectedStream.value).toBe("default"),
+        { timeout: 2000 },
+      );
+      await vi.waitFor(() => expect(ownSearches().length).toBeGreaterThan(0), {
+        timeout: 2000,
+      });
+      await drain();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      mockGetStream.mockClear();
+      mockUpdatedLocalLogFilterField.mockClear();
+      routerReplaceSpy.mockClear();
+    };
 
-      await servicesCatalogEl.vm.$emit("request:stream-change", "catalog-stream");
+    const applyView = async (view: Record<string, unknown>) => {
+      await wrapper.findComponent({ name: "search-bar" }).vm.$emit("apply-saved-view", view);
+      await drain();
+    };
+
+    const applyViewAndWaitForSearch = async (view: Record<string, unknown>) => {
+      await applyView(view);
+      await vi.waitFor(() => expect(ownSearches().length).toBeGreaterThan(0), {
+        timeout: 2000,
+      });
+      await drain();
+    };
+
+    afterEach(() => {
+      mockSearchObj.meta.resultGrid.sortBy = "start_time";
+      mockSearchObj.meta.resultGrid.sortOrder = "desc";
+      mockSearchObj.data.datetime = { ...originalDatetime };
+      mockSearchObj.data.stream.selectedFields = [];
+      mockSearchObj.data.resultGrid.columns = [];
+      mockFetchQueryDataWithHttpStream.mockReset();
+    });
+
+    it("restores every field before running exactly one search", async () => {
+      await mountPage();
+      const stateAtSearch: any[] = [];
+      mockFetchQueryDataWithHttpStream.mockImplementation(function (this: unknown) {
+        if (this !== wrapper.vm.$) return;
+        stateAtSearch.push({
+          editorValue: mockSearchObj.data.editorValue,
+          searchMode: mockSearchObj.meta.searchMode,
+          datetime: { ...mockSearchObj.data.datetime },
+          sortBy: mockSearchObj.meta.resultGrid.sortBy,
+          sortOrder: mockSearchObj.meta.resultGrid.sortOrder,
+          selectedFields: [...mockSearchObj.data.stream.selectedFields],
+        });
+      });
+
+      await applyViewAndWaitForSearch(savedView());
+
+      expect(stateAtSearch).toEqual([
+        {
+          editorValue: "service_name = 'checkout'",
+          searchMode: "spans",
+          datetime: expect.objectContaining({ type: "absolute", startTime: 111, endTime: 222 }),
+          sortBy: "duration",
+          sortOrder: "asc",
+          selectedFields: ["service_name", "http_method"],
+        },
+      ]);
+      expect(mockGetStream).not.toHaveBeenCalled();
+      expect(mockUpdatedLocalLogFilterField).toHaveBeenCalledWith("spans");
+    });
+
+    describe("restores the picker's date type", () => {
+      const ABSOLUTE = {
+        type: "absolute",
+        relativeTimePeriod: "15m",
+        startTime: 1752490000000000,
+        endTime: 1752490900000000,
+      };
+      const RELATIVE = { type: "relative", relativeTimePeriod: "2h", startTime: 0, endTime: 0 };
+      let pickerEmits: any[];
+
+      // Pinned default-type, so only Index.vue itself can move the picker's type.
+      const searchBarWithPicker = (defaultType: string) =>
+        defineComponent({
+          name: "search-bar",
+          emits: ["apply-saved-view"],
+          setup() {
+            return { dateTimeRef: ref<any>(null) };
+          },
+          render() {
+            return h(DateTime, {
+              ref: "dateTimeRef",
+              autoApply: true,
+              defaultType,
+              defaultRelativeTime: "15m",
+              "onOn:date-change": (value: any) => pickerEmits.push(value),
+            });
+          },
+        });
+
+      const picker = () => wrapper.findComponent(DateTime).vm as any;
+
+      beforeEach(() => {
+        pickerEmits = [];
+      });
+
+      it("switches a relative picker to absolute with one search", async () => {
+        await mountPage(searchBarWithPicker("relative"));
+        pickerEmits.length = 0;
+
+        await applyViewAndWaitForSearch(savedView({ datetime: ABSOLUTE }));
+
+        expect(picker().selectedType).toBe("absolute");
+        expect(ownSearches()).toHaveLength(1);
+        expect(pickerEmits.filter((v) => v.userChangedValue)).toEqual([]);
+      });
+
+      it("switches an absolute picker to relative with one search", async () => {
+        await mountPage(searchBarWithPicker("absolute"));
+        pickerEmits.length = 0;
+
+        await applyViewAndWaitForSearch(savedView({ datetime: RELATIVE }));
+
+        expect(picker().selectedType).toBe("relative");
+        expect(picker().relativeValue).toBe(2);
+        expect(picker().relativePeriod).toBe("h");
+        expect(ownSearches()).toHaveLength(1);
+        expect(pickerEmits.filter((v) => v.userChangedValue)).toEqual([]);
+      });
+    });
+
+    it("extracts fields for a different stream without clearing the filter", async () => {
+      await mountPage();
+
+      await applyViewAndWaitForSearch(
+        savedView({ stream: { label: "test-stream", value: "test-stream" } }),
+      );
+
+      expect(mockGetStream).toHaveBeenCalledWith("test-stream", "traces", true);
+      expect(mockSearchObj.data.stream.selectedStream.value).toBe("test-stream");
+      expect(mockSearchObj.data.editorValue).toBe("service_name = 'checkout'");
+      expect(ownSearches()).toHaveLength(1);
+    });
+
+    it("applies only the latest view when an earlier apply finishes last", async () => {
+      await mountPage();
+      let resolveStreamA!: (value: unknown) => void;
+      mockGetStream.mockImplementationOnce(
+        () => new Promise((resolve) => (resolveStreamA = resolve)),
+      );
+      const streamA = { label: "test-stream", value: "test-stream" };
+      const searchBar = wrapper.findComponent({ name: "search-bar" });
+
+      searchBar.vm.$emit("apply-saved-view", savedView({ stream: streamA, editorValue: "a" }));
+      await flushPromises();
+      await applyViewAndWaitForSearch(savedView({ stream: streamA, editorValue: "b" }));
+      resolveStreamA(mockStreamList.list.find((s: any) => s.name === "test-stream"));
+      await drain();
+
+      expect(ownSearches()).toHaveLength(1);
+      expect(mockSearchObj.data.editorValue).toBe("b");
+    });
+
+    it("rebuilds the columns even when the search returns no hits", async () => {
+      await mountPage();
+
+      await applyViewAndWaitForSearch(savedView());
+
+      const ids = mockSearchObj.data.resultGrid.columns.map((c: any) => c.id);
+      expect(ids).toContain("http_method");
+    });
+
+    it("clears trace_id and span_id from a trace-detail URL", async () => {
+      await mountPage();
+      routerCurrentRouteSpy.mockReturnValue({
+        value: {
+          query: { stream: "default", tab: "traces", trace_id: "abc", span_id: "def" },
+          name: "traces",
+          path: "/traces",
+        },
+      } as any);
+
+      await applyViewAndWaitForSearch(savedView());
+
+      expect(routerReplaceSpy).toHaveBeenCalledTimes(1);
+      const query = (routerReplaceSpy.mock.calls[0][0] as any).query;
+      expect(query).not.toHaveProperty("trace_id");
+      expect(query).not.toHaveProperty("span_id");
+      expect(query.tab).toBe("spans");
+    });
+
+    it("applies a view saved without selectedFields as no selected fields", async () => {
+      await mountPage();
+      mockSearchObj.data.stream.selectedFields = ["stale_field"];
+      const { selectedFields: _omitted, ...view } = savedView();
+
+      await applyViewAndWaitForSearch(view);
+
+      expect(mockSearchObj.data.stream.selectedFields).toEqual([]);
+      expect(mockSearchObj.data.editorValue).toBe("service_name = 'checkout'");
+      expect(ownSearches()).toHaveLength(1);
+    });
+
+    it("toasts an error and leaves state unchanged for an unknown view version", async () => {
+      await mountPage();
+      const before = mockSearchObj.data.editorValue;
+      const modeBefore = mockSearchObj.meta.searchMode;
+
+      await applyView(savedView({ version: 2 }));
+
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+      expect(mockSearchObj.data.editorValue).toBe(before);
+      expect(mockSearchObj.meta.searchMode).toBe(modeBefore);
+      expect(ownSearches()).toHaveLength(0);
+    });
+
+    it("toasts and leaves state unchanged when the stream no longer exists", async () => {
+      await mountPage();
+      const before = mockSearchObj.data.editorValue;
+      const modeBefore = mockSearchObj.meta.searchMode;
+
+      await applyView(savedView({ stream: { label: "gone", value: "gone" } }));
+
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
+      expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
+      expect(mockSearchObj.data.editorValue).toBe(before);
+      expect(mockSearchObj.meta.searchMode).toBe(modeBefore);
+      expect(ownSearches()).toHaveLength(0);
+    });
+
+    describe("keeps datetime on the searched window", () => {
+      const NOW = Date.UTC(2026, 9, 6, 12, 0, 0);
+      const MIN = 60 * 1000;
+      const THREE_DAYS = 3 * 24 * 60 * MIN;
+      const staleRelative = {
+        type: "relative",
+        relativeTimePeriod: "15m",
+        startTime: (NOW - THREE_DAYS - 15 * MIN) * 1000,
+        endTime: (NOW - THREE_DAYS) * 1000,
+      };
+
+      const ownRequests = () => {
+        const { calls, contexts } = mockFetchQueryDataWithHttpStream.mock;
+        return calls.filter((_c, i) => contexts[i] === wrapper.vm.$).map((c: any) => c[0].queryReq);
+      };
+      const lastWindow = () => {
+        const req = ownRequests().at(-1);
+        return {
+          startTime: req.query?.start_time ?? req.start_time,
+          endTime: req.query?.end_time ?? req.end_time,
+        };
+      };
+      const datetimeWindow = () => ({
+        startTime: mockSearchObj.data.datetime.startTime,
+        endTime: mockSearchObj.data.datetime.endTime,
+      });
+
+      beforeEach(() => {
+        vi.setSystemTime(NOW);
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it("moves a stale relative view's datetime onto the request window ending now", async () => {
+        await mountPage();
+
+        await applyViewAndWaitForSearch(savedView({ datetime: staleRelative }));
+
+        expect(datetimeWindow()).toEqual(lastWindow());
+        expect(datetimeWindow()).toEqual({
+          startTime: (NOW - 15 * MIN) * 1000,
+          endTime: NOW * 1000,
+        });
+      });
+
+      it("moves the window forward when the view is applied again later", async () => {
+        await mountPage();
+        await applyViewAndWaitForSearch(savedView({ datetime: staleRelative }));
+
+        vi.setSystemTime(NOW + 5 * MIN);
+        mockFetchQueryDataWithHttpStream.mockClear();
+        await applyViewAndWaitForSearch(savedView({ datetime: staleRelative }));
+
+        expect(datetimeWindow().endTime).toBe((NOW + 5 * MIN) * 1000);
+        expect(datetimeWindow()).toEqual(lastWindow());
+      });
+
+      it("updates datetime when Run query fires after time has passed", async () => {
+        await mountPage();
+        await applyViewAndWaitForSearch(savedView({ datetime: staleRelative }));
+
+        vi.setSystemTime(NOW + 7 * MIN);
+        wrapper.vm.searchData();
+        await drain();
+
+        expect(datetimeWindow().endTime).toBe((NOW + 7 * MIN) * 1000);
+        expect(datetimeWindow()).toEqual(lastWindow());
+      });
+
+      it("leaves an absolute view's datetime unchanged", async () => {
+        await mountPage();
+
+        await applyViewAndWaitForSearch(savedView());
+
+        expect(datetimeWindow()).toEqual({ startTime: 111, endTime: 222 });
+        expect(lastWindow()).toEqual({ startTime: 111, endTime: 222 });
+      });
+
+      it("sorts on the last request's window without moving datetime", async () => {
+        await mountPage();
+        await applyViewAndWaitForSearch(savedView({ datetime: staleRelative }));
+        const searched = lastWindow();
+
+        vi.setSystemTime(NOW + 5 * MIN);
+        wrapper.vm.runQueryOnSort();
+        await drain();
+
+        expect(datetimeWindow()).toEqual(searched);
+        expect(lastWindow()).toEqual(searched);
+      });
+    });
+
+    describe("paging keeps page 1's filter", () => {
+      const lastFilter = () => {
+        const { calls, contexts } = mockFetchQueryDataWithHttpStream.mock;
+        const own = calls.filter((_c, i) => contexts[i] === wrapper.vm.$);
+        return (own.at(-1) as any)[0].queryReq.filter;
+      };
+
+      afterEach(() => {
+        mockSearchObj.data.resultGrid.currentPage = 0;
+      });
+
+      it("pages with the submitted filter after the editor changes, until a new Run", async () => {
+        await mountPage();
+        await applyViewAndWaitForSearch(
+          savedView({ searchMode: "traces", editorValue: "service_name = 'a'" }),
+        );
+        expect(lastFilter()).toBe("service_name = 'a'");
+
+        mockSearchObj.data.editorValue = "service_name = 'b'";
+        mockSearchObj.data.resultGrid.currentPage = 1;
+        wrapper.vm.getMoreData();
+        await drain();
+        expect(lastFilter()).toBe("service_name = 'a'");
+
+        wrapper.vm.searchData();
+        await drain();
+        expect(lastFilter()).toBe("service_name = 'b'");
+
+        mockSearchObj.data.resultGrid.currentPage = 1;
+        wrapper.vm.getMoreData();
+        await drain();
+        expect(lastFilter()).toBe("service_name = 'b'");
+      });
+    });
+  });
+
+  // Placed last in the file: this test drives fetchQueryDataWithHttpStream's
+  // handlers directly and calls mockFetchQueryDataWithHttpStream.mockReset()
+  // at the end, so it cannot leak an implementation into tests declared after it.
+  describe("Stale search error handling (o2-enterprise#2643)", () => {
+    // Regression: a rejected query's RED metrics charts stayed hidden forever,
+    // even after the query was fixed and the next search succeeded — because a
+    // cancelled search's late error callback overwrote the newer search's state.
+    it("should not let a cancelled search's late error overwrite a newer search's state", async () => {
+      mockSearchObj.data.stream.selectedStream = {
+        label: "default",
+        value: "default",
+      };
+      mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
+      mockSearchObj.data.datetime = {
+        startTime: new Date().getTime() * 1000 - 900000000,
+        endTime: new Date().getTime() * 1000,
+        relativeTimePeriod: "15m",
+        type: "relative",
+      };
+
+      const capturedHandlers: any[] = [];
+      mockFetchQueryDataWithHttpStream.mockImplementation((_data: any, handlers: any) => {
+        capturedHandlers.push(handlers);
+      });
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+      capturedHandlers.length = 0;
+
+      // Search #1 starts and is left in-flight (never resolves on its own).
+      await wrapper.vm.getQueryData();
+      expect(capturedHandlers.length).toBe(1);
+
+      // Search #2 starts before #1 finishes — this cancels #1 (deletes its
+      // request-state entry) and clears errorMsg for the new attempt.
+      await wrapper.vm.getQueryData();
+      expect(capturedHandlers.length).toBe(2);
+
+      expect(mockSearchObj.data.errorMsg).toBe("");
+
+      // #1's HTTP stream finally errors out after being cancelled/superseded.
+      capturedHandlers[0].error({}, { message: "stale failure from search #1", code: 500 });
       await flushPromises();
 
-      expect(wrapper.vm.streamChangeDialog.show).toBe(true);
-      expect(wrapper.vm.streamChangeDialog.pendingStream).toBe("catalog-stream");
+      // The stale error must not resurrect the error banner / hide the charts
+      // for the still-in-flight, newer search.
+      expect(mockSearchObj.data.errorMsg).toBe("");
+
+      // A genuine error for the CURRENT (non-superseded) search must still work.
+      // getQueryData()'s error handler sets errorMsg synchronously, so assert
+      // immediately — before yielding to the event loop via flushPromises().
+      // An unrelated component instance left over from an earlier test in this
+      // file can still have a mount-triggered search pending (onUnmounted does
+      // not cancel in-flight work); if its own getQueryData() call happens to
+      // settle during our flushPromises() here, it resets the shared
+      // mockSearchObj.data.errorMsg back to "" before we get a chance to read
+      // it, unrelated to the cancellation behavior this test is verifying.
+      capturedHandlers[1].error({}, { message: "real failure from search #2", code: 500 });
+      expect(mockSearchObj.data.errorMsg).toBe("real failure from search #2");
+      await flushPromises();
+
+      mockFetchQueryDataWithHttpStream.mockReset();
+    });
+  });
+
+  describe("restoreFilters with unparsable SQL", () => {
+    it("returns without touching filters when the saved filter does not parse", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      const parser = createdTracesParsers.at(-1) as { astify: ReturnType<typeof vi.fn> };
+      parser.astify.mockImplementationOnce(() => {
+        throw new Error("Expected end of input");
+      });
+
+      expect(() => wrapper.vm.restoreFilters("service_name = ")).not.toThrow();
+    });
+  });
+
+  describe("traces count failure logging", () => {
+    it("warns with the error instead of logging a bare console error", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      mockSearchObj.data.queryPayload = { query: { start_time: 1, end_time: 2 } };
+      mockFetchQueryDataWithHttpStream.mockClear();
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const err = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      wrapper.vm.fetchTracesCount();
+      const [, handlers] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+      const failure = { content: { message: "network error" } };
+      handlers.error({}, failure);
+
+      expect(warn).toHaveBeenCalledWith("Failed to fetch traces count", failure);
+      expect(err).not.toHaveBeenCalledWith("Failed to fetch traces count");
+      warn.mockRestore();
+      err.mockRestore();
+      mockSearchObj.data.queryPayload = null;
     });
   });
 });

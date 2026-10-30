@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
 
 interface AkeylessStore {
   store: {
@@ -48,10 +49,20 @@ interface CipherKeyData {
 }
 const cipherKeys = {
   create: (org_identifier: string, data: CipherKeyData) => {
-    return http().post(`/api/${org_identifier}/cipher_keys`, data);
+    return http()
+      .post(`/api/${org_identifier}/cipher_keys`, data)
+      .then((res) => {
+        analytics.track("cipher_key_created");
+        return res;
+      });
   },
   update: (org_identifier: string, data: CipherKeyData, name: String) => {
-    return http().put(`/api/${org_identifier}/cipher_keys/${name}`, data);
+    return http()
+      .put(`/api/${org_identifier}/cipher_keys/${name}`, data)
+      .then((res) => {
+        analytics.track("cipher_key_updated");
+        return res;
+      });
   },
   list: (org_identifier: string) => {
     return http().get(`/api/${org_identifier}/cipher_keys`);

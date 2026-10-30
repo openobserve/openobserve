@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nText } from "@/types/i18n";
+
 export interface FieldItem {
   name: string;
   type?: string;
@@ -11,7 +13,7 @@ export interface FieldItem {
 export interface OFieldListProps {
   fields: FieldItem[];
   search?: string;
-  searchPlaceholder?: string;
+  searchPlaceholder?: I18nText;
   loading?: boolean;
   currentPage?: number;
   pageSize?: number;
@@ -23,13 +25,15 @@ export interface OFieldListProps {
   draggable?: boolean;
   dragEnabledFn?: (row: FieldItem, index: number) => boolean;
   sortFn?: (a: FieldItem, b: FieldItem) => number;
+  /** Rows take focus and Enter or Space picks them, for a list that is a picker. */
+  keyboard?: boolean;
 }
 
 export interface OFieldListEmits {
   "update:search": [value: string];
   "update:currentPage": [page: number];
   "update:expandedIds": [ids: string[]];
-  "row-click": [row: FieldItem, event: MouseEvent];
+  "row-click": [row: FieldItem, event: MouseEvent | KeyboardEvent];
   "row-dblclick": [row: FieldItem, event: MouseEvent];
   "scroll-end": [scrollInfo: any];
   "drag-start": [row: FieldItem, event: DragEvent];

@@ -1,0 +1,317 @@
+const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+const testLogger = require('../utils/test-logger.js');
+const PageManager = require('../../pages/page-manager.js');
+
+test.describe("App Theme Default (Light/Dark) testcases", () => {
+  test.describe.configure({ mode: 'parallel' });
+  let pm;
+
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
+    pm = new PageManager(page);
+    testLogger.info('Theme default test setup completed');
+  });
+
+  test("should default to light mode on a fresh load with no theme key", {
+    tag: ['@theme-default', '@theme', '@all', '@P0']
+  }, async ({ page }) => {
+    testLogger.info('Clearing theme storage for a fresh light-default load');
+
+    // Seed before navigation: bootstrapTheme() reads localStorage.theme
+    // synchronously in main.ts, so a write after navigateToBase has no effect.
+    await page.addInitScript(() => {
+      localStorage.removeItem('theme');
+      localStorage.removeItem('appliedLightThemeName');
+      localStorage.removeItem('appliedDarkThemeName');
+      localStorage.removeItem('appliedLightTheme');
+      localStorage.removeItem('appliedDarkTheme');
+    });
+    await navigateToBase(page);
+    await pm.themePage.expectProfileMenuVisible();
+    testLogger.info('Layout shell mounted; asserting default light mode');
+
+    await pm.themePage.expectLightMode();
+    // No persisted theme resolves to light and is written back, so the key is 'light'.
+    expect(await pm.themePage.getCurrentThemeFromStorage()).toBe('light');
+    testLogger.info('Default light mode verified');
+  });
+
+  test("should boot in dark mode when theme is seeded to 'dark' before app scripts run", {
+    tag: ['@theme-default', '@theme', '@all', '@P0']
+  }, async ({ page }) => {
+    testLogger.info("Seeding theme='dark' before navigation");
+
+    // Seed the exact literal "dark" before navigation so the first paint is dark.
+    await page.addInitScript(() => localStorage.setItem('theme', 'dark'));
+    await navigateToBase(page);
+    await pm.themePage.waitForDarkModeApplied();
+    testLogger.info('Dark class applied on <html>');
+
+    await pm.themePage.expectDarkMode();
+    expect(await pm.themePage.getCurrentThemeFromStorage()).toBe('dark');
+    testLogger.info('Dark default on first paint verified');
+  });
+
+  test("should fall back to light mode for a corrupt non-'dark' theme value", {
+    tag: ['@theme-default', '@theme', '@all', '@P1']
+  }, async ({ page }) => {
+    testLogger.info("Seeding a corrupt theme value 'DARK' before navigation");
+
+    // Strict === "dark" means "DARK" (and "1", "true", "") resolves to light.
+    await page.addInitScript(() => localStorage.setItem('theme', 'DARK'));
+    await navigateToBase(page);
+    await pm.themePage.expectProfileMenuVisible();
+    testLogger.info('Layout shell mounted; asserting corrupt value resolved to light');
+
+    await pm.themePage.expectLightMode();
+    testLogger.info('Corrupt theme value resolved to light mode');
+  });
+});
+
+test.describe("Theme Management Tests", () => {
+  test.describe.configure({ mode: 'serial' }); // Serial to avoid theme state conflicts
+  let pm; // Page Manager instance
+
+  test.beforeEach(async ({ page }, testInfo) => {
+    // Initialize test setup
+    testLogger.testStart(testInfo.title, testInfo.file);
+
+    // Navigate to base URL with authentication
+    await navigateToBase(page);
+    pm = new PageManager(page);
+
+    // Post-authentication stabilization wait — keyed on the profile button which
+    // is the first user-actionable element to mount after layout shell hydrates.
+    await page.waitForLoadState('domcontentloaded');
+    await expect(pm.themePage.profileMenuBtn).toBeVisible({ timeout: 10000 });
+
+    testLogger.info('Theme management test setup completed');
+  });
+
+  test.describe("Theme Switcher", () => {
+    test("should toggle between light and dark mode and persist after reload", {
+      tag: ['@theme', '@themeSwitcher', '@themePersistence', '@P1']
+    }, async ({ page }) => {
+      testLogger.info('Testing theme mode toggle and persistence functionality');
+
+      // Get initial theme state
+      const initialIsDark = await pm.themePage.isDarkMode();
+      testLogger.info(`Initial theme mode: ${initialIsDark ? 'dark' : 'light'}`);
+
+      // Toggle theme
+      await pm.themePage.toggleThemeMode();
+
+      // Verify theme changed
+      const afterToggleIsDark = await pm.themePage.isDarkMode();
+      expect(afterToggleIsDark).not.toBe(initialIsDark);
+      testLogger.info(`Theme toggled to: ${afterToggleIsDark ? 'dark' : 'light'}`);
+
+      // Toggle back to original
+      await pm.themePage.toggleThemeMode();
+
+      // Verify theme restored
+      const finalIsDark = await pm.themePage.isDarkMode();
+      expect(finalIsDark).toBe(initialIsDark);
+      testLogger.info('Theme toggle test completed');
+
+      // Test persistence - switch to dark mode
+      await pm.themePage.switchToDarkMode();
+      await pm.themePage.expectDarkMode();
+      testLogger.info('Switched to dark mode for persistence test');
+
+      // Reload the page
+      await page.reload();
+      await page.waitForLoadState('domcontentloaded');
+
+      // Wait for theme to be restored from storage (Vue needs time to apply it).
+      // The dark-mode signal is the `.dark` class on <html> (set by
+      // utils/theme.ts); the legacy `body--dark` on <body> was retired.
+      await page.waitForFunction(
+        (darkClass) => document.documentElement.classList.contains(darkClass),
+        'dark',
+        { timeout: 10000 }
+      );
+
+      // Verify dark mode persisted
+      await pm.themePage.expectDarkMode();
+      testLogger.info('Dark mode persisted after reload');
+
+      // Switch back to light mode for cleanup
+      await pm.themePage.switchToLightMode();
+      testLogger.info('Theme toggle and persistence test completed');
+    });
+  });
+
+  test.describe("Predefined Themes", () => {
+    test("should open dialog, display tabs and theme options, then close", {
+      tag: ['@theme', '@predefinedThemes', '@P1']
+    }, async ({ page }) => {
+      testLogger.info('Testing predefined themes dialog functionality');
+
+      // Open predefined themes dialog
+      await pm.themePage.openPredefinedThemesDialog();
+      await pm.themePage.expectPredefinedThemesDialogVisible();
+      testLogger.info('Predefined themes dialog opened');
+
+      // Verify light mode tab is visible
+      await pm.themePage.expectLightModeTabVisible();
+      testLogger.info('Light Mode tab visible');
+
+      // Verify dark mode tab is visible
+      await pm.themePage.expectDarkModeTabVisible();
+      testLogger.info('Dark Mode tab visible');
+
+      // Switch between tabs
+      await pm.themePage.selectDarkModeTab();
+      testLogger.info('Switched to Dark Mode tab');
+
+      await pm.themePage.selectLightModeTab();
+      testLogger.info('Switched back to Light Mode tab');
+
+      // Verify predefined theme options (Light tab is currently active)
+      const expectedThemes = ['O2 Signature', 'O2 Pulse', 'O2 Horizon', 'O2 Beacon'];
+      for (const themeName of expectedThemes) {
+        await pm.themePage.expectThemeCardVisible(themeName, 'light');
+        testLogger.info(`Theme "${themeName}" is visible`);
+      }
+
+      // Verify Custom Color option exists
+      await pm.themePage.expectCustomColorCardVisible('light');
+      testLogger.info('Custom Color option is visible');
+
+      // Close dialog
+      await pm.themePage.closePredefinedThemesDialog();
+      await pm.themePage.expectPredefinedThemesDialogHidden();
+      testLogger.info('Predefined themes dialog closed');
+    });
+
+    test("should apply predefined theme, show Applied badge, and reset to default", {
+      tag: ['@theme', '@predefinedThemes', '@applyTheme', '@resetTheme', '@P1']
+    }, async ({ page }) => {
+      testLogger.info('Testing predefined theme application and reset');
+
+      // Ensure we're in light mode first
+      await pm.themePage.switchToLightMode();
+
+      // Open predefined themes dialog
+      await pm.themePage.openPredefinedThemesDialog();
+
+      // Apply "O2 Pulse" theme
+      await pm.themePage.applyThemeByName('O2 Pulse');
+      testLogger.info('Applied O2 Pulse theme');
+
+      // Verify notification
+      await pm.themePage.expectNotificationContains('applied');
+      testLogger.info('Theme application notification shown');
+
+      // Verify "Applied" badge appears
+      const isApplied = await pm.themePage.isThemeApplied('O2 Pulse');
+      expect(isApplied).toBe(true);
+      testLogger.info('Applied badge shown for O2 Pulse');
+
+      // Now test reset - Apply a different theme first
+      await pm.themePage.applyThemeByName('O2 Horizon');
+      testLogger.info('Applied O2 Horizon theme');
+
+      // Reset to default
+      await pm.themePage.resetToDefaultTheme();
+      testLogger.info('Reset theme to default');
+
+      // Verify reset notification
+      try {
+        await pm.themePage.expectNotificationContains('reset');
+        testLogger.info('Reset notification shown');
+      } catch (e) {
+        testLogger.info('Reset notification not captured (may have been transient)');
+      }
+
+      // Close dialog
+      await pm.themePage.closePredefinedThemesDialog();
+      testLogger.info('Apply and reset theme test completed');
+    });
+
+    test("should apply theme in dark mode", {
+      tag: ['@theme', '@darkMode', '@P2']
+    }, async ({ page }) => {
+      testLogger.info('Testing theme application in dark mode');
+
+      // Switch to dark mode
+      await pm.themePage.switchToDarkMode();
+      await pm.themePage.expectDarkMode();
+      testLogger.info('Switched to dark mode');
+
+      // Open predefined themes dialog
+      await pm.themePage.openPredefinedThemesDialog();
+
+      // Select dark mode tab
+      await pm.themePage.selectDarkModeTab();
+
+      // Apply "O2 Beacon" theme for dark mode
+      await pm.themePage.applyThemeByName('O2 Beacon', 'dark');
+      testLogger.info('Applied O2 Beacon theme in dark mode');
+
+      // Verify notification
+      await pm.themePage.expectNotificationContains('applied');
+
+      // Reset to default
+      await pm.themePage.resetToDefaultTheme();
+
+      // Close dialog and switch back to light mode
+      await pm.themePage.closePredefinedThemesDialog();
+      await pm.themePage.switchToLightMode();
+      testLogger.info('Dark mode theme test completed');
+    });
+  });
+
+  test.describe("Custom Color Theme", () => {
+    test("should open color picker, close it, and apply custom color theme", {
+      tag: ['@theme', '@customColor', '@P2']
+    }, async ({ page }) => {
+      testLogger.info('Testing custom color theme functionality');
+
+      // Open predefined themes dialog
+      await pm.themePage.openPredefinedThemesDialog();
+
+      // Open custom color picker
+      await pm.themePage.openCustomColorPicker();
+      testLogger.info('Custom color picker opened');
+
+      // Verify color picker is visible
+      await pm.themePage.expectColorPickerDialogVisible();
+      testLogger.info('Color picker dialog is visible');
+
+      // Close color picker
+      await pm.themePage.closeColorPicker();
+      testLogger.info('Color picker closed');
+
+      // Apply custom color theme
+      await pm.themePage.applyCustomColor();
+      testLogger.info('Applied custom color theme');
+
+      // Verify notification
+      try {
+        await pm.themePage.expectNotificationContains('Custom color applied');
+        testLogger.info('Custom color notification shown');
+      } catch (e) {
+        testLogger.info('Custom color notification not captured (may have been transient)');
+      }
+
+      // Reset to default for cleanup
+      await pm.themePage.resetToDefaultTheme();
+
+      // Close dialog
+      await pm.themePage.closePredefinedThemesDialog();
+      testLogger.info('Custom color theme test completed');
+    });
+  });
+
+  test.afterEach(async () => {
+    // Ensure we're back to light mode for next test
+    try {
+      await pm.themePage.switchToLightMode();
+    } catch (e) {
+      // Ignore errors in cleanup
+    }
+    testLogger.info('Theme management test completed');
+  });
+});

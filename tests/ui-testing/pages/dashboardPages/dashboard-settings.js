@@ -9,6 +9,9 @@ export default class DashboardSetting {
   constructor(page) {
     this.page = page;
     this.setting = page.locator('[data-test="dashboard-setting-btn"]');
+    this.addVariableBtn = page.locator(
+      '[data-test="dashboard-add-variable-btn"]'
+    );
     this.general = page.locator('[data-test="dashboard-settings-general-tab"]');
     this.variables = page.locator(
       '[data-test="dashboard-settings-variable-tab"]'
@@ -18,6 +21,9 @@ export default class DashboardSetting {
     this.time = page.locator('[data-test="date-time-btn"]');
     this.dynamicFilter = page.locator(
       '[data-test="dashboard-general-setting-dynamic-filter"]'
+    );
+    this.dynamicFilterSwitch = page.locator(
+      '[data-test="dashboard-general-setting-dynamic-filter-btn"]'
     );
     this.newName = page.locator('[data-test="dashboard-general-setting-name-field"]');
     this.saveSettingBtn = page.locator(
@@ -117,9 +123,20 @@ export default class DashboardSetting {
       )
       .click();
 
-    await this.page
-      .locator(`[data-test="date-time-relative-${date}-${time}-btn"]`)
-      .click();
+    // The picker renders in a portal that mounts on click — clicking the option
+    // in the same tick lands before it exists (or on a node still animating in).
+    const relativeBtn = this.page.locator(
+      `[data-test="date-time-relative-${date}-${time}-btn"]`
+    );
+    await relativeBtn.waitFor({ state: "visible", timeout: 10000 });
+    await relativeBtn.click();
+  }
+
+  // Toast message locator scoped to a given text (assert visibility in the spec)
+  getToastMessageByText(text) {
+    return this.page
+      .locator('[data-test="o-toast-message"]')
+      .filter({ hasText: text });
   }
 
   //Save Setting//
@@ -132,11 +149,33 @@ export default class DashboardSetting {
   async cancelSettingDashboard() {
     await this.cancelBtn.waitFor({ state: "visible" });
     await this.cancelBtn.click();
+    await this.discardSettingsDraftIfAsked();
+  }
+
+  // Closing with unsaved settings opens the leave dialog; Discard keeps the old close-and-forget behaviour.
+  async discardSettingsDraftIfAsked() {
+    const dialog = this.page.locator('[data-test="editor-draft-leave-dialog"]');
+    const drawer = this.page.locator('[data-test="dashboard-settings-drawer"]');
+    const asked = await Promise.race([
+      dialog.waitFor({ state: "visible", timeout: 5000 }).then(() => true),
+      drawer.waitFor({ state: "hidden", timeout: 5000 }).then(() => false),
+    ]).catch(() => false);
+    if (!asked) return;
+    await dialog.locator('[data-test="o-dialog-neutral-btn"]').click();
+    await dialog.waitFor({ state: "hidden", timeout: 10000 });
   }
   //close setting dashboard//
   async closeSettingDashboard() {
     await this.closeSetting.waitFor({ state: "visible" });
     await this.closeSetting.click();
+    await this.discardSettingsDraftIfAsked();
+    // The ODrawer animates out over a backdrop that still swallows pointer
+    // events mid-transition, so a following click (e.g. the back button) can be
+    // eaten. Wait for it to actually be gone.
+    await this.page
+      .locator('[data-test="dashboard-settings-drawer"]')
+      .waitFor({ state: "hidden", timeout: 10000 })
+      .catch(() => {});
   }
 
   //show dynamic filter//
@@ -144,12 +183,32 @@ export default class DashboardSetting {
     await this.dynamicFilter.waitFor({ state: "visible" });
     await this.dynamicFilter.click();
   }
+
+  // New dashboards hide dynamic filters, so tests that use them turn the setting on first.
+  async enableDynamicFilters() {
+    await this.openSetting();
+    await this.dynamicFilterSwitch.waitFor({ state: "visible" });
+    if ((await this.dynamicFilterSwitch.getAttribute("aria-checked")) !== "true") {
+      await this.dynamicFilter.click();
+    }
+    await this.saveSetting();
+    await this.getToastMessageByText("Dashboard updated successfully").waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+    await this.closeSettingDashboard();
+  }
   //Add Tabs//
   generateUniqueTabnewName(prefix = "u") {
     return `${prefix}_${Date.now()}`;
   }
 
   //Tab Settings//
+
+  //Click the "Tab" settings tab (tabs management view)//
+  async clickTabsSettingsTab() {
+    await this.tab.click();
+  }
 
   //Add new tab//
   async addTabSetting(tabnewName) {
@@ -169,6 +228,13 @@ export default class DashboardSetting {
   //save new tab setting//
   async saveTabSetting() {
     await this.saveTab.click();
+    // The dialog closes only once the tab has actually been created, so this is
+    // the signal that the save landed — without it a caller can close the
+    // settings drawer out from under an in-flight request and lose the tab.
+    await this.page
+      .locator('[data-test="dashboard-tab-settings-add-tab-dialog"]')
+      .waitFor({ state: "hidden", timeout: 15000 })
+      .catch(() => {});
   }
 
   /**
@@ -207,18 +273,39 @@ export default class DashboardSetting {
 
   //cancel changes
   async cancelTabwithoutSave() {
+    await this.addTabCancel.waitFor({ state: "visible", timeout: 10000 });
     await this.addTabCancel.click();
+    await this.page
+      .locator('[data-test="dashboard-tab-settings-add-tab-dialog"]')
+      .waitFor({ state: "hidden", timeout: 10000 })
+      .catch(() => {});
   }
 
   //Cancel edit tab name
   async cancelEditedtab() {
-    await this.page
-      .locator('[data-test="dashboard-tab-settings-tab-name-edit-cancel"]')
-      .click();
+    const cancelBtn = this.page.locator(
+      '[data-test="dashboard-tab-settings-tab-name-edit-cancel"]'
+    );
+    await cancelBtn.waitFor({ state: "visible", timeout: 10000 });
+    await cancelBtn.click();
   }
 
   //Variables Settings
   //Open Variables tab
+
+  // The variables tab click can be swallowed mid drawer-transition, leaving the
+  // General tab showing. Callers then wait out their full timeout on a control
+  // that was never going to render, so gate the tab switch on the variables panel
+  // actually appearing — either its list (add-variable button) or, if a variable
+  // form is already open, the form's name field.
+  async waitForVariablesPanel(timeout = 5000) {
+    await this.page
+      .locator(
+        '[data-test="dashboard-add-variable-btn"], [data-test="dashboard-variable-name-field"]'
+      )
+      .first()
+      .waitFor({ state: "visible", timeout });
+  }
 
   async openVariables() {
     // Check if the settings dialog is already open
@@ -255,6 +342,7 @@ export default class DashboardSetting {
         await variablesTab.waitFor({ state: "visible", timeout: 10000 });
         await variablesTab.scrollIntoViewIfNeeded();
         await variablesTab.click();
+        await this.waitForVariablesPanel();
         return; // Success
       } catch (e) {
         testLogger.warn(`openVariables attempt ${attempt} failed: ${e.message}`);
@@ -286,6 +374,7 @@ export default class DashboardSetting {
         await variablesTab.waitFor({ state: "visible", timeout: 10000 });
         await variablesTab.scrollIntoViewIfNeeded();
         await variablesTab.click();
+        await this.waitForVariablesPanel();
         return; // Success
       } catch (e) {
         testLogger.warn(`goToVariablesTab attempt ${attempt} failed: ${e.message}`);
@@ -430,6 +519,11 @@ export default class DashboardSetting {
       .click();
   }
 
+  // Wait for the "Add Variable" button to be visible (variables list view)
+  async waitForAddVariableBtnVisible() {
+    await this.addVariableBtn.waitFor({ state: "visible" });
+  }
+
   //Cancel variable
   async cancelVariable() {
     await this.page
@@ -467,6 +561,7 @@ export default class DashboardSetting {
         // Wait for close button with a short timeout
         await closeBtn.waitFor({ state: "visible", timeout: 3000 });
         await closeBtn.click({ timeout: 2000 });
+        await this.discardSettingsDraftIfAsked();
 
         // Wait for dialog to actually disappear
         await settingsDialog.waitFor({ state: "hidden", timeout: 5000 });
@@ -515,10 +610,13 @@ export default class DashboardSetting {
       .locator('[data-test="dashboard-tab-settings-tab-edit-btn"]')
       .click();
 
-    // Click to enable name editing
+    // Click to enable name editing. The input is rendered only after the row
+    // swaps into edit mode, so clicking in the same tick as the edit button
+    // above lands on a node that does not exist yet.
     const nameEditLocator = page.locator(
       '[data-test="dashboard-tab-settings-tab-name-edit"]'
     );
+    await nameEditLocator.waitFor({ state: "visible", timeout: 10000 });
     await nameEditLocator.click();
 
     // Fill new tab name
@@ -527,9 +625,11 @@ export default class DashboardSetting {
 
   //save edited tab name
   async saveEditedtab() {
-    await this.page
-      .locator('[data-test="dashboard-tab-settings-tab-name-edit-save"]')
-      .click();
+    const saveBtn = this.page.locator(
+      '[data-test="dashboard-tab-settings-tab-name-edit-save"]'
+    );
+    await saveBtn.waitFor({ state: "visible", timeout: 10000 });
+    await saveBtn.click();
   }
 
   // Delete tab in edit tab options//

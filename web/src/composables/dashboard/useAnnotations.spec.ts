@@ -3,11 +3,14 @@ import { useAnnotations } from "./useAnnotations";
 import { annotationService } from "../../services/dashboard_annotations";
 
 // Mock the annotation service
-vi.mock("../../services/dashboard_annotations", () => ({
-  annotationService: {
-    get_timed_annotations: vi.fn(),
-  },
-}));
+vi.mock("../../services/dashboard_annotations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    annotationService: {
+      get_timed_annotations: vi.fn(),
+    },
+  });
+});
 
 const mockAnnotationService = vi.mocked(annotationService);
 
@@ -218,7 +221,9 @@ describe("useAnnotations", () => {
       const composable = useAnnotations("test-org", "test-dashboard", "test-panel");
       const result = await composable.refreshAnnotations(1000, 2000);
 
-      expect(result).toBeUndefined();
+      // Normalised to null with the other two "no annotations" shapes: a cached
+      // query result may not be undefined.
+      expect(result).toBeNull();
     });
 
     it("should handle null service response", async () => {

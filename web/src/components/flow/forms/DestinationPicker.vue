@@ -30,16 +30,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div data-test="destination-picker" class="flex w-full flex-col gap-4">
-    <!-- Mode toggle — a bare control OUTSIDE the form: it swaps the
-         select-existing form for the CreateDestinationForm create child. -->
+    <!-- Mode toggle — a bare control OUTSIDE the form: it swaps the select-existing
+         form for the CreateDestinationForm create child. Always visible, so the user
+         can toggle back to picking an existing destination without hunting for Cancel. -->
     <OSwitch
       v-model="createNewDestination"
       :label="t('flow.destination.createNew')"
+      :disabled="disabled"
       data-test="destination-picker-create-toggle"
     />
 
     <!-- inline create destination form (own save/cancel) -->
-    <div v-if="createNewDestination" class="w-full">
+    <div v-if="createNewDestination && !disabled" class="w-full">
       <CreateDestinationForm
         :forced-type="forcedType"
         @created="onDestinationCreated"
@@ -52,25 +54,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OFormSelect
         name="selectedDestination"
         :label="t('flow.destination.select')"
-        required
+        :required="!optional"
+        :disabled="disabled"
         :options="destinationOptions"
         tabindex="0"
         data-test="destination-picker-select"
       />
+      <!-- The dropdown shows each endpoint but drops it on selection, leaving no way
+           to confirm where the step posts without reopening the list. -->
+      <div
+        v-if="selectedDestination"
+        data-test="destination-picker-details"
+        class="border-border-default rounded-default mt-2 flex flex-col gap-1 border px-3 py-2"
+      >
+        <div class="flex flex-wrap items-baseline gap-2">
+          <OBadge variant="default-soft" size="sm">{{ selectedMethod }}</OBadge>
+          <span class="text-text-body font-mono text-xs break-all">{{
+            selectedDestination.url
+          }}</span>
+        </div>
+        <div v-if="selectedHeaderNames.length" class="flex gap-2 text-xs">
+          <span class="text-text-secondary shrink-0">{{ t("workflow.results.headersLabel") }}</span>
+          <span class="text-text-body break-words">{{ selectedHeaderNames.join(", ") }}</span>
+        </div>
+      </div>
     </OForm>
   </div>
 </template>
 
 <script lang="ts" setup>
+import { destinationKeys } from "@/services/alert_destination.querykeys";
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { computed, onBeforeMount, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import destinationService from "@/services/alert_destination";
+import { isCustomDestination } from "@/utils/destinationType";
 import CreateDestinationForm from "@/components/pipeline/NodeForm/CreateDestinationForm.vue";
 import {
   makeExternalDestinationSchema,
@@ -79,13 +104,28 @@ import {
 
 // `forcedType`, when set, is forwarded to the inline create form to lock its
 // destination type and skip the type-selection step (workflows → "custom").
-const props = withDefaults(defineProps<{ initialName?: string; forcedType?: string }>(), {
-  initialName: "",
-  forcedType: undefined,
-});
+// `optional` (Workflows) lets the picker be saved with NO destination selected —
+// `submit()` then returns an empty `destination_name` instead of null, and the
+// required schema check is skipped. `disabled` greys the whole picker out (used by
+// the Workflows "Set up later" toggle). Both default false so Pipelines are
+// unaffected.
+const props = withDefaults(
+  defineProps<{
+    initialName?: string;
+    forcedType?: string;
+    optional?: boolean;
+    disabled?: boolean;
+  }>(),
+  {
+    initialName: "",
+    forcedType: undefined,
+    optional: false,
+    disabled: false,
+  },
+);
 const emit = defineEmits<{ (e: "expand", value: boolean): void }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 const destinations = ref<any[]>([]);
@@ -114,7 +154,11 @@ watch(createNewDestination, async (v) => {
   emit("expand", v);
   if (v) return;
   // Returning from create (either cancelled or just created) — refetch once so a
-  // newly-created destination shows, then apply any pending selection.
+  // newly-created destination shows, then apply any pending selection. Drop the
+  // cached list first so this is a real refetch and not a cache hit.
+  await queryClient.invalidateQueries({
+    queryKey: destinationKeys.all(store.state.selectedOrganization.identifier),
+  });
   await getDestinations();
   if (pendingSelection.value) {
     form.setFieldValue("selectedDestination", pendingSelection.value);
@@ -122,28 +166,59 @@ watch(createNewDestination, async (v) => {
   }
 });
 
-// Show the destination URL as a sub-label.
-const destinationOptions = computed(() =>
-  destinations.value.map((d: any) => ({
-    label: d.name,
-    value: d.name,
-    subLabel: d.url && d.url.length > 70 ? d.url.slice(0, 70) + "..." : d.url,
-    subLabelInline: true,
-  })),
+// form.useStore, not form.state: the latter is a snapshot, so the pane would stay
+// pinned to whatever was selected when it first rendered.
+const selectedName = form.useStore((s: any) => s.values.selectedDestination as string);
+const selectedDestination = computed<any | null>(() => {
+  const name = selectedName.value || props.initialName || "";
+  if (!name) return null;
+  return destinations.value.find((d: any) => d.name === name && d.url) || null;
+});
+const selectedMethod = computed(() =>
+  String(selectedDestination.value?.method || "POST").toUpperCase(),
 );
+// Header VALUES are withheld: this pane gets screenshotted into tickets and an
+// Authorization token should not travel with it.
+const selectedHeaderNames = computed(() => Object.keys(selectedDestination.value?.headers || {}));
+
+const toOption = (d: any) => ({
+  label: d.name,
+  value: d.name,
+  subLabel: d.url,
+  subLabelInline: true,
+});
+
+// Show the destination URL as a sub-label. When the host locks the type to custom
+// (Workflows), prebuilt provider destinations are filtered out — they are listed by
+// the shared pipeline endpoint but cannot be executed by a workflow node.
+const destinationOptions = computed(() => {
+  const all = destinations.value;
+  if (props.forcedType !== "custom") return all.map(toOption);
+
+  const custom = all.filter(isCustomDestination);
+  const options = custom.map(toOption);
+
+  // A node saved before this filter existed may point at a prebuilt destination.
+  // Keep it listed (flagged) rather than letting it vanish — an empty picker would
+  // silently downgrade the node to a placeholder on the next Save.
+  const saved = props.initialName
+    ? all.find((d: any) => d.name === props.initialName && !isCustomDestination(d))
+    : undefined;
+  if (saved) {
+    options.unshift({
+      ...toOption(saved),
+      subLabel: t("flow.destination.unsupportedType"),
+    });
+  }
+  return options;
+});
 
 // Pipeline-module external destinations.
 const getDestinations = async () => {
   try {
-    const res = await destinationService.list({
-      page_num: 1,
-      page_size: 100000,
-      sort_by: "name",
-      desc: false,
-      org_identifier: store.state.selectedOrganization.identifier,
-      module: "pipeline",
-    });
-    destinations.value = res.data || [];
+    destinations.value = await queryClient.fetchQuery(
+      destinationsQuery(store.state.selectedOrganization.identifier, "pipeline"),
+    );
   } catch (e: any) {
     if (e?.response?.status !== 403) {
       toast({ variant: "error", message: t("flow.destination.loadError") });
@@ -165,6 +240,16 @@ const onDestinationCreated = (name: string) => {
 // only fires on a schema-valid submit, so `validated` stays null otherwise.
 const submit = async () => {
   if (createNewDestination.value) return null; // still in the inline create form
+  // Optional (Workflows placeholder): empty is allowed. Read the current value
+  // WITHOUT running the required schema, so no inline error and empty resolves to
+  // "" rather than null.
+  if (props.optional) {
+    const name = (form.state.values.selectedDestination as string) || "";
+    return {
+      org_id: store.state.selectedOrganization.identifier,
+      destination_name: name,
+    };
+  }
   validated.value = null;
   await form.handleSubmit();
   const values = validated.value as ExternalDestinationForm | null;

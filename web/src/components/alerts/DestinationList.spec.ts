@@ -48,7 +48,7 @@ describe.skip("Alert List", async () => {
   });
 
   it("Should render alerts title", () => {
-    expect(wrapper.find('[data-test="alert-destinations-list-title"]').text()).toBe("Destinations");
+    expect(wrapper.find('[data-test="alert-destinations-list-title"]').text()).toBe("Alerts");
   });
   it("Should reder table with templates", () => {
     expect(wrapper.find('[data-test="alert-destinations-list-table"]').exists()).toBeTruthy();

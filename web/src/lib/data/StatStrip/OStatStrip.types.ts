@@ -4,6 +4,8 @@
 // top of list / table / dashboard screens. `tone` is the ONE knob that drives a
 // stat's colour, so the same semantic state reads the same colour everywhere.
 
+import type { I18nText } from "@/types/i18n";
+
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 /** Semantic colour of a stat. Maps to one icon-chip + value colour pair.
@@ -26,7 +28,7 @@ export type StatTone =
 export interface StatTrend {
   direction: "up" | "down" | "flat";
   /** Already-formatted delta text, e.g. "12%" or "+4". */
-  label: string;
+  label: I18nText;
   /** Colour of the trend text. Defaults to neutral. */
   tone?: StatTone;
 }
@@ -35,9 +37,18 @@ export interface StatItem {
   /** Stable key for the v-for. */
   key: string;
   /** Uppercase caption under the value (already localised by the caller). */
-  label: string;
+  label: I18nText;
   /** The number / text shown large. */
   value: string | number;
+  /**
+   * Short qualifier beside the label, saying what the value IS when the label
+   * alone is ambiguous (e.g. "wait time" under a generic "Database time").
+   */
+  sub?: I18nText;
+  /** Show the qualifier as this small glyph instead of text; `sub` becomes its accessible name and default tooltip. */
+  subIcon?: IconName;
+  /** The glyph's tooltip when it should say more than `sub`. */
+  subTooltip?: I18nText;
   /** Optional leading glyph, shown in a tone-coloured chip. */
   icon?: IconName;
   /** Semantic colour. Defaults to `neutral`. */
@@ -50,7 +61,7 @@ export interface StatItem {
    */
   max?: number;
   /** Show a numeric value as "819.5K"; the exact number moves to the tooltip. */
-  compact?: boolean;
+  compactValue?: boolean;
   /**
    * When the strip is `selectable`, set this to false to make THIS tile a plain
    * display (not a clickable filter) — e.g. a "Total" tile. Defaults to true.

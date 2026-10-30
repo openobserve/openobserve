@@ -176,41 +176,6 @@ async function multistreamselect(page) {
     await pageManager.logsPage.selectRunQuery();
   });
 
-  // test("should click on live mode on button and select 5 sec, switch off, and then click run query", async ({
-    
-  //   page,
-  // }) => {
-  //   await multistreamselect(page);
-  //   await page.route("**/logData.ValueQuery", (route) => route.continue());
-  //   await page.locator('[data-test="date-time-btn"]').click({ force: true });
-
-  //   await page
-  //     .locator('[data-test="date-time-relative-6-w-btn"] button')
-  //     .click({
-  //       force: true,
-  //     });
-  //   await page
-  //     .locator('[data-test="logs-search-bar-refresh-interval-btn-dropdown"]')
-  //     .click({ force: true });
-  //   await page.locator('[data-test="logs-search-bar-refresh-time-5"]').click({
-  //     force: true,
-  //   });
-  //   await page.waitForTimeout(1000);
-  //   await expect(page.locator('[role="alert"]')).toContainText(
-  //     "Live mode is enabled"
-  //   );
-  //   await page.waitForTimeout(5000);
-  //   await page
-  //     .locator('[data-test="logs-search-off-refresh-interval"] button')
-  //     .click({ force: true });
-  //   await page
-  //     .locator(
-  //       '[data-test="logs-search-off-refresh-interval"] button'
-  //     )
-  //     .click({ force: true });
-  //   await applyQueryButton(page);
-  // });
-
   test("should redirect to logs after clicking on stream explorer via stream page", {
     tag: ['@navigation', '@streamExplorer', '@multistream', '@all']
   }, async ({ page }) => {
@@ -234,10 +199,32 @@ async function multistreamselect(page) {
     const pageManager = new PageManager(page);
     testLogger.info('Testing interesting fields with multistream selection');
 
-    await multistreamselect(page);
+    // Deliberately NOT using multistreamselect() (e2e_automate + e2e_stream1) here:
+    // e2e_automate is a shared fixture ingested into by unrelated tests across the whole
+    // suite, so its schema only grows over time. The app auto-marks fields from
+    // zoConfig.default_quick_mode_fields (service_name, span_id, trace_id, etc.) as
+    // "interesting" the moment they exist in a selected stream's schema — if e2e_automate
+    // has picked one up but e2e_stream1 hasn't, the resulting multi-stream UNION ALL BY
+    // NAME query selects that field from both streams and the one missing it 500s with a
+    // schema error, with zero relation to what this test actually exercises. Two freshly
+    // ingested, identically-shaped streams keep this test deterministic regardless of what
+    // any other test does to the shared fixtures.
+    const testRunId = Date.now().toString(36);
+    const { streamA, streamB } = await pageManager.ingestionPage.ingestionJoinUnion(testRunId);
+
+    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await pageManager.logsPage.selectStream(streamA);
+    await pageManager.logsPage.applyQueryButton(logData.logsUrl);
+    await pageManager.logsPage.fillStreamFilter(streamB);
+    await page.waitForTimeout(2000);
+    await pageManager.logsPage.toggleStreamSelection(streamB);
+    await page.waitForTimeout(4000);
+    await pageManager.logsPage.expectLogsSearchIndexListContainsText(`${streamA}, ${streamB}`);
 
     // The interesting-field (ⓘ) button only renders when quick mode is on
     // (FieldExpansion.vue v-if="showQuickMode"), and surfaces on row hover.
+    await pageManager.logsPage.enableQuickModeIfDisabled();
+    await pageManager.logsPage.clickAllFieldsButton();
     await pageManager.logsPage.ensureQuickModeState(true);
 
     // Search for job field using POM
@@ -421,7 +408,7 @@ async function multistreamselect(page) {
     
     // Wait for success message with timeout constant
     try {
-      await page.locator('[data-test-variant="success"]').waitFor({
+      await pageManager.logsPage.getSuccessToastLocator().waitFor({
         state: 'visible',
         timeout: MULTISTREAM_CONFIG.TIMEOUTS.DATA_INDEXING
       });

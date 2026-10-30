@@ -14,8 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import type { BrowserCheck, BrowserStep } from "@/types/synthetics";
-import { buildCreateBrowserTestPayload } from "./buildPayload";
+import type { BrowserCheck, BrowserStep, ProtocolCheck } from "@/types/synthetics";
+import {
+  buildCreateBrowserTestPayload,
+  buildCreateProtocolCheckPayload,
+  mapResponseToBrowserCheck,
+} from "./buildPayload";
 
 function journey(): BrowserStep[] {
   return [
@@ -73,10 +77,106 @@ describe("buildCreateBrowserTestPayload", () => {
   // second line of defence, so that a gate that ever stops agreeing with the
   // writer fails loudly here instead of posting a step the server refuses.
   it("throws rather than emitting a step it cannot build", () => {
+    // `wait`, not `hover`: hover became storable when Playwright 1.56 added it to
+    // the recorder model. scroll, wait and screenshot still have no counterpart.
     const withRetired = check({
-      journey: [...journey(), { id: "s3", action: "hover", name: "Reveal" }],
+      journey: [...journey(), { id: "s3", action: "wait", name: "Pause" }],
     });
 
     expect(() => buildCreateBrowserTestPayload(withRetired)).toThrow(/cannot be stored/);
+  });
+});
+
+describe("environments round-trip", () => {
+  it("carries environments through the browser payload", () => {
+    const payload = buildCreateBrowserTestPayload(check({ environments: ["env-1"] }));
+
+    expect(payload.environments).toEqual(["env-1"]);
+  });
+
+  it("carries environments through the protocol payload", () => {
+    const protocolCheck = {
+      ...check({ environments: ["env-1"] }),
+      checkType: "tcp",
+      tcp: { port: 443, timeout_ms: 10000, response_contains: "" },
+    } as unknown as ProtocolCheck;
+
+    expect(buildCreateProtocolCheckPayload(protocolCheck).environments).toEqual(["env-1"]);
+  });
+
+  it("reads environments back off the wire", () => {
+    const mapped = mapResponseToBrowserCheck({
+      name: "Cloud login",
+      target: "https://app.test",
+      environments: ["env-1"],
+      config: { steps: [] },
+    });
+
+    expect(mapped.environments).toEqual(["env-1"]);
+  });
+});
+
+describe("browser config extras (UI-04)", () => {
+  const stored = {
+    name: "api made",
+    target: "https://app.test",
+    enabled: true,
+    tags: [],
+    locations: ["us-east"],
+    frequency: { type: "minutes", interval: 5, cron: "" },
+    config: {
+      steps: [],
+      timeout_ms: 90000,
+      journey_budget_ms: 120000,
+      test_id_attr: "data-qa",
+      runtime: "playwright-1.50",
+      capture: { screenshot: "always", trace: "on-fail", video: "on" },
+      headers: [{ name: "Authorization", value: "Bearer secret" }],
+      secret_blob: "do-not-spread",
+    },
+  };
+
+  it("uses defaults on create", () => {
+    const config = buildCreateBrowserTestPayload(check()).config as Record<string, any>;
+    expect(config.timeout_ms).toBe(30000);
+    expect(config.capture.video).toBe("off");
+    expect("journey_budget_ms" in config).toBe(false);
+    expect("test_id_attr" in config).toBe(false);
+    expect("runtime" in config).toBe(false);
+  });
+
+  it("preserves API-set fields across an unrelated name edit", () => {
+    const loaded = mapResponseToBrowserCheck(stored);
+    const config = buildCreateBrowserTestPayload({ ...loaded, name: "renamed" }).config as Record<
+      string,
+      any
+    >;
+    expect(config.timeout_ms).toBe(90000);
+    expect(config.journey_budget_ms).toBe(120000);
+    expect(config.test_id_attr).toBe("data-qa");
+    expect(config.runtime).toBe("playwright-1.50");
+    expect(config.capture.video).toBe("on");
+  });
+
+  it("does not leak unsupported config keys into the extras", () => {
+    const loaded = mapResponseToBrowserCheck(stored);
+    expect(Object.keys(loaded.browserConfigExtras ?? {}).sort()).toEqual([
+      "journey_budget_ms",
+      "runtime",
+      "test_id_attr",
+      "timeout_ms",
+      "video",
+    ]);
+    expect(JSON.stringify(loaded.browserConfigExtras)).not.toContain("do-not-spread");
+  });
+
+  it("still applies intentional capture edits", () => {
+    const loaded = mapResponseToBrowserCheck(stored);
+    const config = buildCreateBrowserTestPayload({
+      ...loaded,
+      capture: { screenshot: "off", trace: "off" },
+    }).config as Record<string, any>;
+    expect(config.capture.screenshot).toBe("off");
+    expect(config.capture.video).toBe("on");
   });
 });

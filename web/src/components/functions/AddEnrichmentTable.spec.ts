@@ -13,22 +13,25 @@ import AddEnrichmentTable from "./AddEnrichmentTable.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 
 // Mock dependencies
-vi.mock("@/services/jstransform", () => ({
-  default: {
-    create_enrichment_table: vi.fn(() =>
-      Promise.resolve({
-        data: { message: "Enrichment table created successfully" },
-      }),
-    ),
-    create_enrichment_table_from_url: vi.fn(() =>
-      Promise.resolve({
-        data: { message: "Enrichment table job started" },
-      }),
-    ),
-  },
-}));
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create_enrichment_table: vi.fn(() =>
+        Promise.resolve({
+          data: { message: "Enrichment table created successfully" },
+        }),
+      ),
+      create_enrichment_table_from_url: vi.fn(() =>
+        Promise.resolve({
+          data: { message: "Enrichment table job started" },
+        }),
+      ),
+    },
+  });
+});
 
-vi.mock("@/services/segment_analytics", () => ({
+vi.mock("@/services/product_analytics", () => ({
   default: {
     track: vi.fn(),
   },
@@ -68,6 +71,13 @@ describe("AddEnrichmentTable.vue", () => {
   };
   const OIconStub = { name: "OIcon", template: "<i></i>", props: ["name", "size"] };
   const OSeparatorStub = { name: "OSeparator", template: "<hr />" };
+  // ODialog portals its body; the stub renders it inline so the real fields stay queryable.
+  const ODialogStub = {
+    name: "ODialog",
+    template: '<div :data-test="$attrs[\'data-test\']" :data-open="open"><slot /></div>',
+    props: ["open", "size", "title", "formId", "primaryButtonLabel", "secondaryButtonLabel"],
+    emits: ["update:open", "click:secondary"],
+  };
 
   const getForm = (w: any) => (w.findComponent(OForm).vm as any).form;
 
@@ -96,6 +106,12 @@ describe("AddEnrichmentTable.vue", () => {
       globalInjection: true,
       messages: {
         en: {
+          toastMessages: {
+            functions: {
+              pleaseWait: "Please wait...",
+              enrichmentTableCreatedSuccessfully: "Enrichment table created successfully",
+            },
+          },
           function: {
             addEnrichmentTable: "Add Enrichment Table",
             updateEnrichmentTable: "Update Enrichment Table",
@@ -120,12 +136,14 @@ describe("AddEnrichmentTable.vue", () => {
           file: "",
           append: false,
         },
+        open: true,
         isUpdating: false,
         ...propsData,
       },
       global: {
         plugins: [store, i18n],
         stubs: {
+          ODialog: ODialogStub,
           OButton: OButtonStub,
           OIcon: OIconStub,
           OSeparator: OSeparatorStub,
@@ -149,9 +167,9 @@ describe("AddEnrichmentTable.vue", () => {
     it("should render the component", () => {
       wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('[data-test="add-enrichment-table-title"]').text()).toBe(
-        "Add Enrichment Table",
-      );
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("title")).toBe("Add Enrichment Table");
+      expect(dialog.props("open")).toBe(true);
     });
 
     it("should initialize with correct default values", async () => {
@@ -167,9 +185,7 @@ describe("AddEnrichmentTable.vue", () => {
         isUpdating: true,
         modelValue: { name: "existing-table", file: "", append: false },
       });
-      expect(wrapper.find('[data-test="add-enrichment-table-title"]').text()).toBe(
-        "Update Enrichment Table",
-      );
+      expect(wrapper.findComponent(ODialogStub).props("title")).toBe("Update Enrichment Table");
     });
 
     it("should initialize with provided modelValue", async () => {
@@ -366,23 +382,25 @@ describe("AddEnrichmentTable.vue", () => {
     });
   });
 
-  describe("Save button", () => {
-    it("keeps the Save button enabled (no :disabled binding)", () => {
+  describe("Dialog footer", () => {
+    it("links the dialog's Save button to the form", () => {
       wrapper = createWrapper();
-      const saveBtn = wrapper.find('[data-test="add-enrichment-table-save-btn"]');
-      expect(saveBtn.exists()).toBe(true);
-      expect(saveBtn.attributes("disabled")).toBeUndefined();
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("primaryButtonLabel")).toBe("Save");
+      expect(dialog.props("secondaryButtonLabel")).toBe("Cancel");
+      expect(dialog.props("formId")).toBe("add-enrichment-table-form");
+      expect(wrapper.find("form#add-enrichment-table-form").exists()).toBe(true);
     });
 
-    it("has save and cancel buttons", () => {
+    it("emits cancel:hideform when Cancel is clicked", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('[data-test="add-enrichment-table-cancel-btn"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="add-enrichment-table-save-btn"]').exists()).toBe(true);
+      wrapper.findComponent(ODialogStub).vm.$emit("click:secondary");
+      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
     });
 
-    it("emits cancel:hideform when cancel is clicked", async () => {
+    it("emits cancel:hideform when the dialog is dismissed", () => {
       wrapper = createWrapper();
-      await wrapper.find('[data-test="add-enrichment-table-cancel-btn"]').trigger("click");
+      wrapper.findComponent(ODialogStub).vm.$emit("update:open", false);
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
     });
   });

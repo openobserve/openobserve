@@ -49,15 +49,18 @@ use tokio::sync::mpsc;
 use tracing::Span;
 
 #[cfg(feature = "enterprise")]
-use crate::search::utils::{StreamPermissionResourceType, check_stream_permissions};
+use crate::search::utils::{
+    StreamPermissionResourceType, check_cipher_key_permissions, check_stream_permissions,
+};
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
         utils::http::{
-            get_clear_cache_from_request, get_fallback_order_by_col_from_request,
-            get_is_multi_stream_search_from_request, get_is_ui_histogram_from_request,
-            get_or_create_trace_id, get_search_event_context_from_request,
-            get_search_type_from_request, get_stream_type_from_request, get_use_cache_from_request,
+            get_clear_cache_from_request, get_client_search_type,
+            get_fallback_order_by_col_from_request, get_is_multi_stream_search_from_request,
+            get_is_ui_histogram_from_request, get_or_create_trace_id,
+            get_search_event_context_from_request, get_stream_type_from_request,
+            get_use_cache_from_request,
         },
     },
     search::{
@@ -428,40 +431,38 @@ pub async fn search_http2_stream(
     // Set use_cache from query params
     req.use_cache = get_use_cache_from_request(&query) && !req.clear_cache;
 
-    // Set search type if not set
-    if req.search_type.is_none() {
-        req.search_type = match get_search_type_from_request(&query) {
-            Ok(v) => v,
-            Err(e) => {
-                #[cfg(feature = "enterprise")]
-                let error_message = e.to_string();
+    // Set search type from the body, else the URL
+    req.search_type = match get_client_search_type(req.search_type, &query) {
+        Ok(v) => v,
+        Err(e) => {
+            #[cfg(feature = "enterprise")]
+            let error_message = e.to_string();
 
-                let http_response = map_error_to_http_response(&(e.into()), Some(trace_id.clone()));
+            let http_response = map_error_to_http_response(&(e.into()), Some(trace_id.clone()));
 
-                // Add audit before closing
-                #[cfg(feature = "enterprise")]
-                {
-                    report_to_audit(
-                        user_id,
-                        org_id.clone(),
-                        trace_id,
-                        http_response.status().into(),
-                        Some(error_message),
-                        "POST".to_string(),
-                        format!("/api/{}/_search_stream", org_id),
-                        query
-                            .iter()
-                            .map(|(k, v)| format!("{}={}", k, v))
-                            .collect::<Vec<_>>()
-                            .join("&"),
-                        body_bytes,
-                    )
-                    .await;
-                }
-                return http_response;
+            // Add audit before closing
+            #[cfg(feature = "enterprise")]
+            {
+                report_to_audit(
+                    user_id,
+                    org_id.clone(),
+                    trace_id,
+                    http_response.status().into(),
+                    Some(error_message),
+                    "POST".to_string(),
+                    format!("/api/{}/_search_stream", org_id),
+                    query
+                        .iter()
+                        .map(|(k, v)| format!("{}={}", k, v))
+                        .collect::<Vec<_>>()
+                        .join("&"),
+                    body_bytes,
+                )
+                .await;
             }
-        };
-    }
+            return http_response;
+        }
+    };
 
     let fallback_order_by_col = get_fallback_order_by_col_from_request(&query);
 
@@ -483,43 +484,61 @@ pub async fn search_http2_stream(
         };
 
     #[cfg(feature = "enterprise")]
-    for stream_name in stream_names.iter() {
-        if let Some(res) = check_stream_permissions(
-            stream_name,
-            &org_id,
-            &user_id,
-            &stream_type,
-            permission_resource_type,
+    if let Some(res) = crate::search::check_sql_stream_permissions(
+        &req.query.sql,
+        &org_id,
+        &user_id,
+        stream_type,
+        permission_resource_type,
+        &trace_id,
+    )
+    .await
+    {
+        report_to_audit(
+            user_id,
+            org_id.clone(),
+            trace_id,
+            res.status().into(),
+            Some("Unauthorized Access".to_string()),
+            "POST".to_string(),
+            format!("/api/{}/_search_stream", org_id),
+            query
+                .iter()
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect::<Vec<_>>()
+                .join("&"),
+            body_bytes,
         )
-        .await
-        {
-            // Add audit before closing
-            #[cfg(feature = "enterprise")]
-            {
-                report_to_audit(
-                    user_id,
-                    org_id.clone(),
-                    trace_id,
-                    res.status().into(),
-                    Some("Unauthorized Access".to_string()),
-                    "POST".to_string(),
-                    format!("/api/{}/_search_stream", org_id),
-                    query
-                        .iter()
-                        .map(|(k, v)| format!("{}={}", k, v))
-                        .collect::<Vec<_>>()
-                        .join("&"),
-                    body_bytes,
-                )
-                .await;
-            }
-            return res;
-        }
+        .await;
+        return res;
     }
 
-    // Hack for limit in query
-    if sql.limit != 0 {
-        req.query.size = sql.limit;
+    #[cfg(feature = "enterprise")]
+    if let Some(res) = check_cipher_key_permissions(&org_id, &user_id, &req.query.sql).await {
+        report_to_audit(
+            user_id,
+            org_id.clone(),
+            trace_id,
+            res.status().into(),
+            Some("Unauthorized Access to key".to_string()),
+            "POST".to_string(),
+            format!("/api/{}/_search_stream", org_id),
+            query
+                .iter()
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect::<Vec<_>>()
+                .join("&"),
+            body_bytes,
+        )
+        .await;
+        return res;
+    }
+
+    // 0 means size 0 with no positive SQL LIMIT, so use the default; negative stays unlimited.
+    match sql.limit {
+        0 => req.query.size = cfg.limit.query_default_limit,
+        n if n > 0 => req.query.size = n,
+        _ => {}
     }
 
     let req_order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
@@ -618,6 +637,12 @@ pub async fn search_http2_stream(
                             }
                         }
                     }
+                    // A server-side refusal (e.g. ZO_SDR_FAIL_CLOSED) keeps its 503.
+                    infra::errors::Error::ResourceError(_) => StreamResponses::Error {
+                        code: err.http_status(),
+                        message: err.to_string(),
+                        error_detail: None,
+                    },
                     _ => StreamResponses::Error {
                         code: 500,
                         message: err.to_string(),
@@ -874,6 +899,28 @@ pub async fn values_http2_stream(
         }
     }
 
+    // the generated SQL embeds the caller's WHERE, so cipher keys it names need the same check
+    #[cfg(feature = "enterprise")]
+    if let Some(res) = check_cipher_key_permissions(&org_id, &user_id, &req.query.sql).await {
+        report_to_audit(
+            user_id,
+            org_id.clone(),
+            trace_id,
+            res.status().into(),
+            Some("Unauthorized Access to key".to_string()),
+            "POST".to_string(),
+            format!("/api/{}/_values_stream", org_id),
+            query
+                .iter()
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect::<Vec<_>>()
+                .join("&"),
+            body_bytes.clone(),
+        )
+        .await;
+        return res;
+    }
+
     // Create a channel for streaming results
     let (tx, rx) =
         mpsc::channel::<Result<config::meta::search::StreamResponses, infra::errors::Error>>(100);
@@ -944,6 +991,13 @@ pub async fn values_http2_stream(
                             code: http_response.status().into(),
                             message,
                             error_detail: Some(error_detail),
+                        }
+                    }
+                    infra::errors::Error::ResourceError(_) => {
+                        config::meta::search::StreamResponses::Error {
+                            code: err.http_status(),
+                            message: err.to_string(),
+                            error_detail: None,
                         }
                     }
                     _ => config::meta::search::StreamResponses::Error {

@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nText } from "@/types/i18n";
+
 export type FileSize = "sm" | "md";
 
 /**
@@ -20,13 +22,13 @@ export interface FileProps {
   /** Show drag-and-drop drop zone */
   dropZone?: boolean;
   /** Label rendered above the control */
-  label?: string;
+  label?: I18nText;
   /** Placeholder displayed when no file is selected */
-  placeholder?: string;
+  placeholder?: I18nText;
   /** Helper text below the control */
-  helpText?: string;
+  helpText?: I18nText;
   /** Error message — when provided the field shows error styling */
-  errorMessage?: string;
+  errorMessage?: I18nText;
   /** Marks the field as being in error state without a message */
   error?: boolean;
   /** Prevents interaction */

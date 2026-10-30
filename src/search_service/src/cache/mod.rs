@@ -13,13 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::str::FromStr;
-
 use ::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta};
 use chrono::{TimeZone, Utc};
 use common::utils::http::get_work_group;
 #[cfg(feature = "vectorscan")]
 use config::meta::projections::ProjectionColumnMapping;
+#[cfg(any(feature = "vectorscan", test))]
+use config::meta::self_reporting::redaction::{
+    DataWindow, EvidenceScope, FailPosture, RedactionEvidence, is_self_reporting_stream,
+};
 use config::{
     TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
@@ -41,7 +43,10 @@ use config::{
     },
 };
 use infra::{
-    cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},
+    cache::{
+        file_data::disk::{self, QUERY_RESULT_CACHE},
+        meta::ResultCacheMeta,
+    },
     errors::Error,
 };
 #[cfg(feature = "enterprise")]
@@ -67,6 +72,58 @@ pub mod result_utils;
 
 // Define cache version
 const CACHE_VERSION: &str = "v3";
+
+/// The hits a search was about to return when redaction could not run on them.
+#[cfg(any(feature = "vectorscan", test))]
+struct SkippedHits<'a> {
+    org_id: &'a str,
+    stream_type: StreamType,
+    all_streams: &'a str,
+    hits: &'a [json::Value],
+}
+
+#[cfg(any(feature = "vectorscan", test))]
+impl<'a> SkippedHits<'a> {
+    fn new(
+        org_id: &'a str,
+        stream_type: StreamType,
+        all_streams: &'a str,
+        hits: &'a [json::Value],
+    ) -> Self {
+        Self {
+            org_id,
+            stream_type,
+            all_streams,
+            hits,
+        }
+    }
+
+    /// One row per stream the query read, since a join exposes the fields of each.
+    fn evidence(&self, posture: FailPosture, reason: &str) -> Vec<RedactionEvidence> {
+        let data = DataWindow::from_timestamps(
+            self.hits
+                .iter()
+                .filter_map(|hit| hit.get(TIMESTAMP_COL_NAME).and_then(json::Value::as_i64)),
+        );
+        self.all_streams
+            .split(',')
+            .map(str::trim)
+            .filter(|stream| {
+                !stream.is_empty()
+                    && !is_self_reporting_stream(self.org_id, stream, self.stream_type)
+            })
+            .map(|stream| {
+                RedactionEvidence::search_scan_unavailable(
+                    &EvidenceScope::new(self.org_id, stream, self.stream_type),
+                    posture,
+                    self.hits.len() as u64,
+                    data,
+                    reason,
+                )
+            })
+            .collect()
+    }
+}
 
 #[tracing::instrument(name = "service:search:cacher:search", skip_all)]
 #[allow(clippy::too_many_arguments)]
@@ -146,19 +203,19 @@ pub async fn search(
 
     // Result caching check ends, start search
     let cache_took = start.elapsed().as_millis() as usize;
-    let mut results = Vec::new();
     let mut work_group_set = Vec::new();
+    let mut search_results_have_hits = false;
     let mut res = if !should_exec_query {
         // no need to search, just merge the cached response
         // TODO: which case we don't need to search?
         merge_response(
             trace_id,
-            &mut c_resp
+            c_resp
                 .cached_response
-                .iter()
-                .map(|r| r.cached_response.clone())
+                .into_iter()
+                .map(|r| r.cached_response)
                 .collect(),
-            &mut vec![],
+            vec![],
             &c_resp.ts_column,
             c_resp.limit,
             c_resp.is_descending,
@@ -257,22 +314,29 @@ pub async fn search(
             tasks.push(task);
         }
 
-        for task in tasks {
-            results.push(task.await.map_err(|e| Error::Message(e.to_string()))??);
-        }
+        // A public dashboard build owns its children: no delta may outlive a failed call.
+        let drain = in_req.search_type == Some(search::SearchEventType::PublicDashboard);
+        // Deltas run as `{trace_id}-{n}`; the failing parent goes with them.
+        let (org, family) = (org_id.to_string(), trace_id.to_string());
+        let mut results = join_deltas(tasks, drain, move || async move {
+            crate::abort_trace_family(&org, &family).await
+        })
+        .await?;
         for res in &results {
             work_group_set.push(res.work_group.clone());
         }
+        search_results_have_hits = results.first().is_some_and(|res| !res.hits.is_empty())
+            || results.last().is_some_and(|res| !res.hits.is_empty());
         // merge the cached response and the search response
         if c_resp.has_cached_data {
             merge_response(
                 trace_id,
-                &mut c_resp
+                c_resp
                     .cached_response
-                    .iter()
-                    .map(|r| r.cached_response.clone())
+                    .into_iter()
+                    .map(|r| r.cached_response)
                     .collect(),
-                &mut results,
+                results,
                 &c_resp.ts_column,
                 c_resp.limit,
                 c_resp.is_descending,
@@ -280,7 +344,7 @@ pub async fn search(
                 c_resp.order_by,
             )
         } else {
-            let mut reps = results[0].clone();
+            let mut reps = results.swap_remove(0);
             sort_response(
                 c_resp.is_descending,
                 &mut reps,
@@ -302,6 +366,7 @@ pub async fn search(
             ),
             SearchInspectorFieldsBuilder::new()
                 .trace_id(trace_id.to_string())
+                .org_id(org_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("summary".to_string())
                 .search_role(search_role)
@@ -438,10 +503,7 @@ pub async fn search(
         "[trace_id {trace_id}] should_cache_results: {should_cache_results}, is_http2_streaming: {is_http2_streaming}, hits: {}",
         res.hits.len()
     );
-    if should_cache_results
-        && (results.first().is_some_and(|res| !res.hits.is_empty())
-            || results.last().is_some_and(|res| !res.hits.is_empty()))
-    {
+    if should_cache_results && search_results_have_hits {
         // Determine if this is a non-timestamp histogram query
         // Note: write_res.order_by_metadata contains the same ORDER BY info
         let is_histogram_non_ts_order = c_resp.histogram_interval > 0
@@ -457,7 +519,7 @@ pub async fn search(
             &c_resp.ts_column,
             req.query.start_time,
             req.query.end_time,
-            deep_copy_response(&res),
+            &res,
             file_path,
             is_complex_query,
             c_resp.is_descending,
@@ -472,7 +534,7 @@ pub async fn search(
     crate::cache::apply_regex_to_response(
         &req,
         org_id,
-        &stream_name,
+        &all_streams,
         stream_type,
         &mut res,
         trace_id,
@@ -528,12 +590,6 @@ pub async fn prepare_cache_response(
         query_fn = None;
     }
 
-    let action = req
-        .query
-        .action_id
-        .as_ref()
-        .and_then(|v| svix_ksuid::Ksuid::from_str(v).ok());
-
     // Parse SQL first to get metadata needed for normalization
     let query: SearchQuery = req.query.clone().into();
     let sql = match crate::Sql::new(&query, org_id, stream_type, req.search_type).await {
@@ -575,9 +631,6 @@ pub async fn prepare_cache_response(
     ];
     if let Some(vrl_function) = &query_fn {
         hash_body.push(vrl_function.to_string());
-    }
-    if let Some(action_id) = action {
-        hash_body.push(action_id.to_string());
     }
     if !req.regions.is_empty() {
         hash_body.extend(req.regions.clone());
@@ -656,14 +709,53 @@ pub async fn prepare_cache_response(
     Ok((resp, should_exec_query))
 }
 
+/// Awaits every delta; with `drain` the first error, in any order, aborts the rest and waits.
+async fn join_deltas<T, F, Fut>(
+    tasks: Vec<tokio::task::JoinHandle<Result<T, Error>>>,
+    drain: bool,
+    abort: F,
+) -> Result<Vec<T>, Error>
+where
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = ()>,
+{
+    if !drain {
+        let mut results = Vec::with_capacity(tasks.len());
+        for task in tasks {
+            results.push(task.await.map_err(|e| Error::Message(e.to_string()))??);
+        }
+        return Ok(results);
+    }
+    let mut slots: Vec<Option<T>> = tasks.iter().map(|_| None).collect();
+    let mut pending: futures::stream::FuturesUnordered<_> = tasks
+        .into_iter()
+        .enumerate()
+        .map(|(i, task)| async move { (i, task.await) })
+        .collect();
+    let mut abort = Some(abort);
+    let mut first_err = None;
+    while let Some((i, joined)) = futures::StreamExt::next(&mut pending).await {
+        match joined.map_err(|e| Error::Message(e.to_string())) {
+            Ok(Ok(res)) => slots[i] = Some(res),
+            Ok(Err(e)) | Err(e) => {
+                if let Some(abort) = abort.take() {
+                    abort().await;
+                }
+                first_err.get_or_insert(e);
+            }
+        }
+    }
+    first_err.map_or_else(|| Ok(slots.into_iter().flatten().collect()), Err)
+}
+
 // based on _timestamp of first record in config::meta::search::Response either add it in start
 // or end to cache response
 #[tracing::instrument(name = "service:search:cache:merge_response", skip_all)]
 #[allow(clippy::too_many_arguments)]
 pub fn merge_response(
     trace_id: &str,
-    cached_responses: &mut Vec<config::meta::search::Response>,
-    search_responses: &mut Vec<config::meta::search::Response>,
+    mut cached_responses: Vec<config::meta::search::Response>,
+    mut search_responses: Vec<config::meta::search::Response>,
     ts_column: &str,
     limit: i64,
     is_descending: bool,
@@ -689,11 +781,9 @@ pub fn merge_response(
             if res.hits.is_empty() {
                 continue;
             }
-            resp.hits.extend(res.hits.clone());
+            resp.hits.extend(res.hits);
             resp.histogram_interval = res.histogram_interval;
-            if !res.function_error.is_empty() {
-                fn_error.extend(res.function_error.clone());
-            }
+            fn_error.extend(res.function_error);
         }
         resp.took = cache_took;
         resp
@@ -713,9 +803,7 @@ pub fn merge_response(
             cache_response.scan_size += res.scan_size;
             cache_response.took += res.took;
             cache_response.histogram_interval = res.histogram_interval;
-            if !res.function_error.is_empty() {
-                fn_error.extend(res.function_error.clone());
-            }
+            fn_error.extend(res.function_error);
         }
         cache_response.function_error = fn_error;
         return cache_response;
@@ -729,7 +817,18 @@ pub fn merge_response(
 
     let mut res_took = ResponseTook::default();
 
-    for res in search_responses.clone() {
+    let search_responses_len = search_responses.len();
+    let (first_order_by, first_order_by_metadata, first_is_histogram_eligible) = search_responses
+        .first()
+        .map(|res| {
+            (
+                res.order_by,
+                res.order_by_metadata.clone(),
+                res.is_histogram_eligible,
+            )
+        })
+        .unwrap_or_default();
+    for res in search_responses {
         cache_response.total += res.total;
         cache_response.scan_size += res.scan_size;
         cache_response.took += res.took;
@@ -748,9 +847,7 @@ pub fn merge_response(
         res_took.search_took = std::cmp::max(res_took.search_took, res.took_detail.search_took);
         res_took.file_list_took =
             std::cmp::max(res_took.file_list_took, res.took_detail.file_list_took);
-        if !res.function_error.is_empty() {
-            fn_error.extend(res.function_error.clone());
-        }
+        fn_error.extend(res.function_error);
 
         cache_response.peak_memory_usage = Some(
             cache_response
@@ -759,7 +856,7 @@ pub fn merge_response(
                 .max(res.peak_memory_usage.unwrap_or(0.0)),
         );
 
-        cache_response.hits.extend(res.hits.clone());
+        cache_response.hits.extend(res.hits);
     }
     sort_response(is_descending, &mut cache_response, ts_column, &order_by);
 
@@ -770,8 +867,8 @@ pub fn merge_response(
         cache_response.total = cache_response.hits.len();
     }
 
-    if !search_responses.is_empty() {
-        cache_response.cached_ratio = files_cache_ratio / search_responses.len();
+    if let Some(ratio) = files_cache_ratio.checked_div(search_responses_len) {
+        cache_response.cached_ratio = ratio;
     }
     cache_response.size = cache_response.hits.len() as i64;
     let total = cache_response.size;
@@ -801,14 +898,8 @@ pub fn merge_response(
     );
 
     cache_response.took_detail = res_took;
-    cache_response.order_by = search_responses
-        .first()
-        .map(|res| res.order_by)
-        .unwrap_or_default();
-    cache_response.order_by_metadata = search_responses
-        .first()
-        .map(|res| res.order_by_metadata.clone())
-        .unwrap_or_default();
+    cache_response.order_by = first_order_by;
+    cache_response.order_by_metadata = first_order_by_metadata;
     cache_response.result_cache_ratio = (((cached_hits_len as f64) * 100_f64)
         / ((search_hits_len + cached_hits_len) as f64))
         as usize;
@@ -816,10 +907,7 @@ pub fn merge_response(
         cache_response.function_error.extend(fn_error);
         cache_response.is_partial = true;
     }
-    cache_response.is_histogram_eligible = search_responses
-        .first()
-        .map(|res| res.is_histogram_eligible)
-        .unwrap_or_default();
+    cache_response.is_histogram_eligible = first_is_histogram_eligible;
     cache_response
 }
 
@@ -842,7 +930,7 @@ fn sort_response(
         in_order_by
     };
 
-    cache_response.hits.sort_by(|a, b| {
+    let compare = |a: &serde_json::Value, b: &serde_json::Value| {
         for (field, order) in order_by {
             let cmp = if ts_column == field {
                 let a_ts = get_ts_value(ts_column, a);
@@ -891,7 +979,15 @@ fn sort_response(
 
         // If all fields are equal, maintain stable sort
         std::cmp::Ordering::Equal
-    });
+    };
+    // a single fresh result already arrives in query order; sorting it again is pure cost
+    if cache_response
+        .hits
+        .is_sorted_by(|a, b| compare(a, b) != std::cmp::Ordering::Greater)
+    {
+        return;
+    }
+    cache_response.hits.sort_by(compare);
 }
 
 /// Caches search results to disk after applying filtering and validation strategies.
@@ -902,28 +998,25 @@ fn sort_response(
 ///    - Check the histogram interval, if the time range is not a multiple of the histogram
 ///      interval, we need to remove the incomplete records: first & last record.
 ///
-/// 2. **Remove Records with Discard Duration**:
-///    - Removes records that are older than the configured `discard_duration`.
-///    - The `discard_duration` is the time difference between the current time and the time when
-///      the record was created.
-///    - The `discard_duration` is configured by `ZO_CACHE_DELAY_SECS`.
+/// 2. **Discard Recent Data**:
+///    - Clamps the cache end time to `now - ZO_CACHE_DELAY_SECS` so records that may still change
+///      are not cached.
 ///
-/// 3. **Skip Caching for Empty or Insufficient Hits**:
-///    - If no hits remain after removing one, caching is skipped.
-///    - Logs a message: `"No hits found for caching, skipping caching."`
+/// 3. **Discard Short Time Ranges**:
+///    - Skips caching if the cacheable time range is smaller than `ZO_CACHE_DELAY_SECS`.
 ///
-/// 4. **Discard Short Time Ranges**:
-///    - Skips caching if the difference between the first and last record timestamps is smaller
-///      than the configured `discard_duration`.
+/// 4. **Skip Covered Ranges** (unless `clear_cache`):
+///    - Skips caching when an existing cache entry already fully covers the time range.
 ///
-/// 5. **Adjust Cache Time Range**:
-///    - Adjusts the cache start and end times based on the smallest and largest timestamps:
-///      - `start_time = max(smallest_ts, req_query_start_time)`
-///      - `end_time = min(largest_ts, req_query_end_time)`
+/// 5. **Skip Caching for Empty Hits**:
+///    - If no hits remain after filtering to the cacheable time range, caching is skipped.
 ///
 /// 6. **Cache to Disk**:
 ///    - Saves the filtered response to a file named:
 ///      `"<start_time>_<end_time>_<is_aggregate>_<is_descending>.json"`.
+///
+/// 7. **Per-Key Entry Limit**:
+///    - Evicts the entries with the oldest data range beyond the per-key entry limit.
 #[tracing::instrument(name = "service:search:cache:write_results", skip_all)]
 #[allow(clippy::too_many_arguments)]
 pub async fn write_results(
@@ -931,7 +1024,7 @@ pub async fn write_results(
     ts_column: &str,
     req_query_start_time: i64,
     req_query_end_time: i64,
-    mut res: config::meta::search::Response,
+    res: &config::meta::search::Response,
     file_path: String,
     is_aggregate: bool,
     is_descending: bool,
@@ -962,15 +1055,49 @@ pub async fn write_results(
         }
     }
 
-    // 2. get the data time range, check if need to remove records with discard_duration
+    // 2. check if need to remove records with discard_duration
+    let delay_ts = second_micros(get_config().limit.cache_delay_secs);
+    let accept_end_time = std::cmp::min(Utc::now().timestamp_micros() - delay_ts, accept_end_time);
+
+    // 3. check if the time range is less than discard_duration
+    if (accept_end_time - accept_start_time) < delay_ts {
+        log::info!("[trace_id {trace_id}] Time range is too short for caching, skipping caching");
+        return;
+    }
+
+    // 4. the cached time range, with the end time realigned for histogram
+    let mut cache_end_time = accept_end_time;
+    if need_adjust_end_time
+        && is_aggregate
+        && let Some(interval) = res.histogram_interval
+        && interval > 0
+    {
+        cache_end_time += interval * 1000 * 1000;
+    }
+    let meta = ResultCacheMeta {
+        start_time: accept_start_time,
+        end_time: cache_end_time,
+        is_aggregate,
+        is_descending,
+    };
+
+    // 5. skip the write when an existing entry already fully covers this range;
+    // checked before the deep copy and serialization below so a covered write costs nothing
+    let query_key = file_path.replace('/', "_");
+    if !clear_cache && is_range_already_cached(&query_key, &file_path, &meta).await {
+        log::debug!(
+            "[trace_id {trace_id}] Result cache already covers {accept_start_time} - {cache_end_time}, skip caching"
+        );
+        return;
+    }
+
+    // 6. filter the records to the accept time range
     // For histogram queries with non-timestamp ORDER BY, we need to scan all hits
     // to find actual min/max timestamps, since results may not be time-ordered
+    let mut res = deep_copy_response(res);
     let is_time_ordered = !is_histogram_non_ts_order;
     let (data_start_time, data_end_time) =
         extract_timestamp_range(&res.hits, ts_column, is_time_ordered);
-    let delay_ts = second_micros(get_config().limit.cache_delay_secs);
-    let mut accept_end_time =
-        std::cmp::min(Utc::now().timestamp_micros() - delay_ts, accept_end_time);
     if data_start_time < accept_start_time || data_end_time > accept_end_time {
         res.hits.retain(|hit| {
             if let Some(hit_ts) = hit.get(ts_column)
@@ -986,38 +1113,14 @@ pub async fn write_results(
         res.total = res.hits.len();
         res.size = res.hits.len() as i64;
     }
-
-    // 3. check if the hits is empty
     if res.hits.is_empty() {
         log::info!("[trace_id {trace_id}] No hits found for caching, skipping caching");
         return;
     }
 
-    // 4. check if the time range is less than discard_duration
-    if (accept_end_time - accept_start_time) < delay_ts {
-        log::info!("[trace_id {trace_id}] Time range is too short for caching, skipping caching");
-        return;
-    }
-
-    // 5. adjust the cache time range
-    if need_adjust_end_time
-        && is_aggregate
-        && let Some(interval) = res.histogram_interval
-        && interval > 0
-    {
-        accept_end_time += interval * 1000 * 1000;
-    }
-
-    // 6. cache to disk
-    let file_name = format!(
-        "{}_{}_{}_{}.json",
-        accept_start_time,
-        accept_end_time,
-        if is_aggregate { 1 } else { 0 },
-        if is_descending { 1 } else { 0 }
-    );
+    // 7. cache to disk
+    let file_name = disk::result_cache_file_name(&meta);
     let res_cache = json::to_string(&res).unwrap();
-    let query_key = file_path.replace('/', "_");
     let trace_id = trace_id.to_string();
     tokio::spawn(async move {
         match SearchService::cache::cacher::cache_results_to_disk(
@@ -1026,26 +1129,15 @@ pub async fn write_results(
             &file_name,
             res_cache,
             clear_cache,
-            Some(accept_start_time),
-            Some(accept_end_time),
+            Some(meta.start_time),
+            Some(meta.end_time),
         )
         .await
         {
             Ok(success) => {
+                // success: false means the file already exists on disk, skip indexing
                 if success {
-                    // success: true, cache to disk success
-                    // success: false, cache to disk already exists, skipping caching
-                    QUERY_RESULT_CACHE
-                        .write()
-                        .await
-                        .entry(query_key)
-                        .or_insert_with(Vec::new)
-                        .push(ResultCacheMeta {
-                            start_time: accept_start_time,
-                            end_time: accept_end_time,
-                            is_aggregate,
-                            is_descending,
-                        });
+                    disk::add_result_cache_meta(&format!("results/{file_path}/{file_name}")).await;
                 }
             }
             Err(e) => {
@@ -1053,6 +1145,36 @@ pub async fn write_results(
             }
         }
     });
+}
+
+async fn is_range_already_cached(query_key: &str, file_path: &str, meta: &ResultCacheMeta) -> bool {
+    let covering = {
+        let r = QUERY_RESULT_CACHE.read().await;
+        r.get(query_key).map_or(Vec::new(), |metas| {
+            metas
+                .iter()
+                .filter(|m| {
+                    m.is_aggregate == meta.is_aggregate
+                        && m.is_descending == meta.is_descending
+                        && m.start_time <= meta.start_time
+                        && m.end_time >= meta.end_time
+                })
+                .cloned()
+                .collect()
+        })
+    };
+    for m in covering {
+        let file_name = disk::result_cache_file_name(&m);
+        // a covering meta only counts while its file is still indexed on disk
+        if disk::indexed_file_guard(&format!("results/{file_path}/{file_name}"))
+            .await
+            .is_some()
+        {
+            return true;
+        }
+        cacher::remove_stale_cache_meta(file_path, &file_name, query_key, &m).await;
+    }
+    false
 }
 
 pub fn apply_vrl_to_response(
@@ -1112,10 +1234,7 @@ pub fn apply_vrl_to_response(
                         .as_array()
                         .unwrap()
                         .iter()
-                        .filter_map(|v| {
-                            (!v.is_null())
-                                .then_some(config::utils::flatten::flatten(v.clone()).unwrap())
-                        })
+                        .filter_map(|v| super::flatten_vrl_result(v.clone()))
                         .collect()
                 } else {
                     let mut error = "".to_string();
@@ -1136,8 +1255,7 @@ pub fn apply_vrl_to_response(
                             if let Some(e) = err {
                                 error = e;
                             }
-                            (!ret_val.is_null())
-                                .then_some(config::utils::flatten::flatten(ret_val).unwrap())
+                            super::flatten_vrl_result(ret_val)
                         })
                         .collect();
                     if !error.is_empty() {
@@ -1205,14 +1323,64 @@ pub async fn apply_regex_to_response(
     }
 
     let start = std::time::Instant::now();
-    let pattern_manager = get_pattern_manager().await?;
+    let pattern_manager = match get_pattern_manager().await {
+        Ok(manager) => manager,
+        Err(e) => {
+            log::error!(
+                "[trace_id {trace_id}] SDR patterns application: pattern manager unavailable: {e}"
+            );
+            // Can't tell which streams have search-time patterns without the
+            // manager, so assume the worst case: fail closed treats this as
+            // "yes, redaction may have been skipped"; fail open (the default)
+            // returns unredacted hits rather than breaking search entirely.
+            return redaction_skipped(
+                config::get_config().common.sdr_fail_closed,
+                || true,
+                &SkippedHits::new(org_id, stream_type, all_streams, &res.hits),
+                &format!("pattern manager unavailable: {e}"),
+                usage_reporting::redaction_evidence::publish_search_scan_unavailable,
+            );
+        }
+    };
+    redaction_skipped(
+        config::get_config().common.sdr_fail_closed,
+        || {
+            any_stream(all_streams, |stream| {
+                pattern_manager.has_unbuilt_patterns(
+                    org_id,
+                    stream_type,
+                    stream,
+                    o2_enterprise::enterprise::re_patterns::ApplyTime::Search,
+                )
+            })
+        },
+        &SkippedHits::new(org_id, stream_type, all_streams, &res.hits),
+        "a configured pattern failed to build",
+        // Fail-open still redacts with the last block that built, so no hit leaves unredacted.
+        |_| {},
+    )?;
 
     let query: proto::cluster_rpc::SearchQuery = req.query.clone().into();
     let sql = match crate::sql::Sql::new(&query, org_id, stream_type, req.search_type).await {
         Ok(v) => v,
         Err(e) => {
-            log::error!("Error parsing sql: {e}");
-            return Ok(());
+            log::error!("[trace_id {trace_id}] SDR patterns application: error parsing sql: {e}");
+            let at_ingestion =
+                infra::table::re_pattern_stream_map::ApplyPolicy::AtIngestion.to_string();
+            return redaction_skipped(
+                config::get_config().common.sdr_fail_closed,
+                || {
+                    all_streams.split(',').any(|stream| {
+                        pattern_manager
+                            .get_associations(org_id, stream_type, stream.trim())
+                            .iter()
+                            .any(|a| a.apply_at != at_ingestion)
+                    })
+                },
+                &SkippedHits::new(org_id, stream_type, all_streams, &res.hits),
+                &e.to_string(),
+                usage_reporting::redaction_evidence::publish_search_scan_unavailable,
+            );
         }
     };
 
@@ -1233,7 +1401,7 @@ pub async fn apply_regex_to_response(
             log::error!(
                 "[trace_id {trace_id}] SDR patterns application: error in processing records for stream: {all_streams}: {e}"
             );
-            Err(infra::errors::Error::Message(e.to_string()))
+            Err(redaction_error(all_streams, &e.to_string()))
         }
     };
     let took = start.elapsed().as_millis();
@@ -1244,9 +1412,206 @@ pub async fn apply_regex_to_response(
     ret
 }
 
+/// Every stream a query reads, not only the first: a join exposes the fields of each.
+#[cfg(any(feature = "vectorscan", test))]
+fn any_stream(all_streams: &str, pred: impl Fn(&str) -> bool) -> bool {
+    all_streams.split(',').any(|stream| pred(stream.trim()))
+}
+
+/// Under `ZO_SDR_FAIL_CLOSED`, hits a search-time pattern applies to are never returned unredacted.
+#[cfg(any(feature = "vectorscan", test))]
+fn redaction_skipped(
+    fail_closed: bool,
+    has_search_patterns: impl FnOnce() -> bool,
+    skipped: &SkippedHits<'_>,
+    reason: &str,
+    publish: impl FnOnce(Vec<RedactionEvidence>),
+) -> Result<(), infra::errors::Error> {
+    if !has_search_patterns() {
+        return Ok(());
+    }
+    let posture = if fail_closed {
+        FailPosture::Closed
+    } else {
+        FailPosture::Open
+    };
+    publish(skipped.evidence(posture, reason));
+    if fail_closed {
+        // 503, not 400: the refusal is a server-side condition, not a fault in the query.
+        return Err(infra::errors::Error::ResourceError(format!(
+            "sensitive-data redaction could not run for {}: {reason}; refusing to return unredacted hits (ZO_SDR_FAIL_CLOSED)",
+            skipped.all_streams
+        )));
+    }
+    Ok(())
+}
+
+/// A redaction failure is the server's fault, so it is a 503, not a 400.
+#[cfg(any(feature = "vectorscan", test))]
+fn redaction_error(all_streams: &str, reason: &str) -> infra::errors::Error {
+    infra::errors::Error::ResourceError(format!(
+        "sensitive-data redaction failed for {all_streams}: {reason}; refusing to return unredacted hits"
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_any_stream_checks_every_joined_stream() {
+        assert!(any_stream("first, second", |stream| stream == "second"));
+        assert!(!any_stream("first,second", |stream| stream == "third"));
+    }
+
+    #[test]
+    fn test_redaction_error_is_a_503() {
+        let err = redaction_error("app_logs", "scan failed");
+        assert_eq!(err.http_status(), 503, "{err}");
+        assert!(err.to_string().contains("app_logs"), "{err}");
+    }
+
+    fn skip(
+        fail_closed: bool,
+        has_search_patterns: bool,
+        hits: &[json::Value],
+    ) -> (Result<(), infra::errors::Error>, Vec<RedactionEvidence>) {
+        let mut published = Vec::new();
+        let skipped = SkippedHits::new("org_a", StreamType::Logs, "app_logs, audit_logs", hits);
+        let ret = redaction_skipped(
+            fail_closed,
+            || has_search_patterns,
+            &skipped,
+            "parse error",
+            |rows| published = rows,
+        );
+        (ret, published)
+    }
+
+    #[test]
+    fn test_redaction_skipped_fails_open_by_default() {
+        assert!(skip(false, true, &[]).0.is_ok());
+    }
+
+    #[test]
+    fn test_redaction_skipped_fails_closed_only_with_search_patterns() {
+        let err = skip(true, true, &[])
+            .0
+            .expect_err("a stream with search-time patterns must not return unredacted hits");
+        assert!(err.to_string().contains("app_logs"), "{err}");
+        assert_eq!(err.http_status(), 503, "{err}");
+        assert!(skip(true, false, &[]).0.is_ok());
+    }
+
+    #[test]
+    fn test_fail_open_search_publishes_an_evidence_row_per_stream() {
+        let ts = TIMESTAMP_COL_NAME;
+        let hits = [
+            json::json!({ ts: 30, "card": "4111" }),
+            json::json!({ ts: 10, "card": "4222" }),
+            json::json!({ ts: 20, "card": "4333" }),
+        ];
+        let (ret, rows) = skip(false, true, &hits);
+        assert!(ret.is_ok());
+        let streams: Vec<&str> = rows.iter().map(|r| r.stream_name.as_str()).collect();
+        assert_eq!(streams, ["app_logs", "audit_logs"]);
+        for row in &rows {
+            assert_eq!(row.kind, "scan_unavailable");
+            assert_eq!(row.apply_time, "search");
+            assert_eq!(row.org_id, "org_a");
+            assert_eq!(row.stream_type, "logs");
+            assert_eq!(row.fail_posture.as_deref(), Some("open"));
+            assert_eq!(row.reason.as_deref(), Some("parse error"));
+            assert_eq!(row.records_scanned, 3);
+            assert_eq!((row.data_min_ts, row.data_max_ts), (Some(10), Some(30)));
+        }
+    }
+
+    #[test]
+    fn test_fail_closed_search_publishes_a_closed_row() {
+        let (ret, rows) = skip(true, true, &[]);
+        assert!(ret.is_err());
+        assert_eq!(rows.len(), 2);
+        assert!(
+            rows.iter()
+                .all(|r| r.fail_posture.as_deref() == Some("closed"))
+        );
+    }
+
+    #[test]
+    fn test_search_evidence_skips_self_reporting_streams() {
+        let skipped = SkippedHits::new("org_a", StreamType::Logs, "app_logs, usage", &[]);
+        let streams: Vec<String> = skipped
+            .evidence(FailPosture::Open, "pattern manager unavailable")
+            .into_iter()
+            .map(|row| row.stream_name)
+            .collect();
+        assert_eq!(streams, ["app_logs"]);
+    }
+
+    #[test]
+    fn test_search_without_search_patterns_publishes_nothing() {
+        for fail_closed in [false, true] {
+            let (ret, rows) = skip(fail_closed, false, &[]);
+            assert!(ret.is_ok());
+            assert!(rows.is_empty(), "{rows:?}");
+        }
+    }
+
+    #[test]
+    fn test_apply_vrl_to_response_preserves_hits_on_compile_failure() {
+        let mut response = config::meta::search::Response {
+            hits: vec![json::json!({"nested": {"value": 42}})],
+            ..Default::default()
+        };
+        let expected = response.hits.clone();
+        let hits = apply_vrl_to_response(
+            Some(". = [".to_string()),
+            &mut response,
+            "default",
+            "test",
+            "test",
+        );
+        assert_eq!(hits, expected);
+    }
+
+    #[test]
+    fn test_apply_vrl_to_response_filters_null_per_record() {
+        let mut response = config::meta::search::Response {
+            hits: vec![
+                json::json!({"drop": true}),
+                json::json!({"drop": false, "nested": {"value": 42}}),
+            ],
+            ..Default::default()
+        };
+        let hits = apply_vrl_to_response(
+            Some("if .drop == true { . = null } else { del(.drop) }; .".to_string()),
+            &mut response,
+            "default",
+            "test",
+            "test",
+        );
+        assert_eq!(hits, vec![json::json!({"nested_value": 42})]);
+    }
+
+    #[test]
+    fn test_apply_vrl_to_response_filters_null_array_items() {
+        let mut response = config::meta::search::Response {
+            hits: vec![json::json!({"input": true})],
+            ..Default::default()
+        };
+        let hits = apply_vrl_to_response(
+            Some(
+                "#ResultArray#SkipVRL#\n. = [null, {\"nested\": {\"value\": 42}}, null]"
+                    .to_string(),
+            ),
+            &mut response,
+            "default",
+            "test",
+            "test",
+        );
+        assert_eq!(hits, vec![json::json!({"nested_value": 42})]);
+    }
 
     #[test]
     fn test_is_result_array_skip_vrl() {
@@ -1295,5 +1660,194 @@ mod tests {
     fn test_is_result_array_skip_vrl_no_marker() {
         let query_fn = "just a normal query";
         assert!(!is_result_array_skip_vrl(query_fn));
+    }
+
+    #[tokio::test]
+    async fn test_is_range_already_cached() {
+        let file_path = "test_org_covered/logs/test_stream/hash_covered";
+        let query_key = file_path.replace('/', "_");
+        let cached = ResultCacheMeta {
+            start_time: 1000,
+            end_time: 5000,
+            is_aggregate: false,
+            is_descending: true,
+        };
+        QUERY_RESULT_CACHE
+            .write()
+            .await
+            .insert(query_key.clone(), vec![cached.clone()]);
+        let covering_file = format!(
+            "results/{file_path}/{}",
+            infra::cache::file_data::disk::result_cache_file_name(&cached)
+        );
+        infra::cache::file_data::disk::set_size(&covering_file, 1)
+            .await
+            .unwrap();
+
+        let inner = ResultCacheMeta {
+            start_time: 2000,
+            end_time: 4000,
+            ..cached.clone()
+        };
+        assert!(is_range_already_cached(&query_key, file_path, &inner).await);
+
+        let wider = ResultCacheMeta {
+            end_time: 6000,
+            ..inner.clone()
+        };
+        assert!(!is_range_already_cached(&query_key, file_path, &wider).await);
+
+        let ascending = ResultCacheMeta {
+            is_descending: false,
+            ..inner.clone()
+        };
+        assert!(!is_range_already_cached(&query_key, file_path, &ascending).await);
+
+        // a covering meta whose file left the disk index no longer counts and is pruned
+        infra::cache::file_data::disk::remove(&covering_file)
+            .await
+            .unwrap();
+        assert!(!is_range_already_cached(&query_key, file_path, &inner).await);
+        assert!(!QUERY_RESULT_CACHE.read().await.contains_key(&query_key));
+    }
+
+    #[tokio::test]
+    async fn gate09_a_failed_delta_aborts_and_drains_its_siblings_before_returning() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        };
+        let long_done = Arc::new(AtomicBool::new(false));
+        let aborted = Arc::new(AtomicBool::new(false));
+        let done = long_done.clone();
+        let flag = aborted.clone();
+        let seen = aborted.clone();
+        // The long delta is first: the early failure must abort it while it still runs.
+        let tasks = vec![
+            tokio::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+                done.store(seen.load(Ordering::SeqCst), Ordering::SeqCst);
+                Ok(1)
+            }),
+            tokio::spawn(async { Err::<u8, Error>(Error::Message("early".into())) }),
+        ];
+        let err = join_deltas(tasks, true, || async move {
+            flag.store(true, Ordering::SeqCst);
+        })
+        .await
+        .unwrap_err();
+        assert_eq!(err.to_string(), Error::Message("early".into()).to_string());
+        assert!(aborted.load(Ordering::SeqCst), "siblings are aborted");
+        assert!(
+            long_done.load(Ordering::SeqCst),
+            "the abort fired while the long delta ran, and it was drained"
+        );
+
+        let tasks = vec![
+            tokio::spawn(async { Err::<u8, Error>(Error::Message("early".into())) }),
+            tokio::spawn(async { Ok(1) }),
+        ];
+        assert!(join_deltas(tasks, false, || async {}).await.is_err());
+        let tasks = vec![
+            tokio::spawn(async { Ok::<u8, Error>(1) }),
+            tokio::spawn(async { Ok(2) }),
+        ];
+        assert_eq!(join_deltas(tasks, true, || async {}).await.unwrap(), [1, 2]);
+    }
+
+    fn response_with_ts(ts: &[i64]) -> search::Response {
+        let hits = ts
+            .iter()
+            .map(|t| json::json!({"_timestamp": t, "name": format!("r{t}")}))
+            .collect::<Vec<_>>();
+        search::Response {
+            total: hits.len(),
+            scan_size: 1,
+            cached_ratio: 50,
+            hits,
+            ..Default::default()
+        }
+    }
+
+    fn ts_of(resp: &search::Response) -> Vec<i64> {
+        resp.hits
+            .iter()
+            .map(|h| get_ts_value("_timestamp", h))
+            .collect()
+    }
+
+    #[test]
+    fn test_merge_response_moves_cached_and_search_hits_in_order() {
+        let cached = vec![response_with_ts(&[10, 20])];
+        let searched = vec![response_with_ts(&[40, 30]), response_with_ts(&[50])];
+        let asc = merge_response(
+            "t",
+            cached.clone(),
+            searched.clone(),
+            "_timestamp",
+            10,
+            false,
+            7,
+            vec![],
+        );
+        assert_eq!(ts_of(&asc), vec![10, 20, 30, 40, 50]);
+        assert_eq!(asc.total, 5);
+        assert_eq!(asc.size, 5);
+        assert_eq!(asc.scan_size, 2);
+        assert_eq!(asc.cached_ratio, 50);
+        assert_eq!(asc.result_cache_ratio, 40);
+
+        let desc = merge_response("t", cached, searched, "_timestamp", 10, true, 7, vec![]);
+        assert_eq!(ts_of(&desc), vec![50, 40, 30, 20, 10]);
+    }
+
+    #[test]
+    fn test_merge_response_truncates_to_limit_after_sorting() {
+        let merged = merge_response(
+            "t",
+            vec![response_with_ts(&[10, 20])],
+            vec![response_with_ts(&[30, 40])],
+            "_timestamp",
+            3,
+            true,
+            0,
+            vec![],
+        );
+        assert_eq!(ts_of(&merged), vec![40, 30, 20]);
+        assert_eq!(merged.total, 3);
+    }
+
+    #[test]
+    fn test_merge_response_without_any_hits_returns_empty_response() {
+        let mut empty = response_with_ts(&[]);
+        empty.total = 3;
+        let merged = merge_response("t", vec![], vec![empty], "_timestamp", 10, true, 0, vec![]);
+        assert!(merged.hits.is_empty());
+        assert_eq!(merged.total, 0);
+    }
+
+    #[test]
+    fn test_sort_response_reorders_unsorted_hits() {
+        let mut resp = response_with_ts(&[30, 10, 20]);
+        sort_response(true, &mut resp, "_timestamp", &vec![]);
+        assert_eq!(ts_of(&resp), vec![30, 20, 10]);
+        sort_response(false, &mut resp, "_timestamp", &vec![]);
+        assert_eq!(ts_of(&resp), vec![10, 20, 30]);
+    }
+
+    #[test]
+    fn test_sort_response_keeps_already_sorted_hits_untouched() {
+        let mut resp = response_with_ts(&[30, 20, 20, 10]);
+        let before = resp.hits.clone();
+        sort_response(true, &mut resp, "_timestamp", &vec![]);
+        assert_eq!(resp.hits, before);
+    }
+
+    #[test]
+    fn test_sort_response_honours_explicit_order_by_field() {
+        let mut resp = response_with_ts(&[10, 30, 20]);
+        let order_by = vec![("name".to_string(), OrderBy::Desc)];
+        sort_response(false, &mut resp, "_timestamp", &order_by);
+        assert_eq!(ts_of(&resp), vec![30, 20, 10]);
     }
 }

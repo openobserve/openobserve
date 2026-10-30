@@ -43,12 +43,15 @@ vi.mock("@/composables/useStreams", () => ({
   }),
 }));
 
-vi.mock("@/services/stream", () => ({
-  default: {
-    createStream: mockCreateStream,
-    schema: mockSchemaStream,
-  },
-}));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      createStream: mockCreateStream,
+      schema: mockSchemaStream,
+    },
+  });
+});
 
 vi.mock("@/services/reodotdev_analytics", () => ({
   useReo: () => ({
@@ -56,7 +59,7 @@ vi.mock("@/services/reodotdev_analytics", () => ({
   }),
 }));
 
-vi.mock("@/services/segment_analytics", () => ({
+vi.mock("@/services/product_analytics", () => ({
   default: { track: vi.fn() },
 }));
 

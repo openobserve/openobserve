@@ -1,5 +1,8 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nText } from "@/types/i18n";
+import type { TemplateDelimiter, TemplateSuggestion } from "../TemplateInput/OTemplateInput.types";
+
 /**
  * OInlineEdit.types.ts — single source of truth for OInlineEdit's public types.
  * No types are defined inline in OInlineEdit.vue.
@@ -25,11 +28,11 @@ export interface InlineEditProps {
   /** Current value. Emitted back live while the user types. */
   modelValue?: string;
   /** Shown (muted) in display mode when the value is empty, and as the input's placeholder. */
-  placeholder?: string;
+  placeholder?: I18nText;
   /** Accessible name for both the display trigger and the input. */
-  ariaLabel?: string;
+  ariaLabel?: I18nText;
   /** Tooltip/title on the display trigger — e.g. "Click to rename". */
-  editHint?: string;
+  editHint?: I18nText;
   size?: InlineEditSize;
   /** Heading line (default) or the meta/description line. */
   tone?: InlineEditTone;
@@ -40,7 +43,13 @@ export interface InlineEditProps {
   /** Invalid state — red border while editing, red value in display mode. */
   error?: boolean;
   /** Message rendered below the control (absolutely, so the header never reflows). */
-  errorMessage?: string;
+  errorMessage?: I18nText;
+  /** Whether Enter also submits the owning form; `false` makes Enter only commit. @default true */
+  submitOnEnter?: boolean;
+  /** Tokens offered at the caret while editing, as in OTemplateInput; absent or empty means none. */
+  suggestions?: TemplateSuggestion[];
+  /** Token syntax the suggestions open on and insert. @default "double" */
+  delimiter?: TemplateDelimiter;
 }
 
 export interface InlineEditEmits {

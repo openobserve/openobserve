@@ -307,6 +307,20 @@ impl From<(MetaFolder, MetaDashboard)> for ListDashboardsResponseBodyItem {
 mod tests {
     use super::*;
 
+    // The model drops a null `unit_custom` and always writes `base_map`/`map_view` as null.
+    fn without_nulls(value: &Value) -> Value {
+        match value {
+            Value::Object(map) => Value::Object(
+                map.iter()
+                    .filter(|(_, v)| !v.is_null())
+                    .map(|(k, v)| (k.clone(), without_nulls(v)))
+                    .collect(),
+            ),
+            Value::Array(items) => Value::Array(items.iter().map(without_nulls).collect()),
+            other => other.clone(),
+        }
+    }
+
     #[test]
     fn test_latest_dashboard_version_is_eight() {
         assert_eq!(LATEST_DASHBOARD_VERSION, 8);
@@ -335,6 +349,41 @@ mod tests {
     }
 
     #[test]
+    fn test_v8_default_refresh_interval_survives_save_and_reload() {
+        let json = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../web/src/assets/dashboards/host_metrics.dashboard.json"
+        ));
+        let mut value: Value = serde_json::from_str(json).unwrap();
+        value["defaultRefreshInterval"] = serde_json::json!(60);
+
+        let saved: MetaDashboard = serde_json::from_value::<DashboardRequestBody>(value)
+            .unwrap()
+            .into();
+        let stored = serde_json::to_value(saved.v8.unwrap()).unwrap();
+        assert_eq!(stored["defaultRefreshInterval"], 60);
+        let reloaded: v8::Dashboard = serde_json::from_value(stored).unwrap();
+        assert_eq!(reloaded.default_refresh_interval, Some(60));
+    }
+
+    #[test]
+    fn test_v8_default_refresh_interval_omitted_when_unset() {
+        let json = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../web/src/assets/dashboards/host_metrics.dashboard.json"
+        ));
+        let body: DashboardRequestBody = serde_json::from_str(json).unwrap();
+        let saved: MetaDashboard = body.into();
+        let stored = serde_json::to_value(saved.v8.unwrap()).unwrap();
+        assert!(
+            !stored
+                .as_object()
+                .unwrap()
+                .contains_key("defaultRefreshInterval")
+        );
+    }
+
+    #[test]
     fn test_deserialize_unsupported_version_returns_err() {
         let json = serde_json::json!({
             "version": 99,
@@ -343,6 +392,355 @@ mod tests {
         });
         let result: Result<DashboardRequestBody, _> = serde_json::from_value(json);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_bundled_host_metrics_dashboard_dispatches_to_v8() {
+        // Pins the create endpoint's version dispatch on the real bundled asset.
+        let json = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../web/src/assets/dashboards/host_metrics.dashboard.json"
+        ));
+        let body: DashboardRequestBody = serde_json::from_str(json).unwrap();
+        assert!(matches!(body, DashboardRequestBody::V8(_)));
+    }
+
+    #[test]
+    fn test_v8_query_config_formula_fields_survive_save_and_reload() {
+        let json = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../web/src/assets/dashboards/host_metrics.dashboard.json"
+        ));
+        let mut value: Value = serde_json::from_str(json).unwrap();
+        let fields = serde_json::json!({
+            "formula": "A / B * 100",
+            "ref": "C",
+            "hide": true,
+            "query_type": "instant",
+            "promql_legend_fallback": "errors"
+        });
+        let config = value["tabs"][0]["panels"][0]["queries"][0]["config"]
+            .as_object_mut()
+            .unwrap();
+        config.extend(fields.as_object().unwrap().clone());
+
+        let saved: MetaDashboard = serde_json::from_value::<DashboardRequestBody>(value)
+            .unwrap()
+            .into();
+        let stored = serde_json::to_value(saved.v8.unwrap()).unwrap();
+        let reloaded: v8::Dashboard = serde_json::from_value(stored).unwrap();
+        let reloaded = serde_json::to_value(reloaded).unwrap();
+
+        let config = &reloaded["tabs"][0]["panels"][0]["queries"][0]["config"];
+        for (key, expected) in fields.as_object().unwrap() {
+            assert_eq!(&config[key], expected, "{key} was dropped");
+        }
+    }
+
+    #[test]
+    fn test_v8_query_config_omits_unset_formula_fields() {
+        let json = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../web/src/assets/dashboards/host_metrics.dashboard.json"
+        ));
+        let body: DashboardRequestBody = serde_json::from_str(json).unwrap();
+        let saved: MetaDashboard = body.into();
+        let stored = serde_json::to_value(saved.v8.unwrap()).unwrap();
+        let config = stored["tabs"][0]["panels"][0]["queries"][0]["config"]
+            .as_object()
+            .unwrap();
+        for key in [
+            "formula",
+            "ref",
+            "hide",
+            "query_type",
+            "promql_legend_fallback",
+        ] {
+            assert!(!config.contains_key(key), "{key} serialised while unset");
+        }
+    }
+
+    #[test]
+    fn test_v8_panel_config_heatmap_fields_survive_save_and_reload() {
+        let json = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../web/src/assets/dashboards/host_metrics.dashboard.json"
+        ));
+        let mut value: Value = serde_json::from_str(json).unwrap();
+        let fields = serde_json::json!({
+            "heatmap_mode": "prometheus_histogram",
+            "bucket_unit": "seconds",
+            "bucket_unit_custom": "req",
+            "heatmap_color_min": 1.5,
+            "heatmap_color_max": 40.0,
+            "heatmap_palette": "magma",
+            "heatmap_palette_reverse": true,
+            "heatmap_color_scale": "linear",
+            "heatmap_y_sort": "asc",
+            "heatmap_y_bucket": { "mode": "log", "base": 2.0 },
+            "heatmap_y_min": 1.0,
+            "heatmap_y_max": 4096.0
+        });
+        let config = value["tabs"][0]["panels"][0]["config"]
+            .as_object_mut()
+            .unwrap();
+        config.extend(fields.as_object().unwrap().clone());
+
+        let saved: MetaDashboard = serde_json::from_value::<DashboardRequestBody>(value)
+            .unwrap()
+            .into();
+        let stored = serde_json::to_value(saved.v8.unwrap()).unwrap();
+        let reloaded: v8::Dashboard = serde_json::from_value(stored).unwrap();
+        let reloaded = serde_json::to_value(reloaded).unwrap();
+
+        let config = &reloaded["tabs"][0]["panels"][0]["config"];
+        for (key, expected) in fields.as_object().unwrap() {
+            assert_eq!(&config[key], expected, "{key} was dropped");
+        }
+    }
+
+    fn chart_parity_panel_config_fields() -> Value {
+        let mut fields = serde_json::json!({
+            "tooltip_sort": "asc",
+            "y_axis_scale": "log",
+            "y_axis_log_base": 10.0,
+            "y_axis_label": "Requests",
+            "y_axis_hard_min": 0.0,
+            "y_axis_hard_max": 50.0,
+            "line_style": "dotted",
+            "stack_mode": "percent",
+            "connect_nulls_threshold": 120.0,
+            "bar_radius": 3.0,
+            "sort_order": "desc",
+            "mark_area": [
+                {"name": "Incident", "axis": "x", "from": "1700000000000", "to": "1700000900000", "color": "#EF4444"}
+            ],
+            "scatter_size_field": "count",
+            "scatter_color_field": "code",
+            "scatter_size_min": 2.0,
+            "scatter_size_max": 30.0
+        });
+        let rest = serde_json::json!({
+            "stat_text_mode": "name",
+            "value_font_size": 36.0,
+            "gauge_style": "circle",
+            "gauge_segments": 0.0,
+            "gauge_round_cap": false,
+            "gauge_neutral": 50.0,
+            "pie_label_content": ["name", "value", "percent"],
+            "pie_other_threshold": 5.0,
+            "donut_inner_radius": 45.0,
+            "table_footer_calcs": ["min", "max", "count"],
+            "table_density": "comfortable"
+        });
+        let rest2 = serde_json::json!({
+            "heatmap_cell_gap": 2.0,
+            "heatmap_hide_below": 1.0,
+            "state_value_align": "right",
+            "map_cluster": true,
+            "map_cluster_radius": 60.0,
+            "bar_gauge_mode": "gradient",
+            "bar_gauge_orientation": "horizontal",
+            "bar_gauge_show_unfilled": true
+        });
+        let rest3 = serde_json::json!({
+            "state_timeline_display": "cells",
+            "treemap_show_breadcrumb": true,
+            "sunburst_show_labels": false,
+            "funnel_sort": "none",
+            "funnel_orient": "vertical",
+            "funnel_show_percent": false,
+            "node_graph_layout": "force",
+            "node_graph_show_edge_labels": false,
+            "alert_list_state": ["firing", "ok"],
+            "alert_list_max": 10.0,
+            "alert_list_sort": "time",
+            "alert_list_folder": "",
+            "flame_graph_stack_field": "folded",
+            "flame_graph_value_field": "value",
+            "boxplot_whisker": "minmax",
+            "logs_message_field": "log",
+            "logs_level_field": "severity",
+            "logs_time_field": "_timestamp",
+            "logs_wrap": false,
+            "logs_prettify_json": true,
+            "logs_show_time": false,
+            "logs_order": "newest",
+            "override_config": [{
+                "field": {"matchBy": "series", "value": "errors"},
+                "config": [
+                    {"type": "y_axis", "value": "hidden"},
+                    {"type": "transform", "value": "negative_y"},
+                    {"type": "draw_style", "value": "points"},
+                    {"type": "line_style", "value": "solid"}
+                ]
+            }],
+            "distribution_bucket_count": 20.0,
+            "distribution_bucket_size": 5.0,
+            "distribution_bucket_offset": 0.0
+        });
+        for part in [rest, rest2, rest3] {
+            fields
+                .as_object_mut()
+                .unwrap()
+                .extend(part.as_object().unwrap().clone());
+        }
+        fields
+    }
+
+    #[test]
+    fn test_v8_panel_config_chart_parity_fields_survive_save_and_reload() {
+        let json = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../web/src/assets/dashboards/host_metrics.dashboard.json"
+        ));
+        let mut value: Value = serde_json::from_str(json).unwrap();
+        let fields = chart_parity_panel_config_fields();
+        let config = value["tabs"][0]["panels"][0]["config"]
+            .as_object_mut()
+            .unwrap();
+        config.extend(fields.as_object().unwrap().clone());
+
+        let saved: MetaDashboard = serde_json::from_value::<DashboardRequestBody>(value)
+            .unwrap()
+            .into();
+        let stored = serde_json::to_value(saved.v8.unwrap()).unwrap();
+        let reloaded: v8::Dashboard = serde_json::from_value(stored.clone()).unwrap();
+        let reloaded = serde_json::to_value(reloaded).unwrap();
+
+        for (stage, dashboard) in [("stored", &stored), ("reloaded", &reloaded)] {
+            let config = &dashboard["tabs"][0]["panels"][0]["config"];
+            for (key, expected) in fields.as_object().unwrap() {
+                assert_eq!(&config[key], expected, "{key} changed in the {stage} JSON");
+            }
+        }
+    }
+
+    #[test]
+    fn test_v8_panel_config_omits_unset_chart_parity_fields() {
+        let json = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../web/src/assets/dashboards/host_metrics.dashboard.json"
+        ));
+        let body: DashboardRequestBody = serde_json::from_str(json).unwrap();
+        let saved: MetaDashboard = body.into();
+        let stored = serde_json::to_string(&saved.v8.unwrap()).unwrap();
+        for key in chart_parity_panel_config_fields()
+            .as_object()
+            .unwrap()
+            .keys()
+        {
+            let written_key = format!("\"{key}\":");
+            assert!(
+                !stored.contains(&written_key),
+                "{key} serialised while unset"
+            );
+        }
+    }
+
+    #[test]
+    fn test_v8_panel_config_thresholds_and_series_override_entries_survive_save_and_reload() {
+        let json = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../web/src/assets/dashboards/host_metrics.dashboard.json"
+        ));
+        let mut value: Value = serde_json::from_str(json).unwrap();
+        let fields = serde_json::json!({
+            "thresholds": {
+                "mode": "absolute",
+                "showAs": "color_line",
+                "baseColor": "#22C55E",
+                "steps": [
+                    {"value": 500.0, "color": "#F59E0B"},
+                    {"value": 1000.0, "color": "#EF4444"}
+                ]
+            },
+            "override_config": [
+                {
+                    "field": {"matchBy": "series_regex", "value": "/^checkout/i"},
+                    "config": [
+                        {"type": "unit", "value": {"unit": "milliseconds", "customUnit": ""}},
+                        {"type": "decimals", "value": 2.0},
+                        {"type": "display_name", "value": "Checkout API"},
+                        {"type": "series_color", "value": "#EF4444"},
+                        {"type": "thresholds", "value": {"mode": "percentage", "showAs": "line", "steps": []}}
+                    ]
+                },
+                {
+                    "field": {"matchBy": "series", "value": "cart"},
+                    "config": [{"type": "series_color", "value": "#22C55E"}]
+                },
+                {
+                    "field": {"matchBy": "name", "value": "status"},
+                    "config": [{"type": "alignment", "value": "right"}]
+                }
+            ]
+        });
+        let config = value["tabs"][0]["panels"][0]["config"]
+            .as_object_mut()
+            .unwrap();
+        config.extend(fields.as_object().unwrap().clone());
+
+        let saved: MetaDashboard = serde_json::from_value::<DashboardRequestBody>(value)
+            .unwrap()
+            .into();
+        let stored = serde_json::to_value(saved.v8.unwrap()).unwrap();
+        let reloaded: v8::Dashboard = serde_json::from_value(stored.clone()).unwrap();
+        let reloaded = serde_json::to_value(reloaded).unwrap();
+
+        for (stage, dashboard) in [("stored", &stored), ("reloaded", &reloaded)] {
+            let config = &dashboard["tabs"][0]["panels"][0]["config"];
+            for (key, expected) in fields.as_object().unwrap() {
+                assert_eq!(&config[key], expected, "{key} changed in the {stage} JSON");
+            }
+        }
+    }
+
+    #[test]
+    fn test_v8_panel_config_omits_unset_thresholds_and_override_config() {
+        let json = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../web/src/assets/dashboards/host_metrics.dashboard.json"
+        ));
+        let body: DashboardRequestBody = serde_json::from_str(json).unwrap();
+        let saved: MetaDashboard = body.into();
+        let stored = serde_json::to_string(&saved.v8.unwrap()).unwrap();
+        for key in ["thresholds", "override_config"] {
+            let written_key = format!("\"{key}\":");
+            assert!(
+                !stored.contains(&written_key),
+                "{key} serialised while unset"
+            );
+        }
+    }
+
+    #[test]
+    fn test_v8_bundled_dashboard_panel_configs_are_stored_unchanged() {
+        let json = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../web/src/assets/dashboards/host_metrics.dashboard.json"
+        ));
+        let input: Value = serde_json::from_str(json).unwrap();
+        let body: DashboardRequestBody = serde_json::from_str(json).unwrap();
+        let saved: MetaDashboard = body.into();
+        let stored = serde_json::to_value(saved.v8.unwrap()).unwrap();
+
+        let input_tabs = input["tabs"].as_array().unwrap();
+        let stored_tabs = stored["tabs"].as_array().unwrap();
+        assert_eq!(stored_tabs.len(), input_tabs.len());
+        for (input_tab, stored_tab) in input_tabs.iter().zip(stored_tabs) {
+            let input_panels = input_tab["panels"].as_array().unwrap();
+            let stored_panels = stored_tab["panels"].as_array().unwrap();
+            assert_eq!(stored_panels.len(), input_panels.len());
+            for (input_panel, stored_panel) in input_panels.iter().zip(stored_panels) {
+                assert_eq!(
+                    without_nulls(&stored_panel["config"]),
+                    without_nulls(&input_panel["config"]),
+                    "stored config of panel {} differs from the file",
+                    input_panel["id"]
+                );
+            }
+        }
     }
 
     #[test]

@@ -1,0 +1,1110 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+//! Soft-normalizes OTLP/JSON profiles payloads for serde.
+//!
+//! OTLP/JSON uses camelCase ([OTLP spec](https://opentelemetry.io/docs/specs/otlp/)).
+//! This layer fills missing defaults and coerces stringified integers —
+//! it does not rewrite field names.
+//!
+//! Several profiles protobuf messages lack `#[serde(default)]`, so omitted
+//! ProtoJSON defaults (empty `resourceProfiles`, zero `timeUnixNano` /
+//! `durationNano`, `mappingIndex`, etc.) fail deserialization without this pass.
+
+use config::utils::json;
+use opentelemetry_proto::tonic::{
+    collector::profiles::v1development::ExportProfilesServiceRequest,
+    common::v1::{AnyValue, ArrayValue, KeyValueList, any_value::Value},
+};
+use serde::de::Error as _;
+
+const INTEGRAL_KEYS: &[&str] = &[
+    "timeUnixNano",
+    "durationNano",
+    "period",
+    "linkIndex",
+    "typeStrindex",
+    "unitStrindex",
+    "stackIndex",
+    "mappingIndex",
+    "functionIndex",
+    "address",
+    "line",
+    "column",
+    "nameStrindex",
+    "systemNameStrindex",
+    "filenameStrindex",
+    "startLine",
+    "keyStrindex",
+    "unitStrindex",
+    "stringValueStrindex",
+    "intValue",
+    "droppedAttributesCount",
+    "memoryStart",
+    "memoryLimit",
+    "fileOffset",
+];
+
+const INTEGRAL_ARRAY_KEYS: &[&str] = &[
+    "values",
+    "locationIndices",
+    "attributeIndices",
+    "timestampsUnixNano",
+];
+
+pub fn normalize(body: &mut json::Value) {
+    json::canonicalize_floats(body);
+    normalize_value(body);
+    ensure_defaults(body);
+}
+
+pub fn deserialize(mut body: json::Value) -> Result<ExportProfilesServiceRequest, json::Error> {
+    // The upstream AnyValue visitor cannot decode stringValueStrindex.
+    let mut values = Vec::new();
+    if let Some(attributes) = body.pointer_mut("/dictionary/attributeTable") {
+        take_attribute_values(attributes, &mut values)?;
+    }
+    if let Some(resources) = body
+        .get_mut("resourceProfiles")
+        .and_then(json::Value::as_array_mut)
+    {
+        for resource in resources {
+            if let Some(attributes) = resource.pointer_mut("/resource/attributes") {
+                take_attribute_values(attributes, &mut values)?;
+            }
+            if let Some(scopes) = resource
+                .get_mut("scopeProfiles")
+                .and_then(json::Value::as_array_mut)
+            {
+                for scope in scopes {
+                    if let Some(attributes) = scope.pointer_mut("/scope/attributes") {
+                        take_attribute_values(attributes, &mut values)?;
+                    }
+                }
+            }
+        }
+    }
+    let mut request: ExportProfilesServiceRequest = json::from_value(body)?;
+    let mut values = values.into_iter();
+    if let Some(dictionary) = &mut request.dictionary {
+        for attribute in &mut dictionary.attribute_table {
+            attribute.value = values.next().flatten();
+        }
+    }
+    for resource in &mut request.resource_profiles {
+        if let Some(resource) = &mut resource.resource {
+            for attribute in &mut resource.attributes {
+                attribute.value = values.next().flatten();
+            }
+        }
+        for scope in &mut resource.scope_profiles {
+            if let Some(scope) = &mut scope.scope {
+                for attribute in &mut scope.attributes {
+                    attribute.value = values.next().flatten();
+                }
+            }
+        }
+    }
+    Ok(request)
+}
+
+fn take_attribute_values(
+    attributes: &mut json::Value,
+    values: &mut Vec<Option<AnyValue>>,
+) -> Result<(), json::Error> {
+    if let Some(attributes) = attributes.as_array_mut() {
+        for attribute in attributes {
+            if attribute.get("key").is_none() {
+                ensure_common_key_value_defaults(attribute);
+            }
+            let value = attribute.get_mut("value").map(json::Value::take);
+            values.push(
+                value
+                    .filter(|value| !value.is_null())
+                    .map(deserialize_any_value)
+                    .transpose()?,
+            );
+        }
+    }
+    Ok(())
+}
+
+fn deserialize_any_value(mut value: json::Value) -> Result<AnyValue, json::Error> {
+    if value.as_object().is_some_and(json::Map::is_empty) {
+        return Ok(AnyValue::default());
+    }
+    if let Some(index) = value.get_mut("stringValueStrindex") {
+        return json::from_value(index.take()).map(|index| AnyValue {
+            value: Some(Value::StringValueStrindex(index)),
+        });
+    }
+    if let Some(array) = value.get_mut("arrayValue") {
+        ensure_collection_values(array)?;
+        let values: Vec<json::Value> = json::from_value(
+            array
+                .get_mut("values")
+                .map(json::Value::take)
+                .unwrap_or(json::Value::Null),
+        )?;
+        let values = values
+            .into_iter()
+            .map(deserialize_any_value)
+            .collect::<Result<_, _>>()?;
+        return Ok(AnyValue {
+            value: Some(Value::ArrayValue(ArrayValue { values })),
+        });
+    }
+    if let Some(list) = value.get_mut("kvlistValue") {
+        ensure_collection_values(list)?;
+        let mut values = Vec::new();
+        if let Some(attributes) = list.get_mut("values") {
+            take_attribute_values(attributes, &mut values)?;
+        }
+        let mut list: KeyValueList = json::from_value(list.take())?;
+        for (attribute, value) in list.values.iter_mut().zip(values) {
+            attribute.value = value;
+        }
+        return Ok(AnyValue {
+            value: Some(Value::KvlistValue(list)),
+        });
+    }
+    json::from_value(value)
+}
+
+fn ensure_collection_values(value: &mut json::Value) -> Result<(), json::Error> {
+    let value = value
+        .as_object_mut()
+        .ok_or_else(|| json::Error::custom("profile collection must be an object"))?;
+    if !value.contains_key("values") {
+        value.insert("values".to_string(), json::Value::Array(vec![]));
+    }
+    Ok(())
+}
+
+fn normalize_value(value: &mut json::Value) {
+    match value {
+        json::Value::Array(items) => {
+            for item in items {
+                normalize_value(item);
+            }
+        }
+        json::Value::Object(map) => {
+            for child in map.values_mut() {
+                normalize_value(child);
+            }
+            normalize_integral_fields(map);
+            normalize_integral_arrays(map);
+            normalize_raw_bytes_fields(map);
+        }
+        _ => {}
+    }
+}
+
+fn normalize_integral_fields(map: &mut json::Map<String, json::Value>) {
+    for key in INTEGRAL_KEYS {
+        let Some(value) = map.get_mut(*key) else {
+            continue;
+        };
+        coerce_integral_value(value);
+    }
+}
+
+fn normalize_integral_arrays(map: &mut json::Map<String, json::Value>) {
+    for key in INTEGRAL_ARRAY_KEYS {
+        let Some(json::Value::Array(items)) = map.get_mut(*key) else {
+            continue;
+        };
+        for item in items.iter_mut() {
+            coerce_integral_value(item);
+        }
+    }
+}
+
+fn coerce_integral_value(value: &mut json::Value) {
+    let Some(raw) = value.as_str() else {
+        return;
+    };
+    if let Ok(v) = raw.parse::<u64>() {
+        *value = json::Value::from(v);
+        return;
+    }
+    if let Ok(v) = raw.parse::<i64>() {
+        *value = json::Value::from(v);
+    }
+}
+
+/// Convert ProtoJSON bytes strings into JSON number arrays for bare `Vec<u8>`
+/// fields (opentelemetry-proto serde expects sequences, not strings).
+///
+/// OTLP/JSON uses hex only for `traceId` / `spanId`. Ordinary protobuf `bytes`
+/// fields such as `originalPayload` use standard base64.
+fn normalize_raw_bytes_fields(map: &mut json::Map<String, json::Value>) {
+    for key in ["traceId", "spanId"] {
+        let Some(value) = map.get_mut(key) else {
+            continue;
+        };
+        match value {
+            json::Value::String(raw) => {
+                if raw.is_empty() {
+                    *value = json::Value::Array(vec![]);
+                    continue;
+                }
+                if let Some(bytes) = decode_hex(raw) {
+                    *value = json::Value::Array(bytes.into_iter().map(json::Value::from).collect());
+                }
+            }
+            json::Value::Null => {
+                *value = json::Value::Array(vec![]);
+            }
+            _ => {}
+        }
+    }
+
+    let Some(value) = map.get_mut("originalPayload") else {
+        return;
+    };
+    match value {
+        json::Value::String(raw) => {
+            if raw.is_empty() {
+                *value = json::Value::Array(vec![]);
+                return;
+            }
+            if let Some(bytes) = decode_base64(raw) {
+                *value = json::Value::Array(bytes.into_iter().map(json::Value::from).collect());
+            }
+        }
+        json::Value::Null => {
+            *value = json::Value::Array(vec![]);
+        }
+        _ => {}
+    }
+}
+
+fn decode_hex(raw: &str) -> Option<Vec<u8>> {
+    let raw = raw.strip_prefix("0x").unwrap_or(raw);
+    if !raw.len().is_multiple_of(2) {
+        return None;
+    }
+    let mut out = Vec::with_capacity(raw.len() / 2);
+    for i in (0..raw.len()).step_by(2) {
+        out.push(u8::from_str_radix(&raw[i..i + 2], 16).ok()?);
+    }
+    Some(out)
+}
+
+fn decode_base64(raw: &str) -> Option<Vec<u8>> {
+    use base64::Engine;
+    base64::engine::general_purpose::STANDARD.decode(raw).ok()
+}
+
+fn ensure_defaults(body: &mut json::Value) {
+    if let Some(root) = body.as_object_mut() {
+        root.entry("resourceProfiles".to_string())
+            .or_insert_with(|| json::Value::Array(vec![]));
+    }
+    ensure_dictionary_defaults(body);
+    ensure_profile_defaults(body);
+}
+
+fn ensure_dictionary_defaults(body: &mut json::Value) {
+    let Some(dictionary) = body.get_mut("dictionary") else {
+        return;
+    };
+    let Some(dictionary) = dictionary.as_object_mut() else {
+        return;
+    };
+
+    for key in [
+        "mappingTable",
+        "locationTable",
+        "functionTable",
+        "attributeTable",
+        "stackTable",
+        "linkTable",
+        "stringTable",
+    ] {
+        dictionary
+            .entry(key.to_string())
+            .or_insert_with(|| json::Value::Array(vec![]));
+    }
+
+    if let Some(json::Value::Array(locations)) = dictionary.get_mut("locationTable") {
+        for location in locations.iter_mut() {
+            ensure_location_defaults(location);
+        }
+    }
+    if let Some(json::Value::Array(functions)) = dictionary.get_mut("functionTable") {
+        for function in functions.iter_mut() {
+            ensure_function_defaults(function);
+        }
+    }
+    if let Some(json::Value::Array(mappings)) = dictionary.get_mut("mappingTable") {
+        for mapping in mappings.iter_mut() {
+            ensure_mapping_defaults(mapping);
+        }
+    }
+    if let Some(json::Value::Array(links)) = dictionary.get_mut("linkTable") {
+        for link in links.iter_mut() {
+            ensure_link_defaults(link);
+        }
+    }
+    if let Some(json::Value::Array(attrs)) = dictionary.get_mut("attributeTable") {
+        for attr in attrs.iter_mut() {
+            ensure_attribute_defaults(attr);
+        }
+    }
+    if let Some(json::Value::Array(stacks)) = dictionary.get_mut("stackTable") {
+        for stack in stacks.iter_mut() {
+            ensure_stack_defaults(stack);
+        }
+    }
+}
+
+fn ensure_location_defaults(location: &mut json::Value) {
+    let Some(location) = location.as_object_mut() else {
+        return;
+    };
+    location
+        .entry("mappingIndex".to_string())
+        .or_insert_with(|| json::Value::from(0));
+    location
+        .entry("address".to_string())
+        .or_insert_with(|| json::Value::from(0));
+    location
+        .entry("lines".to_string())
+        .or_insert_with(|| json::Value::Array(vec![]));
+    location
+        .entry("attributeIndices".to_string())
+        .or_insert_with(|| json::Value::Array(vec![]));
+
+    if let Some(json::Value::Array(lines)) = location.get_mut("lines") {
+        for line in lines.iter_mut() {
+            ensure_line_defaults(line);
+        }
+    }
+}
+
+fn ensure_line_defaults(line: &mut json::Value) {
+    let Some(line) = line.as_object_mut() else {
+        return;
+    };
+    line.entry("functionIndex".to_string())
+        .or_insert_with(|| json::Value::from(0));
+    line.entry("line".to_string())
+        .or_insert_with(|| json::Value::from(0));
+    line.entry("column".to_string())
+        .or_insert_with(|| json::Value::from(0));
+}
+
+fn ensure_function_defaults(function: &mut json::Value) {
+    let Some(function) = function.as_object_mut() else {
+        return;
+    };
+    function
+        .entry("nameStrindex".to_string())
+        .or_insert_with(|| json::Value::from(0));
+    function
+        .entry("systemNameStrindex".to_string())
+        .or_insert_with(|| json::Value::from(0));
+    function
+        .entry("filenameStrindex".to_string())
+        .or_insert_with(|| json::Value::from(0));
+    function
+        .entry("startLine".to_string())
+        .or_insert_with(|| json::Value::from(0));
+}
+
+fn ensure_mapping_defaults(mapping: &mut json::Value) {
+    let Some(mapping) = mapping.as_object_mut() else {
+        return;
+    };
+    mapping
+        .entry("memoryStart".to_string())
+        .or_insert_with(|| json::Value::from(0));
+    mapping
+        .entry("memoryLimit".to_string())
+        .or_insert_with(|| json::Value::from(0));
+    mapping
+        .entry("fileOffset".to_string())
+        .or_insert_with(|| json::Value::from(0));
+    mapping
+        .entry("filenameStrindex".to_string())
+        .or_insert_with(|| json::Value::from(0));
+    mapping
+        .entry("attributeIndices".to_string())
+        .or_insert_with(|| json::Value::Array(vec![]));
+}
+
+fn ensure_link_defaults(link: &mut json::Value) {
+    let Some(link) = link.as_object_mut() else {
+        return;
+    };
+    // Bare Vec<u8> fields — empty JSON array.
+    link.entry("traceId".to_string())
+        .or_insert_with(|| json::Value::Array(vec![]));
+    link.entry("spanId".to_string())
+        .or_insert_with(|| json::Value::Array(vec![]));
+}
+
+fn ensure_attribute_defaults(attr: &mut json::Value) {
+    let Some(attr) = attr.as_object_mut() else {
+        return;
+    };
+    // ProtoJSON may omit empty `key` when only `keyStrindex` is set.
+    attr.entry("key".to_string())
+        .or_insert_with(|| json::Value::String(String::new()));
+    attr.entry("keyStrindex".to_string())
+        .or_insert_with(|| json::Value::from(0));
+    attr.entry("unitStrindex".to_string())
+        .or_insert_with(|| json::Value::from(0));
+}
+
+fn ensure_common_key_value_defaults(attr: &mut json::Value) {
+    let Some(attr) = attr.as_object_mut() else {
+        return;
+    };
+    attr.entry("key".to_string())
+        .or_insert_with(|| json::Value::String(String::new()));
+}
+
+fn ensure_stack_defaults(stack: &mut json::Value) {
+    let Some(stack) = stack.as_object_mut() else {
+        return;
+    };
+    stack
+        .entry("locationIndices".to_string())
+        .or_insert_with(|| json::Value::Array(vec![]));
+}
+
+fn ensure_profile_defaults(body: &mut json::Value) {
+    let Some(resource_profiles) = body
+        .get_mut("resourceProfiles")
+        .and_then(json::Value::as_array_mut)
+    else {
+        return;
+    };
+
+    for resource_profile in resource_profiles {
+        if let Some(resource_profile_obj) = resource_profile.as_object_mut() {
+            resource_profile_obj
+                .entry("schemaUrl".to_string())
+                .or_insert_with(|| json::Value::String(String::new()));
+            resource_profile_obj
+                .entry("scopeProfiles".to_string())
+                .or_insert_with(|| json::Value::Array(vec![]));
+        }
+
+        if let Some(resource) = resource_profile.get_mut("resource")
+            && let Some(attrs) = resource
+                .get_mut("attributes")
+                .and_then(json::Value::as_array_mut)
+        {
+            for attr in attrs {
+                ensure_common_key_value_defaults(attr);
+            }
+        }
+
+        let Some(scope_profiles) = resource_profile
+            .get_mut("scopeProfiles")
+            .and_then(json::Value::as_array_mut)
+        else {
+            continue;
+        };
+
+        for scope_profile in scope_profiles {
+            if let Some(scope_profile_obj) = scope_profile.as_object_mut() {
+                scope_profile_obj
+                    .entry("schemaUrl".to_string())
+                    .or_insert_with(|| json::Value::String(String::new()));
+                scope_profile_obj
+                    .entry("profiles".to_string())
+                    .or_insert_with(|| json::Value::Array(vec![]));
+            }
+
+            if let Some(scope) = scope_profile.get_mut("scope")
+                && let Some(attrs) = scope
+                    .get_mut("attributes")
+                    .and_then(json::Value::as_array_mut)
+            {
+                for attr in attrs {
+                    ensure_common_key_value_defaults(attr);
+                }
+            }
+
+            let Some(profiles) = scope_profile
+                .get_mut("profiles")
+                .and_then(json::Value::as_array_mut)
+            else {
+                continue;
+            };
+
+            for profile in profiles {
+                let Some(profile) = profile.as_object_mut() else {
+                    continue;
+                };
+                // ProtoJSON omits zero defaults; serde without #[serde(default)]
+                // requires these fields to be present.
+                profile
+                    .entry("timeUnixNano".to_string())
+                    .or_insert_with(|| json::Value::from(0));
+                profile
+                    .entry("durationNano".to_string())
+                    .or_insert_with(|| json::Value::from(0));
+                profile
+                    .entry("period".to_string())
+                    .or_insert_with(|| json::Value::from(0));
+                profile
+                    .entry("samples".to_string())
+                    .or_insert_with(|| json::Value::Array(vec![]));
+                profile
+                    .entry("profileId".to_string())
+                    .or_insert_with(|| json::Value::String(String::new()));
+                profile
+                    .entry("droppedAttributesCount".to_string())
+                    .or_insert_with(|| json::Value::from(0));
+                profile
+                    .entry("attributeIndices".to_string())
+                    .or_insert_with(|| json::Value::Array(vec![]));
+                profile
+                    .entry("originalPayloadFormat".to_string())
+                    .or_insert_with(|| json::Value::String(String::new()));
+                profile
+                    .entry("originalPayload".to_string())
+                    .or_insert_with(|| json::Value::Array(vec![]));
+
+                if let Some(sample_type) = profile.get_mut("sampleType") {
+                    ensure_value_type_defaults(sample_type);
+                }
+                if let Some(period_type) = profile.get_mut("periodType") {
+                    ensure_value_type_defaults(period_type);
+                }
+
+                if let Some(samples) = profile
+                    .get_mut("samples")
+                    .and_then(json::Value::as_array_mut)
+                {
+                    for sample in samples {
+                        let Some(sample) = sample.as_object_mut() else {
+                            continue;
+                        };
+                        sample
+                            .entry("stackIndex".to_string())
+                            .or_insert_with(|| json::Value::from(0));
+                        sample
+                            .entry("linkIndex".to_string())
+                            .or_insert_with(|| json::Value::from(0));
+                        sample
+                            .entry("attributeIndices".to_string())
+                            .or_insert_with(|| json::Value::Array(vec![]));
+                        sample
+                            .entry("values".to_string())
+                            .or_insert_with(|| json::Value::Array(vec![]));
+                        sample
+                            .entry("timestampsUnixNano".to_string())
+                            .or_insert_with(|| json::Value::Array(vec![]));
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn ensure_value_type_defaults(value_type: &mut json::Value) {
+    let Some(value_type) = value_type.as_object_mut() else {
+        return;
+    };
+    value_type
+        .entry("typeStrindex".to_string())
+        .or_insert_with(|| json::Value::from(0));
+    value_type
+        .entry("unitStrindex".to_string())
+        .or_insert_with(|| json::Value::from(0));
+}
+
+#[cfg(test)]
+mod tests {
+    use config::utils::json;
+
+    use super::{Value, deserialize, normalize};
+
+    #[test]
+    fn accepts_standard_otlp_json_camel_case() {
+        let mut payload = json::json!({
+            "resourceProfiles": [
+                {
+                    "scopeProfiles": [
+                        {
+                            "profiles": [
+                                {
+                                    "timeUnixNano": "1735732800000000000",
+                                    "durationNano": "1000000000",
+                                    "samples": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        });
+
+        normalize(&mut payload);
+
+        let req = deserialize(payload).expect("OTLP/JSON camelCase payload should deserialize");
+        let profile = &req.resource_profiles[0].scope_profiles[0].profiles[0];
+        assert_eq!(profile.time_unix_nano, 1735732800000000000);
+        assert_eq!(profile.duration_nano, 1000000000);
+        assert_eq!(profile.period, 0);
+        assert!(profile.samples.is_empty());
+    }
+
+    #[test]
+    fn fills_missing_dictionary_tables() {
+        let mut payload = json::json!({
+            "resourceProfiles": [],
+            "dictionary": {
+                "linkTable": []
+            }
+        });
+
+        normalize(&mut payload);
+
+        deserialize(payload).expect("dictionary defaults should satisfy serde requirements");
+    }
+
+    #[test]
+    fn fills_missing_location_mapping_index_like_curl_payload() {
+        let mut payload = json::json!({
+            "dictionary": {
+                "stringTable": ["", "samples", "count", "main"],
+                "functionTable": [{}, { "nameStrindex": 3 }],
+                "locationTable": [
+                    {},
+                    { "lines": [{ "functionIndex": 1, "line": 10 }] }
+                ],
+                "stackTable": [
+                    {},
+                    { "locationIndices": [1] }
+                ],
+                "linkTable": [{}],
+                "attributeTable": [{}],
+                "mappingTable": [{}]
+            },
+            "resourceProfiles": [
+                {
+                    "resource": {
+                        "attributes": [
+                            { "key": "service.name", "value": { "stringValue": "my-service" } }
+                        ]
+                    },
+                    "scopeProfiles": [
+                        {
+                            "profiles": [
+                                {
+                                    "sampleType": { "typeStrindex": 1, "unitStrindex": 2 },
+                                    "timeUnixNano": "2000000000000000000",
+                                    "durationNano": "1000000000",
+                                    "period": "50000000",
+                                    "samples": [
+                                        {
+                                            "stackIndex": 1,
+                                            "values": ["5"]
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        });
+
+        normalize(&mut payload);
+        let req = deserialize(payload)
+            .expect("location without mappingIndex should deserialize after normalize");
+        let loc = &req.dictionary.as_ref().unwrap().location_table[1];
+        assert_eq!(loc.mapping_index, 0);
+        assert_eq!(
+            req.resource_profiles[0].scope_profiles[0].profiles[0].samples[0].values,
+            vec![5]
+        );
+    }
+
+    #[test]
+    fn accepts_omitted_top_level_resource_profiles() {
+        let mut payload = json::json!({});
+        normalize(&mut payload);
+        let req = deserialize(payload).expect("empty object should deserialize after normalize");
+        assert!(req.resource_profiles.is_empty());
+        assert!(req.dictionary.is_none());
+    }
+
+    #[test]
+    fn accepts_omitted_zero_profile_time_and_duration() {
+        // Instant profiles (e.g. live heap) may omit durationNano=0; timeUnixNano
+        // may also be omitted when the sender uses ProtoJSON default-omission.
+        let mut payload = json::json!({
+            "resourceProfiles": [
+                {
+                    "scopeProfiles": [
+                        {
+                            "profiles": [
+                                {
+                                    "samples": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        });
+        normalize(&mut payload);
+        let req = deserialize(payload)
+            .expect("profile without timeUnixNano/durationNano should deserialize");
+        let profile = &req.resource_profiles[0].scope_profiles[0].profiles[0];
+        assert_eq!(profile.time_unix_nano, 0);
+        assert_eq!(profile.duration_nano, 0);
+    }
+
+    #[test]
+    fn accepts_omitted_empty_scope_profiles_and_profiles() {
+        let mut payload = json::json!({
+            "resourceProfiles": [
+                {},
+                {
+                    "scopeProfiles": [
+                        {}
+                    ]
+                }
+            ]
+        });
+        normalize(&mut payload);
+        let req =
+            deserialize(payload).expect("omitted empty scopeProfiles/profiles should deserialize");
+        assert_eq!(req.resource_profiles.len(), 2);
+        assert!(req.resource_profiles[0].scope_profiles.is_empty());
+        assert_eq!(req.resource_profiles[1].scope_profiles.len(), 1);
+        assert!(
+            req.resource_profiles[1].scope_profiles[0]
+                .profiles
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn preserves_string_value_strindex_for_validation() {
+        let mut payload = json::json!({
+            "dictionary": {
+                "stringTable": ["", "thread.name", "worker-1"],
+                "attributeTable": [
+                    {},
+                    {
+                        "keyStrindex": 1,
+                        "value": { "stringValueStrindex": 2 }
+                    }
+                ],
+                "locationTable": [{}],
+                "functionTable": [{}],
+                "stackTable": [{}],
+                "linkTable": [{}],
+                "mappingTable": [{}]
+            },
+            "resourceProfiles": []
+        });
+        normalize(&mut payload);
+        let req = deserialize(payload).expect("stringValueStrindex should deserialize unchanged");
+        let attr = &req.dictionary.as_ref().unwrap().attribute_table[1];
+        match attr.value.as_ref().and_then(|v| v.value.as_ref()) {
+            Some(Value::StringValueStrindex(index)) => assert_eq!(*index, 2),
+            other => panic!("expected StringValueStrindex, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn collector_empty_any_value_json_sentinel_is_accepted() {
+        let mut payload = json::json!({
+            "dictionary": {"attributeTable": [{"value": {}}]},
+            "resourceProfiles": [{"scopeProfiles": [{"profiles": [{"samples": [{"values": [1]}]}]}]}]
+        });
+        normalize(&mut payload);
+        let request = deserialize(payload).unwrap();
+        assert_eq!(
+            request.dictionary.as_ref().unwrap().attribute_table[0].value,
+            Some(super::AnyValue::default())
+        );
+        super::super::validation::validate(&request).unwrap();
+    }
+
+    #[test]
+    fn nonempty_unknown_any_value_shapes_are_rejected() {
+        for value in [
+            json::json!({"unknownValue": 1}),
+            json::json!({"unknownValue": {}}),
+        ] {
+            let mut payload =
+                json::json!({"dictionary": {"attributeTable": [{}, {"value": value}]}});
+            normalize(&mut payload);
+            assert!(deserialize(payload).is_err());
+        }
+    }
+
+    #[test]
+    fn omitted_empty_collection_values_match_explicit_empty_lists() {
+        for collection in ["arrayValue", "kvlistValue"] {
+            let mut requests = Vec::new();
+            for content in [json::json!({}), json::json!({"values": []})] {
+                let mut value = json::json!({});
+                value[collection] = content;
+                let mut payload =
+                    json::json!({"dictionary": {"attributeTable": [{}, {"value": value}]}});
+                normalize(&mut payload);
+                let request = deserialize(payload).unwrap();
+                super::super::validation::validate(&request).unwrap();
+                requests.push(request);
+            }
+            assert_eq!(requests[0], requests[1]);
+        }
+    }
+
+    #[test]
+    fn active_empty_collections_do_not_qualify_as_zero_sentinels() {
+        for value in [
+            json::json!({"arrayValue": {}}),
+            json::json!({"kvlistValue": {}}),
+        ] {
+            let mut payload = json::json!({"dictionary": {"attributeTable": [{"value": value}]}});
+            normalize(&mut payload);
+            let request = deserialize(payload).unwrap();
+            assert_eq!(
+                super::super::validation::validate(&request).unwrap_err(),
+                "dictionary.attribute_table[0] must be the zero value"
+            );
+        }
+    }
+
+    #[test]
+    fn malformed_collection_values_and_containers_are_rejected() {
+        for collection in ["arrayValue", "kvlistValue"] {
+            for invalid in [
+                json::Value::Null,
+                json::json!({}),
+                json::json!(true),
+                json::json!(7),
+                json::json!("bad"),
+            ] {
+                let mut value = json::json!({});
+                value[collection] = json::json!({"values": invalid});
+                let mut payload =
+                    json::json!({"dictionary": {"attributeTable": [{}, {"value": value}]}});
+                normalize(&mut payload);
+                assert!(
+                    deserialize(payload).is_err(),
+                    "invalid {collection} values accepted"
+                );
+            }
+            for invalid in [
+                json::Value::Null,
+                json::json!([]),
+                json::json!([[]]),
+                json::json!(true),
+                json::json!(7),
+                json::json!("bad"),
+            ] {
+                let mut value = json::json!({});
+                value[collection] = invalid;
+                let mut payload =
+                    json::json!({"dictionary": {"attributeTable": [{}, {"value": value}]}});
+                normalize(&mut payload);
+                assert!(
+                    deserialize(payload).is_err(),
+                    "invalid {collection} container accepted"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn preserves_nested_and_resource_scope_string_references() {
+        let mut payload = json::json!({
+            "dictionary": {
+                "stringTable": ["", "thread.name", "worker-1"],
+                "attributeTable": [{}, {"keyStrindex": 1, "value": {"arrayValue": {"values": [{"stringValueStrindex": "2"}, {"kvlistValue": {"values": [{"key": "nested", "value": {"stringValueStrindex": -1}}]}}]}}}]
+            },
+            "resourceProfiles": [{
+                "resource": {"attributes": [{"key": "service.name", "value": {"stringValueStrindex": 2}}]},
+                "scopeProfiles": [{"scope": {"attributes": [{"key": "scope.label", "value": {"stringValueStrindex": 99}}]}}]
+            }]
+        });
+        normalize(&mut payload);
+        let request = deserialize(payload).unwrap();
+        let resource = request.resource_profiles[0].resource.as_ref().unwrap();
+        assert_eq!(
+            resource.attributes[0].value.as_ref().unwrap().value,
+            Some(Value::StringValueStrindex(2))
+        );
+        let scope = request.resource_profiles[0].scope_profiles[0]
+            .scope
+            .as_ref()
+            .unwrap();
+        assert_eq!(
+            scope.attributes[0].value.as_ref().unwrap().value,
+            Some(Value::StringValueStrindex(99))
+        );
+        let dictionary = request.dictionary.as_ref().unwrap();
+        assert!(dictionary.attribute_table[0].value.is_none());
+        let Some(Value::ArrayValue(array)) = dictionary.attribute_table[1]
+            .value
+            .as_ref()
+            .unwrap()
+            .value
+            .as_ref()
+        else {
+            panic!("expected array");
+        };
+        assert_eq!(array.values[0].value, Some(Value::StringValueStrindex(2)));
+        let Some(Value::KvlistValue(list)) = array.values[1].value.as_ref() else {
+            panic!("expected kvlist");
+        };
+        assert_eq!(
+            list.values[0].value.as_ref().unwrap().value,
+            Some(Value::StringValueStrindex(-1))
+        );
+    }
+
+    #[test]
+    fn converts_link_hex_strings_to_byte_arrays() {
+        let mut payload = json::json!({
+            "dictionary": {
+                "stringTable": [""],
+                "linkTable": [
+                    {},
+                    {
+                        "traceId": "1122aabbccddeeff0000000000000000",
+                        "spanId": "ff01020304050607"
+                    }
+                ],
+                "locationTable": [{}],
+                "functionTable": [{}],
+                "stackTable": [{}],
+                "attributeTable": [{}],
+                "mappingTable": [{}]
+            },
+            "resourceProfiles": []
+        });
+        normalize(&mut payload);
+        let req = deserialize(payload).expect("hex link ids should convert to byte arrays");
+        let link = &req.dictionary.as_ref().unwrap().link_table[1];
+        assert_eq!(link.trace_id.len(), 16);
+        assert_eq!(link.span_id.len(), 8);
+        assert_eq!(link.trace_id[0], 0x11);
+        assert_eq!(link.span_id[0], 0xff);
+    }
+
+    #[test]
+    fn accepts_base64_original_payload() {
+        let mut payload = json::json!({
+            "resourceProfiles": [
+                {
+                    "scopeProfiles": [
+                        {
+                            "profiles": [
+                                {
+                                    "timeUnixNano": "1",
+                                    "durationNano": "0",
+                                    "originalPayload": "AQID",
+                                    "samples": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        });
+        normalize(&mut payload);
+        let req = deserialize(payload).expect("base64 originalPayload should decode before serde");
+        assert_eq!(
+            req.resource_profiles[0].scope_profiles[0].profiles[0].original_payload,
+            vec![1, 2, 3]
+        );
+    }
+
+    #[test]
+    fn accepts_key_strindex_only_resource_attribute() {
+        // ProtoJSON may omit empty `key` when only keyStrindex is set.
+        let mut payload = json::json!({
+            "dictionary": {
+                "stringTable": ["", "service.name"],
+                "mappingTable": [],
+                "locationTable": [],
+                "functionTable": [],
+                "attributeTable": [],
+                "stackTable": [],
+                "linkTable": []
+            },
+            "resourceProfiles": [
+                {
+                    "resource": {
+                        "attributes": [
+                            {
+                                "keyStrindex": 1,
+                                "value": { "stringValue": "my-service" }
+                            }
+                        ]
+                    },
+                    "scopeProfiles": []
+                }
+            ]
+        });
+        normalize(&mut payload);
+        let req = deserialize(payload).expect("omitted key with keyStrindex should deserialize");
+        let attr = &req.resource_profiles[0]
+            .resource
+            .as_ref()
+            .unwrap()
+            .attributes[0];
+        assert!(attr.key.is_empty());
+        assert_eq!(attr.key_strindex, 1);
+    }
+
+    #[test]
+    fn accepts_non_canonical_double_attributes() {
+        use opentelemetry_proto::tonic::common::v1::any_value::Value;
+
+        let mut payload = json::from_str::<json::Value>(
+            r#"{"dictionary":{"stringTable":["","cpu.ratio"],"attributeTable":[{"keyStrindex":1,"value":{"doubleValue":2.50}}]},
+                "resourceProfiles":[{"resource":{"attributes":[{"key":"ratio","value":{"doubleValue":1.50}},{"key":"scale","value":{"doubleValue":1e0}}]},"scopeProfiles":[]}]}"#,
+        )
+        .unwrap();
+        normalize(&mut payload);
+        let req = deserialize(payload).expect("non-canonical doubles should deserialize");
+        let attributes = &req.resource_profiles[0]
+            .resource
+            .as_ref()
+            .unwrap()
+            .attributes;
+        let doubles: Vec<_> = attributes
+            .iter()
+            .map(|attr| attr.value.as_ref().and_then(|v| v.value.clone()))
+            .collect();
+        assert_eq!(
+            doubles,
+            vec![Some(Value::DoubleValue(1.5)), Some(Value::DoubleValue(1.0))]
+        );
+        let table_entry = &req.dictionary.as_ref().unwrap().attribute_table[0];
+        assert_eq!(
+            table_entry.value.as_ref().and_then(|v| v.value.clone()),
+            Some(Value::DoubleValue(2.5))
+        );
+    }
+}

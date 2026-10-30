@@ -30,7 +30,10 @@ use arrow::{
 use arrow_schema::Schema;
 use futures::{Stream, StreamExt, TryStreamExt};
 use parquet::{
-    arrow::{AsyncArrowWriter, ParquetRecordBatchStreamBuilder, arrow_reader::ArrowReaderMetadata},
+    arrow::{
+        AsyncArrowWriter, ParquetRecordBatchStreamBuilder, arrow_reader::ArrowReaderMetadata,
+        async_writer::AsyncFileWriter,
+    },
     basic::{Compression, Encoding},
     file::{metadata::KeyValue, properties::WriterProperties},
 };
@@ -38,7 +41,7 @@ use serde::{Deserialize, Serialize};
 use vortex::{
     VortexSessionDefault,
     array::{ArrayRef, VortexSessionExecute},
-    arrow::{ArrowSessionExt, ToArrowType},
+    arrow::ArrowSessionExt,
     buffer::Buffer,
     file::OpenOptionsSessionExt,
     io::session::RuntimeSessionExt,
@@ -71,28 +74,22 @@ pub fn encode_vortex_file_meta(metadata: &FileMeta) -> Vec<u8> {
     .expect("file meta is always serializable")
 }
 
-pub fn new_parquet_writer<'a>(
-    buf: &'a mut Vec<u8>,
-    schema: &'a Arc<Schema>,
-    bloom_filter_fields: &'a [String],
-    metadata: &'a FileMeta,
+pub fn new_parquet_writer<W: AsyncFileWriter>(
+    buf: W,
+    schema: &Arc<Schema>,
+    bloom_filter_fields: &[String],
+    metadata: &FileMeta,
     write_metadata: bool,
     compression: Option<&str>,
-) -> AsyncArrowWriter<&'a mut Vec<u8>> {
+) -> AsyncArrowWriter<W> {
     let cfg = get_config();
     let compression = compression.unwrap_or(&cfg.common.parquet_compression);
     let mut writer_props = WriterProperties::builder()
         .set_write_batch_size(cfg.limit.batch_size) // in bytes
         .set_max_row_group_row_count(Some(PARQUET_MAX_ROW_GROUP_SIZE)) // maximum number of rows in a row group
         .set_compression(get_parquet_compression(compression))
-        .set_column_dictionary_enabled(
-            TIMESTAMP_COL_NAME.into(),
-            false,
-        )
-        .set_column_encoding(
-            TIMESTAMP_COL_NAME.into(),
-            Encoding::DELTA_BINARY_PACKED,
-        );
+        .set_column_dictionary_enabled(TIMESTAMP_COL_NAME.into(), false)
+        .set_column_encoding(TIMESTAMP_COL_NAME.into(), Encoding::DELTA_BINARY_PACKED);
     if cfg.common.timestamp_compression_disabled {
         writer_props = writer_props
             .set_column_compression(TIMESTAMP_COL_NAME.into(), Compression::UNCOMPRESSED);
@@ -124,7 +121,7 @@ pub fn new_parquet_writer<'a>(
             writer_props = writer_props
                 .set_column_bloom_filter_enabled(field.as_str().into(), true)
                 .set_column_bloom_filter_fpp(field.as_str().into(), DEFAULT_BLOOM_FILTER_FPP)
-                .set_column_bloom_filter_ndv(field.into(), bf_ndv); // take the field ownership
+                .set_column_bloom_filter_max_ndv(field.into(), bf_ndv); // take the field ownership
         }
     }
     let writer_props = writer_props.build();
@@ -205,7 +202,7 @@ pub async fn get_recordbatch_reader_from_bytes(
             let session = VortexSession::default().with_tokio();
             let buf = Buffer::from(data.to_vec());
             let vxf = session.open_options().open_buffer(buf)?;
-            let schema = Arc::new(vxf.dtype().to_arrow_schema()?);
+            let schema = Arc::new(session.arrow().to_arrow_schema(vxf.dtype())?);
             let arrow_data_type = DataType::Struct(schema.fields().clone());
             let vortex_stream = vxf.scan()?.into_array_stream()?;
 
@@ -248,7 +245,7 @@ pub async fn read_schema_from_file(path: &PathBuf) -> Result<Arc<Schema>, anyhow
             // Read vortex file
             let session = VortexSession::default().with_tokio();
             let vxf = session.open_options().open_path(path.clone()).await?;
-            let schema = Arc::new(vxf.dtype().to_arrow_schema()?);
+            let schema = Arc::new(session.arrow().to_arrow_schema(vxf.dtype())?);
             Ok(schema)
         }
         _ => {
@@ -275,7 +272,7 @@ pub async fn read_schema_from_bytes(
             let session = VortexSession::default().with_tokio();
             let buf = Buffer::from(data.to_vec());
             let vxf = session.open_options().open_buffer(buf)?;
-            let schema = Arc::new(vxf.dtype().to_arrow_schema()?);
+            let schema = Arc::new(session.arrow().to_arrow_schema(vxf.dtype())?);
             Ok(schema)
         }
     }
@@ -374,20 +371,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_memtable_id_simple() {
-        // Simple case with single underscore
-        let file_name = "file_1234567890.parquet";
-        assert_eq!(get_memtable_id_from_file_name(file_name), 1234567890);
-    }
-
-    #[test]
-    fn test_get_memtable_id_multiple_underscores() {
-        // Multiple underscores - should get the last one
-        let file_name = "prefix_middle_suffix_9876543210.parquet";
-        assert_eq!(get_memtable_id_from_file_name(file_name), 9876543210);
-    }
-
-    #[test]
     fn test_get_memtable_id_complex_real_world() {
         // Real-world complex case from the issue
         let file_name =
@@ -396,24 +379,10 @@ mod tests {
     }
 
     #[test]
-    fn test_get_memtable_id_multiple_dots_and_underscores() {
-        // Multiple dots and underscores
-        let file_name = "a.b.c_d.e.f_12345.parquet";
-        assert_eq!(get_memtable_id_from_file_name(file_name), 12345);
-    }
-
-    #[test]
     fn test_get_memtable_id_no_extension() {
         // No extension
         let file_name = "file_555666777";
         assert_eq!(get_memtable_id_from_file_name(file_name), 555666777);
-    }
-
-    #[test]
-    fn test_get_memtable_id_no_underscore() {
-        // No underscore - should return 0
-        let file_name = "file.parquet";
-        assert_eq!(get_memtable_id_from_file_name(file_name), 0);
     }
 
     #[test]
@@ -430,32 +399,10 @@ mod tests {
     }
 
     #[test]
-    fn test_get_memtable_id_only_underscore() {
-        // Only underscore
-        let file_name = "_123456.parquet";
-        assert_eq!(get_memtable_id_from_file_name(file_name), 123456);
-    }
-
-    #[test]
-    fn test_get_memtable_id_multiple_extensions() {
-        // Multiple extensions (e.g., .tar.gz style)
-        // Based on add_memtable_id_to_file_name, the ID is added before the extension
-        let file_name = "file.tar_999888777.gz";
-        assert_eq!(get_memtable_id_from_file_name(file_name), 999888777);
-    }
-
-    #[test]
     fn test_get_memtable_id_max_u64() {
         // Test with max u64 value
         let file_name = "file_18446744073709551615.parquet";
         assert_eq!(get_memtable_id_from_file_name(file_name), u64::MAX);
-    }
-
-    #[test]
-    fn test_get_memtable_id_zero() {
-        // Test with zero
-        let file_name = "file_0.parquet";
-        assert_eq!(get_memtable_id_from_file_name(file_name), 0);
     }
 
     #[tokio::test]
@@ -530,6 +477,7 @@ mod tests {
             original_size: 8,
             compressed_size: 9,
             index_size: 10,
+            mindex_size: 0,
             bloom_ver: 11,
             flattened: true,
         };

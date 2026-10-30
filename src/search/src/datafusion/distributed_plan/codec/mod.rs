@@ -18,7 +18,7 @@ use std::sync::Arc;
 use datafusion::{
     common::Result, execution::TaskContext, logical_expr::ScalarUDF, physical_plan::ExecutionPlan,
 };
-use datafusion_proto::physical_plan::PhysicalExtensionCodec;
+use datafusion_proto::physical_plan::{PhysicalExtensionCodec, PhysicalProtoConverterExtension};
 
 mod aggregate_topk_exec;
 mod deduplication_exec;
@@ -27,6 +27,8 @@ mod enrichment_exec;
 mod physical_plan_node;
 mod streaming_aggs_exec;
 mod tmp_exec;
+
+pub use tmp_exec::is_join_result_path;
 
 pub fn get_physical_extension_codec() -> ComposedPhysicalExtensionCodec {
     ComposedPhysicalExtensionCodec {
@@ -49,10 +51,11 @@ impl PhysicalExtensionCodec for ComposedPhysicalExtensionCodec {
         buf: &[u8],
         inputs: &[Arc<dyn ExecutionPlan>],
         ctx: &TaskContext,
+        proto_converter: &dyn PhysicalProtoConverterExtension,
     ) -> Result<Arc<dyn ExecutionPlan>> {
         let mut last_err = None;
         for codec in &self.codecs {
-            match codec.try_decode(buf, inputs, ctx) {
+            match codec.try_decode(buf, inputs, ctx, proto_converter) {
                 Ok(plan) => return Ok(plan),
                 Err(e) => last_err = Some(e),
             }
@@ -60,10 +63,15 @@ impl PhysicalExtensionCodec for ComposedPhysicalExtensionCodec {
         Err(last_err.unwrap())
     }
 
-    fn try_encode(&self, node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()> {
+    fn try_encode(
+        &self,
+        node: Arc<dyn ExecutionPlan>,
+        buf: &mut Vec<u8>,
+        proto_converter: &dyn PhysicalProtoConverterExtension,
+    ) -> Result<()> {
         let mut last_err = None;
         for codec in &self.codecs {
-            match codec.try_encode(node.clone(), buf) {
+            match codec.try_encode(node.clone(), buf, proto_converter) {
                 Ok(_) => return Ok(()),
                 Err(e) => last_err = Some(e),
             }

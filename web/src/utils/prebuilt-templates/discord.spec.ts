@@ -84,24 +84,6 @@ describe("discord template", () => {
       expect(discordConfig.method).toBe("post");
     });
 
-    it("has URL validator function", () => {
-      expect(typeof discordConfig.urlValidator).toBe("function");
-    });
-
-    it("URL validator accepts valid Discord webhook URLs", () => {
-      expect(discordConfig.urlValidator("https://discord.com/api/webhooks/123456789/abcdef")).toBe(
-        true,
-      );
-      expect(discordConfig.urlValidator("https://discord.com/api/webhooks/123/abc")).toBe(true);
-    });
-
-    it("URL validator rejects invalid URLs", () => {
-      expect(discordConfig.urlValidator("https://example.com/webhook")).toBe(false);
-      expect(discordConfig.urlValidator("https://discord.com/api/other")).toBe(false);
-      expect(discordConfig.urlValidator("https://evil.com?discord.com=fake")).toBe(false);
-      expect(discordConfig.urlValidator("invalid-url")).toBe(false);
-    });
-
     it("has credential fields", () => {
       expect(discordConfig.credentialFields).toBeInstanceOf(Array);
       expect(discordConfig.credentialFields.length).toBeGreaterThan(0);
@@ -118,6 +100,14 @@ describe("discord template", () => {
       const usernameField = discordConfig.credentialFields.find((f) => f.key === "username");
       expect(usernameField).toBeDefined();
       expect(usernameField?.required).toBe(false);
+    });
+
+    it("persists only the optional username in destination metadata", () => {
+      const persistentFields = discordConfig.credentialFields
+        .filter((field) => field.persistInMetadata)
+        .map((field) => field.key);
+
+      expect(persistentFields).toEqual(["username"]);
     });
 
     it("webhook URL validator validates Discord URLs", () => {
@@ -149,8 +139,8 @@ describe("discord template", () => {
     });
 
     it("has description", () => {
-      expect(discordDestinationType.description).toBeTruthy();
-      expect(typeof discordDestinationType.description).toBe("string");
+      expect(discordDestinationType.descriptionKey).toBeTruthy();
+      expect(typeof discordDestinationType.descriptionKey).toBe("string");
     });
 
     it("has icon", () => {

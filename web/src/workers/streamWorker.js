@@ -11,11 +11,36 @@ let patchNsMap = {};
 // (?<!\\) skips escaped-quote sequences inside JSON string values.
 const NS_FIELDS_RE = /(?<!\\)"(start_time|end_time)"\s*:\s*(\d{19,})/g;
 
+// Matches any bare JSON integer value — any field name, any nesting depth —
+// with 16+ digits, the digit count of Number.MAX_SAFE_INTEGER (9007199254740991),
+// the minimum length where precision loss becomes possible. Kept in sync with
+// web/src/utils/nsFieldsPatch.ts, which this worker cannot import (no ES modules
+// here without bundler support).
+const UNSAFE_INT_RE = /(?<!\\)"((?:[^"\\]|\\.)*)"\s*:\s*(-?\d{16,})(?=\s*[,}\]])/g;
+const MAX_SAFE_INTEGER_DIGITS = "9007199254740991"; // Number.MAX_SAFE_INTEGER
+
+function exceedsMaxSafeInteger(digits) {
+  const unsigned = digits[0] === "-" ? digits.slice(1) : digits;
+  return unsigned.length !== MAX_SAFE_INTEGER_DIGITS.length
+    ? unsigned.length > MAX_SAFE_INTEGER_DIGITS.length
+    : unsigned > MAX_SAFE_INTEGER_DIGITS;
+}
+
+// Quotes any integer field value outside JS's safe integer range so JSON.parse
+// can't silently round it — e.g. a user-defined `userid` field (#14376). Skips
+// start_time/end_time, which patchNs handles separately (kept numeric, with an
+// exact-value shadow field) since other code still expects them to be numbers.
+function patchUnsafeIntegers(text) {
+  UNSAFE_INT_RE.lastIndex = 0;
+  return text.replace(UNSAFE_INT_RE, (match, key, digits) => {
+    if (key === "start_time" || key === "end_time") return match;
+    return exceedsMaxSafeInteger(digits) ? `"${key}":"${digits}"` : match;
+  });
+}
+
 function safeParseJson(text, patchNs) {
-  if (!patchNs) return JSON.parse(text);
-  NS_FIELDS_RE.lastIndex = 0;
-  const patched = text.replace(NS_FIELDS_RE, '"$1":$2,"_$1_ns":"$2"');
-  return JSON.parse(patched);
+  const withNs = patchNs ? text.replace(NS_FIELDS_RE, '"$1":$2,"_$1_ns":"$2"') : text;
+  return JSON.parse(patchUnsafeIntegers(withNs));
 }
 
 // Helper function to extract data from message line

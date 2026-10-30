@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import type { BrowserCheck, SyntheticsDevice } from "@/types/synthetics";
 import chromiumSvgUrl from "@/assets/images/synthetics/chromium.svg";
 import firefoxSvgUrl from "@/assets/images/synthetics/firefox.svg";
@@ -31,7 +31,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 function deviceLabelKey(label: string): string {
   const map: Record<string, string> = {
@@ -44,9 +44,9 @@ function deviceLabelKey(label: string): string {
 
 const DEFAULT_BROWSERS = ["chromium", "firefox"];
 const DEFAULT_DEVICES: SyntheticsDevice[] = [
-  { id: "desktop", label: "Desktop", width: 1440, height: 900 },
-  { id: "tablet", label: "Tablet", width: 768, height: 1024 },
-  { id: "mobile", label: "Mobile", width: 375, height: 667 },
+  { id: "desktop", label: t("synthetics.browserDevices.desktop"), width: 1440, height: 900 },
+  { id: "tablet", label: t("synthetics.browserDevices.tablet"), width: 768, height: 1024 },
+  { id: "mobile", label: t("synthetics.browserDevices.mobile"), width: 375, height: 667 },
 ];
 
 const DEVICE_ICONS: Record<string, string> = {
@@ -103,14 +103,14 @@ function toggle(browserId: string, deviceId: string) {
     data-test="synthetics-check-browser-devices"
   >
     <div class="border-border-default flex items-center border-b px-3 py-2.5">
-      <div class="rounded-default bg-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+      <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0" />
       <h3 class="text-text-heading text-base font-semibold">
         {{ t("synthetics.browserDevices.title") }}
       </h3>
     </div>
     <div class="flex flex-col gap-3 px-3 py-2">
       <!-- Device column headers -->
-      <div class="flex items-center gap-10 pb-2 pl-36">
+      <div class="flex items-center gap-10 ps-36 pb-2">
         <div
           v-for="device in activeDevices"
           :key="device.id"

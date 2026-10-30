@@ -2,6 +2,7 @@
 //methods: All configs related to dashboard panels
 
 import { expect } from "@playwright/test";
+import { SELECTORS, visibleOnly } from "./dashboard-selectors.js";
 
 export default class DashboardPanelConfigs {
   constructor(page) {
@@ -24,6 +25,9 @@ export default class DashboardPanelConfigs {
     this.description = page.locator(
       '[data-test="dashboard-config-description"]'
     );
+    this.descriptionField = page.locator(
+      '[data-test="dashboard-config-description-field"]'
+    );
     this.axisWidth = page.locator('[data-test="dashboard-config-axis-width"]');
     this.showSymbols = page.locator(
       '[data-test="dashboard-config-show_symbol"]'
@@ -39,6 +43,8 @@ export default class DashboardPanelConfigs {
     );
     this.yAxisMin = page.locator('[data-test="dashboard-config-y_axis_min"]');
     this.yAxisMax = page.locator('[data-test="dashboard-config-y_axis_max"]');
+    this.yAxisMinField = this.yAxisMin.locator('[data-test$="-field"]');
+    this.yAxisMaxField = this.yAxisMax.locator('[data-test$="-field"]');
     this.valuePosition = page.locator(
       '[data-test="dashboard-config-label-position"]'
     );
@@ -70,11 +76,23 @@ export default class DashboardPanelConfigs {
     this.wrapcell = page.locator(
       '[data-test="dashboard-config-wrap-table-cells"]'
     );
+    // The underlying toggle button (carries aria-checked), distinct from the
+    // wrapcell label/container above used by selectWrapCell().
+    this.wrapCellBtn = page.locator(
+      '[data-test="dashboard-config-wrap-table-cells-btn"]'
+    );
     this.transpose = page.locator(
       '[data-test="dashboard-config-table_transpose"]'
     );
+    this.transposeBtn = page.locator(
+      '[data-test="dashboard-config-table_transpose-btn"]'
+    );
     this.dynamicColumn = page.locator(
       '[data-test="dashboard-config-table_dynamic_columns"]'
+    );
+    // The inner toggle button (carries aria-checked) for dynamic columns config
+    this.dynamicColumnBtn = page.locator(
+      '[data-test="dashboard-config-table_dynamic_columns-btn"]'
     );
     this.valueMapping = page.locator(
       '[data-test="dashboard-addpanel-config-value-mapping-add-btn"]'
@@ -120,8 +138,13 @@ export default class DashboardPanelConfigs {
     this.rowsPerPageField = page.locator('[data-test="dashboard-config-rows-per-page-field"]');
     this.rowsPerPageInfo = page.locator('[data-test="dashboard-config-rows-per-page-info"]');
     this.tablePagination = page.locator('[data-test="dashboard-table-pagination"]');
+    // Pagination container scoped inside the rendered panel table (distinct from the
+    // unscoped tablePagination, which can also match a PromQL legend bottom slot).
+    this.tablePaginationInTable = page.locator('[data-test="dashboard-panel-table"] [data-test="dashboard-table-pagination"]');
     this.tableRowsPerPageLabel = page.locator('[data-test="dashboard-table-rows-per-page-label"]');
     this.tableRowCount = page.locator('[data-test="dashboard-table-row-count"]');
+    // Generic role=tooltip (e.g. rows-per-page info icon hover tooltip)
+    this.infoTooltip = page.locator('[role="tooltip"]');
 
     //Metric Text
     this.bgColor = page.locator('[data-test="dashboard-config-color-mode"]');
@@ -185,6 +208,167 @@ export default class DashboardPanelConfigs {
     this.colorBySeriesCancelBtn = page.locator(
       '[data-test="color-by-series-popup-dialog"] [data-test="o-dialog-close-btn"]'
     );
+
+    // ===== Config-panel elements referenced directly by the config-* spec suite =====
+    // (relocated from the specs so no raw page.locator lives in the tests)
+
+    // Line style
+    this.showSymbolTrigger = page.locator('[data-test="dashboard-config-show_symbol-trigger"]');
+    this.lineInterpolationTrigger = page.locator('[data-test="dashboard-config-line_interpolation-trigger"]');
+
+    // Trellis
+    this.trellisTrigger = page.locator('[data-test="dashboard-trellis-chart-trigger"]');
+    this.trellisNumColumns = page.locator('[data-test="trellis-chart-num-of-columns"]');
+    this.trellisGroupByYAxis = page.locator('[data-test="dashboard-config-trellis-group-by-y-axis"]');
+
+    // General settings
+    this.customUnit = page.locator('[data-test="dashboard-config-custom-unit"]');
+    this.noValueReplacementWrapper = page.locator('[data-test="dashboard-config-no-value-replacement"]');
+
+    // Axis settings
+    this.showGridlines = page.locator('[data-test="dashboard-config-show-gridlines"]');
+    this.labelPositionTrigger = page.locator('[data-test="dashboard-config-label-position-trigger"]');
+    this.axisLabelRotate = page.locator('[data-test="dashboard-config-axis-label-rotate"]');
+    this.axisLabelTruncate = page.locator('[data-test="dashboard-config-axis-label-truncate"]');
+
+    // Legends
+    this.showLegend = page.locator('[data-test="dashboard-config-show-legend"]');
+    this.legendsScrollable = page.locator('[data-test="dashboard-config-legends-scrollable"]');
+    this.legendWidth = page.locator('[data-test="dashboard-config-legend-width"]');
+    this.legendHeight = page.locator('[data-test="dashboard-config-legend-height"]');
+    this.legendWidthUnitActive = page.locator('[data-test="dashboard-config-legend-width-unit-active"]');
+    this.legendWidthUnitInactive = page.locator('[data-test="dashboard-config-legend-width-unit-inactive"]');
+    this.legendHeightUnitActive = page.locator('[data-test="dashboard-config-legend-height-unit-active"]');
+    this.legendHeightUnitInactive = page.locator('[data-test="dashboard-config-legend-height-unit-inactive"]');
+    // Pie/donut only: multi-select toggle group with "value" and "percent" items
+    this.legendValues = page.locator('[data-test="dashboard-config-legend-values"]');
+
+    // Gauge & Maps
+    this.geomapRenderer = page.locator('[data-test="dashboard-geomap-renderer"]');
+    this.mapSymbolFixed = page.locator('[data-test="dashboard-config-map-symbol-fixed"]');
+    this.symbolTrigger = page.locator('[data-test="dashboard-config-symbol-trigger"]');
+    this.layerTypeTrigger = page.locator('[data-test="dashboard-config-layer-type-trigger"]');
+    this.mapTypeTrigger = page.locator('[data-test="dashboard-config-map-type-trigger"]');
+
+    // Advanced settings
+    this.timeShiftRemoveButtons = page.locator('[data-test^="dashboard-addpanel-config-time-shift-remove-"]');
+    this.topResults = page.locator('[data-test="dashboard-config-top_results"]');
+    this.topResultsOthers = page.locator('[data-test="dashboard-config-top_results_others"]');
+    this.chartAlign = page.locator('[data-test="dashboard-config-chart-align"]');
+    this.chartAlignOptions = page.locator('[data-test="dashboard-config-chart-align-option"]');
+    this.sparklineType = page.locator('[data-test="dashboard-config-sparkline-type"]');
+    this.sparklineLayout = page.locator('[data-test="dashboard-config-sparkline-layout"]');
+    this.sparklineLineWidthInput = page.locator('[data-test="dashboard-config-sparkline-line-width"]');
+    this.sparklineFillOpacity = page.locator('[data-test="dashboard-config-sparkline-fill-opacity"]');
+    this.panelSchemaRendererError = page.locator('[data-test="panel-schema-renderer-error-message"]');
+
+    // Mark line
+    this.marklineAddBtn = page.locator('[data-test="dashboard-addpanel-config-markline-add-btn"]');
+
+    // PromQL settings
+    this.stepValue = page.locator('[data-test="dashboard-config-step-value"]');
+    this.promqlLegendInfo = page.locator('[data-test="dashboard-config-promql-legend-info"]');
+    this.aggregation = page.locator('[data-test="dashboard-config-aggregation"]');
+    this.promqlTableMode = page.locator('[data-test="dashboard-config-promql-table-mode"]');
+    this.promqlTableModeTrigger = page.locator('[data-test="dashboard-config-promql-table-mode-trigger"]');
+    this.stickyFirstColumn = page.locator('[data-test="dashboard-config-sticky-first-column"]');
+    this.tableAggregations = page.locator('[data-test="dashboard-config-table-aggregations"]');
+    this.tableAggregationsTrigger = page.locator('[data-test="dashboard-config-table-aggregations-trigger"]');
+    this.visibleColumns = page.locator('[data-test="dashboard-config-visible-columns"]');
+    this.visibleColumnsTrigger = page.locator('[data-test="dashboard-config-visible-columns-trigger"]');
+    this.visibleColumnsSearch = page.locator('[data-test="dashboard-config-visible-columns-search"]');
+    this.hiddenColumns = page.locator('[data-test="dashboard-config-hidden-columns"]');
+    this.hiddenColumnsTrigger = page.locator('[data-test="dashboard-config-hidden-columns-trigger"]');
+    this.hiddenColumnsSearch = page.locator('[data-test="dashboard-config-hidden-columns-search"]');
+    this.stickyColumns = page.locator('[data-test="dashboard-config-sticky-columns"]');
+    this.stickyColumnsTrigger = page.locator('[data-test="dashboard-config-sticky-columns-trigger"]');
+    this.stickyColumnsSearch = page.locator('[data-test="dashboard-config-sticky-columns-search"]');
+    this.geoLatLabel = page.locator('[data-test="dashboard-config-geo-lat-label"]');
+    this.geoLonLabel = page.locator('[data-test="dashboard-config-geo-lon-label"]');
+    this.geoWeightLabel = page.locator('[data-test="dashboard-config-geo-weight-label"]');
+    this.mapsNameLabel = page.locator('[data-test="dashboard-config-maps-name-label"]');
+    this.promqlLegend = page.locator('[data-test="dashboard-config-promql-legend"]');
+    this.addQueryBtn = page.locator('[data-test="dashboard-panel-query-tab-add"]');
+    this.promqlSeriesLimit = page.locator('[data-test="dashboard-config-promql-series-limit"]');
+    this.promqlSeriesLimitField = this.promqlSeriesLimit.locator('[data-test$="-field"]');
+    this.promqlQueryTypeTrigger = page.locator('[data-test="dashboard-promql-builder-query-type-trigger"]');
+    this.mapRoam = page.locator('[data-test="dashboard-config-map-roam"]');
+    this.mapRoamBtn = this.mapRoam.locator('[data-test$="-btn"]');
+    this.thresholdsShowAs = page.locator('[data-test="dashboard-config-thresholds-show-as"]');
+    this.thresholdsShowAsTrigger = page.locator('[data-test="dashboard-config-thresholds-show-as-trigger"]');
+    this.thresholdsAddStep = page.locator('[data-test="dashboard-config-thresholds-add-step"]');
+    this.thresholdStepValueFields = page.locator(
+      '[data-test^="dashboard-config-thresholds-step-"][data-test$="-value-field"]'
+    );
+    this.thresholdStepValueField = (index) =>
+      page.locator(`[data-test="dashboard-config-thresholds-step-${index}-value-field"]`);
+
+    // Heatmap colour settings
+    this.heatmapColorMin = page.locator('[data-test="dashboard-config-heatmap_color_min"]');
+    this.heatmapColorMinField = page.locator('[data-test="dashboard-config-heatmap_color_min-field"]');
+    this.heatmapColorMax = page.locator('[data-test="dashboard-config-heatmap_color_max"]');
+    this.heatmapColorMaxField = page.locator('[data-test="dashboard-config-heatmap_color_max-field"]');
+    this.heatmapColorMaxError = page.locator('[data-test="dashboard-config-heatmap_color_max-error"]');
+    this.heatmapPalette = page.locator('[data-test="dashboard-config-heatmap_palette"]');
+    this.heatmapPaletteTrigger = page.locator('[data-test="dashboard-config-heatmap_palette-trigger"]');
+    this.heatmapPaletteReverse = page.locator('[data-test="dashboard-config-heatmap_palette_reverse"]');
+    this.heatmapPaletteReverseBtn = page.locator('[data-test="dashboard-config-heatmap_palette_reverse-btn"]');
+    this.heatmapColorScale = page.locator('[data-test="dashboard-config-heatmap_color_scale"]');
+
+    // Heatmap PromQL histogram settings
+    this.heatmapHistogramMode = page.locator('[data-test="dashboard-config-heatmap_mode"]');
+    this.heatmapHistogramModeBtn = page.locator('[data-test="dashboard-config-heatmap_mode-btn"]');
+    this.heatmapBucketUnit = page.locator('[data-test="dashboard-config-bucket_unit"]');
+
+    // Heatmap y-axis settings
+    this.heatmapYSort = page.locator('[data-test="dashboard-config-heatmap_y_sort"]');
+    this.heatmapYSortOptions = page.locator('[data-test="dashboard-config-heatmap_y_sort-option"]');
+    this.heatmapYBucket = page.locator('[data-test="dashboard-config-heatmap_y_bucket"]');
+    this.heatmapYBucketSize = page.locator('[data-test="dashboard-config-heatmap_y_bucket_size"]');
+    this.heatmapYBucketSizeField = page.locator('[data-test="dashboard-config-heatmap_y_bucket_size-field"]');
+    this.heatmapYBucketSizeError = page.locator('[data-test="dashboard-config-heatmap_y_bucket_size-error"]');
+    this.heatmapYBucketBase = page.locator('[data-test="dashboard-config-heatmap_y_bucket_base"]');
+    this.heatmapYMin = page.locator('[data-test="dashboard-config-heatmap_y_min"]');
+    this.heatmapYMinField = page.locator('[data-test="dashboard-config-heatmap_y_min-field"]');
+    this.heatmapYMax = page.locator('[data-test="dashboard-config-heatmap_y_max"]');
+    this.heatmapYMaxField = page.locator('[data-test="dashboard-config-heatmap_y_max-field"]');
+    this.heatmapYMaxError = page.locator('[data-test="dashboard-config-heatmap_y_max-error"]');
+  }
+
+  /** Types a PromQL series limit into the config sidebar input. */
+  async setPromqlSeriesLimit(limit) {
+    await this.scrollSidebarToElement(this.promqlSeriesLimit);
+    await this.promqlSeriesLimitField.fill(String(limit));
+  }
+
+  /** Picks Range or Instant in the PromQL custom-mode query type select. */
+  async selectPromqlQueryType(label) {
+    await this.selectConfigOption("dashboard-promql-builder-query-type", label);
+  }
+
+  /** Picks the reducer, e.g. "Max (maximum value)", in the aggregation select. */
+  async selectAggregation(label) {
+    await this.selectConfigOption("dashboard-config-aggregation", label);
+  }
+
+  /** Picks how thresholds draw, e.g. "Shaded band" or "Limit line only". */
+  async selectThresholdsShowAs(label) {
+    await this.scrollSidebarToElement(this.thresholdsShowAs);
+    await this.selectConfigOption("dashboard-config-thresholds-show-as", label);
+  }
+
+  /** Adds a threshold step and sets its value. */
+  async addThresholdStep(value) {
+    const index = await this.thresholdStepValueFields.count();
+    await this.thresholdsAddStep.click();
+    const field = this.thresholdStepValueField(index);
+    await field.fill(String(value));
+    await field.press("Tab");
+  }
+
+  async toggleMapRoam() {
+    await this.scrollSidebarToElement(this.mapRoam);
+    await this.mapRoam.click();
   }
   async _clickVirtualOption(dataTestParent, label) {
     const option = this.page.locator(
@@ -239,16 +423,188 @@ export default class DashboardPanelConfigs {
     await this._clickVirtualOption("dashboard-config-legend-position", position);
   }
 
+  // Select legend type ("Auto" | "Plain" | "Scroll"). OToggleGroup, items always rendered.
+  async selectLegendsType(type) {
+    await this._clickVirtualOption("dashboard-config-legends-scrollable", type);
+  }
+
+  /**
+   * Legend values toggle item for a pie/donut panel.
+   * @param {"value"|"percent"} key - the item's value, carried in data-test-label
+   */
+  getLegendValuesOption(key) {
+    return this.page.locator(
+      `[data-test="dashboard-config-legend-values-option"][data-test-label="${key}"]`
+    );
+  }
+
+  /**
+   * Bring the Legend values toggle group to exactly the given selection.
+   * Clicks only the items whose state differs, then waits for each to reflect it.
+   * @param {Array<"value"|"percent">} keys - items that should end up pressed
+   */
+  async setLegendValues(keys) {
+    await this.scrollSidebarToElement(this.legendValues);
+    for (const key of ["value", "percent"]) {
+      const option = this.getLegendValuesOption(key);
+      const wanted = keys.includes(key) ? "on" : "off";
+      if ((await option.getAttribute("data-state")) !== wanted) {
+        await option.click();
+      }
+      await expect(option).toHaveAttribute("data-state", wanted, { timeout: 5000 });
+    }
+  }
+
+  /** Flip the Show Legends switch. */
+  async toggleShowLegends() {
+    await this.showLegend.click();
+  }
+
+  /**
+   * Assert the Legend values control is shown (both items) or absent.
+   * @param {boolean} visible
+   */
+  async expectLegendValuesVisible(visible = true) {
+    if (!visible) {
+      await expect(this.legendValues).toBeHidden();
+      return;
+    }
+    await this.scrollSidebarToElement(this.legendValues);
+    await expect(this.getLegendValuesOption("value")).toBeVisible();
+    await expect(this.getLegendValuesOption("percent")).toBeVisible();
+  }
+
+  /**
+   * Assert the PromQL Aggregation Function selector is shown or hidden.
+   * @param {boolean} visible
+   */
+  async expectAggregationVisible(visible = true) {
+    if (visible) {
+      await expect(this.aggregation).toBeVisible();
+    } else {
+      await expect(this.aggregation).toBeHidden();
+    }
+  }
+
+  /**
+   * Assert the Legend values toggle group shows exactly the given selection.
+   * @param {Array<"value"|"percent">} keys - items expected to be pressed
+   */
+  async expectLegendValuesSelected(keys) {
+    await this.scrollSidebarToElement(this.legendValues);
+    for (const key of ["value", "percent"]) {
+      await expect(this.getLegendValuesOption(key)).toHaveAttribute(
+        "data-state",
+        keys.includes(key) ? "on" : "off"
+      );
+    }
+  }
+
+  // Select chart alignment ("Auto" | "Left" | "Center"). Same OToggleGroup shape as
+  // legend position — the items are always rendered, so click the label directly.
+  async selectChartAlign(align) {
+    await this._clickVirtualOption("dashboard-config-chart-align", align);
+  }
+
+  // Return the panel description input field locator
+  getDescriptionField() {
+    return this.descriptionField;
+  }
+
+  /**
+   * Open an OSelect dropdown and keep retrying until its search box holds, since a
+   * focus shift right after the popover opens dismisses it again.
+   * @returns {{trigger: import('@playwright/test').Locator, search: import('@playwright/test').Locator}}
+   */
+  async _openSelectDropdown(parentDataTest) {
+    const trigger = this.page.locator(`[data-test="${parentDataTest}-trigger"]`);
+    const search = this.page.locator(`[data-test="${parentDataTest}-search"]`);
+    await trigger.waitFor({ state: "visible", timeout: 10000 });
+    await expect(async () => {
+      if ((await trigger.getAttribute("aria-expanded")) !== "true") {
+        await trigger.click();
+      }
+      await search.waitFor({ state: "visible", timeout: 2000 });
+    }).toPass({ timeout: 15000, intervals: [500, 1000, 2000] });
+    return { trigger, search };
+  }
+
   // Select unit
   async selectUnit(unit) {
-    const trigger = this.page.locator('[data-test="dashboard-config-unit-trigger"]');
-    await trigger.waitFor({ state: "visible" });
-    await trigger.click();
+    const { search } = await this._openSelectDropdown("dashboard-config-unit");
     // OSelect has 18+ items; use search to filter before clicking
-    const searchInput = this.page.locator('[data-test="dashboard-config-unit-search"]');
-    await searchInput.waitFor({ state: "visible" });
-    await searchInput.fill(unit);
+    await search.fill(unit);
     await this._clickVirtualOption("dashboard-config-unit", unit);
+  }
+
+  // ========== Unit select — the "Other Locale" group of per-locale Locale Format units ==========
+  // The locale options nest under a non-selectable "Other Locale" expander row, so they
+  // only exist in the DOM while that row is expanded or a search is flattening the list.
+
+  /** Trigger of a unit OSelect; carries the saved unit in data-test-selected-value. */
+  getUnitTrigger(parentDataTest = "dashboard-config-unit") {
+    return this.page.locator(`[data-test="${parentDataTest}-trigger"]`);
+  }
+
+  /** The non-selectable "Other Locale" expander row of a unit OSelect. */
+  getLocaleGroupRow(parentDataTest = "dashboard-config-unit") {
+    return this.page.locator(
+      `[data-test="${parentDataTest}-expand"][data-test-value="other-locale"]`
+    );
+  }
+
+  /** Every currently rendered locale option ("locale:<tag>") of a unit OSelect. */
+  getLocaleOptions(parentDataTest = "dashboard-config-unit") {
+    return this.page.locator(
+      `[data-test="${parentDataTest}-option"][data-test-value^="locale:"]`
+    );
+  }
+
+  /** The locale option for one BCP-47 tag, e.g. "de-DE". */
+  getLocaleOption(tag, parentDataTest = "dashboard-config-unit") {
+    return this.page.locator(
+      `[data-test="${parentDataTest}-option"][data-test-value="locale:${tag}"]`
+    );
+  }
+
+  /** Expand/collapse the "Other Locale" row and wait for its new aria-expanded state. */
+  async toggleLocaleGroup(parentDataTest = "dashboard-config-unit") {
+    const row = this.getLocaleGroupRow(parentDataTest);
+    await row.waitFor({ state: "visible", timeout: 10000 });
+    const wasExpanded = (await row.getAttribute("aria-expanded")) === "true";
+    await row.click();
+    await expect(row).toHaveAttribute(
+      "aria-expanded",
+      wasExpanded ? "false" : "true"
+    );
+    return !wasExpanded;
+  }
+
+  /**
+   * Type into a unit OSelect's search box. Searching by the underscored locale code
+   * ("de_DE") rather than the language name keeps lookups independent of the viewer's
+   * UI language, which is what renders the name half of each locale label.
+   */
+  async searchUnitOptions(term, parentDataTest = "dashboard-config-unit") {
+    const { search } = await this._openSelectDropdown(parentDataTest);
+    await search.fill(term);
+    return search;
+  }
+
+  /** Pick the Locale Format unit for `tag` (e.g. "de-DE") from a unit OSelect. */
+  async selectLocaleUnit(tag, parentDataTest = "dashboard-config-unit") {
+    await this.searchUnitOptions(tag.replaceAll("-", "_"), parentDataTest);
+    const option = this.getLocaleOption(tag, parentDataTest);
+    await option.waitFor({ state: "visible", timeout: 10000 });
+    await option.click();
+  }
+
+  /** Pick a per-locale Locale Format unit in the Column Formatting dialog's unit select. */
+  async selectFormatUnitLocale(tag) {
+    const unitSelect = this.getOverrideUnitSelect();
+    await unitSelect.waitFor({ state: "visible", timeout: 5000 });
+    const parentDataTest = await unitSelect.getAttribute("data-test");
+    await this.selectLocaleUnit(tag, parentDataTest);
   }
 
   //Decimals
@@ -440,9 +796,9 @@ export default class DashboardPanelConfigs {
    * Open the Column Formatting dialog, add the first field, force it numeric so the
    * unit applies, select a unit, then save. Strictly data-test driven.
    * @param {Object} options
-   * @param {string} [options.unitName] - Unit label to select (e.g. "Bytes", "Milliseconds")
+   * @param {string} [options.unitName] - Unit label to select (e.g. "Bytes (1024)", "Milliseconds (ms)")
    */
-  async configureOverrideWithUnit({ unitName = "Bytes" } = {}) {
+  async configureOverrideWithUnit({ unitName = "Bytes (1024)" } = {}) {
     await this.openOverrideConfig();
     await this.addFirstOverrideField();
 
@@ -470,6 +826,7 @@ export default class DashboardPanelConfigs {
       .first();
     await firstField.waitFor({ state: "visible", timeout: 5000 });
     await firstField.click();
+    await this.waitForAddFieldMenuClosed();
   }
 
   /**
@@ -485,6 +842,16 @@ export default class DashboardPanelConfigs {
     );
     await fieldOptions.first().waitFor({ state: "visible", timeout: 5000 });
     await fieldOptions.last().click();
+    await this.waitForAddFieldMenuClosed();
+  }
+
+  /** Wait for the "Add field" dropdown to unmount after a field is picked. */
+  async waitForAddFieldMenuClosed() {
+    // The menu hands focus back to its trigger on unmount, which dismisses any popover opened before then.
+    await this.page
+      .locator('[data-test^="dashboard-addpanel-config-add-field-"]')
+      .first()
+      .waitFor({ state: "detached", timeout: 5000 });
   }
 
   /** Select a unit from the Value Formatting OSelect for the currently configured column. */
@@ -496,11 +863,8 @@ export default class DashboardPanelConfigs {
     // nodes until scrolled to. Type into the built-in search box instead, which
     // narrows filteredOptions so the match renders immediately.
     const parentDataTest = await unitSelect.getAttribute("data-test");
-    await unitSelect.click();
-
-    const searchInput = this.page.locator(`[data-test="${parentDataTest}-search"]`);
-    await searchInput.waitFor({ state: "visible", timeout: 5000 });
-    await searchInput.fill(unitName);
+    const { search } = await this._openSelectDropdown(parentDataTest);
+    await search.fill(unitName);
 
     const unitOption = this.page.locator(
       `[data-test="${parentDataTest}-option"][data-test-label="${unitName}"]`
@@ -596,6 +960,9 @@ export default class DashboardPanelConfigs {
       .first();
     await btn.waitFor({ state: "visible", timeout: 5000 });
     await btn.click();
+    await expect(btn.locator('[role="checkbox"]')).toHaveAttribute("aria-checked", "true", {
+      timeout: 5000,
+    });
   }
 
   /**
@@ -634,8 +1001,12 @@ export default class DashboardPanelConfigs {
 
   /** Set the text/bg color for the conditional rule at ruleIdx (data-test driven). */
   async setConditionRuleColor(ruleIdx, kind, hex) {
+    // Exclude the swatch buttons (…-swatch-N) so a rule-N swatch can't be mistaken
+    // for the ColorSwatchPicker root, whose data-test ends in the same "-N".
     const wrapper = this.overrideDialog
-      .locator(`[data-test^="o2-format-cond-${kind}-"][data-test$="-${ruleIdx}"]`)
+      .locator(
+        `[data-test^="o2-format-cond-${kind}-"][data-test$="-${ruleIdx}"]:not([data-test*="-swatch-"])`
+      )
       .first();
     await wrapper.waitFor({ state: "visible", timeout: 5000 });
     const colorInput = wrapper.locator('input[type="color"]');
@@ -656,7 +1027,7 @@ export default class DashboardPanelConfigs {
    * @param {Object} options
    * @param {string} [options.value] - Value to match (type=value row)
    * @param {string} [options.text] - Display text to show
-   * @param {boolean} [options.setColor] - Whether to initialize the color (clicks "Set color")
+   * @param {boolean} [options.setColor] - Whether to set a background colour (clicks a swatch in the picker)
    */
   async configureValueMapping({ value = "test_value", text = "Mapped!", setColor = true } = {}) {
     const valueMappingBtn = this.page.locator('[data-test="dashboard-addpanel-config-value-mapping-add-btn"]');
@@ -674,9 +1045,11 @@ export default class DashboardPanelConfigs {
     await textInput.locator('[data-test$="-field"]').fill(text);
 
     if (setColor) {
-      const setColorBtn = popup.locator('[data-test="dashboard-addpanel-config-value-mapping-set-color-btn-0"]');
-      await setColorBtn.click();
-      await setColorBtn.waitFor({ state: "hidden", timeout: 5000 });
+      const bgSwatch = popup.locator(
+        '[data-test="dashboard-addpanel-config-value-mapping-bg-color-0-swatch-0"]'
+      );
+      await bgSwatch.waitFor({ state: "visible", timeout: 5000 });
+      await bgSwatch.click();
     }
 
     // ValueMappingPopUp is now an ODialog — Apply is the primary footer button
@@ -704,6 +1077,168 @@ export default class DashboardPanelConfigs {
     await popup.locator('[data-test="o-dialog-close-btn"]').click();
     await popup.waitFor({ state: "hidden", timeout: 5000 });
   }
+
+  /**
+   * Fill a value-mapping row's value and/or display-text inputs (type=value rows).
+   * @param {import('@playwright/test').Locator} popup
+   * @param {number} index
+   * @param {{value?: string, text?: string}} fields
+   */
+  async fillValueMappingRow(popup, index, { value, text } = {}) {
+    if (value !== undefined) {
+      await popup
+        .locator(`[data-test="dashboard-addpanel-config-value-mapping-value-input-${index}"]`)
+        .locator('[data-test$="-field"]')
+        .fill(value);
+    }
+    if (text !== undefined) {
+      await popup
+        .locator(`[data-test="dashboard-addpanel-config-value-mapping-text-input-${index}"]`)
+        .locator('[data-test$="-field"]')
+        .fill(text);
+    }
+  }
+
+  /** Append a new mapping row via the dialog's "Add New Mapping" (neutral) button. */
+  async addValueMappingRow(popup) {
+    await popup.locator('[data-test="o-dialog-neutral-btn"]').click();
+  }
+
+  /** Remove a mapping row via its per-row delete button (sits outside the row border). */
+  async deleteValueMappingRow(popup, index) {
+    await popup
+      .locator(`[data-test="dashboard-addpanel-config-value-mapping-delete-btn-${index}"]`)
+      .click();
+  }
+
+  valueMappingRows(popup) {
+    return popup.locator(
+      '[data-test^="dashboard-addpanel-config-value-mapping-type-select-"]:not([data-test$="-trigger"])'
+    );
+  }
+
+  /**
+   * The inner input for a value-mapping row field, for reading back persisted values.
+   * @param {import('@playwright/test').Locator} popup
+   * @param {number} index - mapping row index
+   * @param {"value"|"text"|"from"|"to"} kind - which field of the row
+   */
+  valueMappingRowField(popup, index, kind) {
+    return popup
+      .locator(`[data-test="dashboard-addpanel-config-value-mapping-${kind}-input-${index}"]`)
+      .locator('[data-test$="-field"]');
+  }
+
+  /** Apply the value-mapping dialog (primary button) and wait for it to close. */
+  async applyValueMappingPopup(popup) {
+    await popup.locator('[data-test="o-dialog-primary-btn"]').click();
+    await popup.waitFor({ state: "hidden", timeout: 5000 });
+  }
+
+  /**
+   * Select a value-mapping row's type via its OSelect ("Equals"/"Between"/"Matches regex").
+   * Options are portaled, so match by label on the page (not scoped to the popup).
+   */
+  async selectValueMappingType(popup, index, label) {
+    const parent = `dashboard-addpanel-config-value-mapping-type-select-${index}`;
+    await popup.locator(`[data-test="${parent}-trigger"]`).click();
+    await this._clickVirtualOption(parent, label);
+  }
+
+  /**
+   * Fill a "Between" (range) mapping row: from/to bounds + display text.
+   * The row's type must already be set to range (see selectValueMappingType).
+   */
+  async fillValueMappingRange(popup, index, { from, to, text } = {}) {
+    const field = (kind) =>
+      popup
+        .locator(`[data-test="dashboard-addpanel-config-value-mapping-${kind}-input-${index}"]`)
+        .locator('[data-test$="-field"]');
+    if (from !== undefined) await field("from").fill(String(from));
+    if (to !== undefined) await field("to").fill(String(to));
+    if (text !== undefined) await field("text").fill(String(text));
+  }
+
+  /**
+   * A swatch button inside a mapping row's ColorSwatchPicker.
+   * @param {import('@playwright/test').Locator} popup
+   * @param {number} index - mapping row index
+   * @param {"text-color"|"bg-color"} kind
+   * @param {number|"none"} swatch - palette index, or "none" for the clear button
+   */
+  valueMappingColorSwatch(popup, index, kind, swatch) {
+    const suffix = swatch === "none" ? "none" : `swatch-${swatch}`;
+    return popup.locator(
+      `[data-test="dashboard-addpanel-config-value-mapping-${kind}-${index}-${suffix}"]`
+    );
+  }
+
+  /** Click a mapping row's text/background colour swatch. Returns the swatch locator. */
+  async pickValueMappingColorSwatch(popup, index, kind, swatch) {
+    const target = this.valueMappingColorSwatch(popup, index, kind, swatch);
+    await target.waitFor({ state: "visible", timeout: 5000 });
+    await target.click();
+    return target;
+  }
+
+  /** Toggle the sparkline enable switch. */
+  async enableSparkline() {
+    const enableSwitch = this.page.locator('[data-test="dashboard-config-sparkline-enable"]');
+    await this.scrollSidebarToElement(enableSwitch);
+    await enableSwitch.locator('[data-test$="-btn"]').click();
+  }
+
+  /** Read the sparkline enable switch state (aria-checked on the inner button). */
+  async isSparklineEnabled() {
+    const btn = this.page.locator(
+      '[data-test="dashboard-config-sparkline-enable"] [data-test$="-btn"]'
+    );
+    await btn.waitFor({ state: "visible", timeout: 10000 });
+    return (await btn.getAttribute("aria-checked")) === "true";
+  }
+
+  /** Select a sparkline chart type by its option label ("Auto (Area)"/"Line"/"Area"/"Bar"). */
+  async selectSparklineType(label) {
+    const trigger = this.page.locator('[data-test="dashboard-config-sparkline-type-trigger"]');
+    await this.scrollSidebarToElement(trigger);
+    await trigger.click();
+    await this._clickVirtualOption("dashboard-config-sparkline-type", label);
+  }
+
+  /** Select a sparkline layout by its option label ("Auto"/"Bottom"/"Background"). */
+  async selectSparklineLayout(label) {
+    const trigger = this.page.locator('[data-test="dashboard-config-sparkline-layout-trigger"]');
+    await this.scrollSidebarToElement(trigger);
+    await trigger.click();
+    await this._clickVirtualOption("dashboard-config-sparkline-layout", label);
+  }
+
+  /** Pick a sparkline colour swatch by index (0..7 are the series palette). Returns the swatch. */
+  async pickSparklineColorSwatch(index = 0) {
+    const swatch = this.page.locator(
+      `[data-test="dashboard-config-sparkline-color-swatch-${index}"]`
+    );
+    await this.scrollSidebarToElement(swatch);
+    await swatch.click();
+    return swatch;
+  }
+
+  /** Set the sparkline line width (numeric OInput; hidden for Bar type). */
+  async setSparklineLineWidth(width) {
+    const input = this.page.locator('[data-test="dashboard-config-sparkline-line-width"]');
+    await this.scrollSidebarToElement(input);
+    await input.locator('[data-test$="-field"]').fill(String(width));
+  }
+
+  /** Read the sparkline line width input's current value. */
+  async getSparklineLineWidth() {
+    const field = this.page.locator(
+      '[data-test="dashboard-config-sparkline-line-width"] [data-test$="-field"]'
+    );
+    await field.waitFor({ state: "visible", timeout: 10000 });
+    return field.inputValue();
+  }
+
 
   // Add and configure override with dynamic column and type
   // Click-hold on the sidebar and scroll down until the Override button is visible
@@ -755,9 +1290,18 @@ export default class DashboardPanelConfigs {
   //BG color
   async selectBGColor(color) {
     const trigger = this.page.locator('[data-test="dashboard-config-color-mode-trigger"]');
+    const option = this.page.locator(
+      `[data-test="dashboard-config-color-mode-option"][data-test-label="${color}"]`
+    );
     await trigger.waitFor({ state: "visible" });
-    await trigger.click();
-    await this._clickVirtualOption("dashboard-config-color-mode", color);
+    // The threshold section above shifts layout while it renders, so a single click can land before the popover holds.
+    await expect(async () => {
+      if ((await trigger.getAttribute("aria-expanded")) !== "true") {
+        await trigger.click();
+      }
+      await option.waitFor({ state: "visible", timeout: 2000 });
+    }).toPass({ timeout: 15000, intervals: [500, 1000, 2000] });
+    await option.click();
   }
 
   //Guage chart configs
@@ -792,6 +1336,102 @@ export default class DashboardPanelConfigs {
     }
 
     return isChecked;
+  }
+
+  /**
+   * Drive an OSwitch config toggle to `desired` and prove it got there.
+   *
+   * A bare `toggle.click()` is not enough in the config sidebar: the toggle is
+   * inside an OCollapsible that is still running its open animation right after
+   * expandAllConfigSections(), so a click can land while the row is moving and
+   * either miss or be swallowed. Nothing surfaces at that point — the test only
+   * fails much later, at the post-save persistence assertion, pointing at the
+   * wrong step.
+   *
+   * Read the state first and click only when it actually needs to change, so the
+   * helper is idempotent and safe to retry; then assert on the OSwitch's own
+   * `aria-checked` (an expect, so it retries while Vue commits the update).
+   *
+   * @param {import('@playwright/test').Locator} toggleLocator - the OSwitch wrapper
+   * @param {boolean} [desired=true]
+   */
+  async setConfigToggle(toggleLocator, desired = true) {
+    const button = toggleLocator.locator('[data-test$="-btn"]');
+    const want = desired ? "true" : "false";
+
+    await expect(async () => {
+      await this.scrollSidebarToElement(toggleLocator);
+      await button.waitFor({ state: "visible", timeout: 10000 });
+      if ((await button.getAttribute("aria-checked")) !== want) {
+        await button.click();
+      }
+      await expect(button).toHaveAttribute("aria-checked", want, { timeout: 5000 });
+    }).toPass({ timeout: 30000, intervals: [300, 700, 1500] });
+  }
+
+  /**
+   * Assert a config toggle's persisted state, retrying while the reopened panel
+   * hydrates. The raw `getAttribute` this replaces resolved on the FIRST poll,
+   * so a config sidebar that had not yet applied the saved value read as the
+   * component default and failed a correct panel.
+   *
+   * @param {import('@playwright/test').Locator} toggleLocator - the OSwitch wrapper
+   * @param {boolean} [expected=true]
+   */
+  async expectConfigToggle(toggleLocator, expected = true) {
+    await this.scrollSidebarToElement(toggleLocator);
+    await expect(toggleLocator.locator('[data-test$="-btn"]')).toHaveAttribute(
+      "aria-checked",
+      expected ? "true" : "false",
+      { timeout: 15000 }
+    );
+  }
+
+  /**
+   * Open an OSelect in the config sidebar and wait until its popover is really open.
+   *
+   * Two failure modes this closes over a bare `wrapper.click()`:
+   *  - `disabled` lives on the inner trigger <button>, never on the `data-test`
+   *    wrapper <div>, so clicking the wrapper skips Playwright's enabled check
+   *    and can fire at a disabled control, which the browser silently drops;
+   *  - the sidebar's collapsible animations move the trigger, and OSelect closes
+   *    its popover when an ancestor scrolls — so a click that did open the list
+   *    can have it dismissed again before the option is clicked.
+   *
+   * @param {string} baseTestId - e.g. "dashboard-config-aggregation"
+   */
+  async openConfigSelect(baseTestId) {
+    const trigger = this.page.locator(`[data-test="${baseTestId}-trigger"]`);
+    await this.scrollSidebarToElement(trigger);
+    await expect(trigger).toBeEnabled({ timeout: 15000 });
+
+    await expect(async () => {
+      if ((await trigger.getAttribute("data-state")) !== "open") {
+        await trigger.click();
+      }
+      await expect(trigger).toHaveAttribute("data-state", "open", { timeout: 2000 });
+    }).toPass({ timeout: 20000, intervals: [200, 500, 1000] });
+  }
+
+  /**
+   * Open a config OSelect and pick an option by its label, confirming the popover
+   * closed so the caller can click Apply without the list intercepting the click.
+   *
+   * @param {string} baseTestId - e.g. "dashboard-config-aggregation"
+   * @param {string} label - full option label, e.g. "Max (maximum value)"
+   */
+  async selectConfigOption(baseTestId, label) {
+    const trigger = this.page.locator(`[data-test="${baseTestId}-trigger"]`);
+    const option = this.page.locator(
+      `[data-test="${baseTestId}-option"][data-test-label="${label}"]`
+    );
+
+    await expect(async () => {
+      await this.openConfigSelect(baseTestId);
+      await option.waitFor({ state: "visible", timeout: 5000 });
+      await option.click();
+      await expect(trigger).not.toHaveAttribute("data-state", "open", { timeout: 5000 });
+    }).toPass({ timeout: 30000, intervals: [300, 700, 1500] });
   }
 
   // ========== Time Shift (Compare Against / Multi-Window) ==========
@@ -845,6 +1485,34 @@ export default class DashboardPanelConfigs {
     await removeBtn.click();
   }
 
+  /** The offset picker trigger of added time-shift row `index` (the 0m reference row has none). */
+  timeShiftPickerTrigger(index = 0) {
+    return this.page
+      .locator(`[data-test="dashboard-addpanel-config-time-shift-remove-${index}"]`)
+      .locator("xpath=..")
+      .locator('[data-test="date-time-btn"]');
+  }
+
+  async openTimeShiftPicker(index = 0) {
+    await this.timeShiftPickerTrigger(index).click();
+  }
+
+  /** A relative-offset cell in the open picker, e.g. (1, "d") for "1 day". */
+  timeShiftOffsetOption(amount, unit) {
+    return this.page.locator(`[data-test="date-time-relative-${amount}-${unit}-btn"]:visible`);
+  }
+
+  /** Set time-shift row `index` to a relative offset such as (1, "d"), then close the picker. */
+  async setTimeShiftOffset(index, amount, unit) {
+    await this.openTimeShiftPicker(index);
+    const option = this.timeShiftOffsetOption(amount, unit);
+    await option.click();
+    // The picker stays open after a pick.
+    await this.page.keyboard.press("Escape");
+    await option.waitFor({ state: "hidden" });
+    await expect(this.timeShiftPickerTrigger(index)).toContainText(new RegExp(`\\b${amount}\\b`));
+  }
+
   // ========== Color By Series ==========
 
   /**
@@ -857,45 +1525,101 @@ export default class DashboardPanelConfigs {
   }
 
   /**
-   * Select a series from the autocomplete dropdown at the given row index.
-   * Can select by index or by matching text (e.g., "ago" to find comparison series).
+   * Returns the option locators for a color-by-series row's combobox.
+   * OCombobox uses ComboboxPortal — options render at document root, outside the
+   * popup — so this must be a page-level locator, not a colorBySeriesPopup-scoped one.
    * @param {number} rowIndex - Row index in the color-by-series popup (0-based)
-   * @param {Object} options - Selection options
-   * @param {number} [options.optionIndex] - Which option to select by index (0-based)
-   * @param {string} [options.matchText] - Text to match in the option (e.g., "ago", "Minutes")
-   * @returns {string} The selected series name
    */
-  async selectColorBySeriesOption(rowIndex = 0, { optionIndex, matchText } = {}) {
-    // OCombobox input — `dashboard-addpanel-config-color-by-series-series-select-${rowIndex}-input`
-    const comboboxInput = this.colorBySeriesPopup.locator(
+  colorBySeriesOptions(rowIndex = 0) {
+    return this.page.locator(
+      `[data-test="dashboard-addpanel-config-color-by-series-series-select-${rowIndex}-option"]`
+    );
+  }
+
+  /** Returns the combobox input locator for a color-by-series row. */
+  colorBySeriesSeriesInput(rowIndex = 0) {
+    return this.colorBySeriesPopup.locator(
       `[data-test="dashboard-addpanel-config-color-by-series-series-select-${rowIndex}-input"]`
     );
+  }
+
+  /**
+   * Open a row's series dropdown and return every option label, then close it again.
+   * Lets a test assert on which series the chart is actually offering (e.g. that a
+   * time-shift comparison series exists) without reaching for raw locators.
+   * @param {number} rowIndex - Row index (0-based)
+   * @returns {Promise<string[]>} The option labels
+   */
+  async getColorBySeriesOptionLabels(rowIndex = 0) {
+    const comboboxInput = this.colorBySeriesSeriesInput(rowIndex);
     await comboboxInput.waitFor({ state: "visible", timeout: 10000 });
     await comboboxInput.click();
 
-    // OCombobox uses ComboboxPortal — options are rendered at document root, outside the popup.
-    // Must use page-level locator, not colorBySeriesPopup-scoped locator.
-    const optionLocators = this.page.locator(
-      `[data-test="dashboard-addpanel-config-color-by-series-series-select-${rowIndex}-option"]`
+    const optionLocators = this.colorBySeriesOptions(rowIndex);
+    await optionLocators
+      .first()
+      .waitFor({ state: "visible", timeout: 10000 })
+      .catch(() => {});
+
+    const labels = await optionLocators.evaluateAll((els) =>
+      els.map((el) => (el.getAttribute("data-test-label") || el.textContent || "").trim())
     );
+    // Close the portal without picking anything, so the caller can re-open it.
+    await this.page.keyboard.press("Escape");
+    return labels;
+  }
+
+  /** Returns the currently committed series name for a color-by-series row. */
+  async getColorBySeriesRowValue(rowIndex = 0) {
+    return this.colorBySeriesSeriesInput(rowIndex).inputValue();
+  }
+
+  /** Returns the currently committed colour (hex string) for a color-by-series row. */
+  async getColorBySeriesRowColor(rowIndex = 0) {
+    const colorSection = this.colorBySeriesPopup.locator(
+      `[data-test="dashboard-addpanel-config-color-by-series-color-section-${rowIndex}"]`
+    );
+    await colorSection.waitFor({ state: "visible", timeout: 5000 });
+    return colorSection.locator("input").first().inputValue();
+  }
+
+  /**
+   * Select a series from the autocomplete dropdown at the given row index.
+   * Can select by index or by matching text (e.g., "ago" to find comparison series).
+   *
+   * `matchText` is strict: if no option contains it, this throws and lists what was
+   * on offer. It used to fall back to the first/last option, which silently turned
+   * "colour the comparison series" into "colour whatever series happened to exist"
+   * — a test that passed without exercising the behaviour it named.
+   *
+   * @param {number} rowIndex - Row index in the color-by-series popup (0-based)
+   * @param {Object} options - Selection options
+   * @param {number} [options.optionIndex] - Which option to select by index (0-based)
+   * @param {string} [options.matchText] - Text the option must contain (e.g. "15 Minutes ago")
+   * @returns {string} The selected series name
+   */
+  async selectColorBySeriesOption(rowIndex = 0, { optionIndex, matchText } = {}) {
+    const comboboxInput = this.colorBySeriesSeriesInput(rowIndex);
+    await comboboxInput.waitFor({ state: "visible", timeout: 10000 });
+    await comboboxInput.click();
+
+    const optionLocators = this.colorBySeriesOptions(rowIndex);
     await optionLocators.first().waitFor({ state: "visible", timeout: 10000 });
 
     let targetOption;
 
     if (matchText) {
-      const count = await optionLocators.count();
-      for (let i = 0; i < count; i++) {
-        const text = await optionLocators.nth(i).textContent();
-        if (text && text.includes(matchText)) {
-          targetOption = optionLocators.nth(i);
-          break;
-        }
+      const labels = await optionLocators.evaluateAll((els) =>
+        els.map((el) => (el.getAttribute("data-test-label") || el.textContent || "").trim())
+      );
+      const index = labels.findIndex((label) => label.includes(matchText));
+      if (index === -1) {
+        throw new Error(
+          `No color-by-series option matching "${matchText}" in row ${rowIndex}. ` +
+            `Available options: ${JSON.stringify(labels)}`
+        );
       }
-      if (!targetOption && count > 1) {
-        targetOption = optionLocators.nth(count - 1);
-      } else if (!targetOption) {
-        targetOption = optionLocators.first();
-      }
+      targetOption = optionLocators.nth(index);
     } else {
       targetOption = optionLocators.nth(optionIndex ?? 0);
     }
@@ -1186,7 +1910,12 @@ export default class DashboardPanelConfigs {
    * Toggle the pagination switch in the config panel.
    */
   async togglePagination() {
-    await this.paginationToggle.waitFor({ state: "visible" });
+    await this.paginationToggle.waitFor({ state: "visible", timeout: 30000 });
+    // The toggle lives near the bottom of the collapsible "Table" config section,
+    // so on a short viewport it can sit outside the scrolled config pane right
+    // after the panel opens. Bring it into view before clicking — a bare click on
+    // an off-screen target burns the whole action timeout waiting for stability.
+    await this.paginationToggle.scrollIntoViewIfNeeded().catch(() => {});
     await this.paginationToggle.click();
   }
 
@@ -1196,6 +1925,27 @@ export default class DashboardPanelConfigs {
    */
   async isPaginationEnabled() {
     return this.getToggleState(this.paginationToggle);
+  }
+
+  /**
+   * Turn pagination on, tolerating a default that already has it enabled.
+   * @returns {Promise<void>}
+   */
+  async enablePagination() {
+    if (await this.isPaginationEnabled()) return;
+    await this.togglePagination();
+    await this.rowsPerPageWrapper.waitFor({ state: "visible", timeout: 10000 });
+  }
+
+  /**
+   * Returns the rows-per-page minimum, or null when the control declares none.
+   * @returns {Promise<string|null>}
+   */
+  async getRowsPerPageMin() {
+    // OInput only puts `min` on the inner field when it declares it as a prop;
+    // otherwise the attribute falls through to the wrapper div. Check both.
+    const fieldMin = await this.rowsPerPageField.getAttribute("min");
+    return fieldMin ?? (await this.rowsPerPageWrapper.getAttribute("min"));
   }
 
   /**
@@ -1251,4 +2001,230 @@ export default class DashboardPanelConfigs {
     return this.getToggleState(this.pivotColTotals);
   }
 
+  // ========== Parameterized locator getters for the config-* spec suite ==========
+
+  /** Legend type (Scroll/Plain) OSelect option by label. */
+  getLegendsScrollableOption(label) {
+    return this.page.locator(
+      `[data-test="dashboard-config-legends-scrollable-option"][data-test-label="${label}"]`
+    );
+  }
+
+  /** Map type OSelect option by label (shared: geomap-maps + PromQL maps). */
+  getMapTypeOption(label) {
+    return this.page.locator(
+      `[data-test="dashboard-config-map-type-option"][data-test-label="${label}"]`
+    );
+  }
+
+  /** PromQL aggregation OSelect option by full label (e.g. "Max (maximum value)"). */
+  getAggregationOption(label) {
+    return this.page.locator(
+      `[data-test="dashboard-config-aggregation-option"][data-test-label="${label}"]`
+    );
+  }
+
+  /** PromQL table-mode OSelect option by label (e.g. "Aggregate"). */
+  getPromqlTableModeOption(label) {
+    return this.page.locator(
+      `[data-test="dashboard-config-promql-table-mode-option"][data-test-label="${label}"]`
+    );
+  }
+
+  /** PromQL table-aggregations OSelect option by label. */
+  getTableAggregationsOption(label) {
+    return this.page.locator(
+      `[data-test="dashboard-config-table-aggregations-option"][data-test-label="${label}"]`
+    );
+  }
+
+  /** Config-panel per-query tab by index (multi-query PromQL). */
+  getConfigQueryTab(index) {
+    return this.page.locator(`[data-test="dashboard-config-query-tab-${index}"]`);
+  }
+
+  // ---- Mark line rows (index-based) ----
+
+  /** Mark line type OSelect wrapper for row `index`. */
+  getMarklineTypeSelect(index) {
+    return this.page.locator(`[data-test="dashboard-config-markline-type-${index}"]`);
+  }
+
+  /** Mark line type OSelect trigger for row `index` (carries data-test-selected-value). */
+  getMarklineTypeTrigger(index) {
+    return this.page.locator(`[data-test="dashboard-config-markline-type-${index}-trigger"]`);
+  }
+
+  /** Mark line type OSelect option by label for row `index`. */
+  getMarklineTypeOption(index, label) {
+    return this.page.locator(
+      `[data-test="dashboard-config-markline-type-${index}-option"][data-test-label="${label}"]`
+    );
+  }
+
+  /**
+   * Set the mark line type for row `index` and prove the row actually changed.
+   *
+   * Each row's OSelect follows the standard `-trigger` / `-option` shape, so this
+   * is selectConfigOption plus a per-row confirmation. Asserting on the trigger's
+   * `data-test-selected-label` replaces the old
+   * `getMarklineTypeOption(...).waitFor({state:"hidden"}).catch(() => {})`, which
+   * swallowed its own failure: a dropdown that never closed left the next fill()
+   * landing on the open option list, and the value-input visibility assertion that
+   * follows a type change could resolve before the v-if had been re-evaluated.
+   *
+   * @param {number} index - mark line row
+   * @param {string} label - option label, e.g. "Average" / "Y-Axis" / "Max"
+   */
+  async selectMarklineType(index, label) {
+    await this.selectConfigOption(`dashboard-config-markline-type-${index}`, label);
+    await expect(this.getMarklineTypeTrigger(index)).toHaveAttribute(
+      "data-test-selected-label",
+      label,
+      { timeout: 10000 }
+    );
+  }
+
+  /**
+   * Fill a mark line row's name field and confirm the value stuck, so a fill that
+   * raced a re-render fails here rather than at a much later persistence check.
+   */
+  async setMarklineName(index, value) {
+    const field = this.getMarklineName(index).locator('[data-test$="-field"]');
+    await this.scrollSidebarToElement(field);
+    await field.fill(value);
+    await expect(field).toHaveValue(value, { timeout: 5000 });
+  }
+
+  /** Mark line value input wrapper for row `index`. */
+  getMarklineValue(index) {
+    return this.page.locator(`[data-test="dashboard-config-markline-value-${index}"]`);
+  }
+
+  /** Mark line name input wrapper for row `index`. */
+  getMarklineName(index) {
+    return this.page.locator(`[data-test="dashboard-config-markline-name-${index}"]`);
+  }
+
+  /** Mark line per-row remove button for row `index`. */
+  getMarklineRemoveBtn(index) {
+    return this.page.locator(`[data-test="dashboard-addpanel-config-markline-remove-${index}"]`);
+  }
+
+  /**
+   * Hover the Drilldown section's info icon and return its tooltip.
+   *
+   * PanelEditor.vue mounts ConfigPanel in two layout branches, so the icon matches
+   * 2 nodes and the dormant one is parked OFF-VIEWPORT rather than hidden — it
+   * satisfies `visible=true` yet hover never reaches it ("element is outside of the
+   * viewport", retried to timeout). Probing each copy and keeping the one that
+   * actually opens the bubble is the only reliable discriminator.
+   */
+  async hoverDrilldownInfoForTooltip() {
+    const candidates = this.page.locator(SELECTORS.CONFIG_DRILLDOWN_INFO);
+    const total = await candidates.count();
+
+    for (let i = 0; i < total; i++) {
+      try {
+        await candidates.nth(i).hover({ timeout: 5000 });
+        const tooltip = this.page
+          .locator(visibleOnly(SELECTORS.TOOLTIP_CONTENT))
+          .first();
+        await tooltip.waitFor({ state: "visible", timeout: 5000 });
+        return tooltip;
+      } catch {
+        // Dormant layout branch — try the next copy.
+      }
+    }
+
+    throw new Error(
+      `hoverDrilldownInfoForTooltip: none of the ${total} drilldown info icons opened a tooltip`
+    );
+  }
+
+  // ========== Heatmap ==========
+
+  /** Fill the colour scale min/max inputs; pass "" to clear a bound back to Auto. */
+  async setHeatmapColorRange(min, max) {
+    await this.scrollSidebarToElement(this.heatmapColorMin);
+    await this.heatmapColorMinField.fill(min);
+    await this.heatmapColorMaxField.fill(max);
+    await expect(this.heatmapColorMinField).toHaveValue(min);
+    await expect(this.heatmapColorMaxField).toHaveValue(max);
+  }
+
+  getHeatmapYSortOption(label) {
+    return this.heatmapYSortOptions.and(this.page.locator(`[data-test-label="${label}"]`));
+  }
+
+  async selectHeatmapPalette(label) {
+    await this.selectConfigOption("dashboard-config-heatmap_palette", label);
+  }
+
+  async toggleHeatmapPaletteReverse() {
+    const before = await this.heatmapPaletteReverseBtn.getAttribute("aria-checked");
+    await this.scrollSidebarToElement(this.heatmapPaletteReverse);
+    await this.heatmapPaletteReverseBtn.click();
+    await expect(this.heatmapPaletteReverseBtn).toHaveAttribute(
+      "aria-checked",
+      before === "true" ? "false" : "true"
+    );
+  }
+
+  /** Pick an option of a heatmap OToggleGroup and wait for the group to report it. */
+  async _selectHeatmapToggle(group, baseTestId, label, value) {
+    await this.scrollSidebarToElement(group);
+    await this._clickVirtualOption(baseTestId, label);
+    await expect(group).toHaveAttribute("data-test-selected-value", value);
+  }
+
+  async selectHeatmapColorScale(label, value) {
+    await this._selectHeatmapToggle(
+      this.heatmapColorScale,
+      "dashboard-config-heatmap_color_scale",
+      label,
+      value
+    );
+  }
+
+  async selectHeatmapYSort(label, value) {
+    await this._selectHeatmapToggle(this.heatmapYSort, "dashboard-config-heatmap_y_sort", label, value);
+  }
+
+  async selectHeatmapYBucketMode(label, value) {
+    await this._selectHeatmapToggle(this.heatmapYBucket, "dashboard-config-heatmap_y_bucket", label, value);
+  }
+
+  async selectHeatmapYBucketBase(base) {
+    await this._selectHeatmapToggle(
+      this.heatmapYBucketBase,
+      "dashboard-config-heatmap_y_bucket_base",
+      base,
+      base
+    );
+  }
+
+  async setHeatmapYBucketSize(size) {
+    await this.scrollSidebarToElement(this.heatmapYBucketSize);
+    await this.heatmapYBucketSizeField.fill(size);
+    await expect(this.heatmapYBucketSizeField).toHaveValue(size);
+  }
+
+  async setHeatmapYRange(min, max) {
+    await this.scrollSidebarToElement(this.heatmapYMin);
+    await this.heatmapYMinField.fill(min);
+    await this.heatmapYMaxField.fill(max);
+    await expect(this.heatmapYMinField).toHaveValue(min);
+    await expect(this.heatmapYMaxField).toHaveValue(max);
+  }
+
+  async toggleHeatmapHistogramMode() {
+    const before = await this.heatmapHistogramModeBtn.getAttribute("aria-checked");
+    await this.scrollSidebarToElement(this.heatmapHistogramMode);
+    await this.heatmapHistogramModeBtn.click();
+    await expect(this.heatmapHistogramModeBtn).toHaveAttribute(
+      "aria-checked",
+      before === "true" ? "false" : "true"
+    );
+  }
 }

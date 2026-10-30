@@ -369,32 +369,43 @@ describe("FilterCondition.vue Branch Coverage", () => {
     });
   });
 
-  describe("Event Emission Branch Coverage", () => {
-    it("should call delete, add, and add-group functions", async () => {
-      const wrapper = mount(FilterCondition, {
-        props: defaultProps,
+  // Workflow fields display dotted (`meta.alert_name`) but store flattened
+  // (`meta_alert_name`); searching the shown text must still match.
+  describe("column search matches label as well as value", () => {
+    const workflowFields = [
+      { label: "meta.alert_name", value: "meta_alert_name" },
+      { label: "meta.alert_count", value: "meta_alert_count" },
+      { label: "meta.org_id", value: "meta_org_id" },
+    ];
+
+    const mountWithWorkflowFields = () =>
+      mount(FilterCondition, {
+        props: { ...defaultProps, streamFields: workflowFields },
         global: {
           plugins: [mockI18n],
-          provide: {
-            store: mockStore,
-          },
+          provide: { store: mockStore },
         },
       });
 
-      // Test deleteApiHeader function
-      (wrapper.vm as any).deleteApiHeader("testField");
-      expect(wrapper.emitted("remove")).toBeTruthy();
-      expect(wrapper.emitted("input:update")).toBeTruthy();
+    it("finds a field when the user types the dotted label they can see", () => {
+      const wrapper = mountWithWorkflowFields();
+      (wrapper.vm as any).filterColumns("meta.alert");
+      expect((wrapper.vm as any).filteredFields.map((f: any) => f.value)).toEqual([
+        "meta_alert_name",
+        "meta_alert_count",
+      ]);
+    });
 
-      // Test addApiHeader function
-      (wrapper.vm as any).addApiHeader("testGroup");
-      expect(wrapper.emitted("add")).toBeTruthy();
-      expect(wrapper.emitted("add")?.[0]).toEqual(["testGroup"]);
+    it("still finds a field by its stored flattened value", () => {
+      const wrapper = mountWithWorkflowFields();
+      (wrapper.vm as any).filterColumns("meta_org");
+      expect((wrapper.vm as any).filteredFields.map((f: any) => f.value)).toEqual(["meta_org_id"]);
+    });
 
-      // Test addGroupApiHeader function
-      (wrapper.vm as any).addGroupApiHeader("testGroupId");
-      expect(wrapper.emitted("add-group")).toBeTruthy();
-      expect(wrapper.emitted("add-group")?.[0]).toEqual(["testGroupId"]);
+    it("returns nothing for a term in neither label nor value", () => {
+      const wrapper = mountWithWorkflowFields();
+      (wrapper.vm as any).filterColumns("nonexistent");
+      expect((wrapper.vm as any).filteredFields).toEqual([]);
     });
   });
 

@@ -49,23 +49,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template #header-tabs>
-      <OTabs v-model="currentTab" dense align="left" data-test="alert-insights-tabs">
+      <OTabs
+        :model-value="currentTab"
+        dense
+        align="left"
+        data-test="alert-insights-tabs"
+        @update:model-value="onTabsChange"
+      >
         <OTab
           name="overview"
           :label="t('alerts.insights.tabs.overview')"
           data-test="tab-overview"
         />
         <OTab
-          v-if="isEnterprise"
           name="frequency"
           :label="t('alerts.insights.tabs.frequency')"
           data-test="tab-frequency"
+          :suffix-icon="!insightsAccess.allowed ? 'lock' : undefined"
         />
         <OTab
-          v-if="isEnterprise"
           name="correlation"
           :label="t('alerts.insights.tabs.correlation')"
           data-test="tab-correlation"
+          :suffix-icon="!insightsAccess.allowed ? 'lock' : undefined"
         />
         <OTab name="quality" :label="t('alerts.insights.tabs.quality')" data-test="tab-quality" />
       </OTabs>
@@ -119,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon
           name="close"
           size="sm"
-          class="ml-2 cursor-pointer text-sm opacity-70 transition-opacity duration-200 hover:opacity-100"
+          class="ms-2 cursor-pointer text-sm opacity-70 transition-opacity duration-200 hover:opacity-100"
           @click="removeRangeFilter(panelId)"
         />
       </div>
@@ -129,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="hasActiveFilters"
         variant="ghost"
         size="sm"
-        class="ml-2"
+        class="ms-2"
         @click="clearAllFilters"
         data-test="clear-all-filters-btn"
         icon-left="close"
@@ -149,17 +155,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ t("alerts.insights.actions.actionsFor") }}
         <strong>{{ selectedAlertForAction }}</strong></span
       >
-
-      <OButton
-        variant="ghost-primary"
-        size="sm"
-        @click="openDedupConfig"
-        data-test="configure-dedup-btn"
-        icon-left="settings"
-      >
-        {{ t("alerts.insights.actions.configureDedup") }}
-        <OTooltip :content="t('alerts.insights.actions.configureDedupTooltip')" />
-      </OButton>
 
       <OButton
         variant="ghost-primary"
@@ -192,17 +187,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="close-actions-btn"
       >
         <OIcon name="close" size="sm" />
-        <OTooltip content="Close actions" />
+        <OTooltip :content="t('alerts.insights.actions.closeActions')" />
       </OButton>
     </div>
 
     <!-- Dashboard Content -->
-    <div class="min-h-0 flex-1 px-2.5 pb-2.5">
-      <div class="bg-card-glass-bg mb-2.5 h-[calc(100vh-13rem)]">
+    <div class="min-h-0 flex-1 px-2.5 pb-2.5 max-lg:overflow-y-auto">
+      <div class="bg-card-glass-bg mb-2.5 h-[calc(100vh-13rem)] max-md:h-auto">
         <div @contextmenu="handleNativeContextMenu">
           <div v-show="isLoading" class="flex h-100 items-center justify-center">
             <OSpinner size="md" />
-            <div class="ml-3">Loading insights...</div>
+            <div class="ms-3">{{ t("alerts.insights.loading.insights") }}</div>
           </div>
 
           <div :class="isLoading ? 'invisible' : 'visible'">
@@ -239,7 +234,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :panel-id="contextMenu.panelId"
       @close="contextMenu.show = false"
       @filter="handleContextMenuFilter"
-      @configure-dedup="handleConfigureDedup"
       @edit-alert="handleEditAlert"
       @view-history="handleViewHistory"
     />
@@ -254,14 +248,13 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { ref, computed, onMounted, watch, nextTick, reactive, provide } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import dateTime from "@/components/DateTimePickerDashboard.vue";
 import AlertInsightsContextMenu from "./AlertInsightsContextMenu.vue";
 import { useAlertInsights } from "@/composables/useAlertInsights";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import insightsConfig from "@/utils/alerts/insights-metrics.json";
-import config from "@/aws-exports";
 import alertsService from "@/services/alerts";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -269,14 +262,21 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { ToastOptions } from "@/lib/feedback/Toast/OToast.types";
+import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
+const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
-// Check if enterprise features are enabled
-const isEnterprise = config.isEnterprise === "true";
+// Frequency/Correlation tabs — shown locked (not hidden) in builds that
+// don't unlock it.
+const insightsAccess = computed(() =>
+  checkFeatureAccess("alertInsights", buildFeatureGateContext(store.state.zoConfig)),
+);
+const LOCKED_TAB_NAMES = ["frequency", "correlation"];
 
 // Composable
 const {
@@ -296,6 +296,17 @@ const isLoading = ref(false);
 const dashboardRef = ref(null);
 const dateTimeRef = ref(null);
 const currentTab = ref("overview");
+
+// OTabs is controlled (`:model-value`), so refusing to advance `currentTab`
+// here is what actually keeps a locked tab from becoming active — clicking
+// it opens the upgrade dialog instead of switching.
+function onTabsChange(name: string | number) {
+  if (LOCKED_TAB_NAMES.includes(String(name)) && !insightsAccess.value.allowed) {
+    openUpgradeDialog();
+    return;
+  }
+  currentTab.value = String(name);
+}
 const selectedAlertForAction = ref<string | null>(null);
 const dashboardData = ref<any>(null); // Store dashboard config as ref instead of computed
 const alertsList = ref<any[]>([]); // Cache alerts list
@@ -420,15 +431,16 @@ const fetchAlerts = async () => {
   } catch (error) {
     toast({
       variant: "error",
-      message: "Failed to load alerts",
+      message: t("toastMessages.alerts.failedToLoadAlerts"),
     });
   }
 };
 
 const goBack = () => {
+  const { folder, tab } = route.query;
   router.push({
     name: "alertList",
-    query: { org_identifier: store.state.selectedOrganization.identifier },
+    query: { org_identifier: store.state.selectedOrganization.identifier, folder, tab },
   });
 };
 
@@ -481,7 +493,7 @@ const onDataZoom = (data: any) => {
 
   addRangeFilter({
     panelId,
-    panelTitle: "Alert Volume Over Time",
+    panelTitle: t("alerts.insights.alertVolumeOverTime"),
     start,
     end,
   });
@@ -528,7 +540,7 @@ const handleNativeContextMenu = (event: MouseEvent) => {
     contextMenu.y = event.clientY;
     contextMenu.value = alertName;
     contextMenu.panelId = dedupPanel?.id || "";
-    contextMenu.panelTitle = dedupPanel?.title || "Dedup Impact Analysis";
+    contextMenu.panelTitle = dedupPanel?.title || raw("Dedup Impact Analysis");
   }
   // If not first column or no alert name, let default context menu show
 };
@@ -569,39 +581,6 @@ const handleContextMenuFilter = (filter: any) => {
   refreshDashboard();
 };
 
-const handleConfigureDedup = async (alertName: string) => {
-  try {
-    // Use cached alerts list
-    const alert = alertsList.value.find((a: any) => a.name === alertName);
-
-    if (!alert) {
-      toast({
-        variant: "error",
-        message: `Alert "${alertName}" not found in ${alertsList.value.length} alerts`,
-      });
-      return;
-    }
-
-    // Navigate to alert edit page with dedup section
-    await router.push({
-      name: "alertList",
-      query: {
-        action: "update",
-        alert_id: alert.alert_id, // Use alert_id instead of id
-        name: alert.name,
-        org_identifier: store.state.selectedOrganization.identifier,
-        folder: alert.folder_id || "default",
-        section: "dedup",
-      },
-    });
-  } catch (error) {
-    toast({
-      variant: "error",
-      message: "Failed to navigate to alert",
-    });
-  }
-};
-
 const handleEditAlert = async (alertName: string) => {
   try {
     // Use cached alerts list
@@ -610,7 +589,7 @@ const handleEditAlert = async (alertName: string) => {
     if (!alert) {
       toast({
         variant: "error",
-        message: "Alert not found",
+        message: t("toastMessages.alerts.alertNotFound"),
       });
       return;
     }
@@ -628,7 +607,7 @@ const handleEditAlert = async (alertName: string) => {
   } catch (error) {
     toast({
       variant: "error",
-      message: "Failed to navigate to alert",
+      message: t("toastMessages.alerts.failedToNavigateToAlert"),
     });
   }
 };
@@ -651,28 +630,12 @@ const formatFilterValue = (value: number): string => {
 };
 
 // Action button methods
-const openDedupConfig = () => {
-  // `caption` predates OToast and is not rendered; cast keeps the object untouched.
-  toast({
-    variant: "info",
-    message: `Opening dedup configuration for: ${selectedAlertForAction.value}`,
-    caption: "This would navigate to alert edit page with dedup section focused",
-  } as ToastOptions);
-
-  // TODO: Navigate to alert edit page with dedup section
-  // router.push({
-  //   name: 'alertEdit',
-  //   params: { alertName: selectedAlertForAction.value },
-  //   query: { section: 'dedup' }
-  // });
-};
-
 const editAlert = () => {
   toast({
     variant: "info",
-    message: `Editing alert: ${selectedAlertForAction.value}`,
+    message: t("toastMessages.alerts.editingAlert", { name: selectedAlertForAction.value }),
     caption: "This would navigate to alert edit page",
-  } as ToastOptions);
+  } as unknown as ToastOptions);
 
   // TODO: Navigate to alert edit page
   // router.push({
@@ -705,9 +668,14 @@ watch(currentTab, async () => {
 
 // Lifecycle
 onMounted(async () => {
-  // Check if there's a tab in query params
-  if (route.query.tab) {
-    currentTab.value = route.query.tab as string;
+  // Check if there's a tab in query params. Defense in depth: a locked tab
+  // is disabled in the UI, but a direct link with ?tab=frequency/correlation
+  // shouldn't be able to land on it while locked.
+  const queryTab = route.query.tab as string | undefined;
+  const isLockedTab =
+    (queryTab === "frequency" || queryTab === "correlation") && !insightsAccess.value.allowed;
+  if (queryTab && !isLockedTab) {
+    currentTab.value = queryTab;
   }
 
   // Fetch alerts list once on mount

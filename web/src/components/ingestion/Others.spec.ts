@@ -2,6 +2,7 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { nextTick } from "vue";
 import Others from "@/components/ingestion/Others.vue";
+import { raw } from "@/types/i18n";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
@@ -168,7 +169,7 @@ describe("Others Component", () => {
           },
         },
         icon: "img:mock-images/ingestion/airflow.svg",
-        label: wrapper.vm.t("ingestion.airflow"),
+        label: raw("Airflow"),
         contentClass: "tab_content",
       },
       {
@@ -180,7 +181,7 @@ describe("Others Component", () => {
           },
         },
         icon: "img:mock-images/ingestion/cribl.webp",
-        label: wrapper.vm.t("ingestion.cribl"),
+        label: raw("Cribl"),
         contentClass: "tab_content",
       },
       {
@@ -192,7 +193,7 @@ describe("Others Component", () => {
           },
         },
         icon: "img:mock-images/ingestion/vercel.svg",
-        label: wrapper.vm.t("ingestion.vercel"),
+        label: raw("Vercel"),
         contentClass: "tab_content",
       },
       {
@@ -204,7 +205,7 @@ describe("Others Component", () => {
           },
         },
         icon: "img:mock-images/ingestion/heroku.svg",
-        label: wrapper.vm.t("ingestion.heroku"),
+        label: raw("Heroku"),
         contentClass: "tab_content",
       },
     ];

@@ -28,11 +28,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         :frame="false"
         :loading="loading"
+        :forbidden="forbidden"
         row-key="id"
         pagination="client"
         :page-size="pageSize"
         :page-size-options="[20, 50, 100, 250, 500]"
+        :current-page="currentPage"
+        keep-page-on-data-change
+        @update:current-page="onPageChange"
+        @update:page-size="pageSize = $event"
         sorting="client"
+        :sort-by="sortBy"
+        :sort-order="sortOrder"
+        @update:sort-by="sortBy = $event"
+        @update:sort-order="sortOrder = $event"
         filter-mode="client"
         :default-columns="false"
         show-index
@@ -44,13 +53,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         table-id="alerts-incident-list"
         data-test="incident-list-table"
         :get-row-style="incidentRowStyle"
-        @row-click="viewIncident"
+        @row-click="viewIncident($event)"
       >
         <!-- Toolbar: status toggle (All / Active / Resolved) + search — same
              shape as the Alerts page tabs. -->
         <template #toolbar>
-          <div class="flex w-full items-center gap-2">
+          <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
             <OToggleGroup
+              mobile-dropdown
               :model-value="statusFilter"
               @update:model-value="(v) => filterByStatus(v as string)"
               data-test="incident-status-filter-group"
@@ -74,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroup>
             <OSearchInput
               v-model="searchQuery"
-              class="min-w-0 flex-1"
+              class="min-w-0 flex-1 max-md:min-w-40"
               :placeholder="t('alerts.incidents.search')"
               data-test="incident-search-input"
               clearable
@@ -93,33 +103,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="loading"
               selectable
               :selected-key="severityFilter"
+              default-key="total"
               @select="onSeveritySelect"
             />
           </div>
         </template>
         <template #toolbar-trailing>
-          <OButton
+          <ORefreshButton
+            layout="inline"
             variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
-            :loading="loading"
+            :last-run-at="lastUpdatedAt"
+            :loading="fetching"
+            shortcut-id="alertIncidentsRefresh"
             data-test="incident-list-refresh-btn"
             @click="refreshIncidents"
-          >
-            <OTooltip
-              side="bottom"
-              :content="t('common.refresh')"
-              shortcut-id="alertIncidentsRefresh"
-            />
-          </OButton>
+          />
         </template>
         <template #cell-status="{ row }">
           <OTag
             type="incidentStatus"
             :value="row.status"
-            :label="getStatusLabel(row.status)"
+            :label="raw(getStatusLabel(row.status))"
             size="sm"
             data-test="incident-status-badge"
+          />
+        </template>
+        <template #cell-ai_analysis="{ row }">
+          <IncidentAiAnalysisCell
+            :incident="row"
+            :rca-enabled="rcaEnabled"
+            :now="now"
+            @open="viewIncident(row, 'incidentAnalysis')"
+            @started="loadIncidents(true)"
+            @failed="loadIncidents(true)"
           />
         </template>
         <template #cell-severity="{ row }">
@@ -131,14 +147,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #cell-title="{ row }">
-          <div class="flex items-center gap-1">
-            <span>
+          <div class="flex min-w-0 items-center gap-1">
+            <OTruncatedText class="min-w-0">
               {{ row.title || formatDimensions(row.group_values) }}
-            </span>
+            </OTruncatedText>
+            <OTag
+              v-if="row.muted_by_downtime_id"
+              type="downtimeStatus"
+              value="active"
+              class="max-w-60 min-w-12 shrink-4"
+              data-test="incident-list-muted"
+            >
+              <span class="truncate">{{ mutedLabel(row.muted_by_downtime_id) }}</span>
+              <OTooltip :content="mutedTooltip(row.muted_by_downtime_id)" />
+            </OTag>
           </div>
         </template>
         <template #cell-dimensions="{ row }">
-          <div class="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden">
+          <div
+            v-if="getSortedDimensions(row.group_values).length"
+            class="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden"
+          >
             <ODimensionChip
               v-for="[key, value] in getSortedDimensions(row.group_values).slice(0, 2)"
               :key="key"
@@ -173,9 +202,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OTooltip>
             </OTag>
           </div>
+          <span v-else class="text-text-muted text-xs italic">
+            {{ t("alerts.incidents.noDimensionsAvailable") }}
+          </span>
         </template>
         <template #cell-alert_count="{ row }">
-          <OTag type="countChip" value="neutral">{{ row.alert_count }}</OTag>
+          <div
+            v-if="row.alert_groups?.length"
+            class="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden"
+          >
+            <OTag
+              v-for="group in row.alert_groups.slice(0, 2)"
+              :key="group.alert_id"
+              type="countChip"
+              value="neutral"
+              class="min-w-0"
+              data-test="incident-alert-group-chip"
+            >
+              <!-- One element, so the tooltip anchors on the whole label, truncated name included. -->
+              <span class="flex min-w-0">
+                <span class="truncate">{{ group.alert_name }}</span>
+                <span class="shrink-0">&nbsp;×{{ group.count }}</span>
+              </span>
+              <OTooltip
+                :delay="300"
+                :content="
+                  t(
+                    'alerts.incidents.alertGroupTooltip',
+                    { name: group.alert_name, count: group.count },
+                    group.count,
+                  )
+                "
+              />
+            </OTag>
+            <OTag
+              v-if="row.alert_groups.length > 2"
+              type="countChip"
+              value="neutral"
+              class="shrink-0"
+              data-test="incident-alert-group-more"
+            >
+              {{ t("alerts.incidents.moreAlertGroups", { count: row.alert_groups.length - 2 }) }}
+              <OTooltip :delay="300" :max-width="'28rem'">
+                <template #content>
+                  <div
+                    class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1"
+                    data-test="incident-alert-group-list"
+                  >
+                    <template v-for="group in row.alert_groups.slice(2)" :key="group.alert_id">
+                      <span class="truncate">{{ group.alert_name }}</span>
+                      <span class="text-right tabular-nums">×{{ group.count }}</span>
+                    </template>
+                  </div>
+                </template>
+              </OTooltip>
+            </OTag>
+          </div>
+          <OTag v-else type="countChip" value="neutral">{{ row.alert_count }}</OTag>
         </template>
         <template #cell-last_alert_at="{ row }">
           <OTimeCell
@@ -183,7 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             unit="us"
             mode="relative"
             :timezone="store.state.timezone"
-            empty-label="—"
+            :empty-label="raw('—')"
           />
         </template>
         <template #cell-actions="{ row }">
@@ -192,15 +275,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="row.status === 'open'"
               variant="ghost-warning"
               size="icon-sm"
+              :aria-label="t('alerts.incidents.acknowledgeAriaLabel')"
+              class="max-md:hidden"
               @click.stop="acknowledgeIncident(row)"
               data-test="incident-ack-btn"
-              ><OIcon name="visibility" size="sm" /><OTooltip
+              ><OIcon name="check-circle" size="sm" aria-hidden="true" /><OTooltip
                 :content="t('alerts.incidents.acknowledge')"
             /></OButton>
             <OButton
               v-if="row.status !== 'resolved'"
               variant="ghost-primary"
               size="icon-sm"
+              class="max-md:hidden"
               @click.stop="resolveIncident(row)"
               data-test="incident-resolve-btn"
               ><OIcon name="task-alt" size="sm" /><OTooltip
@@ -210,11 +296,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="row.status === 'resolved'"
               variant="ghost-warning"
               size="icon-sm"
+              class="max-md:hidden"
               @click.stop="reopenIncident(row)"
               data-test="incident-reopen-btn"
               ><OIcon name="restart-alt" size="sm" /><OTooltip
                 :content="t('alerts.incidents.reopen')"
             /></OButton>
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  :title="t('dashboard.moreActions')"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="incident-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                v-if="row.status === 'open'"
+                icon-left="visibility"
+                class="md:hidden"
+                data-test="incident-ack-btn-menu"
+                @select="acknowledgeIncident(row)"
+              >
+                <span>{{ t("alerts.incidents.acknowledge") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="row.status !== 'resolved'"
+                icon-left="task-alt"
+                class="md:hidden"
+                data-test="incident-resolve-btn-menu"
+                @select="resolveIncident(row)"
+              >
+                <span>{{ t("alerts.incidents.resolve") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="row.status === 'resolved'"
+                icon-left="restart-alt"
+                class="md:hidden"
+                data-test="incident-reopen-btn-menu"
+                @select="reopenIncident(row)"
+              >
+                <span>{{ t("alerts.incidents.reopen") }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </div>
         </template>
 
@@ -230,34 +357,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </template>
-
-        <!-- Bottom -->
-        <template #bottom>
-          <div class="flex h-12 w-full items-center justify-between">
-            <div class="mr-md flex w-25 items-center text-xs font-normal">
-              {{ visibleIncidents.length }}
-              {{ visibleIncidents.length === 1 ? "Incident" : "Incidents" }}
-            </div>
-          </div>
-        </template>
       </OTable>
     </OPageLayout>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, shallowRef, computed, onMounted, watch, nextTick } from "vue";
-import { useI18n } from "vue-i18n";
+import { useDowntimeLookup } from "@/composables/downtimes/useDowntimeLookup";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useQuery } from "@tanstack/vue-query";
+import { incidentsQuery } from "@/services/incidents.queries";
+import {
+  defineComponent,
+  ref,
+  shallowRef,
+  computed,
+  onMounted,
+  onUnmounted,
+  watch,
+  nextTick,
+} from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { formatToReadable } from "@/utils/date";
-import incidentsService, { Incident } from "@/services/incidents";
+import incidentsService, { type Incident } from "@/services/incidents";
+import IncidentAiAnalysisCell from "@/components/alerts/IncidentAiAnalysisCell.vue";
+import { isLiveRca } from "@/utils/incidents/rcaCell";
+import { useListViewState } from "@/composables/useListViewState";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -268,9 +403,15 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { COL } from "@/lib/core/Table/OTable.types";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
+
+/** Re-fetch period while a live RCA run is on the current page. */
+const RCA_LIVE_POLL_MS = 30_000;
 
 export default defineComponent({
   name: "IncidentList",
@@ -278,8 +419,10 @@ export default defineComponent({
     OPageLayout,
     OEmptyState,
     OButton,
+    ORefreshButton,
     OSearchInput,
     OTooltip,
+    OTruncatedText,
     OIcon,
     OTable,
     OTag,
@@ -288,21 +431,71 @@ export default defineComponent({
     OStatStrip,
     OToggleGroup,
     OToggleGroupItem,
+    ODropdown,
+    ODropdownItem,
+    IncidentAiAnalysisCell,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
     const route = useRoute();
+    const { confirm } = useConfirmDialog();
 
     const qTableRef: any = ref(null);
-    const loading = ref(false);
+    const orgIdForList = useOrgId();
+    // Set from `liveRowOnPage` below; the query getter reads it, so a change
+    // re-applies the options and TanStack restarts or stops its interval timer.
+    const pollLiveRows = ref(false);
+    const incidentsList = useQuery(() =>
+      Object.assign(incidentsQuery(orgIdForList.value, undefined as unknown as string, 1000, 0), {
+        enabled: !!orgIdForList.value,
+        refetchInterval: pollLiveRows.value ? RCA_LIVE_POLL_MS : (false as const),
+      }),
+    );
+
+    // `isPending` also starts true on a cold read, so the page-restore watch below still sees a real true→false transition.
+    const loading = incidentsList.isPending;
+    // Request in flight with rows still on screen — the refresh button's
+    // spinner. `loading` is the skeleton, for a cold read only.
+    const fetching = incidentsList.isFetching;
+    // Epoch ms of the last successful read — drives the button's "1m ago" label.
+    const lastUpdatedAt = incidentsList.dataUpdatedAt;
+    // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+    const forbidden = computed(() => {
+      const e: any = incidentsList.error.value;
+      return e?.status === 403 || e?.response?.status === 403;
+    });
+    // The first real load lands after mount: land on the saved page, or page 1 when it no longer exists. setTimeout(0) runs after the table has taken the new rows.
+    watch(
+      loading,
+      (isLoading) => {
+        if (isLoading) return;
+        setTimeout(() => {
+          qTableRef.value?.restorePage?.(currentPage.value);
+        }, 0);
+      },
+      { once: true },
+    );
     // The incident dataset is read-only display data replaced wholesale on every
     // reload, so hold it in a shallowRef (and freeze each row on load — see
     // loadIncidents). Vue then never deep-proxies the hundreds of objects, which
     // keeps the filter computeds and the table's row-model rebuild off the
     // reactivity hot path — the difference is very visible at a few hundred rows.
     const allIncidents = shallowRef<Incident[]>([]);
+    // The downtimes list is read only to name a muted row's downtime.
+    const { nameOf, notLoaded } = useDowntimeLookup(() =>
+      allIncidents.value.some((incident) => !!incident.muted_by_downtime_id),
+    );
+    // A downtime past the lookup's one page says so, with its id kept for the tooltip.
+    const mutedLabel = (id: string) =>
+      t("alerts.downtimes.incident.mutedBy", {
+        name: notLoaded(id) ? t("alerts.downtimes.incident.notLoaded") : nameOf(id),
+      });
+    const mutedTooltip = (id: string) =>
+      notLoaded(id)
+        ? t("alerts.downtimes.incident.notLoadedTooltip", { id })
+        : t("alerts.downtimes.incident.mutedBy", { name: nameOf(id) });
     const searchQuery = ref("");
     // Primary filter groups the lifecycle like other list pages: Active covers
     // both open and acknowledged (still needs attention), Resolved is done.
@@ -315,9 +508,41 @@ export default defineComponent({
         : "active",
     );
     const isRestoringState = ref(false);
-    const pageSize = ref(20);
+    const viewState = useListViewState("incidents", {
+      severityFilter: "all",
+      pageSize: 20,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+    });
+    const pageSize = ref(viewState.pageSize);
+    const sortBy = ref(viewState.sortBy);
+    const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
+    // Restored from the Vuex incidents store (same mechanism as searchQuery/statusFilter) so returning from a detail view lands back on the same page.
+    const currentPage = ref(1);
+    const onPageChange = (page: number) => {
+      currentPage.value = page;
+      savePageState();
+    };
     // Severity facet — independent of status ("all" | "P1".."P4").
-    const severityFilter = ref("all");
+    const severityFilter = ref(viewState.severityFilter);
+    watch([severityFilter, pageSize, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        severityFilter: severityFilter.value,
+        pageSize: pageSize.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
+    });
+    // The table keeps its page when the rows change (a poll refetch), so
+    // a new filter, sort or page size starts over on page 1 here.
+    const resetPage = () => {
+      currentPage.value = 1;
+      qTableRef.value?.restorePage?.(1);
+      savePageState();
+    };
+    watch([searchQuery, statusFilter, severityFilter, pageSize, sortBy, sortOrder], () => {
+      if (!isRestoringState.value) resetPage();
+    });
 
     const columns: OTableColumnDef[] = [
       {
@@ -349,12 +574,20 @@ export default defineComponent({
         meta: { align: "left" },
       },
       {
+        id: "ai_analysis",
+        header: t("alerts.incidents.aiAnalysis.column"),
+        resizable: true,
+        hideable: true,
+        size: 220,
+        meta: { align: "left" },
+      },
+      {
         id: "dimensions",
-        header: "Dimensions",
+        header: t("alerts.incidents.stableDimensions"),
         accessorKey: "group_values",
         resizable: true,
         hideable: true,
-        size: 500,
+        size: 320,
         meta: { align: "left" },
       },
       {
@@ -363,8 +596,8 @@ export default defineComponent({
         accessorKey: "alert_count",
         resizable: true,
         hideable: true,
-        size: 80,
-        meta: { align: "right" },
+        size: 260,
+        meta: { align: "left" },
       },
       {
         id: "last_alert_at",
@@ -437,6 +670,34 @@ export default defineComponent({
         (incident) => String(incident.severity).toUpperCase() === severityFilter.value,
       );
     });
+
+    // OTable pages and sorts on the client, so mirror its only sortable
+    // column to know which rows the current page shows.
+    const liveRowOnPage = computed(() => {
+      let rows = visibleIncidents.value;
+      if (sortBy.value === "last_alert_at") {
+        const dir = sortOrder.value === "desc" ? -1 : 1;
+        rows = [...rows].sort((a, b) => dir * (a.last_alert_at - b.last_alert_at));
+      }
+      const start = (currentPage.value - 1) * pageSize.value;
+      return rows.slice(start, start + pageSize.value).some((incident) => isLiveRca(incident.rca));
+    });
+    watch(
+      liveRowOnPage,
+      (live) => {
+        pollLiveRows.value = live;
+      },
+      { immediate: true },
+    );
+
+    // Deployment-wide switch; undefined (older server) reads as disabled.
+    const rcaEnabled = computed(() => store.state.zoConfig?.incidents_rca_enabled === true);
+    // Elapsed and "ago" labels in the AI analysis cell are relative to this clock.
+    const now = ref(Date.now());
+    const nowTimer = setInterval(() => {
+      now.value = Date.now();
+    }, RCA_LIVE_POLL_MS);
+    onUnmounted(() => clearInterval(nowTimer));
 
     // Severity breakdown for the summary strip (over the status-scoped set, so it
     // tracks the toggle). The four hues (red/orange/amber/blue) match the rail.
@@ -536,48 +797,61 @@ export default defineComponent({
                 : s === "P4"
                   ? "var(--color-blue-500)"
                   : "var(--color-grey-400)";
-      return { boxShadow: `inset 0.25rem 0 0 0 ${color}` };
+      return { boxShadow: `var(--shadow-rail-geom) ${color}` };
     };
 
-    const loadIncidents = async () => {
-      loading.value = true;
-      try {
-        const org = store.state.selectedOrganization.identifier;
-        const limit = 1000;
-        const offset = 0;
-        const keyword = undefined;
-
-        const response = await incidentsService.list(org, undefined, limit, offset, keyword);
-
-        // Freeze each row so Vue leaves it raw (frozen objects are never made
-        // reactive), both here and once it lands in the Vuex cache below.
-        const items: Incident[] = response.data.incidents || [];
-        for (const it of items) Object.freeze(it);
-        allIncidents.value = items;
-        store.dispatch("incidents/setCachedData", items);
-      } catch (error: any) {
-        toast({
-          variant: "error",
-          message: t("alerts.incidents.errorLoading"),
-        });
-        console.error("Failed to load incidents:", error);
-      } finally {
-        loading.value = false;
-      }
+    // Freezing and the Vuex dispatch are both idempotent, so this is safe to
+    // run twice — the cached rows paint, then the server's.
+    const applyIncidents = (data: any) => {
+      const items: Incident[] = data?.incidents || [];
+      // Frozen objects are never made reactive, so Vue leaves the hundreds of
+      // rows raw both here and in the Vuex cache below.
+      for (const it of items) Object.freeze(it);
+      allIncidents.value = items;
+      now.value = Date.now();
+      store.dispatch("incidents/setCachedData", items);
     };
 
-    const viewIncident = (incident: Incident) => {
+    // The list is the query now: anything that invalidates the incidents scope
+    // repaints these rows without this component asking.
+    watch(
+      incidentsList.data,
+      (data: any) => {
+        if (data) applyIncidents(data);
+      },
+      { immediate: true },
+    );
+    watch(incidentsList.error, (error: any) => {
+      // The grouped access toast already reports a 403; a second red toast adds nothing.
+      if (!error || forbidden.value) return;
+      toast({ variant: "error", message: t("alerts.incidents.errorLoading") });
+      console.error("Failed to load incidents:", error);
+    });
+
+    // Only an explicit call reads: refresh, post-write reload, search. Mount and
+    // invalidation-driven repaints come from the query itself.
+    const loadIncidents = async (force = false) => {
+      if (force) await incidentsList.refetch();
+    };
+
+    // `tab` selects the incident page's tab (e.g. "incidentAnalysis" from the AI analysis cell).
+    const viewIncident = (incident: Incident, tab?: string) => {
       store.dispatch("incidents/setIncidents", {
         searchQuery: searchQuery.value,
         statusFilter: statusFilter.value,
-        pagination: { page: 1, rowsPerPage: 20 },
+        pagination: { page: currentPage.value, rowsPerPage: pageSize.value },
         organizationIdentifier: store.state.selectedOrganization.identifier,
       });
 
+      // Spread the existing query so anything already on this route (e.g. page) survives the round trip to the detail view and back.
       router.push({
         name: "incidentDetail",
         params: { id: incident.id },
-        query: { org_identifier: store.state.selectedOrganization.identifier },
+        query: {
+          ...route.query,
+          org_identifier: store.state.selectedOrganization.identifier,
+          ...(tab ? { tab } : {}),
+        },
       });
     };
 
@@ -586,7 +860,7 @@ export default defineComponent({
       store.dispatch("incidents/setIncidents", {
         searchQuery: searchQuery.value,
         statusFilter: statusFilter.value,
-        pagination: { page: 1, rowsPerPage: 20 },
+        pagination: { page: currentPage.value, rowsPerPage: pageSize.value },
         organizationIdentifier: store.state.selectedOrganization.identifier,
       });
     };
@@ -616,7 +890,8 @@ export default defineComponent({
           variant: "success",
           message: t("alerts.incidents.statusUpdated"),
         });
-        loadIncidents();
+        // Post-write reload: must reach the server.
+        loadIncidents(true);
         store.dispatch("incidents/setShouldRefresh", true);
       } catch (error: any) {
         toast({
@@ -627,15 +902,39 @@ export default defineComponent({
       }
     };
 
-    const acknowledgeIncident = (incident: Incident) => {
+    const acknowledgeIncident = async (incident: Incident) => {
+      const ok = await confirm({
+        title: t("alerts.incidents.acknowledgeConfirmTitle"),
+        message: t("alerts.incidents.acknowledgeConfirmMessage"),
+        confirmLabel: t("alerts.incidents.acknowledgeConfirmLabel"),
+        cancelLabel: t("alerts.incidents.acknowledgeConfirmCancelLabel"),
+        persistent: false,
+      });
+      if (!ok) return;
       updateStatus(incident, "acknowledged");
     };
 
-    const resolveIncident = (incident: Incident) => {
+    const resolveIncident = async (incident: Incident) => {
+      const ok = await confirm({
+        title: t("alerts.incidents.resolveConfirmTitle"),
+        message: t("alerts.incidents.resolveConfirmMessage"),
+        confirmLabel: t("alerts.incidents.resolve"),
+        cancelLabel: t("common.cancel"),
+        persistent: false,
+      });
+      if (!ok) return;
       updateStatus(incident, "resolved");
     };
 
-    const reopenIncident = (incident: Incident) => {
+    const reopenIncident = async (incident: Incident) => {
+      const ok = await confirm({
+        title: t("alerts.incidents.reopenConfirmTitle"),
+        message: t("alerts.incidents.reopenConfirmMessage"),
+        confirmLabel: t("alerts.incidents.reopen"),
+        cancelLabel: t("common.cancel"),
+        persistent: false,
+      });
+      if (!ok) return;
       updateStatus(incident, "open");
     };
 
@@ -671,7 +970,7 @@ export default defineComponent({
 
     const formatDimensions = (dimensions: Record<string, string> | undefined) => {
       if (!dimensions || Object.keys(dimensions).length === 0) {
-        return "Unknown";
+        return t("common.unknown");
       }
       return Object.entries(dimensions)
         .map(([k, v]) => `${k}=${v}`)
@@ -755,6 +1054,9 @@ export default defineComponent({
         if (savedState.statusFilter !== undefined) {
           statusFilter.value = savedState.statusFilter;
         }
+        if (savedState.pagination?.page) {
+          currentPage.value = savedState.pagination.page;
+        }
         return true;
       }
       return false;
@@ -765,10 +1067,14 @@ export default defineComponent({
       const shouldRefresh = store.state.incidents?.shouldRefresh || false;
 
       if (allIncidents.value.length === 0 || shouldRefresh) {
+        // Not forced: the drawer's writes drop the cached list, so the observer refetches on its own and forcing here would repeat it.
         await loadIncidents();
         if (shouldRefresh) {
           store.dispatch("incidents/setShouldRefresh", false);
         }
+      } else {
+        // Cached data means loadIncidents() never ran, so loading needs an explicit false here to fire the once-off page-restore watch.
+        loading.value = false;
       }
 
       if (!store.state.incidents.isInitialized) {
@@ -779,7 +1085,7 @@ export default defineComponent({
         store.dispatch("incidents/setIncidents", {
           searchQuery: searchQuery.value,
           statusFilter: statusFilter.value,
-          pagination: { page: 1, rowsPerPage: 20 },
+          pagination: { page: currentPage.value, rowsPerPage: pageSize.value },
           organizationIdentifier: store.state.selectedOrganization.identifier,
         });
       }
@@ -788,13 +1094,20 @@ export default defineComponent({
       isRestoringState.value = false;
     });
 
-    watch(() => searchQuery.value, savePageState);
+    // Rows can leave under the current page (a resolve, a refetch); a page past
+    // the end falls back to page 1, and the table reports it to `onPageChange`.
+    watch(
+      () => visibleIncidents.value.length,
+      () => qTableRef.value?.restorePage?.(currentPage.value),
+      { flush: "post" },
+    );
 
     const refreshIncidents = async () => {
-      await loadIncidents();
+      // Explicit refresh: must reach the server.
+      await loadIncidents(true);
       toast({
         variant: "success",
-        message: "Incidents refreshed",
+        message: t("toastMessages.alerts.incidentsRefreshed"),
         timeout: 1500,
       });
     };
@@ -809,10 +1122,18 @@ export default defineComponent({
     ]);
 
     return {
+      mutedLabel,
+      mutedTooltip,
+      raw,
       t,
       loading,
+      fetching,
+      lastUpdatedAt,
+      forbidden,
       allIncidents,
       visibleIncidents,
+      rcaEnabled,
+      now,
       severityStats,
       severityFilter,
       onSeveritySelect,
@@ -823,6 +1144,10 @@ export default defineComponent({
       clearFilters,
       columns,
       pageSize,
+      sortBy,
+      sortOrder,
+      currentPage,
+      onPageChange,
       loadIncidents,
       refreshIncidents,
       viewIncident,

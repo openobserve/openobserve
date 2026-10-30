@@ -23,10 +23,13 @@
 // first-agent default the selected agent's `source_stream` is non-empty, so the
 // fallback is never observably reached (covered by an equivalence test).
 
+import { raw } from "@/types/i18n";
+
 import { computed, ref, watch } from "vue";
 import type { ComputedRef, Ref } from "vue";
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
-import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
+import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import {
   buildAgentSelectOptions,
@@ -84,6 +87,8 @@ export interface UseAgentScopeOptions {
    * requiring an explicit version pick.
    */
   versionAgnostic?: boolean;
+  /** Cascade only (Quality): each level offers and starts on "All"; the unset buckets are left out, as exact-match APIs cannot filter on them. */
+  allOption?: boolean;
   /** Module-scoped agents ref (Sessions/LLM) or created locally (Graph/Behavior). */
   agents?: Ref<GenAiAgentListItem[]>;
   /** Module-scoped agentsLoaded ref, created locally when omitted. */
@@ -135,6 +140,15 @@ export interface UseAgentScopeReturn {
    * No-op — returns false — outside cascade mode or when no agent matches.
    */
   selectAgentByName: (name: string) => boolean;
+  /**
+   * Seed the cascade from an exact (env, name, version) triple — the fuller
+   * restore path when all three dimensions were persisted, so a same-named
+   * agent under a different env/version doesn't get picked by mistake. Falls
+   * back to `selectAgentByName` (first match by name) when no agent matches
+   * the exact triple, e.g. the persisted version no longer exists for this
+   * window. Returns true when either resolved.
+   */
+  selectAgentByScope: (env: string, name: string, version: string) => boolean;
 }
 
 export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
@@ -161,7 +175,6 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
   // a dimension with exactly one value auto-selects, and changing any level
   // (or agents reloading) re-derives every level beneath it.
   const cascade = opts.cascade ?? false;
-  const versionAgnostic = opts.versionAgnostic ?? false;
   const selectedEnv = ref<string>("");
   const selectedAgentName = ref<string>("");
   const selectedVersion = ref<string>("");
@@ -182,32 +195,61 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
       if (seen.has(v)) continue;
       seen.add(v);
       out.push({
-        label: v === UNSET ? (unsetLabel ?? v) : v,
+        label: raw(v === UNSET ? (unsetLabel ?? v) : v),
         value: v,
       });
     }
     return out;
   }
 
+  const allOption = cascade && (opts.allOption ?? false);
+  // With allOption, an "All" level matches every agent and the unset bucket is not offered.
+  const levelMatches = (selected: string, value: string) =>
+    (allOption && selected === ALL_AGENTS_VALUE) || selected === value;
+  const withAll = (options: SelectOption[], allKey: string): SelectOption[] =>
+    allOption
+      ? [
+          { label: raw(opts.t(allKey)), value: ALL_AGENTS_VALUE },
+          ...options.filter((o) => o.value !== UNSET),
+        ]
+      : options;
+
   const envs = computed<SelectOption[]>(() =>
-    cascade ? distinctOptions(agents.value.map(agentEnv), opts.t("traces.agentNoEnv")) : [],
+    cascade
+      ? withAll(
+          distinctOptions(agents.value.map(agentEnv), opts.t("traces.agentNoEnv")),
+          "common.all",
+        )
+      : [],
   );
 
   const agentNames = computed<SelectOption[]>(() =>
     cascade
-      ? distinctOptions(
-          agents.value.filter((a) => agentEnv(a) === selectedEnv.value).map((a) => a.name),
+      ? withAll(
+          distinctOptions(
+            agents.value
+              .filter((a) => levelMatches(selectedEnv.value, agentEnv(a)))
+              .map((a) => a.name),
+          ),
+          "traces.allAgents",
         )
       : [],
   );
 
   const versions = computed<SelectOption[]>(() =>
     cascade
-      ? distinctOptions(
-          agents.value
-            .filter((a) => agentEnv(a) === selectedEnv.value && a.name === selectedAgentName.value)
-            .map(agentVersion),
-          opts.t("traces.agentNoVersion"),
+      ? withAll(
+          distinctOptions(
+            agents.value
+              .filter(
+                (a) =>
+                  levelMatches(selectedEnv.value, agentEnv(a)) &&
+                  levelMatches(selectedAgentName.value, a.name),
+              )
+              .map(agentVersion),
+            opts.t("traces.agentNoVersion"),
+          ),
+          "common.all",
         )
       : [],
   );
@@ -258,6 +300,18 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
     selectedEnv.value = agentEnv(match);
     selectedAgentName.value = match.name;
     selectedVersion.value = agentVersion(match);
+    return true;
+  }
+
+  function selectAgentByScope(env: string, name: string, version: string): boolean {
+    if (!cascade) return false;
+    const exact = agents.value.find(
+      (a) => agentEnv(a) === env && a.name === name && agentVersion(a) === version,
+    );
+    if (!exact) return selectAgentByName(name);
+    selectedEnv.value = env;
+    selectedAgentName.value = name;
+    selectedVersion.value = version;
     return true;
   }
 
@@ -326,7 +380,7 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
     if (!org || !startTime || !endTime) return;
     agentsLoaded.value = false;
     try {
-      const res = await genAiAgentMappingService.listAgents(org, startTime, endTime);
+      const res = await queryClient.fetchQuery(genAiAgentsQuery(org, startTime, endTime));
       agents.value = res.agents ?? [];
       if (allAgents) {
         // Sentinel shape: keep All-Agents; only clamp a now-invalid selection.
@@ -369,5 +423,6 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
     selectedAgentName,
     selectedVersion,
     selectAgentByName,
+    selectAgentByScope,
   };
 }

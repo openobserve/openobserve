@@ -32,6 +32,7 @@ pub struct Model {
     /// Per-series alerting for a PromQL alert. NULL means the alert predates
     /// the feature, which is the same as `false`.
     pub query_promql_multi_alert: Option<bool>,
+    pub query_promql_rule_mode: Option<bool>,
     pub query_vrl_function: Option<String>,
     pub query_search_event_type: Option<i16>,
     pub query_multi_time_range: Option<Json>,
@@ -52,6 +53,16 @@ pub struct Model {
     /// and every ingest pass (SA-19), and a JSON key is not portably
     /// indexable. NULL = not an SLO alert.
     pub slo_id: Option<String>,
+    /// The team this alert pages, overriding ownership discovery. An explicit
+    /// column rather than a key in `context_attributes` because "which alerts
+    /// route here" runs on every team delete and a JSON key is not portably
+    /// indexable. NULL = discover the owner from identity dimensions.
+    pub oncall_team: Option<String>,
+    /// Where the fix for this alert is written down. An explicit column beside
+    /// `oncall_team` and for the same reason: it is copied onto every response
+    /// record the alert opens, and a JSON key is not portably indexable.
+    /// NULL = no runbook.
+    pub runbook_url: Option<String>,
     /// Feature 5 (D42): the `SloCondition` payload. Follows the
     /// `query_aggregation` precedent, NOT `trigger_thresholds`, whose scope is
     /// threshold and level configuration only (D1).
@@ -66,11 +77,23 @@ pub struct Model {
     pub last_edited_by: Option<String>,
     pub updated_at: Option<i64>,
     pub align_time: bool,
+    // Legacy deduplication columns: no longer read or written, dropped in a later release.
     pub dedup_enabled: bool,
     pub dedup_time_window_minutes: Option<i32>,
     pub dedup_config: Option<Json>,
     pub creates_incident: bool,
     pub workflows: Json,
+    pub pending_period_sec: i64,
+    /// Send a recovery notification when this alert stops firing. NULL means
+    /// the alert predates the feature, which is the same as `false`.
+    pub notify_on_recovery: Option<bool>,
+    /// JSON array of destination names. NULL = the recovery follows the firing's own destinations.
+    pub recovery_destinations: Option<String>,
+    /// How long the condition must stay clear before the episode recovers.
+    /// NULL or 0 recovers on the first clear evaluation.
+    pub keep_firing_for_seconds: Option<i64>,
+    /// NULL predates the feature, which is the same as `false`.
+    pub suppress_repeats: Option<bool>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -124,6 +147,7 @@ mod tests {
             query_promql_condition: None,
             query_aggregation: None,
             query_promql_multi_alert: None,
+            query_promql_rule_mode: None,
             query_vrl_function: None,
             query_search_event_type: None,
             query_multi_time_range: None,
@@ -134,6 +158,8 @@ mod tests {
             priority: None,
             tags: None,
             slo_id: None,
+            oncall_team: None,
+            runbook_url: None,
             query_slo_condition: None,
             trigger_frequency_type: 0,
             trigger_frequency_seconds: 300,
@@ -150,6 +176,11 @@ mod tests {
             dedup_config: None,
             creates_incident: false,
             workflows: serde_json::json!(vec!["abc123"]),
+            pending_period_sec: 0,
+            notify_on_recovery: None,
+            recovery_destinations: None,
+            keep_firing_for_seconds: None,
+            suppress_repeats: None,
         };
         assert_eq!(m.id, "alert-1");
         assert_eq!(m.name, "High Error Rate");

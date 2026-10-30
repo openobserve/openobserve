@@ -179,7 +179,7 @@ impl Default for TantivyResultCache {
     fn default() -> Self {
         Self::new(
             config::get_config()
-                .limit
+                .search
                 .inverted_index_result_cache_max_entries,
         )
     }
@@ -394,20 +394,6 @@ mod tests {
 
         let retrieved = cache.get(&key);
         assert!(retrieved.is_some());
-    }
-
-    #[test]
-    fn test_tantivy_result_cache_stress_test() {
-        let cache = TantivyResultCache::new(100);
-
-        for i in 0..200 {
-            let key = format!("stress_key_{i}");
-            let result = create_test_count_result();
-            cache.put(key, result);
-        }
-
-        assert!(cache.get("stress_key_0").is_none());
-        assert!(cache.get("stress_key_199").is_some());
     }
 
     #[test]

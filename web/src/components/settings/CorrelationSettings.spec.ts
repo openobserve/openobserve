@@ -18,6 +18,12 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import CorrelationSettings from "./CorrelationSettings.vue";
+import { queryClient } from "@/composables/query/queryClient";
+import serviceStreamsService from "@/services/service_streams";
+import { serviceStreamKeys } from "@/services/service_streams.querykeys";
+import { onBeforeRouteLeave } from "vue-router";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { beginDraftSignOut, cancelDraftSignOut } from "@/utils/drafts/draftSession";
 
 vi.mock("vue-router", () => ({
   useRoute: () => ({ params: {}, query: {} }),
@@ -29,15 +35,6 @@ vi.mock("@/services/service_streams", () => ({
   default: {
     getSemanticGroups: vi.fn().mockResolvedValue({ data: [] }),
     updateSemanticGroups: vi.fn().mockResolvedValue({}),
-  },
-}));
-
-vi.mock("@/components/alerts/OrganizationDeduplicationSettings.vue", () => ({
-  default: {
-    name: "OrganizationDeduplicationSettings",
-    template: '<div data-test="org-deduplication-settings" />',
-    props: ["orgId", "config"],
-    emits: ["saved"],
   },
 }));
 
@@ -54,7 +51,7 @@ vi.mock("@/components/settings/ServiceIdentitySetup.vue", () => ({
     name: "ServiceIdentitySetup",
     template: '<div data-test="service-identity-setup" />',
     props: ["orgIdentifier", "semanticGroups"],
-    emits: ["navigate-to-aliases", "navigate-to-services", "update-service-fields"],
+    emits: ["navigate-to-aliases", "navigate-to-services"],
   },
 }));
 
@@ -78,9 +75,6 @@ const mockStore = createStore({
   state: {
     selectedOrganization: { identifier: "test-org" },
     theme: "light",
-    organizationSettings: {
-      deduplication_config: { enabled: true },
-    },
   },
 });
 
@@ -94,7 +88,6 @@ const mockI18n = createI18n({
           subtitle: "Configure service correlation",
           discoveredServicesTab: "Discovered Services",
           serviceDiscoveryTab: "Service Discovery",
-          alertCorrelationTab: "Alert Correlation",
           fieldAliasesTab: "Field Aliases",
         },
       },
@@ -159,11 +152,6 @@ describe("CorrelationSettings", () => {
       expect(wrapper.find('[data-name="discovery"]').exists()).toBe(true);
     });
 
-    it("should render Alert Correlation tab", () => {
-      wrapper = mountComponent();
-      expect(wrapper.find('[data-name="alert-correlation"]').exists()).toBe(true);
-    });
-
     it("should render Field Aliases tab", () => {
       wrapper = mountComponent();
       expect(wrapper.find('[data-name="field-aliases"]').exists()).toBe(true);
@@ -186,13 +174,6 @@ describe("CorrelationSettings", () => {
       expect(wrapper.find('[data-test="discovered-services"]').isVisible()).toBe(false);
     });
 
-    it("should show OrganizationDeduplicationSettings when activeTab=alert-correlation", async () => {
-      wrapper = mountComponent();
-      wrapper.vm.activeTab = "alert-correlation";
-      await wrapper.vm.$nextTick();
-      expect(wrapper.find('[data-test="org-deduplication-settings"]').exists()).toBe(true);
-    });
-
     it("should show SemanticFieldGroupsConfig when activeTab=field-aliases", async () => {
       wrapper = mountComponent();
       wrapper.vm.activeTab = "field-aliases";
@@ -208,12 +189,6 @@ describe("CorrelationSettings", () => {
       expect(wrapper.vm.activeTab).toBe("discovery");
     });
 
-    it("should switch to alert-correlation tab", () => {
-      wrapper = mountComponent();
-      wrapper.vm.onTabChange("alert-correlation");
-      expect(wrapper.vm.activeTab).toBe("alert-correlation");
-    });
-
     it("should switch back to services tab", () => {
       wrapper = mountComponent();
       wrapper.vm.onTabChange("discovery");
@@ -222,17 +197,10 @@ describe("CorrelationSettings", () => {
     });
   });
 
-  describe("onCorrelationSettingsSaved", () => {
-    it("should handle saved event without throwing", () => {
-      wrapper = mountComponent();
-      expect(() => wrapper.vm.onCorrelationSettingsSaved()).not.toThrow();
-    });
-  });
-
   describe("tabs computed", () => {
-    it("should have 4 tab entries", () => {
+    it("should have 3 tab entries", () => {
       wrapper = mountComponent();
-      expect(wrapper.vm.tabs).toHaveLength(4);
+      expect(wrapper.vm.tabs).toHaveLength(3);
     });
 
     it("should have correct tab values", () => {
@@ -240,7 +208,7 @@ describe("CorrelationSettings", () => {
       const values = wrapper.vm.tabs.map((t: any) => t.value);
       expect(values).toContain("services");
       expect(values).toContain("discovery");
-      expect(values).toContain("alert-correlation");
+      expect(values).not.toContain("alert-correlation");
       expect(values).toContain("field-aliases");
     });
   });
@@ -251,6 +219,58 @@ describe("CorrelationSettings", () => {
       wrapper.vm.activeTab = "discovery";
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.store.state.selectedOrganization.identifier).toBe("test-org");
+    });
+  });
+
+  // The groups are cached, and dimension analytics is computed from them, so a save expires the whole scope.
+  describe("saving field aliases", () => {
+    const scope = { queryKey: serviceStreamKeys.all("test-org") };
+
+    it("expires the service-correlation cache after a successful save", async () => {
+      const spy = vi.spyOn(queryClient, "invalidateQueries");
+      wrapper = mountComponent();
+      await flushPromises();
+      (wrapper.vm as any).draftSemanticGroups = [{ display: "Host", group: "", fields: ["host"] }];
+      await (wrapper.vm as any).saveSemanticGroups();
+
+      expect(spy).toHaveBeenCalledWith(scope);
+      spy.mockRestore();
+    });
+
+    it("leaves the cache alone when the save fails", async () => {
+      vi.mocked(serviceStreamsService.updateSemanticGroups).mockRejectedValueOnce(
+        new Error("boom"),
+      );
+      const spy = vi.spyOn(queryClient, "invalidateQueries");
+      wrapper = mountComponent();
+      await flushPromises();
+      (wrapper.vm as any).draftSemanticGroups = [{ display: "Host", group: "", fields: ["host"] }];
+      await (wrapper.vm as any).saveSemanticGroups();
+
+      expect(spy).not.toHaveBeenCalledWith(scope);
+      spy.mockRestore();
+    });
+  });
+
+  describe("leaving with unsaved field aliases", () => {
+    it("a forced sign-out offers only Discard, which cannot be dismissed", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      (wrapper.vm as unknown as { draftSemanticGroups: unknown[] }).draftSemanticGroups = [
+        { display: "Host", group: "", fields: ["host"] },
+      ];
+      const guard = vi.mocked(onBeforeRouteLeave).mock.calls[0][0] as () => Promise<boolean>;
+      const { currentDialog, handleConfirm } = useConfirmDialog();
+      beginDraftSignOut({ forced: true });
+      try {
+        const leave = guard();
+        await flushPromises();
+        expect(currentDialog.value).toMatchObject({ confirmOnly: true });
+        handleConfirm();
+        expect(await leave).toBe(true);
+      } finally {
+        cancelDraftSignOut();
+      }
     });
   });
 });

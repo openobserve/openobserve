@@ -47,18 +47,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { createGroup } from "@/services/iam";
+import { useMutation } from "@tanstack/vue-query";
+import { createGroupMutation } from "@/services/iam.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
-import { useStore } from "vuex";
+import { useI18nTyped } from "@/types/i18n";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeAddGroupSchema, type AddGroupForm } from "./AddGroup.schema";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const props = defineProps({
   open: {
     type: Boolean,
@@ -78,27 +79,27 @@ const emits = defineEmits(["update:open", "added:group"]);
 
 const { track } = useReo();
 
-const store = useStore();
-
 const addGroupSchema = makeAddGroupSchema(t);
 
 // The OForm owns `name`. The ODialog unmounts its body on close + remounts fresh
 // on open, so this typed computed re-seeds `:default-values` each open (the
 // optional `group` prop prefills it, otherwise blank). No local model / watch.
-const addGroupDefaults = computed(
-  (): AddGroupForm => ({
-    name: props.group?.name ?? "",
-  }),
-);
+const addGroupDefaults = computed((): AddGroupForm => ({
+  name: props.group?.name ?? "",
+}));
 
 // Plain async @submit handler — the validated `value` is the source of truth.
 // The schema validates the trimmed name (so surrounding whitespace doesn't trip
 // the regex, mirroring the old `v-model.trim`); trim again here so the saved
 // value matches. OForm awaits this, so the Save spinner spans the request.
+const orgId = useOrgId();
+const createGroupMutation_ = useMutation(() => createGroupMutation(orgId.value));
+
 const saveGroup = async (value: AddGroupForm) => {
   const name = value.name.trim();
   try {
-    const res = await createGroup(name, store.state.selectedOrganization.identifier);
+    // The mutation declares the scope it drops; this component never names a cache.
+    const res = await createGroupMutation_.mutateAsync(name);
     emits("added:group", { group_name: name, data: res.data });
     emits("update:open", false);
 

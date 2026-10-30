@@ -1,6 +1,9 @@
 const { expect } = require('@playwright/test');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { isCloudEnvironment } = require('../cloudPages/cloud-env.js');
+
+// The dropdown trigger intermittently drops the opening click, so it is re-tried.
+const HELP_MENU_OPEN_ATTEMPTS = 3;
 import { openNavFlyoutChild } from '../commonActions.js';
 
 class EnrichmentPage {
@@ -16,15 +19,14 @@ class EnrichmentPage {
         this.listAddBtn = page.locator('[data-test="enrichment-tables-add-btn"]');
         this.searchInput = page.locator('[data-test="enrichment-tables-search-input"]');
         this.searchInputField = page.locator('[data-test="enrichment-tables-search-input-field"]');
+        this.listRefreshBtn = page.locator('[data-test="enrichment-tables-list-refresh-btn"]');
 
         // ────────────────────────────────────────────────────────────────────
         // Add / Update enrichment table form locators (AddEnrichmentTable.vue)
         // ────────────────────────────────────────────────────────────────────
-        this.addPage = page.locator('[data-test="add-enrichment-table-page"]');
-        this.addTitle = page.locator('[data-test="add-enrichment-table-title"]');
-        this.addBackBtn = page.locator('[data-test="add-enrichment-table-back-btn"]');
-        this.addCancelBtn = page.locator('[data-test="add-enrichment-table-cancel-btn"]');
-        this.addSaveBtn = page.locator('[data-test="add-enrichment-table-save-btn"]');
+        this.addPage = page.locator('[data-test="add-enrichment-table-dialog"]');
+        this.addCancelBtn = page.locator('[data-test="add-enrichment-table-dialog"] [data-test="o-dialog-secondary-btn"]');
+        this.addSaveBtn = page.locator('[data-test="add-enrichment-table-dialog"] [data-test="o-dialog-primary-btn"]');
         this.nameField = page.locator('[data-test="add-enrichment-table-name-field"]');
         // OOptionGroup root + per-option data-test forwarded by OOptionGroup
         this.sourceGroup = page.locator('[data-test="add-enrichment-table-source"]');
@@ -75,6 +77,8 @@ class EnrichmentPage {
         // ────────────────────────────────────────────────────────────────────
         this.vrlEditor = '[data-test="logs-vrl-function-editor"]';
         this.refreshButton = '[data-test="logs-search-bar-refresh-btn"]';
+        // While a search runs the same data-test is the Cancel button, so idle is keyed on the Run title.
+        this.idleRunQueryButton = page.locator('[data-test="logs-search-bar-refresh-btn"][title="Run query"]');
         this.showQueryToggleBtn = '[data-test="logs-search-bar-show-query-toggle-btn"]';
         this.functionsBtn = '[data-test="logs-search-functions-btn"]';
 
@@ -246,7 +250,23 @@ class EnrichmentPage {
      */
     async clickHelpMenuItem() {
         await this.helpMenuItem.waitFor({ state: 'visible', timeout: 10000 });
-        await this.helpMenuItem.click();
+
+        // The trigger intermittently swallows the first click and stays closed, which
+        // then reads as the menu's items being missing rather than never rendered.
+        // `data-state` is the dropdown's own signal, so it separates the two.
+        for (let attempt = 1; attempt <= HELP_MENU_OPEN_ATTEMPTS; attempt++) {
+            await this.helpMenuItem.click();
+            try {
+                await expect(this.helpMenuItem)
+                    .toHaveAttribute('data-state', 'open', { timeout: 3000 });
+                return;
+            } catch (e) {
+                testLogger.warn(`clickHelpMenuItem: menu still closed after attempt ${attempt}`);
+            }
+        }
+        throw new Error(
+            `help menu did not open after ${HELP_MENU_OPEN_ATTEMPTS} attempts`
+        );
     }
 
     /**
@@ -333,10 +353,17 @@ class EnrichmentPage {
         await openNavFlyoutChild(this.page, 'pipeline');
         await this.enrichmentTableTab.click();
         await listResponse;
-        // Wait for the enrichment tables list page to be visible. Alpha nav can be
-        // slow under load — give it room so a transient slow render doesn't abort
-        // callers that poll this (e.g. waitForUrlJobToFinish).
-        await this.listPage.waitFor({ state: 'visible', timeout: 20000 });
+        // Wait for the enrichment tables list page to be visible. Alpha nav can be slow
+        // under load; if the tab click didn't land or the page didn't render in time,
+        // re-open the nav flyout and re-click the tab once before failing (the
+        // enrichment-table-url:318 flake was this 20s wait timing out under load).
+        try {
+            await this.listPage.waitFor({ state: 'visible', timeout: 30000 });
+        } catch (e) {
+            await openNavFlyoutChild(this.page, 'pipeline');
+            await this.enrichmentTableTab.click().catch(() => {});
+            await this.listPage.waitFor({ state: 'visible', timeout: 30000 });
+        }
     }
 
     /**
@@ -508,10 +535,10 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     async applyQuery() {
-        // OButton returns early in handleClick when loading=true, so wait for enabled first.
         const refreshBtn = this.page.locator(this.refreshButton);
         await refreshBtn.waitFor({ state: 'visible', timeout: 15000 });
-        await expect(refreshBtn).toBeEnabled({ timeout: 15000 });
+        // An auto-run search makes this button an enabled Cancel, so "enabled" alone would cancel that search.
+        await expect(this.idleRunQueryButton).toBeEnabled({ timeout: 30000 });
 
         // Click on the run query button and wait for response
         const search = this.page.waitForResponse("**/api/**/_search**");
@@ -538,28 +565,19 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.page.waitForLoadState('domcontentloaded');
     }
 
-    async applyQueryMultipleClicks() {
-        // Click run query button multiple times to ensure it registers (VRL test specific).
-        // NOTE: Do NOT use `{ force: true }` — OButton's @click handler does not
-        // fire on a forced click (Reka Primitive expects a real bubble path).
-        // Key the final click to a _search response so we don't sit in a
-        // 10s networkidle wait for cross-domain background requests.
-        const refreshButton = this.page.locator(this.refreshButton);
-        await refreshButton.waitFor({ state: 'visible' });
-
-        for (let i = 0; i < 4; i++) {
-            if (i === 3) {
-                const searchResp = this.page.waitForResponse(
-                    (resp) => /\/api\/.*\/_search/.test(resp.url()),
-                    { timeout: 30000 }
-                ).catch(() => null);
-                await refreshButton.click();
-                await searchResp;
-            } else {
-                await refreshButton.click();
-                await this.page.waitForLoadState('domcontentloaded');
-            }
-        }
+    async runQueryWhenIdle({ withVrl = false } = {}) {
+        // Do NOT use `{ force: true }`: OButton's @click handler does not fire on a forced click.
+        await expect(this.idleRunQueryButton).toBeVisible({ timeout: 30000 });
+        await expect(this.idleRunQueryButton).toBeEnabled({ timeout: 15000 });
+        // With Auto Run on, a search without the VRL can answer first; only the one carrying it proves enrichment ran.
+        const searchResp = this.page.waitForResponse(
+            (resp) => /\/api\/.*\/_search/.test(resp.url())
+                && (!withVrl || /"query_fn":"[^"]+"/.test(resp.request().postData() || '')),
+            { timeout: 30000 }
+        );
+        await this.idleRunQueryButton.click();
+        await searchResp;
+        await expect(this.idleRunQueryButton).toBeVisible({ timeout: 30000 });
     }
 
     async verifyNoQueryWarning() {
@@ -571,21 +589,8 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     async expandFirstLogRow() {
-        // Additional run query clicks to ensure VRL enrichment is fully processed.
-        // NOTE: Do NOT use `{ force: true }` — see applyQueryMultipleClicks().
-        // Key each click to a _search response so we don't burn 10s networkidle
-        // timeouts per iteration.
-        const refreshButton = this.page.locator(this.refreshButton);
-        if (await refreshButton.isVisible()) {
-            for (let i = 0; i < 3; i++) {
-                const searchResp = this.page.waitForResponse(
-                    (resp) => /\/api\/.*\/_search/.test(resp.url()),
-                    { timeout: 15000 }
-                ).catch(() => null);
-                await refreshButton.click();
-                await searchResp;
-            }
-        }
+        // Re-run once the previous search settles; clicking mid-search hits Cancel and empties the grid.
+        await this.runQueryWhenIdle();
 
         // Wait for timestamp column to be visible and stable
         await this.timestampColumn.first().waitFor({ state: 'visible', timeout: 30000 });
@@ -800,8 +805,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         // Wait for VRL editor to be fully ready for processing
         await this.waitForVRLEditorReady();
 
-        // Apply query with multiple clicks for VRL test reliability
-        await this.applyQueryMultipleClicks();
+        await this.runQueryWhenIdle({ withVrl: true });
 
         // Wait for query results to load — either the timestamp column appears
         // (success) or the error-details button appears (failure).
@@ -818,7 +822,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
             testLogger.warn('Error detected after first VRL query attempt, waiting 5s and retrying');
 
             // Retry the query — the backend may need a moment to index the new table
-            await this.applyQueryMultipleClicks();
+            await this.runQueryWhenIdle({ withVrl: true });
             await Promise.race([
                 timestampCol.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {}),
                 errorDetailsBtn.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {}),
@@ -974,9 +978,12 @@ abc, err = get_enrichment_table_record("${fileName}", {
         // appears; for the negative path (callers expecting non-existence)
         // wait only for the input value to flush so the filter has fired.
         if (expectExists) {
+            // The list is fetched once right after save and can predate the new table, so re-fetch it while the row is missing.
             await expect.poll(async () => {
-                return await this.getRowTypeCell(tableName).isVisible({ timeout: 200 }).catch(() => false);
-            }, { timeout: 15000, intervals: [200, 500, 1000, 2000] }).toBe(true);
+                if (await this.getRowTypeCell(tableName).isVisible().catch(() => false)) return true;
+                if (await this.listRefreshBtn.isEnabled().catch(() => false)) await this.listRefreshBtn.click().catch(() => {});
+                return false;
+            }, { timeout: 45000, intervals: [500, 1000, 2000, 3000] }).toBe(true);
         } else {
             // Negative path: wait for the input value to be committed; callers
             // (verifyTableNotCreated) then poll for count==0 on their own.
@@ -1036,16 +1043,16 @@ abc, err = get_enrichment_table_record("${fileName}", {
             throw new Error(`Edit button for table "${tableName}" not visible — URL job may still be processing.`);
         }
         await editBtn.click();
-        // Edit form mounts immediately — wait for the add/update page wrapper
+        // Edit form mounts immediately — wait for the add/update dialog
         await this.addPage.waitFor({ state: 'visible', timeout: 10000 });
         testLogger.debug('Edit button clicked');
     }
 
     async verifyUpdateMode() {
         testLogger.debug('Verifying update mode form is visible');
-        // Wait for the update form: the add-enrichment-table-page mounts both
-        // for "Add" and "Update" — title differs but page data-test does not.
-        // Use the page locator + name field as ready signals.
+        // Wait for the update form: the add-enrichment-table-dialog mounts both
+        // for "Add" and "Update" — title differs but dialog data-test does not.
+        // Use the dialog locator + name field as ready signals.
         await this.addPage.waitFor({ state: 'visible', timeout: 30000 });
         // Verify the name field is present (always rendered in both modes)
         await this.nameField.waitFor({ state: 'visible', timeout: 10000 });
@@ -1219,7 +1226,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         const urlWrapper = this.page.locator('[data-test="add-enrichment-table-url"]');
         await urlWrapper.waitFor({ state: 'visible', timeout: 10000 });
 
-        // Snapshot the entire add-enrichment-table-page subtree for diagnostics
+        // Snapshot the entire add-enrichment-table-dialog subtree for diagnostics
         // — the error may be rendered in a parent container if Vue's reactivity
         // routes through a slot/template.
         await expect.poll(async () => {
@@ -1777,26 +1784,30 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
         // The duplicate-name error surfaces either as an OToast notification
         // (`o-toast-error` / `o-toast-message`) or as an inline error on the
-        // name OInput wrapper. Accept either.
-        const toastVisible = await this.toastError.first().isVisible({ timeout: 5000 }).catch(() => false);
-        if (toastVisible) {
-            testLogger.debug('Duplicate name error verified via OToast');
-            return;
-        }
-        const toastMsg = await this.toastMessage.first().isVisible({ timeout: 1000 }).catch(() => false);
-        if (toastMsg) {
-            testLogger.debug('Duplicate name error verified via toast message');
-            return;
-        }
-        // Fallback: inline error on the name field wrapper
+        // name OInput wrapper. Accept either. The save request may still be in
+        // flight when this is called, so poll rather than one-shot check.
         const nameWrapper = this.page.locator('[data-test="add-enrichment-table-name"]');
-        const hasInline = await nameWrapper.evaluate((el) => {
-            const text = el.textContent || '';
-            return /already exists|duplicate|exists/i.test(text);
-        }).catch(() => false);
-        expect(hasInline).toBe(true);
+        const deadline = Date.now() + 20000;
+        while (Date.now() < deadline) {
+            if (await this.toastError.first().isVisible({ timeout: 1000 }).catch(() => false)) {
+                testLogger.debug('Duplicate name error verified via OToast');
+                return;
+            }
+            if (await this.toastMessage.first().isVisible({ timeout: 500 }).catch(() => false)) {
+                testLogger.debug('Duplicate name error verified via toast message');
+                return;
+            }
+            const hasInline = await nameWrapper
+                .evaluate((el) => /already exists|duplicate|exists/i.test(el.textContent || ''))
+                .catch(() => false);
+            if (hasInline) {
+                testLogger.debug('Duplicate name error verified via inline error');
+                return;
+            }
+            await this.page.waitForTimeout(1000);
+        }
 
-        testLogger.debug('Duplicate name error verified');
+        throw new Error('Duplicate name error did not surface (toast or inline) within 20s');
     }
 
     /**
@@ -2520,6 +2531,66 @@ abc, err = get_enrichment_table_record("${fileName}", {
         const inputFile = this.page.locator(this.fileInput);
         await inputFile.setInputFiles(filePath);
         testLogger.debug('File input set');
+    }
+
+    /** Delete on a budget; the prefix sweep in cleanup.spec.js is the real safety net. */
+    async bestEffortDeleteTable(tableName, budgetMs = 30000) {
+        let timer;
+        const budget = new Promise((resolve) => {
+            timer = setTimeout(() => resolve({ deleted: false, reason: 'budget_exceeded' }), budgetMs);
+        });
+        try {
+            return await Promise.race([this.deleteTableIfExists(tableName), budget]);
+        } catch (error) {
+            return { deleted: false, reason: 'deletion_failed', error: error.message };
+        } finally {
+            clearTimeout(timer);
+        }
+    }
+
+    /** Upload a CSV table under the given name, ready to be explored. */
+    async uploadTableAndConfirmListed(tableName, csvPath) {
+        await this.uploadEnrichmentFile(csvPath, tableName);
+        await this.waitForAddFormToClose();
+        await this.searchEnrichmentTableInList(tableName);
+        await this.verifyTableVisibleInList(tableName);
+    }
+
+    /** Wait for Explore to land on the logs page and hand back its query params. */
+    async waitForExploreNavigation() {
+        await this.page.waitForURL(/\/web\/logs/, { timeout: 30000 });
+        return new URL(this.page.url()).searchParams;
+    }
+
+    /** Explore must carry the table's own stream type, not fall back to logs. */
+    async expectExploreScopedToTable(tableName) {
+        const params = await this.waitForExploreNavigation();
+        expect(params.get('stream_type')).toBe('enrichment_tables');
+        expect(params.get('stream')).toBe(tableName);
+        expect(params.get('type')).toBe('stream_explorer');
+    }
+
+    /** Explore derives from/to from the table's stats; a 15m period means the lookup failed. */
+    async expectExploreTimeRangeFromTableStats() {
+        const params = await this.waitForExploreNavigation();
+        expect(params.get('period'), 'explore fell back to a relative period').toBeNull();
+
+        const from = Number(params.get('from'));
+        const to = Number(params.get('to'));
+        expect(Number.isFinite(from) && from > 0, `unusable from=${params.get('from')}`).toBe(true);
+        expect(Number.isFinite(to) && to > from, `unusable to=${params.get('to')}`).toBe(true);
+        return { from, to };
+    }
+
+    /** The explored table's own columns must load, which is what "stream not found" used to block. */
+    async expectFieldListContains(fieldName) {
+        await this.page
+            .locator(`[data-test="logs-field-list-item-${fieldName}"]`)
+            .waitFor({ state: 'visible', timeout: 30000 });
+    }
+
+    async expectNoStreamNotFoundError() {
+        await expect(this.page.getByText(/stream not found/i)).toHaveCount(0);
     }
 }
 

@@ -53,4 +53,14 @@ describe("OIcon", () => {
     // verify the wrapper renders something inside the span.
     expect(wrapper.find("span").element.children.length).toBeGreaterThan(0);
   });
+
+  it("marks directional icons for RTL mirroring", () => {
+    const wrapper = mount(OIcon, { props: { name: "chevron-left" } });
+    expect(wrapper.find("span").attributes("data-rtl-mirror")).toBe("true");
+  });
+
+  it("does not mark non-directional icons for RTL mirroring", () => {
+    const wrapper = mount(OIcon, { props: { name: "settings" } });
+    expect(wrapper.find("span").attributes("data-rtl-mirror")).toBeUndefined();
+  });
 });

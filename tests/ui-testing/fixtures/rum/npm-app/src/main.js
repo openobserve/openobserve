@@ -1,18 +1,18 @@
 // NPM-package RUM instrumentation entry (bundled by esbuild).
 // --------------------------------------------------------------------------
-// This is the NPM counterpart to the CDN sample's `oo-rum.js`. It imports the
-// published packages, initializes RUM + Logs, and then installs `window.OO_RUM`
-// / `window.OO_LOGS` shims so the SHARED sample interactions in
+// This is the NPM counterpart to the CDN sample's `o2-rum.js`. It imports the
+// published packages, initializes RUM + Logs, and then installs `window.O2_RUM`
+// / `window.O2_LOGS` shims so the SHARED sample interactions in
 // `fixtures/rum/cdn-sample/app.js` run UNCHANGED (that app.js was written for
 // the CDN async-loader stub which exposes an `.onReady()` queue).
 //
-// Config is injected by the fixture server as `window.__OO_CONFIG__` before this
+// Config is injected by the fixture server as `window.__O2_CONFIG__` before this
 // bundle executes.
 
 import { openobserveRum } from '@openobserve/browser-rum';
 import { openobserveLogs } from '@openobserve/browser-logs';
 
-const cfg = window.__OO_CONFIG__ || {};
+const cfg = window.__O2_CONFIG__ || {};
 
 openobserveLogs.init({
   clientToken: cfg.clientToken,
@@ -55,5 +55,5 @@ if (typeof openobserveRum.onReady !== 'function') {
 if (typeof openobserveLogs.onReady !== 'function') {
   openobserveLogs.onReady = (cb) => cb();
 }
-window.OO_RUM = openobserveRum;
-window.OO_LOGS = openobserveLogs;
+window.O2_RUM = openobserveRum;
+window.O2_LOGS = openobserveLogs;

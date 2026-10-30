@@ -207,11 +207,6 @@ impl SsoClaimParserError {
             claims_json: None,
         }
     }
-
-    pub fn with_claims(mut self, claims_json: String) -> Self {
-        self.claims_json = Some(claims_json);
-        self
-    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -357,25 +352,13 @@ mod tests {
     }
 
     #[test]
-    fn test_sso_claim_parser_error_with_claims() {
-        let ce = SsoClaimParserError::new(
-            "fn".to_string(),
-            "parse_error".to_string(),
-            "bad input".to_string(),
-        )
-        .with_claims(r#"{"sub":"user1"}"#.to_string());
-        assert!(ce.claims_json.is_some());
-        assert!(ce.claims_json.unwrap().contains("user1"));
-    }
-
-    #[test]
     fn test_sso_claim_parser_error_serialization_with_claims() {
-        let ce = SsoClaimParserError::new(
-            "my_fn".to_string(),
-            "exec_error".to_string(),
-            "vrl failed".to_string(),
-        )
-        .with_claims(r#"{"key":"val"}"#.to_string());
+        let ce = SsoClaimParserError {
+            function_name: "my_fn".to_string(),
+            error_type: "exec_error".to_string(),
+            error: "vrl failed".to_string(),
+            claims_json: Some(r#"{"key":"val"}"#.to_string()),
+        };
         let error_data = ErrorData {
             _timestamp: 1,
             stream_params: StreamParams::default(),

@@ -1083,7 +1083,7 @@ pub async fn get_group_details(Path(_path): Path<(String, String)>) -> Response 
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
-pub async fn get_resources(Path(_org_id): Path<String>) -> Response {
+pub async fn get_resources(Path(org_id): Path<String>) -> Response {
     #[cfg(feature = "cloud")]
     use o2_openfga::meta::mapping::NON_CLOUD_RESOURCE_KEYS;
     use o2_openfga::meta::mapping::{Resource, remove_resource_keys};
@@ -1101,6 +1101,10 @@ pub async fn get_resources(Path(_org_id): Path<String>) -> Response {
         .into_iter()
         .filter(|r| !remove_keys.contains(&r.key))
         .collect::<Vec<&Resource>>();
+    let resources = hide_slack_unless_enabled(
+        resources,
+        o2_enterprise::enterprise::slack::enabled_for(&org_id),
+    );
     Json(resources).into_response()
 }
 
@@ -1286,6 +1290,23 @@ pub async fn delete_group_bulk(
 )]
 pub async fn delete_group(Path(_path): Path<(String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
+}
+
+#[cfg(feature = "enterprise")]
+fn hide_slack_unless_enabled<'a, 'b>(
+    resources: Vec<&'b o2_openfga::meta::mapping::Resource<'a>>,
+    slack_enabled: bool,
+) -> Vec<&'b o2_openfga::meta::mapping::Resource<'a>> {
+    let slack_key = o2_openfga::meta::mapping::OFGA_MODELS
+        .get("slack")
+        .map(|r| r.key);
+    if slack_enabled || slack_key.is_none() {
+        return resources;
+    }
+    resources
+        .into_iter()
+        .filter(|r| Some(r.key) != slack_key)
+        .collect()
 }
 
 #[cfg(test)]
@@ -1828,5 +1849,21 @@ mod tests {
         assert_eq!(request.remove_users, Some(remove_users));
         assert!(request.add_roles.is_none());
         assert!(request.remove_roles.is_none());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn slack_resource_is_listed_only_while_slack_is_enabled() {
+        use o2_openfga::meta::mapping::{OFGA_MODELS, Resource};
+        let keys = |resources: &[&Resource]| -> Vec<String> {
+            resources.iter().map(|r| r.key.to_string()).collect()
+        };
+        let all: Vec<&Resource> = OFGA_MODELS.values().collect();
+        let off = hide_slack_unless_enabled(all.clone(), false);
+        assert!(!keys(&off).contains(&"slack_integration".to_string()));
+        assert_eq!(off.len(), all.len() - 1);
+        let on = hide_slack_unless_enabled(all.clone(), true);
+        assert!(keys(&on).contains(&"slack_integration".to_string()));
+        assert_eq!(on.len(), all.len());
     }
 }

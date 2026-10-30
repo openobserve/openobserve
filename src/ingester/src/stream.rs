@@ -13,7 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
+use std::{
+    collections::{BTreeMap, btree_map},
+    path::PathBuf,
+    sync::Arc,
+};
 
 use arrow_schema::Schema;
 use config::{stats::MemorySize, utils::schema_ext::SchemaExt};
@@ -44,13 +48,11 @@ impl Stream {
         batch: Arc<RecordBatchEntry>,
     ) -> Result<usize> {
         let mut arrow_size = 0;
-        let partition = match self.partitions.get_mut(&entry.stream) {
-            Some(v) => v,
-            None => {
+        let partition = match self.partitions.entry(entry.schema_key.clone()) {
+            btree_map::Entry::Occupied(v) => v.into_mut(),
+            btree_map::Entry::Vacant(v) => {
                 arrow_size += schema.size();
-                self.partitions
-                    .entry(entry.schema_key.clone())
-                    .or_insert_with(Partition::new)
+                v.insert(Partition::new())
             }
         };
         arrow_size += partition.write(entry, batch)?;
@@ -106,7 +108,28 @@ impl MemorySize for Stream {
 
 #[cfg(test)]
 mod tests {
+    use arrow::{array::Int64Array, record_batch::RecordBatch};
+    use arrow_schema::{DataType, Field};
+    use config::utils::record_batch_ext::RecordBatchExt;
+
     use super::*;
+
+    fn write_entry(s: &mut Stream, schema: &Arc<Schema>, schema_key: &str) -> usize {
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(Int64Array::from(vec![1_i64, 2, 3]))],
+        )
+        .unwrap();
+        let arrow_size = batch.size();
+        let batch = RecordBatchEntry::new("logs".into(), batch, 10, arrow_size);
+        let entry = Entry {
+            stream: "default".into(),
+            schema_key: schema_key.into(),
+            partition_key: "2026/10/15/00".into(),
+            ..Entry::new()
+        };
+        s.write(schema.clone(), entry, batch).unwrap() - arrow_size
+    }
 
     #[test]
     fn test_stream_new_has_empty_partitions() {
@@ -118,5 +141,19 @@ mod tests {
     fn test_stream_mem_size_empty() {
         let s = Stream::new();
         assert!(s.mem_size() >= std::mem::size_of::<Stream>());
+    }
+
+    #[test]
+    fn test_stream_write_counts_schema_size_once_per_partition() {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "_timestamp",
+            DataType::Int64,
+            false,
+        )]));
+        let mut s = Stream::new();
+        assert_eq!(write_entry(&mut s, &schema, "hash_a"), schema.size());
+        assert_eq!(write_entry(&mut s, &schema, "hash_a"), 0);
+        assert_eq!(write_entry(&mut s, &schema, "hash_b"), schema.size());
+        assert_eq!(s.partitions.len(), 2);
     }
 }

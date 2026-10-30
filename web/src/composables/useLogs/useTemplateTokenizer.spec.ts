@@ -463,10 +463,13 @@ describe("anomalyExplanation", () => {
     expect(result).toContain("freq=1");
   });
 
-  it("returns patternAnomalyRarePlural for very low percentage with freq>1", () => {
+  // One pipe-plural message, so the KEY no longer changes with the count — the
+  // `count` arg is what picks the form, and that is what this asserts.
+  it("passes the raw frequency as the plural choice for freq>1", () => {
     const result = anomalyExplanation({ percentage: 0.5, frequency: 3 }, t);
-    expect(result).toContain("search.patternAnomalyRarePlural");
+    expect(result).toContain("search.patternAnomalyRare");
     expect(result).toContain("freq=3");
+    expect(result).toContain("count=3");
   });
 
   it("returns patternAnomalyLowFreq when z_score < -1.5 and avg_frequency > 0", () => {
@@ -478,12 +481,12 @@ describe("anomalyExplanation", () => {
     expect(result).toContain("freq=2");
   });
 
-  it("returns patternAnomalyLowFreqPlural for low-freq with freq>1", () => {
+  it("returns patternAnomalyLowFreq for low-freq with freq>1", () => {
     const result = anomalyExplanation(
       { percentage: 5, frequency: 50, z_score: -2.5, avg_frequency: 500 },
       t,
     );
-    expect(result).toContain("search.patternAnomalyLowFreqPlural");
+    expect(result).toContain("search.patternAnomalyLowFreq");
   });
 
   it("falls back to anomaly score when no other condition matches", () => {

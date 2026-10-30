@@ -16,31 +16,30 @@
 use std::{future::Future, io::Error};
 
 use arrow_schema::{DataType, Field, Schema};
-use axum::{
-    Json, http,
-    response::{IntoResponse, Response as HttpResponse},
-};
+use axum::{http, response::Response as HttpResponse};
 use chrono::{TimeZone, Timelike, Utc};
 use common::meta::{
     authz::Authz,
-    http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
+    http::HttpResponse as MetaHttpResponse,
     stream::{FieldUpdate, Stream, StreamCreate},
 };
-// Reserved self-reporting stream guards are a Cloud-only concern (Cloud manages
-// these streams for billing); OSS / self-hosted must not block user streams.
-#[cfg(feature = "cloud")]
-use config::meta::self_reporting::usage::is_reserved_internal_stream;
 use config::{
-    SIZE_IN_MB, TIMESTAMP_COL_NAME, get_config, is_local_disk_storage,
+    META_ORG_ID, SIZE_IN_MB, TIMESTAMP_COL_NAME, get_config, is_local_disk_storage,
     meta::{
         promql,
         promql::get_metadata_from_schema as get_prom_metadata_from_schema,
+        self_reporting::{ai_chat::is_protected_ai_chat_stream, usage::AUDIT_STREAM},
         stream::{
             DistinctField, PartitionTimeLevel, StreamField, StreamSettings, StreamStats,
             StreamType, TimeRange, UpdateStreamSettings,
         },
     },
-    utils::{flatten::format_label_name, json, time::now_micros, util::get_distinct_stream_name},
+    utils::{
+        flatten::format_label_name,
+        json,
+        time::now_micros,
+        util::{get_distinct_stream_name, get_trace_time_index_stream_name},
+    },
 };
 #[cfg(feature = "vectorscan")]
 use db::re_pattern::process_association_changes;
@@ -178,7 +177,7 @@ pub fn stream_res(
     stats.created_at = unwrap_stream_created_at(&schema).unwrap_or_default();
 
     let metrics_meta = if stream_type == StreamType::Metrics {
-        let mut meta = get_prom_metadata_from_schema(&schema).unwrap_or(promql::Metadata {
+        let mut meta = get_prom_metadata_from_schema(&schema).unwrap_or_else(|| promql::Metadata {
             metric_type: promql::MetricType::Empty,
             metric_family_name: stream_name.to_string(),
             help: stream_name.to_string(),
@@ -236,49 +235,38 @@ pub async fn create_stream(
     stream_type: StreamType,
     mut stream: StreamCreate,
 ) -> Result<HttpResponse, Error> {
-    // Reserved self-reporting streams (usage/stats/triggers/errors/...) are
-    // managed internally by Cloud and must not be user-created — doing so would
-    // corrupt billing/usage accounting. The internal self-reporting job creates
-    // its schema directly (not via create_stream), so blocking here is safe.
-    // Cloud-only: OSS / self-hosted may legitimately use these stream names.
-    #[cfg(feature = "cloud")]
-    if is_reserved_internal_stream(stream_name) {
-        return Ok((
+    // The AI chat-events stream is created and written only by server-side
+    // chat persistence, in every edition.
+    if is_protected_ai_chat_stream(stream_name) {
+        return Ok(MetaHttpResponse::error_with_header(
             http::StatusCode::BAD_REQUEST,
-            [(ERROR_HEADER, "stream name is reserved")],
-            Json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST,
-                format!("stream name '{stream_name}' is reserved and cannot be created"),
-            )),
-        )
-            .into_response());
+            format!("stream name '{stream_name}' is reserved and cannot be created"),
+        ));
+    }
+    if let Some(violation) =
+        infra::file_list::stream_key_violation(org_id, stream_type, stream_name)
+    {
+        return Ok(MetaHttpResponse::error_with_header(
+            http::StatusCode::BAD_REQUEST,
+            violation,
+        ));
     }
 
     // check if the stream already exists
     let schema = match infra::schema::get(org_id, stream_name, stream_type).await {
         Ok(schema) => schema,
         Err(e) => {
-            return Ok((
+            return Ok(MetaHttpResponse::error_with_header(
                 http::StatusCode::INTERNAL_SERVER_ERROR,
-                [(ERROR_HEADER, format!("error in getting schema: {e}"))],
-                Json(MetaHttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("error in getting schema: {e}"),
-                )),
-            )
-                .into_response());
+                format!("error in getting schema: {e}"),
+            ));
         }
     };
     if !schema.fields().is_empty() {
-        return Ok((
+        return Ok(MetaHttpResponse::error_with_header(
             http::StatusCode::BAD_REQUEST,
-            [(ERROR_HEADER, "stream already exists")],
-            Json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST,
-                "stream already exists",
-            )),
-        )
-            .into_response());
+            "stream already exists",
+        ));
     }
 
     // create the stream
@@ -287,15 +275,10 @@ pub async fn create_stream(
     let mut has_timestamp = false;
     for f in schema {
         let Ok(data_type) = f.r#type.parse::<DataType>() else {
-            return Ok((
+            return Ok(MetaHttpResponse::error_with_header(
                 http::StatusCode::BAD_REQUEST,
-                [(ERROR_HEADER, format!("invalid data type: {}", f.r#type))],
-                Json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST,
-                    format!("invalid data type: {}", f.r#type),
-                )),
-            )
-                .into_response());
+                format!("invalid data type: {}", f.r#type),
+            ));
         };
         let name = format_label_name(&f.name);
         if name == TIMESTAMP_COL_NAME {
@@ -317,29 +300,16 @@ pub async fn create_stream(
         match infra::schema::merge(org_id, stream_name, stream_type, &schema, Some(min_ts)).await {
             Ok(Some((s, _))) => s,
             Ok(None) => {
-                return Ok((
+                return Ok(MetaHttpResponse::error_with_header(
                     http::StatusCode::INTERNAL_SERVER_ERROR,
-                    [(
-                        ERROR_HEADER,
-                        "error in creating stream: created schema is empty",
-                    )],
-                    Json(MetaHttpResponse::error(
-                        http::StatusCode::INTERNAL_SERVER_ERROR,
-                        "error in creating stream: created schema is empty",
-                    )),
-                )
-                    .into_response());
+                    "error in creating stream: created schema is empty",
+                ));
             }
             Err(e) => {
-                return Ok((
+                return Ok(MetaHttpResponse::error_with_header(
                     http::StatusCode::INTERNAL_SERVER_ERROR,
-                    [(ERROR_HEADER, format!("error in creating stream: {e}"))],
-                    Json(MetaHttpResponse::error(
-                        http::StatusCode::INTERNAL_SERVER_ERROR,
-                        format!("error in creating stream: {e}"),
-                    )),
-                )
-                    .into_response());
+                    format!("error in creating stream: {e}"),
+                ));
             }
         };
 
@@ -381,15 +351,10 @@ pub async fn save_stream_settings(
     {
         Ok(saved) => saved,
         Err(schema::StreamSettingsError::StreamDeleting(message)) => {
-            return Ok((
+            return Ok(MetaHttpResponse::error_with_header(
                 http::StatusCode::BAD_REQUEST,
-                [(ERROR_HEADER, message.clone())],
-                Json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST,
-                    message,
-                )),
-            )
-                .into_response());
+                message,
+            ));
         }
         Err(schema::StreamSettingsError::BadRequest(message)) => {
             return Ok(MetaHttpResponse::bad_request(message));
@@ -400,56 +365,75 @@ pub async fn save_stream_settings(
     };
     let settings = saved.settings;
 
-    // skip metadata, as we should never do distinct values stream for
-    // metadata streams
-    if matches!(stream_type, StreamType::Logs | StreamType::Traces)
-        && let Some(original_settings) = saved.previous_settings
-    {
-        let existing = original_settings.data_retention;
-        let new = settings.data_retention;
-        if existing != new {
-            let distinct_stream = get_distinct_stream_name(stream_type, stream_name);
-
-            match infra::schema::get(org_id, &distinct_stream, StreamType::Metadata).await {
-                Ok(distinct_schema) => {
-                    let mut distinct_settings =
-                        unwrap_stream_settings(&distinct_schema).unwrap_or_default();
-                    distinct_settings.data_retention = new;
-
-                    let mut metadata = distinct_schema.metadata.clone();
-                    metadata.insert(
-                        "settings".to_string(),
-                        json::to_string(&distinct_settings).unwrap(),
-                    );
-                    if !metadata.contains_key("created_at") {
-                        metadata.insert("created_at".to_string(), now_micros().to_string());
-                    }
-
-                    if let Err(e) = db::schema::update_setting(
-                        org_id,
-                        &distinct_stream,
-                        StreamType::Metadata,
-                        metadata,
-                    )
-                    .await
-                    {
-                        log::warn!(
-                            "error in updating retention setting for distinct stream : {org_id}/{distinct_stream} : {e}"
-                        );
-                    }
-                }
-                Err(e) => {
-                    // We have already updated the main stream settings, and this is just for
-                    // retention, so no point in failing the api call if this fails.
-                    log::warn!(
-                        "error getting schema for distinct stream {org_id}/{distinct_stream} : {e}"
-                    );
-                }
-            }
-        }
-    }
+    sync_associated_metadata_stream_retention(org_id, stream_name, stream_type, &settings).await;
 
     Ok(MetaHttpResponse::ok(""))
+}
+
+async fn sync_associated_metadata_stream_retention(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    settings: &StreamSettings,
+) {
+    for metadata_stream in associated_metadata_streams(stream_type, stream_name) {
+        if !infra::schema::exists(org_id, StreamType::Metadata, &metadata_stream).await {
+            continue;
+        }
+
+        let metadata_schema =
+            match infra::schema::get(org_id, &metadata_stream, StreamType::Metadata).await {
+                Ok(schema) => schema,
+                Err(e) => {
+                    log::warn!(
+                        "error getting associated metadata stream {org_id}/{metadata_stream}: {e}"
+                    );
+                    continue;
+                }
+            };
+        let mut metadata_settings = unwrap_stream_settings(&metadata_schema).unwrap_or_default();
+        if metadata_settings.data_retention == settings.data_retention
+            && metadata_settings.extended_retention_days == settings.extended_retention_days
+        {
+            continue;
+        }
+
+        metadata_settings.data_retention = settings.data_retention;
+        metadata_settings.extended_retention_days = settings.extended_retention_days.clone();
+        let mut metadata = metadata_schema.metadata.clone();
+        metadata.insert(
+            "settings".to_string(),
+            json::to_string(&metadata_settings).unwrap(),
+        );
+        if !metadata.contains_key("created_at") {
+            metadata.insert("created_at".to_string(), now_micros().to_string());
+        }
+        if let Err(e) =
+            db::schema::update_setting(org_id, &metadata_stream, StreamType::Metadata, metadata)
+                .await
+        {
+            // The source stream settings have already been saved. A failure to update an
+            // associated metadata stream must not fail the original request.
+            log::warn!(
+                "error updating retention for associated metadata stream {org_id}/{metadata_stream}: {e}"
+            );
+        }
+    }
+}
+
+fn associated_metadata_streams(stream_type: StreamType, stream_name: &str) -> Vec<String> {
+    if !matches!(
+        stream_type,
+        StreamType::Logs | StreamType::Metrics | StreamType::Traces
+    ) {
+        return Vec::new();
+    }
+
+    let mut streams = vec![get_distinct_stream_name(stream_type, stream_name)];
+    if stream_type == StreamType::Traces {
+        streams.push(get_trace_time_index_stream_name(stream_name));
+    }
+    streams
 }
 
 #[tracing::instrument(skip(new_settings))]
@@ -459,6 +443,12 @@ pub async fn update_stream_settings(
     stream_type: StreamType,
     mut new_settings: UpdateStreamSettings,
 ) -> Result<HttpResponse, Error> {
+    if is_protected_ai_chat_stream(stream_name) {
+        return Ok(MetaHttpResponse::error_with_header(
+            http::StatusCode::BAD_REQUEST,
+            format!("stream '{stream_name}' is reserved and cannot be modified"),
+        ));
+    }
     let Some(settings) = infra::schema::get_settings(org_id, stream_name, stream_type).await else {
         return Ok(MetaHttpResponse::not_found("stream not found"));
     };
@@ -510,6 +500,14 @@ pub async fn update_stream_settings(
     }
     if let Some(v) = new_settings.approx_partition {
         settings.approx_partition = v;
+    }
+    if let Some(v) = new_settings.dynamic_merge {
+        if !stream_type.support_dynamic_merge() {
+            return Ok(MetaHttpResponse::bad_request(
+                "dynamic_merge is only supported for logs, metrics and traces streams",
+            ));
+        }
+        settings.dynamic_merge = Some(v);
     }
     if let Some(v) = new_settings.index_original_data {
         settings.index_original_data = v;
@@ -617,15 +615,10 @@ pub async fn update_stream_settings(
             let usage = match check_field_use(org_id, stream_name, stream_type.as_str(), f).await {
                 Ok(entry) => entry,
                 Err(e) => {
-                    return Ok((
+                    return Ok(MetaHttpResponse::error_with_header(
                         http::StatusCode::INTERNAL_SERVER_ERROR,
-                        [(ERROR_HEADER, format!("error in updating settings : {e}"))],
-                        Json(MetaHttpResponse::error(
-                            http::StatusCode::INTERNAL_SERVER_ERROR,
-                            format!("error in updating settings : {e}"),
-                        )),
-                    )
-                        .into_response());
+                        format!("error in updating settings : {e}"),
+                    ));
                 }
             };
             // if there are multiple uses, we cannot allow it to be removed
@@ -672,15 +665,10 @@ pub async fn update_stream_settings(
                 f,
             );
             if let Err(e) = distinct_values::add(record).await {
-                return Ok((
+                return Ok(MetaHttpResponse::error_with_header(
                     http::StatusCode::INTERNAL_SERVER_ERROR,
-                    [(ERROR_HEADER, format!("error in updating settings : {e}"))],
-                    Json(MetaHttpResponse::error(
-                        http::StatusCode::INTERNAL_SERVER_ERROR,
-                        format!("error in updating settings : {e}"),
-                    )),
-                )
-                    .into_response());
+                    format!("error in updating settings : {e}"),
+                ));
             }
             // we cannot allow duplicate entries here
             let temp = DistinctField {
@@ -755,9 +743,14 @@ pub async fn update_stream_settings(
         )
         .await
         {
-            return Ok(MetaHttpResponse::internal_error(format!(
-                "Internal server error while updating pattern associations {e}",
-            )));
+            return Ok(match e {
+                infra::errors::Error::ErrorCode(infra::errors::ErrorCodes::InvalidParams(msg)) => {
+                    MetaHttpResponse::bad_request(msg)
+                }
+                e => MetaHttpResponse::internal_error(format!(
+                    "Internal server error while updating pattern associations {e}",
+                )),
+            });
         }
     }
 
@@ -779,21 +772,20 @@ where
     E: FnOnce(String, String, StreamType) -> EFut,
     EFut: Future<Output = ()>,
 {
-    // Reserved self-reporting streams (usage/stats/triggers/errors/...) are
-    // managed internally by Cloud and must not be user-deleted — retention/
-    // compaction uses a separate internal path, so blocking this user-facing
-    // delete is safe and preserves billing/usage accounting. Cloud-only.
-    #[cfg(feature = "cloud")]
-    if is_reserved_internal_stream(stream_name) {
-        return Ok((
+    // The audit trail must not be destroyable through the same API it records.
+    if org_id == META_ORG_ID && stream_name == AUDIT_STREAM && stream_type == StreamType::Logs {
+        return Ok(MetaHttpResponse::bad_request(
+            "Cannot delete the audit stream",
+        ));
+    }
+    // Chat history is deleted through the Chat API (which tombstones the
+    // session index and lets retention remove the rows), never by dropping
+    // the whole org's stream from the streams UI.
+    if is_protected_ai_chat_stream(stream_name) {
+        return Ok(MetaHttpResponse::error_with_header(
             http::StatusCode::BAD_REQUEST,
-            [(ERROR_HEADER, "stream name is reserved")],
-            Json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST,
-                format!("stream '{stream_name}' is reserved and cannot be deleted"),
-            )),
-        )
-            .into_response());
+            format!("stream '{stream_name}' is reserved and cannot be deleted"),
+        ));
     }
 
     let schema = infra::schema::get_versions(org_id, stream_name, stream_type, None)
@@ -826,25 +818,23 @@ where
         return Ok(MetaHttpResponse::not_found("stream not found"));
     }
 
-    // delete stream schema
-    if let Err(e) = db::schema::delete(org_id, stream_name, Some(stream_type)).await {
-        return Ok((
-            http::StatusCode::INTERNAL_SERVER_ERROR,
-            [(ERROR_HEADER, format!("failed to delete stream schema: {e}"))],
-            Json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR,
-                format!("failed to delete stream schema: {e}"),
-            )),
-        )
-            .into_response());
-    }
-
+    // Related-resource cleanup includes a graph-locked preflight of every
+    // alert owned by this stream. It must run before the schema mutation so a
+    // referenced alert rejects the cascade without deleting any member.
     if del_related_feature_resources
         && let Err(response) =
             cleanup_related_resources(org_id.to_string(), stream_name.to_string(), stream_type)
                 .await
     {
         return Ok(response);
+    }
+
+    // delete stream schema
+    if let Err(e) = db::schema::delete(org_id, stream_name, Some(stream_type)).await {
+        return Ok(MetaHttpResponse::error_with_header(
+            http::StatusCode::INTERNAL_SERVER_ERROR,
+            format!("failed to delete stream schema: {e}"),
+        ));
     }
 
     // create delete for compactor
@@ -854,28 +844,20 @@ where
         log::error!(
             "Failed to create retention job for stream: {org_id}/{stream_type}/{stream_name}, error: {e}"
         );
-        return Ok((
+        return Ok(MetaHttpResponse::error_with_header(
             http::StatusCode::INTERNAL_SERVER_ERROR,
-            [(ERROR_HEADER, format!("failed to delete stream: {e}"))],
-            Json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR,
-                format!("failed to delete stream: {e}"),
-            )),
-        )
-            .into_response());
+            format!("failed to delete stream: {e}"),
+        ));
     }
+
+    delete_associated_metadata_streams(org_id, stream_name, stream_type).await;
 
     // delete related resource
     if let Err(e) = stream_delete_inner(org_id, stream_type, stream_name).await {
-        return Ok((
+        return Ok(MetaHttpResponse::error_with_header(
             http::StatusCode::INTERNAL_SERVER_ERROR,
-            [(ERROR_HEADER, format!("failed to delete stream: {e}"))],
-            Json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR,
-                format!("failed to delete stream: {e}"),
-            )),
-        )
-            .into_response());
+            format!("failed to delete stream: {e}"),
+        ));
     }
 
     if stream_type == StreamType::EnrichmentTables {
@@ -891,6 +873,43 @@ where
     db::authz::remove_ownership(org_id, stream_type.as_str(), Authz::new(stream_name)).await;
 
     Ok(MetaHttpResponse::ok("stream deleted"))
+}
+
+async fn delete_associated_metadata_streams(
+    org_id: &str,
+    source_stream: &str,
+    stream_type: StreamType,
+) {
+    for metadata_stream in associated_metadata_streams(stream_type, source_stream) {
+        if !infra::schema::exists(org_id, StreamType::Metadata, &metadata_stream).await {
+            continue;
+        }
+
+        if let Err(e) =
+            db::schema::delete(org_id, &metadata_stream, Some(StreamType::Metadata)).await
+        {
+            log::warn!(
+                "failed to delete associated metadata stream schema {org_id}/{metadata_stream}: {e}"
+            );
+        }
+        if let Err(e) = db::compact::retention::delete_stream(
+            org_id,
+            StreamType::Metadata,
+            &metadata_stream,
+            None,
+        )
+        .await
+        {
+            log::warn!(
+                "failed to schedule associated metadata stream deletion {org_id}/{metadata_stream}: {e}"
+            );
+        }
+        if let Err(e) = stream_delete_inner(org_id, StreamType::Metadata, &metadata_stream).await {
+            log::warn!(
+                "failed to clean associated metadata stream caches {org_id}/{metadata_stream}: {e}"
+            );
+        }
+    }
 }
 
 pub async fn stream_delete_inner(
@@ -911,7 +930,7 @@ pub async fn stream_delete_inner(
     w.remove(&key);
     drop(w);
     let mut w = STREAM_SCHEMAS_LATEST.write().await;
-    w.remove(&key);
+    infra::schema::remove_latest(&mut w, &key);
     drop(w);
 
     // delete stream settings cache
@@ -939,6 +958,17 @@ pub async fn delete_stream_data_by_time_range(
     stream_name: &str,
     time_range: TimeRange,
 ) -> Result<String, infra::errors::Error> {
+    if org_id == META_ORG_ID && stream_name == AUDIT_STREAM && stream_type == StreamType::Logs {
+        return Err(infra::errors::Error::Message(
+            "Cannot delete the audit stream".to_string(),
+        ));
+    }
+    if is_protected_ai_chat_stream(stream_name) {
+        return Err(infra::errors::Error::Message(format!(
+            "stream '{stream_name}' is reserved and cannot be deleted"
+        )));
+    }
+
     if time_range.start > time_range.end {
         return Err(infra::errors::Error::Message(
             "Start time must be less than end time".to_string(),
@@ -1017,6 +1047,7 @@ async fn transform_stats(
     stats.storage_size /= SIZE_IN_MB;
     stats.compressed_size /= SIZE_IN_MB;
     stats.index_size /= SIZE_IN_MB;
+    stats.mindex_size /= SIZE_IN_MB;
     if stream_type == StreamType::EnrichmentTables
         && let Some(meta) = enrichment_table::get_meta_table_stats(org_id, stream_name).await
     {
@@ -1025,22 +1056,48 @@ async fn transform_stats(
     }
 }
 
+async fn find_reserved_field<'a>(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    mut field_names: impl Iterator<Item = &'a str>,
+) -> Option<String> {
+    let settings = infra::schema::get_settings(org_id, stream_name, stream_type).await;
+    let reserved_columns = match settings.as_deref() {
+        Some(settings) => settings.uds_internal_columns(),
+        None => StreamSettings::default().uds_internal_columns(),
+    };
+    field_names
+        .find(|name| reserved_columns.iter().any(|r| r == name))
+        .map(String::from)
+}
+
 pub async fn delete_fields(
     org_id: &str,
     stream_name: &str,
     stream_type: Option<StreamType>,
     fields: &[String],
 ) -> Result<(), anyhow::Error> {
+    if is_protected_ai_chat_stream(stream_name) {
+        anyhow::bail!("stream '{stream_name}' is reserved and cannot be modified");
+    }
     if fields.is_empty() {
         return Ok(());
     }
-    db::schema::delete_fields(
+    let stream_type = stream_type.unwrap_or_default();
+    if let Some(reserved) = find_reserved_field(
         org_id,
         stream_name,
-        stream_type.unwrap_or_default(),
-        fields.to_vec(),
+        stream_type,
+        fields.iter().map(String::as_str),
     )
-    .await?;
+    .await
+    {
+        return Err(anyhow::anyhow!(
+            "field [{reserved}] is reserved and cannot be deleted"
+        ));
+    }
+    db::schema::delete_fields(org_id, stream_name, stream_type, fields.to_vec()).await?;
     Ok(())
 }
 
@@ -1063,10 +1120,27 @@ pub async fn update_fields_type(
     stream_type: Option<StreamType>,
     field_updates: &[FieldUpdate],
 ) -> Result<(), anyhow::Error> {
+    if is_protected_ai_chat_stream(stream_name) {
+        anyhow::bail!("stream '{stream_name}' is reserved and cannot be modified");
+    }
     if field_updates.is_empty() {
         return Ok(());
     }
+    let stream_type = stream_type.unwrap_or_default();
+    if let Some(reserved) = find_reserved_field(
+        org_id,
+        stream_name,
+        stream_type,
+        field_updates.iter().map(|f| f.name.as_str()),
+    )
+    .await
+    {
+        return Err(anyhow::anyhow!(
+            "field [{reserved}] is reserved and cannot be updated"
+        ));
+    }
 
+    let stream_schema = infra::schema::get_cache(org_id, stream_name, stream_type).await?;
     // Build HashMap of field_name -> (DataType, nullable)
     let mut updates = HashMap::with_capacity(field_updates.len());
     for field_update in field_updates {
@@ -1076,6 +1150,18 @@ pub async fn update_fields_type(
                 field_update.data_type, field_update.name
             ))
         })?;
+        // handle_diff_schema would leave a non-widening change unapplied and still return Ok
+        if let Some(current) = stream_schema
+            .field_with_name(&field_update.name)
+            .map(|f| f.data_type())
+            && current != &dt
+            && !infra::schema::is_widening_conversion(current, &dt)
+        {
+            return Err(anyhow::anyhow!(
+                "field [{}] is {current} and cannot be changed to {dt}",
+                field_update.name
+            ));
+        }
         updates.insert(field_update.name.clone(), (dt, field_update.nullable));
     }
 
@@ -1095,7 +1181,7 @@ pub async fn update_fields_type(
     schema::handle_diff_schema(
         org_id,
         stream_name,
-        stream_type.unwrap_or_default(),
+        stream_type,
         false,
         &new_schema,
         min_ts,
@@ -1107,23 +1193,34 @@ pub async fn update_fields_type(
     Ok(())
 }
 
-pub async fn get_stream_retention(
-    org_id: &str,
-    stream_type: StreamType,
-    stream: &str,
-) -> Option<i64> {
-    infra::schema::get_settings(org_id, stream, stream_type)
-        .await
-        .map(|s| s.data_retention)
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
 
     use arrow_schema::{DataType, Field};
+    use config::meta::stream::UpdateSettingsWrapper;
 
     use super::*;
+
+    // unique org so the process-wide schema caches can host these tests in parallel
+    const SETTINGS_TEST_ORG: &str = "settings_cache_test_org";
+
+    #[test]
+    fn test_associated_metadata_streams() {
+        assert_eq!(
+            associated_metadata_streams(StreamType::Logs, "app"),
+            vec!["distinct_values_logs_app"]
+        );
+        assert_eq!(
+            associated_metadata_streams(StreamType::Metrics, "cpu"),
+            vec!["distinct_values_metrics_cpu"]
+        );
+        assert_eq!(
+            associated_metadata_streams(StreamType::Traces, "default"),
+            vec!["distinct_values_traces_default", "trace_time_index_default"]
+        );
+        assert!(associated_metadata_streams(StreamType::Metadata, "internal").is_empty());
+    }
 
     #[test]
     fn test_stream_res() {
@@ -1275,6 +1372,7 @@ mod tests {
             storage_size: 10.0 * 1024.0 * 1024.0,   // 10MB in bytes
             compressed_size: 5.0 * 1024.0 * 1024.0, // 5MB in bytes
             index_size: 2.0 * 1024.0 * 1024.0,      // 2MB in bytes
+            mindex_size: 3.0 * 1024.0 * 1024.0,
             ..Default::default()
         };
 
@@ -1284,6 +1382,7 @@ mod tests {
         assert_eq!(stats.storage_size, 10.0);
         assert_eq!(stats.compressed_size, 5.0);
         assert_eq!(stats.index_size, 2.0);
+        assert_eq!(stats.mindex_size, 3.0);
     }
 
     #[tokio::test]
@@ -1302,6 +1401,199 @@ mod tests {
     async fn test_delete_fields_empty() {
         let result = delete_fields("org1", "stream1", Some(StreamType::Logs), &[]).await;
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_delete_fields_rejects_always_reserved_columns() {
+        // no persisted settings, so falls back to StreamSettings::default()
+        let reserved_fields = [
+            TIMESTAMP_COL_NAME.to_string(),
+            get_config().common.column_all.clone(),
+        ];
+        for reserved in reserved_fields {
+            let result = delete_fields(
+                "org1",
+                "stream1",
+                Some(StreamType::Logs),
+                std::slice::from_ref(&reserved),
+            )
+            .await;
+            assert!(result.is_err(), "expected {reserved} to be rejected");
+            let err = result.unwrap_err().to_string();
+            assert!(err.contains(&reserved), "reserved={reserved:?} err={err:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_delete_fields_allows_uds_columns_when_feature_disabled() {
+        // _original is only reserved when store_original_data/index_original_data is set
+        let result = delete_fields(
+            "org1",
+            "stream1",
+            Some(StreamType::Logs),
+            &[config::ORIGINAL_DATA_COL_NAME.to_string()],
+        )
+        .await;
+        if let Err(e) = result {
+            assert!(
+                !e.to_string().contains("is reserved"),
+                "expected _original not to be rejected as reserved, got: {e}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_delete_fields_rejects_reserved_among_others() {
+        let result = delete_fields(
+            "org1",
+            "stream1",
+            Some(StreamType::Logs),
+            &[
+                "a".to_string(),
+                TIMESTAMP_COL_NAME.to_string(),
+                "b".to_string(),
+            ],
+        )
+        .await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_update_fields_type_rejects_reserved_columns() {
+        let result = update_fields_type(
+            "org1",
+            "stream1",
+            Some(StreamType::Logs),
+            &[FieldUpdate {
+                name: TIMESTAMP_COL_NAME.to_string(),
+                data_type: "int64".to_string(),
+                nullable: None,
+            }],
+        )
+        .await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_create_stream_rejects_a_stream_key_too_long() {
+        infra::db::create_table().await.unwrap();
+        // unique per run: where the key is not bounded the stream is created and a rerun would
+        // clash
+        let name = format!(
+            "{}{}",
+            config::utils::time::now_micros(),
+            "s".repeat(infra::file_list::STREAM_KEY_MAX_LEN)
+        );
+        let bounded =
+            infra::file_list::stream_key_violation("org1", StreamType::Logs, &name).is_some();
+        let stream = StreamCreate {
+            fields: vec![],
+            settings: StreamSettings::default(),
+        };
+        let resp = create_stream("org1", &name, StreamType::Logs, stream)
+            .await
+            .unwrap();
+        let expected = if bounded {
+            http::StatusCode::BAD_REQUEST
+        } else {
+            http::StatusCode::OK
+        };
+        assert_eq!(resp.status(), expected);
+        assert_eq!(
+            infra::schema::exists("org1", StreamType::Logs, &name).await,
+            !bounded
+        );
+    }
+
+    async fn create_update_fields_test_stream(name: &str) {
+        infra::db::create_table().await.unwrap();
+        let stream = StreamCreate {
+            fields: [("status_code", "Utf8"), ("count", "Int64")]
+                .into_iter()
+                .map(|(name, r#type)| StreamField {
+                    name: name.to_string(),
+                    r#type: r#type.to_string(),
+                })
+                .collect(),
+            settings: StreamSettings::default(),
+        };
+        let resp = create_stream("org1", name, StreamType::Logs, stream)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+    }
+
+    async fn persisted_field_type(name: &str, field: &str) -> Option<String> {
+        let schema = infra::schema::get_from_db("org1", name, StreamType::Logs)
+            .await
+            .unwrap();
+        schema
+            .field_with_name(field)
+            .ok()
+            .map(|f| f.data_type().to_string())
+    }
+
+    fn field_update(name: &str, data_type: &str) -> FieldUpdate {
+        FieldUpdate {
+            name: name.to_string(),
+            data_type: data_type.to_string(),
+            nullable: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_update_fields_type_refuses_a_change_it_cannot_apply() {
+        // the test DB outlives the run, so each run needs fresh stream names
+        let name = &format!("refuse_{}", now_micros());
+        create_update_fields_test_stream(name).await;
+        for requested in ["Int64", "UInt64", "Float64", "Boolean"] {
+            let err = update_fields_type(
+                "org1",
+                name,
+                Some(StreamType::Logs),
+                &[
+                    field_update("count", "Float64"),
+                    field_update("status_code", requested),
+                ],
+            )
+            .await
+            .unwrap_err();
+            assert_eq!(
+                err.to_string(),
+                format!("field [status_code] is Utf8 and cannot be changed to {requested}")
+            );
+        }
+        // refused as a whole, so the widening change sent with it is not applied either
+        assert_eq!(
+            persisted_field_type(name, "count").await.as_deref(),
+            Some("Int64")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_update_fields_type_accepts_the_changes_the_merge_applies() {
+        let name = &format!("accept_{}", now_micros());
+        create_update_fields_test_stream(name).await;
+        update_fields_type(
+            "org1",
+            name,
+            Some(StreamType::Logs),
+            &[
+                field_update("count", "Float64"),
+                field_update("status_code", "Utf8"),
+                field_update("new_field", "Int64"),
+            ],
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            persisted_field_type(name, "count").await.as_deref(),
+            Some("Float64")
+        );
+        assert_eq!(
+            persisted_field_type(name, "new_field").await.as_deref(),
+            Some("Int64")
+        );
     }
 
     #[test]
@@ -1540,5 +1832,161 @@ mod tests {
         assert_eq!(parse_data_type("text"), None);
         assert_eq!(parse_data_type(""), None);
         assert_eq!(parse_data_type("int32"), None);
+    }
+
+    #[tokio::test]
+    async fn test_delete_stream_with_cleanup_refuses_audit_stream() {
+        let res = delete_stream_with_cleanup(
+            META_ORG_ID,
+            AUDIT_STREAM,
+            StreamType::Logs,
+            false,
+            |_, _, _| async { Ok(()) },
+            |_, _, _| async {},
+        )
+        .await
+        .expect("the guard returns a response, not an error");
+        assert_eq!(res.status(), http::StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_delete_stream_data_by_time_range_refuses_audit_stream() {
+        let err = delete_stream_data_by_time_range(
+            META_ORG_ID,
+            StreamType::Logs,
+            AUDIT_STREAM,
+            TimeRange { start: 1, end: 0 },
+        )
+        .await
+        .expect_err("the audit stream must not be time-range deletable");
+        assert!(err.to_string().contains("Cannot delete the audit stream"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_stream_data_by_time_range_allows_customer_audit_stream() {
+        let err = delete_stream_data_by_time_range(
+            "customer_org",
+            StreamType::Logs,
+            AUDIT_STREAM,
+            TimeRange { start: 1, end: 0 },
+        )
+        .await
+        .expect_err("start after end is rejected by the later validation");
+        assert!(err.to_string().contains("Start time must be less than end"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_stream_data_by_time_range_allows_meta_org_non_logs_audit() {
+        let err = delete_stream_data_by_time_range(
+            META_ORG_ID,
+            StreamType::Traces,
+            AUDIT_STREAM,
+            TimeRange { start: 1, end: 0 },
+        )
+        .await
+        .expect_err("start after end is rejected by the later validation");
+        assert!(err.to_string().contains("Start time must be less than end"));
+    }
+
+    async fn create_settings_test_stream(name: &str, fields: &[&str]) {
+        let _ = infra::db::create_table().await;
+        let stream = StreamCreate {
+            fields: fields
+                .iter()
+                .map(|f| StreamField {
+                    name: f.to_string(),
+                    r#type: "Utf8".to_string(),
+                })
+                .collect(),
+            settings: StreamSettings {
+                enable_distinct_fields: false,
+                ..Default::default()
+            },
+        };
+        let resp = create_stream(SETTINGS_TEST_ORG, name, StreamType::Logs, stream)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+    }
+
+    async fn evict_settings_test_stream(name: &str) {
+        let key = format!("{SETTINGS_TEST_ORG}/{}/{name}", StreamType::Logs);
+        STREAM_SCHEMAS_LATEST.write().await.remove(&key);
+        infra::schema::remove_stream_settings(&key).await;
+    }
+
+    async fn update_settings_test_stream(name: &str, update: UpdateStreamSettings) {
+        let resp = update_stream_settings(SETTINGS_TEST_ORG, name, StreamType::Logs, update)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+    }
+
+    async fn settings_test_stream(name: &str) -> StreamSettings {
+        get_stream(SETTINGS_TEST_ORG, name, StreamType::Logs)
+            .await
+            .unwrap()
+            .settings
+    }
+
+    #[tokio::test]
+    async fn test_settings_update_is_read_back_without_waiting_for_the_watcher() {
+        // the test DB outlives the run, so each run needs fresh stream names
+        let name = &format!("read_back_{}", now_micros());
+        create_settings_test_stream(name, &[]).await;
+        // cold caches, as after a restart; no schema watcher runs in unit tests
+        evict_settings_test_stream(name).await;
+        update_settings_test_stream(
+            name,
+            UpdateStreamSettings {
+                enable_distinct_fields: Some(true),
+                data_retention: Some(17),
+                ..Default::default()
+            },
+        )
+        .await;
+        let settings = settings_test_stream(name).await;
+        assert!(settings.enable_distinct_fields);
+        assert_eq!(settings.data_retention, 17);
+    }
+
+    #[tokio::test]
+    async fn test_settings_update_right_after_create_finds_the_stream() {
+        let name = &format!("right_after_create_{}", now_micros());
+        create_settings_test_stream(name, &[]).await;
+        update_settings_test_stream(
+            name,
+            UpdateStreamSettings {
+                data_retention: Some(17),
+                ..Default::default()
+            },
+        )
+        .await;
+        assert_eq!(settings_test_stream(name).await.data_retention, 17);
+    }
+
+    #[tokio::test]
+    async fn test_back_to_back_settings_updates_keep_both_changes() {
+        let name = &format!("back_to_back_{}", now_micros());
+        create_settings_test_stream(name, &["fa", "fb"]).await;
+        evict_settings_test_stream(name).await;
+        for field in ["fa", "fb"] {
+            update_settings_test_stream(
+                name,
+                UpdateStreamSettings {
+                    index_fields: UpdateSettingsWrapper {
+                        add: vec![field.to_string()],
+                        remove: vec![],
+                    },
+                    ..Default::default()
+                },
+            )
+            .await;
+        }
+        // read what was persisted, not what this node cached
+        evict_settings_test_stream(name).await;
+        let index_fields = settings_test_stream(name).await.index_fields;
+        assert!(index_fields.contains(&"fa".to_string()), "{index_fields:?}");
+        assert!(index_fields.contains(&"fb".to_string()), "{index_fields:?}");
     }
 }

@@ -295,7 +295,7 @@ test.describe('Streams StreamFieldInputs form validation', { tag: ['@streams-for
         await pm.streamsFormValidation.fillStreamName('e2e_streamfv_dtype_001');
 
         // Skip if the data type select is not visible (feature may be disabled in this environment)
-        const dataTypeSelectLocator = page.locator('[data-test="add-stream-field-data-type-select"]').first();
+        const dataTypeSelectLocator = pm.streamsFormValidation.getFieldDataTypeSelectLocator().first();
         const dataTypeSelectVisible = await dataTypeSelectLocator.isVisible().catch(() => false);
         if (!dataTypeSelectVisible) {
             testLogger.info('TC-SFI-005: Data type select not visible in this environment — skipping assertion');

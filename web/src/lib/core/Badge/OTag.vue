@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { raw, type I18nText } from "@/types/i18n";
 // Copyright 2026 OpenObserve Inc.
 //
 // OTag — THE badge component for the whole app. It is a superset of OBadge:
@@ -50,7 +51,7 @@ const props = withDefaults(
     /** Override the corner shape: pill, rounded, or square. */
     shape?: BadgeShape;
     /** Override the resolved label with dynamic/runtime text. */
-    label?: string;
+    label?: I18nText;
     /** Override the resolved colour variant. */
     variant?: BadgeVariant;
     /** Override the resolved icon (OIcon name). Pass "" to suppress. */
@@ -65,16 +66,25 @@ const props = withDefaults(
     clickable?: boolean;
     /** Mute + disable interaction (OBadge passthrough). */
     disabled?: boolean;
+    /** Render a trailing ✕ that emits `remove` (OBadge passthrough). Use this
+     *  for chips a user can delete — a selected token, an escalation target —
+     *  instead of nesting a bare `<button>` inside the tag. */
+    removable?: boolean;
+    /** Accessible name for the remove button. Defaults to `common.remove`. */
+    removeLabel?: I18nText;
     /** Text shown when a typed value is empty. Default "—". */
-    emptyLabel?: string;
+    emptyLabel?: I18nText;
   }>(),
   // `dot` MUST default to undefined (not Vue's Boolean-absent→false coercion) so
   // `props.dot ?? resolved.dot` falls back to the registry's dot when the caller
   // doesn't pass it. Without this, every dot-mode group silently loses its dot.
-  { emptyLabel: "—", dot: undefined },
+  { emptyLabel: raw("—"), dot: undefined },
 );
 
-const emit = defineEmits<{ click: [e: MouseEvent | KeyboardEvent] }>();
+const emit = defineEmits<{
+  click: [e: MouseEvent | KeyboardEvent];
+  remove: [e: MouseEvent];
+}>();
 
 const slots = useSlots();
 
@@ -132,8 +142,11 @@ const dot = computed(() => props.dot ?? (props.type ? resolved.value.dot : false
     :hide-zero-count="hideZeroCount"
     :clickable="clickable"
     :disabled="disabled"
+    :removable="removable"
+    :remove-label="removeLabel"
     v-bind="$attrs"
     @click="emit('click', $event)"
+    @remove="emit('remove', $event)"
   >
     <template v-if="slots.icon" #icon><slot name="icon" /></template>
     <slot>{{ label }}</slot>

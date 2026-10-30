@@ -13,12 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { savedViewsQuery } from "@/services/saved_views.queries";
+import { viewTypeOf } from "@/services/saved_views";
+import { queryClient } from "@/composables/query/queryClient";
 import { buildFunctionArgs } from "@/utils/query/sqlCompletion";
 import { useStore } from "vuex";
+import type { TranslateFn } from "@/types/i18n";
 
 import { searchState } from "@/composables/useLogs/searchState";
 import useStreams from "@/composables/useStreams";
-import savedviewsService from "@/services/saved_views";
 import searchService from "@/services/search";
 
 import { arraysMatch } from "@/utils/zincutils";
@@ -26,7 +29,6 @@ import { arraysMatch } from "@/utils/zincutils";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import type { ExtendedParsedSQLResult } from "@/composables/useLogs/logsUtils";
 
-import useActions from "@/composables/useActions";
 import useFunctions from "@/composables/useFunctions";
 import useNotifications from "@/composables/useNotifications";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
@@ -34,33 +36,58 @@ import useSearchStream from "@/composables/useLogs/useSearchStream";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
+import { raw } from "@/types/i18n";
+import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
+import { pruneFreeTextScan } from "@/utils/logs/freeTextScan";
+import {
+  closeDrawerForQuery,
+  keepsDetailOnRefresh,
+  resetRowSelection,
+  withQueryOrigin,
+} from "@/composables/useLogs/logsRowNav";
+import { noteGridQuery } from "@/composables/useLogs/useLogPermalink";
+import { getCachedSemanticGroups, loadSemanticGroups } from "@/utils/semanticGroupsCache";
 import config from "@/aws-exports";
-import { toast } from "@/lib/feedback/Toast/useToast";
 
-export const useSearchBar = () => {
-  const { getStream, isStreamExists, isStreamFetched } = useStreams();
+let selectionToken = 0;
 
-  let { searchObj, searchObjDebug, notificationMsg } = searchState();
+export const bumpSelectionToken = (): number => ++selectionToken;
+
+export const currentSelectionToken = (): number => selectionToken;
+
+export interface StreamChangeOptions {
+  origin?: "editor" | "selector";
+}
+
+export interface QueryDataOptions {
+  generationId?: number;
+  reuseSchema?: boolean;
+  origin?: string;
+}
+
+export const useSearchBar = (t: TranslateFn) => {
+  const { getStream, isStreamExists, isStreamFetched } = useStreams(t);
+
+  let { searchObj, searchObjDebug, notificationMsg, clearFieldValues } = searchState();
 
   const store = useStore();
 
   const { fnParsedSQL, extractTimestamps } = logsUtils();
 
-  const { getDataThroughStream, buildSearch } = useSearchStream();
+  const { getDataThroughStream, buildSearch } = useSearchStream(t);
 
   const { getAllFunctions } = useFunctions();
-  const { getAllActions } = useActions();
   const { showErrorNotification } = useNotifications();
 
   const { cancelSearchQueryBasedOnRequestId } = useSearchWebSocket();
 
   const { extractFields } = useStreamFields();
 
+  useLogsAutoRun();
+
   const getFunctions = async () => {
     try {
-      if (store.state.organizationData.functions.length == 0) {
-        await getAllFunctions();
-      }
+      await getAllFunctions();
 
       store.state.organizationData.functions.map((data: any) => {
         const itemObj: {
@@ -80,48 +107,42 @@ export const useSearchBar = () => {
       });
       return;
     } catch (e) {
-      showErrorNotification("Error while fetching functions");
+      showErrorNotification(t("toastMessages.useLogs.errorWhileFetchingFunctions"));
     }
   };
 
-  const getActions = async () => {
-    try {
-      searchObj.data.actions = [];
-
-      if (store.state.organizationData.actions.length == 0) {
-        await getAllActions();
-      }
-
-      store.state.organizationData.actions.forEach((data: any) => {
-        if (data.execution_details_type === "service") {
-          searchObj.data.actions.push({
-            name: data.name,
-            id: data.id,
-          });
-        }
-      });
-      return;
-    } catch (e) {
-      showErrorNotification("Error while fetching actions");
-    }
-  };
-
-  const getSavedViews = async () => {
+  // `force` for the reloads that follow a create/update/delete; a plain call on
+  // Logs entry is a cache hit.
+  /** Resolves with the org's complete saved-views list, or undefined when the fetch failed. */
+  const getSavedViews = async (force = false): Promise<any[] | undefined> => {
     try {
       searchObj.loadingSavedView = true;
-      savedviewsService
-        .get(store.state.selectedOrganization.identifier)
-        .then((res) => {
+      const org = store.state.selectedOrganization.identifier;
+      return await (
+        force
+          ? queryClient
+              .invalidateQueries({
+                queryKey: savedViewsQuery(org).queryKey,
+                exact: true,
+                refetchType: "none",
+              })
+              .then(() => queryClient.fetchQuery(savedViewsQuery(org)))
+          : queryClient.fetchQuery(savedViewsQuery(org))
+      )
+        .then((views: any[]) => {
           searchObj.loadingSavedView = false;
-          searchObj.data.savedViews = res.data.views;
+          searchObj.data.savedViews = views.filter((v) => viewTypeOf(v) === "logs");
+          return views;
         })
         .catch((err) => {
           searchObj.loadingSavedView = false;
           console.log(err);
+          return undefined;
         });
     } catch (e: any) {
       searchObj.loadingSavedView = false;
       console.log("Error while getting saved views", e);
+      return undefined;
     }
   };
 
@@ -267,7 +288,7 @@ export const useSearchBar = () => {
         )
       ) {
         searchObj.data.stream.selectedStream = newSelectedStreams;
-        onStreamChange(value);
+        onStreamChange(value, { origin: "editor" });
       }
     } catch (error) {
       console.error("Error in setSelectedStreams:", {
@@ -279,16 +300,29 @@ export const useSearchBar = () => {
     }
   };
 
-  const onStreamChange = async (queryStr: string) => {
+  const onStreamChange = async (queryStr: string, options: StreamChangeOptions = {}) => {
+    const token = bumpSelectionToken();
+    const autoRun = useLogsAutoRun();
+    const editorOrigin = options.origin === "editor";
+    const legacyAutoRun = !store.state.zoConfig.query_on_stream_selection;
+    const stale = () => token !== selectionToken;
     try {
       searchObj.loadingStream = true;
-      searchObj.loading = true;
+      searchObj.loading = false;
       searchObj.loadingProgressPercentage = 0;
 
-      await cancelQuery();
+      autoRun.engine.cancelGeneration(null, { cause: "reset" });
+      if (!editorOrigin) autoRun.engine.clearEditorDirty();
 
-      // Reset query results
+      autoRun.invalidateExecuted("stream");
       searchObj.data.queryResults = { hits: [] };
+      // Autocomplete reads these values with the new stream's context, so the old stream's must go with its results.
+      clearFieldValues();
+      searchObj.data.freeTextBlocked = null;
+      pruneFreeTextScan(searchObj);
+      // Cleared with the results, else the previous stream's "no events found"
+      // flashes before the new fields land.
+      searchObj.meta.searchApplied = false;
 
       // Build UNION query once
       const streams = searchObj.data.stream.selectedStream;
@@ -304,6 +338,7 @@ export const useSearchBar = () => {
       );
 
       const streamDataResults = await Promise.all(streamDataPromises);
+      if (stale()) return;
 
       // TODO : We can optimize filter + flatMap using a single reducer function
       // Collect all schema fields
@@ -348,16 +383,15 @@ export const useSearchBar = () => {
       searchObj.data.editorValue = finalQuery;
       searchObj.data.query = finalQuery;
       searchObj.data.tempFunctionContent = "";
-      searchObj.meta.searchApplied = false;
 
       // Update histogram visibility
       if (streams.length > 1 && searchObj.meta.sqlMode == true) {
         searchObj.meta.showHistogram = false;
       }
 
-      if (!store.state.zoConfig.query_on_stream_selection) {
+      if (legacyAutoRun) {
         searchObj.meta.refreshHistogram = true;
-        await handleQueryData();
+        handleQueryData();
       } else {
         // Reset states when query on selection is disabled
         searchObj.data.sortedQueryResults = [];
@@ -367,7 +401,8 @@ export const useSearchBar = () => {
           breakdownField: null,
           breakdownSeries: null,
           chartParams: {
-            title: "",
+            title: raw(""),
+            titleParts: null,
             unparsed_x_data: [],
             timezone: "",
           },
@@ -376,18 +411,14 @@ export const useSearchBar = () => {
           errorDetail: "",
         };
         await extractFields();
-        // In live mode, auto-run the query after fields are loaded
-        if (store.state.zoConfig.auto_query_enabled && searchObj.meta.liveMode) {
-          searchObj.meta.refreshHistogram = true;
-          await handleQueryData();
-        } else {
-          searchObj.loading = false;
-        }
+        if (stale()) return;
+        searchObj.loading = false;
+        if (!editorOrigin) autoRun.request("stream");
       }
     } catch (e: any) {
       console.info("Error while getting stream data:", e);
     } finally {
-      searchObj.loadingStream = false;
+      if (!stale()) searchObj.loadingStream = false;
     }
   };
 
@@ -396,15 +427,35 @@ export const useSearchBar = () => {
       searchObj.data.tempFunctionLoading = false;
       searchObj.data.tempFunctionName = "";
       searchObj.data.tempFunctionContent = "";
-      searchObj.loading = true;
-      searchObj.loadingProgressPercentage = 0;
-      await getQueryData();
+      useLogsAutoRun().engine.requestRun("explicit");
     } catch (e: any) {
       console.log("Error while loading logs data");
     }
   };
 
-  const getQueryData = async (isPagination = false) => {
+  const getQueryData = (isPagination = false, options: QueryDataOptions = {}) => {
+    noteGridQuery(options.origin, options.generationId);
+    const run = () => withQueryOrigin(options.origin, () => runQueryData(isPagination, options));
+    const groupsLoad = isPagination ? null : pendingFilterSemanticGroups();
+    // The origin only covers runQueryData's synchronous part, so the wait happens before it, never inside it.
+    if (!groupsLoad) return run();
+    return groupsLoad.then(() => {
+      const superseded =
+        options.generationId !== undefined &&
+        !useLogsAutoRun().engine.isCurrent(options.generationId);
+      return superseded ? undefined : run();
+    });
+  };
+
+  // Filters are mapped across streams through semantic groups, and extractFields no longer waits for them.
+  const pendingFilterSemanticGroups = (): Promise<unknown> | null => {
+    if (config.isEnterprise !== "true" && config.isCloud !== "true") return null;
+    if (!searchObj.data.query?.trim()) return null;
+    const org = store.state.selectedOrganization.identifier;
+    return getCachedSemanticGroups(org) ? null : loadSemanticGroups(org);
+  };
+
+  const runQueryData = async (isPagination: boolean, options: QueryDataOptions) => {
     try {
       //remove any data that has been cached
       if (Object.keys(searchObj.data.originalDataCache).length > 0) {
@@ -422,7 +473,11 @@ export const useSearchBar = () => {
 
       // searchObj.data.histogram.chartParams.title = "";
       searchObjDebug["queryDataStartTime"] = performance.now();
-      searchObj.meta.showDetailTab = false;
+      // The old index points at a different record once new hits land; the rematch restores it.
+      if (keepsDetailOnRefresh(searchObj))
+        searchObj.meta.resultGrid.navigation.currentRowIndex = null;
+      else if (!isPagination) resetRowSelection(searchObj);
+      closeDrawerForQuery(searchObj, isPagination);
       searchObj.meta.searchApplied = true;
       searchObj.data.functionError = "";
       if (
@@ -508,7 +563,9 @@ export const useSearchBar = () => {
       }
 
       // Use the appropriate method to fetch data
-      getDataThroughStream(isPagination);
+      getDataThroughStream(isPagination, options.generationId, {
+        reuseSchema: !!options.reuseSchema,
+      });
 
       // searchObjDebug["buildSearchStartTime"] = performance.now();
       // const queryReq: any = buildSearch();
@@ -539,7 +596,6 @@ export const useSearchBar = () => {
       //     searchObj.meta.refreshHistogram = true;
       //   }
 
-      //   // update query with function or action
       //   addTransformToQuery(queryReq);
 
       //   // in case of relative time, set start_time and end_time to query
@@ -579,8 +635,6 @@ export const useSearchBar = () => {
 
       //   delete searchObj.data.histogramQuery.query.quick_mode;
       //   delete searchObj.data.histogramQuery.query.from;
-      //   if (searchObj.data.histogramQuery.query.action_id)
-      //     delete searchObj.data.histogramQuery.query.action_id;
 
       //   delete searchObj.data.histogramQuery.aggs;
       //   searchObj.data.customDownloadQueryObj = JSON.parse(
@@ -843,66 +897,19 @@ export const useSearchBar = () => {
       //   e,
       // );
       searchObj.loading = false;
-      showErrorNotification(notificationMsg.value || "Error occurred during the search operation.");
+      showErrorNotification(
+        raw(
+          notificationMsg.value || t("toastMessages.useLogs.errorOccurredDuringTheSearchOperation"),
+        ),
+      );
       notificationMsg.value = "";
     }
   };
 
   const cancelQuery = async (): Promise<boolean> => {
-    return new Promise((resolve) => {
-      try {
-        // only call cancel query api if it is enterprise
-        // otherwise resolve and return immediately
-        if (config.isEnterprise !== "true") {
-          resolve(true);
-          return;
-        }
-
-        const tracesIds = [...searchObj.data.searchRequestTraceIds];
-
-        if (!searchObj.data.searchRequestTraceIds.length) {
-          searchObj.data.isOperationCancelled = false;
-          resolve(true);
-          return;
-        }
-
-        searchObj.data.isOperationCancelled = true;
-
-        searchService
-          .delete_running_queries(
-            store.state.selectedOrganization.identifier,
-            searchObj.data.searchRequestTraceIds,
-          )
-          .then((res) => {
-            const isCancelled = res.data.some((item: any) => item.is_success);
-            if (isCancelled) {
-              searchObj.data.isOperationCancelled = false;
-              toast({
-                variant: "info",
-                message: "Running query cancelled successfully",
-              });
-            }
-          })
-          .catch((error: any) => {
-            toast({
-              variant: "error",
-              message: error.response?.data?.message || "Failed to cancel running query",
-            });
-          })
-          .finally(() => {
-            searchObj.data.searchRequestTraceIds = searchObj.data.searchRequestTraceIds.filter(
-              (id: string) => !tracesIds.includes(id),
-            );
-            resolve(true);
-          });
-      } catch (error) {
-        toast({
-          variant: "error",
-          message: "Failed to cancel running query",
-        });
-        resolve(true);
-      }
-    });
+    useLogsAutoRun().engine.cancelGeneration(null, { cause: "user" });
+    searchObj.data.isOperationCancelled = false;
+    return true;
   };
 
   const sendCancelSearchMessage = (searchRequests: any[]) => {
@@ -923,7 +930,7 @@ export const useSearchBar = () => {
       });
     } catch (error: any) {
       console.error("Failed to cancel WebSocket searches:", error);
-      showErrorNotification("Failed to cancel search operations");
+      showErrorNotification(t("toastMessages.useLogs.failedToCancelSearchOperations"));
     }
   };
 
@@ -950,7 +957,6 @@ export const useSearchBar = () => {
   //       queryReq.query.size = 0;
   //       delete queryReq.query.from;
   //       delete queryReq.query.quick_mode;
-  //       if (queryReq.query.action_id) delete queryReq.query.action_id;
   //       if (queryReq.query.hasOwnProperty("streaming_output"))
   //         delete queryReq.query.streaming_output;
   //       if (queryReq.query.hasOwnProperty("streaming_id"))
@@ -1344,7 +1350,6 @@ export const useSearchBar = () => {
 
   return {
     getFunctions,
-    getActions,
     getSavedViews,
     getRegionInfo,
     setSelectedStreams,

@@ -15,4 +15,5 @@ export type {
   ShortcutInput,
   RegisteredShortcut,
   ShortcutManagerOptions,
+  UseShortcutsOptions,
 } from "./types";

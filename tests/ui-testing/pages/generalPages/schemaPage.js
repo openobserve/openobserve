@@ -86,6 +86,7 @@ class SchemaPage {
 
         // Per-row action buttons on the LogStream OTable (cell-actions template)
         this.logStreamSchemaBtnFirst = page.locator('[data-test="log-stream-schema-btn"]').first();
+        this.logStreamNameCells = page.locator('[data-test^="log-stream-name-cell-"]');
         this.logStreamExploreBtnFirst = page.locator('[data-test="log-stream-explore-btn"]').first();
 
         // Field row expanders on the log search index list (FieldRow templates)
@@ -105,6 +106,33 @@ class SchemaPage {
 
         // Counter locator used for diagnostic schema-element counting
         this.schemaElementCountLocator = page.locator('[data-test*="schema"]');
+
+        // =========================================================
+        // Timeline chip locators (schema.vue #header-right slot)
+        // NEEDS SELECTOR — no data-test attributes exist on timeline
+        // chip elements yet. Fallback locators scoped to the schema
+        // drawer use structural relationships (img + span presence).
+        // =========================================================
+        // Chip wrapper: the div inside schema-drawer that contains
+        // an img (timeline icon) and is NOT the close-button area.
+        this.schemaTimelineChip = page.locator('[data-test="schema-drawer"] div').filter({
+            has: page.locator('img'),
+        }).filter({
+            hasNot: page.locator('[data-test="o-drawer-close-btn"]'),
+        }).first();
+
+        // Timezone label span (e.g. "UTC", "America/New_York")
+        // The first <span> inside the chip is the timezone label.
+        this.schemaTimelineTimezoneLabel = this.schemaTimelineChip.locator('span').first();
+
+        // The div containing the doc_time range text (innermost text div with
+        // class text-text-body — avoids strict mode violation from nested divs
+        // that also contain the → character via descendant text).
+        this.schemaTimelineDocTimeRange = this.schemaTimelineChip.locator('div.text-text-body');
+
+        // Tab selectors within the schema drawer
+        this.schemaSettingsTab = page.locator('[data-test="schema-settings-tab"]');
+        this.schemaConfigurationTab = page.locator('[data-test="schema-configuration-tab"]');
 
         // =========================================================
         // Legacy schemaLocators map preserved for any callers that
@@ -244,6 +272,12 @@ class SchemaPage {
         await this.streamsSearchStreamInputField.click();
         await this.streamsSearchStreamInputField.fill(streamName);
         await this.page.waitForLoadState('domcontentloaded');
+        // The list refetches 300 ms after typing and swaps its rows for a skeleton, which swallows an earlier row click.
+        const needle = streamName.toLowerCase();
+        await expect.poll(async () => {
+            const names = await this.logStreamNameCells.evaluateAll((cells) => cells.map((cell) => cell.getAttribute('data-test')));
+            return names.length > 0 && names.every((name) => name.toLowerCase().includes(needle));
+        }, { timeout: 15000 }).toBe(true);
     }
 
     // Open stream details
@@ -812,6 +846,73 @@ class SchemaPage {
         }
     }
 
+    // =========================================================
+    // Timeline chip interaction methods
+    // =========================================================
+
+    // Wait for the schema drawer to become visible
+    async waitForSchemaDrawerVisible() {
+        await this.schemaDrawer.waitFor({ state: 'visible', timeout: 30000 });
+    }
+
+    // Wait for the timeline chip to appear inside the schema drawer
+    async waitForTimelineChipVisible() {
+        // First ensure the drawer is visible and schema has loaded (spinner gone)
+        await this.schemaDrawer.waitFor({ state: 'visible', timeout: 30000 });
+        // The timeline chip only renders when indexData.name is set (after getSchema() API)
+        await this.schemaTimelineChip.waitFor({ state: 'visible', timeout: 30000 });
+    }
+
+    // Expect the timeline chip to be visible
+    async expectTimelineChipVisible() {
+        await expect(this.schemaTimelineChip).toBeVisible({ timeout: 15000 });
+    }
+
+    // Get the text content of the timezone label span
+    async getTimezoneLabelText() {
+        const text = await this.schemaTimelineTimezoneLabel.textContent();
+        return (text || '').trim();
+    }
+
+    // Get the text content of the doc_time range (min → max)
+    async getDocTimeRangeText() {
+        const text = await this.schemaTimelineDocTimeRange.textContent();
+        return (text || '').trim();
+    }
+
+    // Assert the timezone label is non-empty
+    async expectTimezoneLabelNonEmpty() {
+        await expect(this.schemaTimelineTimezoneLabel).toBeVisible({ timeout: 15000 });
+        const text = await this.schemaTimelineTimezoneLabel.textContent();
+        expect(text).toBeTruthy();
+        expect(text.trim().length).toBeGreaterThan(0);
+    }
+
+    // Assert the doc_time range is a formatted date (not raw epoch)
+    async expectDocTimeRangeFormatted() {
+        await expect(this.schemaTimelineDocTimeRange).toBeVisible({ timeout: 15000 });
+        const text = await this.schemaTimelineDocTimeRange.textContent();
+        expect(text).toBeTruthy();
+        // Should NOT contain epoch date (1970-01-01) — stream has ingested data
+        expect(text).not.toContain('1970-01-01');
+        // Should contain a formatted timestamp pattern like YYYY-MM-DD
+        expect(text).toMatch(/\d{4}-\d{2}-\d{2}/);
+    }
+
+    // Click the Schema Settings tab
+    async clickSchemaSettingsTab() {
+        await this.schemaSettingsTab.waitFor({ state: 'visible', timeout: 10000 });
+        await this.schemaSettingsTab.click();
+        await this.page.waitForLoadState('domcontentloaded');
+    }
+
+    // Click the Configuration tab
+    async clickSchemaConfigurationTab() {
+        await this.schemaConfigurationTab.waitFor({ state: 'visible', timeout: 10000 });
+        await this.schemaConfigurationTab.click();
+        await this.page.waitForLoadState('domcontentloaded');
+    }
+
     // Verification methods for POM compliance
     async verifyNoErrorMessages() {
         await expect(this.logsSearchErrorMessage).not.toBeVisible();
@@ -822,6 +923,20 @@ class SchemaPage {
         const streamsPageVisible = await this.streamsSearchStreamInputField.isVisible();
         expect(streamsPageVisible).toBe(true);
         return streamsPageVisible;
+    }
+
+    /**
+     * Assert the stream's schema editor actually rendered: the schema ODrawer is
+     * open, its title is shown, and the field-mapping table (the stream's field
+     * list) is visible. This is the real, environment-independent outcome of
+     * opening a stream's schema detail — the add-field / delete-field controls
+     * are gated behind isSchemaUDSEnabled (User-Defined Schema, enterprise/config)
+     * so they are NOT a reliable cross-environment signal.
+     */
+    async verifySchemaEditorLoaded() {
+        await expect(this.schemaDrawer).toBeVisible({ timeout: 30000 });
+        await expect(this.schemaTitleText).toBeVisible({ timeout: 15000 });
+        await expect(this.schemaLogStreamFieldMappingTable.first()).toBeVisible({ timeout: 15000 });
     }
 }
 

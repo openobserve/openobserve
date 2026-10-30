@@ -13,6 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { I18nText } from "@/types/i18n";
+import type { AnnotationSource } from "@/ts/interfaces/dashboard";
+
 import type { Ref } from "vue";
 
 // ============================================================================
@@ -97,8 +100,8 @@ export interface PanelEditorChartData {
   version?: number;
   id?: string;
   type?: string;
-  title?: string;
-  description?: string;
+  title?: I18nText;
+  description?: I18nText;
   config?: Record<string, any>;
   htmlContent?: string;
   markdownContent?: string;
@@ -138,6 +141,9 @@ export interface PanelEditorChartData {
       min?: number;
       max?: number;
       time_shift?: any[];
+      formula?: string;
+      ref?: string;
+      hide?: boolean;
     };
   }>;
   [key: string]: any;
@@ -152,8 +158,8 @@ export interface PanelEditorChartData {
  */
 export interface PanelEditorDashboardData {
   dashboardId?: string;
-  title?: string;
-  description?: string;
+  title?: I18nText;
+  description?: I18nText;
   tabs?: any[];
   variables?: {
     list?: any[];
@@ -165,6 +171,7 @@ export interface PanelEditorDashboardData {
     endTime?: string;
     relativeTimePeriod?: string;
   };
+  annotationSources?: AnnotationSource[];
   [key: string]: any;
 }
 
@@ -222,6 +229,14 @@ export interface PanelEditorProps {
    * @default false (dashboard), true (metrics, logs)
    */
   showAddToDashboardButton?: boolean;
+
+  addToDashboardDisabledReason?: I18nText | null;
+
+  /**
+   * While true, chart-type and config re-renders keep the queries the chart last ran.
+   * @default false
+   */
+  holdQueries?: boolean;
 
   // ---- Chart Configuration ----
   /**
@@ -340,6 +355,9 @@ export interface PanelEditorEmits {
    */
   (e: "chartApiError", error: any): void;
 
+  /** Every change of the renderer's error; `{ message: "" }` means the last run succeeded. */
+  (e: "renderer-error", error: { message?: unknown; code?: unknown } | string | null): void;
+
   /**
    * Emitted when user zooms on chart (for datetime update).
    * Parent should update its DateTimePicker with new time range.
@@ -379,6 +397,17 @@ export interface PanelEditorEmits {
    * Parent can use these to initialize variables from URL.
    */
   (e: "initialVariableValuesUpdated", values: Record<string, any>): void;
+
+  /**
+   * Emitted by the preview's Refresh notice action. A host that listens re-runs it the way its
+   * Apply does; without a listener the editor re-runs its own preview.
+   */
+  (e: "applyRequested"): void;
+
+  /**
+   * Emitted by a preview notice's "Open inspector". The action is offered only when the host listens.
+   */
+  (e: "openQueryInspector"): void;
 }
 
 // ============================================================================
@@ -511,7 +540,8 @@ export const DASHBOARD_PRESET: PanelEditorConfig = {
   showQueryBuilder: true,
   showVariablesSelector: true,
   showLastRefreshedTime: true,
-  showOutdatedWarning: true,
+  // Live preview runs builder edits itself; pending changes show on the Apply button.
+  showOutdatedWarning: false,
   showAddToDashboardButton: false, // Dashboard has Save button instead
   showQueryTypeSelector: false,
   showGeneratedQueryDisplay: false,
@@ -628,12 +658,24 @@ export const ALL_CHART_TYPES = [
   "donut",
   "metric",
   "gauge",
+  "bar-gauge",
   "table",
   "heatmap",
+  "state-timeline",
+  "boxplot",
+  "distribution",
+  "treemap",
+  "sunburst",
+  "funnel",
+  "hostmap",
   "geomap",
   "sankey",
+  "node-graph",
   "html",
   "markdown",
+  "alert-list",
+  "flame-graph",
+  "logs",
   "custom_chart",
 ] as const;
 
@@ -661,7 +703,14 @@ export const AGGREGATION_REQUIRED_CHART_TYPES: ChartType[] = [
   "donut",
   "metric",
   "gauge",
+  "bar-gauge",
   "heatmap",
+  "state-timeline",
+  "treemap",
+  "sunburst",
+  "funnel",
+  "hostmap",
   "geomap",
   "sankey",
+  "node-graph",
 ];

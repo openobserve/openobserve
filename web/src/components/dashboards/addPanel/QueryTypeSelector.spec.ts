@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { nextTick } from "vue";
+import { nextTick, reactive } from "vue";
 import QueryTypeSelector from "./QueryTypeSelector.vue";
-import { reactive } from "vue";
 import enLocaleFull from "@/locales/languages/en-US.json";
 
 // Mock i18n.
@@ -897,5 +896,16 @@ describe("QueryTypeSelector", () => {
 
       expect(mockDashboardPanelData.data.queryType).toBe("promql");
     });
+  });
+
+  it("does not offer the builder on a formula query", async () => {
+    mockDashboardPanelData.data.queryType = "promql";
+    mockDashboardPanelData.data.queries[0].customQuery = true;
+    (mockDashboardPanelData.data.queries[0] as any).config = { formula: "A * 2" };
+    wrapper = createWrapper();
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[data-test="dashboard-builder-query-type"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="dashboard-custom-query-type"]').exists()).toBe(true);
   });
 });

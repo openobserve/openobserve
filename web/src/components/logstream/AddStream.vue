@@ -118,12 +118,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { watch, computed } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import StreamFieldInputs from "./StreamFieldInputs.vue";
 import streamService from "@/services/stream";
 import { useStore } from "vuex";
-import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -133,13 +132,16 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeAddStreamSchema, addStreamDefaults, type AddStreamForm } from "./AddStream.schema";
+import { createStreamMutation } from "@/services/stream.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const streamTypes = [
-  { label: "Logs", value: "logs" },
-  { label: "Metrics", value: "metrics" },
-  { label: "Traces", value: "traces" },
+  { label: t("common.logs"), value: "logs" },
+  { label: t("common.metrics"), value: "metrics" },
+  { label: t("common.traces"), value: "traces" },
 ];
 
 const emits = defineEmits(["streamAdded", "close", "added:stream-added", "update:open"]);
@@ -148,7 +150,10 @@ const props = defineProps<{
   open?: boolean;
 }>();
 
-const { addStream, getStream } = useStreams();
+const { addStream, getStream } = useStreams(t);
+
+const orgId = useOrgId();
+const createStream = useMutation(() => createStreamMutation(orgId.value));
 
 const store = useStore();
 
@@ -213,7 +218,10 @@ const saveStream = async (value: AddStreamForm) => {
   await getStream(value.name, value.stream_type, false)
     .then(() => {
       toast({
-        message: `Stream "${value.name}" of type "${value.stream_type}" is already present.`,
+        message: t("toastMessages.logstream.streamOfTypeIsAlreadyPresent", {
+          name: value.name,
+          streamType: value.stream_type,
+        }),
         variant: "warning",
       });
       isStreamPresent = true;
@@ -225,16 +233,11 @@ const saveStream = async (value: AddStreamForm) => {
   const payload = getStreamPayload(Number(value.dataRetentionDays), value.fields ?? []);
   if (!payload) return;
 
-  await streamService
-    .createStream(
-      store.state.selectedOrganization.identifier,
-      value.name,
-      value.stream_type,
-      payload,
-    )
-    .then(() => {
+  await createStream
+    .mutateAsync({ name: value.name, type: value.stream_type, payload })
+    .then(async () => {
       toast({
-        message: "Stream created successfully",
+        message: t("toastMessages.logstream.streamCreatedSuccessfully"),
         variant: "success",
       });
 
@@ -250,7 +253,7 @@ const saveStream = async (value: AddStreamForm) => {
     .catch((err) => {
       if (err.response.status != 403) {
         toast({
-          message: err.response?.data?.message || "Failed to create stream",
+          message: err.response?.data?.message || t("logStream.createStreamFailed"),
           variant: "error",
         });
       }
@@ -285,7 +288,7 @@ const getStreamPayload = (dataRetentionDays: number, rows: any[]) => {
 
   if (showDataRetention.value && dataRetentionDays < 1) {
     toast({
-      message: "Invalid Data Retention Period: Retention period must be at least 1 day.",
+      message: t("toastMessages.logstream.invalidDataRetentionPeriodRetentionPeriod"),
       variant: "error",
     });
     return;

@@ -14,13 +14,19 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import i18nInstance from "@/locales";
 
-vi.mock("@/services/settings", () => ({
-  default: {
-    getSetting: vi.fn(),
-    setUserSetting: vi.fn(),
-  },
-}));
+const t = (i18nInstance.global as any).t;
+
+vi.mock("@/services/settings", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getSetting: vi.fn(),
+      setUserSetting: vi.fn(),
+    },
+  });
+});
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 
 import settings from "@/services/settings";
@@ -61,7 +67,8 @@ describe("useFavoriteDashboards", () => {
     (settings.getSetting as any).mockResolvedValue({
       data: { setting_value: { not: "an array" } },
     });
-    await load("org1", "me@example.com");
+    // Forced: the first load above cached the setting for this org+user.
+    await load("org1", "me@example.com", true);
     expect(favorites.value).toEqual([]);
   });
 
@@ -86,7 +93,7 @@ describe("useFavoriteDashboards", () => {
     (settings.setUserSetting as any).mockResolvedValue({});
     const { toggleFavorite, favorites } = useFavoriteDashboards();
     favorites.value = [D1];
-    const p = toggleFavorite("org1", "me@example.com", D2);
+    const p = toggleFavorite("org1", "me@example.com", D2, t);
     expect(favorites.value).toEqual([D1, D2]); // optimistic — before resolve
     await p;
     expect(settings.setUserSetting).toHaveBeenCalledWith(
@@ -102,7 +109,7 @@ describe("useFavoriteDashboards", () => {
     (settings.setUserSetting as any).mockResolvedValue({});
     const { toggleFavorite, favorites } = useFavoriteDashboards();
     favorites.value = [D1, D2];
-    await toggleFavorite("org1", "me@example.com", D1);
+    await toggleFavorite("org1", "me@example.com", D1, t);
     expect(favorites.value).toEqual([D2]);
     expect(settings.setUserSetting).toHaveBeenCalledWith(
       "org1",
@@ -119,7 +126,7 @@ describe("useFavoriteDashboards", () => {
     });
     const { toggleFavorite, favorites } = useFavoriteDashboards();
     favorites.value = [D1];
-    await toggleFavorite("org1", "me@example.com", D2);
+    await toggleFavorite("org1", "me@example.com", D2, t);
     expect(favorites.value).toEqual([D1]); // reverted
     expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
   });
@@ -129,7 +136,7 @@ describe("useFavoriteDashboards", () => {
       response: { status: 403 },
     });
     const { toggleFavorite, favorites } = useFavoriteDashboards();
-    await toggleFavorite("org1", "me@example.com", D1);
+    await toggleFavorite("org1", "me@example.com", D1, t);
     expect(favorites.value).toEqual([]);
     expect(toast).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -141,8 +148,8 @@ describe("useFavoriteDashboards", () => {
 
   it("toggleFavorite no-ops (no API call, no flash) without org or user", async () => {
     const { toggleFavorite, favorites } = useFavoriteDashboards();
-    await toggleFavorite("", "me@example.com", D1);
-    await toggleFavorite("org1", "", D1);
+    await toggleFavorite("", "me@example.com", D1, t);
+    await toggleFavorite("org1", "", D1, t);
     expect(settings.setUserSetting).not.toHaveBeenCalled();
     expect(favorites.value).toEqual([]);
   });

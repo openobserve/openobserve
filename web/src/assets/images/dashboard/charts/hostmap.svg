@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" style="color-scheme:light dark">
+  <rect x="4.5" y="8.5" width="26" height="47" rx="2" fill="none" stroke="#131313" style="stroke:light-dark(#131313,#FFFFFF)"/>
+  <rect x="33.5" y="8.5" width="26" height="47" rx="2" fill="none" stroke="#131313" style="stroke:light-dark(#131313,#FFFFFF)"/>
+  <rect x="8" y="12" width="9" height="9" fill="#34D399"/>
+  <rect x="18" y="12" width="9" height="9" fill="#34D399"/>
+  <rect x="8" y="22" width="9" height="9" fill="#FBBF24"/>
+  <rect x="18" y="22" width="9" height="9" fill="#34D399"/>
+  <rect x="8" y="32" width="9" height="9" fill="#34D399"/>
+  <rect x="18" y="32" width="9" height="9" fill="#FF2A00"/>
+  <rect x="37" y="12" width="9" height="9" fill="#34D399"/>
+  <rect x="47" y="12" width="9" height="9" fill="#FBBF24"/>
+  <rect x="37" y="22" width="9" height="9" fill="#34D399"/>
+  <rect x="47" y="22" width="9" height="9" fill="#34D399"/>
+  <rect x="37" y="32" width="9" height="9" fill="#34D399"/>
+  <rect x="47" y="32" width="9" height="9" fill="#34D399"/>
+</svg>

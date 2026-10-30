@@ -10,7 +10,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
      installed is coverage you already paid for in ingestion and are not using. -->
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -62,7 +62,7 @@ import {
   type SeverityTone,
 } from "@/utils/security/severity";
 
-const { t, te } = useI18n();
+const { t, te } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
@@ -791,7 +791,7 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
         <template #subheader>
           <div class="px-page-edge border-table-row-divider border-b py-1.5">
             <OStatStrip
-              compact
+              compact-values
               :items="ruleStats"
               selectable
               :selected-key="ruleFacet"
@@ -914,7 +914,7 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
         <template #subheader>
           <div class="px-page-edge border-table-row-divider border-b py-1.5">
             <OStatStrip
-              compact
+              compact-values
               :items="sourceStats"
               selectable
               :selected-key="sourceFacet"

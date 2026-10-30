@@ -23,7 +23,7 @@
       </div>
       <!-- Moving circle indicator -->
       <div
-        class="absolute top-0 h-0.5 w-0.75 -translate-x-1/2 transform rounded-full shadow-[0_0_0.625rem_0.125rem_color-mix(in_srgb,var(--color-brand-indigo)_50%,transparent)]"
+        class="ring-brand-indigo/50 absolute top-0 h-0.5 w-0.75 -translate-x-1/2 transform rounded-full ring-2"
         :class="'bg-brand-indigo'"
         :style="{
           left: `${displayPercentage}%`,

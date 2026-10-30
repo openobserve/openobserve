@@ -21,20 +21,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="tabs-delete-popup-dialog"
     v-model:open="open"
     size="md"
-    :title="
-      t('dashboard.tabsDeletePopUp.deleteTitle', {
-        name: dashboardData?.tabs?.find((tab: any) => tab.tabId === tabId)?.name,
-      })
-    "
+    :title="t('dashboard.tabsDeletePopUp.deleteTitle', { name: tabName })"
     :secondary-button-label="t('confirmDialog.cancel')"
     :primary-button-label="t('confirmDialog.ok')"
+    primary-button-variant="destructive"
     @click:secondary="onCancel"
     @click:primary="onConfirm"
   >
     <div data-test="dialog-box">
-      <p class="para" data-test="dashboard-tab-delete-tab-para">
-        {{ t("dashboard.tabsDeletePopUp.confirmMessage") }}
-      </p>
+      <i18n-t
+        keypath="dashboard.tabsDeletePopUp.confirmMessage"
+        tag="p"
+        class="para"
+        data-test="dashboard-tab-delete-tab-para"
+      >
+        <template #name
+          ><span
+            data-test="dashboard-tab-delete-tab-name"
+            class="text-text-heading font-semibold break-all"
+            >{{ tabName }}</span
+          ></template
+        >
+      </i18n-t>
 
       <!-- only show if there are panels in the tab -->
       <div
@@ -51,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-tab-delete-tab-panels-move"
                 :label="t('dashboard.tabsDeletePopUp.movePanels')"
               />
-              <div v-if="action === 'move'" class="mb-2.5 ml-5 max-w-75 min-w-50">
+              <div v-if="action === 'move'" class="ms-5 mb-2.5 max-w-75 min-w-50">
                 <OSelect
                   v-model="selectedTabToMovePanels"
                   :options="moveTabOptions"
@@ -72,9 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { onMounted } from "vue";
-import { defineComponent, ref, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { onMounted, defineComponent, ref, computed } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
@@ -90,10 +97,14 @@ export default defineComponent({
     modelValue: { type: Boolean, default: false },
   },
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const action = ref("move");
     const selectedTabToMovePanels = ref<string | undefined>(undefined);
     const moveTabOptions = ref([]);
+
+    const tabName = computed(
+      () => props.dashboardData?.tabs?.find((tab: any) => tab.tabId === props.tabId)?.name,
+    );
 
     const open = computed({
       get: () => props.modelValue ?? false,
@@ -141,6 +152,7 @@ export default defineComponent({
     };
     return {
       t,
+      tabName,
       open,
       onCancel,
       onConfirm,

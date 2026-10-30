@@ -35,40 +35,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="pipeline-history-date-picker"
         @on:date-change="updateDateTime"
       />
-      <OSelect
-        v-model="selectedPipeline"
-        :options="allPipelines"
-        labelKey="label"
-        valueKey="value"
-        searchable
-        @update:model-value="onPipelineSelected"
-        :placeholder="t(`pipeline.searchHistory`) || 'Select or search pipeline...'"
-        data-test="pipeline-history-search-select"
-        class="min-w-62.5"
-        clearable
+    </Teleport>
+    <!-- A phone header only has room for the title and the date, so the filters become a toolbar row in the body. -->
+    <Teleport to="#o2-page-actions" defer :disabled="isMobile">
+      <div
+        :class="
+          isMobile
+            ? 'px-page-edge border-border-default flex items-center gap-2 border-b py-2'
+            : 'contents'
+        "
       >
-        <template #empty>
-          <span>No pipelines found</span>
-        </template>
-      </OSelect>
-      <OTableColumnToggle
-        :columns="columns"
-        :column-visibility="columnVisibility"
-        :has-resized-columns="tableRef?.hasResizedColumns ?? false"
-        @update:column-visibility="setColumnVisibility"
-        @reset:column-sizes="tableRef?.resetColumnSizes()"
-      />
-      <OButton
-        variant="outline"
-        size="icon-sm"
-        class="shrink-0"
-        @click="refreshData"
-        data-test="pipeline-history-refresh-btn"
-        :loading="loading"
-        icon-left="refresh"
-      >
-        <OTooltip :content="t('common.refresh') || 'Refresh'" side="top" />
-      </OButton>
+        <OSelect
+          v-model="selectedPipeline"
+          :options="allPipelines"
+          labelKey="label"
+          valueKey="value"
+          searchable
+          @update:model-value="onPipelineSelected"
+          :placeholder="t('pipeline.searchHistory')"
+          data-test="pipeline-history-search-select"
+          class="min-w-62.5 max-md:min-w-0 max-md:flex-1"
+          clearable
+        >
+          <template #empty>
+            <span>{{ t("pipeline.noPipelinesFound") }}</span>
+          </template>
+        </OSelect>
+        <OTableColumnToggle
+          :columns="columns"
+          :column-visibility="columnVisibility"
+          :has-resized-columns="tableRef?.hasResizedColumns ?? false"
+          @update:column-visibility="setColumnVisibility"
+          @reset:column-sizes="tableRef?.resetColumnSizes()"
+        />
+        <ORefreshButton
+          layout="inline"
+          variant="outline"
+          class="shrink-0"
+          :last-run-at="lastUpdatedAt"
+          :loading="loading"
+          data-test="pipeline-history-refresh-btn"
+          @click="refreshData"
+        />
+      </div>
     </Teleport>
     <div class="min-h-0 flex-1 overflow-hidden">
       <div
@@ -76,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="pipeline-history-table bg-card-glass-bg h-full"
       >
         <OTable
+          :forbidden="forbidden"
           ref="tableRef"
           :frame="false"
           :data="rows"
@@ -104,6 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           sticky-header
           @pagination-change="onPaginationChange"
           @sort-change="onSortChange"
+          @row-click="showDetailsDialog"
         >
           <template #cell-timestamp="{ row }">
             <OTimeCell
@@ -142,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-is_realtime="{ row }">
-            <OTooltip :content="row.is_realtime ? 'Real-time' : 'Scheduled'">
+            <OTooltip :content="row.is_realtime ? t('common.realTime') : t('alerts.scheduled')">
               <OIcon
                 :name="row.is_realtime ? 'check-circle' : 'schedule'"
                 :class="row.is_realtime ? 'text-status-positive' : 'text-text-muted'"
@@ -152,7 +163,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-is_silenced="{ row }">
-            <OTooltip :content="row.is_silenced ? 'Silenced' : 'Not Silenced'">
+            <OTooltip
+              :content="
+                row.is_silenced ? t('alerts.insights.filters.silenced') : t('common.notSilenced')
+              "
+            >
               <OIcon
                 :name="row.is_silenced ? 'volume-off' : 'volume-up'"
                 :class="row.is_silenced ? 'text-text-muted' : 'text-status-positive'"
@@ -172,7 +187,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="row.is_partial ? 'text-warning' : 'text-status-positive'"
               size="xs"
             >
-              <OTooltip :content="row.is_partial ? 'Partial Results' : 'Complete Results'" />
+              <OTooltip
+                :content="row.is_partial ? t('common.partialResults') : t('common.completeResults')"
+              />
             </OIcon>
             <span v-else>-</span>
           </template>
@@ -210,12 +227,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @action="(id) => id === 'clear-filters' && clearSearch()"
             />
           </template>
-
-          <template #bottom="{ totalRows }">
-            <div class="mr-4 flex items-center py-2 text-xs font-normal">
-              {{ totalRows }} {{ t("pipeline.header") }}
-            </div>
-          </template>
         </OTable>
       </div>
     </div>
@@ -225,8 +236,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="pipeline-history-details-dialog"
       v-model:open="detailsDialog"
       size="lg"
-      title="Pipeline Execution Details"
-      primary-button-label="Close"
+      :title="t('pipeline.executionDetailsTitle')"
+      :primary-button-label="t('common.close')"
       @click:primary="detailsDialog = false"
     >
       <div class="scroll" style="max-height: 70vh" v-if="selectedRow">
@@ -235,13 +246,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="py-1">
             <div class="flex gap-3">
               <div class="w-1/2">
-                <div class="text-text-label mb-1 text-xs">Pipeline Name</div>
+                <div class="text-text-label mb-1 text-xs">
+                  {{ t("pipeline.pipelineNameLabel") }}
+                </div>
                 <div class="text-sm font-medium">
                   {{ selectedRow.pipeline_name }}
                 </div>
               </div>
               <div class="w-1/2">
-                <div class="text-text-label mb-1 text-xs">Status</div>
+                <div class="text-text-label mb-1 text-xs">{{ t("common.status") }}</div>
                 <OTag type="pipelineRunOutcome" :value="selectedRow.status" />
               </div>
             </div>
@@ -253,13 +266,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="py-1">
             <div class="flex gap-3">
               <div class="w-1/2">
-                <div class="text-text-label mb-1 text-xs">Timestamp</div>
+                <div class="text-text-label mb-1 text-xs">{{ t("pipeline.timestampLabel") }}</div>
                 <div class="text-sm">
                   {{ formatDate(selectedRow.timestamp) }}
                 </div>
               </div>
               <div class="w-1/2">
-                <div class="text-text-label mb-1 text-xs">Duration</div>
+                <div class="text-text-label mb-1 text-xs">{{ t("common.duration") }}</div>
                 <div class="text-sm">
                   {{ formatDuration(selectedRow.end_time - selectedRow.start_time) }}
                 </div>
@@ -273,22 +286,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="py-1">
             <div class="flex gap-3">
               <div class="w-1/2">
-                <div class="text-text-label mb-1 text-xs">Type</div>
+                <div class="text-text-label mb-1 text-xs">{{ t("common.type") }}</div>
                 <div class="text-sm">
                   <OIcon
                     :name="selectedRow.is_realtime ? 'speed' : 'schedule'"
-                    class="mr-1"
+                    class="me-1"
                     size="xs"
                   />
-                  {{ selectedRow.is_realtime ? "Real-time" : "Scheduled" }}
+                  {{ selectedRow.is_realtime ? t("common.realTime") : t("alerts.scheduled") }}
                 </div>
               </div>
               <div class="w-1/2">
-                <div class="text-text-label mb-1 text-xs">Silenced</div>
+                <div class="text-text-label mb-1 text-xs">{{ t("pipeline.silencedLabel") }}</div>
                 <div class="text-sm">
-                  <OIcon v-if="selectedRow.is_silenced" name="volume-off" size="xs" class="mr-1" />
-                  <OIcon v-else name="volume-up" size="xs" class="mr-1" />
-                  {{ selectedRow.is_silenced ? "Yes" : "No" }}
+                  <OIcon v-if="selectedRow.is_silenced" name="volume-off" size="xs" class="me-1" />
+                  <OIcon v-else name="volume-up" size="xs" class="me-1" />
+                  {{ selectedRow.is_silenced ? t("common.yes") : t("common.no") }}
                 </div>
               </div>
             </div>
@@ -308,36 +321,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="py-1">
               <div class="flex gap-3">
                 <div v-if="selectedRow.evaluation_took_in_secs" class="w-1/3">
-                  <div class="text-text-label mb-1 text-xs">Evaluation Time</div>
+                  <div class="text-text-label mb-1 text-xs">
+                    {{ t("pipeline.evaluationTimeLabel") }}
+                  </div>
                   <div class="text-sm">{{ selectedRow.evaluation_took_in_secs.toFixed(2) }}s</div>
                 </div>
                 <div v-if="selectedRow.query_took" class="w-1/3">
-                  <div class="text-text-label mb-1 text-xs">Query Time</div>
+                  <div class="text-text-label mb-1 text-xs">{{ t("pipeline.queryTimeLabel") }}</div>
                   <div class="text-sm">{{ (selectedRow.query_took / 1000).toFixed(2) }}ms</div>
                 </div>
                 <div v-if="selectedRow.retries > 0" class="w-1/3">
-                  <div class="text-text-label mb-1 text-xs">Retries</div>
+                  <div class="text-text-label mb-1 text-xs">{{ t("pipeline.retriesLabel") }}</div>
                   <div class="text-sm">{{ selectedRow.retries }}</div>
                 </div>
                 <div v-if="selectedRow.delay_in_secs" class="w-1/3">
-                  <div class="text-text-label mb-1 text-xs">Delay</div>
+                  <div class="text-text-label mb-1 text-xs">{{ t("pipeline.delay") }}</div>
                   <div class="text-sm">{{ selectedRow.delay_in_secs }}s</div>
                 </div>
                 <div
                   v-if="selectedRow.is_partial !== null && selectedRow.is_partial !== undefined"
                   class="w-1/3"
                 >
-                  <div class="text-text-label mb-1 text-xs">Result Status</div>
+                  <div class="text-text-label mb-1 text-xs">
+                    {{ t("pipeline.resultStatusLabel") }}
+                  </div>
                   <div class="text-sm">
                     <OIcon
                       :name="selectedRow.is_partial ? 'warning' : 'check-circle'"
                       :class="[
-                        'mr-1',
+                        'me-1',
                         selectedRow.is_partial ? 'text-warning' : 'text-status-positive',
                       ]"
                       size="xs"
                     />
-                    {{ selectedRow.is_partial ? "Partial" : "Complete" }}
+                    {{ selectedRow.is_partial ? t("common.partial") : t("common.complete") }}
                   </div>
                 </div>
               </div>
@@ -348,7 +365,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="selectedRow.source_node">
             <OSeparator class="my-2" />
             <div class="py-1">
-              <div class="text-text-label mb-1 text-xs">Source Node</div>
+              <div class="text-text-label mb-1 text-xs">{{ t("pipeline.sourceNodeLabel") }}</div>
               <div class="text-compact font-mono text-sm">
                 {{ selectedRow.source_node }}
               </div>
@@ -360,8 +377,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSeparator class="my-2" />
             <div class="py-1">
               <div class="text-text-label mb-1 text-xs">
-                <OIcon name="error" size="xs" class="mr-1" />
-                Error Details
+                <OIcon name="error" size="xs" class="me-1" />
+                {{ t("pipeline.errorDetailsLabel") }}
               </div>
               <div
                 class="rounded-default border-status-negative/30 bg-status-error-bg mt-2 border border-solid p-2"
@@ -373,8 +390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     font-family: var(--font-mono);
                     font-size: var(--text-xs);
                   "
-                  >{{ selectedRow.error }}</pre
-                >
+                  >{{ selectedRow.error }}</pre>
               </div>
             </div>
           </template>
@@ -384,8 +400,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSeparator class="my-2" />
             <div class="py-1">
               <div class="text-text-label mb-1 text-xs">
-                <OIcon name="check-circle" size="xs" class="mr-1" />
-                Response
+                <OIcon name="check-circle" size="xs" class="me-1" />
+                {{ t("pipeline.responseLabel") }}
               </div>
               <div
                 class="rounded-default border-status-positive/30 bg-status-success-bg mt-2 border border-solid p-2"
@@ -397,8 +413,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     font-family: var(--font-mono);
                     font-size: var(--text-xs);
                   "
-                  >{{ selectedRow.success_response }}</pre
-                >
+                  >{{ selectedRow.success_response }}</pre>
               </div>
             </div>
           </template>
@@ -414,10 +429,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="errorMessage?.pipeline_name"
       :sub-title="
         errorMessage?.last_error_timestamp
-          ? `Last error: ${new Date(errorMessage.last_error_timestamp / 1000).toLocaleString()}`
+          ? t('common.lastErrorAt', {
+              time: new Date(errorMessage.last_error_timestamp / 1000).toLocaleString(),
+            })
           : undefined
       "
-      primary-button-label="Close"
+      :primary-button-label="t('common.close')"
       @update:open="(v) => !v && closeErrorDialog()"
       @click:primary="closeErrorDialog"
     >
@@ -426,7 +443,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <div class="mb-4">
         <div class="text-compact mb-2 font-semibold tracking-[0.02em] opacity-80">
-          Error Summary
+          {{ t("pipeline.errorSummaryLabel") }}
         </div>
         <div
           class="rounded-default text-compact bg-banner-error-soft-bg border-banner-error-soft-border text-banner-error-soft-text border p-4 font-mono leading-[1.6] wrap-break-word whitespace-pre-wrap"
@@ -441,10 +458,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, onMounted, watch } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import * as dateUtils from "@/utils/date";
 import DateTime from "@/components/DateTime.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -457,17 +475,21 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import ONumberCell from "@/lib/core/Table/cells/ONumberCell.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import pipelinesService from "@/services/pipelines";
-import http from "@/services/http";
+import { pipelineHistoryQuery } from "@/services/pipelines.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { COL } from "@/lib/core/Table/OTable.types";
 import type { OTableColumnDef, OTableExposed } from "@/lib/core/Table/OTable.types";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
+const { isMobile } = useBreakpoint();
 
 // Data
 const loading = ref(false);
+const lastUpdatedAt = ref<number | null>(null);
+const forbidden = ref(false);
 const rows = ref<any[]>([]);
 const searchQuery = ref("");
 const selectedPipeline = ref<any>();
@@ -520,7 +542,7 @@ const errorMessage = ref<any>(null);
 const columns = ref<OTableColumnDef[]>([
   {
     id: "pipeline_name",
-    header: "Pipeline Name",
+    header: t("pipeline.pipelineNameLabel"),
     accessorKey: "pipeline_name",
     sortable: true,
     hideable: true,
@@ -530,7 +552,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "is_realtime",
-    header: "Type",
+    header: t("common.type"),
     accessorKey: "is_realtime",
     sortable: true,
     hideable: true,
@@ -539,7 +561,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "is_silenced",
-    header: "Is Silenced",
+    header: t("alerts.isSilenced"),
     accessorKey: "is_silenced",
     sortable: true,
     hideable: true,
@@ -548,7 +570,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "timestamp",
-    header: "Timestamp",
+    header: t("pipeline.timestampLabel"),
     accessorKey: "timestamp",
     sortable: true,
     hideable: true,
@@ -557,7 +579,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "start_time",
-    header: "Start Time",
+    header: t("alerts.startTime"),
     accessorKey: "start_time",
     sortable: true,
     hideable: true,
@@ -566,7 +588,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "end_time",
-    header: "End Time",
+    header: t("alerts.endTime"),
     accessorKey: "end_time",
     sortable: true,
     hideable: true,
@@ -575,7 +597,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "duration",
-    header: "Duration",
+    header: t("common.duration"),
     accessorFn: (row: any) => row.end_time - row.start_time,
     sortable: true,
     hideable: true,
@@ -584,7 +606,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "status",
-    header: "Status",
+    header: t("common.status"),
     accessorKey: "status",
     sortable: true,
     hideable: true,
@@ -597,7 +619,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "retries",
-    header: "Retries",
+    header: t("pipeline.retriesLabel"),
     accessorKey: "retries",
     sortable: true,
     hideable: true,
@@ -609,7 +631,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "is_partial",
-    header: "Partial",
+    header: t("common.partial"),
     accessorKey: "is_partial",
     sortable: false,
     hideable: true,
@@ -618,7 +640,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "delay_in_secs",
-    header: "Delay (s)",
+    header: t("pipeline.delayInSecs"),
     accessorKey: "delay_in_secs",
     sortable: true,
     hideable: true,
@@ -627,7 +649,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "evaluation_took_in_secs",
-    header: "Eval Time (s)",
+    header: t("pipeline.evalTimeInSecs"),
     accessorKey: "evaluation_took_in_secs",
     sortable: true,
     hideable: true,
@@ -636,7 +658,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "query_took",
-    header: "Query Time (ms)",
+    header: t("pipeline.queryTimeInMs"),
     accessorKey: "query_took",
     sortable: true,
     hideable: true,
@@ -685,8 +707,9 @@ const clearSearch = () => {
   fetchPipelineHistory();
 };
 
-const fetchPipelineHistory = async () => {
+const fetchPipelineHistory = async (force = false) => {
   loading.value = true;
+  forbidden.value = false;
   try {
     const org = store.state.selectedOrganization.identifier;
 
@@ -712,13 +735,21 @@ const fetchPipelineHistory = async () => {
       params.sort_order = pagination.value.descending ? "desc" : "asc";
     }
 
-    const url = `/api/${org}/pipelines/history`;
-    const response = await http().get(url, { params });
+    // Cached read — a revisit inside the freshness window paints without a
+    // request; the Refresh button forces.
+    const options = pipelineHistoryQuery(org, params);
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const historyData: any = await queryClient.fetchQuery(options);
+    // The cache records the fetch time; fetchQuery does not hand it back, so read it here.
+    lastUpdatedAt.value = queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? Date.now();
 
-    if (response.data) {
-      // Handle the response data
-      const historyData = response.data;
-
+    if (historyData) {
       // Map the hits array or handle empty response
       rows.value = (historyData.hits || []).map((hit: any, index: number) => ({
         ...hit,
@@ -735,10 +766,17 @@ const fetchPipelineHistory = async () => {
   } catch (error: any) {
     console.error("Error fetching pipeline history:", error);
     console.error("Error response:", error.response);
-    toast({
-      variant: "error",
-      message: error.response?.data?.message || error.message || "Failed to fetch pipeline history",
-    });
+    forbidden.value = error?.response?.status === 403;
+    // The grouped access toast already reports a 403; a second red toast adds nothing.
+    if (!forbidden.value) {
+      toast({
+        variant: "error",
+        message:
+          error.response?.data?.message ||
+          error.message ||
+          t("pipeline.fetchPipelineHistoryFailed"),
+      });
+    }
   } finally {
     loading.value = false;
   }
@@ -784,7 +822,7 @@ const onSortChange = (params: { column: string; order: "asc" | "desc" }) => {
 };
 
 const refreshData = () => {
-  fetchPipelineHistory();
+  fetchPipelineHistory(true);
 };
 
 const formatDate = (timestamp: number) => {
@@ -808,6 +846,11 @@ const formatDuration = (microseconds: number) => {
     return `${minutes}m ${seconds % 60}s`;
   }
   return `${seconds}s`;
+};
+
+const showDetailsDialog = (row: any) => {
+  selectedRow.value = row;
+  detailsDialog.value = true;
 };
 
 const closeErrorDialog = () => {

@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { computed, ref, watch, onUnmounted } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -31,7 +31,7 @@ import {
 } from "@/composables/synthetics/syntheticResultsSchema";
 import syntheticsService from "@/services/synthetics";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   runId: string;
@@ -44,6 +44,8 @@ const emit = defineEmits<{ close: [] }>();
 
 const store = useStore();
 const { executeQuery, cancelAll } = useLLMStreamQuery();
+
+onUnmounted(() => cancelAll());
 
 const loading = ref(false);
 const queryError = ref<string | null>(null);
@@ -79,7 +81,7 @@ watch(
       }
       expandedSteps.value = new Set(expandedSteps.value);
     } catch (e: any) {
-      queryError.value = e?.message ?? "Query failed";
+      queryError.value = e?.message ?? t("synthetics.queryFailed");
     } finally {
       loading.value = false;
     }
@@ -149,7 +151,7 @@ function toggleSteps(executionId: string) {
     :open="open"
     size="lg"
     :title="t('synthetics.runDetail.title')"
-    :sub-title="fmtTime(scheduledTs)"
+    :sub-title="raw(fmtTime(scheduledTs))"
     @update:open="
       (v) => {
         if (!v) emit('close');
@@ -166,19 +168,19 @@ function toggleSteps(executionId: string) {
       <!-- ── Loading skeleton ── -->
       <div v-if="loading" class="flex flex-col gap-3 p-5">
         <div class="mb-2 flex gap-6">
-          <div class="rounded-default h-10 w-28 animate-pulse bg-[var(--color-border-default)]" />
-          <div class="rounded-default h-10 w-20 animate-pulse bg-[var(--color-border-default)]" />
-          <div class="rounded-default h-10 w-40 animate-pulse bg-[var(--color-border-default)]" />
+          <div class="rounded-default bg-border-default h-10 w-28 animate-pulse" />
+          <div class="rounded-default bg-border-default h-10 w-20 animate-pulse" />
+          <div class="rounded-default bg-border-default h-10 w-40 animate-pulse" />
         </div>
         <div
           v-for="i in 2"
           :key="i"
           class="rounded-default border-border-default overflow-hidden border"
         >
-          <div class="h-11 w-full animate-pulse bg-[var(--color-border-default)]" />
+          <div class="bg-border-default h-11 w-full animate-pulse" />
           <div class="flex flex-col gap-2 p-4">
-            <div class="rounded-default h-4 w-2/3 animate-pulse bg-[var(--color-border-default)]" />
-            <div class="rounded-default h-4 w-1/2 animate-pulse bg-[var(--color-border-default)]" />
+            <div class="rounded-default bg-border-default h-4 w-2/3 animate-pulse" />
+            <div class="rounded-default bg-border-default h-4 w-1/2 animate-pulse" />
           </div>
         </div>
       </div>
@@ -258,7 +260,7 @@ function toggleSteps(executionId: string) {
               <span class="text-text-heading truncate text-sm font-semibold">{{
                 loc.location || "—"
               }}</span>
-              <div class="ml-auto flex shrink-0 items-center gap-3">
+              <div class="ms-auto flex shrink-0 items-center gap-3">
                 <span class="text-text-muted text-xs">{{
                   [loc.browserEngine, loc.device].filter(Boolean).join(" · ")
                 }}</span>
@@ -278,13 +280,12 @@ function toggleSteps(executionId: string) {
                   {{ t("synthetics.results.error") }}
                 </p>
                 <pre
-                  class="text-text-secondary bg-status-error-bg rounded-default border border-[var(--color-status-error-text)] px-3 py-2 font-mono text-xs leading-relaxed whitespace-pre-wrap"
-                  >{{ loc.error }}</pre
-                >
+                  class="text-text-secondary bg-status-error-bg rounded-default border-status-error-text border px-3 py-2 font-mono text-xs leading-relaxed whitespace-pre-wrap"
+                  >{{ loc.error }}</pre>
               </div>
 
               <!-- Steps -->
-              <div v-if="loc.steps.length" class="px-4 py-3">
+              <div v-if="loc.steps.length || loc.startLoad" class="px-4 py-3">
                 <OButton
                   variant="ghost"
                   size="xs"
@@ -299,7 +300,7 @@ function toggleSteps(executionId: string) {
                   {{ t("synthetics.runDetail.stepsCount", { count: loc.steps.length }) }}
                   <span
                     v-if="loc.steps.some((s) => s.status === 'fail')"
-                    class="text-status-error-text ml-1"
+                    class="text-status-error-text ms-1"
                   >
                     ·
                     {{
@@ -311,6 +312,36 @@ function toggleSteps(executionId: string) {
                 </OButton>
 
                 <div v-if="expandedSteps.has(loc.executionId)" class="flex flex-col gap-1">
+                  <!-- Row 0: the Starting URL, above the numbered Steps and counted in none of them. -->
+                  <div
+                    v-if="loc.startLoad"
+                    class="flex items-start gap-2.5 py-1.5 text-xs"
+                    :data-test="`synthetics-run-detail-start-row-${loc.executionId}`"
+                  >
+                    <span
+                      class="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-white"
+                      :class="loc.startLoad.status === 'ok' ? 'bg-success-600' : 'bg-error-500'"
+                    >
+                      <OIcon name="language" size="xs" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-center gap-2">
+                        <span class="text-text-secondary truncate" :title="loc.startLoad.url">{{
+                          t("synthetics.runDetail.startLoadLabel", { url: loc.startLoad.url })
+                        }}</span>
+                        <span class="text-text-muted ms-auto shrink-0 tabular-nums">{{
+                          fmtDuration(loc.startLoad.durationMs)
+                        }}</span>
+                      </div>
+                      <p
+                        v-if="loc.startLoad.error"
+                        class="text-status-error-text mt-0.5 truncate"
+                        :title="loc.startLoad.error"
+                      >
+                        {{ loc.startLoad.error }}
+                      </p>
+                    </div>
+                  </div>
                   <div
                     v-for="(step, idx) in loc.steps"
                     :key="step.stepId"
@@ -318,11 +349,7 @@ function toggleSteps(executionId: string) {
                   >
                     <span
                       class="text-3xs mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full font-bold text-white"
-                      :class="
-                        step.status === 'ok'
-                          ? 'bg-[var(--color-success-600)]'
-                          : 'bg-[var(--color-error-500)]'
-                      "
+                      :class="step.status === 'ok' ? 'bg-success-600' : 'bg-error-500'"
                       >{{ idx + 1 }}</span
                     >
                     <div class="min-w-0 flex-1">
@@ -330,7 +357,7 @@ function toggleSteps(executionId: string) {
                         <span class="text-text-secondary truncate font-mono">{{
                           step.stepId
                         }}</span>
-                        <span class="text-text-muted ml-auto shrink-0 tabular-nums">{{
+                        <span class="text-text-muted ms-auto shrink-0 tabular-nums">{{
                           fmtDuration(step.durationMs)
                         }}</span>
                       </div>
@@ -360,11 +387,7 @@ function toggleSteps(executionId: string) {
                     <div class="border-border-default flex items-center gap-1.5 border-b px-2 py-1">
                       <span
                         class="h-2 w-2 shrink-0 rounded-full"
-                        :class="
-                          step.status === 'ok'
-                            ? 'bg-[var(--color-success-500)]'
-                            : 'bg-[var(--color-error-500)]'
-                        "
+                        :class="step.status === 'ok' ? 'bg-success-500' : 'bg-error-500'"
                       />
                       <span class="text-3xs text-text-muted truncate font-mono">{{
                         step.stepId
@@ -373,7 +396,7 @@ function toggleSteps(executionId: string) {
                     <a :href="artifactUrl(step.screenshotKey!)" target="_blank">
                       <img
                         :src="artifactUrl(step.screenshotKey!)"
-                        :alt="`Screenshot ${step.stepId}`"
+                        :alt="t('common.screenshotOfStep', { step: step.stepId })"
                         class="block max-h-48 w-full object-contain transition-opacity hover:opacity-90"
                         loading="lazy"
                       />

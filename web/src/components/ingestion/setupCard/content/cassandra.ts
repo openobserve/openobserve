@@ -17,6 +17,8 @@
 // https://openobserve.ai/blog/how-to-monitor-cassandra — Cassandra is scraped via
 // the JMX receiver (needs the OTel JMX metrics jar + JMX enabled on Cassandra).
 
+import { raw, type TranslateFn } from "@/types/i18n";
+
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants } from "./otelShared";
@@ -47,58 +49,79 @@ service:
       processors: [batch]
       exporters: [otlphttp/openobserve]`;
 
-export default function cassandraCard(subs: CardSubstitutions): RichCardContent {
+export default function cassandraCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   return {
     provider: {
-      name: "Cassandra",
-      tagline:
-        "Collect Cassandra metrics via the OpenTelemetry Collector's JMX receiver and ship them to OpenObserve.",
+      id: "cassandra",
+      name: raw("Cassandra"),
+      tagline: t("ingestion.setupCard.cassandraTagline"),
       logo: getImageURL("images/ingestion/cassandra.png"),
       tone: "#1287B1",
-      metaBadges: ["Metrics"],
+      metaBadges: [t("common.metrics")],
     },
     steps: [
       {
         id: "jmx-jar",
-        title: "Download the JMX Metrics Jar",
-        description: "The JMX receiver runs this helper jar (requires Java on the collector host).",
-        chip: { kind: "terminal", label: "Terminal" },
+        titleKey: "ingestion.setupCard.downloadJmxJarTitle",
+        descriptionKey: "ingestion.setupCard.downloadJmxJarDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
         completeOn: "copy",
         code: { lang: "bash", raw: JMX_JAR },
       },
-      collectorInstallStep(),
+      collectorInstallStep(t),
       {
         id: "configure",
-        title: "Configure the OpenTelemetry Collector",
-        description: "Writes `config.yaml` — set the JMX host/port below.",
-        chip: { kind: "terminal", label: "Terminal" },
+        titleKey: "ingestion.setupCard.configureCollectorTitle",
+        descriptionKey: "ingestion.setupCard.configureCollectorJmxDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
         required: true,
         completeOn: "copy",
         variantGroup: "os",
         variantToggle: false,
         inputs: [
-          { id: "host", label: "JMX Host", default: "localhost", placeholder: "localhost" },
-          { id: "port", label: "JMX Port", default: "9000", placeholder: "9000", width: "sm" },
+          {
+            id: "host",
+            labelKey: "ingestion.setupCard.jmxHostLabel",
+            default: "localhost",
+            placeholder: raw("localhost"),
+          },
+          {
+            id: "port",
+            labelKey: "ingestion.setupCard.jmxPortLabel",
+            default: "9000",
+            placeholder: raw("9000"),
+            width: "sm",
+          },
         ],
         variants: writeConfigVariants(CONFIG_YAML, subs),
-        note: "Enable JMX remote access on Cassandra for the receiver to connect.",
+        note: t("ingestion.setupCard.cassandraJmxNote"),
       },
       {
         id: "run",
-        title: "Run the OpenTelemetry Collector",
-        description: "Start the collector.",
-        chip: { kind: "run", label: "Run" },
+        titleKey: "ingestion.setupCard.runCollectorTitle",
+        descriptionKey: "ingestion.setupCard.runCollectorDesc",
+        chip: { kind: "run", labelKey: "ingestion.setupCard.chipRun" },
         completeOn: "copy",
         code: { lang: "bash", raw: "./otelcol-contrib --config ./config.yaml" },
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description: "Hit Test below, or check Streams for the `cassandra_*` metrics.",
-        chip: { kind: "traces", label: "Metrics" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyCassandraMetricsDesc",
+        chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Read Latency", "Write Latency", "Compactions", "GC Pauses", "Heap Usage"],
+        // What the verify step will show, in prose. These are NOT the ingested metric
+        // names (those are cassandra.client.request.latency, cassandra.compaction.tasks.*,
+        // jvm.gc.*, jvm.memory.heap.used) — they are a plain-English summary of them,
+        // so they are translated.
+        pills: [
+          t("ingestion.setupCard.pillReadLatency"),
+          t("ingestion.setupCard.pillWriteLatency"),
+          t("ingestion.setupCard.pillCompactions"),
+          t("ingestion.setupCard.pillGcPauses"),
+          t("ingestion.setupCard.pillHeapUsage"),
+        ],
       },
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "cassandra", filter: "" },

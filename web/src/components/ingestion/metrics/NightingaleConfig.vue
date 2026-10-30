@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <IngestionContent>
-    <CopyContent class="copy-content-container-cls" :content="content" />
+  <IngestionContent snippet-kind="config" config-tool="Nightingale">
+    <CredentialCodeBlock slug="nightingale" :content="content" />
     <IngestionDocLink href="https://github.com/ccfos/nightingale">
-      to learn how to ingest metrics using Nightingale
+      {{ t("ingestion.nightingaleDocLinkText") }}
     </IngestionDocLink>
   </IngestionContent>
 </template>
@@ -27,9 +27,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref } from "vue";
 import { useStore } from "vuex";
 import { getEndPoint, getIngestionURL } from "../../../utils/zincutils";
-import CopyContent from "@/components/CopyContent.vue";
+import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
+import { useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
   name: "nightingale-config",
@@ -41,8 +42,9 @@ export default defineComponent({
       type: String,
     },
   },
-  components: { CopyContent, IngestionContent, IngestionDocLink },
+  components: { CredentialCodeBlock, IngestionContent, IngestionDocLink },
   setup() {
+    const { t } = useI18nTyped();
     const store = useStore();
     const endpoint: any = ref({
       url: "",
@@ -61,6 +63,7 @@ BasicAuthUser = "[EMAIL]"
 BasicAuthPass = "[PASSCODE]"`;
 
     return {
+      t,
       content,
     };
   },

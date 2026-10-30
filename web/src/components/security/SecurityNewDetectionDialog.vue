@@ -8,7 +8,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
      fires. -->
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, onUnmounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -64,7 +64,7 @@ const emit = defineEmits<{
   created: [name: string];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const STARTER_YAML = `title: My Detection
 status: experimental

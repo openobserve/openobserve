@@ -19,16 +19,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="isMetaOrg"
     :title="t('queries.runningQueries')"
     icon="query-stats"
-    :subtitle="'Inspect and cancel running queries'"
+    :subtitle="t('settings.queryManagementDesc')"
     bleed
   >
     <!-- Filters live in the sub-nav band directly above the table. -->
     <template #subnav>
       <div
         data-test="running-queries-filter-container"
-        class="px-page-edge flex items-center justify-start gap-3 py-2"
+        class="px-page-edge flex items-center justify-start gap-3 py-2 max-md:flex-wrap max-md:gap-2"
       >
         <OToggleGroup
+          mobile-dropdown
           :model-value="selectedQueryTypeTab"
           @update:model-value="onChangeQueryTab($event as 'summary' | 'all')"
           data-test="running-queries-query-type-tabs"
@@ -48,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="searchFieldOptions"
             labelKey="label"
             valueKey="value"
-            class="w-35 p-0"
+            class="w-35 p-0 max-md:w-28"
             data-test="running-queries-search-fields-select"
             @update:model-value="filterQuery = ''"
           />
@@ -56,14 +57,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSearchInput
           v-if="selectedSearchField == 'all'"
           v-model="filterQuery"
-          class="no-border o2-search-input"
+          class="no-border o2-search-input max-md:min-w-24 max-md:flex-1"
           :placeholder="t('queries.search')"
           data-test="running-queries-search-input"
         />
         <div v-else class="o2-select-input o2-input w-62.5">
           <OSelect
             v-model="filterQuery"
-            placeholder="Select option"
+            :placeholder="t('queries.selectOption')"
             :options="otherFieldOptions"
             labelKey="label"
             valueKey="value"
@@ -84,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <RunningQueriesList
               :rows="rowsQuery"
+              :forbidden="forbidden"
               :filtered="!!filterQuery"
               :last-refreshed="lastRefreshed"
               :search-type="selectedSearchType"
@@ -105,6 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <SummaryList
               :rows="summaryRows"
+              :forbidden="forbidden"
               :filtered="!!filterQuery"
               :last-refreshed="lastRefreshed"
               v-model:selectedRows="selectedRow['summary']"
@@ -144,7 +147,7 @@ import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import SearchService from "@/services/search";
 import { onBeforeMount, ref, defineComponent, computed, toRaw, watch } from "vue";
 
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -152,10 +155,9 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import { durationFormatter } from "@/utils/zincutils";
+import { durationFormatter, getDuration } from "@/utils/zincutils";
 import RunningQueriesList from "./RunningQueriesList.vue";
 import SummaryList from "./SummaryList.vue";
-import { getDuration } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
@@ -176,6 +178,8 @@ export default defineComponent({
     OSearchInput,
   },
   setup() {
+    // Declared first: the option lists below resolve their labels through `t`.
+    const { t } = useI18nTyped();
     const store = useStore();
     const schemaData = ref({});
     const lastRefreshed = ref("");
@@ -190,24 +194,24 @@ export default defineComponent({
     });
 
     const searchFieldOptions = ref([
-      { label: "All Fields", value: "all" },
-      { label: "Exec. Duration", value: "exec_duration" },
-      { label: "Query Range", value: "query_range" },
+      { label: t("search.allFieldsLabel"), value: "all" },
+      { label: t("queries.duration"), value: "exec_duration" },
+      { label: t("queries.queryRange"), value: "query_range" },
     ]);
 
     const selectedQueryTypeTab = ref<"summary" | "all">("summary");
 
     const selectedSearchType = ref("dashboards");
     const searchTypes = ["dashboards", "ui", "Others"]; // UI, Dashboards, Reports, Alerts, Values, Other, RUM, DerivedStream,
-    const searchTypeLabels: Record<string, string> = {
-      dashboards: "Dashboards",
-      ui: "UI",
-      Others: "Others",
+    const searchTypeLabels: Record<string, I18nText> = {
+      dashboards: t("queries.searchTypeDashboards"),
+      ui: t("queries.searchTypeUi"),
+      Others: t("queries.searchTypeOthers"),
     };
 
     const runningQueryTypes = [
-      { label: "User Summary", value: "summary" },
-      { label: "All Queries", value: "all" },
+      { label: t("queries.userSummary"), value: "summary" },
+      { label: t("queries.allQueries"), value: "all" },
     ];
     const selectedSearchField = ref(searchFieldOptions.value[0].value);
 
@@ -224,6 +228,7 @@ export default defineComponent({
         const result = queries.value.reduce((acc: { [key: string]: any }, query: any) => {
           const {
             trace_id,
+            org_id,
             user_id,
             search_type,
             search_type_label,
@@ -242,7 +247,7 @@ export default defineComponent({
               queryRange: 0,
               search_type,
               search_type_label: search_type_label,
-              trace_ids: [],
+              queries: [],
               created_at,
               query: { end_time, start_time },
             };
@@ -260,7 +265,7 @@ export default defineComponent({
             acc[key].query.end_time = end_time;
           }
 
-          acc[key].trace_ids.push(trace_id);
+          acc[key].queries.push({ trace_id, org_id });
 
           acc[key].numOfQueries += 1;
 
@@ -300,16 +305,16 @@ export default defineComponent({
     };
 
     const loadingState = ref(false);
+    const forbidden = ref(false);
     const queries = ref([]);
 
     const deleteDialog = ref({
       show: false,
-      title: "Delete Running Query",
-      message: "Are you sure you want to delete this running query?",
+      title: t("queries.deleteRunningQueryTitle"),
+      message: t("queries.deleteRunningQueryMessage"),
       data: null as any,
     });
 
-    const { t } = useI18n();
     const showListSchemaDialog = ref(false);
 
     const listSchema = (row: any) => {
@@ -320,18 +325,18 @@ export default defineComponent({
     };
 
     const perPageOptions: any = [
-      { label: "5", value: 5 },
-      { label: "10", value: 10 },
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
+      { label: raw("5"), value: 5 },
+      { label: raw("10"), value: 10 },
+      { label: raw("20"), value: 20 },
+      { label: raw("50"), value: 50 },
+      { label: raw("100"), value: 100 },
     ];
     const selectedPerPage = ref(20);
     const pagination: any = ref({
       rowsPerPage: 20,
     });
 
-    const changePagination = (val: { label: string; value: any }) => {
+    const changePagination = (val: { label: I18nText; value: any }) => {
       selectedPerPage.value = val.value;
       pagination.value.rowsPerPage = val.value;
     };
@@ -549,23 +554,23 @@ export default defineComponent({
     const otherFieldOptions = computed(() => {
       if (selectedSearchField.value === "exec_duration") {
         return [
-          { label: "> 1 second", value: "gt_1s" },
-          { label: "> 5 seconds", value: "gt_5s" },
-          { label: "> 15 seconds", value: "gt_15s" },
-          { label: "> 30 seconds", value: "gt_30s" },
-          { label: "> 1 minute", value: "gt_1m" },
-          { label: "> 5 minutes", value: "gt_5m" },
-          { label: "> 10 minutes", value: "gt_10m" },
+          { label: t("queries.durationOptions.gt1s"), value: "gt_1s" },
+          { label: t("queries.durationOptions.gt5s"), value: "gt_5s" },
+          { label: t("queries.durationOptions.gt15s"), value: "gt_15s" },
+          { label: t("queries.durationOptions.gt30s"), value: "gt_30s" },
+          { label: t("queries.durationOptions.gt1m"), value: "gt_1m" },
+          { label: t("queries.durationOptions.gt5m"), value: "gt_5m" },
+          { label: t("queries.durationOptions.gt10m"), value: "gt_10m" },
         ];
       } else if (selectedSearchField.value === "query_range") {
         return [
-          { label: "> 5 minutes", value: "gt_5m" },
-          { label: "> 10 minutes", value: "gt_10m" },
-          { label: "> 15 minutes", value: "gt_15m" },
-          { label: "> 1 hour", value: "gt_1h" },
-          { label: "> 1 day", value: "gt_1d" },
-          { label: "> 1 week", value: "gt_1w" },
-          { label: "> 1 Month", value: "gt_1M" },
+          { label: t("queries.durationOptions.gt5m"), value: "gt_5m" },
+          { label: t("queries.durationOptions.gt10m"), value: "gt_10m" },
+          { label: t("queries.durationOptions.gt15m"), value: "gt_15m" },
+          { label: t("queries.durationOptions.gt1h"), value: "gt_1h" },
+          { label: t("queries.durationOptions.gt1d"), value: "gt_1d" },
+          { label: t("queries.durationOptions.gt1w"), value: "gt_1w" },
+          { label: t("queries.durationOptions.gt1Month"), value: "gt_1M" },
         ];
       }
 
@@ -580,7 +585,7 @@ export default defineComponent({
 
     const getRunningQueries = () => {
       const dismiss = toast({
-        message: "Fetching running queries...",
+        message: t("toastMessages.queries.fetchingRunningQueries"),
         variant: "loading",
         timeout: 0,
       });
@@ -603,10 +608,14 @@ export default defineComponent({
           runningQueriesSummary.value = getRunningQueriesSummary();
         })
         .catch((error: any) => {
-          toast({
-            message: error.response?.data?.message || "Failed to fetch running queries",
-            variant: "error",
-          });
+          forbidden.value = error?.response?.status === 403;
+          // The grouped access toast already reports a 403; a second red toast adds nothing.
+          if (!forbidden.value) {
+            toast({
+              message: error.response?.data?.message || t("queries.fetchRunningQueriesFailed"),
+              variant: "error",
+            });
+          }
         })
         .finally(() => {
           dismiss();
@@ -614,20 +623,20 @@ export default defineComponent({
     };
 
     const deleteQuery = () => {
-      SearchService.delete_running_queries(store.state.zoConfig.meta_org, deleteDialog.value.data)
+      SearchService.cancel_running_queries(store.state.zoConfig.meta_org, deleteDialog.value.data)
         .then(() => {
           selectedRow.value[selectedQueryTypeTab.value] = [];
 
           getRunningQueries();
 
           toast({
-            message: "Query cancelled",
+            message: t("toastMessages.queries.queryCancelled"),
             variant: "info",
           });
         })
         .catch((error: any) => {
           toast({
-            message: error.response?.data?.message || "Failed to cancel query",
+            message: error.response?.data?.message || t("queries.cancelQueryFailed"),
             variant: "error",
           });
         })
@@ -638,26 +647,28 @@ export default defineComponent({
     };
 
     const confirmDeleteAction = (row: any) => {
-      deleteDialog.value.data = [row.trace_id];
+      deleteDialog.value.data = [{ trace_id: row.trace_id, org_id: row.org_id }];
       deleteDialog.value.show = true;
     };
 
-    const handleMultiQueryCancel = (traceIds: string[] | null = null) => {
-      if (!traceIds) {
+    const handleMultiQueryCancel = (
+      runningQueries: { trace_id: string; org_id: string }[] | null = null,
+    ) => {
+      if (!runningQueries) {
         deleteDialog.value.data = selectedRow.value[selectedQueryTypeTab.value].reduce(
           (acc: any, row: any) => {
             if (row.trace_id) {
-              acc.push(row.trace_id);
+              acc.push({ trace_id: row.trace_id, org_id: row.org_id });
             } else {
-              // If query tab is "Summary", then add all trace_ids ( we store trace_id of all queries in trace_ids key )
-              acc.push(...row.trace_ids);
+              // a Summary row holds every query of its user in `queries`
+              acc.push(...row.queries);
             }
             return acc;
           },
           [],
         );
       } else {
-        deleteDialog.value.data = traceIds;
+        deleteDialog.value.data = runningQueries;
       }
 
       deleteDialog.value.show = true;
@@ -706,6 +717,7 @@ export default defineComponent({
           work_group: row?.work_group,
           stream_type: row?.stream_type,
           actions: "true",
+          row_key: `${row?.org_id}/${row?.trace_id}`,
           trace_id: row?.trace_id,
           created_at: row?.created_at,
           started_at: row?.started_at,
@@ -771,6 +783,7 @@ export default defineComponent({
       cancel: "cancel",
       schemaData,
       loadingState,
+      forbidden,
       refreshData,
       lastRefreshed,
       isMetaOrg,

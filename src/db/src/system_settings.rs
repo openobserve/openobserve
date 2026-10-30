@@ -24,6 +24,10 @@ use std::sync::Arc;
 use common::infra::config::SYSTEM_SETTINGS;
 use config::meta::system_settings::{SettingScope, SystemSetting};
 use infra::{errors::Result, table::system_settings as db};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::{
+    common::config::get_config as get_o2_config, super_cluster::queue::SystemSettingMessage,
+};
 
 /// Watcher prefix for system settings events
 const SYSTEM_SETTINGS_WATCHER_PREFIX: &str = "/system_settings/";
@@ -40,6 +44,61 @@ fn cache_key(
     format!("{}:{}:{}:{}", scope.as_str(), org, user, key)
 }
 
+/// The cache key of a stored row; an unknown scope reads as `System`, as `model_to_setting` does.
+fn row_cache_key((scope, org_id, user_id, key): &db::SettingRowKey) -> String {
+    let scope = scope.parse().unwrap_or(SettingScope::System);
+    cache_key(&scope, org_id.as_deref(), user_id.as_deref(), key)
+}
+
+/// Caches the stored row on this node and tells this region's other nodes to reload it.
+async fn cache_and_announce(stored: &SystemSetting) {
+    let cache_k = cache_key(
+        &stored.scope,
+        stored.org_id.as_deref(),
+        stored.user_id.as_deref(),
+        &stored.setting_key,
+    );
+    SYSTEM_SETTINGS
+        .write()
+        .await
+        .insert(cache_k.clone(), stored.clone());
+
+    let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, cache_k);
+    if let Err(e) = infra::coordinator::emit_put(&event_key).await {
+        log::error!("Failed to emit system settings put event: {}", e);
+    }
+}
+
+/// Drops the row from this node's cache and tells this region's other nodes to drop it.
+async fn uncache_and_announce(
+    scope: &SettingScope,
+    org_id: Option<&str>,
+    user_id: Option<&str>,
+    key: &str,
+) {
+    let cache_k = cache_key(scope, org_id, user_id, key);
+    SYSTEM_SETTINGS.write().await.remove(&cache_k);
+
+    let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, cache_k);
+    if let Err(e) = infra::coordinator::emit_delete(&event_key).await {
+        log::error!("Failed to emit system settings delete event: {}", e);
+    }
+}
+
+/// Get a single setting from the populated in-memory cache, without a database lookup.
+pub async fn get_cached(
+    scope: &SettingScope,
+    org_id: Option<&str>,
+    user_id: Option<&str>,
+    key: &str,
+) -> Option<SystemSetting> {
+    SYSTEM_SETTINGS
+        .read()
+        .await
+        .get(&cache_key(scope, org_id, user_id, key))
+        .cloned()
+}
+
 /// Get a single setting from cache or database
 pub async fn get(
     scope: &SettingScope,
@@ -47,12 +106,10 @@ pub async fn get(
     user_id: Option<&str>,
     key: &str,
 ) -> Result<Option<SystemSetting>> {
-    let cache_k = cache_key(scope, org_id, user_id, key);
-
-    // Check cache first
-    if let Some(setting) = SYSTEM_SETTINGS.read().await.get(&cache_k) {
-        return Ok(Some(setting.clone()));
+    if let Some(setting) = get_cached(scope, org_id, user_id, key).await {
+        return Ok(Some(setting));
     }
+    let cache_k = cache_key(scope, org_id, user_id, key);
 
     // Get from database
     let setting = db::get(scope, org_id, user_id, key)
@@ -144,26 +201,29 @@ pub async fn set(setting: &SystemSetting) -> Result<SystemSetting> {
     let result = db::set(setting)
         .await
         .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+    cache_and_announce(&result).await;
+    #[cfg(feature = "enterprise")]
+    publish(put_message(&result)).await;
+    Ok(result)
+}
 
-    // Update local cache
+/// Put a setting into this node's cache without writing it to the database.
+///
+/// For a setting whose absence has a defined meaning: caching that meaning stops every subsequent
+/// [`get`] falling through to a database read that can only return nothing. A real row, written
+/// here or on any other node, replaces it through [`set`] or [`watch`].
+#[cfg(feature = "enterprise")]
+pub(crate) async fn set_only_cached(setting: &SystemSetting) {
     let cache_k = cache_key(
-        &result.scope,
-        result.org_id.as_deref(),
-        result.user_id.as_deref(),
-        &result.setting_key,
+        &setting.scope,
+        setting.org_id.as_deref(),
+        setting.user_id.as_deref(),
+        &setting.setting_key,
     );
     SYSTEM_SETTINGS
         .write()
         .await
-        .insert(cache_k.clone(), result.clone());
-
-    // Emit event to update cache on other cluster nodes
-    let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, cache_k);
-    if let Err(e) = infra::coordinator::system_settings::emit_put_event(&event_key).await {
-        log::error!("Failed to emit system settings put event: {}", e);
-    }
-
-    Ok(result)
+        .insert(cache_k, setting.clone());
 }
 
 /// Delete a setting
@@ -176,53 +236,73 @@ pub async fn delete(
     let result = db::delete(scope, org_id, user_id, key)
         .await
         .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
-
-    // Remove from local cache
-    let cache_k = cache_key(scope, org_id, user_id, key);
-    SYSTEM_SETTINGS.write().await.remove(&cache_k);
-
-    // Emit event to update cache on other cluster nodes
-    let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, cache_k);
-    if let Err(e) = infra::coordinator::system_settings::emit_delete_event(&event_key).await {
-        log::error!("Failed to emit system settings delete event: {}", e);
-    }
-
+    uncache_and_announce(scope, org_id, user_id, key).await;
+    #[cfg(feature = "enterprise")]
+    publish(delete_message(scope, org_id, key)).await;
     Ok(result)
+}
+
+/// Applies an org setting written in another region; false when the stored row is newer.
+pub async fn apply_replicated_put(setting: &SystemSetting) -> Result<bool> {
+    if setting.scope != SettingScope::Org {
+        return Err(infra::errors::Error::Message(format!(
+            "only org settings replicate, got scope {}",
+            setting.scope.as_str()
+        )));
+    }
+    // Through `infra`, not `set`: `set` would publish the row to the other regions again.
+    let Some(stored) = db::apply_replicated(setting)
+        .await
+        .map_err(|e| infra::errors::Error::Message(e.to_string()))?
+    else {
+        return Ok(false);
+    };
+    cache_and_announce(&stored).await;
+    Ok(true)
+}
+
+/// Applies an org setting delete made in another region.
+pub async fn apply_replicated_delete(org_id: &str, key: &str) -> Result<bool> {
+    let removed = db::delete(&SettingScope::Org, Some(org_id), None, key)
+        .await
+        .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+    uncache_and_announce(&SettingScope::Org, Some(org_id), None, key).await;
+    Ok(removed)
 }
 
 /// Delete all settings for an organization
 pub async fn delete_org_settings(org_id: &str) -> Result<u64> {
-    let result = db::delete_org_settings(org_id)
+    // Read before the delete: other nodes may cache rows this node never loaded.
+    let stored = db::list_keys_by_org(org_id)
         .await
         .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
-
-    // Clear org settings from cache, then emit events after releasing lock
-    let keys_to_remove: Vec<String> = {
-        let mut cache = SYSTEM_SETTINGS.write().await;
-        let keys: Vec<String> = cache
-            .iter()
-            .filter(|(k, _)| k.split(':').nth(1) == Some(org_id))
-            .map(|(k, _)| k.clone())
-            .collect();
-        for key in &keys {
-            cache.remove(key);
-        }
-        keys
-    }; // Lock released here
-
-    // Emit events without holding lock
-    for key in &keys_to_remove {
-        let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, key);
-        if let Err(e) = infra::coordinator::system_settings::emit_delete_event(&event_key).await {
-            log::error!(
-                "Failed to emit system settings delete event for {}: {}",
-                key,
-                e
-            );
-        }
+    let mut keys: Vec<String> = SYSTEM_SETTINGS
+        .read()
+        .await
+        .keys()
+        .filter(|k| k.split(':').nth(1) == Some(org_id))
+        .cloned()
+        .collect();
+    keys.extend(stored.iter().map(row_cache_key));
+    keys.sort();
+    keys.dedup();
+    // Events before the row delete, so a failed one leaves the rows for the retry to list.
+    evict_settings(&keys).await?;
+    let deleted = db::delete_org_settings(org_id)
+        .await
+        .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+    // The delete names any row the listing missed; that row is evicted only after it.
+    let missed: Vec<String> = deleted
+        .iter()
+        .map(row_cache_key)
+        .filter(|key| keys.binary_search(key).is_err())
+        .collect();
+    evict_settings(&missed).await?;
+    // A read miss before the delete can refill the caches, and no retry lists a deleted row.
+    if let Err(e) = evict_settings(&keys).await {
+        log::warn!("[SYSTEM_SETTINGS] eviction after the org {org_id} row delete failed: {e}");
     }
-
-    Ok(result)
+    Ok(deleted.len() as u64)
 }
 
 /// Delete all settings for a user in an organization
@@ -251,7 +331,7 @@ pub async fn delete_user_settings(org_id: &str, user_id: &str) -> Result<u64> {
     // Emit events without holding lock
     for key in &keys_to_remove {
         let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, key);
-        if let Err(e) = infra::coordinator::system_settings::emit_delete_event(&event_key).await {
+        if let Err(e) = infra::coordinator::emit_delete(&event_key).await {
             log::error!(
                 "Failed to emit system settings delete event for {}: {}",
                 key,
@@ -283,89 +363,14 @@ pub async fn cache() -> Result<()> {
     Ok(())
 }
 
-/// Watch for system settings changes from other cluster nodes
-pub async fn watch() -> Result<()> {
+/// Register for settings events before loading the database snapshot.
+pub async fn create_watcher() -> Result<impl Future<Output = Result<()>>> {
     let cluster_coordinator = super::get_coordinator().await;
-    let mut events = cluster_coordinator
+    let events = cluster_coordinator
         .watch(SYSTEM_SETTINGS_WATCHER_PREFIX)
         .await
         .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
-    let events = Arc::get_mut(&mut events).unwrap();
-    log::info!("Start watching system settings");
-    loop {
-        let ev = match events.recv().await {
-            Some(ev) => ev,
-            None => {
-                log::error!("watch_system_settings: event channel closed");
-                break;
-            }
-        };
-        match ev {
-            super::Event::Put(ev) => {
-                let cache_k = match ev.key.strip_prefix(SYSTEM_SETTINGS_WATCHER_PREFIX) {
-                    Some(k) => k,
-                    None => {
-                        log::error!("Invalid system settings event key: {}", ev.key);
-                        continue;
-                    }
-                };
-                // Parse cache key: scope:org:user:key
-                let parts: Vec<&str> = cache_k.split(':').collect();
-                if parts.len() != 4 {
-                    log::error!("Invalid cache key format: {}", cache_k);
-                    continue;
-                }
-                let scope = match parts[0].parse::<SettingScope>() {
-                    Ok(s) => s,
-                    Err(e) => {
-                        log::error!("Invalid scope in cache key: {} - {}", parts[0], e);
-                        continue;
-                    }
-                };
-                let org_id = if parts[1] == "_" {
-                    None
-                } else {
-                    Some(parts[1])
-                };
-                let user_id = if parts[2] == "_" {
-                    None
-                } else {
-                    Some(parts[2])
-                };
-                let key = parts[3];
-
-                // Fetch from database and update cache
-                match db::get(&scope, org_id, user_id, key).await {
-                    Ok(Some(setting)) => {
-                        SYSTEM_SETTINGS
-                            .write()
-                            .await
-                            .insert(cache_k.to_string(), setting);
-                        log::debug!("Updated system setting in cache: {}", cache_k);
-                    }
-                    Ok(None) => {
-                        log::warn!("System setting not found in db: {}", cache_k);
-                    }
-                    Err(e) => {
-                        log::error!("Error fetching system setting from db: {}", e);
-                    }
-                }
-            }
-            super::Event::Delete(ev) => {
-                let cache_k = match ev.key.strip_prefix(SYSTEM_SETTINGS_WATCHER_PREFIX) {
-                    Some(k) => k,
-                    None => {
-                        log::error!("Invalid system settings delete event key: {}", ev.key);
-                        continue;
-                    }
-                };
-                SYSTEM_SETTINGS.write().await.remove(cache_k);
-                log::debug!("Removed system setting from cache: {}", cache_k);
-            }
-            super::Event::Empty => {}
-        }
-    }
-    Ok(())
+    Ok(watch_events(events))
 }
 
 /// Invalidate cache for a specific setting
@@ -408,7 +413,7 @@ pub async fn get_semantic_field_groups(org_id: &str) -> Vec<config::meta::correl
 
 /// Get the Gen-AI agent fallback mapping config for an organization.
 ///
-/// Defaults to empty fallback lists when no org-level config is saved.
+/// Uses the cached org override when non-empty, otherwise the in-memory defaults.
 pub async fn get_gen_ai_agent_mapping_config(
     org_id: &str,
 ) -> config::meta::gen_ai::GenAiAgentMappingConfig {
@@ -416,13 +421,10 @@ pub async fn get_gen_ai_agent_mapping_config(
         gen_ai::GenAiAgentMappingConfig, system_settings::keys::GEN_AI_AGENT_MAPPING,
     };
 
-    // Precedence, mirroring `get_semantic_field_groups`: a MEANINGFUL per-org
-    // config (saved and not all-empty) wins; otherwise fall through to the
-    // fetched-or-embedded enterprise defaults. A saved-but-empty config is
-    // treated as "no override" so the defaults apply — same as semantic groups'
-    // `!groups.is_empty()`.
-    if let Ok(Some(setting)) =
-        get(&SettingScope::Org, Some(org_id), None, GEN_AI_AGENT_MAPPING).await
+    // A meaningful cached org override wins. Absent and saved-but-empty values
+    // use the current defaults without querying the database or fetching a URL.
+    if let Some(setting) =
+        get_cached(&SettingScope::Org, Some(org_id), None, GEN_AI_AGENT_MAPPING).await
         && let Ok(config) = serde_json::from_value::<GenAiAgentMappingConfig>(setting.setting_value)
         && let Ok(config) = config.normalize_and_validate()
         && !config.is_all_empty()
@@ -453,8 +455,8 @@ pub async fn get_saved_gen_ai_agent_mapping_config(
     GenAiAgentMappingConfig::default()
 }
 
-/// Fetched-or-embedded Gen-AI agent-mapping defaults (enterprise), used when an
-/// org has no meaningful per-org config. Mirrors `get_default_semantic_field_groups`.
+/// In-memory Gen-AI agent-mapping defaults (enterprise), used when an org has
+/// no meaningful per-org config. Mirrors `get_default_semantic_field_groups`.
 pub fn get_default_gen_ai_agent_mapping_config() -> config::meta::gen_ai::GenAiAgentMappingConfig {
     #[cfg(feature = "enterprise")]
     {
@@ -695,9 +697,348 @@ pub async fn get_semantic_field_groups_updated_at(org_id: &str) -> i64 {
     }
 }
 
+async fn evict_settings(keys: &[String]) -> Result<()> {
+    let local = async {
+        let mut cache = SYSTEM_SETTINGS.write().await;
+        for key in keys {
+            cache.remove(key);
+        }
+    };
+    let broadcast = async {
+        for key in keys {
+            let event_key = format!("{SYSTEM_SETTINGS_WATCHER_PREFIX}{key}");
+            infra::coordinator::emit_delete(&event_key).await?;
+        }
+        Ok(())
+    };
+    crate::teardown::evict(local, broadcast).await
+}
+
+async fn watch_events(mut events: Arc<tokio::sync::mpsc::Receiver<super::Event>>) -> Result<()> {
+    let events = Arc::get_mut(&mut events).unwrap();
+    log::info!("Start watching system settings");
+    loop {
+        let ev = match events.recv().await {
+            Some(ev) => ev,
+            None => {
+                log::error!("watch_system_settings: event channel closed");
+                break;
+            }
+        };
+        match ev {
+            super::Event::Put(ev) => {
+                let cache_k = match ev.key.strip_prefix(SYSTEM_SETTINGS_WATCHER_PREFIX) {
+                    Some(k) => k,
+                    None => {
+                        log::error!("Invalid system settings event key: {}", ev.key);
+                        continue;
+                    }
+                };
+                // Parse cache key: scope:org:user:key
+                let parts: Vec<&str> = cache_k.split(':').collect();
+                if parts.len() != 4 {
+                    log::error!("Invalid cache key format: {}", cache_k);
+                    continue;
+                }
+                let scope = match parts[0].parse::<SettingScope>() {
+                    Ok(s) => s,
+                    Err(e) => {
+                        log::error!("Invalid scope in cache key: {} - {}", parts[0], e);
+                        continue;
+                    }
+                };
+                let org_id = if parts[1] == "_" {
+                    None
+                } else {
+                    Some(parts[1])
+                };
+                let user_id = if parts[2] == "_" {
+                    None
+                } else {
+                    Some(parts[2])
+                };
+                let key = parts[3];
+
+                // Fetch from database and update cache
+                match db::get(&scope, org_id, user_id, key).await {
+                    Ok(Some(setting)) => {
+                        SYSTEM_SETTINGS
+                            .write()
+                            .await
+                            .insert(cache_k.to_string(), setting);
+                        log::debug!("Updated system setting in cache: {}", cache_k);
+                    }
+                    Ok(None) => {
+                        log::warn!("System setting not found in db: {}", cache_k);
+                    }
+                    Err(e) => {
+                        log::error!("Error fetching system setting from db: {}", e);
+                    }
+                }
+            }
+            super::Event::Delete(ev) => {
+                let cache_k = match ev.key.strip_prefix(SYSTEM_SETTINGS_WATCHER_PREFIX) {
+                    Some(k) => k,
+                    None => {
+                        log::error!("Invalid system settings delete event key: {}", ev.key);
+                        continue;
+                    }
+                };
+                SYSTEM_SETTINGS.write().await.remove(cache_k);
+                log::debug!("Removed system setting from cache: {}", cache_k);
+            }
+            super::Event::Empty => {}
+        }
+    }
+    Ok(())
+}
+
+/// The message for the other regions, or `None` for a scope that does not replicate.
+#[cfg(feature = "enterprise")]
+fn put_message(stored: &SystemSetting) -> Option<SystemSettingMessage> {
+    (stored.scope == SettingScope::Org).then(|| SystemSettingMessage::Put {
+        setting: Box::new(SystemSetting {
+            id: None,
+            ..stored.clone()
+        }),
+    })
+}
+
+/// The message for the other regions, or `None` for a scope that does not replicate.
+#[cfg(feature = "enterprise")]
+fn delete_message(
+    scope: &SettingScope,
+    org_id: Option<&str>,
+    key: &str,
+) -> Option<SystemSettingMessage> {
+    match (scope, org_id) {
+        (SettingScope::Org, Some(org_id)) => Some(SystemSettingMessage::Delete {
+            org_id: org_id.to_string(),
+            setting_key: key.to_string(),
+        }),
+        _ => None,
+    }
+}
+
+#[cfg(feature = "enterprise")]
+async fn publish(msg: Option<SystemSettingMessage>) {
+    let Some(msg) = msg else {
+        return;
+    };
+    if !get_o2_config().super_cluster.enabled {
+        return;
+    }
+    if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::system_settings(&msg).await {
+        log::error!(
+            "[SUPER_CLUSTER:sync] Failed to publish the settings write {}: {e}",
+            msg.key()
+        );
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
+
+    async fn announced(event_key: &str) -> bool {
+        let keys = super::super::get_coordinator()
+            .await
+            .list_keys(event_key)
+            .await
+            .unwrap();
+        !keys.is_empty()
+    }
+
+    #[tokio::test]
+    async fn a_replicated_org_write_lands_in_the_table_and_the_cache_and_is_announced() {
+        infra::db::create_table().await.unwrap();
+        db::create_table().await.unwrap();
+        let (org, key) = ("b6r-replicated-org", "auto_investigate_gate");
+        let cache_k = cache_key(&SettingScope::Org, Some(org), None, key);
+        let event_key = format!("{SYSTEM_SETTINGS_WATCHER_PREFIX}{cache_k}");
+        let _ = db::delete(&SettingScope::Org, Some(org), None, key).await;
+        let _ = infra::coordinator::emit_delete(&event_key).await;
+        SYSTEM_SETTINGS.write().await.remove(&cache_k);
+        assert!(!announced(&event_key).await);
+
+        let mut incoming = SystemSetting::new_org(org, key, json!({"mode": "p1"}));
+        incoming.created_at = 1_000;
+        incoming.updated_at = 2_000;
+        assert!(apply_replicated_put(&incoming).await.unwrap());
+        let row = db::get(&SettingScope::Org, Some(org), None, key)
+            .await
+            .unwrap()
+            .expect("the row is written");
+        assert_eq!(row.setting_value, incoming.setting_value);
+        assert_eq!(row.updated_at, 2_000);
+        let cached = get_cached(&SettingScope::Org, Some(org), None, key).await;
+        assert_eq!(
+            cached.map(|s| s.setting_value),
+            Some(incoming.setting_value.clone())
+        );
+        assert!(
+            announced(&event_key).await,
+            "this region's nodes reload the row"
+        );
+        let resolved = get_resolved(Some(org), None, key).await.unwrap();
+        assert_eq!(
+            resolved.map(|s| s.setting_value),
+            Some(incoming.setting_value.clone())
+        );
+
+        let mut stale = incoming.clone();
+        stale.updated_at = 1_500;
+        stale.setting_value = json!({"mode": "off"});
+        assert!(!apply_replicated_put(&stale).await.unwrap());
+        let row = db::get(&SettingScope::Org, Some(org), None, key)
+            .await
+            .unwrap();
+        assert_eq!(
+            row.map(|s| s.setting_value),
+            Some(incoming.setting_value.clone())
+        );
+
+        assert!(apply_replicated_delete(org, key).await.unwrap());
+        assert!(
+            db::get(&SettingScope::Org, Some(org), None, key)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            get_cached(&SettingScope::Org, Some(org), None, key)
+                .await
+                .is_none()
+        );
+        assert!(
+            !announced(&event_key).await,
+            "this region's nodes drop the row"
+        );
+
+        let user = SystemSetting::new_user(org, "dana@acme.com", key, json!({"mode": "p1"}));
+        assert!(apply_replicated_put(&user).await.is_err());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn only_org_scope_writes_produce_a_replication_message() {
+        let mut org =
+            SystemSetting::new_org("acme", "auto_investigate_gate", json!({"mode": "p1"}));
+        org.id = Some(7);
+        let Some(SystemSettingMessage::Put { setting }) = put_message(&org) else {
+            panic!("an org put replicates");
+        };
+        assert_eq!(
+            setting.id, None,
+            "the row id is local to the region that wrote it"
+        );
+        assert_eq!(setting.org_id.as_deref(), Some("acme"));
+        assert_eq!(setting.setting_value, org.setting_value);
+        assert_eq!(setting.updated_at, org.updated_at);
+        let Some(SystemSettingMessage::Delete {
+            org_id,
+            setting_key,
+        }) = delete_message(&SettingScope::Org, Some("acme"), "auto_investigate_gate")
+        else {
+            panic!("an org delete replicates");
+        };
+        assert_eq!(
+            (org_id.as_str(), setting_key.as_str()),
+            ("acme", "auto_investigate_gate")
+        );
+
+        assert!(put_message(&SystemSetting::new_system("k", json!(1))).is_none());
+        assert!(put_message(&SystemSetting::new_user("acme", "dana", "k", json!(1))).is_none());
+        assert!(delete_message(&SettingScope::System, None, "k").is_none());
+        assert!(delete_message(&SettingScope::User, Some("acme"), "k").is_none());
+    }
+
+    #[tokio::test]
+    async fn gen_ai_mapping_uses_cached_org_override_or_defaults() {
+        use config::meta::{
+            gen_ai::GenAiAgentMappingConfig, system_settings::keys::GEN_AI_AGENT_MAPPING,
+        };
+
+        let org = "gen-ai-mapping-cache-only-test";
+        let key = cache_key(&SettingScope::Org, Some(org), None, GEN_AI_AGENT_MAPPING);
+        SYSTEM_SETTINGS.write().await.remove(&key);
+        assert!(
+            get_cached(&SettingScope::Org, Some(org), None, GEN_AI_AGENT_MAPPING)
+                .await
+                .is_none()
+        );
+
+        let defaults = get_gen_ai_agent_mapping_config(org).await;
+        assert_eq!(defaults, get_default_gen_ai_agent_mapping_config());
+
+        let override_config = GenAiAgentMappingConfig {
+            agent_name_fields: vec!["custom.agent.name".to_owned()],
+            ..Default::default()
+        };
+        SYSTEM_SETTINGS.write().await.insert(
+            key.clone(),
+            SystemSetting::new_org(
+                org,
+                GEN_AI_AGENT_MAPPING,
+                serde_json::to_value(&override_config).unwrap(),
+            ),
+        );
+        assert_eq!(get_gen_ai_agent_mapping_config(org).await, override_config);
+
+        SYSTEM_SETTINGS.write().await.insert(
+            key.clone(),
+            SystemSetting::new_org(
+                org,
+                GEN_AI_AGENT_MAPPING,
+                serde_json::to_value(GenAiAgentMappingConfig::default()).unwrap(),
+            ),
+        );
+        assert_eq!(get_gen_ai_agent_mapping_config(org).await, defaults);
+        SYSTEM_SETTINGS.write().await.remove(&key);
+    }
+
+    #[tokio::test]
+    async fn queued_delete_after_hydration_removes_saved_agent_mapping() {
+        use config::meta::{
+            gen_ai::GenAiAgentMappingConfig, system_settings::keys::GEN_AI_AGENT_MAPPING,
+        };
+
+        let org = "gen-ai-mapping-queued-delete-test";
+        let key = cache_key(&SettingScope::Org, Some(org), None, GEN_AI_AGENT_MAPPING);
+        let (tx, rx) = tokio::sync::mpsc::channel(1);
+        tx.send(infra::db::Event::Delete(infra::db::EventData {
+            key: format!("{SYSTEM_SETTINGS_WATCHER_PREFIX}{key}"),
+            value: None,
+            start_dt: None,
+        }))
+        .await
+        .unwrap();
+        drop(tx);
+
+        let old_config = GenAiAgentMappingConfig {
+            agent_name_fields: vec!["old.agent.name".to_owned()],
+            ..Default::default()
+        };
+        SYSTEM_SETTINGS.write().await.insert(
+            key.clone(),
+            SystemSetting::new_org(
+                org,
+                GEN_AI_AGENT_MAPPING,
+                serde_json::to_value(&old_config).unwrap(),
+            ),
+        );
+        assert_eq!(get_gen_ai_agent_mapping_config(org).await, old_config);
+
+        watch_events(Arc::new(rx)).await.unwrap();
+
+        assert_eq!(
+            get_gen_ai_agent_mapping_config(org).await,
+            get_default_gen_ai_agent_mapping_config()
+        );
+        SYSTEM_SETTINGS.write().await.remove(&key);
+    }
 
     #[test]
     fn test_cache_key() {

@@ -25,52 +25,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="rum-error-issue-cell-type"
         >{{ issue.error_type || t("rum.error") }}:</span
       >
-      <span
-        class="text-text-body min-w-0 truncate font-semibold"
-        :title="issue.error_message"
+      <OTruncatedText
+        class="text-text-body font-semibold"
         data-test="rum-error-issue-cell-message"
-        >{{ issue.error_message }}</span
+        >{{ issue.error_message }}</OTruncatedText
       >
     </div>
 
     <div class="flex min-w-0 items-center gap-1.5 overflow-hidden">
       <OTag
         v-if="issue.error_handling"
-        :label="issue.error_handling"
+        :label="raw(issue.error_handling)"
         :variant="isUnhandled ? 'error-outline' : 'warning-outline'"
         size="xs"
         shape="rounded"
         class="shrink-0 uppercase"
         data-test="rum-error-issue-cell-handling-tag"
       />
-      <code
-        v-if="topFrame"
-        class="min-w-0 truncate"
-        :title="topFrame.line !== null ? `${topFrame.file}:${topFrame.line}` : topFrame.file"
-        data-test="rum-error-issue-cell-frame"
+      <OTruncatedText v-if="topFrame" as="code" data-test="rum-error-issue-cell-frame"
         >{{ topFrame.file
-        }}<template v-if="topFrame.line !== null">:{{ topFrame.line }}</template></code
+        }}<template v-if="topFrame.line !== null">:{{ topFrame.line }}</template></OTruncatedText
       >
       <OTag
         v-if="route"
-        :label="route"
+        :label="raw(route)"
         variant="default-soft"
         size="xs"
         shape="rounded"
         class="shrink-0"
         data-test="rum-error-issue-cell-route-tag"
       />
-      <small v-if="issue.service" class="truncate" data-test="rum-error-issue-cell-service">{{
+      <OTruncatedText v-if="issue.service" as="small" data-test="rum-error-issue-cell-service">{{
         issue.service
-      }}</small>
+      }}</OTruncatedText>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { parseTopFrame, routeFromUrl } from "@/utils/rum/errorIssueUtils";
 
 const props = defineProps<{
@@ -84,7 +80,7 @@ const props = defineProps<{
   };
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // "handled" is the only safe state — treat missing/other values as unhandled.
 const isUnhandled = computed(() => props.issue.error_handling !== "handled");

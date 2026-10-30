@@ -41,9 +41,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         labelKey="label"
         valueKey="value"
         @update:model-value="onAlertSelected"
-        :placeholder="t(`alerts.searcHistory`) || 'Select or search alert...'"
+        :placeholder="t('alerts.searcHistory')"
         data-test="alert-history-search-select"
-        class="o2-search-input min-w-62.5"
+        class="o2-search-input min-w-62.5 max-lg:hidden"
         clearable
         @clear="clearSearch"
       >
@@ -51,18 +51,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon class="o2-search-input-icon" name="search" size="sm" />
         </template>
         <template #empty>
-          <div class="text-muted-foreground px-3 py-2">No alerts found</div>
+          <div class="text-muted-foreground px-3 py-2">
+            {{ t("alerts.noAlertsFound") }}
+          </div>
         </template>
       </OSelect>
       <OButton
         variant="ghost"
         icon-left="search"
         size="icon-sm"
+        class="max-lg:hidden"
         @click="manualSearch"
         data-test="alert-history-manual-search-btn"
         :disabled="loading"
       >
-        <OTooltip :content="t('common.search') || 'Search'" />
+        <OTooltip :content="t('common.search')" />
       </OButton>
       <OButton
         variant="ghost"
@@ -70,13 +73,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         icon-left="refresh"
         @click="refreshData"
         data-test="alert-history-refresh-btn"
-        :loading="loading"
+        :loading="fetching"
       >
-        <OTooltip :content="t('common.refresh') || 'Refresh'" />
+        <OTooltip :content="t('common.refresh')" />
       </OButton>
     </template>
+    <div
+      class="border-border-default flex shrink-0 items-center gap-1 border-b px-3 py-1.5 lg:hidden"
+    >
+      <OSelect
+        v-model="selectedAlert"
+        :options="filteredAlertOptions"
+        labelKey="label"
+        valueKey="value"
+        @update:model-value="onAlertSelected"
+        :placeholder="t('alerts.searcHistory')"
+        data-test="alert-history-search-select-mobile"
+        class="o2-search-input min-w-0 flex-1"
+        clearable
+        @clear="clearSearch"
+      >
+        <template #icon-left>
+          <OIcon class="o2-search-input-icon" name="search" size="sm" />
+        </template>
+        <template #empty>
+          <div class="text-muted-foreground px-3 py-2">
+            {{ t("alerts.noAlertsFound") }}
+          </div>
+        </template>
+      </OSelect>
+      <OButton
+        variant="ghost"
+        icon-left="search"
+        size="icon-sm"
+        @click="manualSearch"
+        data-test="alert-history-manual-search-btn-mobile"
+        :disabled="loading"
+      >
+        <OTooltip :content="t('common.search')" />
+      </OButton>
+    </div>
     <div class="min-h-0 flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
+        <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
         <OTable
           data-test="alert-history-table"
           :data="rows"
@@ -99,6 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @pagination-change="onPaginationChange"
           @sort-change="onSortChange"
         >
+          <!-- eslint-enable local/no-hardcoded-px -->
           <template #empty>
             <div class="h-screen w-full">
               <NoData />
@@ -111,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               unit="us"
               mode="absolute"
               :timezone="store.state.timezone"
-              empty-label="—"
+              :empty-label="raw('—')"
             />
           </template>
 
@@ -121,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               unit="us"
               mode="absolute"
               :timezone="store.state.timezone"
-              empty-label="—"
+              :empty-label="raw('—')"
             />
           </template>
 
@@ -131,18 +171,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               unit="us"
               mode="absolute"
               :timezone="store.state.timezone"
-              empty-label="—"
+              :empty-label="raw('—')"
             />
           </template>
 
-          <template #cell-status="{ value }">
-            <OTag type="alertState" :value="value" data-test="alert-history-status-badge" />
+          <template #cell-status="{ row }">
+            <OTag
+              type="alertState"
+              :value="historyStatusOf(row)"
+              data-test="alert-history-status-badge"
+            />
           </template>
 
           <!-- T-10: what was observed, against what, and the level it
                classified to. Pre-change rows (no actual_value) render "—". -->
           <template #cell-condition="{ row }">
-            <div class="flex min-w-0 items-center gap-1.5">
+            <OTruncatedText
+              v-if="isAckEventRow(row)"
+              class="text-compact"
+              data-test="alert-history-ack-event-text"
+            >
+              {{ ackEventText(row, t) }}
+            </OTruncatedText>
+            <div v-else class="flex min-w-0 items-center gap-1.5">
               <span class="text-compact whitespace-nowrap tabular-nums">
                 {{ conditionSummary(row) }}
               </span>
@@ -150,81 +201,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="text-text-secondary text-2xs shrink-0">→</span>
                 <OTag type="alertLevel" :value="row.level" class="shrink-0" />
               </template>
-              <span
+              <OTruncatedText
                 v-if="row.group_label"
-                class="text-2xs text-text-secondary min-w-0 truncate"
+                class="text-2xs text-text-secondary"
                 data-test="alert-history-group-label"
               >
                 {{ t("alerts.historyTable.forGroup", { group: row.group_label }) }}
-                <OTooltip :content="row.group_label" :max-width="'300px'" />
-              </span>
+              </OTruncatedText>
             </div>
           </template>
 
-          <template #cell-is_realtime="{ value }">
+          <template #cell-is_realtime="{ row, value }">
+            <span v-if="isAckEventRow(row)" class="text-text-secondary">—</span>
             <OIcon
+              v-else
               :name="value ? 'check-circle' : 'schedule'"
               :class="value ? 'text-status-positive' : 'text-text-body'"
               size="xs"
             >
-              <OTooltip :content="value ? 'Real-time' : 'Scheduled'" />
+              <OTooltip :content="value ? t('common.realTime') : t('alerts.scheduled')" />
             </OIcon>
           </template>
 
-          <template #cell-is_silenced="{ value }">
+          <template #cell-is_silenced="{ row, value }">
+            <span v-if="isAckEventRow(row)" class="text-text-secondary">—</span>
             <OIcon
+              v-else
               :name="value ? 'volume-off' : 'volume-up'"
               :class="value ? 'text-text-body' : 'text-status-positive'"
               size="md"
             >
-              <OTooltip :content="value ? 'Silenced' : 'Not Silenced'" />
+              <OTooltip
+                :content="value ? t('alerts.insights.filters.silenced') : t('common.notSilenced')"
+              />
             </OIcon>
           </template>
 
           <template #cell-duration="{ row }">
-            {{ formatDuration(row.end_time - row.start_time) }}
+            <span v-if="isAckEventRow(row)" class="text-text-secondary">—</span>
+            <template v-else>{{ formatDuration(row.end_time - row.start_time) }}</template>
           </template>
 
-          <template #cell-dedup="{ row }">
-            <span v-if="!row.dedup_enabled" class="text-text-secondary">-</span>
-            <div v-else-if="row.dedup_suppressed" class="text-status-error-text">
-              <OIcon name="block" size="sm">
-                <OTooltip>
-                  <template #content>
-                    Suppressed by deduplication
-                    <div v-if="row.dedup_count">
-                      {{ row.dedup_count }} occurrence{{ row.dedup_count > 1 ? "s" : "" }}
-                    </div>
-                  </template>
-                </OTooltip>
-              </OIcon>
-            </div>
+          <template #cell-retries="{ row }">
+            <span v-if="isAckEventRow(row)" class="text-text-secondary">—</span>
+            <template v-else>{{ row.retries }}</template>
+          </template>
+
+          <template #cell-suppression="{ row }">
+            <span v-if="isAckEventRow(row)" class="text-text-secondary">—</span>
+            <OTruncatedText
+              v-else-if="ackSuppressedBy(row)"
+              class="text-text-secondary text-xs"
+              data-test="alert-history-ack-dedup"
+            >
+              {{ t("alerts.ack.history.dedupSuppressed", { who: raw(ackSuppressedBy(row)) }) }}
+            </OTruncatedText>
+            <OTruncatedText
+              v-else-if="row.repeat_suppressed === true"
+              class="text-text-secondary text-xs"
+              data-test="alert-history-repeat-suppressed"
+            >
+              {{ t("alerts.suppressedAsRepeat") }}
+            </OTruncatedText>
             <div v-else-if="row.grouped" class="text-primary flex items-center justify-center">
               <OIcon name="group-work" size="md">
                 <OTooltip>
                   <template #content>
-                    Grouped notification
-                    <div>{{ row.group_size }} alerts batched together</div>
+                    {{ t("alerts.groupedNotification") }}
+                    <div>{{ row.group_size }} {{ t("alerts.alertsBatchedTogether") }}</div>
                   </template>
                 </OTooltip>
               </OIcon>
-              <span class="ml-1 text-xs">×{{ row.group_size || 1 }}</span>
+              <span class="ms-1 text-xs">×{{ row.group_size || 1 }}</span>
             </div>
-            <div v-else class="text-status-positive flex items-center justify-center">
-              <OIcon name="check-circle" size="md">
-                <OTooltip>
-                  <template #content>
-                    Notification sent
-                    <div v-if="row.dedup_count && row.dedup_count > 1">
-                      {{ row.dedup_count }} occurrences deduplicated
-                    </div>
-                  </template>
-                </OTooltip>
-              </OIcon>
-              <span v-if="row.dedup_count && row.dedup_count > 1" class="ml-1 text-xs">
-                ×{{ row.dedup_count }}
-              </span>
-            </div>
+            <span v-else class="text-text-secondary">—</span>
           </template>
 
           <template #cell-actions="{ row }">
@@ -232,10 +282,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
               icon-left="visibility"
+              class="max-md:hidden"
               @click="showDetailsDialog(row)"
               data-test="alert-history-view-details"
             >
-              <OTooltip content="View Details" />
+              <OTooltip :content="t('alerts.viewDetails')" />
             </OButton>
             <OButton
               v-if="row.error"
@@ -243,12 +294,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost-destructive"
               size="icon-sm"
               icon-left="error"
+              class="max-md:hidden"
               @click.stop="showErrorDialog(row)"
             >
               <OTooltip
-                :content="`Last error: ${new Date(row.timestamp / 1000).toLocaleString()}`"
+                :content="
+                  t('common.lastErrorAt', { time: new Date(row.timestamp / 1000).toLocaleString() })
+                "
               />
             </OButton>
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  :aria-label="t('common.moreActions')"
+                  icon-left="more-vert"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="alert-history-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                icon-left="visibility"
+                class="md:hidden"
+                data-test="alert-history-view-details-menu"
+                @select="showDetailsDialog(row)"
+              >
+                <span>{{ t("alerts.viewDetails") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="row.error"
+                icon-left="error"
+                variant="destructive"
+                class="md:hidden"
+                :data-test="`pipeline-list-${row.name}-error-indicator-menu`"
+                @select="showErrorDialog(row)"
+              >
+                <span>{{
+                  t("common.lastErrorAt", { time: new Date(row.timestamp / 1000).toLocaleString() })
+                }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </template>
         </OTable>
       </div>
@@ -259,8 +346,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="alert-history-details-dialog"
       v-model:open="detailsDialog"
       :width="55"
-      title="Alert Execution Details"
-      primary-button-label="Close"
+      :title="t('alerts.alertExecutionDetails')"
+      :primary-button-label="t('common.close')"
       @click:primary="detailsDialog = false"
     >
       <div v-if="selectedRow" class="gap-2">
@@ -268,14 +355,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="px-0 py-1">
           <div class="flex gap-3">
             <div class="w-1/2">
-              <div class="text-text-secondary mb-1 text-xs">Alert Name</div>
+              <div class="text-text-secondary mb-1 text-xs">{{ t("alerts.alertName") }}</div>
               <div class="text-sm font-medium">
                 {{ selectedRow.alert_name }}
               </div>
             </div>
             <div class="w-1/2">
-              <div class="text-text-secondary mb-1 text-xs">Status</div>
-              <OTag type="alertState" :value="selectedRow.status" />
+              <div class="text-text-secondary mb-1 text-xs">{{ t("common.status") }}</div>
+              <OTag type="alertState" :value="historyStatusOf(selectedRow)" />
             </div>
           </div>
         </div>
@@ -286,13 +373,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="px-0 py-1">
           <div class="flex gap-3">
             <div class="w-1/2">
-              <div class="text-text-secondary mb-1 text-xs">Timestamp</div>
+              <div class="text-text-secondary mb-1 text-xs">{{ t("alerts.timestamp") }}</div>
               <div class="text-sm">
                 {{ formatHistoryDate(selectedRow.timestamp) }}
               </div>
             </div>
             <div class="w-1/2">
-              <div class="text-text-secondary mb-1 text-xs">Duration</div>
+              <div class="text-text-secondary mb-1 text-xs">{{ t("common.duration") }}</div>
               <div class="text-sm">
                 {{ formatDuration(selectedRow.end_time - selectedRow.start_time) }}
               </div>
@@ -306,22 +393,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="px-0 py-1">
           <div class="flex gap-3">
             <div class="w-1/2">
-              <div class="text-text-secondary mb-1 text-xs">Type</div>
+              <div class="text-text-secondary mb-1 text-xs">{{ t("common.type") }}</div>
               <div class="text-sm">
                 <OIcon
                   :name="selectedRow.is_realtime ? 'speed' : 'schedule'"
-                  class="mr-1"
+                  class="me-1"
                   size="xs"
                 />
-                {{ selectedRow.is_realtime ? "Real-time" : "Scheduled" }}
+                {{ selectedRow.is_realtime ? t("common.realTime") : t("alerts.scheduled") }}
               </div>
             </div>
             <div class="w-1/2">
-              <div class="text-text-secondary mb-1 text-xs">Silenced</div>
+              <div class="text-text-secondary mb-1 text-xs">
+                {{ t("alerts.insights.filters.silenced") }}
+              </div>
               <div class="text-sm">
-                <OIcon v-if="selectedRow.is_silenced" name="volume-off" size="xs" class="mr-1" />
-                <OIcon v-else name="volume-up" size="xs" class="mr-1" />
-                {{ selectedRow.is_silenced ? "Yes" : "No" }}
+                <OIcon v-if="selectedRow.is_silenced" name="volume-off" size="xs" class="me-1" />
+                <OIcon v-else name="volume-up" size="xs" class="me-1" />
+                {{ selectedRow.is_silenced ? t("common.yes") : t("common.no") }}
               </div>
             </div>
           </div>
@@ -337,15 +426,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="px-0 py-1">
             <div class="flex gap-3">
               <div v-if="selectedRow.evaluation_took_in_secs" class="w-1/3">
-                <div class="text-text-secondary mb-1 text-xs">Evaluation Time</div>
+                <div class="text-text-secondary mb-1 text-xs">
+                  {{ t("alerts.evaluationTime") }}
+                </div>
                 <div class="text-sm">{{ selectedRow.evaluation_took_in_secs.toFixed(2) }}s</div>
               </div>
               <div v-if="selectedRow.query_took" class="w-1/3">
-                <div class="text-text-secondary mb-1 text-xs">Query Time</div>
+                <div class="text-text-secondary mb-1 text-xs">
+                  {{ t("alerts.queryTime") }}
+                </div>
                 <div class="text-sm">{{ (selectedRow.query_took / 1000).toFixed(2) }}ms</div>
               </div>
               <div v-if="selectedRow.retries > 0" class="w-1/3">
-                <div class="text-text-secondary mb-1 text-xs">Retries</div>
+                <div class="text-text-secondary mb-1 text-xs">{{ t("alerts.retries") }}</div>
                 <div class="text-sm">{{ selectedRow.retries }}</div>
               </div>
             </div>
@@ -356,7 +449,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-if="selectedRow.source_node">
           <OSeparator class="my-2" />
           <div class="px-0 py-1">
-            <div class="text-text-secondary mb-1 text-xs">Source Node</div>
+            <div class="text-text-secondary mb-1 text-xs">{{ t("alerts.sourceNode") }}</div>
             <div class="font-mono text-sm">
               {{ selectedRow.source_node }}
             </div>
@@ -368,8 +461,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSeparator class="my-2" />
           <div class="px-0 py-1">
             <div class="text-text-secondary mb-1 text-xs">
-              <OIcon name="error" size="xs" class="mr-1" />
-              Error Details
+              <OIcon name="error" size="xs" class="me-1" />
+              {{ t("alerts.errorDetails") }}
             </div>
             <div
               class="rounded-default border-negative/30 bg-status-error-bg mt-2 border border-solid p-2"
@@ -383,8 +476,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   font-family: var(--font-mono);
                   font-size: var(--text-xs);
                 "
-                >{{ selectedRow.error }}</pre
-              >
+                >{{ selectedRow.error }}</pre>
             </div>
           </div>
         </template>
@@ -394,8 +486,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSeparator class="my-2" />
           <div class="px-0 py-1">
             <div class="text-text-secondary mb-1 text-xs">
-              <OIcon name="check-circle" size="xs" class="mr-1" />
-              Response
+              <OIcon name="check-circle" size="xs" class="me-1" />
+              {{ t("alerts.response") }}
             </div>
             <div
               class="rounded-default border-positive/30 bg-status-success-bg mt-2 border border-solid p-2"
@@ -409,8 +501,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   font-family: var(--font-mono);
                   font-size: var(--text-xs);
                 "
-                >{{ selectedRow.success_response }}</pre
-              >
+                >{{ selectedRow.success_response }}</pre>
             </div>
           </div>
         </template>
@@ -423,16 +514,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="errorDialog"
       size="md"
       :title="errorMessage.alert_name"
-      primary-button-label="Close"
+      :primary-button-label="t('common.close')"
       @click:primary="closeErrorDialog"
     >
       <template #header-left>
         <OIcon name="error" size="sm" class="text-status-error-text" />
       </template>
       <template #header-right>
-        <div class="text-compact ml-9 flex items-center text-xs opacity-70">
-          <span class="mr-1">Last error:</span>
-          <OIcon name="schedule" size="xs" class="mr-1" />
+        <div class="text-compact ms-9 flex items-center text-xs opacity-70">
+          <span class="me-1">{{ t("alerts.lastError") }}</span>
+          <OIcon name="schedule" size="xs" class="me-1" />
           {{
             errorMessage.last_error_timestamp &&
             new Date(errorMessage.last_error_timestamp / 1000).toLocaleString()
@@ -441,7 +532,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <div class="mb-4">
-        <div class="mb-2 text-sm font-semibold tracking-[0.02em] opacity-80">Error Summary</div>
+        <div class="mb-2 text-sm font-semibold tracking-[0.02em] opacity-80">
+          {{ t("alerts.errorSummary") }}
+        </div>
         <div
           class="rounded-default text-compact bg-status-error-bg border-status-negative text-status-error-text border border-solid p-4 font-mono leading-[1.6] wrap-break-word whitespace-pre-wrap"
         >
@@ -453,35 +546,75 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from "vue";
-import { useRouter } from "vue-router";
+import type { AlertHistoryQuery } from "@/services/alerts";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useQuery } from "@tanstack/vue-query";
+import { alertHistoryQuery, alertsListQuery } from "@/services/alerts.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { ref, onMounted, watch, nextTick } from "vue";
+import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { formatDate } from "@/utils/date";
 import DateTime from "@/components/DateTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import alertsService from "@/services/alerts";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { conditionSummary } from "@/utils/alerts/runOutcome";
+import {
+  ackEventText,
+  ackSuppressedBy,
+  historyStatusOf,
+  isAckEventRow,
+} from "@/utils/alerts/ackState";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
+const route = useRoute();
 
 // Data
-const loading = ref(false);
+// The query shape this page is currently reading (range + page + sort +
+// filter). Held reactively so the key forks per shape — paging back to a page
+// already seen renders from cache instead of blanking the table.
+const orgIdForHistory = useOrgId();
+const readQuery = ref<AlertHistoryQuery | null>(null);
+const hasRequestedHistory = ref(false);
+
+// `enabled: false` does not stop the options factory from running, and the key
+// builder reads fields off the query — so a placeholder stands in until the page
+// has actually asked for a page of history.
+const EMPTY_HISTORY_QUERY = {
+  start_time: 0,
+  end_time: 0,
+  from: 0,
+  size: 0,
+} as unknown as AlertHistoryQuery;
+
+const historyList = useQuery(() =>
+  Object.assign(alertHistoryQuery(orgIdForHistory.value, readQuery.value ?? EMPTY_HISTORY_QUERY), {
+    enabled: hasRequestedHistory.value && !!readQuery.value && !!orgIdForHistory.value,
+  }),
+);
+
+const loading = historyList.isLoading;
+// A request in flight while rows stay on screen — the refresh button's
+// spinner. `loading` is the skeleton, which only a cold read wants.
+const fetching = historyList.isFetching;
 const rows = ref<any[]>([]);
 const searchQuery = ref("");
 const selectedAlert = ref<any>(null);
@@ -525,7 +658,7 @@ const errorMessage = ref<any>("");
 const columns = ref<OTableColumnDef[]>([
   {
     id: "alert_name",
-    header: t("alerts.alertName") || "Alert Name",
+    header: t("alerts.alertName"),
     accessorKey: "alert_name",
     sortable: true,
     size: COL.name,
@@ -533,7 +666,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "is_realtime",
-    header: t("alerts.type") || "Type",
+    header: t("alerts.type"),
     accessorKey: "is_realtime",
     sortable: true,
     size: 37,
@@ -544,7 +677,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "is_silenced",
-    header: t("alerts.isSilenced") || "Is Silenced",
+    header: t("alerts.isSilenced"),
     accessorKey: "is_silenced",
     sortable: true,
     size: 37,
@@ -555,7 +688,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "timestamp",
-    header: t("alerts.timestamp") || "Timestamp",
+    header: t("alerts.timestamp"),
     accessorKey: "timestamp",
     sortable: true,
     size: COL.dateAbsolute,
@@ -565,7 +698,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "start_time",
-    header: t("alerts.startTime") || "Start Time",
+    header: t("alerts.startTime"),
     accessorKey: "start_time",
     sortable: true,
     size: COL.dateAbsolute,
@@ -575,7 +708,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "end_time",
-    header: t("alerts.endTime") || "End Time",
+    header: t("alerts.endTime"),
     accessorKey: "end_time",
     sortable: true,
     size: COL.dateAbsolute,
@@ -585,7 +718,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "duration",
-    header: t("alerts.duration") || "Duration",
+    header: t("alerts.duration"),
     accessorFn: (row: any) => row.end_time - row.start_time,
     sortable: false,
     size: COL.duration,
@@ -595,11 +728,11 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "status",
-    header: t("alerts.status") || "Status",
+    header: t("alerts.status"),
     accessorKey: "status",
     sortable: true,
-    size: COL.status,
-    maxSize: COL.status,
+    size: 128,
+    maxSize: 128,
     cell: " ",
     meta: { align: "left" },
   },
@@ -615,25 +748,26 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "retries",
-    header: t("alerts.retries") || "Retries",
+    header: t("alerts.retries"),
     accessorKey: "retries",
     sortable: true,
     size: 64,
     maxSize: 64,
+    cell: " ",
     meta: { align: "right" },
   },
   {
-    id: "dedup",
-    header: t("alerts.dedup") || "Dedup",
+    id: "suppression",
+    header: t("alerts.suppression"),
     sortable: false,
-    size: 80,
-    maxSize: 80,
+    size: 112,
+    maxSize: 112,
     cell: " ",
     meta: { align: "left" },
   },
   {
     id: "actions",
-    header: t("common.actions") || "Actions",
+    header: t("common.actions"),
     isAction: true,
     pinned: "right",
     size: 80,
@@ -650,28 +784,18 @@ const fetchAlertsList = async () => {
   try {
     const org = store.state.selectedOrganization.identifier;
 
-    // Fetch all alerts for the organization
-    const res = await alertsService.listByFolderId(
-      1,
-      1000,
-      "name",
-      false,
-      "",
-      org,
-      "", // all folders
-      "", // no query filter
-    );
+    // All folders ("") — through the cached list read, so revisits share the
+    // entry instead of re-downloading every alert for the name filter.
+    const list = await queryClient.fetchQuery(alertsListQuery(org, ""));
 
-    if (res.data && res.data.list) {
-      // Store complete alert objects and sort by name
-      allAlerts.value = res.data.list
-        .map((alert: any) => ({
-          label: alert.name,
-          value: alert.alert_id,
-        }))
-        .sort((a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label));
-      filteredAlertOptions.value = [...allAlerts.value];
-    }
+    // Store complete alert objects and sort by name
+    allAlerts.value = (list ?? [])
+      .map((alert: any) => ({
+        label: alert.name,
+        value: alert.alert_id,
+      }))
+      .sort((a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label));
+    filteredAlertOptions.value = [...allAlerts.value];
   } catch (error: any) {
     console.error("Error fetching alerts list:", error);
     // Silently fail - user can still type alert names manually
@@ -696,11 +820,12 @@ const clearSearch = () => {
 
 const manualSearch = () => {
   currentPage.value = 1;
-  fetchAlertHistory();
+  // The user explicitly asked for results, so this always hits the server even
+  // when the filter shape is unchanged.
+  fetchAlertHistory(true);
 };
 
-const fetchAlertHistory = async () => {
-  loading.value = true;
+const fetchAlertHistory = async (force = false) => {
   try {
     const org = store.state.selectedOrganization.identifier;
 
@@ -723,16 +848,40 @@ const fetchAlertHistory = async () => {
       query.sort_order = sortOrder.value;
     }
 
-    const response = await alertsService.getHistory(org, query);
-    if (response.data) {
-      const historyData = response.data;
-
-      rows.value = (historyData.hits || []).map((hit: any, index: number) => ({
+    const applyHistory = (data: any) => {
+      rows.value = (data.hits || []).map((hit: any, index: number) => ({
         ...hit,
         id: `${hit.timestamp}_${index}`,
       }));
+      totalCount.value = data.total || 0;
+    };
 
-      totalCount.value = historyData.total || 0;
+    // Cached per query shape (range + page + sort + filter), so paging back to
+    // a page already seen renders from cache instead of blanking the table.
+    // Stale-while-revalidate otherwise: the page keeps its rows while the
+    // refetch runs.
+    readQuery.value = query;
+    // Let the key pick up the new query shape before asking for the data.
+    await nextTick();
+
+    if (!hasRequestedHistory.value) {
+      hasRequestedHistory.value = true;
+      await nextTick();
+      await historyList.suspense();
+    } else if (force) {
+      await historyList.refetch();
+    } else {
+      await historyList.suspense();
+    }
+    await nextTick();
+
+    {
+      if (historyList.data.value) applyHistory(historyList.data.value);
+
+      const nextFrom = currentPage.value * pageSize.value;
+      if (nextFrom < totalCount.value) {
+        queryClient.prefetchQuery(alertHistoryQuery(org, { ...query, from: nextFrom.toString() }));
+      }
 
       if (rows.value.length === 0) {
         console.warn("No alert history found for the selected time range");
@@ -743,10 +892,8 @@ const fetchAlertHistory = async () => {
     console.error("Error response:", error.response);
     toast({
       variant: "error",
-      message: error.response?.data?.message || error.message || "Failed to fetch alert history",
+      message: error.response?.data?.message || error.message || t("alerts.failedToFetchHistory"),
     });
-  } finally {
-    loading.value = false;
   }
 };
 
@@ -786,7 +933,7 @@ const onSortChange = (params: { column: string; order: "asc" | "desc" }) => {
 };
 
 const refreshData = () => {
-  fetchAlertHistory();
+  fetchAlertHistory(true);
 };
 
 const formatHistoryDate = (timestamp: number) => {
@@ -828,9 +975,10 @@ const closeErrorDialog = () => {
 };
 
 const goBack = () => {
+  const { folder, tab } = route.query;
   router.push({
     name: "alertList",
-    query: { org_identifier: store.state.selectedOrganization.identifier },
+    query: { org_identifier: store.state.selectedOrganization.identifier, folder, tab },
   });
 };
 

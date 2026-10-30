@@ -21,12 +21,17 @@ export type ButtonVariant =
   | "ghost-warning"
   | "ghost-neutral"
   | "outline-destructive"
+  // Solid "stop this running operation" red — distinct from destructive
+  // (delete/danger): a query/task actively in flight that a click will abort
+  | "cancel-query"
   | "sidebar-toggle"
   // Dedicated variant for sidebar panel collapse/expand icon button
   | "panel-collapse"
   // Primary-colored tall-narrow vertical rectangle — for splitter collapse/expand buttons
   | "sidebar-button"
   | "destructive"
+  // Icon-only exclude-filter toggle (≠) — lighter red than destructive; glyph-on-fill, so 3:1 non-text contrast applies
+  | "filter-exclude"
   // AI-themed gradient — purple→pink gradient background, white text (AI send/generate buttons)
   | "ai-gradient"
   // Use on dark gradient backgrounds — white background with primary text
@@ -35,21 +40,33 @@ export type ButtonVariant =
   | "on-dark-ghost"
   // Solid warning (yellow) background — use to draw attention to a required action
   | "warning"
+  // Solid amber for a Run/Apply button whose result is behind unapplied edits; never the theme accent (light amber-400, dark amber-500)
+  | "pending"
   // Destination preview buttons — brand-colored CTAs inside alert destination preview cards
   | "preview-slack"
   | "preview-teams"
   | "preview-email"
+  | "preview-opsgenie"
   // Generic preview action button — for destination previews with no specific brand color
   | "preview-action"
   // Webinar banner dismiss — inline text-link style button for the top bar banner
   | "webinar-dismiss"
+  // Banner action — inline text-link style button for actions inside an OBanner bar
+  | "banner-dismiss"
   // Pricing template chip — pill-shaped toggle chip for quick-setup template selection
   | "pricing-chip"
   // Outline with primary color text + border — for "always highlighted" branded badges (e.g. edition indicator)
   | "outline-primary"
   // Dashed outline "add tile" — transparent bg, dashed muted border + muted icon.
   // For the small "+" add-affordance buttons in the query builder (add join / filter / condition).
-  | "dashed";
+  | "dashed"
+  // Soft categorical badge fill (bg + text) for colour-coded identity tiles, e.g. a cluster code in a hot bar
+  | "tint-teal"
+  | "tint-purple"
+  | "tint-blue"
+  | "tint-orange"
+  // Table-cell content that is itself the action: no chrome, full cell width, stacked lines.
+  | "cell";
 
 /** Size controls height, padding, font-size, and border-radius */
 export type ButtonSize =
@@ -58,6 +75,7 @@ export type ButtonSize =
   | "sm"
   | "sm-action"
   | "md"
+  | "cta"
   | "lg"
   | "icon"
   | "icon-xs"
@@ -77,6 +95,7 @@ export type ButtonSize =
   | "sidebar-button"
   // 30px labeled button — matches toolbar icon height for labeled outline toolbar buttons
   | "sm-toolbar"
+  | "xs-grouped"
   // Chip with fixed 12px font — for dashboard query builder axis field chips
   | "chip-12";
 
@@ -87,6 +106,10 @@ export interface ButtonProps extends PrimitiveProps {
   size?: ButtonSize;
   /** Disables the button and all interaction */
   disabled?: boolean;
+  /** Keeps an unavailable button focusable so its reason can be reached. */
+  focusableUnavailable?: boolean;
+  /** Associates the unavailable button with its reason. */
+  descriptionId?: string;
   /** Shows loading state and disables interaction */
   loading?: boolean;
   /** Applies active/selected state styling (overrides variant to primary appearance) */
@@ -113,6 +136,8 @@ export interface ButtonEmits {
 export interface ButtonSlots {
   /** Main label / content */
   default?: () => unknown;
+  /** Explains why the focusable button cannot perform its action. */
+  "unavailable-reason"?: () => unknown;
   /** Icon placed before the label */
   "icon-left"?: () => unknown;
   /** Icon placed after the label */

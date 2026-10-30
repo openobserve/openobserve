@@ -21,12 +21,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   picks the route the rail/breadcrumb highlight.
 -->
 <template>
-  <OPageLayout bleed :sidebar-width="230">
+  <OPageLayout bleed :sidebar-width="railCollapsed ? RAIL_COLLAPSED_WIDTH : RAIL_WIDTH">
     <template #sidebar>
       <SectionRail
+        v-model:collapsed="railCollapsed"
         :groups="sectionGroups"
         :active-key="activeSection"
         :title="t('aiObservability.title')"
+        :icon="AI_ICON"
+        collapsible
       />
     </template>
 
@@ -37,124 +40,117 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { computed, ref, watch } from "vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import SectionRail from "@/components/common/SectionRail.vue";
 import type { SectionHubGroup, SectionHubItem } from "@/components/common/SectionHub.vue";
+import { navSection } from "./navSection";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import { buildFeatureGateContext, checkFeatureAccess } from "@/utils/enterpriseFeatures";
+import { AI_OBSERVABILITY_SECTIONS } from "@/composables/shared/useAIObservabilityRoutes";
+
+/** The same mark the primary nav uses for this module, so the collapsed rail
+ *  still says which module it belongs to. */
+const AI_ICON: IconName = "auto-awesome";
+
+// Wide enough for one icon plus the pill's own inset; the expanded width is
+// unchanged from before the toggle existed.
+const RAIL_WIDTH = 230;
+const RAIL_COLLAPSED_WIDTH = 52;
+const RAIL_STORAGE_KEY = "o2-ai-rail-collapsed";
+
+// Remembered per browser: a rail you collapsed should not reopen every time you
+// leave the module. Storage can throw (private mode), and the rail opening
+// expanded is a fine outcome when it does.
+function readCollapsed(): boolean {
+  try {
+    return window.localStorage.getItem(RAIL_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+const railCollapsed = ref(readCollapsed());
+
+watch(railCollapsed, (value) => {
+  try {
+    window.localStorage.setItem(RAIL_STORAGE_KEY, String(value));
+  } catch {
+    // Unavailable storage keeps the toggle working for this session only.
+  }
+});
 
 defineOptions({ name: "AIObservabilityShell" });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
-
-type EvalTab = "quality" | "jobs" | "scorers" | "scoreConfigs";
 
 const orgQuery = computed(() => ({
   org_identifier: store.state.selectedOrganization?.identifier,
 }));
 
-function evalLink(tab: EvalTab) {
-  return { name: "aiEvaluations", query: { ...orgQuery.value, tab } };
-}
-
-// Section key for the rail's `active-key`. Evaluations sub-pages share the
-// route name `aiEvaluations`; `?tab=` distinguishes them so we map it down
-// to the rail's per-item keys.
-const activeSection = computed<string>(() => {
-  if (route.name === "aiLLMInsights") return "llmInsights";
-  if (route.name === "aiSessions") return "sessions";
-  if (route.name === "aiAgentGraph") return "agentGraph";
-  if (route.name === "aiAgentBehavior") return "agentBehavior";
-  if (route.name === "aiEvaluations") {
-    const tab = (route.query.tab as string) || "quality";
-    return tab;
-  }
-  return "";
-});
+const activeSection = computed<string>(() => navSection(route.name, route.query.tab));
 
 // Single source of truth for the rail items (groups) AND the breadcrumb
-// switcher. Order here is the order shown in the rail.
-const sectionItems = computed<(SectionHubItem & { group: string })[]>(() => [
-  {
-    key: "llmInsights",
-    label: t("aiObservability.nav.llmInsights"),
-    icon: "dashboard",
-    to: { name: "aiLLMInsights", query: orgQuery.value },
-    dataTest: "ai-secondary-nav-llm-insights",
-    group: "Monitor",
-  },
-  {
-    key: "sessions",
-    label: t("aiObservability.nav.sessions"),
-    icon: "forum",
-    to: { name: "aiSessions", query: orgQuery.value },
-    dataTest: "ai-secondary-nav-sessions",
-    group: "Monitor",
-  },
-  {
-    key: "agentGraph",
-    label: t("aiObservability.nav.agentGraph"),
-    icon: "hub",
-    to: { name: "aiAgentGraph", query: orgQuery.value },
-    dataTest: "ai-secondary-nav-agent-graph",
-    group: "Monitor",
-  },
-  {
-    key: "agentBehavior",
-    label: t("aiObservability.nav.agentBehavior"),
-    icon: "troubleshoot",
-    to: { name: "aiAgentBehavior", query: orgQuery.value },
-    dataTest: "ai-secondary-nav-agent-behavior",
-    group: "Monitor",
-  },
-  {
-    key: "quality",
-    label: t("aiObservability.nav.quality"),
-    icon: "star-rate",
-    to: evalLink("quality"),
-    dataTest: "ai-secondary-nav-quality",
-    group: "Evaluate",
-  },
-  {
-    key: "jobs",
-    label: t("aiObservability.nav.evalJobs"),
-    icon: "event",
-    to: evalLink("jobs"),
-    dataTest: "ai-secondary-nav-eval-jobs",
-    group: "Evaluate",
-  },
-  {
-    key: "scorers",
-    label: t("aiObservability.nav.scorers"),
-    icon: "rule",
-    to: evalLink("scorers"),
-    dataTest: "ai-secondary-nav-scorers",
-    group: "Evaluate",
-  },
-  {
-    key: "scoreConfigs",
-    label: t("aiObservability.nav.scoreConfigs"),
-    icon: "tune",
-    to: evalLink("scoreConfigs"),
-    dataTest: "ai-secondary-nav-score-configs",
-    group: "Evaluate",
-  },
-]);
+// switcher, derived from AI_OBSERVABILITY_SECTIONS — the SAME list the OSS
+// and enterprise routers build their /ai routes from (see
+// composables/shared/useAIObservabilityRoutes.ts), so a nav item's
+// `featureKey`/`routeName` can't drift from what actually gates/names its
+// route. Every section beyond Monitor's LLM Insights + Sessions is
+// enterprise/cloud-only — rather than hiding those items in OSS, they stay
+// visible but locked (lock icon + pitch-card tooltip), matching the
+// Settings/IAM rail pattern.
+const sectionItems = computed<(SectionHubItem & { group: string })[]>(() => {
+  const featureGateCtx = buildFeatureGateContext(store.state.zoConfig);
+  // Memoized per featureKey, not per nav item — the four Evaluate entries
+  // share one key and would otherwise recompute the same access check 4x.
+  const accessByFeatureKey = new Map<string, ReturnType<typeof checkFeatureAccess>>();
+  return AI_OBSERVABILITY_SECTIONS.map((section) => {
+    let locked: boolean | undefined;
+    let lockedMessage: I18nText | undefined;
+    if (section.featureKey) {
+      let access = accessByFeatureKey.get(section.featureKey);
+      if (!access) {
+        access = checkFeatureAccess(section.featureKey, featureGateCtx);
+        accessByFeatureKey.set(section.featureKey, access);
+      }
+      locked = !access.allowed;
+      lockedMessage = access.message;
+    }
+    return {
+      key: section.key,
+      label: t(section.labelKey),
+      icon: section.icon,
+      to: {
+        name: section.routeName,
+        query: section.tabQuery ? { ...orgQuery.value, tab: section.tabQuery } : orgQuery.value,
+      },
+      dataTest: section.dataTest,
+      group: section.group,
+      locked,
+      lockedMessage,
+    };
+  });
+});
 
 const activeSectionItem = computed(() =>
   sectionItems.value.find((i) => i.key === activeSection.value),
 );
 
-// Group order: Monitor before Evaluate.
-const sectionGroupOrder = ["Monitor", "Evaluate"];
+// Group order: Monitor, then Evaluate, then Experiment, then Annotate at the
+// bottom. Experiment is its own section (not an Evaluate sub-item) because an
+// experiment is a run you author, not a scoring config you maintain.
+const sectionGroupOrder = ["Monitor", "Evaluate", "Experiment", "Annotate"];
 
-const groupLabels = computed<Record<string, string>>(() => ({
+const groupLabels = computed<Record<string, I18nText>>(() => ({
   Monitor: t("aiObservability.sections.monitor"),
+  Annotate: t("aiObservability.sections.annotate"),
   Evaluate: t("aiObservability.sections.evaluate"),
+  Experiment: t("aiObservability.sections.experiment"),
 }));
 
 const sectionGroups = computed<SectionHubGroup[]>(() => {
@@ -170,7 +166,7 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
   };
   return [...buckets.keys()]
     .sort((a, b) => rank(a) - rank(b))
-    .map((key) => ({ label: groupLabels.value[key] ?? key, items: buckets.get(key)! }));
+    .map((key) => ({ label: groupLabels.value[key] ?? raw(key), items: buckets.get(key)! }));
 });
 
 // Reserved for future per-section header chrome wiring (mirrors Settings'

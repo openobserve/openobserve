@@ -14,9 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { ComputedRef, InjectionKey } from "vue";
+import type { I18nKey, I18nText } from "@/types/i18n";
 
 export interface NavItem {
-  title: string;
+  title: I18nText;
   icon: string;
   link: string;
   exact?: boolean;
@@ -24,6 +25,14 @@ export interface NavItem {
   display?: boolean;
   hide?: boolean;
   badge?: number;
+  /**
+   * Present but unreachable — an enterprise/cloud-only item in a build that
+   * doesn't unlock it. Rendered dimmed with `lockedMessage` as a tooltip and
+   * inert on click, instead of being spliced out of the rail. Set from
+   * `checkFeatureAccess()` in utils/enterpriseFeatures.ts.
+   */
+  locked?: boolean;
+  lockedMessage?: I18nText;
 }
 
 /**
@@ -38,6 +47,11 @@ export const RailIndicatorActiveKey: InjectionKey<ComputedRef<boolean>> = Symbol
   "o-navbar-rail-indicator-active",
 );
 
+/** Provided by ONavbar so a teleported flyout item can mark its click as rail-started. */
+export const RailNavigationMarkKey: InjectionKey<(event: MouseEvent) => void> = Symbol(
+  "o-navbar-rail-navigation-mark",
+);
+
 /**
  * A flyout sub-item. These mirror the target page's own in-page section nav
  * EXACTLY — same label (i18n key), same icon, same category grouping — so the
@@ -47,15 +61,35 @@ export const RailIndicatorActiveKey: InjectionKey<ComputedRef<boolean>> = Symbol
  */
 export interface SubnavChild {
   /** i18n key for the label, translated in the flyout. */
-  titleKey: string;
+  titleKey: I18nKey;
+  /**
+   * Literal label, used INSTEAD of `titleKey` when the name must not be
+   * translated — an acronym or product name. "RUM" came back from the
+   * translator as "RON"/"RHUM" (the drink) in several locales.
+   */
+  title?: string;
   /** OIcon registry name — matches the sub-page's own icon. */
   icon: string;
   /** Route name — used for navigation, active-state, and hasRoute gating. */
   name: string;
-  /** Section header this item sits under (mirrors the sub-page nav grouping). */
-  category?: string;
-  /** Query `tab` for routes that switch sub-views via a query param (AI evals). */
+  /**
+   * i18n key for a section header this item sits under. Consecutive children
+   * sharing a key render beneath one header, mirroring the sub-page grouping.
+   * A KEY, not a literal: the rail ships in 15 locales.
+   */
+  categoryKey?: I18nKey;
+  /** Query `tab` for routes that switch sub-views via a query param. */
   tab?: string;
+  /** Use this child as the active fallback when its route has no `tab` query. */
+  defaultForRoute?: boolean;
+  /**
+   * Also mark this child active on these route names. For a section whose
+   * sub-views are IN-PAGE TABS on sibling routes rather than query params:
+   * Databases owns `dbmQueries` and `dbmQueryDetail`, which have no flyout
+   * entry of their own, so without this the entry unlights the moment the
+   * user switches tab.
+   */
+  activeOnRoutes?: string[];
   /** Group children only: include only when this top-level item is present. */
   requires?: string;
   /**
@@ -65,6 +99,16 @@ export interface SubnavChild {
    * flyout when the page itself would hide it.
    */
   gate?: string;
+  /** Shows the shared "Beta" tag (see BetaBadge.vue) next to this child's label. */
+  beta?: boolean;
+  /**
+   * Set at RENDER time (ONavGroup.vue), not in the static NAV_GROUPS/NAV_SUBNAV
+   * tables: when `gate` corresponds to a registered `FeatureKey`
+   * (utils/enterpriseFeatures.ts) and that feature isn't unlocked, the child
+   * is kept rather than filtered out, dimmed, and inert on click.
+   */
+  locked?: boolean;
+  lockedMessage?: I18nText;
 }
 
 /** Context for evaluating subnav `gate` predicates (see navGroups.ts). */
@@ -78,6 +122,16 @@ export interface NavGateContext {
   modelPricing: boolean;
   serviceStreams: boolean;
   onlineEvals: boolean;
+  /** `/config` `oncall_enabled` — the module's only navigation gate. */
+  oncallEnabled: boolean;
+  /** `zoConfig.database_monitoring_enabled`. OSS feature — no build gate. */
+  databaseMonitoring: boolean;
+  /** `/config` `downtimes_enabled` (enterprise `O2_DOWNTIMES_ENABLED`). */
+  downtimesEnabled: boolean;
+  /** `/config` `alert_calibration_enabled` (enterprise `O2_ALERT_CALIBRATION_ENABLED`). */
+  alertCalibrationEnabled: boolean;
+  /** `/config` `fleet_enabled` (enterprise `O2_FLEET_ENABLED`). */
+  fleetEnabled: boolean;
   /** Raw `custom_hide_menus` entries (split on ",") — matches how pages test it. */
   hiddenMenus: Set<string>;
 }
@@ -95,11 +149,11 @@ export interface NavGateContext {
  */
 export type RailEntry =
   | { type: "link"; item: NavItem }
-  | { type: "linkGroup"; item: NavItem; children: SubnavChild[] }
+  | { type: "linkGroup"; item: NavItem; children: SubnavChild[]; filtered?: SubnavChild[] }
   | {
       type: "group";
       key: string;
-      title: string;
+      title: I18nText;
       icon: string;
       children: SubnavChild[];
       pinBottom: boolean;
@@ -109,6 +163,14 @@ export interface NavbarProps {
   linksList: NavItem[];
   miniMode?: boolean;
   visible?: boolean;
+  /**
+   * Render the rail as a fixed slide-over above page content instead of a
+   * normal flex sibling that reserves its own column width. Used on narrow
+   * viewports, where the rail is hidden by default (`visible=false`) and
+   * revealed on demand via a header hamburger toggle — reserving its ~90px
+   * column permanently there would eat a quarter of a 390px viewport.
+   */
+  overlay?: boolean;
 }
 
 export interface NavbarEmits {

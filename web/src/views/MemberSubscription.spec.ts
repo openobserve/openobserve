@@ -6,11 +6,14 @@ import MemberSubscription from "./MemberSubscription.vue";
 import organizationsService from "@/services/organizations";
 
 // Mock the services and utilities
-vi.mock("@/services/organizations", () => ({
-  default: {
-    process_subscription: vi.fn(),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      process_subscription: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/utils/zincutils", () => ({
   useLocalOrganization: vi.fn(),

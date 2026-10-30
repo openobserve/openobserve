@@ -40,11 +40,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ patternLevelInfo.level }}
             </span>
-            <h4
-              class="text-text-heading m-0 min-w-0 truncate text-base leading-tight font-semibold"
+            <OTruncatedText
+              as="h4"
+              class="text-text-heading m-0 text-base leading-tight font-semibold"
             >
               {{ selectedPattern?.pattern?.description || t("search.patternDetailsTitle") }}
-            </h4>
+            </OTruncatedText>
             <template v-if="selectedPattern">
               <OTag type="countChip" value="neutral" class="shrink-0">
                 {{ selectedTemplateTokens.length }}
@@ -65,10 +66,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </div>
           <!-- Row 2: full-width module path, truncates at edge -->
-          <code
+          <OTruncatedText
             v-if="selectedPattern && patternPathToken"
-            class="text-text-code text-2xs text-text-secondary block w-full truncate font-mono"
-            >{{ patternPathToken }}</code
+            as="code"
+            :tooltip="false"
+            class="text-text-code text-2xs text-text-secondary block w-full font-mono"
+            >{{ patternPathToken }}</OTruncatedText
           >
         </div>
       </template>
@@ -80,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="rounded-surface bg-surface-subtle border-card-glass-border mb-4 flex items-center gap-2 border border-solid p-2.5"
             data-test="pattern-detail-actions"
           >
-            <span class="text-text-secondary mr-1 text-xs font-medium tracking-wide uppercase">
+            <span class="text-text-secondary me-1 text-xs font-medium tracking-wide uppercase">
               {{ t("logs.patternList.actionsLabel") }}
             </span>
             <OButton
@@ -193,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("search.patternVariablesHeader") }}
             </div>
             <div
-              class="rounded-default border-l-accent bg-surface-subtle border-l-4 border-solid px-2.5 py-1.5"
+              class="rounded-default border-s-accent bg-surface-subtle border-s-4 border-solid px-2.5 py-1.5"
             >
               {{
                 selectedPattern.pattern.examples?.[0]?.variables
@@ -211,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("search.patternTemplate") }}
             </div>
             <div
-              class="text-compact rounded-default border-l-accent bg-surface-subtle border-l-4 border-solid px-2.5 py-1.5 font-mono leading-[1.6] break-all whitespace-pre-wrap"
+              class="text-compact rounded-default border-s-accent bg-surface-subtle border-s-4 border-solid px-2.5 py-1.5 font-mono leading-[1.6] break-all whitespace-pre-wrap"
             >
               <template v-for="(tok, i) in selectedTemplateTokens" :key="i">
                 <span v-if="tok.kind === 'text'">{{ tok.value }}</span>
@@ -249,9 +252,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="border-card-glass-border w-full border border-solid"
             >
               <template #cell-name="{ row }">
-                <div class="text-primary text-left font-bold">
-                  {{ row.name || "var_" + row.index }}
-                </div>
+                <span class="text-primary text-left font-bold">
+                  {{ raw(row.name || "var_" + row.index) }}
+                </span>
               </template>
 
               <template #cell-type="{ row }">
@@ -281,7 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="(example, exIdx) in selectedPattern.pattern.examples"
               :key="exIdx"
-              class="rounded-default bg-surface-panel border-l-border-default mb-1.5 border-l-[0.1875rem] border-solid px-2.5 py-1.5 font-mono text-xs leading-[1.6] break-all whitespace-pre-wrap"
+              class="rounded-default bg-surface-panel border-s-border-default mb-1.5 border-s-[0.1875rem] border-solid px-2.5 py-1.5 font-mono text-xs leading-[1.6] break-all whitespace-pre-wrap"
             >
               <LogsHighLighting
                 :data="example.log_message"
@@ -354,10 +357,11 @@ import useTheme from "@/composables/useTheme";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -389,7 +393,7 @@ const emit = defineEmits<{
   (e: "create-alert", pattern: any): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Window-wide occurrences for the selected pattern, read from the SAME cache the
 // rows use. Opening a row is therefore a cache hit and shows its real count

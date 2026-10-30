@@ -14,6 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
+
+/** The page a saved view belongs to. A view stored before the field existed is a logs view. */
+export const viewTypeOf = (view: { view_type?: string | null }): string =>
+  view?.view_type || "logs";
 
 const savedViews = {
   get: (org_identifier: string) => {
@@ -22,15 +27,30 @@ const savedViews = {
   },
   post: (org_identifier: string, data: any) => {
     const url = `/api/${org_identifier}/savedviews`;
-    return http().post(url, { ...data });
+    return http()
+      .post(url, { ...data })
+      .then((res) => {
+        analytics.track("saved_view_created");
+        return res;
+      });
   },
   put: (org_identifier: string, id: string, data: any) => {
     const url = `/api/${org_identifier}/savedviews/${id}`;
-    return http().put(url, { ...data });
+    return http()
+      .put(url, { ...data })
+      .then((res) => {
+        analytics.track("saved_view_updated");
+        return res;
+      });
   },
   delete: (org_identifier: string, id: string) => {
     const url = `/api/${org_identifier}/savedviews/${id}`;
-    return http().delete(url);
+    return http()
+      .delete(url)
+      .then((res) => {
+        analytics.track("saved_view_deleted", { count: 1 });
+        return res;
+      });
   },
   getViewDetail: (org_identifier: string, id: string) => {
     const url = `/api/${org_identifier}/savedviews/${id}`;

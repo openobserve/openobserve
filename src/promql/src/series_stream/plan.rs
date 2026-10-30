@@ -1,0 +1,1239 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+//! Planning over a selector's hash-sorted table: the label columns to project, and one set of
+//! hash-ordered input streams per partition for the hash-sorted stream to consume.
+
+use std::sync::Arc;
+
+use config::{
+    TIMESTAMP_COL_NAME,
+    meta::{
+        plan::generate_plan_string,
+        promql::{
+            BUCKET_LABEL, HASH_LABEL, MetricsBlockScan, NAME_LABEL, VALUE_LABEL,
+            is_metrics_hash_excluded_label, value::EvalContext,
+        },
+    },
+};
+use datafusion::{
+    arrow::datatypes::{DataType, Schema},
+    error::{DataFusionError, Result},
+    execution::{SendableRecordBatchStream, TaskContext},
+    physical_expr::PhysicalSortExpr,
+    physical_plan::{
+        ExecutionPlan, execute_stream_partitioned,
+        expressions::Column,
+        sorts::{sort::SortExec, sort_preserving_merge::SortPreservingMergeExec},
+    },
+    prelude::{DataFrame, SessionContext, col, lit},
+};
+use futures::future::BoxFuture;
+use hashbrown::HashSet;
+use promql_parser::{label::Matchers, parser::LabelModifier};
+use tokio::task::JoinSet;
+
+use super::{SeriesSource, blocks, hash_sorted::HashSortedSeriesStream};
+use crate::{
+    ScanSource,
+    aggregations::AggOp,
+    functions::keeps_metric_name,
+    utils::{apply_matchers, apply_time_window},
+};
+
+type SourceFuture = BoxFuture<'static, Result<SeriesSource>>;
+
+/// The selector being scanned; `offset` is the `offset` modifier in microseconds.
+pub(crate) struct StreamingSelector<'a> {
+    pub table_name: &'a str,
+    pub matchers: &'a Matchers,
+    pub offset: i64,
+}
+
+/// The label columns a stream reads: `group` keys the series it yields, `series` is what its
+/// labels carry. The same set for a scalar aggregation; a ranking keys by the `by()` columns
+/// but carries every label column.
+pub(crate) struct LabelColumns {
+    pub group: Vec<String>,
+    pub series: Vec<String>,
+}
+
+impl LabelColumns {
+    /// Series keyed and labelled by the same columns.
+    pub(crate) fn grouped(cols: Vec<String>) -> Self {
+        Self {
+            group: cols.clone(),
+            series: cols,
+        }
+    }
+
+    /// The columns an aggregation reads: keyed by the `by()` columns, carrying every label
+    /// column when the output keeps the series' own labels; `None` when the modifier cannot be
+    /// keyed by columns.
+    pub(crate) fn for_op(
+        op: &AggOp,
+        modifier: &Option<LabelModifier>,
+        schema: &Schema,
+        label_selector: &HashSet<String>,
+        func_name: &str,
+    ) -> Option<Self> {
+        let group = group_label_columns(modifier, schema, func_name)?;
+        Some(if op.needs_series_labels() {
+            Self {
+                group,
+                series: series_label_columns(schema, label_selector, func_name),
+            }
+        } else {
+            Self::grouped(group)
+        })
+    }
+}
+
+struct PlannedPartition {
+    plan: Arc<dyn ExecutionPlan>,
+    task_ctx: Arc<TaskContext>,
+}
+
+pub(crate) async fn execute_partitioned(
+    ctx: &SessionContext,
+    source: &ScanSource,
+    selector: &StreamingSelector<'_>,
+    label_cols: LabelColumns,
+    lookback: i64,
+    eval_ctx: &EvalContext,
+) -> Result<Vec<SourceFuture>> {
+    let label_cols = Arc::new(label_cols);
+    let partitions = ctx.state().config().target_partitions();
+    match source {
+        ScanSource::Blocks(scan) => {
+            execute_blocks(scan, selector, label_cols, partitions, lookback, eval_ctx).await
+        }
+        ScanSource::HashSorted => {
+            execute_hash_sorted(ctx, selector, label_cols, partitions, lookback, eval_ctx).await
+        }
+        ScanSource::Table => Err(DataFusionError::Execution(format!(
+            "{} is a table source and cannot stream",
+            selector.table_name
+        ))),
+    }
+}
+
+async fn execute_blocks(
+    scan: &MetricsBlockScan,
+    selector: &StreamingSelector<'_>,
+    label_cols: Arc<LabelColumns>,
+    partitions: usize,
+    lookback: i64,
+    eval_ctx: &EvalContext,
+) -> Result<Vec<SourceFuture>> {
+    let intervals = hash_partitions(partitions).collect::<Vec<_>>();
+    let prepared = blocks::prepare(
+        scan,
+        selector.matchers,
+        label_cols,
+        &intervals,
+        selector.offset,
+        lookback,
+        eval_ctx,
+    )
+    .await
+    .map_err(|error| DataFusionError::External(error.into()))?;
+    Ok(prepared
+        .into_iter()
+        .map(|partition| {
+            Box::pin(async move {
+                Ok(SeriesSource::Block(blocks::BlockSeriesStream::new(
+                    partition,
+                )))
+            }) as SourceFuture
+        })
+        .collect())
+}
+
+async fn execute_hash_sorted(
+    ctx: &SessionContext,
+    selector: &StreamingSelector<'_>,
+    label_cols: Arc<LabelColumns>,
+    partitions: usize,
+    lookback: i64,
+    eval_ctx: &EvalContext,
+) -> Result<Vec<SourceFuture>> {
+    let df = ctx.table(selector.table_name).await?;
+    let df = apply_time_window(
+        df,
+        eval_ctx.start - selector.offset,
+        eval_ctx.end - selector.offset,
+        eval_ctx.step,
+        lookback,
+    )?;
+    let df = apply_matchers(df, selector.matchers)?;
+    let mut columns = vec![TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL];
+    for name in label_cols.group.iter().chain(&label_cols.series) {
+        if !columns.contains(&name.as_str()) {
+            columns.push(name);
+        }
+    }
+    let partition_inputs =
+        build_partition_inputs(&df, &columns, partitions, &eval_ctx.trace_id).await?;
+    let offset = selector.offset;
+    Ok(partition_inputs
+        .into_iter()
+        .map(|streams| {
+            let columns = Arc::clone(&label_cols);
+            Box::pin(async move {
+                HashSortedSeriesStream::start(streams, columns, offset)
+                    .await
+                    .map(SeriesSource::DataFusion)
+            }) as SourceFuture
+        })
+        .collect())
+}
+
+/// The `by()` columns in a stable order; `None` for `without()`, which needs the full label set.
+pub(crate) fn group_label_columns(
+    modifier: &Option<LabelModifier>,
+    schema: &Schema,
+    func_name: &str,
+) -> Option<Vec<String>> {
+    let include = match modifier {
+        None => return Some(vec![]),
+        Some(LabelModifier::Include(labels)) => &labels.labels,
+        Some(LabelModifier::Exclude(_)) => return None,
+    };
+    let mut cols: Vec<String> = include
+        .iter()
+        .filter(|name| {
+            let name = name.as_str();
+            !is_metrics_hash_excluded_label(name)
+                // range functions strip the metric name before aggregation
+                && (name != NAME_LABEL || keeps_metric_name(func_name))
+                && schema.field_with_name(name).is_ok()
+        })
+        .cloned()
+        .collect();
+    cols.sort();
+    cols.dedup();
+    Some(cols)
+}
+
+/// The label columns an emitted series carries, in the sorted order the materializing loader
+/// uses: string columns other than the hash-excluded ones, narrowed by the label selector
+/// (which always keeps `le`), without the metric name unless the function keeps it.
+pub(crate) fn series_label_columns(
+    schema: &Schema,
+    label_selector: &HashSet<String>,
+    func_name: &str,
+) -> Vec<String> {
+    let mut cols: Vec<String> = schema
+        .fields()
+        .iter()
+        .filter(|field| matches!(field.data_type(), DataType::Utf8 | DataType::Utf8View))
+        .map(|field| field.name().clone())
+        .filter(|name| {
+            !is_metrics_hash_excluded_label(name)
+                && (label_selector.is_empty()
+                    || label_selector.contains(name)
+                    || name == BUCKET_LABEL)
+                && (name != NAME_LABEL || keeps_metric_name(func_name))
+        })
+        .collect();
+    cols.sort();
+    cols
+}
+
+async fn build_partition_inputs(
+    df: &DataFrame,
+    columns: &[&str],
+    partitions: usize,
+    trace_id: &str,
+) -> Result<Vec<Vec<SendableRecordBatchStream>>> {
+    let (mut state, logical_plan) = df.clone().into_parts();
+    // Outer hash shards provide parallelism; keep each shard's ordered scan chains intact.
+    state
+        .config_mut()
+        .options_mut()
+        .optimizer
+        .repartition_file_scans = false;
+    let df = DataFrame::new(state, logical_plan);
+    let columns: Arc<[String]> = columns.iter().map(|name| (*name).to_string()).collect();
+    let plans = hash_partitions(partitions).map(|(lo, hi)| {
+        let df = df.clone();
+        let columns = Arc::clone(&columns);
+        async move {
+            let columns: Vec<_> = columns.iter().map(String::as_str).collect();
+            let partition_df = df
+                .filter(
+                    col(HASH_LABEL)
+                        .gt_eq(lit(lo))
+                        .and(col(HASH_LABEL).lt_eq(lit(hi))),
+                )?
+                .select_columns(&columns)?
+                // Planning-only: proves inputs are hash-ordered; the series stream merges them
+                .sort(vec![col(HASH_LABEL).sort(true, false)])?;
+            let task_ctx = Arc::new(partition_df.task_ctx());
+            let plan = partition_df.create_physical_plan().await?;
+            Ok(PlannedPartition { plan, task_ctx })
+        }
+    });
+    let plans = collect_plans(plans, partitions).await?;
+    execute_planned_partitions(plans, trace_id)
+}
+
+async fn collect_plans<T, F>(
+    plans: impl IntoIterator<Item = F>,
+    concurrency: usize,
+) -> Result<Vec<T>>
+where
+    T: Send + 'static,
+    F: Future<Output = Result<T>> + Send + 'static,
+{
+    let mut plans = plans.into_iter().enumerate();
+    let mut results = Vec::new();
+    let mut tasks = JoinSet::new();
+    for _ in 0..concurrency.max(1) {
+        let Some((index, plan)) = plans.next() else {
+            break;
+        };
+        results.push(None);
+        tasks.spawn(async move { (index, plan.await) });
+    }
+    while let Some(joined) = tasks.join_next().await {
+        let result = match joined {
+            Ok((index, plan)) => plan.map(|plan| (index, plan)),
+            Err(error) => Err(DataFusionError::Execution(format!(
+                "shard planning task failed: {error}"
+            ))),
+        };
+        match result {
+            Ok((index, plan)) => results[index] = Some(plan),
+            Err(error) => {
+                tasks.shutdown().await;
+                return Err(error);
+            }
+        }
+        if let Some((index, plan)) = plans.next() {
+            results.push(None);
+            tasks.spawn(async move { (index, plan.await) });
+        }
+    }
+    Ok(results
+        .into_iter()
+        .map(|plan| plan.expect("every dispatched plan joined"))
+        .collect())
+}
+
+fn execute_planned_partitions(
+    plans: Vec<PlannedPartition>,
+    trace_id: &str,
+) -> Result<Vec<Vec<SendableRecordBatchStream>>> {
+    let mut inputs = Vec::with_capacity(plans.len());
+    for (partition, PlannedPartition { plan, task_ctx }) in plans.into_iter().enumerate() {
+        if partition == 0 && config::get_config().common.print_key_sql {
+            log::info!("{}", generate_plan_string(trace_id, plan.as_ref()));
+        }
+        let Some(input) = ordered_partition_input(&plan) else {
+            return Err(DataFusionError::Execution(format!(
+                "hash-sorted partition {partition} plan cannot stream in order:\n{}",
+                generate_plan_string(trace_id, plan.as_ref())
+            )));
+        };
+        inputs.push((input, task_ctx));
+    }
+    inputs
+        .into_iter()
+        .map(|(plan, task_ctx)| execute_stream_partitioned(plan, task_ctx))
+        .collect()
+}
+
+/// Uniform partition of the u64 hash space into `count` inclusive ranges.
+fn hash_partitions(count: usize) -> impl Iterator<Item = (u64, u64)> {
+    let count = count.max(1) as u128;
+    let span = (u64::MAX as u128) + 1;
+    (0..count).map(move |partition| {
+        let lo = (span * partition / count) as u64;
+        let hi = (span * (partition + 1) / count - 1) as u64;
+        (lo, hi)
+    })
+}
+
+fn ordered_partition_input(plan: &Arc<dyn ExecutionPlan>) -> Option<Arc<dyn ExecutionPlan>> {
+    if plan_contains_sort(plan) {
+        return None;
+    }
+    if plan.properties().output_partitioning().partition_count() == 0 {
+        return Some(Arc::clone(plan));
+    }
+    if let Some(merge) = plan.downcast_ref::<SortPreservingMergeExec>() {
+        return Some(merge.input().clone());
+    }
+    if plan.properties().output_partitioning().partition_count() == 1 && hash_ordered(plan) {
+        return Some(Arc::clone(plan));
+    }
+    None
+}
+
+fn plan_contains_sort(plan: &Arc<dyn ExecutionPlan>) -> bool {
+    plan.downcast_ref::<SortExec>().is_some()
+        || plan
+            .children()
+            .iter()
+            .any(|child| plan_contains_sort(child))
+}
+
+fn hash_ordered(plan: &Arc<dyn ExecutionPlan>) -> bool {
+    let Ok(column) = Column::new_with_schema(HASH_LABEL, &plan.schema()) else {
+        return false;
+    };
+    let ordering = PhysicalSortExpr::new_default(Arc::new(column))
+        .asc()
+        .nulls_last();
+    plan.properties()
+        .eq_properties
+        .ordering_satisfy([ordering])
+        .unwrap_or(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        fs::File,
+        sync::atomic::{AtomicUsize, Ordering},
+        time::Duration,
+    };
+
+    use config::meta::promql::EXEMPLARS_LABEL;
+    use datafusion::{
+        arrow::{
+            array::{AsArray, Float64Array, Int64Array, RecordBatch, UInt64Array},
+            datatypes::{Field, Float64Type, Int64Type, UInt64Type},
+        },
+        common::tree_node::TreeNodeRecursion,
+        datasource::MemTable,
+        parquet::arrow::ArrowWriter,
+        physical_expr::{LexOrdering, PhysicalExpr, PhysicalSortExpr},
+        physical_plan::{
+            DisplayAs, DisplayFormatType, PlanProperties,
+            coalesce_partitions::CoalescePartitionsExec, empty::EmptyExec,
+        },
+        prelude::{ParquetReadOptions, SessionConfig},
+    };
+    use futures::{
+        FutureExt, TryStreamExt,
+        future::{BoxFuture, pending},
+    };
+    use promql_parser::label::Labels as ModifierLabels;
+    use tokio::sync::{Barrier, Notify, Semaphore, oneshot};
+
+    use super::{super::tests::*, *};
+    use crate::{aggregations::AggOp, streaming_eval::tests::by};
+
+    struct DroppedPlan(Option<oneshot::Sender<()>>);
+
+    impl Drop for DroppedPlan {
+        fn drop(&mut self) {
+            if let Some(sender) = self.0.take() {
+                let _ = sender.send(());
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    struct CountingExec {
+        input: Arc<dyn ExecutionPlan>,
+        executions: Arc<AtomicUsize>,
+    }
+
+    impl DisplayAs for CountingExec {
+        fn fmt_as(&self, _: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(f, "CountingExec")
+        }
+    }
+
+    impl ExecutionPlan for CountingExec {
+        fn name(&self) -> &str {
+            "CountingExec"
+        }
+        fn properties(&self) -> &Arc<PlanProperties> {
+            self.input.properties()
+        }
+        fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+            vec![&self.input]
+        }
+        fn apply_expressions(
+            &self,
+            _: &mut dyn FnMut(&Arc<dyn PhysicalExpr>) -> Result<TreeNodeRecursion>,
+        ) -> Result<TreeNodeRecursion> {
+            Ok(TreeNodeRecursion::Continue)
+        }
+        fn with_new_children(
+            self: Arc<Self>,
+            mut children: Vec<Arc<dyn ExecutionPlan>>,
+        ) -> Result<Arc<dyn ExecutionPlan>> {
+            assert_eq!(children.len(), 1);
+            Ok(Arc::new(Self {
+                input: children.remove(0),
+                executions: Arc::clone(&self.executions),
+            }))
+        }
+        fn execute(
+            &self,
+            partition: usize,
+            ctx: Arc<TaskContext>,
+        ) -> Result<SendableRecordBatchStream> {
+            self.executions.fetch_add(1, Ordering::SeqCst);
+            self.input.execute(partition, ctx)
+        }
+    }
+
+    #[test]
+    fn test_group_label_columns_resolution() {
+        let schema = arrow_schema();
+        assert_eq!(group_label_columns(&None, &schema, "rate"), Some(vec![]));
+        assert_eq!(
+            group_label_columns(&by(&["path", "instance", "path"]), &schema, "rate"),
+            Some(vec!["instance".to_string(), "path".to_string()])
+        );
+        // absent columns group like an absent label: no column to read
+        assert_eq!(
+            group_label_columns(&by(&["nope", HASH_LABEL, VALUE_LABEL]), &schema, "rate"),
+            Some(vec![])
+        );
+        // rate strips the metric name; last_over_time keeps it (not in schema here)
+        assert_eq!(
+            group_label_columns(&by(&[NAME_LABEL]), &schema, "rate"),
+            Some(vec![])
+        );
+        let without = Some(LabelModifier::Exclude(ModifierLabels {
+            labels: vec!["instance".to_string()],
+        }));
+        assert_eq!(group_label_columns(&without, &schema, "rate"), None);
+    }
+
+    #[test]
+    fn test_series_label_columns_follow_the_loader() {
+        let schema = Schema::new(vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new(HASH_LABEL, DataType::UInt64, false),
+            Field::new(VALUE_LABEL, DataType::Float64, false),
+            Field::new("path", DataType::Utf8View, true),
+            Field::new(NAME_LABEL, DataType::Utf8, true),
+            Field::new(BUCKET_LABEL, DataType::Utf8, true),
+            Field::new("instance", DataType::Utf8, true),
+            Field::new(EXEMPLARS_LABEL, DataType::Utf8, true),
+            Field::new("start_time", DataType::Utf8, true),
+            Field::new("flag", DataType::Utf8, true),
+        ]);
+        assert_eq!(
+            group_label_columns(&by(&["instance", "start_time"]), &schema, "rate"),
+            Some(vec!["instance".to_string()])
+        );
+        let all = HashSet::new();
+        assert_eq!(
+            series_label_columns(&schema, &all, "rate"),
+            ["instance", "le", "path"]
+        );
+        // last_over_time keeps the metric name, like an offset would
+        assert_eq!(
+            series_label_columns(&schema, &all, "last_over_time"),
+            [NAME_LABEL, "instance", "le", "path"]
+        );
+        let selected: HashSet<String> = ["path".to_string()].into_iter().collect();
+        assert_eq!(
+            series_label_columns(&schema, &selected, "rate"),
+            ["le", "path"]
+        );
+    }
+
+    #[test]
+    fn test_shard_streams_empty_scan_yields_zero_chains() {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            HASH_LABEL,
+            DataType::UInt64,
+            false,
+        )]));
+        let plan = Arc::new(EmptyExec::new(schema).with_partitions(0));
+        let streams = execute_planned_partitions(
+            vec![PlannedPartition {
+                plan,
+                task_ctx: Arc::new(TaskContext::default()),
+            }],
+            "empty_shard",
+        )
+        .unwrap();
+        assert_eq!(streams.len(), 1);
+        assert!(streams[0].is_empty());
+    }
+
+    #[test]
+    fn test_hash_shards_cover_the_full_space_contiguously() {
+        for count in [1, 3, 7, 16] {
+            let partitions: Vec<_> = hash_partitions(count).collect();
+            assert_eq!(partitions.len(), count);
+            assert_eq!(partitions[0].0, 0);
+            assert_eq!(partitions[count - 1].1, u64::MAX);
+            for pair in partitions.windows(2) {
+                assert_eq!(pair[0].1.wrapping_add(1), pair[1].0);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_single_hash_parquet_streams_after_ordering_is_normalized() {
+        for rows in [1, 4] {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("single_hash.parquet");
+            let schema = Arc::new(Schema::new(vec![
+                Field::new(HASH_LABEL, DataType::UInt64, false),
+                Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+                Field::new(VALUE_LABEL, DataType::Float64, false),
+            ]));
+            let batch = RecordBatch::try_new(
+                schema.clone(),
+                vec![
+                    Arc::new(UInt64Array::from(vec![1u64 << 63; rows])),
+                    Arc::new(Int64Array::from_iter_values(0..rows as i64)),
+                    Arc::new(Float64Array::from(vec![1.0; rows])),
+                ],
+            )
+            .unwrap();
+            let mut writer =
+                ArrowWriter::try_new(File::create(&path).unwrap(), schema, None).unwrap();
+            writer.write(&batch).unwrap();
+            writer.close().unwrap();
+
+            let ctx = SessionContext::new_with_config(
+                SessionConfig::new()
+                    .with_target_partitions(1)
+                    .with_collect_statistics(true),
+            );
+            let df = ctx
+                .read_parquet(
+                    path.to_str().unwrap(),
+                    ParquetReadOptions::default().file_sort_order(vec![vec![
+                        col(HASH_LABEL).sort(true, false),
+                        col(TIMESTAMP_COL_NAME).sort(true, false),
+                    ]]),
+                )
+                .await
+                .unwrap()
+                .filter(
+                    col(TIMESTAMP_COL_NAME)
+                        .gt_eq(lit(0i64))
+                        .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(60i64)))
+                        .and(col(HASH_LABEL).gt_eq(lit(1u64 << 63)))
+                        .and(col(HASH_LABEL).lt_eq(lit(u64::MAX))),
+                )
+                .unwrap()
+                .select_columns(&[TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL])
+                .unwrap()
+                .sort(vec![col(HASH_LABEL).sort(true, false)])
+                .unwrap();
+            let plan = df.create_physical_plan().await.unwrap();
+            assert!(!plan_contains_sort(&plan));
+            assert!(plan.properties().output_ordering().is_none_or(|ordering| {
+                ordering
+                    .first()
+                    .expr
+                    .downcast_ref::<Column>()
+                    .is_some_and(|column| column.name() == TIMESTAMP_COL_NAME)
+            }));
+
+            let mut inputs = execute_planned_partitions(
+                vec![PlannedPartition {
+                    plan,
+                    task_ctx: Arc::new(df.task_ctx()),
+                }],
+                "single_hash_parquet",
+            )
+            .expect("a constant hash satisfies the streaming ordering requirement");
+            let batches = inputs
+                .pop()
+                .unwrap()
+                .pop()
+                .unwrap()
+                .try_collect::<Vec<_>>()
+                .await
+                .unwrap();
+            assert_eq!(
+                batches.iter().map(RecordBatch::num_rows).sum::<usize>(),
+                rows
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_single_hash_parquet_across_multiple_partitions() {
+        for partitions in [2, 4] {
+            for rows in [1, 4] {
+                let dir = tempfile::tempdir().unwrap();
+                for index in 0..partitions {
+                    write_hash_parquet(
+                        &dir.path().join(format!("{index}.parquet")),
+                        &vec![1u64 << 63; rows],
+                    );
+                }
+                let ctx = parquet_ordering_context(partitions);
+                let df = ctx
+                    .read_parquet(
+                        dir.path().to_str().unwrap(),
+                        ParquetReadOptions::default().file_sort_order(vec![vec![
+                            col(HASH_LABEL).sort(true, false),
+                            col(TIMESTAMP_COL_NAME).sort(true, false),
+                        ]]),
+                    )
+                    .await
+                    .unwrap()
+                    .filter(
+                        col(TIMESTAMP_COL_NAME)
+                            .gt_eq(lit(0i64))
+                            .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(60i64)))
+                            .and(col(HASH_LABEL).gt_eq(lit(1u64 << 63)))
+                            .and(col(HASH_LABEL).lt_eq(lit(u64::MAX))),
+                    )
+                    .unwrap()
+                    .select_columns(&[TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL])
+                    .unwrap();
+                let scan = df.create_physical_plan().await.unwrap();
+                assert_eq!(
+                    scan.properties().output_partitioning().partition_count(),
+                    partitions
+                );
+                assert!(hash_ordered(&scan));
+                let stats = datafusion::physical_plan::statistics::StatisticsContext::new()
+                    .compute(
+                        scan.as_ref(),
+                        &datafusion::physical_plan::statistics::StatisticsArgs::new(),
+                    )
+                    .unwrap();
+                let hash_index = scan.schema().index_of(HASH_LABEL).unwrap();
+                assert!(stats.column_statistics[hash_index].is_singleton());
+                eprintln!(
+                    "constant-hash scan: partitions={partitions}, rows_per_file={rows}, output_ordering={:?}, hash_stats={:?}",
+                    scan.properties().output_ordering(),
+                    stats.column_statistics[hash_index]
+                );
+                let df = df.sort(vec![col(HASH_LABEL).sort(true, false)]).unwrap();
+                let plan = df.create_physical_plan().await.unwrap();
+                eprintln!(
+                    "constant-hash final: partitions={}, has_sort={}, root_merge={}, output_ordering={:?}\n{}",
+                    plan.properties().output_partitioning().partition_count(),
+                    plan_contains_sort(&plan),
+                    plan.downcast_ref::<SortPreservingMergeExec>().is_some(),
+                    plan.properties().output_ordering(),
+                    datafusion::physical_plan::displayable(plan.as_ref()).indent(false)
+                );
+                assert!(!plan_contains_sort(&plan));
+                assert!(plan.downcast_ref::<CoalescePartitionsExec>().is_some());
+                assert_eq!(plan.properties().output_partitioning().partition_count(), 1);
+                assert!(plan.properties().output_ordering().is_none());
+                assert!(hash_ordered(&plan));
+                let mut inputs = execute_planned_partitions(
+                    vec![PlannedPartition {
+                        plan,
+                        task_ctx: Arc::new(df.task_ctx()),
+                    }],
+                    "constant_hash_multi_partition",
+                )
+                .expect("coalesced constant-hash partitions must stream without sorting");
+                let streams = inputs.pop().unwrap();
+                assert_eq!(streams.len(), 1);
+                let mut actual = 0;
+                for stream in streams {
+                    for batch in stream.try_collect::<Vec<_>>().await.unwrap() {
+                        assert!(
+                            batch[HASH_LABEL]
+                                .as_primitive::<UInt64Type>()
+                                .values()
+                                .iter()
+                                .all(|hash| *hash == 1u64 << 63)
+                        );
+                        actual += batch.num_rows();
+                    }
+                }
+                assert_eq!(actual, partitions * rows);
+                eprintln!("constant-hash execution: returned_rows={actual}");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_multi_hash_parquet_preserves_ordered_partition_chains() {
+        for partitions in [1, 2, 4] {
+            let dir = tempfile::tempdir().unwrap();
+            let hashes = vec![10, 10, 20, 20, 30, 30];
+            for index in 0..partitions {
+                write_hash_parquet(&dir.path().join(format!("{index}.parquet")), &hashes);
+            }
+            let ctx = parquet_ordering_context(partitions);
+            let df = ctx
+                .read_parquet(
+                    dir.path().to_str().unwrap(),
+                    ParquetReadOptions::default().file_sort_order(vec![vec![
+                        col(HASH_LABEL).sort(true, false),
+                        col(TIMESTAMP_COL_NAME).sort(true, false),
+                    ]]),
+                )
+                .await
+                .unwrap()
+                .filter(col(TIMESTAMP_COL_NAME).gt_eq(lit(0i64)))
+                .unwrap()
+                .select_columns(&[TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL])
+                .unwrap();
+            let scan = df.create_physical_plan().await.unwrap();
+            assert_eq!(
+                scan.properties().output_partitioning().partition_count(),
+                partitions
+            );
+            assert!(hash_ordered(&scan));
+            assert_eq!(ordered_partition_input(&scan).is_some(), partitions == 1);
+
+            let df = df.sort(vec![col(HASH_LABEL).sort(true, false)]).unwrap();
+            let plan = df.create_physical_plan().await.unwrap();
+            assert!(!plan_contains_sort(&plan));
+            assert_eq!(
+                plan.downcast_ref::<SortPreservingMergeExec>().is_some(),
+                partitions > 1
+            );
+            let input = ordered_partition_input(&plan).unwrap();
+            assert_eq!(
+                input.properties().output_partitioning().partition_count(),
+                partitions
+            );
+            let mut inputs = execute_planned_partitions(
+                vec![PlannedPartition {
+                    plan,
+                    task_ctx: Arc::new(df.task_ctx()),
+                }],
+                "multi_hash_parquet",
+            )
+            .unwrap();
+            let streams = inputs.pop().unwrap();
+            assert_eq!(streams.len(), partitions);
+            let mut actual = Vec::new();
+            for stream in streams {
+                let batches = stream.try_collect::<Vec<_>>().await.unwrap();
+                let mut previous = None;
+                for batch in batches {
+                    for hash in batch[HASH_LABEL].as_primitive::<UInt64Type>().values() {
+                        assert!(previous.is_none_or(|previous| previous <= *hash));
+                        previous = Some(*hash);
+                        actual.push(*hash);
+                    }
+                }
+            }
+            actual.sort_unstable();
+            let mut expected = hashes.repeat(partitions);
+            expected.sort_unstable();
+            assert_eq!(actual, expected);
+            eprintln!(
+                "ordered multi-hash parquet: partitions={partitions}, rows={}, accepted",
+                actual.len()
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_unordered_multi_hash_parquet_is_rejected() {
+        for partitions in [1, 2, 4] {
+            for ordering in ["none", "timestamp", "descending_hash", "timestamp_hash"] {
+                let dir = tempfile::tempdir().unwrap();
+                let hashes = if ordering == "descending_hash" {
+                    vec![30, 30, 20, 20, 10, 10]
+                } else {
+                    vec![30, 10, 20, 10, 30, 20]
+                };
+                for index in 0..partitions {
+                    write_hash_parquet(&dir.path().join(format!("{index}.parquet")), &hashes);
+                }
+                let options = match ordering {
+                    "timestamp" => ParquetReadOptions::default()
+                        .file_sort_order(vec![vec![col(TIMESTAMP_COL_NAME).sort(true, false)]]),
+                    "descending_hash" => ParquetReadOptions::default()
+                        .file_sort_order(vec![vec![col(HASH_LABEL).sort(false, false)]]),
+                    "timestamp_hash" => ParquetReadOptions::default().file_sort_order(vec![vec![
+                        col(TIMESTAMP_COL_NAME).sort(true, false),
+                        col(HASH_LABEL).sort(true, false),
+                    ]]),
+                    _ => ParquetReadOptions::default(),
+                };
+                let ctx = parquet_ordering_context(partitions);
+                let df = ctx
+                    .read_parquet(dir.path().to_str().unwrap(), options)
+                    .await
+                    .unwrap()
+                    .filter(col(TIMESTAMP_COL_NAME).gt_eq(lit(0i64)))
+                    .unwrap()
+                    .select_columns(&[TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL])
+                    .unwrap();
+                let scan = df.create_physical_plan().await.unwrap();
+                assert_eq!(
+                    scan.properties().output_partitioning().partition_count(),
+                    partitions
+                );
+                assert!(!plan_contains_sort(&scan));
+                assert!(!hash_ordered(&scan));
+                assert!(ordered_partition_input(&scan).is_none());
+                let error = execute_planned_partitions(
+                    vec![PlannedPartition {
+                        plan: scan,
+                        task_ctx: Arc::new(df.task_ctx()),
+                    }],
+                    "unordered_multi_hash_scan",
+                )
+                .err()
+                .expect("an unordered scan must fail validation");
+                assert!(error.to_string().contains("plan cannot stream in order"));
+
+                let df = df.sort(vec![col(HASH_LABEL).sort(true, false)]).unwrap();
+                let plan = df.create_physical_plan().await.unwrap();
+                assert!(plan_contains_sort(&plan));
+                assert!(ordered_partition_input(&plan).is_none());
+                let error = execute_planned_partitions(
+                    vec![PlannedPartition {
+                        plan,
+                        task_ctx: Arc::new(df.task_ctx()),
+                    }],
+                    "unordered_multi_hash_sort",
+                )
+                .err()
+                .expect("a scan needing a real sort must fail validation");
+                assert!(error.to_string().contains("plan cannot stream in order"));
+                eprintln!(
+                    "unordered multi-hash parquet: partitions={partitions}, ordering={ordering}, scan and SortExec rejected"
+                );
+            }
+        }
+    }
+
+    fn parquet_ordering_context(partitions: usize) -> SessionContext {
+        let mut config = SessionConfig::new()
+            .with_target_partitions(partitions)
+            .with_collect_statistics(true)
+            .with_repartition_file_scans(false);
+        config
+            .options_mut()
+            .optimizer
+            .enable_round_robin_repartition = false;
+        config
+            .options_mut()
+            .execution
+            .split_file_groups_by_statistics = true;
+        SessionContext::new_with_config(config)
+    }
+
+    fn write_hash_parquet(path: &std::path::Path, hashes: &[u64]) {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(HASH_LABEL, DataType::UInt64, false),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new(VALUE_LABEL, DataType::Float64, false),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(UInt64Array::from(hashes.to_vec())),
+                Arc::new(Int64Array::from_iter_values(0..hashes.len() as i64)),
+                Arc::new(Float64Array::from(vec![1.0; hashes.len()])),
+            ],
+        )
+        .unwrap();
+        let mut writer = ArrowWriter::try_new(File::create(path).unwrap(), schema, None).unwrap();
+        writer.write(&batch).unwrap();
+        writer.close().unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_hash_shards_preserve_scan_chains_and_session_config() {
+        let partitions = 8;
+        let rows_per_batch = 64;
+        let mut config = SessionConfig::new()
+            .with_target_partitions(partitions)
+            .with_batch_size(32)
+            .with_repartition_file_scans(true);
+        config
+            .options_mut()
+            .optimizer
+            .enable_round_robin_repartition = false;
+        config.options_mut().optimizer.prefer_existing_sort = true;
+        let ctx = SessionContext::new_with_config(config);
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(HASH_LABEL, DataType::UInt64, false),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new(VALUE_LABEL, DataType::Float64, false),
+        ]));
+        let expected: Vec<_> = hash_partitions(partitions)
+            .flat_map(|(lo, _)| {
+                (0..rows_per_batch).map(move |row| (lo + row / 2, (row % 2) as i64, row as f64))
+            })
+            .collect();
+        let batches = expected
+            .chunks(rows_per_batch as usize)
+            .map(|rows| {
+                RecordBatch::try_new(
+                    schema.clone(),
+                    vec![
+                        Arc::new(UInt64Array::from_iter_values(rows.iter().map(|row| row.0))),
+                        Arc::new(Int64Array::from_iter_values(rows.iter().map(|row| row.1))),
+                        Arc::new(Float64Array::from_iter_values(rows.iter().map(|row| row.2))),
+                    ],
+                )
+                .unwrap()
+            })
+            .collect();
+        let table = MemTable::try_new(schema, vec![batches])
+            .unwrap()
+            .with_sort_order(vec![vec![
+                col(HASH_LABEL).sort(true, false),
+                col(TIMESTAMP_COL_NAME).sort(true, false),
+            ]]);
+        ctx.register_table("sorted", Arc::new(table)).unwrap();
+        let df = ctx.table("sorted").await.unwrap();
+        let inputs = build_partition_inputs(
+            &df,
+            &[HASH_LABEL, TIMESTAMP_COL_NAME, VALUE_LABEL],
+            partitions,
+            "preserve_shard_chains",
+        )
+        .await
+        .expect("hash shards must preserve the declared input ordering");
+        assert_eq!(inputs.len(), partitions);
+        let mut actual = Vec::new();
+        for (streams, (lo, hi)) in inputs.into_iter().zip(hash_partitions(partitions)) {
+            assert_eq!(streams.len(), 1, "each shard must keep the one input chain");
+            let mut previous = None;
+            for mut stream in streams {
+                while let Some(batch) = stream.try_next().await.unwrap() {
+                    let hashes = batch[HASH_LABEL].as_primitive::<UInt64Type>();
+                    let timestamps = batch[TIMESTAMP_COL_NAME].as_primitive::<Int64Type>();
+                    let values = batch[VALUE_LABEL].as_primitive::<Float64Type>();
+                    for row in 0..batch.num_rows() {
+                        let key = (hashes.value(row), timestamps.value(row));
+                        assert!((lo..=hi).contains(&key.0));
+                        assert!(previous.is_none_or(|previous| previous <= key));
+                        previous = Some(key);
+                        actual.push((key.0, key.1, values.value(row)));
+                    }
+                }
+            }
+        }
+        assert_eq!(actual, expected);
+        assert!(
+            ctx.state()
+                .config()
+                .options()
+                .optimizer
+                .repartition_file_scans
+        );
+        assert!(
+            df.into_parts()
+                .0
+                .config()
+                .options()
+                .optimizer
+                .repartition_file_scans
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_parallel_plans_preserve_shard_order_with_bounded_dispatch() {
+        let release_first = Arc::new(Notify::new());
+        let finished_second = Arc::new(Notify::new());
+        let plans = (0..3).map(|index| {
+            let release_first = Arc::clone(&release_first);
+            let finished_second = Arc::clone(&finished_second);
+            async move {
+                match index {
+                    0 => release_first.notified().await,
+                    1 => finished_second.notify_one(),
+                    _ => {
+                        finished_second.notified().await;
+                        release_first.notify_one();
+                    }
+                }
+                Ok(index)
+            }
+        });
+        assert_eq!(collect_plans(plans, 2).await.unwrap(), vec![0, 1, 2]);
+        let empty = std::iter::empty::<BoxFuture<'static, Result<usize>>>();
+        assert!(collect_plans(empty, 2).await.unwrap().is_empty());
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_parallel_plans_do_not_construct_beyond_dispatch_limit() {
+        let started = Arc::new(Semaphore::new(0));
+        let dispatched = Arc::new(AtomicUsize::new(0));
+        let (senders, receivers): (Vec<_>, Vec<_>) =
+            (0..6).map(|_| oneshot::channel::<()>()).unzip();
+        let plans = receivers.into_iter().enumerate().map({
+            let started = Arc::clone(&started);
+            let dispatched = Arc::clone(&dispatched);
+            move |(index, receiver)| {
+                dispatched.fetch_add(1, Ordering::SeqCst);
+                let started = Arc::clone(&started);
+                async move {
+                    started.add_permits(1);
+                    receiver.await.unwrap();
+                    Ok(index)
+                }
+            }
+        });
+        let task = tokio::spawn(collect_plans(plans, 2));
+        let mut senders = senders.into_iter();
+        for batch in 1..=3 {
+            tokio::time::timeout(Duration::from_secs(5), started.acquire_many(2))
+                .await
+                .unwrap()
+                .unwrap()
+                .forget();
+            assert_eq!(dispatched.load(Ordering::SeqCst), batch * 2);
+            for _ in 0..2 {
+                senders.next().unwrap().send(()).unwrap();
+            }
+        }
+        assert_eq!(task.await.unwrap().unwrap(), vec![0, 1, 2, 3, 4, 5]);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_parallel_plan_error_and_panic_drain_other_tasks() {
+        for panic in [false, true] {
+            let barrier = Arc::new(Barrier::new(2));
+            let (dropped, mut observed_drop) = oneshot::channel();
+            let blocked_barrier = Arc::clone(&barrier);
+            let blocked = async move {
+                let _guard = DroppedPlan(Some(dropped));
+                blocked_barrier.wait().await;
+                pending::<Result<usize>>().await
+            }
+            .boxed();
+            let failure = async move {
+                barrier.wait().await;
+                assert!(!panic, "test planner panic");
+                Err(DataFusionError::Execution("test planner error".into()))
+            }
+            .boxed();
+            let error = collect_plans(vec![blocked, failure], 2).await.unwrap_err();
+            assert!(error.to_string().contains(if panic {
+                "test planner panic"
+            } else {
+                "test planner error"
+            }));
+            observed_drop
+                .try_recv()
+                .expect("other task dropped before error returned");
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_cancelling_parallel_planning_aborts_owned_tasks() {
+        let (started, observe_start) = oneshot::channel();
+        let (dropped, observe_drop) = oneshot::channel();
+        let plan = async move {
+            let _guard = DroppedPlan(Some(dropped));
+            started.send(()).unwrap();
+            pending::<Result<usize>>().await
+        };
+        let task = tokio::spawn(collect_plans([plan], 1));
+        observe_start.await.unwrap();
+        task.abort();
+        assert!(task.await.unwrap_err().is_cancelled());
+        tokio::time::timeout(Duration::from_secs(5), observe_drop)
+            .await
+            .unwrap()
+            .expect("cancelled planning task must release its guard");
+    }
+
+    #[tokio::test]
+    async fn test_all_plans_validate_before_any_shard_executes() {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            HASH_LABEL,
+            DataType::UInt64,
+            false,
+        )]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(UInt64Array::from(vec![1u64]))],
+        )
+        .unwrap();
+        let table = MemTable::try_new(schema, vec![vec![batch]])
+            .unwrap()
+            .with_sort_order(vec![vec![col(HASH_LABEL).sort(true, false)]]);
+        let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1));
+        ctx.register_table("ordered", Arc::new(table)).unwrap();
+        let df = ctx.table("ordered").await.unwrap();
+        let executions = Arc::new(AtomicUsize::new(0));
+        let input: Arc<dyn ExecutionPlan> = Arc::new(CountingExec {
+            input: df.create_physical_plan().await.unwrap(),
+            executions: Arc::clone(&executions),
+        });
+        assert!(hash_ordered(&input));
+        let task_ctx = Arc::new(df.task_ctx());
+        let ordering = LexOrdering::new(vec![PhysicalSortExpr::new(
+            Arc::new(Column::new(HASH_LABEL, 0)),
+            Default::default(),
+        )])
+        .unwrap();
+        let needs_sort: Arc<dyn ExecutionPlan> = Arc::new(SortExec::new(ordering, input.clone()));
+        let rejected = execute_planned_partitions(
+            vec![
+                PlannedPartition {
+                    plan: input.clone(),
+                    task_ctx: task_ctx.clone(),
+                },
+                PlannedPartition {
+                    plan: needs_sort,
+                    task_ctx: task_ctx.clone(),
+                },
+            ],
+            "late_invalid_shard",
+        );
+        assert!(rejected.is_err());
+        assert_eq!(executions.load(Ordering::SeqCst), 0);
+        let accepted = execute_planned_partitions(
+            vec![
+                PlannedPartition {
+                    plan: input.clone(),
+                    task_ctx: task_ctx.clone(),
+                },
+                PlannedPartition {
+                    plan: input,
+                    task_ctx,
+                },
+            ],
+            "all_valid_shards",
+        )
+        .unwrap();
+        assert_eq!(accepted.len(), 2);
+        assert_eq!(executions.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn test_hash_sorted_source_without_a_table_is_an_error() {
+        let ctx = session_ctx();
+
+        let result = run_streaming(&ctx, &None, "rate", AggOp::Sum, Duration::from_secs(60)).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_hash_sorted_source_without_declared_ordering_is_an_error() {
+        let ctx = session_ctx();
+        // the same data registered without the ordering
+        // declaration: the plan needs a real sort, so the gate must reject it
+        let table = MemTable::try_new(arrow_schema(), sorted_partitions()).unwrap();
+        ctx.register_table("m", Arc::new(table)).unwrap();
+
+        let result = run_streaming(&ctx, &None, "rate", AggOp::Sum, Duration::from_secs(60)).await;
+        assert!(result.is_err());
+    }
+}

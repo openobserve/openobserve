@@ -15,8 +15,8 @@
 </template>
 <script lang="ts">
 import { ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
+import { useI18nTyped } from "@/types/i18n";
 
 export default {
   name: "RawQueryBuilder",
@@ -29,7 +29,7 @@ export default {
   },
   emits: ["update:modelValue"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const fields = ref(props.modelValue);
 
     watch(

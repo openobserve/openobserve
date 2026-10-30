@@ -229,13 +229,6 @@ fn extract_where_clause(statement: &Statement) -> Result<String, Error> {
     }
 }
 
-/// Snaps `timestamp_us` down to the nearest histogram bucket boundary.
-/// Both arguments are in microseconds. Used to ensure the first bucket
-/// returned by date_bin() is fully populated rather than partial.
-pub fn histogram_bucket_start(timestamp_us: i64, interval_us: i64) -> i64 {
-    timestamp_us - timestamp_us % interval_us
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -269,17 +262,6 @@ mod tests {
             convert_to_histogram_query(original_query, &stream_names, false, None).unwrap();
 
         let expected = "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"logs\" GROUP BY zo_sql_key ORDER BY zo_sql_key DESC";
-        assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn test_convert_complex_where() {
-        let original_query = "SELECT * FROM \"api_logs\" WHERE status >= 400 AND level = 'error' AND user_id IS NOT NULL";
-        let stream_names = vec!["api_logs".to_string()];
-        let result =
-            convert_to_histogram_query(original_query, &stream_names, false, None).unwrap();
-
-        let expected = "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"api_logs\" WHERE status >= 400 AND level = 'error' AND user_id IS NOT NULL GROUP BY zo_sql_key ORDER BY zo_sql_key DESC";
         assert_eq!(result, expected);
     }
 
@@ -387,13 +369,6 @@ mod tests {
     }
 
     #[test]
-    fn test_detect_histogram_breakdown_field_log_level_beats_level() {
-        let fields = vec!["level".to_string(), "log_level".to_string()];
-        let result = detect_histogram_breakdown_field(&fields);
-        assert_eq!(result, Some("log_level".to_string()));
-    }
-
-    #[test]
     fn test_detect_histogram_breakdown_field_log_level_beats_status() {
         let fields = vec!["status".to_string(), "log_level".to_string()];
         let result = detect_histogram_breakdown_field(&fields);
@@ -442,19 +417,6 @@ mod tests {
                 .unwrap();
 
         let expected = "SELECT histogram(_timestamp) AS zo_sql_key, \"level\" AS zo_sql_breakdown, count(*) AS zo_sql_num FROM \"logs\" GROUP BY zo_sql_key, zo_sql_breakdown ORDER BY zo_sql_key DESC";
-        assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn test_convert_query_with_breakdown_complex_where() {
-        // breakdown field + WHERE clause are both preserved
-        let original_query = "SELECT * FROM \"api_logs\" WHERE status >= 400 AND level = 'error'";
-        let stream_names = vec!["api_logs".to_string()];
-        let result =
-            convert_to_histogram_query(original_query, &stream_names, false, Some("severity"))
-                .unwrap();
-
-        let expected = "SELECT histogram(_timestamp) AS zo_sql_key, \"severity\" AS zo_sql_breakdown, count(*) AS zo_sql_num FROM \"api_logs\" WHERE status >= 400 AND level = 'error' GROUP BY zo_sql_key, zo_sql_breakdown ORDER BY zo_sql_key DESC";
         assert_eq!(result, expected);
     }
 

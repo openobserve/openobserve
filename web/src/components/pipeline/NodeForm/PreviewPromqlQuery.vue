@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div ref="chartPanelRef" class="relative h-full">
+    <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
     <div class="w-full" style="height: calc(100vh - 220px)" data-test="alert-preview-chart">
       <PanelSchemaRenderer
         :panelSchema="chartData"
@@ -28,9 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
-import { reactive } from "vue";
-import { onBeforeMount } from "vue";
+import { ref, reactive, onBeforeMount } from "vue";
 import { cloneDeep } from "lodash-es";
 import { useStore } from "vuex";
 import PanelSchemaRenderer from "../../dashboards/PanelSchemaRenderer.vue";

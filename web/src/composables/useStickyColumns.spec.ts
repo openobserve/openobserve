@@ -216,7 +216,7 @@ describe("useStickyColumns", () => {
         left: "0px",
         "z-index": 2,
         "background-color": chartColor("--color-surface-base"),
-        "box-shadow": "4px 0 8px rgba(0, 0, 0, 0.15)",
+        "box-shadow": "var(--shadow-sticky-left)",
       });
     });
 

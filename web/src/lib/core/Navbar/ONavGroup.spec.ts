@@ -7,6 +7,42 @@ import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import ONavGroup from "./ONavGroup.vue";
 import type { SubnavChild } from "./ONavbar.types";
+import { NAV_GROUPS } from "./navGroups";
+import { AIM_IDLE, aim } from "./hoverIntent";
+
+// Breakpoint and paywall are app state; the spec drives both directly.
+const { mobile, paywalled } = vi.hoisted(() => ({
+  // `set` is filled in by the mock factory once the module is first imported.
+  mobile: { set: (_value: boolean) => {} },
+  paywalled: new Set<string>(),
+}));
+vi.mock("@/composables/useBreakpoint", async () => {
+  const { computed, ref } = await import("vue");
+  const flag = ref(false);
+  mobile.set = (value: boolean) => {
+    flag.value = value;
+  };
+  return {
+    default: () => ({
+      isMobile: computed(() => flag.value),
+      isTablet: computed(() => false),
+      isDesktop: computed(() => !flag.value),
+      mdUp: computed(() => !flag.value),
+      lgUp: computed(() => !flag.value),
+    }),
+  };
+});
+vi.mock("@/composables/useTrialPaywall", () => ({
+  useTrialPaywall: () => ({
+    isPaywalled: (to: unknown) =>
+      paywalled.has(typeof to === "string" ? to : String((to as { name?: unknown }).name)),
+  }),
+}));
+
+// OSS by default — exercises the locked-not-hidden path for FeatureKey-gated
+// children (e.g. `gate: "enterprise"` on Service Graph). None of the other
+// tests in this file use a FeatureKey gate, so this has no effect on them.
+vi.mock("@/aws-exports", () => ({ default: { isEnterprise: "false", isCloud: "false" } }));
 
 // Hover debounce delays — keep in sync with OPEN_DELAY / CLOSE_DELAY in
 // ONavGroup.vue. The tests drive them with fake timers.
@@ -42,7 +78,16 @@ const store = createStore({
 const i18n = createI18n({
   locale: "en",
   legacy: false,
-  messages: { en: {} },
+  messages: {
+    en: {
+      menu: {
+        alerts: "Alerts",
+        pipeline: "Pipelines",
+        trialFlyoutNote: "Your trial has ended. Pages with a lock need a plan.",
+        trialPageNeedsPlan: "{page} needs a plan",
+      },
+    },
+  },
   missingWarn: false,
   fallbackWarn: false,
 });
@@ -51,12 +96,27 @@ const i18n = createI18n({
 // its internals (which would need the full icon registry).
 const menuLinkStub = {
   template:
-    '<a data-test="tile" href="#" @click.prevent="$emit(\'click\')" @keydown="$emit(\'keydown\', $event)">{{ title }}</a>',
-  props: ["submenu", "asTrigger", "title", "icon", "link", "active", "expanded", "mini"],
+    '<a data-test="tile" href="#" :data-paywalled="paywalled || undefined" @click.prevent="$emit(\'click\', $event)" @keydown="$emit(\'keydown\', $event)">{{ title }}</a>',
+  props: [
+    "submenu",
+    "asTrigger",
+    "title",
+    "icon",
+    "link",
+    "active",
+    "expanded",
+    "mini",
+    "paywalled",
+  ],
   emits: ["click", "keydown"],
 };
 
 const oIconStub = { template: "<span />", props: ["name", "size"] };
+
+// VTU's trigger cannot set the read-only `detail`; detail 0 is a keyboard activation, 1 a pointer click.
+function click(el: Element, detail: number) {
+  el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail }));
+}
 
 describe("ONavGroup", () => {
   let wrapper: VueWrapper;
@@ -69,9 +129,14 @@ describe("ONavGroup", () => {
     wrapper?.unmount();
     vi.useRealTimers();
     vi.clearAllMocks();
+    mobile.set(false);
+    paywalled.clear();
+    document.documentElement.dir = "";
+    document.body.innerHTML = "";
+    Object.assign(aim, { exit: null, last: null, movedAt: 0, flyout: null });
   });
 
-  function mountGroup() {
+  function mountGroup(attach = false) {
     return mount(ONavGroup, {
       props: {
         groupKey: "data",
@@ -81,6 +146,7 @@ describe("ONavGroup", () => {
         // Link+subnav mode — the tile navigates, the flyout is hover-driven.
         parentItem: { link: "/streams", title: "Data", icon: "database", name: "logstreams" },
       },
+      attachTo: attach ? document.body : undefined,
       global: {
         plugins: [makeRouter(), store, i18n],
         // Teleport is stubbed so the flyout renders inline and wrapper.find works.
@@ -114,6 +180,371 @@ describe("ONavGroup", () => {
     expect(flyout().exists()).toBe(true);
   });
 
+  /**
+   * A dropdown is portaled after this flyout and sits on a higher layer, so it
+   * paints over the menu the pointer is on. Escape is what reka's dismissable
+   * layers listen for; the flyout sends it before showing itself.
+   */
+  it("closes an open dropdown before showing the flyout", async () => {
+    const popper = document.createElement("div");
+    popper.setAttribute("data-reka-popper-content-wrapper", "");
+    document.body.appendChild(popper);
+    const keys: string[] = [];
+    const listener = (e: Event) => keys.push((e as KeyboardEvent).key);
+    document.addEventListener("keydown", listener);
+
+    wrapper = mountGroup();
+    await hoverOpen();
+
+    document.removeEventListener("keydown", listener);
+    popper.remove();
+    expect(keys).toContain("Escape");
+    expect(flyout().exists()).toBe(true);
+  });
+
+  // Nothing to dismiss must stay silent: a stray Escape would close whatever
+  // else is listening, and hovering the rail is not a dismissal gesture.
+  it("sends no Escape when no dropdown is open", async () => {
+    const keys: string[] = [];
+    const listener = (e: Event) => keys.push((e as KeyboardEvent).key);
+    document.addEventListener("keydown", listener);
+
+    wrapper = mountGroup();
+    await hoverOpen();
+
+    document.removeEventListener("keydown", listener);
+    expect(keys).not.toContain("Escape");
+  });
+
+  // A dialog or drawer owns Escape while it is open, and the rail stays
+  // reachable beside a drawer — so the flyout must not fire the key there.
+  it("leaves an open dialog alone", async () => {
+    const popper = document.createElement("div");
+    popper.setAttribute("data-reka-popper-content-wrapper", "");
+    const overlay = document.createElement("div");
+    overlay.setAttribute("data-test", "o-dialog-overlay");
+    document.body.append(popper, overlay);
+    const keys: string[] = [];
+    const listener = (e: Event) => keys.push((e as KeyboardEvent).key);
+    document.addEventListener("keydown", listener);
+
+    wrapper = mountGroup();
+    await hoverOpen();
+
+    document.removeEventListener("keydown", listener);
+    popper.remove();
+    overlay.remove();
+    expect(keys).not.toContain("Escape");
+  });
+
+  it("positions the flyout after the rail in LTR", async () => {
+    document.documentElement.dir = "ltr";
+    wrapper = mountGroup();
+    vi.spyOn(wrapper.element, "getBoundingClientRect").mockReturnValue({
+      left: 10,
+      right: 98,
+      top: 40,
+      bottom: 100,
+      width: 88,
+      height: 60,
+      x: 10,
+      y: 40,
+      toJSON: () => ({}),
+    });
+
+    await hoverOpen();
+
+    expect(flyout().attributes("style")).toContain("left: 102px");
+    expect(flyout().attributes("style")).not.toContain("right:");
+  });
+
+  it("positions the flyout before the right-hand rail in RTL", async () => {
+    const viewportWidth = 1024;
+    vi.spyOn(document.documentElement, "clientWidth", "get").mockReturnValue(viewportWidth);
+    document.documentElement.dir = "rtl";
+    wrapper = mountGroup();
+    vi.spyOn(wrapper.element, "getBoundingClientRect").mockReturnValue({
+      left: viewportWidth - 88,
+      right: viewportWidth,
+      top: 40,
+      bottom: 100,
+      width: 88,
+      height: 60,
+      x: viewportWidth - 88,
+      y: 40,
+      toJSON: () => ({}),
+    });
+
+    await hoverOpen();
+
+    expect(flyout().attributes("style")).toContain("right: 92px");
+    expect(flyout().attributes("style")).not.toContain("left:");
+    document.documentElement.dir = "ltr";
+  });
+
+  // The Infra tile holds ONE child (Database Monitoring) behind the
+  // `databaseMonitoring` runtime gate. Rendering the tile regardless of its
+  // children would leave a dead "Infra" entry on every build with the feature
+  // off — it would open nothing, and clicking it would land on a page the route
+  // guard bounces straight back. The tile must not exist at all.
+  describe("a group whose children are all filtered out", () => {
+    // A store whose zoConfig can be set per test, unlike the shared one above.
+    function makeGatedStore(databaseMonitoringEnabled: boolean) {
+      return createStore({
+        state: () => ({
+          theme: "light",
+          zoConfig: { database_monitoring_enabled: databaseMonitoringEnabled },
+          organizationData: {},
+          selectedOrganization: { identifier: "default" },
+        }),
+      });
+    }
+
+    // Infra's real shape: one gated child, routes registered (they always are —
+    // the guard, not the router, is what turns the feature off).
+    function mountInfra(databaseMonitoringEnabled: boolean) {
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/", name: "home", component: { template: "<div />" } },
+          {
+            path: "/traces/databases",
+            name: "dbmDatabases",
+            component: { template: "<div />" },
+          },
+        ],
+      });
+      return mount(ONavGroup, {
+        props: {
+          groupKey: "infra",
+          title: "Infra",
+          icon: "dns",
+          children: [
+            {
+              titleKey: "menu.databases",
+              icon: "database",
+              name: "dbmDatabases",
+              gate: "databaseMonitoring",
+            },
+          ] as SubnavChild[],
+          parentItem: {
+            link: "/traces/databases",
+            title: "Infra",
+            icon: "dns",
+            name: "infra",
+          },
+        },
+        global: {
+          plugins: [router, makeGatedStore(databaseMonitoringEnabled), i18n],
+          stubs: { MenuLink: menuLinkStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+    }
+
+    it("renders the Infra tile when the databaseMonitoring gate passes", () => {
+      wrapper = mountInfra(true);
+      expect(wrapper.find('[data-test="nav-group-infra"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="tile"]').exists()).toBe(true);
+    });
+
+    it("renders NO Infra tile when the databaseMonitoring gate fails", () => {
+      wrapper = mountInfra(false);
+      // The whole wrapper element is gone — not merely an empty flyout.
+      expect(wrapper.find('[data-test="nav-group-infra"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="tile"]').exists()).toBe(false);
+    });
+
+    it("renders no tile when every child's route is missing from the build", async () => {
+      // The other half of the filter: `router.hasRoute` rather than `gate`.
+      wrapper = mountGroup();
+      await wrapper.setProps({
+        children: [{ titleKey: "menu.ghost", icon: "x", name: "notARoute" }] as SubnavChild[],
+      });
+      expect(wrapper.find('[data-test="nav-group-data"]').exists()).toBe(false);
+    });
+  });
+
+  // Anchor-child tile link (4.7/§6): the child resolving to parentLink wins; gated out ⇒ first visible child.
+  describe("Infra tile with workload children (Hosts first)", () => {
+    // Exposes the resolved tile link so the anchor-child rule is assertable.
+    const linkedTileStub = {
+      template:
+        '<a data-test="tile" href="#" :data-link="link" @click.prevent="$emit(\'click\')">{{ title }}</a>',
+      props: ["submenu", "asTrigger", "title", "icon", "link", "active", "expanded", "mini"],
+      emits: ["click", "keydown"],
+    };
+
+    const infraChildren = (): SubnavChild[] => [
+      { titleKey: "menu.hosts", icon: "dns", name: "infraHosts" },
+      {
+        titleKey: "menu.databases",
+        icon: "database",
+        name: "dbmDatabases",
+        gate: "databaseMonitoring",
+      },
+      { titleKey: "menu.kubernetes", icon: "hub", name: "infraKubernetes" },
+      { titleKey: "menu.kubernetes2", icon: "hub", name: "infraKubernetes2" },
+    ];
+
+    function infraRouter() {
+      return createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/", name: "home", component: { template: "<div />" } },
+          { path: "/infra/hosts", name: "infraHosts", component: { template: "<div />" } },
+          { path: "/infra/databases", name: "dbmDatabases", component: { template: "<div />" } },
+          {
+            path: "/infra/kubernetes",
+            name: "infraKubernetes",
+            component: { template: "<div />" },
+          },
+          {
+            path: "/infra/kubernetes-2",
+            name: "infraKubernetes2",
+            component: { template: "<div />" },
+          },
+          { path: "/streams", name: "logstreams", component: { template: "<div />" } },
+          { path: "/pipelines", name: "pipelines", component: { template: "<div />" } },
+        ],
+      });
+    }
+
+    function infraStore(dbmEnabled: boolean, hiddenMenus = "") {
+      return createStore({
+        state: () => ({
+          theme: "light",
+          zoConfig: {
+            database_monitoring_enabled: dbmEnabled,
+            custom_hide_menus: hiddenMenus,
+          },
+          organizationData: {},
+          selectedOrganization: { identifier: "default" },
+        }),
+      });
+    }
+
+    function mountInfraTile(
+      dbmEnabled: boolean,
+      { hiddenMenus = "", children = infraChildren(), parentLink = "/infra/databases" } = {},
+    ) {
+      return mount(ONavGroup, {
+        props: {
+          groupKey: "infra",
+          title: "Infra",
+          icon: "dns",
+          children,
+          parentItem: { link: parentLink, title: "Infra", icon: "dns", name: "infra" },
+        },
+        global: {
+          plugins: [infraRouter(), infraStore(dbmEnabled, hiddenMenus), i18n],
+          stubs: { MenuLink: linkedTileStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+    }
+
+    const tileLink = () => wrapper.find('[data-test="tile"]').attributes("data-link");
+
+    async function hoverOpenInfra() {
+      await wrapper.trigger("mouseenter");
+      vi.advanceTimersByTime(OPEN_DELAY);
+      await flushPromises();
+    }
+
+    it("keeps the Infra tile with the ungated children when DBM is off", async () => {
+      wrapper = mountInfraTile(false);
+      expect(wrapper.find('[data-test="nav-group-infra"]').exists()).toBe(true);
+      await hoverOpenInfra();
+      const fly = wrapper.find('[data-test="nav-group-flyout-infra"]');
+      expect(fly.find('[data-test="nav-group-item-infraHosts"]').exists()).toBe(true);
+      expect(fly.find('[data-test="nav-group-item-infraKubernetes"]').exists()).toBe(true);
+      expect(fly.find('[data-test="nav-group-item-infraKubernetes2"]').exists()).toBe(true);
+      // Databases stays behind its runtime gate.
+      expect(fly.find('[data-test="nav-group-item-dbmDatabases"]').exists()).toBe(false);
+    });
+
+    it("lands the tile on /infra/hosts when the anchor child gates out (DBM off)", () => {
+      // The static parentLink would bounce off the DBM route guard onto Traces.
+      wrapper = mountInfraTile(false);
+      expect(tileLink()).toBe("/infra/hosts");
+    });
+
+    it("keeps /infra/databases as the tile link when DBM is on, despite Hosts being declared first", () => {
+      // Ungated Hosts always survives, so keying on "first declared" would re-break DBM-off.
+      wrapper = mountInfraTile(true);
+      expect(tileLink()).toBe("/infra/databases");
+    });
+
+    it.each(["infraHosts", "infraKubernetes", "infraKubernetes2"])(
+      "custom_hide_menus can hide %s by route name",
+      async (name) => {
+        wrapper = mountInfraTile(true, { hiddenMenus: name });
+        await hoverOpenInfra();
+        const fly = wrapper.find('[data-test="nav-group-flyout-infra"]');
+        expect(fly.find(`[data-test="nav-group-item-${name}"]`).exists()).toBe(false);
+      },
+    );
+
+    it("keeps parentLink verbatim for a group with no child resolving to it", () => {
+      wrapper = mountInfraTile(true, { parentLink: "/somewhere-else" });
+      expect(tileLink()).toBe("/somewhere-else");
+    });
+
+    it("retargets a NON-infra tile to its first visible child when its anchor child is hidden", () => {
+      // custom_hide_menus=streams drops the logstreams child (requires: streams) into `filtered` upstream.
+      wrapper = mount(ONavGroup, {
+        props: {
+          groupKey: "data",
+          title: "Data",
+          icon: "database",
+          children: children.filter((c) => c.name !== "logstreams"),
+          filteredChildren: children.filter((c) => c.name === "logstreams"),
+          parentItem: { link: "/streams", title: "Data", icon: "database", name: "logstreams" },
+        },
+        global: {
+          plugins: [infraRouter(), infraStore(true, "streams"), i18n],
+          stubs: { MenuLink: linkedTileStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+      expect(tileLink()).toBe("/pipelines");
+    });
+
+    it("renders no tile when every child of the group is hidden", () => {
+      wrapper = mount(ONavGroup, {
+        props: {
+          groupKey: "data",
+          title: "Data",
+          icon: "database",
+          children: [],
+          filteredChildren: children,
+          parentItem: { link: "/streams", title: "Data", icon: "database", name: "logstreams" },
+        },
+        global: {
+          plugins: [infraRouter(), infraStore(true, "streams"), i18n],
+          stubs: { MenuLink: linkedTileStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+      expect(wrapper.find('[data-test="nav-group-data"]').exists()).toBe(false);
+    });
+
+    it("leaves every other group's tile link byte-identical to its parentLink", () => {
+      // The anchor child survives in every existing group, so they render bit-identically.
+      wrapper = mount(ONavGroup, {
+        props: {
+          groupKey: "data",
+          title: "Data",
+          icon: "database",
+          children,
+          parentItem: { link: "/streams", title: "Data", icon: "database", name: "logstreams" },
+        },
+        global: {
+          plugins: [infraRouter(), infraStore(true), i18n],
+          stubs: { MenuLink: linkedTileStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+      expect(tileLink()).toBe("/streams");
+    });
+  });
+
   it("renders only children whose routes are registered", async () => {
     wrapper = mountGroup();
     await wrapper.setProps({
@@ -126,6 +557,151 @@ describe("ONavGroup", () => {
     expect(flyout().find('[data-test="nav-group-item-notARoute"]').exists()).toBe(false);
   });
 
+  it("tags a beta child with the shared Beta badge, and only that child", async () => {
+    wrapper = mountGroup();
+    await wrapper.setProps({
+      children: [children[0], { ...children[1], beta: true }],
+    });
+    await hoverOpen();
+
+    const item = (name: string) => flyout().find(`[data-test="nav-group-item-${name}"]`);
+    expect(item("pipelines").find('[data-test="beta-badge"]').exists()).toBe(true);
+    expect(item("logstreams").find('[data-test="beta-badge"]').exists()).toBe(false);
+  });
+
+  it("heads a run of children sharing a categoryKey, and TRANSLATES the header", async () => {
+    // The header was the one string in the rail rendered from a raw literal, so
+    // it would have stayed English in all 15 locales. It takes an i18n key like
+    // every other label here.
+    wrapper = mountGroup();
+    await wrapper.setProps({
+      children: [
+        { titleKey: "menu.streams", icon: "table", name: "logstreams", categoryKey: "menu.alerts" },
+        {
+          titleKey: "menu.pipeline",
+          icon: "graph-2",
+          name: "pipelines",
+          categoryKey: "menu.alerts",
+        },
+      ],
+    });
+    await hoverOpen();
+
+    const header = flyout().find('[data-test^="nav-group-section-label-"]');
+    expect(header.exists()).toBe(true);
+    expect(header.text()).toBe("Alerts");
+
+    // The run is a real group to assistive tech, named by that heading. A bare
+    // heading div is not a valid child of role="menu" — AT drops it, and the
+    // grouping this exists to convey is silent.
+    const group = flyout().find('[role="group"]');
+    expect(group.exists()).toBe(true);
+    expect(group.attributes("aria-labelledby")).toBe(header.attributes("id"));
+    expect(header.attributes("role")).toBe("presentation");
+    expect(group.findAll('[role="menuitem"]')).toHaveLength(2);
+  });
+
+  it("sizes the three levels by depth, not against it", async () => {
+    // It ran 11px → 11px → 14px: the group title and its section headers were
+    // the same size, and the ITEMS — the deepest level — were the largest text
+    // in the flyout. Group (base) > section (sm, secondary) > item (sm, plain).
+    wrapper = mountGroup();
+    await wrapper.setProps({
+      children: [
+        { titleKey: "menu.streams", icon: "table", name: "logstreams", categoryKey: "menu.alerts" },
+      ],
+    });
+    await hoverOpen();
+
+    const classesOf = (sel: string) => flyout().find(sel).classes().join(" ");
+    const groupTitle = flyout().element.firstElementChild?.className ?? "";
+    // Group and items share body size; the group outranks them by weight. It is
+    // NOT a step above — 16px read as a page title inside a 217px menu.
+    expect(groupTitle).toContain("text-sm");
+    expect(groupTitle).toContain("font-semibold");
+    expect(classesOf('[data-test="nav-group-item-logstreams"]')).toContain("text-sm");
+    expect(classesOf('[data-test="nav-group-item-logstreams"]')).not.toContain("font-semibold");
+    // The section header is the one label that steps DOWN, in the secondary
+    // colour — it names a run, it is not a thing you click.
+    expect(classesOf('[data-test^="nav-group-section-label-"]')).toContain("text-xs");
+    expect(classesOf('[data-test^="nav-group-section-label-"]')).toContain("font-semibold");
+    expect(classesOf('[data-test^="nav-group-section-label-"]')).toContain("text-text-secondary");
+  });
+
+  it("heads the run once, not once per child", async () => {
+    wrapper = mountGroup();
+    await wrapper.setProps({
+      children: [
+        { titleKey: "menu.streams", icon: "table", name: "logstreams", categoryKey: "menu.alerts" },
+        {
+          titleKey: "menu.pipeline",
+          icon: "graph-2",
+          name: "pipelines",
+          categoryKey: "menu.alerts",
+        },
+      ],
+    });
+    await hoverOpen();
+
+    expect(flyout().findAll('[data-test^="nav-group-section-label-"]')).toHaveLength(1);
+  });
+
+  it("leaves uncategorised children unheaded, so they are not filed under it", async () => {
+    // Reliability's SLOs/Incidents sit outside the Alerts header exactly this
+    // way: a trailing child with no key must not inherit the previous header.
+    wrapper = mountGroup();
+    await wrapper.setProps({
+      children: [
+        { titleKey: "menu.streams", icon: "table", name: "logstreams", categoryKey: "menu.alerts" },
+        { titleKey: "menu.pipeline", icon: "graph-2", name: "pipelines" },
+      ],
+    });
+    await hoverOpen();
+
+    const rows = flyout().findAll(
+      '[data-test^="nav-group-section-label-"], [data-test^="nav-group-item-"]',
+    );
+    expect(rows.map((r) => r.attributes("data-test"))).toEqual([
+      "nav-group-section-label-h-menu.alerts-0",
+      "nav-group-item-logstreams",
+      "nav-group-item-pipelines",
+    ]);
+    // Outside the group element, not merely after the heading.
+    expect(
+      flyout().find('[role="group"]').find('[data-test="nav-group-item-pipelines"]').exists(),
+    ).toBe(false);
+    // And it is visibly outside: a header owns everything below it until
+    // something says otherwise, and at the same indent nothing else does.
+    expect(flyout().find('[data-test="nav-group-item-pipelines"]').classes()).toContain("mt-3");
+  });
+
+  it("does not break the run it is still inside", async () => {
+    // The gap marks LEAVING a headed run. Putting it on a member would split
+    // the run into two groups under one header.
+    wrapper = mountGroup();
+    await wrapper.setProps({
+      children: [
+        { titleKey: "menu.streams", icon: "table", name: "logstreams", categoryKey: "menu.alerts" },
+        {
+          titleKey: "menu.pipeline",
+          icon: "graph-2",
+          name: "pipelines",
+          categoryKey: "menu.alerts",
+        },
+      ],
+    });
+    await hoverOpen();
+
+    expect(flyout().find('[data-test="nav-group-item-pipelines"]').classes()).not.toContain("mt-3");
+  });
+
+  it("adds no gap when nothing is categorised at all", async () => {
+    // The Data group has no headers; it must stay one flat list.
+    wrapper = mountGroup();
+    await hoverOpen();
+    expect(flyout().find('[data-test="nav-group-item-pipelines"]').classes()).not.toContain("mt-3");
+  });
+
   // Regression: clicking the tile used to close() the flyout while the pointer
   // was still inside the tile — mouseenter could never re-fire, so the submenu
   // was unreachable until the user moved the mouse away and back.
@@ -134,7 +710,8 @@ describe("ONavGroup", () => {
     await hoverOpen();
     expect(flyout().exists()).toBe(true);
 
-    await wrapper.find('[data-test="tile"]').trigger("click");
+    click(wrapper.find('[data-test="tile"]').element, 1);
+    await flushPromises();
     await flushPromises();
     expect(flyout().exists()).toBe(true);
   });
@@ -147,9 +724,32 @@ describe("ONavGroup", () => {
     await flushPromises();
     expect(flyout().exists()).toBe(false);
 
-    await wrapper.find('[data-test="tile"]').trigger("click");
+    click(wrapper.find('[data-test="tile"]').element, 1);
+    await flushPromises();
     await flushPromises();
     expect(flyout().exists()).toBe(true);
+  });
+
+  it("stays open through a resize event a page dispatches without the window changing size", async () => {
+    wrapper = mountGroup();
+    await hoverOpen();
+    window.dispatchEvent(new Event("resize"));
+    await flushPromises();
+    expect(flyout().exists()).toBe(true);
+  });
+
+  it("closes when the window really changes size", async () => {
+    const width = window.innerWidth;
+    wrapper = mountGroup();
+    await hoverOpen();
+    try {
+      window.innerWidth = width + 200;
+      window.dispatchEvent(new Event("resize"));
+      await flushPromises();
+      expect(flyout().exists()).toBe(false);
+    } finally {
+      window.innerWidth = width;
+    }
   });
 
   it("closes the flyout after the pointer leaves the tile", async () => {
@@ -292,6 +892,918 @@ describe("ONavGroup", () => {
         { titleKey: "menu.alerts", icon: "shield-alert-outline", name: "alertDetail" },
       ]);
       expect(activeNames(wrapper)).toEqual(["alertDetail"]);
+    });
+  });
+
+  describe("query-tab navigation and active state", () => {
+    const tracesChildren: SubnavChild[] = [
+      {
+        titleKey: "traces.spansTab",
+        icon: "layers",
+        name: "traces",
+        tab: "spans",
+      },
+      {
+        titleKey: "menu.traces",
+        icon: "account-tree",
+        name: "traces",
+        tab: "traces",
+        defaultForRoute: true,
+      },
+      {
+        titleKey: "menu.serviceGraph",
+        icon: "share",
+        name: "traces",
+        tab: "service-graph",
+      },
+      {
+        titleKey: "menu.services",
+        icon: "menu-book",
+        name: "traces",
+        tab: "services-catalog",
+      },
+    ];
+
+    function makeTracesRouter() {
+      return createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/", name: "home", component: { template: "<div />" } },
+          { path: "/traces", name: "traces", component: { template: "<div />" } },
+        ],
+      });
+    }
+
+    async function mountAt(path: string) {
+      const router = makeTracesRouter();
+      router.push(path);
+      await router.isReady();
+      const w = mount(ONavGroup, {
+        props: {
+          groupKey: "traces",
+          title: "Traces",
+          icon: "account-tree",
+          children: tracesChildren,
+          parentItem: {
+            link: "/traces",
+            title: "Traces",
+            icon: "account-tree",
+            name: "traces",
+          },
+        },
+        global: {
+          plugins: [router, store, i18n],
+          stubs: { MenuLink: menuLinkStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+      await w.trigger("mouseenter");
+      vi.advanceTimersByTime(OPEN_DELAY);
+      await flushPromises();
+      return w;
+    }
+
+    function activeTabs(w: VueWrapper): string[] {
+      return w
+        .findAll('[data-test^="nav-group-item-"]')
+        .filter((el) => el.attributes("aria-current") === "page")
+        .map((el) => el.attributes("data-test")!.replace("nav-group-item-traces-", ""));
+    }
+
+    it("marks Traces on plain /traces", async () => {
+      wrapper = await mountAt("/traces");
+      expect(activeTabs(wrapper)).toEqual(["traces"]);
+    });
+
+    it("marks Traces on /traces?tab=traces", async () => {
+      wrapper = await mountAt("/traces?tab=traces");
+      expect(activeTabs(wrapper)).toEqual(["traces"]);
+    });
+
+    it("marks Service Graph, not Traces, on /traces?tab=service-graph", async () => {
+      wrapper = await mountAt("/traces?tab=service-graph");
+      expect(activeTabs(wrapper)).toEqual(["service-graph"]);
+    });
+
+    it("marks Service Catalog, not Traces, on /traces?tab=services-catalog", async () => {
+      wrapper = await mountAt("/traces?tab=services-catalog");
+      expect(activeTabs(wrapper)).toEqual(["services-catalog"]);
+    });
+
+    it("marks Spans on /traces?tab=spans", async () => {
+      wrapper = await mountAt("/traces?tab=spans");
+      expect(activeTabs(wrapper)).toEqual(["spans"]);
+    });
+
+    it("builds canonical Traces URLs for every flyout item", async () => {
+      wrapper = await mountAt("/traces");
+
+      expect(wrapper.get('[data-test="nav-group-item-traces-traces"]').attributes("href")).toBe(
+        "/traces?org_identifier=default&tab=traces",
+      );
+      expect(wrapper.get('[data-test="nav-group-item-traces-spans"]').attributes("href")).toBe(
+        "/traces?org_identifier=default&tab=spans",
+      );
+      expect(
+        wrapper.get('[data-test="nav-group-item-traces-service-graph"]').attributes("href"),
+      ).toBe("/traces?org_identifier=default&tab=service-graph");
+      expect(
+        wrapper.get('[data-test="nav-group-item-traces-services-catalog"]').attributes("href"),
+      ).toBe("/traces?org_identifier=default&tab=services-catalog");
+    });
+
+    it("preserves the current Traces query when switching tabs", async () => {
+      wrapper = await mountAt(
+        "/traces?org_identifier=default&tab=traces&search_mode=spans&stream=default&period=15m&query=c2VydmljZQ%3D%3D",
+      );
+
+      const href = wrapper.get('[data-test="nav-group-item-traces-spans"]').attributes("href");
+      const query = new URL(href, "http://localhost").searchParams;
+
+      expect(query.get("org_identifier")).toBe("default");
+      expect(query.get("tab")).toBe("spans");
+      expect(query.has("search_mode")).toBe(false);
+      expect(query.get("stream")).toBe("default");
+      expect(query.get("period")).toBe("15m");
+      expect(query.get("query")).toBe("c2VydmljZQ==");
+    });
+  });
+
+  describe("locked FeatureKey-gated child (e.g. Service Graph in OSS)", () => {
+    // Mirrors the real traces children, with `gate: "enterprise"` on Service
+    // Graph — the actual shape from navGroups.ts, unlike `tracesChildren`
+    // above which has no gate and so never exercises the locked path.
+    const lockedTracesChildren: SubnavChild[] = [
+      { titleKey: "traces.spansTab", icon: "layers", name: "traces", tab: "spans" },
+      {
+        titleKey: "menu.serviceGraph",
+        icon: "share",
+        name: "traces",
+        tab: "service-graph",
+        gate: "enterprise",
+      },
+    ];
+
+    async function mountLocked(path: string) {
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/", name: "home", component: { template: "<div />" } },
+          { path: "/traces", name: "traces", component: { template: "<div />" } },
+          {
+            path: "/enterprise-features",
+            name: "enterpriseFeatures",
+            component: { template: "<div />" },
+          },
+        ],
+      });
+      router.push(path);
+      await router.isReady();
+      const w = mount(ONavGroup, {
+        props: {
+          groupKey: "traces",
+          title: "Traces",
+          icon: "account-tree",
+          children: lockedTracesChildren,
+          parentItem: { link: "/traces", title: "Traces", icon: "account-tree", name: "traces" },
+        },
+        global: {
+          plugins: [router, store, i18n],
+          stubs: { MenuLink: menuLinkStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+      await w.trigger("mouseenter");
+      vi.advanceTimersByTime(OPEN_DELAY);
+      await flushPromises();
+      return { wrapper: w, router };
+    }
+
+    it("renders the locked child as a non-navigating element, not a router-link", async () => {
+      const { wrapper: w } = await mountLocked("/traces");
+      const el = w.get('[data-test="nav-group-item-traces-service-graph-locked"]');
+      expect(el.element.tagName).toBe("DIV");
+      expect(el.attributes("href")).toBeUndefined();
+      wrapper = w;
+    });
+
+    // Clicking a locked item must never navigate to its real destination
+    // (Service Graph) — it redirects to the Enterprise Features page instead.
+    it("redirects to the Enterprise Features page, not the real destination, when the locked child is clicked", async () => {
+      const { wrapper: w, router } = await mountLocked("/");
+      expect(router.currentRoute.value.fullPath).toBe("/");
+
+      await w.get('[data-test="nav-group-item-traces-service-graph-locked"]').trigger("click");
+      await flushPromises();
+
+      expect(router.currentRoute.value.name).toBe("enterpriseFeatures");
+      wrapper = w;
+    });
+
+    it("still lets the UNLOCKED sibling child navigate normally", async () => {
+      const { wrapper: w, router } = await mountLocked("/");
+
+      await w.get('[data-test="nav-group-item-traces-spans"]').trigger("click");
+      await flushPromises();
+
+      expect(router.currentRoute.value.name).toBe("traces");
+      expect(router.currentRoute.value.query.tab).toBe("spans");
+      wrapper = w;
+    });
+  });
+
+  describe("Experience flyout", () => {
+    const view = { template: "<div />" };
+    const experienceChildren = NAV_GROUPS.find((g) => g.key === "experience")!.children;
+    const tileStub = {
+      template: '<a data-test="tile" :data-active="String(active)" :href="link">{{ title }}</a>',
+      props: ["submenu", "asTrigger", "title", "icon", "link", "active", "expanded", "mini"],
+    };
+
+    async function mountAt(path: string, hidden = "") {
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/", name: "home", component: view },
+          { path: "/rum", name: "RUM", component: view },
+          { path: "/synthetics", name: "synthetics", component: view },
+          {
+            path: "/product-analytics",
+            name: "productAnalytics",
+            component: { template: "<router-view />" },
+            children: [
+              { path: "overview", name: "productAnalyticsOverview", component: view },
+              { path: "funnels", name: "productAnalyticsFunnels", component: view },
+              { path: "funnels/build", name: "productAnalyticsFunnelBuilder", component: view },
+              { path: "paths", name: "productAnalyticsPaths", component: view },
+              { path: "retention", name: "productAnalyticsRetention", component: view },
+              { path: "events", name: "productAnalyticsEvents", component: view },
+            ],
+          },
+          {
+            path: "/product-analytics/events/new",
+            name: "productAnalyticsEventNew",
+            component: view,
+          },
+          {
+            path: "/product-analytics/events/:id/edit",
+            name: "productAnalyticsEventEdit",
+            component: view,
+          },
+        ],
+      });
+      router.push(path);
+      await router.isReady();
+      const pageStore = createStore({
+        state: () => ({
+          theme: "light",
+          zoConfig: { custom_hide_menus: hidden },
+          organizationData: {},
+          selectedOrganization: { identifier: "default" },
+        }),
+      });
+      const w = mount(ONavGroup, {
+        props: {
+          groupKey: "experience",
+          title: "Experience",
+          icon: "devices",
+          children: experienceChildren,
+          parentItem: { link: "/rum", title: "Experience", icon: "devices", name: "experience" },
+        },
+        global: {
+          plugins: [router, pageStore, i18n],
+          stubs: { MenuLink: tileStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+      await w.trigger("mouseenter");
+      vi.advanceTimersByTime(OPEN_DELAY);
+      await flushPromises();
+      return w;
+    }
+
+    const items = (w: VueWrapper) =>
+      w.findAll('[data-test^="nav-group-item-"]').map((el) => el.attributes("data-test"));
+    const active = (w: VueWrapper) =>
+      w
+        .findAll('[data-test^="nav-group-item-"]')
+        .filter((el) => el.attributes("aria-current") === "page")
+        .map((el) => el.attributes("data-test"));
+
+    it("lists RUM, Synthetics and Product Analytics in that order", async () => {
+      wrapper = await mountAt("/");
+      expect(items(wrapper)).toEqual([
+        "nav-group-item-RUM",
+        "nav-group-item-synthetics",
+        "nav-group-item-productAnalytics",
+      ]);
+      expect(wrapper.get('[data-test="nav-group-item-productAnalytics"]').attributes("href")).toBe(
+        "/product-analytics?org_identifier=default",
+      );
+    });
+
+    it.each([
+      "/product-analytics",
+      "/product-analytics/overview",
+      "/product-analytics/paths",
+      "/product-analytics/funnels/build",
+      "/product-analytics/events/new",
+      "/product-analytics/events/abc/edit",
+    ])("on %s lights the tile and only Product Analytics", async (path) => {
+      wrapper = await mountAt(path);
+      expect(wrapper.get('[data-test="tile"]').attributes("data-active")).toBe("true");
+      expect(active(wrapper)).toEqual(["nav-group-item-productAnalytics"]);
+    });
+
+    it("lights only RUM on the RUM page", async () => {
+      wrapper = await mountAt("/rum");
+      expect(active(wrapper)).toEqual(["nav-group-item-RUM"]);
+    });
+
+    it("drops only Product Analytics when custom_hide_menus names it", async () => {
+      wrapper = await mountAt("/", "productAnalytics");
+      expect(items(wrapper)).toEqual(["nav-group-item-RUM", "nav-group-item-synthetics"]);
+    });
+  });
+
+  // A child with no top-level rail entry of its own (Alert Library, Destinations,
+  // Enrichment Tables…) is unreachable by MainLayout's linksList filter, and
+  // `requires` only tracks its PARENT. Matching custom_hide_menus against the
+  // child's own route name is what makes those hideable at all.
+  describe("custom_hide_menus names a child directly", () => {
+    function mountWithHidden(hidden: string) {
+      const hiddenStore = createStore({
+        state: () => ({
+          theme: "light",
+          zoConfig: { custom_hide_menus: hidden },
+          organizationData: {},
+          selectedOrganization: { identifier: "default" },
+        }),
+      });
+      return mount(ONavGroup, {
+        props: {
+          groupKey: "data",
+          title: "Data",
+          icon: "database",
+          children,
+          parentItem: { link: "/streams", title: "Data", icon: "database", name: "logstreams" },
+        },
+        global: {
+          plugins: [makeRouter(), hiddenStore, i18n],
+          stubs: { MenuLink: menuLinkStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+    }
+
+    async function openFlyout() {
+      await wrapper.trigger("mouseenter");
+      vi.advanceTimersByTime(OPEN_DELAY);
+      await flushPromises();
+      return wrapper.find('[data-test="nav-group-flyout-data"]');
+    }
+
+    it("drops the named child and keeps its siblings", async () => {
+      wrapper = mountWithHidden("openapi,reports,pipelines");
+      const panel = await openFlyout();
+      expect(panel.find('[data-test="nav-group-item-pipelines"]').exists()).toBe(false);
+      expect(panel.find('[data-test="nav-group-item-logstreams"]').exists()).toBe(true);
+    });
+
+    it("keeps every child when the flag names none of them", async () => {
+      wrapper = mountWithHidden("openapi,reports");
+      const panel = await openFlyout();
+      expect(panel.find('[data-test="nav-group-item-pipelines"]').exists()).toBe(true);
+      expect(panel.find('[data-test="nav-group-item-logstreams"]').exists()).toBe(true);
+    });
+
+    it("ignores an empty flag rather than hiding an unnamed child", async () => {
+      // "".split(",") is [""], so a child whose name is "" would match — none is,
+      // but the empty entry must not be treated as a wildcard either.
+      wrapper = mountWithHidden("");
+      const panel = await openFlyout();
+      expect(panel.find('[data-test="nav-group-item-logstreams"]').exists()).toBe(true);
+      expect(panel.find('[data-test="nav-group-item-pipelines"]').exists()).toBe(true);
+    });
+  });
+
+  // K1: a pointer still travelling inside the exit-to-flyout triangle neither opens a neighbour nor closes the flyout.
+  describe("safe triangle (K1, AC-1)", () => {
+    let now = 0;
+    const tick = (ms: number) => {
+      now += ms;
+      vi.advanceTimersByTime(ms);
+    };
+    const rect = (left: number, top: number, right: number, bottom: number) =>
+      ({ left, top, right, bottom, width: right - left, height: bottom - top }) as DOMRect;
+
+    const rows = (n: number): SubnavChild[] =>
+      Array.from({ length: n }, (_, i) => ({
+        titleKey: "menu.alerts",
+        icon: "x",
+        name: `rel${i}`,
+      }));
+
+    function pairRouter(n: number) {
+      return createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/", name: "home", component: { template: "<div />" } },
+          ...Array.from({ length: n }, (_, i) => ({
+            path: `/rel/${i}`,
+            name: `rel${i}`,
+            component: { template: "<div />" },
+          })),
+          { path: "/infra/hosts", name: "infraHosts", component: { template: "<div />" } },
+        ],
+      });
+    }
+
+    let neighbour: VueWrapper;
+
+    function mountPair(n: number) {
+      const router = pairRouter(n);
+      const global = {
+        plugins: [router, store, i18n],
+        stubs: { MenuLink: menuLinkStub, OIcon: oIconStub, teleport: true },
+      };
+      wrapper = mount(ONavGroup, {
+        props: {
+          groupKey: "reliability",
+          title: "Reliability",
+          icon: "shield",
+          children: rows(n),
+          parentItem: { link: "/rel/0", title: "Reliability", icon: "shield", name: "rel0" },
+        },
+        global,
+      });
+      neighbour = mount(ONavGroup, {
+        props: {
+          groupKey: "infra",
+          title: "Infra",
+          icon: "dns",
+          children: [{ titleKey: "menu.alerts", icon: "dns", name: "infraHosts" }],
+          parentItem: { link: "/infra/hosts", title: "Infra", icon: "dns", name: "infra" },
+        },
+        global,
+      });
+    }
+
+    const openFlyout = () => wrapper.find('[data-test="nav-group-flyout-reliability"]');
+    const infraFlyout = () => neighbour.find('[data-test="nav-group-flyout-infra"]');
+
+    // Opens Reliability, sizes its flyout, then leaves the tile at `exit` towards it.
+    async function openAndLeave(n: number, flyoutRect: DOMRect, exit: { x: number; y: number }) {
+      mountPair(n);
+      await wrapper.trigger("mouseenter", { clientX: exit.x - 10, clientY: exit.y });
+      tick(OPEN_DELAY);
+      await flushPromises();
+      expect(openFlyout().exists()).toBe(true);
+      (openFlyout().element as HTMLElement).getBoundingClientRect = () => flyoutRect;
+      await wrapper.trigger("mouseleave", { clientX: exit.x, clientY: exit.y });
+    }
+
+    function sample(x: number, y: number) {
+      document.dispatchEvent(new MouseEvent("pointermove", { clientX: x, clientY: y }));
+    }
+
+    beforeEach(() => {
+      now = 0;
+      vi.spyOn(performance, "now").mockImplementation(() => now);
+    });
+
+    afterEach(() => {
+      neighbour?.unmount();
+    });
+
+    it("defers the neighbour and the close while the pointer travels inside the triangle, then opens it once rested", async () => {
+      await openAndLeave(5, rect(92, 100, 310, 300), { x: 80, y: 150 });
+      tick(100);
+      sample(86, 220);
+      await neighbour.trigger("mouseenter", { clientX: 86, clientY: 220 });
+      tick(OPEN_DELAY);
+      await flushPromises();
+      expect(infraFlyout().exists()).toBe(false);
+      expect(openFlyout().exists()).toBe(true);
+      tick(CLOSE_DELAY - OPEN_DELAY);
+      await flushPromises();
+      expect(openFlyout().exists()).toBe(true);
+
+      // The pointer rests: AIM_IDLE later the neighbour opens and takes over.
+      tick(AIM_IDLE + 1);
+      await flushPromises();
+      expect(infraFlyout().exists()).toBe(true);
+      expect(openFlyout().exists()).toBe(false);
+    });
+
+    it("opens the neighbour after the normal open delay when the pointer is outside the triangle", async () => {
+      await openAndLeave(5, rect(92, 100, 310, 300), { x: 80, y: 150 });
+      tick(100);
+      sample(86, 400);
+      await neighbour.trigger("mouseenter", { clientX: 86, clientY: 400 });
+      tick(OPEN_DELAY);
+      await flushPromises();
+      expect(infraFlyout().exists()).toBe(true);
+      expect(openFlyout().exists()).toBe(false);
+    });
+
+    it("mirrors the triangle to the flyout's right edge in RTL", async () => {
+      document.documentElement.dir = "rtl";
+      await openAndLeave(5, rect(1130, 100, 1348, 300), { x: 1360, y: 150 });
+      tick(100);
+      sample(1354, 220);
+      await neighbour.trigger("mouseenter", { clientX: 1354, clientY: 220 });
+      tick(OPEN_DELAY);
+      await flushPromises();
+      expect(infraFlyout().exists()).toBe(false);
+      expect(openFlyout().exists()).toBe(true);
+
+      sample(1400, 150);
+      tick(AIM_IDLE);
+      await flushPromises();
+      expect(infraFlyout().exists()).toBe(true);
+    });
+
+    it("uses the real flyout rect, so a 10-child flyout keeps a steeper diagonal", async () => {
+      await openAndLeave(10, rect(92, 100, 310, 500), { x: 80, y: 150 });
+      tick(100);
+      sample(90, 480);
+      await neighbour.trigger("mouseenter", { clientX: 90, clientY: 480 });
+      tick(OPEN_DELAY);
+      await flushPromises();
+      expect(infraFlyout().exists()).toBe(false);
+      expect(openFlyout().exists()).toBe(true);
+    });
+
+    it("stops tracking the pointer once the flyout closes", async () => {
+      await openAndLeave(5, rect(92, 100, 310, 300), { x: 80, y: 150 });
+      sample(86, 400);
+      tick(CLOSE_DELAY + 1);
+      await flushPromises();
+      expect(openFlyout().exists()).toBe(false);
+      sample(1, 1);
+      expect(aim.last).toEqual({ x: 86, y: 400 });
+    });
+  });
+
+  describe("scroll close (K2, AC-3)", () => {
+    it("stays open when a scroller that does not contain the tile scrolls", async () => {
+      wrapper = mountGroup(true);
+      await hoverOpen();
+      const table = document.createElement("div");
+      document.body.appendChild(table);
+      table.dispatchEvent(new Event("scroll"));
+      await flushPromises();
+      expect(flyout().exists()).toBe(true);
+    });
+
+    it("closes when an ancestor of the tile, or the document, scrolls", async () => {
+      wrapper = mountGroup(true);
+      await hoverOpen();
+      document.body.dispatchEvent(new Event("scroll"));
+      await flushPromises();
+      expect(flyout().exists()).toBe(false);
+
+      await hoverOpen();
+      document.dispatchEvent(new Event("scroll"));
+      await flushPromises();
+      expect(flyout().exists()).toBe(false);
+    });
+  });
+
+  describe("rest open (AC-4)", () => {
+    it("re-arms the open delay while the pointer moves, and opens 120 ms after it rests", async () => {
+      wrapper = mountGroup();
+      await wrapper.trigger("mouseenter", { clientX: 10, clientY: 10 });
+      vi.advanceTimersByTime(100);
+      await wrapper.trigger("mousemove", { clientX: 30, clientY: 30 });
+      vi.advanceTimersByTime(100);
+      await flushPromises();
+      expect(flyout().exists()).toBe(false);
+      // A jitter within REST_TOLERANCE is still a rest.
+      await wrapper.trigger("mousemove", { clientX: 32, clientY: 31 });
+      vi.advanceTimersByTime(OPEN_DELAY - 100);
+      await flushPromises();
+      expect(flyout().exists()).toBe(true);
+    });
+
+    it("never opens for a pointer that keeps moving", async () => {
+      wrapper = mountGroup();
+      await wrapper.trigger("mouseenter", { clientX: 0, clientY: 0 });
+      for (let i = 1; i <= 20; i++) {
+        vi.advanceTimersByTime(50);
+        await wrapper.trigger("mousemove", { clientX: i * 10, clientY: i * 10 });
+      }
+      await flushPromises();
+      expect(flyout().exists()).toBe(false);
+    });
+
+    it("does not dismiss an open dropdown for a tile only passed over", async () => {
+      const popper = document.createElement("div");
+      popper.setAttribute("data-reka-popper-content-wrapper", "");
+      document.body.appendChild(popper);
+      const keys: string[] = [];
+      const listener = (e: Event) => keys.push((e as KeyboardEvent).key);
+      document.addEventListener("keydown", listener);
+
+      wrapper = mountGroup();
+      await wrapper.trigger("mouseenter", { clientX: 0, clientY: 0 });
+      vi.advanceTimersByTime(100);
+      await wrapper.trigger("mousemove", { clientX: 40, clientY: 40 });
+      vi.advanceTimersByTime(100);
+      await flushPromises();
+      expect(keys).not.toContain("Escape");
+
+      vi.advanceTimersByTime(OPEN_DELAY);
+      await flushPromises();
+      document.removeEventListener("keydown", listener);
+      expect(keys).toContain("Escape");
+    });
+  });
+
+  describe("mobile drawer scroll (AC-17)", () => {
+    it("keeps an expanded inline group open when the drawer scrolls", async () => {
+      mobile.set(true);
+      wrapper = mountGroup(true);
+      click(wrapper.find('[data-test="tile"]').element, 1);
+      await flushPromises();
+      await flushPromises();
+      expect(wrapper.find('[data-test="nav-group-inline-data"]').exists()).toBe(true);
+      document.dispatchEvent(new Event("scroll"));
+      document.body.dispatchEvent(new Event("scroll"));
+      await flushPromises();
+      expect(wrapper.find('[data-test="nav-group-inline-data"]').exists()).toBe(true);
+    });
+  });
+
+  describe("flyout keyboard (AC-8, AC-27)", () => {
+    let rectsSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      const content = document.createElement("div");
+      content.className = "o2-content-scroll";
+      content.innerHTML = '<button data-test="content-btn">x</button>';
+      document.body.appendChild(content);
+      rectsSpy = vi
+        .spyOn(Element.prototype, "getClientRects")
+        .mockReturnValue([{}] as unknown as DOMRectList);
+    });
+
+    afterEach(() => rectsSpy.mockRestore());
+
+    const tile = () => wrapper.find('[data-test="tile"]').element as HTMLElement;
+    const firstItem = () => flyout().find('[data-test="nav-group-item-logstreams"]');
+
+    it("Tab closes the flyout and moves focus to the first content control", async () => {
+      wrapper = mountGroup(true);
+      await hoverOpen();
+      (firstItem().element as HTMLElement).focus();
+      await firstItem().trigger("keydown", { key: "Tab" });
+      await flushPromises();
+      expect(flyout().exists()).toBe(false);
+      expect(document.activeElement?.getAttribute("data-test")).toBe("content-btn");
+    });
+
+    it("Tab falls back to the tile when the page has no focusable control", async () => {
+      document.body.querySelector(".o2-content-scroll")?.remove();
+      wrapper = mountGroup(true);
+      await hoverOpen();
+      (firstItem().element as HTMLElement).focus();
+      await firstItem().trigger("keydown", { key: "Tab" });
+      await flushPromises();
+      expect(flyout().exists()).toBe(false);
+      expect(document.activeElement).toBe(tile());
+    });
+
+    it("Shift+Tab closes the flyout and focuses the owning tile", async () => {
+      wrapper = mountGroup(true);
+      await hoverOpen();
+      (firstItem().element as HTMLElement).focus();
+      await firstItem().trigger("keydown", { key: "Tab", shiftKey: true });
+      await flushPromises();
+      expect(flyout().exists()).toBe(false);
+      expect(document.activeElement).toBe(tile());
+    });
+
+    it("Enter on the group tile (a click with detail 0) leaves no flyout open", async () => {
+      wrapper = mountGroup(true);
+      await hoverOpen();
+      click(wrapper.find('[data-test="tile"]').element, 0);
+      await flushPromises();
+      await flushPromises();
+      expect(flyout().exists()).toBe(false);
+    });
+
+    it("Enter on an item navigates, closes and returns focus to the tile", async () => {
+      wrapper = mountGroup(true);
+      await hoverOpen();
+      (firstItem().element as HTMLElement).focus();
+      click(firstItem().element, 0);
+      await flushPromises();
+      expect(flyout().exists()).toBe(false);
+      expect(document.activeElement).toBe(tile());
+    });
+
+    it("Space on an item activates it like Enter", async () => {
+      wrapper = mountGroup(true);
+      await hoverOpen();
+      const item = firstItem();
+      (item.element as HTMLElement).focus();
+      const clickSpy = vi.spyOn(item.element as HTMLElement, "click");
+      await item.trigger("keydown", { key: " " });
+      expect(clickSpy).toHaveBeenCalledTimes(1);
+      click(item.element, 0);
+      await flushPromises();
+      expect(flyout().exists()).toBe(false);
+      expect(document.activeElement).toBe(tile());
+    });
+
+    it("a mouse choice closes the flyout but never moves focus to the tile", async () => {
+      wrapper = mountGroup(true);
+      await hoverOpen();
+      click(firstItem().element, 1);
+      await flushPromises();
+      expect(flyout().exists()).toBe(false);
+      expect(document.activeElement).not.toBe(tile());
+    });
+  });
+
+  // Real Teleport here: VTU's teleport stub re-creates the subtree on the position update and drops the focus under test.
+  describe("rtl arrows (AC-18)", () => {
+    function mountTeleported() {
+      return mount(ONavGroup, {
+        props: {
+          groupKey: "data",
+          title: "Data",
+          icon: "database",
+          children,
+          parentItem: { link: "/streams", title: "Data", icon: "database", name: "logstreams" },
+        },
+        attachTo: document.body,
+        global: {
+          plugins: [makeRouter(), store, i18n],
+          stubs: { MenuLink: menuLinkStub, OIcon: oIconStub },
+        },
+      });
+    }
+    const tile = () => wrapper.find('[data-test="tile"]');
+    const docFlyout = () => document.querySelector('[data-test="nav-group-flyout-data"]');
+    const firstItem = () =>
+      docFlyout()?.querySelector<HTMLElement>('[data-test="nav-group-item-logstreams"]');
+
+    async function settle() {
+      await flushPromises();
+      await flushPromises();
+    }
+
+    it("in RTL, ArrowLeft opens and focuses the first item; ArrowRight closes and refocuses the tile", async () => {
+      document.documentElement.dir = "rtl";
+      wrapper = mountTeleported();
+      await tile().trigger("keydown", { key: "ArrowLeft" });
+      await settle();
+      expect(docFlyout()).not.toBeNull();
+      expect(document.activeElement).toBe(firstItem());
+
+      firstItem()!.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }),
+      );
+      await settle();
+      expect(docFlyout()).toBeNull();
+      expect(document.activeElement).toBe(tile().element);
+    });
+
+    it("in LTR, ArrowRight opens and ArrowLeft closes, and ArrowLeft on the tile does nothing", async () => {
+      document.documentElement.dir = "ltr";
+      wrapper = mountTeleported();
+      await tile().trigger("keydown", { key: "ArrowLeft" });
+      await settle();
+      expect(docFlyout()).toBeNull();
+
+      await tile().trigger("keydown", { key: "ArrowRight" });
+      await settle();
+      expect(docFlyout()).not.toBeNull();
+      expect(document.activeElement).toBe(firstItem());
+
+      firstItem()!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+      await settle();
+      expect(docFlyout()).toBeNull();
+      expect(document.activeElement).toBe(tile().element);
+    });
+  });
+
+  describe("filtered child lights group (AC-19)", () => {
+    function reliabilityRouter() {
+      return createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/", name: "home", component: { template: "<div />" } },
+          { path: "/alerts", name: "alertList", component: { template: "<div />" } },
+          { path: "/alert-sources", name: "alertSources", component: { template: "<div />" } },
+        ],
+      });
+    }
+
+    async function mountReliability(path: string) {
+      const router = reliabilityRouter();
+      await router.push(path);
+      wrapper = mount(ONavGroup, {
+        props: {
+          groupKey: "reliability",
+          title: "Reliability",
+          icon: "shield",
+          children: [{ titleKey: "menu.alerts", icon: "shield", name: "alertList" }],
+          filteredChildren: [{ titleKey: "menu.alerts", icon: "webhook", name: "alertSources" }],
+          parentItem: {
+            link: "/alerts",
+            title: "Reliability",
+            icon: "shield",
+            name: "reliability",
+          },
+        },
+        global: {
+          plugins: [router, store, i18n],
+          stubs: { MenuLink: menuLinkStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+    }
+
+    it("lights the tile on a filtered child's route", async () => {
+      await mountReliability("/alert-sources");
+      expect(wrapper.findComponent(menuLinkStub).props("active")).toBe(true);
+    });
+
+    it("still lights on a visible child's exact route, and not elsewhere", async () => {
+      await mountReliability("/alerts");
+      expect(wrapper.findComponent(menuLinkStub).props("active")).toBe(true);
+      wrapper.unmount();
+      await mountReliability("/");
+      expect(wrapper.findComponent(menuLinkStub).props("active")).toBe(false);
+    });
+  });
+
+  describe("trial flyout (AC-14)", () => {
+    const item = (name: string) => flyout().find(`[data-test="nav-group-item-${name}"]`);
+
+    it("shows the note, locks and describes only the paywalled items, and mutes the tile", async () => {
+      paywalled.add("pipelines");
+      paywalled.add("/streams");
+      wrapper = mountGroup();
+      expect(wrapper.findComponent(menuLinkStub).props("paywalled")).toBe(true);
+      await hoverOpen();
+      const note = flyout().find('[data-test="nav-group-flyout-data-trial-note"]');
+      expect(note.exists()).toBe(true);
+      expect(note.text()).toBe("Your trial has ended. Pages with a lock need a plan.");
+      expect(flyout().attributes("aria-describedby")).toBe(note.attributes("id"));
+
+      expect(item("pipelines").attributes("data-paywalled")).toBe("true");
+      expect(flyout().find('[data-test="nav-group-item-pipelines-lock"]').exists()).toBe(true);
+      const descId = item("pipelines").attributes("aria-describedby");
+      expect(flyout().find(`#${descId}`).text()).toBe("Pipelines needs a plan");
+
+      expect(item("logstreams").attributes("data-paywalled")).toBeUndefined();
+      expect(item("logstreams").attributes("aria-describedby")).toBeUndefined();
+      expect(flyout().find('[data-test="nav-group-item-logstreams-lock"]').exists()).toBe(false);
+    });
+
+    it("renders no note, lock or description when nothing is paywalled", async () => {
+      wrapper = mountGroup();
+      expect(wrapper.findComponent(menuLinkStub).props("paywalled")).toBe(false);
+      await hoverOpen();
+      expect(flyout().find('[data-test="nav-group-flyout-data-trial-note"]').exists()).toBe(false);
+      expect(flyout().attributes("aria-describedby")).toBeUndefined();
+      expect(flyout().findAll("[data-paywalled]")).toHaveLength(0);
+    });
+
+    it("mutes the collapsed drawer row of a link-mode group, never a route-less pure group", async () => {
+      paywalled.add("/streams");
+      mobile.set(true);
+      wrapper = mountGroup(true);
+      expect(wrapper.findComponent(menuLinkStub).props("paywalled")).toBe(true);
+      expect(wrapper.find('[data-test="tile"]').attributes("data-paywalled")).toBe("true");
+      wrapper.unmount();
+
+      wrapper = mount(ONavGroup, {
+        props: { groupKey: "data", title: "Data", icon: "database", children },
+        global: {
+          plugins: [makeRouter(), store, i18n],
+          stubs: { MenuLink: menuLinkStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+      expect(wrapper.findComponent(menuLinkStub).props("paywalled")).toBe(false);
+    });
+
+    it("renders the same note and locks in the drawer's inline group", async () => {
+      paywalled.add("pipelines");
+      mobile.set(true);
+      wrapper = mountGroup(true);
+      click(wrapper.find('[data-test="tile"]').element, 1);
+      await flushPromises();
+      await flushPromises();
+      const inline = wrapper.find('[data-test="nav-group-inline-data"]');
+      const note = inline.find('[data-test="nav-group-inline-data-trial-note"]');
+      expect(note.exists()).toBe(true);
+      expect(inline.attributes("aria-describedby")).toBe(note.attributes("id"));
+      expect(inline.find('[data-test="nav-group-item-pipelines-lock"]').exists()).toBe(true);
+      expect(
+        inline.find('[data-test="nav-group-item-pipelines"]').attributes("data-paywalled"),
+      ).toBe("true");
+      expect(inline.find('[data-test="nav-group-item-logstreams-lock"]').exists()).toBe(false);
     });
   });
 });

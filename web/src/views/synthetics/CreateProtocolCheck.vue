@@ -19,9 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // Create/edit view for protocol checks (http/tcp/tls/ssh) — single configure
 // page, no journey step. Mirrors CreateBrowserTest's data fetching and save
 // flow; the per-type request card is slotted into CheckConfigure.
+import { saveMonitorMutation } from "@/services/synthetics.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { computed, onMounted, ref, watch, type Component } from "vue";
-import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useRoute, useRouter } from "vue-router";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import type {
   AgentSetup,
@@ -39,16 +44,20 @@ import {
 import { getFoldersListByType } from "@/utils/commons";
 import { syntheticsListRoute } from "@/utils/synthetics/routes";
 import syntheticsService from "@/services/synthetics";
-import destinationService from "@/services/alert_destination";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import {
+  describeCheckRedacted,
+  redactCheckDraftSecrets,
+  reentryValidationKey,
+} from "@/utils/synthetics/checkDraftSecrets";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import CheckConfigure from "@/components/synthetics/configure/CheckConfigure.vue";
 import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
 import CreateBrowserTestSkeleton from "@/components/synthetics/CreateBrowserTestSkeleton.vue";
-import BetaBadge from "@/components/common/BetaBadge.vue";
 import CheckHttpConfig from "@/components/synthetics/configure/types/CheckHttpConfig.vue";
 import CheckTcpConfig from "@/components/synthetics/configure/types/CheckTcpConfig.vue";
 import CheckTlsConfig from "@/components/synthetics/configure/types/CheckTlsConfig.vue";
@@ -63,7 +72,16 @@ const props = defineProps<{
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
-const { t } = useI18n();
+const orgIdForWrites = useOrgId();
+const saveMonitor = useMutation(() => saveMonitorMutation(orgIdForWrites.value));
+
+// Private locations are served by agents deployed inside the customer's network,
+// the one enterprise part of synthetics. Gated on its own /config flag so an OSS
+// build still offers public, Lambda-served locations.
+const privateLocationsEnabled = computed(() =>
+  Boolean(store.state.zoConfig?.synthetics_private_locations_enabled),
+);
+const { t } = useI18nTyped();
 
 const typeConfigCards: Record<ProtocolCheckType, Component> = {
   http: CheckHttpConfig,
@@ -96,6 +114,8 @@ function makeDefaultCheck(type: ProtocolCheckType): ProtocolCheck {
 }
 
 const check = ref<ProtocolCheck>(makeDefaultCheck(props.checkType));
+/** The check as the server returned it, kept unmodified so its draft hash is stable. */
+let serverCheck: ProtocolCheck | null = null;
 const isLoadingEdit = ref(false);
 const isSaving = ref(false);
 
@@ -109,6 +129,7 @@ const typeLabel = computed(() => t(`synthetics.newCheck.${props.checkType}`));
 
 // Server-driven lists, threaded down to CheckConfigure (same as browser flow).
 const locations = ref<SyntheticsLocation[]>([]);
+const locationsLoading = ref(false);
 const destinations = ref<string[]>([]);
 const folders = ref<SyntheticsFolder[]>([]);
 const foldersLoading = ref(false);
@@ -185,9 +206,9 @@ watch(
 );
 
 async function fetchLocations() {
+  locationsLoading.value = true;
   try {
-    const org = store.state.selectedOrganization.identifier;
-    const res = await syntheticsService.getLocations(org);
+    const res = await syntheticsService.getLocations(orgIdForWrites.value);
     // Protocol checks run from public locations and protocol-capable private
     // agents. Hide disabled locations, and hide private locations whose live
     // agents are browser-only (a browser agent can't run an HTTP/TCP/… check) —
@@ -199,114 +220,166 @@ async function fetchLocations() {
         l.enabled !== false &&
         (l.kind !== "private" || (l.types ?? []).some((t) => t !== "browser")),
     );
-  } catch {
+  } catch (err: any) {
+    // A 403 means the endpoint isn't available on this build; fall back to
+    // empty silently for those, and only surface real failures.
     locations.value = [];
+    if (err?.response?.status !== 403) {
+      toast({ variant: "error", message: t("synthetics.locations.fetchFailed") });
+    }
+  } finally {
+    locationsLoading.value = false;
   }
 }
 
 // ── Private agent setup (drawer opened from the locations card) ──────────
 const showAgentSetup = ref(false);
 const agentSetup = ref<AgentSetup | null>(null);
+const agentSetupLocationId = ref<string | null>(null);
+const agentSetupLocationName = ref<string | null>(null);
 
-async function openAgentSetup() {
+async function openAgentSetup(locationId?: string) {
+  agentSetupLocationId.value = locationId ?? null;
+  agentSetupLocationName.value = locationId
+    ? (locations.value.find((l) => l.id === locationId)?.label ?? null)
+    : null;
   showAgentSetup.value = true;
   if (agentSetup.value) return;
   try {
-    const org = store.state.selectedOrganization.identifier;
-    const res = await syntheticsService.getAgentSetup(org);
+    const res = await syntheticsService.getAgentSetup(orgIdForWrites.value);
     agentSetup.value = (res.data ?? null) as AgentSetup | null;
   } catch {
     agentSetup.value = null;
   }
 }
 
-async function fetchDestinations() {
+async function loadDestinations(force = false) {
   try {
-    const res = await destinationService.list({
-      org_identifier: store.state.selectedOrganization.identifier,
-      page_num: 1,
-      page_size: 1000,
-      sort_by: "name",
-      desc: false,
-    });
-    destinations.value = (res.data ?? []).map((d: any) => d.name as string);
+    const options = destinationsQuery(store.state.selectedOrganization.identifier);
+    // A destination created in another tab never expires this tab's cache, so refresh forces.
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const list = await queryClient.fetchQuery(options);
+    destinations.value = list.map((d: any) => d.name as string);
   } catch {
     destinations.value = [];
   }
 }
 
-async function loadForEdit(id: string) {
+/** A check missing from this org takes its drafts there with it. */
+function forgetMissingCheck() {
+  checkDraft.discard();
+  if (props.editId) {
+    deleteEditorDraftsFor({
+      kind: "synthetic_check",
+      org: orgIdentifier.value,
+      entityId: props.editId,
+    });
+  }
+  toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
+}
+
+function leaveMissingCheck() {
+  forgetMissingCheck();
+  router.push(backTo.value);
+}
+
+/** Resolves true once the check is in the form. */
+async function loadForEdit(id: string): Promise<boolean> {
   isLoadingEdit.value = true;
   try {
     const org = store.state.selectedOrganization.identifier;
     const res = await syntheticsService.get(org, id, String(route.query.folder ?? ""));
     check.value = mapResponseToProtocolCheck(res.data as Record<string, unknown>);
+    serverCheck = JSON.parse(JSON.stringify(check.value)) as ProtocolCheck;
+    return true;
   } catch (err: any) {
     // If the check doesn't exist in this org (e.g. user switched orgs while editing),
     // redirect to the synthetics list with a message.
     if (err?.response?.status === 404) {
-      forceLeave = true;
-      router.push(backTo.value);
-      toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
-      isLoadingEdit.value = false;
-      return;
+      leaveMissingCheck();
+      return false;
     }
     // Surface it — a silent catch here leaves a blank form that saves a
     // fresh check over the existing one.
     console.error("[synthetics] failed to load check for edit", err);
     toast({ variant: "error", message: t("synthetics.newCheck.loadEditFailed") });
+    return false;
   } finally {
     isLoadingEdit.value = false;
   }
 }
 
-onMounted(() => {
-  fetchFolders();
-  fetchLocations();
-  fetchDestinations();
-
-  if (props.editId) {
-    loadForEdit(props.editId).catch(console.error);
-  } else {
-    const folderQuery = route.query.folder;
-    if (typeof folderQuery === "string" && folderQuery) {
-      check.value = { ...check.value, folder: folderQuery };
-    }
-  }
-});
-
-// ── Unsaved changes guard (same pattern as CreateBrowserTest) ────────────────
 const isDirty = ref(false);
-const showUnsavedDialog = ref(false);
-let pendingLeavePath: string | null = null;
-let forceLeave = false;
 
 function onConfigureUpdate(val: BrowserCheck) {
   check.value = val as ProtocolCheck;
   isDirty.value = true;
 }
 
-onBeforeRouteLeave((to, _from, next) => {
-  if (forceLeave || !isDirty.value) {
-    forceLeave = false;
-    next();
-    return;
-  }
-  next(false);
-  pendingLeavePath = to.fullPath;
-  showUnsavedDialog.value = true;
+const hostTarget = computed(() => ["tcp", "tls", "ssh"].includes(props.checkType));
+
+const checkDraft = useEditorDraft<ProtocolCheck>({
+  kind: "synthetic_check",
+  entityLabel: () => t("common.editorDraft.entities.synthetic_check"),
+  entityId: () => props.editId ?? null,
+  newVariant: () => props.checkType,
+  snapshot: () => check.value,
+  apply: (data) => {
+    check.value = data;
+    isDirty.value = true;
+  },
+  base: () => serverCheck,
+  redactBase: (base) =>
+    redactCheckDraftSecrets(base as ProtocolCheck, "", { hostTarget: hostTarget.value }).data,
+  hasChanges: () => isDirty.value,
+  save: async () => {
+    const result = await persistCheck();
+    // The leave guard is still pending, so a deleted check lets that navigation go on instead of opening the list.
+    if (result === "missing") forgetMissingCheck();
+    return result !== "failed";
+  },
+  redact: (data) => redactCheckDraftSecrets(data, "", { hostTarget: hostTarget.value }),
+  describeRedacted: (paths, data) =>
+    describeCheckRedacted(paths, data, t, { urlLabel: t("common.editorDraft.urlField") }),
 });
 
-function onConfirmLeave() {
-  showUnsavedDialog.value = false;
-  forceLeave = true;
-  if (pendingLeavePath) {
-    router.push(pendingLeavePath);
-    pendingLeavePath = null;
-  }
-}
+/** A changed secret the draft did not keep is flagged on its field until it is typed again. */
+const reentryErrors = computed<Record<string, string>>(() =>
+  Object.fromEntries(
+    checkDraft
+      .pendingReentries()
+      .map((path) => [reentryValidationKey(path), t("common.editorDraft.reenterField")]),
+  ),
+);
 
-async function saveCheck() {
+onMounted(async () => {
+  fetchFolders();
+  fetchLocations();
+  loadDestinations();
+
+  if (props.editId) {
+    if (await loadForEdit(props.editId)) await checkDraft.start();
+    return;
+  }
+  const folderQuery = route.query.folder;
+  if (typeof folderQuery === "string" && folderQuery) {
+    check.value = { ...check.value, folder: folderQuery };
+  }
+  await checkDraft.start();
+});
+
+/** Saves without navigating; "missing" means the check is gone from this org. */
+async function persistCheck(): Promise<"saved" | "missing" | "failed"> {
+  if (checkDraft.pendingReentries().length) {
+    toast({ variant: "error", message: t("common.editorDraft.reenterBeforeSave") });
+    return "failed";
+  }
   isSaving.value = true;
   const dismiss = toast({
     variant: "loading",
@@ -314,28 +387,25 @@ async function saveCheck() {
     timeout: 0,
   });
   try {
-    const org = store.state.selectedOrganization.identifier;
     const payload = buildCreateProtocolCheckPayload(check.value);
     if (props.editId) {
-      await syntheticsService.update(org, props.editId, payload, check.value.folder);
+      await saveMonitor.mutateAsync({
+        id: props.editId,
+        payload,
+        folderId: check.value.folder,
+      });
       dismiss();
       toast({ variant: "success", message: t("synthetics.newCheck.updated") });
     } else {
-      await syntheticsService.create(org, payload, check.value.folder);
+      await saveMonitor.mutateAsync({ payload, folderId: check.value.folder });
       dismiss();
       toast({ variant: "success", message: t("synthetics.newCheck.saved") });
     }
     isDirty.value = false;
-    router.push(backTo.value);
+    return "saved";
   } catch (err: any) {
     dismiss();
-    if (err?.response?.status === 404) {
-      forceLeave = true;
-      router.push(backTo.value);
-      toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
-      isSaving.value = false;
-      return;
-    }
+    if (err?.response?.status === 404) return "missing";
     toast({
       variant: "error",
       message:
@@ -344,14 +414,27 @@ async function saveCheck() {
         t("synthetics.newCheck.saveFailed"),
     });
     console.error("[synthetics] save failed", err);
+    return "failed";
   } finally {
     isSaving.value = false;
   }
+}
+
+async function saveCheck() {
+  const result = await persistCheck();
+  if (result === "missing") {
+    leaveMissingCheck();
+    return;
+  }
+  if (result !== "saved") return;
+  checkDraft.markSaved();
+  router.push(backTo.value);
 }
 </script>
 
 <template>
   <OPageLayout
+    :title="raw(headerTitle)"
     :back="{
       label: t('synthetics.newCheck.back'),
       to: backTo,
@@ -359,12 +442,6 @@ async function saveCheck() {
     }"
     bleed
   >
-    <template #title>
-      <span class="inline-flex min-w-0 items-center gap-2">
-        <span class="truncate">{{ headerTitle }}</span>
-        <BetaBadge />
-      </span>
-    </template>
     <CreateBrowserTestSkeleton v-if="isLoadingEdit" :rows="10" />
     <template v-else>
       <div class="min-h-0 flex-1 overflow-y-auto">
@@ -372,20 +449,28 @@ async function saveCheck() {
           :check="check"
           :check-type="checkType"
           :locations="locations"
+          :loading-locations="locationsLoading"
           :destinations="destinations"
           :folders="folders"
           :folders-loading="foldersLoading"
-          :validation-errors="validationErrors"
-          allow-private-locations
+          :validation-errors="{ ...validationErrors, ...reentryErrors }"
+          :allow-private-locations="privateLocationsEnabled"
           class="w-full!"
-          @refresh:destinations="fetchDestinations"
+          @refresh:destinations="loadDestinations(true)"
           @update:check="onConfigureUpdate"
-          @setup-agent="openAgentSetup"
+          @new-location="openAgentSetup()"
+          @add-agent="(id: string) => openAgentSetup(id)"
+          @refresh-locations="fetchLocations"
         >
           <template #type-config>
             <component
               :is="typeConfigCards[checkType]"
               :check="check"
+              v-bind="
+                checkType === 'http'
+                  ? { validationErrors: { ...validationErrors, ...reentryErrors } }
+                  : {}
+              "
               @update:check="onConfigureUpdate"
             />
           </template>
@@ -416,35 +501,28 @@ async function saveCheck() {
         </OButton>
       </div>
 
-      <!-- Private agent setup drawer; locations reload on close so a freshly
-           registered location becomes selectable without leaving the form. -->
+      <!-- Private agent setup drawer; a freshly registered location appears via
+           the locations card's Refresh button. -->
       <AgentSetupDrawer
+        v-if="privateLocationsEnabled"
         v-model:open="showAgentSetup"
         :token="agentSetup?.token"
         :org="agentSetup?.org"
         :o2-url="agentSetup?.o2_url"
         :script-url="agentSetup?.script_url"
         :install="agentSetup?.install"
+        :location-id="agentSetupLocationId"
+        :location-name="agentSetupLocationName"
         @update:open="
           (open: boolean) => {
-            if (!open) fetchLocations();
+            if (!open) {
+              agentSetupLocationId = null;
+              agentSetupLocationName = null;
+            }
           }
         "
       />
-
-      <!-- Unsaved changes dialog -->
-      <ODialog
-        v-model:open="showUnsavedDialog"
-        size="sm"
-        :title="t('synthetics.newCheck.unsavedTitle')"
-        :primary-button-label="t('synthetics.newCheck.leave')"
-        :secondary-button-label="t('synthetics.newCheck.stay')"
-        data-test="synthetics-create-unsaved-dialog"
-        @click:primary="onConfirmLeave"
-        @click:secondary="showUnsavedDialog = false"
-      >
-        <p class="py-2">{{ t("synthetics.newCheck.unsavedBody") }}</p>
-      </ODialog>
     </template>
+    <EditorDraftDialogs :draft="checkDraft" />
   </OPageLayout>
 </template>

@@ -235,7 +235,7 @@ pub async fn update(
 
     // Validate incoming data against the existing kind.
     if body.data.is_some()
-        && let Ok(kind) = ToolsetKind::try_from(existing.kind.as_str())
+        && let Ok(kind) = existing.kind.parse::<ToolsetKind>()
         && let Err(e) = validate_data(kind, &body.data)
     {
         return MetaHttpResponse::bad_request(e);
@@ -245,7 +245,7 @@ pub async fn update(
         .data
         .as_ref()
         .map(|v| serde_json::to_string(v).unwrap())
-        .or(existing.data.clone());
+        .or_else(|| existing.data.clone());
 
     let updated = OrgToolset {
         id: existing.id.clone(),

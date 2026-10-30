@@ -36,18 +36,21 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
-vi.mock("@/services/organizations", () => ({
-  default: {
-    create: vi.fn(async (data: any) => ({
-      status: 200,
-      data: { data: { id: "1", name: data.name, identifier: "org-1" } },
-    })),
-    rename_organization: vi.fn(async (_id: any, name: string) => ({
-      status: 200,
-      data: { data: { id: "1", name, identifier: "org-1" } },
-    })),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create: vi.fn(async (data: any) => ({
+        status: 200,
+        data: { data: { id: "1", name: data.name, identifier: "org-1" } },
+      })),
+      rename_organization: vi.fn(async (_id: any, name: string) => ({
+        status: 200,
+        data: { data: { id: "1", name, identifier: "org-1" } },
+      })),
+    },
+  });
+});
 
 const orgService = (await import("@/services/organizations")).default;
 
@@ -224,6 +227,23 @@ describe("AddUpdateOrganization", () => {
       await submitForm(wrapper);
 
       expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    });
+
+    it("shows the server message verbatim without added quotes", async () => {
+      vi.spyOn(orgService, "create").mockRejectedValueOnce({
+        response: { data: { message: "Organization creation failed." } },
+      });
+      const wrapper = mountComp();
+
+      await getNameInput(wrapper).setValue("Err Org");
+      await submitForm(wrapper);
+
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "error",
+          message: "Organization creation failed.",
+        }),
+      );
     });
 
     it("renames the organization in update mode", async () => {

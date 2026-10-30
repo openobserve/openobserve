@@ -6,18 +6,33 @@ import { cloneDeep } from "lodash-es";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import alertsService from "@/services/alerts";
 import { transformFEToBE } from "./alertDataTransforms";
+import { hasDeliveryTarget } from "./deliveryTarget";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { raw, type TranslateFn, type I18nText } from "@/types/i18n";
 
 export interface PayloadFormData {
   name: string;
-  description: string;
+  description: I18nText;
   is_real_time: boolean | string;
+  /** Minutes on the form; getAlertPayload converts to seconds on the wire. */
+  pending_period_sec: number | string;
   trigger_condition: {
     threshold: number | string;
     operator: string;
     period: number | string;
     frequency: number | string;
     silence: number | string;
+    /**
+     * The second, lower rung of the count gate (T-5 multi-level thresholds).
+     * Optional because the field is only rendered for the alert families that
+     * have a count axis — `QueryConfig.vue` registers it as
+     * `trigger_condition.warning_threshold` and the schema types it
+     * `z.unknown().optional()`, so it arrives as the raw input string, as a
+     * number, or not at all. An SLO alert has no count axis and this key is
+     * DELETED from its payload (SA-4), which is why the type has to admit its
+     * absence rather than the builder casting around it.
+     */
+    warning_threshold?: number | string | null;
   };
   context_attributes: Array<{ key: string; value: string }>;
   query_condition: {
@@ -25,17 +40,35 @@ export interface PayloadFormData {
     aggregation?: any;
     conditions: any[];
     promql_condition?: any;
+    promql_rule_mode?: boolean;
+    promql_multi_alert?: boolean;
+    promql_warning_value?: number | string | null;
     sql: string;
     vrl_function?: string | null;
+    multi_time_range?: any[] | null;
+    /**
+     * The SLO burn/budget condition. The backend enforces
+     * `query_type == "slo"` IFF this is present, in BOTH directions, so a
+     * non-SLO alert must ship it as an explicit `null` rather than leaving a
+     * stale one behind — which is exactly what the builder below does, and
+     * what it could not express while this key was undeclared.
+     */
+    slo_condition?: any;
   };
   stream_name: string;
   stream_type: string;
   row_template?: string;
   row_template_type?: string;
   creates_incident?: boolean;
+  notify_on_recovery?: boolean;
+  recovery_destinations?: string[];
+  keep_firing_for?: number;
+  suppress_repeats?: boolean;
   /** Feature 2: integer storage id 1..5, or null/undefined when unset. */
   priority?: number | string | null;
   tags?: string[];
+  /** On-call team this alert pages, overriding ownership discovery. */
+  oncall_team?: string | null;
   uuid?: string;
   updatedAt?: string;
   createdAt?: string;
@@ -53,6 +86,7 @@ export interface PayloadContext {
 
 export interface SaveAlertContext {
   store: any;
+  t: TranslateFn;
   props: any;
   emit: any;
   router: any;
@@ -98,10 +132,23 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
   payload.context_attributes = {} as any;
 
   payload.query_condition.type = payload.is_real_time ? "custom" : formData.query_condition.type;
+  // Compare-with-Past windows only run with SQL; never send them for another type.
+  if (payload.query_condition.type !== "sql") payload.query_condition.multi_time_range = [];
 
   formData.context_attributes.forEach((attr: any) => {
     if (attr.key?.trim() && attr.value?.trim()) payload.context_attributes[attr.key] = attr.value;
   });
+
+  // SQL tab's Simple/Multi choice (no group-by picker): QueryConfig.vue
+  // already builds `aggregation` via the same having.operator/.value fields
+  // Custom's Measure mode uses, plus a value-column dropdown sourced from the
+  // query's resolved output columns (sql_simple_multi_alert_fe_prd.md §11) —
+  // this flag decides whether that object survives the tab-based null below,
+  // and gates the field-pinning required by the backend's SQL multi-alert
+  // schema contract (group_by: [], function: "count"; having.column is
+  // whatever column the user picked).
+  const isSqlMultiAlert =
+    getSelectedTab.value === "sql" && !!formData.query_condition.aggregation?.multi_alert;
 
   payload.trigger_condition.threshold = parseInt(formData.trigger_condition.threshold as any);
 
@@ -116,16 +163,59 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
     payload.trigger_condition.operator = ">=";
   }
 
+  // SQL Multi Alert: the any-group-count gate is always "at least 1" (M-10),
+  // same rule as the Custom group-by case above.
+  if (isSqlMultiAlert) {
+    payload.trigger_condition.threshold = 1;
+    payload.trigger_condition.operator = ">=";
+  }
+
   payload.trigger_condition.period = parseInt(formData.trigger_condition.period as any);
 
   payload.trigger_condition.frequency = parseInt(formData.trigger_condition.frequency as any);
 
   payload.trigger_condition.silence = parseInt(formData.trigger_condition.silence as any);
 
-  payload.description = formData.description.trim();
+  // A `type="number"` input hands back a STRING, and the API takes an i64 — an
+  // uncoerced "60" is rejected by serde before any validation runs, so the user
+  // sees a deserialization error instead of the field's own rule.
+  //
+  // Both are forced off for realtime, same belt-and-suspenders as
+  // pending_period_sec below: a realtime alert persists no state, so it never
+  // opens an episode and neither field could ever act.
+  payload.keep_firing_for = payload.is_real_time
+    ? 0
+    : parseInt(formData.keep_firing_for as any, 10) || 0;
+  payload.notify_on_recovery = payload.is_real_time ? false : !!formData.notify_on_recovery;
+  // The API refuses the switch on a realtime alert, which keeps no state to compare against.
+  payload.suppress_repeats = payload.is_real_time ? false : !!formData.suppress_repeats;
+  // Dropped with the switch off, or the API refuses a list nothing would use.
+  payload.recovery_destinations = payload.notify_on_recovery
+    ? (formData.recovery_destinations ?? [])
+    : [];
 
-  if (!isAggregationEnabled.value || getSelectedTab.value !== "custom") {
+  // Minutes on the form, seconds on the wire. Forced to 0 for realtime even
+  // though the field is unreachable in that template — same belt-and-suspenders
+  // as the warning_threshold strip below, in case a stale value survives a
+  // realtime<->scheduled toggle without a full remount.
+  const pendingMinutes =
+    payload.query_condition.type === "promql" && payload.query_condition.promql_rule_mode
+      ? Number(formData.pending_period_sec)
+      : parseInt(formData.pending_period_sec as any, 10);
+  payload.pending_period_sec = payload.is_real_time ? 0 : Math.round((pendingMinutes || 0) * 60);
+
+  payload.description = raw(formData.description.trim());
+
+  if (!isSqlMultiAlert && (!isAggregationEnabled.value || getSelectedTab.value !== "custom")) {
     payload.query_condition.aggregation = null;
+  } else if (isSqlMultiAlert) {
+    // Pin the fields this simple flow has no picker for (src/core/src/alerts/alert.rs,
+    // prepare_alert) — group_by is always empty, function is fixed. The value
+    // column is NOT pinned: it's user-chosen via a dropdown sourced from the
+    // query's resolved output columns (sql_simple_multi_alert_fe_prd.md §11),
+    // so `having.column` already carries the user's selection from form state.
+    payload.query_condition.aggregation.group_by = [];
+    payload.query_condition.aggregation.function = "count";
   }
 
   if (getSelectedTab.value === "sql" || getSelectedTab.value === "promql")
@@ -133,10 +223,38 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
 
   if (getSelectedTab.value === "sql" || getSelectedTab.value === "custom") {
     payload.query_condition.promql_condition = null;
+    payload.query_condition.promql_rule_mode = false;
   }
 
-  if (getSelectedTab.value === "promql") {
+  // Feature 5 (§6b.6). The backend enforces `query_type == slo` IFF
+  // `slo_condition` is present, in BOTH directions, so the two must be kept in
+  // lockstep here:
+  //
+  //  * a non-SLO alert must not carry a condition left over from a mode switch — it is rejected
+  //    outright, not ignored;
+  //  * an SLO alert runs NO query, so any SQL, builder condition, aggregation or PromQL condition
+  //    it picked up on the way would be stored and then never read.
+  if (getSelectedTab.value === "slo") {
     payload.query_condition.sql = "";
+    payload.query_condition.conditions = [];
+    payload.query_condition.promql_condition = null;
+    payload.query_condition.aggregation = null;
+
+    // SA-4: an SLO alert has no count axis, and the backend REJECTS a
+    // non-default count gate rather than ignoring it. The SLO tab renders no
+    // count-gate field, but the form still holds whatever the Builder tab
+    // defaulted to (">=" / 3) — so without this reset the save fails with
+    // "SLO alerts have no count gate", naming a control the user cannot see.
+    //
+    // The values must match `TriggerCondition::default()` on the backend:
+    // `Operator::EqualTo` serializes to "=" and `threshold` is 0.
+    payload.trigger_condition.operator = "=";
+    payload.trigger_condition.threshold = 0;
+    // Part of the same gate: a warning on a count gate has no meaning for a
+    // family that has no gate, and is rejected alongside the other two.
+    delete payload.trigger_condition.warning_threshold;
+  } else {
+    payload.query_condition.slo_condition = null;
   }
 
   // `having.value` and `promql_condition.value` arrive here as the RAW STRING the
@@ -195,11 +313,13 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
   // promql_warning_value is meaningless off the promql tab.
   if (
     getSelectedTab.value === "promql" ||
-    (isAggregationEnabled.value && getSelectedTab.value === "custom")
+    (isAggregationEnabled.value && getSelectedTab.value === "custom") ||
+    isSqlMultiAlert
   ) {
     delete (payload.trigger_condition as any).warning_threshold;
   }
-  if (getSelectedTab.value !== "promql") {
+  // Forecast mode has no warning value: its condition is the horizon in days.
+  if (getSelectedTab.value !== "promql" || (formData as any)._ui?.forecast) {
     delete (payload.query_condition as any).promql_warning_value;
   }
   // Realtime alerts carry no warning family at all (D12) — and the form hides
@@ -233,6 +353,11 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
   if (!Array.isArray(payload.tags) || payload.tags.length === 0) {
     delete (payload as any).tags;
   }
+  // Unset means "work the team out from the identity dimensions", which the
+  // backend expresses as an absent key rather than an empty string.
+  if (typeof payload.oncall_team !== "string" || payload.oncall_team.trim() === "") {
+    delete (payload as any).oncall_team;
+  }
 
   if (formData.query_condition.vrl_function) {
     payload.query_condition.vrl_function = b64EncodeUnicode(
@@ -251,11 +376,19 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
     formData.updatedAt = new Date().toISOString();
   }
 
+  if (
+    payload.query_condition.type === "promql" &&
+    payload.query_condition.promql_rule_mode &&
+    Number(payload.pending_period_sec) > 0
+  ) {
+    payload.query_condition.promql_multi_alert = true;
+  }
+
   return payload;
 };
 
 export const prepareAndSaveAlert = async (data: any, context: SaveAlertContext): Promise<void> => {
-  const { store, props, emit, router, isAggregationEnabled, activeFolderId, handleAlertError } =
+  const { store, t, props, emit, router, isAggregationEnabled, activeFolderId, handleAlertError } =
     context;
 
   const payload = cloneDeep(data);
@@ -301,7 +434,7 @@ export const prepareAndSaveAlert = async (data: any, context: SaveAlertContext):
   try {
     const dismiss = toast({
       variant: "loading",
-      message: "Please wait...",
+      message: t("toastMessages.alerts.pleaseWait"),
       timeout: 0,
     });
 
@@ -314,7 +447,9 @@ export const prepareAndSaveAlert = async (data: any, context: SaveAlertContext):
       emit("update:list", activeFolderId.value);
       toast({
         variant: "success",
-        message: "Alert updated successfully.",
+        message: hasDeliveryTarget(payload)
+          ? t("toastMessages.alerts.alertUpdatedSuccessfully")
+          : t("alerts.messages.alertUpdatedNoDestination"),
       });
     } else {
       await alertsService.create_by_alert_id(
@@ -325,7 +460,9 @@ export const prepareAndSaveAlert = async (data: any, context: SaveAlertContext):
       emit("update:list", activeFolderId.value);
       toast({
         variant: "success",
-        message: "Alert saved successfully.",
+        message: hasDeliveryTarget(payload)
+          ? t("toastMessages.alerts.alertSavedSuccessfully")
+          : t("alerts.messages.alertSavedNoDestination"),
       });
     }
     dismiss();

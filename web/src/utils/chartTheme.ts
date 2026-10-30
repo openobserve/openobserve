@@ -33,12 +33,27 @@ const cache = new Map<string, string>();
 // (jsdom unit tests / SSR). Keeps charts from rendering with empty color strings.
 // These are the light-theme resolutions of the corresponding tokens.
 const FALLBACKS: Record<string, string> = {
-  "--color-text-heading": "#171717",
+  "--color-text-heading": "#262626",
+  "--color-text-body": "#404040",
   "--color-text-secondary": "#737373",
-  "--color-border-default": "#e5e5e5",
+  "--color-text-inverse": "#ffffff",
+  "--color-border-default": "#d4d4d4",
+  "--color-border-strong": "#a3a3a3",
   "--color-border-subtle": "#ededed",
+  "--color-border-control": "#949494",
   "--color-surface-base": "#ffffff",
-  "--color-tooltip-text": "#171717",
+  "--color-surface-overlay": "#ffffff",
+  "--color-map-card-header": "#e5e5e5",
+  "--color-map-seq-1": "#05a92e",
+  "--color-map-seq-2": "#819307",
+  "--color-map-seq-3": "#a57c04",
+  "--color-map-seq-4": "#bd6100",
+  "--color-map-seq-5": "#d72601",
+  "--color-status-positive": "#208a3c",
+  "--color-surface-subtle": "#f5f5f5",
+  "--color-white": "#ffffff",
+  "--color-black": "#000000",
+  "--color-tooltip-text": "#262626",
   "--color-tooltip-bg": "#ffffff",
   "--color-tooltip-border": "#ededed",
   "--color-service-health-critical": "#f5222d",
@@ -59,6 +74,8 @@ const FALLBACKS: Record<string, string> = {
   "--color-chart-series-10": "#4ade80",
   "--color-chart-series-11": "#e879f9",
   "--color-chart-series-12": "#facc15",
+  // Mark-line drop shadow (light value) — dark override lives in dark.css.
+  "--color-chart-markline-shadow": "rgba(255, 255, 255, 0.7)",
   // Dashboard table row-highlight palette (light values) + grid line.
   "--color-chart-table-1": "#FFCDEE",
   "--color-chart-table-2": "#FFD2D3",
@@ -84,48 +101,56 @@ const FALLBACKS: Record<string, string> = {
   "--color-chart-table-22": "#FFF2CC",
   "--color-chart-table-23": "#FFE6E6",
   "--color-chart-table-24": "#E8F4FD",
-  "--color-chart-gridline": "rgba(0, 0, 0, 0.08)",
+  "--color-chart-gridline": "rgba(0, 10, 23, 0.09)",
+  "--color-chart-band": "rgba(115, 115, 115, 0.22)",
+  // --color-chart-crosshair-bg is deliberately absent: it is dark-only, and the empty
+  // string light returns is what makes ECharts use its own auto default (base.css:262).
   // Trace span palette (HEX/canvas variant), light values.
-  "--color-trace-span-1": "#10B981",
-  "--color-trace-span-2": "#06B6D4",
-  "--color-trace-span-3": "#84CC16",
-  "--color-trace-span-4": "#6366F1",
-  "--color-trace-span-5": "#F59E0B",
-  "--color-trace-span-6": "#3B82F6",
-  "--color-trace-span-7": "#14B8A6",
-  "--color-trace-span-8": "#D946EF",
-  "--color-trace-span-9": "#7C3AED",
-  "--color-trace-span-10": "#F59E0B",
-  "--color-trace-span-11": "#0284C7",
-  "--color-trace-span-12": "#84CC16",
-  "--color-trace-span-13": "#6366F1",
-  "--color-trace-span-14": "#F9A8D4",
-  "--color-trace-span-15": "#10B981",
+  "--color-trace-span-1": "#84CC16",
+  "--color-trace-span-2": "#7C3AED",
+  "--color-trace-span-3": "#0EA5E9",
+  "--color-trace-span-4": "#D946EF",
+  "--color-trace-span-5": "#A78BFA",
+  "--color-trace-span-6": "#10B981",
+  "--color-trace-span-7": "#22D3EE",
+  "--color-trace-span-8": "#0284C7",
+  "--color-trace-span-9": "#A855F7",
+  "--color-trace-span-10": "#6366F1",
+  "--color-trace-span-11": "#3B82F6",
+  "--color-trace-span-12": "#21CB60",
+  "--color-trace-span-13": "#06B6D4",
+  "--color-trace-span-14": "#14B8A6",
+  "--color-trace-span-15": "#818CF8",
   "--color-trace-span-16": "#8B5CF6",
-  "--color-trace-span-17": "#F97316",
-  "--color-trace-span-18": "#22D3EE",
-  "--color-trace-span-19": "#06B6D4",
-  "--color-trace-span-20": "#21cb60",
-  "--color-trace-span-21": "#A855F7",
-  "--color-trace-span-22": "#FBBF24",
-  "--color-trace-span-23": "#3B82F6",
-  "--color-trace-span-24": "#14B8A6",
-  "--color-trace-span-25": "#6366F1",
-  "--color-trace-span-26": "#FB923C",
-  "--color-trace-span-27": "#0EA5E9",
-  "--color-trace-span-28": "#F472B6",
-  "--color-trace-span-29": "#A855F7",
-  "--color-trace-span-30": "#818CF8",
-  "--color-trace-span-31": "#F97316",
-  "--color-trace-span-32": "#FCA5A5",
-  "--color-trace-span-33": "#06B6D4",
-  "--color-trace-span-34": "#A78BFA",
-  "--color-trace-span-35": "#3B82F6",
   // Metric-panel text default (contrast fallback when a panel has no background).
   "--color-chart-metric-text": "#000000",
+  // Brand accent (--color-primary-600), light value — metric sparkline default color.
+  "--color-accent": "#3f7994",
   // Alert threshold marklines (light values from semantic.css / base.css).
   "--color-status-error-text": "#cc3645",
-  "--color-status-warning-text": "#e56d17",
+  "--color-status-warning-text": "#be5a13",
+  // Error series in canvas charts (light value from base.css).
+  "--color-severity-error-color": "#ea1a17",
+  // Status accents used by SLO / health charts (light values from semantic.css, base.css).
+  "--color-status-negative": "#db3b4b",
+  "--color-status-success-bg": "#f2fcf3",
+  "--color-status-success-text": "#20883b",
+  "--color-success-200": "#bbf7d0",
+  // Threshold step presets (light values from base.css).
+  "--color-success-500": "#22c55e",
+  "--color-amber-500": "#f59e0b",
+  "--color-error-500": "#ef4444",
+  // JSON syntax highlighting in dashboard field renderers (light values from base.css).
+  "--color-json-boolean": "#6d28d9",
+  "--color-json-key": "#b71c1c",
+  "--color-json-null": "#6b7280",
+  "--color-json-number": "#2563eb",
+  "--color-json-object": "#4b5563",
+  "--color-json-string": "#047857",
+  "--color-latency-p95": "#0a4ce8",
+  "--color-progress-bar-default": "#3f7994",
+  "--color-progress-bar-neutral": "#a3a3a3",
+  "--color-progress-bar-track": "#e5e5e5",
 };
 
 /**
@@ -178,3 +203,56 @@ export const chartTextColor = (): string => chartColor("--color-text-secondary")
 export const chartAxisLine = (): string => chartColor("--color-border-default");
 export const chartBg = (): string => chartColor("--color-surface-base");
 export const chartGridLine = (): string => chartColor("--color-border-subtle");
+
+export const HEX_RE = /^#[0-9a-f]{6}$/i;
+
+/** WCAG relative luminance (0–1) of a `#rrggbb` hex colour. */
+function relativeLuminance(hex: string): number {
+  const n = parseInt(hex.slice(1), 16);
+  const r = ((n >> 16) & 0xff) / 255;
+  const g = ((n >> 8) & 0xff) / 255;
+  const b = (n & 0xff) / 255;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** WCAG contrast ratio (1–21) between two `#rrggbb` hex colours. */
+function contrastRatio(a: string, b: string): number {
+  const [l1, l2] = [relativeLuminance(a), relativeLuminance(b)].sort((x, y) => y - x);
+  return (l1 + 0.05) / (l2 + 0.05);
+}
+
+/** `hex` mixed `amount` (0–1) of the way toward white. */
+function mixToWhite(hex: string, amount: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const mix = (channel: number) => Math.round(channel + (255 - channel) * amount);
+  const r = mix((n >> 16) & 0xff);
+  const g = mix((n >> 8) & 0xff);
+  const b = mix(n & 0xff);
+  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+}
+
+/** Lightens `hex` toward white in steps until it clears 3:1 contrast against `backgroundHex`, or white is reached if that ratio isn't achievable. */
+export function lightenForContrast(hex: string, backgroundHex: string): string {
+  if (!HEX_RE.test(hex) || !HEX_RE.test(backgroundHex)) return hex;
+  // A light canvas doesn't need lightening; only a dark one can hide a dark marker colour.
+  if (relativeLuminance(backgroundHex) >= 0.5) return hex;
+  if (contrastRatio(hex, backgroundHex) >= 3) return hex;
+  for (let amount = 0.05; amount < 1; amount += 0.05) {
+    const mixed = mixToWhite(hex, amount);
+    if (contrastRatio(mixed, backgroundHex) >= 3) return mixed;
+  }
+  return "#ffffff";
+}
+
+/** `lightenForContrast` against the chart's own canvas colour, so markers stay legible on a dark dashboard. */
+export const chartMarkerColor = (hex: string): string =>
+  lightenForContrast(hex, chartColor("--color-surface-base"));
+
+// Shared fill for chart selections so the zoom brush and annotation markAreas read identically.
+export const CHART_SELECTION_FILL = "rgba(0, 191, 255, 0.15)";
+
+// echarts v6 defaults the toolbox dataZoom brush to a 50%-opaque tint that hides the chart while dragging.
+export const dataZoomBrushStyle = () => ({
+  borderWidth: 0,
+  color: CHART_SELECTION_FILL,
+});

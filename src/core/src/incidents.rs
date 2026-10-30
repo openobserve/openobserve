@@ -20,16 +20,16 @@ use db::workflows::WorkflowTriggerType;
 use infra::table::workflows::get_all_associations_for_trigger_type;
 use serde_json::Value;
 
-use crate::{alerts::incidents::get_incident_with_alerts, workflows::send_workflow_trigger};
+use crate::{alerts::incidents::get_incident_with_triggers, workflows::send_workflow_trigger};
 
 async fn get_event_metadata(
     org_id: &str,
     incident_id: &str,
     event: IncidentEvent,
 ) -> Result<HashMap<String, Value>, anyhow::Error> {
-    let incident = get_incident_with_alerts(org_id, incident_id)
+    let incident = get_incident_with_triggers(org_id, incident_id)
         .await?
-        .ok_or(anyhow::anyhow!("incident with given id not found"))?;
+        .ok_or_else(|| anyhow::anyhow!("incident with given id not found"))?;
 
     let mut metadata: Vec<(&str, Value)> = Vec::new();
 
@@ -97,7 +97,10 @@ async fn get_event_metadata(
 
         IncidentEventType::Resolved { user_id } => {
             metadata.push(("event_type", "resolved".into()));
-            metadata.push(("user_id", user_id.unwrap_or("system".to_string()).into()));
+            metadata.push((
+                "user_id",
+                user_id.unwrap_or_else(|| "system".to_string()).into(),
+            ));
         }
 
         IncidentEventType::Reopened { user_id, reason } => {
@@ -120,8 +123,14 @@ async fn get_event_metadata(
         }
         IncidentEventType::AssignmentChanged { from, to } => {
             metadata.push(("event_type", "assignment_changed".into()));
-            metadata.push(("from_user", from.unwrap_or("unknown".to_string()).into()));
-            metadata.push(("to_user", to.unwrap_or("unknown".to_string()).into()));
+            metadata.push((
+                "from_user",
+                from.unwrap_or_else(|| "unknown".to_string()).into(),
+            ));
+            metadata.push((
+                "to_user",
+                to.unwrap_or_else(|| "unknown".to_string()).into(),
+            ));
         }
 
         IncidentEventType::Comment { user_id, comment } => {
@@ -150,6 +159,32 @@ async fn get_event_metadata(
         IncidentEventType::AIAnalysisCancelled { user_id } => {
             metadata.push(("event_type", "ai_analysis_cancelled".into()));
             metadata.push(("user_id", user_id.into()));
+        }
+        IncidentEventType::AiAnalysisSteered {
+            run_id,
+            steer_id,
+            user_id,
+            kind,
+        } => {
+            metadata.push(("event_type", "ai_analysis_steered".into()));
+            metadata.push(("run_id", run_id.into()));
+            metadata.push(("steer_id", steer_id.into()));
+            metadata.push(("user_id", user_id.into()));
+            metadata.push(("kind", kind.into()));
+        }
+        IncidentEventType::AiAnalysisNeedsInput {
+            run_id,
+            question_id,
+            need,
+            question,
+            deadline_at,
+        } => {
+            metadata.push(("event_type", "ai_analysis_needs_input".into()));
+            metadata.push(("run_id", run_id.into()));
+            metadata.push(("question_id", question_id.into()));
+            metadata.push(("need", need.into()));
+            metadata.push(("question", question.into()));
+            metadata.push(("deadline_at", deadline_at.into()));
         }
         IncidentEventType::Unknown(value) => {
             metadata.push(("event_type", "unknown".into()));

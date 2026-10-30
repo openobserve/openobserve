@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     side="right"
     size="lg"
     :title="t('synthetics.privateLocations.setup.title')"
-    :sub-title="locationName || undefined"
+    :sub-title="raw(locationName || undefined)"
     data-test="synthetics-agent-setup-drawer"
     @update:open="emit('update:open', $event)"
   >
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Step 1: deploy -->
       <div class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
-          <OTag variant="primary-soft" size="sm" shape="pill">1</OTag>
+          <OTag variant="primary-soft" size="sm" shape="pill">{{ "1" }}</OTag>
           <span class="text-text-heading font-medium">
             {{ t("synthetics.privateLocations.setup.step1Title") }}
           </span>
@@ -40,6 +40,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Composer: location inputs + platform tabs + composed command -->
         <template v-if="canCompose">
           <div class="rounded-default border-border-default flex flex-col gap-3 border p-3">
+            <OInput
+              v-if="!locationId"
+              v-model="draftLocation"
+              :label="t('synthetics.privateLocations.setup.locationNameLabel')"
+              :placeholder="t('synthetics.privateLocations.setup.locationNamePlaceholder')"
+              required
+              size="sm"
+              data-test="synthetics-agent-setup-location-input"
+            />
             <div class="flex flex-col gap-1">
               <OInput
                 v-model="draftAgentName"
@@ -52,15 +61,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("synthetics.privateLocations.setup.agentNameHint") }}
               </p>
             </div>
-            <OInput
-              v-if="!locationId"
-              v-model="draftLocation"
-              :label="t('synthetics.privateLocations.setup.locationNameLabel')"
-              :placeholder="t('synthetics.privateLocations.setup.locationNamePlaceholder')"
-              required
-              size="sm"
-              data-test="synthetics-agent-setup-location-input"
-            />
           </div>
 
           <!-- Which agent to install. The two are different programs, not two
@@ -72,7 +72,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-muted text-xs font-medium uppercase">
               {{ t("synthetics.privateLocations.setup.typeTitle") }}
             </span>
-            <OTabs v-model="agentType" dense bordered data-test="synthetics-agent-setup-type-tabs">
+            <OTabs
+              v-model="selectedAgentType"
+              dense
+              bordered
+              data-test="synthetics-agent-setup-type-tabs"
+            >
               <OTab name="protocol" :label="t('synthetics.privateLocations.setup.typeProtocol')" />
               <OTab name="browser" :label="t('synthetics.privateLocations.setup.typeBrowser')" />
             </OTabs>
@@ -107,8 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <pre
               class="bg-surface-subtle border-border-default rounded-default overflow-x-auto border p-3 font-mono text-xs whitespace-pre"
               data-test="synthetics-agent-setup-install-cmd"
-              >{{ composedCommand }}</pre
-            >
+              >{{ composedCommand }}</pre>
             <OButton
               variant="ghost"
               size="icon-sm"
@@ -126,8 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <pre
             class="bg-surface-subtle border-border-default rounded-default overflow-x-auto border p-3 font-mono text-xs whitespace-pre"
             data-test="synthetics-agent-setup-install-cmd"
-            >{{ install }}</pre
-          >
+            >{{ install }}</pre>
           <OButton
             variant="ghost"
             size="icon-sm"
@@ -146,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Step 2: wait for the agent to register -->
       <div class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
-          <OTag variant="primary-soft" size="sm" shape="pill">2</OTag>
+          <OTag variant="primary-soft" size="sm" shape="pill">{{ "2" }}</OTag>
           <span class="text-text-heading font-medium">
             {{ t("synthetics.privateLocations.setup.step2Title") }}
           </span>
@@ -159,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Step 3: assign in checks -->
       <div class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
-          <OTag variant="primary-soft" size="sm" shape="pill">3</OTag>
+          <OTag variant="primary-soft" size="sm" shape="pill">{{ "3" }}</OTag>
           <span class="text-text-heading font-medium">
             {{ t("synthetics.privateLocations.setup.step3Title") }}
           </span>
@@ -174,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -204,14 +207,14 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ (e: "update:open", open: boolean): void }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const platform = ref<string | number>("docker");
-const agentType = ref<string | number>("protocol");
+const selectedAgentType = ref<string | number>("protocol");
 const draftLocation = ref("");
 const draftAgentName = ref("");
 
-const isBrowser = computed(() => agentType.value === "browser");
+const isBrowser = computed(() => selectedAgentType.value === "browser");
 
 // The browser probe is container-only, so switching to it while sitting on a
 // native-binary tab has to move the platform too — otherwise the hidden tab
@@ -229,7 +232,7 @@ watch(
     // The caller's agentType is the opening default (the browser check page
     // opens this wanting a browser agent), not a lock — the operator can flip
     // tabs to install the other kind for the same location.
-    agentType.value = props.agentType || "protocol";
+    selectedAgentType.value = props.agentType || "protocol";
     // Start BLANK (not an auto-generated `private-location-XXXX`) so the operator
     // deliberately names the location — and reuses that name across agents (a
     // location is a pool of interchangeable agents, not one location per agent).

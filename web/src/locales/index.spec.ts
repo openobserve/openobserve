@@ -24,8 +24,30 @@ vi.mock("@/utils/cookies", () => ({
   setLanguage: vi.fn(),
 }));
 
-import { getNumberLocale, APP_LOCALE_TO_BCP47 } from "@/locales/numberFormat";
-import { localeFileMap } from "@/locales";
+import {
+  getNumberLocale,
+  APP_LOCALE_TO_BCP47,
+  NUMBER_LOCALE_TAGS,
+  localeFromUnit,
+  resolveNumberLocale,
+  toLocaleUnit,
+  toSupportedNumberLocale,
+} from "@/locales/numberFormat";
+import { applyDocumentLocale, getLocale, isRtlLocale, localeFileMap } from "@/locales";
+
+const withNavigatorLanguage = (language: string, assertion: () => void) => {
+  const descriptor = Object.getOwnPropertyDescriptor(navigator, "language");
+  Object.defineProperty(navigator, "language", { value: language, configurable: true });
+  try {
+    assertion();
+  } finally {
+    if (descriptor) {
+      Object.defineProperty(navigator, "language", descriptor);
+    } else {
+      Reflect.deleteProperty(navigator, "language");
+    }
+  }
+};
 
 describe("locale registry stays in sync", () => {
   // locales/index.ts code-splits via import.meta.glob("./languages/*.json"), so
@@ -62,6 +84,7 @@ describe("getNumberLocale (locale format unit)", () => {
   it("maps app language codes to valid BCP-47 tags", () => {
     const cases: Array<[string, string]> = [
       ["en-us", "en-US"],
+      ["ar", "ar-SA-u-nu-latn"],
       ["tr-turk", "tr-TR"],
       ["zh-cn", "zh-CN"],
       ["zh-tw", "zh-TW"],
@@ -99,5 +122,107 @@ describe("getNumberLocale (locale format unit)", () => {
       maximumFractionDigits: 2,
     }).format(1234567.89);
     expect(en).toBe("1,234,567.89");
+  });
+
+  it("keeps Western digits for the Arabic UI", () => {
+    (getLanguage as any).mockReturnValue("ar");
+    const ar = new Intl.NumberFormat(getNumberLocale(), { useGrouping: false }).format(1234567890);
+
+    expect(ar).toBe("1234567890");
+  });
+});
+
+describe("panel-chosen number locale", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (getLanguage as any).mockReturnValue("de");
+  });
+
+  it("canonicalizes supported tags", () => {
+    expect(toSupportedNumberLocale("cs-cz")).toBe("cs-CZ");
+    expect(toSupportedNumberLocale("  hi-IN ")).toBe("hi-IN");
+  });
+
+  it.each([null, undefined, "", "   ", "xx-ZZ", "not a locale!!"])("rejects %j", (tag) => {
+    expect(toSupportedNumberLocale(tag)).toBeNull();
+  });
+
+  it("accepts every offered locale", () => {
+    for (const tag of NUMBER_LOCALE_TAGS) {
+      expect(toSupportedNumberLocale(tag)).toBe(tag);
+    }
+  });
+
+  it("uses a supported chosen locale over the UI language", () => {
+    expect(resolveNumberLocale("cs-CZ")).toBe("cs-CZ");
+  });
+
+  it.each([null, undefined, "", "xx-ZZ"])("treats %j as Auto (UI language)", (tag) => {
+    expect(resolveNumberLocale(tag)).toBe("de-DE");
+  });
+
+  it("offers every UI-language locale plus locales with no UI translation", () => {
+    for (const tag of Object.values(APP_LOCALE_TO_BCP47)) {
+      expect(NUMBER_LOCALE_TAGS).toContain(tag);
+    }
+    expect(NUMBER_LOCALE_TAGS).toEqual(expect.arrayContaining(["cs-CZ", "hi-IN"]));
+    expect(new Set(NUMBER_LOCALE_TAGS).size).toBe(NUMBER_LOCALE_TAGS.length);
+  });
+
+  it("round-trips a locale through a pinned unit value", () => {
+    expect(toLocaleUnit("cs-CZ")).toBe("locale:cs-CZ");
+    expect(localeFromUnit(toLocaleUnit("ar-SA-u-nu-latn"))).toBe("ar-SA-u-nu-latn");
+  });
+
+  it.each(["locale", "bytes", "custom", "", null, undefined])(
+    "finds no pinned locale in the unit %j",
+    (unit) => {
+      expect(localeFromUnit(unit)).toBeNull();
+    },
+  );
+});
+
+describe("navigator language detection", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (getLanguage as any).mockReturnValue(undefined);
+  });
+
+  it.each([
+    ["de-DE", "de"],
+    ["fr-IT", "fr"],
+    ["zh-TW", "zh-tw"],
+    ["ar-SA", "ar"],
+    ["ar-EG", "ar"],
+    ["en-DE", "en-us"],
+    ["en-IT", "en-us"],
+  ])("resolves %s to %s", (language, expected) => {
+    withNavigatorLanguage(language, () => expect(getLocale()).toBe(expected));
+  });
+
+  it.each([
+    ["de-DE", "de-DE"],
+    ["fr-IT", "fr-FR"],
+    ["en-DE", "en-US"],
+    ["en-IT", "en-US"],
+  ])("formats %s with %s", (language, expected) => {
+    withNavigatorLanguage(language, () => expect(getNumberLocale()).toBe(expected));
+  });
+});
+
+describe("document locale", () => {
+  it("identifies only registered RTL locales", () => {
+    expect(isRtlLocale("ar")).toBe(true);
+    expect(isRtlLocale("en-us")).toBe(false);
+  });
+
+  it.each([
+    ["ar", "ar-SA", "rtl"],
+    ["fr", "fr-FR", "ltr"],
+    ["unknown", "en-US", "ltr"],
+  ])("applies %s to the document", (locale, language, direction) => {
+    applyDocumentLocale(locale);
+    expect(document.documentElement.lang).toBe(language);
+    expect(document.documentElement.dir).toBe(direction);
   });
 });

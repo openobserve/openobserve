@@ -16,15 +16,19 @@
 use std::fmt;
 
 use error::ErrorData;
+use redaction::RedactionEvidence;
 use tokio::{
     sync::{mpsc, oneshot},
     time,
 };
 use usage::{TriggerData, UsageData};
 
+pub mod ai_chat;
 pub mod error;
 pub mod evaluator;
+pub mod llm_experiments;
 pub mod llm_scores;
+pub mod redaction;
 pub mod usage;
 
 #[derive(Debug)]
@@ -44,6 +48,8 @@ pub enum ReportingData {
     Usage(Box<UsageData>),
     Trigger(Box<TriggerData>),
     Error(Box<ErrorData>),
+    Redaction(Box<RedactionEvidence>),
+    AutoInvestigateDecision(Box<crate::meta::alerts::auto_investigate::DecisionRow>),
 }
 
 /// Error type for enqueue operations with timeout
@@ -91,6 +97,8 @@ impl ReportingQueue {
             ReportingData::Usage(_) => "Usage",
             ReportingData::Trigger(_) => "Trigger",
             ReportingData::Error(_) => "Error",
+            ReportingData::Redaction(_) => "Redaction",
+            ReportingData::AutoInvestigateDecision(_) => "AutoInvestigateDecision",
         };
 
         log::trace!(
@@ -132,6 +140,8 @@ impl ReportingQueue {
             ReportingData::Usage(_) => "Usage",
             ReportingData::Trigger(_) => "Trigger",
             ReportingData::Error(_) => "Error",
+            ReportingData::Redaction(_) => "Redaction",
+            ReportingData::AutoInvestigateDecision(_) => "AutoInvestigateDecision",
         };
 
         match self
@@ -175,6 +185,8 @@ impl ReportingQueue {
             ReportingData::Usage(_) => "Usage",
             ReportingData::Trigger(_) => "Trigger",
             ReportingData::Error(_) => "Error",
+            ReportingData::Redaction(_) => "Redaction",
+            ReportingData::AutoInvestigateDecision(_) => "AutoInvestigateDecision",
         };
 
         log::trace!(
@@ -328,6 +340,7 @@ mod tests {
             node_name: None,
             dashboard_info: None,
             peak_memory_usage: None,
+            region: None,
         };
 
         let result = queue
@@ -375,17 +388,30 @@ mod tests {
             query_took: None,
             scheduler_trace_id: None,
             time_in_queue_ms: None,
-            dedup_enabled: None,
-            dedup_suppressed: None,
-            dedup_count: None,
             grouped: None,
             group_size: None,
             actual_value: None,
+            rule_value: None,
             threshold_value: None,
             threshold_operator: None,
             level: None,
             group_label: None,
             value_is_lower_bound: None,
+            synthetics_error_source: None,
+            synthetics_location: None,
+            downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
+            delivery_attempted: None,
+            repeat_suppressed: None,
+            trigger_source: None,
+            triggered_by: None,
+            recipient_count: None,
+            attachment_type: None,
+            dashboard_count: None,
+            scheduled_for: None,
         };
 
         let result = queue
@@ -528,6 +554,7 @@ mod tests {
             node_name: None,
             dashboard_info: None,
             peak_memory_usage: None,
+            region: None,
         };
 
         runner.push(ReportingData::Usage(Box::new(usage_data)));
@@ -585,6 +612,7 @@ mod tests {
                 node_name: None,
                 dashboard_info: None,
                 peak_memory_usage: None,
+                region: None,
             };
             runner.push(ReportingData::Usage(Box::new(usage_data)));
         }
@@ -632,6 +660,7 @@ mod tests {
             node_name: None,
             dashboard_info: None,
             peak_memory_usage: None,
+            region: None,
         };
         runner.push(ReportingData::Usage(Box::new(usage_data)));
 
@@ -685,6 +714,7 @@ mod tests {
                 node_name: None,
                 dashboard_info: None,
                 peak_memory_usage: None,
+                region: None,
             };
             runner.push(ReportingData::Usage(Box::new(usage_data)));
         }
@@ -744,6 +774,7 @@ mod tests {
             node_name: None,
             dashboard_info: None,
             peak_memory_usage: None,
+            region: None,
         };
 
         let message = ReportingMessage::Data(ReportingData::Usage(Box::new(usage_data)));
@@ -788,6 +819,7 @@ mod tests {
             node_name: None,
             dashboard_info: None,
             peak_memory_usage: None,
+            region: None,
         };
 
         let data = ReportingData::Usage(Box::new(usage_data));
@@ -837,6 +869,7 @@ mod tests {
             node_name: None,
             dashboard_info: None,
             peak_memory_usage: None,
+            region: None,
         };
 
         // First message should succeed
@@ -891,6 +924,7 @@ mod tests {
             node_name: None,
             dashboard_info: None,
             peak_memory_usage: None,
+            region: None,
         };
 
         let trigger_data = TriggerData {
@@ -915,17 +949,30 @@ mod tests {
             query_took: None,
             scheduler_trace_id: None,
             time_in_queue_ms: None,
-            dedup_enabled: None,
-            dedup_suppressed: None,
-            dedup_count: None,
             grouped: None,
             group_size: None,
             actual_value: None,
+            rule_value: None,
             threshold_value: None,
             threshold_operator: None,
             level: None,
             group_label: None,
             value_is_lower_bound: None,
+            synthetics_error_source: None,
+            synthetics_location: None,
+            downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
+            delivery_attempted: None,
+            repeat_suppressed: None,
+            trigger_source: None,
+            triggered_by: None,
+            recipient_count: None,
+            attachment_type: None,
+            dashboard_count: None,
+            scheduled_for: None,
         };
 
         let error_data = error::ErrorData {
@@ -937,28 +984,34 @@ mod tests {
         runner.push(ReportingData::Usage(Box::new(usage_data)));
         runner.push(ReportingData::Trigger(Box::new(trigger_data)));
         runner.push(ReportingData::Error(Box::new(error_data)));
+        runner.push(ReportingData::Redaction(Box::new(
+            RedactionEvidence::init_for_reflection(),
+        )));
 
-        assert_eq!(runner.pending.len(), 3);
+        assert_eq!(runner.pending.len(), 4);
 
         let batch = runner.take_batch();
-        assert_eq!(batch.len(), 3);
+        assert_eq!(batch.len(), 4);
 
-        // Verify we have all three types
         let mut usage_count = 0;
         let mut trigger_count = 0;
         let mut error_count = 0;
+        let mut redaction_count = 0;
 
         for data in batch {
             match data {
                 ReportingData::Usage(_) => usage_count += 1,
                 ReportingData::Trigger(_) => trigger_count += 1,
                 ReportingData::Error(_) => error_count += 1,
+                ReportingData::Redaction(_) => redaction_count += 1,
+                ReportingData::AutoInvestigateDecision(_) => panic!("none was pushed"),
             }
         }
 
         assert_eq!(usage_count, 1);
         assert_eq!(trigger_count, 1);
         assert_eq!(error_count, 1);
+        assert_eq!(redaction_count, 1);
     }
 
     #[tokio::test]
@@ -989,17 +1042,30 @@ mod tests {
             query_took: None,
             scheduler_trace_id: None,
             time_in_queue_ms: None,
-            dedup_enabled: None,
-            dedup_suppressed: None,
-            dedup_count: None,
             grouped: None,
             group_size: None,
             actual_value: None,
+            rule_value: None,
             threshold_value: None,
             threshold_operator: None,
             level: None,
             group_label: None,
             value_is_lower_bound: None,
+            synthetics_error_source: None,
+            synthetics_location: None,
+            downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
+            delivery_attempted: None,
+            repeat_suppressed: None,
+            trigger_source: None,
+            triggered_by: None,
+            recipient_count: None,
+            attachment_type: None,
+            dashboard_count: None,
+            scheduled_for: None,
         };
 
         let trigger_data2 = TriggerData {
@@ -1053,17 +1119,30 @@ mod tests {
             query_took: None,
             scheduler_trace_id: None,
             time_in_queue_ms: None,
-            dedup_enabled: None,
-            dedup_suppressed: None,
-            dedup_count: None,
             grouped: None,
             group_size: None,
             actual_value: None,
+            rule_value: None,
             threshold_value: None,
             threshold_operator: None,
             level: None,
             group_label: None,
             value_is_lower_bound: None,
+            synthetics_error_source: None,
+            synthetics_location: None,
+            downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
+            delivery_attempted: None,
+            repeat_suppressed: None,
+            trigger_source: None,
+            triggered_by: None,
+            recipient_count: None,
+            attachment_type: None,
+            dashboard_count: None,
+            scheduled_for: None,
         };
 
         // Should succeed when queue has space

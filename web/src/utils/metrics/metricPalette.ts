@@ -32,6 +32,7 @@ import {
   classicColorPaletteDarkTheme,
   classicColorPaletteLightTheme,
 } from "@/utils/dashboard/colorPalette";
+import type { I18nKey } from "@/types/i18n";
 
 export interface PaletteColor {
   dark: string;
@@ -85,11 +86,37 @@ export function getBadgeStyle(
   return { color, background: `${color}1F` };
 }
 
-/** Human-facing badge text per type-filter bucket. */
-export const BADGE_LABELS: Record<string, string> = {
-  counter: "Counter",
-  gauge: "Gauge",
-  histogram: "Histogram",
-  summary: "Summary",
-  other: "Other",
+/** Badge text per type-filter bucket, as KEYS: this module is imported by
+ *  non-setup code, so consumers resolve them with t() at render. */
+export const BADGE_LABEL_KEYS: Record<string, I18nKey> = {
+  counter: "metrics.badge.counter",
+  gauge: "metrics.badge.gauge",
+  histogram: "metrics.badge.histogram",
+  summary: "metrics.badge.summary",
+  other: "metrics.badge.other",
+};
+
+/** Human-facing unit text. */
+export const UNIT_LABELS: Record<string, string> = {
+  seconds: "s",
+  milliseconds: "ms",
+  microseconds: "µs",
+  nanoseconds: "ns",
+  bytes: "bytes",
+  "bytes-per-sec": "bytes/s",
+  "count-per-sec": "c/s",
+  "ms-per-sec": "ms/s",
+  "us-per-sec": "µs/s",
+  "ns-per-sec": "ns/s",
+  bits: "bits",
+  "bits-per-sec": "bits/s",
+  percent: "%",
+  "percent-1": "%",
+  celsius: "°C",
+  volts: "V",
+  amperes: "A",
+  joules: "J",
+  watts: "W",
+  short: "",
+  none: "",
 };

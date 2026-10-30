@@ -256,6 +256,61 @@ export const mockLocations: SyntheticsLocation[] = [
   },
 ];
 
+export const mockPrivateLocations: SyntheticsLocation[] = [
+  {
+    id: "private-mumbai-1",
+    label: "mumbai-prod",
+    region: "mumbai-prod",
+    provider: "",
+    kind: "private",
+    status: "online",
+    agent_names: ["ag-mumbai-22"],
+    live_agents: 1,
+  },
+  {
+    id: "private-blr-1",
+    label: "bangalore-prod",
+    region: "bangalore-prod",
+    provider: "",
+    kind: "private",
+    status: "online",
+    agent_names: ["ag-blr-01", "ag-blr-02", "ag-blr-03"],
+    live_agents: 3,
+  },
+  {
+    id: "private-pending-1",
+    label: "delhi-pending",
+    region: "delhi-pending",
+    provider: "",
+    kind: "private",
+    status: "pending",
+    agent_names: [],
+    live_agents: 0,
+  },
+  {
+    id: "private-offline-1",
+    label: "chennai-offline",
+    region: "chennai-offline",
+    provider: "",
+    kind: "private",
+    status: "offline",
+    agent_names: [],
+    live_agents: 0,
+    last_seen_at: Date.now() * 1000 - 2 * 3600 * 1_000_000, // 2 hours ago
+  },
+  {
+    id: "private-down-1",
+    label: "kolkata-down",
+    region: "kolkata-down",
+    provider: "",
+    kind: "private",
+    status: "offline",
+    agent_names: [],
+    live_agents: 0,
+    last_seen_at: Date.now() * 1000 - 30 * 3600 * 1_000_000, // 30 hours ago
+  },
+];
+
 // ── Capabilities / device fixtures ──────────────────────────────────────────
 
 export const mockCapabilities = {

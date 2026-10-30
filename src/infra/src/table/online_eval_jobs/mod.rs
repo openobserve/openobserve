@@ -17,10 +17,7 @@ use std::collections::BTreeMap;
 
 use config::meta::{
     pipeline::components::ScorerRef,
-    self_reporting::{
-        evaluator::EVALUATOR_STREAM, llm_scores::LLM_SCORES_STREAM,
-        usage::is_reserved_internal_stream,
-    },
+    self_reporting::{evaluator::EVALUATOR_STREAM, llm_scores::LLM_SCORES_STREAM},
 };
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, Order, QueryFilter, QueryOrder, Schema, Set,
@@ -33,15 +30,14 @@ pub mod span_selector;
 pub use completion_window::*;
 pub use span_selector::*;
 
-use super::get_lock;
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors,
     table::entity::online_eval_jobs::{ActiveModel, Column, Entity, Model},
 };
 
 /// Valid job states.
-pub const VALID_STATUSES: &[&str] = &["draft", "active", "paused", "degraded", "archived"];
+pub const VALID_STATUSES: &[&str] = &["draft", "active", "paused", "archived"];
 
 pub type ScorerInputMapping = BTreeMap<String, String>;
 pub type JobInputMapping = BTreeMap<String, ScorerInputMapping>;
@@ -50,7 +46,6 @@ pub fn is_reserved_eval_source_stream(stream: &str) -> bool {
     let stream = stream.trim().to_ascii_lowercase();
     stream == EVALUATOR_STREAM
         || stream == LLM_SCORES_STREAM
-        || is_reserved_internal_stream(&stream)
         || matches!(
             stream.as_str(),
             "eval.task.span"
@@ -150,13 +145,7 @@ impl std::fmt::Display for TargetScope {
 pub fn is_valid_transition(from: &str, to: &str) -> bool {
     matches!(
         (from, to),
-        ("draft", "active")
-            | ("active", "paused")
-            | ("active", "degraded")
-            | ("paused", "active")
-            | ("degraded", "paused")
-            | ("degraded", "active")
-            | (_, "archived")
+        ("draft", "active") | ("active", "paused") | ("paused", "active") | (_, "archived")
     )
 }
 
@@ -407,7 +396,7 @@ impl From<Model> for OnlineEvalJob {
 }
 
 pub async fn create_table() -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let builder = client.get_database_backend();
 
     let schema = Schema::new(builder);
@@ -422,8 +411,6 @@ pub async fn create_table() -> Result<(), errors::Error> {
 }
 
 pub async fn add(job: &OnlineEvalJob) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-
     let record = ActiveModel {
         id: Set(job.id.clone()),
         org_id: Set(job.org_id.clone()),
@@ -457,15 +444,13 @@ pub async fn add(job: &OnlineEvalJob) -> Result<(), errors::Error> {
         updated_at: Set(job.updated_at),
     };
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::insert(record).exec(client).await?;
 
     Ok(())
 }
 
 pub async fn update(job: &OnlineEvalJob) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-
     let record = ActiveModel {
         id: Set(job.id.clone()),
         org_id: Set(job.org_id.clone()),
@@ -499,14 +484,14 @@ pub async fn update(job: &OnlineEvalJob) -> Result<(), errors::Error> {
         updated_at: Set(job.updated_at),
     };
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::update(record).exec(client).await?;
 
     Ok(())
 }
 
 pub async fn get(id: &str) -> Result<Option<OnlineEvalJob>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let record = Entity::find()
         .filter(Column::Id.eq(id))
@@ -518,7 +503,7 @@ pub async fn get(id: &str) -> Result<Option<OnlineEvalJob>, errors::Error> {
 }
 
 pub async fn get_by_org(id: &str, org_id: &str) -> Result<Option<OnlineEvalJob>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let record = Entity::find()
         .filter(Column::Id.eq(id))
@@ -531,7 +516,7 @@ pub async fn get_by_org(id: &str, org_id: &str) -> Result<Option<OnlineEvalJob>,
 }
 
 pub async fn get_all_by_org(org_id: &str) -> Result<Vec<OnlineEvalJob>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let records = Entity::find()
         .filter(Column::OrgId.eq(org_id))
@@ -549,7 +534,7 @@ pub async fn get_by_status(
     org_id: &str,
     status: &str,
 ) -> Result<Vec<OnlineEvalJob>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let records = Entity::find()
         .filter(Column::OrgId.eq(org_id))
@@ -564,13 +549,42 @@ pub async fn get_by_status(
     Ok(records)
 }
 
+/// Skips jobs of an org that is being deleted or has no organizations row.
 pub async fn get_active_trace_session() -> Result<Vec<OnlineEvalJob>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    use sea_orm::sea_query::{Expr, Query};
+
+    use crate::{coordinator::org_status::STATUS_ACTIVE, table::entity::organizations};
+
+    let client = get_orm_client_ro().await;
 
     let records = Entity::find()
         .filter(Column::Status.eq("active"))
         .filter(Column::TargetScope.is_in(["trace", "session"]))
+        .filter(
+            Column::OrgId.in_subquery(
+                Query::select()
+                    .column(organizations::Column::Identifier)
+                    .from(organizations::Entity)
+                    .and_where(Expr::col(organizations::Column::Status).eq(STATUS_ACTIVE))
+                    .to_owned(),
+            ),
+        )
         .order_by(Column::CreatedAt, Order::Desc)
+        .all(client)
+        .await?
+        .into_iter()
+        .map(OnlineEvalJob::from)
+        .collect();
+
+    Ok(records)
+}
+
+/// Jobs the health pass measures, across all orgs; paused ones settle to "no recent runs".
+pub async fn get_running_or_paused() -> Result<Vec<OnlineEvalJob>, errors::Error> {
+    let client = get_orm_client_ro().await;
+
+    let records = Entity::find()
+        .filter(Column::Status.is_in(["active", "paused"]))
         .all(client)
         .await?
         .into_iter()
@@ -585,7 +599,7 @@ pub async fn get_by_stream(
     stream: &str,
     stream_type: &str,
 ) -> Result<Vec<OnlineEvalJob>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let records = Entity::find()
         .filter(Column::OrgId.eq(org_id))
@@ -609,7 +623,7 @@ pub async fn has_non_archived_by_scorer_ref(
     org_id: &str,
     scorer_entity_id: &str,
 ) -> Result<bool, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let jobs = Entity::find()
         .filter(Column::OrgId.eq(org_id))
@@ -625,9 +639,7 @@ pub async fn has_non_archived_by_scorer_ref(
 }
 
 pub async fn delete(id: &str) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::Id.eq(id))
         .exec(client)
@@ -637,9 +649,7 @@ pub async fn delete(id: &str) -> Result<(), errors::Error> {
 }
 
 pub async fn delete_all_by_org(org_id: &str) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::OrgId.eq(org_id))
         .exec(client)
@@ -649,7 +659,7 @@ pub async fn delete_all_by_org(org_id: &str) -> Result<(), errors::Error> {
 }
 
 pub async fn exists(id: &str) -> Result<bool, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let record = Entity::find().filter(Column::Id.eq(id)).one(client).await?;
 
     Ok(record.is_some())
@@ -662,9 +672,7 @@ pub async fn update_status(
     pipeline_id: Option<&str>,
     updated_at: i64,
 ) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let model = Entity::find()
         .filter(Column::Id.eq(id))
         .one(client)
@@ -860,13 +868,11 @@ mod tests {
         assert!(is_valid_transition("draft", "active"));
         assert!(is_valid_transition("active", "paused"));
         assert!(is_valid_transition("paused", "active"));
-        assert!(is_valid_transition("active", "degraded"));
-        assert!(is_valid_transition("degraded", "paused"));
-        assert!(is_valid_transition("degraded", "active"));
+        assert!(!is_valid_transition("active", "degraded"));
         assert!(is_valid_transition("draft", "archived"));
         assert!(is_valid_transition("active", "archived"));
         assert!(is_valid_transition("paused", "archived"));
-        assert!(is_valid_transition("degraded", "archived"));
+        assert!(!is_valid_transition("archived", "active"));
     }
 
     #[test]
@@ -981,7 +987,7 @@ mod tests {
 
     #[test]
     fn test_internal_streams_cannot_be_eval_sources() {
-        for stream in ["_evaluator", "_LLM_SCORES", "usage", "eval.task.trace"] {
+        for stream in ["_evaluator", "_LLM_SCORES", "eval.task.trace"] {
             let mut model = make_model();
             model.stream = stream.to_string();
             let job = OnlineEvalJob::from(model);

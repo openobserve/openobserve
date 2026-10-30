@@ -61,16 +61,14 @@
     </template>
 
     <template #toolbar-trailing>
-      <OButton
+      <ORefreshButton
+        layout="inline"
         variant="outline"
-        size="icon-sm"
-        icon-left="refresh"
+        :last-run-at="lastUpdatedAt"
         :loading="loading"
         data-test="alerts-alertevaluationhistory-refresh"
-        @click="fetchHistory"
-      >
-        <OTooltip side="bottom" :content="t('alerts.groups.refresh')" />
-      </OButton>
+        @click="refreshHistory"
+      />
     </template>
 
     <template #cell-timestamp="{ row }">
@@ -86,7 +84,7 @@
       <span class="inline-flex">
         <OTag
           type="alertState"
-          :value="row.status"
+          :value="historyStatusOf(row)"
           size="sm"
           data-test="alerts-alertevaluationhistory-status"
         />
@@ -99,13 +97,19 @@
     <template #cell-condition="{ row }">
       <div class="flex min-w-0 items-center gap-1.5">
         <span class="text-compact font-mono whitespace-nowrap tabular-nums">
-          {{ conditionSummary(row) }}
+          {{ conditionText(row) }}
         </span>
         <template v-if="row.level">
           <span class="text-2xs text-text-secondary shrink-0">→</span>
           <OTag type="alertLevel" :value="row.level" size="sm" class="shrink-0" />
         </template>
       </div>
+    </template>
+
+    <template #cell-retries="{ row }">
+      <span class="text-compact tabular-nums" data-test="alerts-alertevaluationhistory-retries">
+        {{ row.retries != null ? row.retries : "—" }}
+      </span>
     </template>
 
     <template #cell-evaluation_time="{ row }">
@@ -116,6 +120,15 @@
       </span>
     </template>
 
+    <template #cell-anomaly_count="{ row }">
+      <span
+        class="text-compact tabular-nums"
+        :class="row.anomaly_count > 0 ? 'text-status-error-text font-medium' : ''"
+      >
+        {{ row.anomaly_count ?? "—" }}
+      </span>
+    </template>
+
     <template #cell-query_time="{ row }">
       <span class="text-compact tabular-nums">
         {{ row.query_took != null ? row.query_took + "ms" : "—" }}
@@ -123,9 +136,7 @@
     </template>
 
     <template #cell-error="{ row }">
-      <OTooltip v-if="row.error" :content="row.error">
-        <span class="text-compact">{{ row.error }}</span>
-      </OTooltip>
+      <span v-if="row.error" class="text-compact">{{ row.error }}</span>
       <span v-else class="text-compact">—</span>
     </template>
 
@@ -142,12 +153,14 @@
 </template>
 
 <script setup lang="ts">
+import { alertHistoryQuery } from "@/services/alerts.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { computed, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 
-import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -155,16 +168,20 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import alertsService from "@/services/alerts";
 import { conditionSummary } from "@/utils/alerts/runOutcome";
+import { historyStatusOf } from "@/utils/alerts/ackState";
 
-const props = defineProps<{ alertId: string }>();
+const props = withDefaults(
+  defineProps<{ alertId: string; isComposite?: boolean; isAnomaly?: boolean }>(),
+  { isComposite: false, isAnomaly: false },
+);
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 const history = ref<any[]>([]);
 const loading = ref(false);
+const lastUpdatedAt = ref<number | null>(null);
 const totalCount = ref(0);
 const currentPage = ref(1);
 const pageSize = ref(25);
@@ -191,22 +208,51 @@ const rows = computed(() =>
     .map((row, index) => ({ ...row, rowKey: `${row.timestamp}-${index}` })),
 );
 
-const fetchHistory = async () => {
+// A composite's `actual_value` is the boolean expression result (1/0) with no
+// threshold; render it as true/false rather than a bare 1/0.
+const conditionText = (row: Record<string, unknown>): string => {
+  if (props.isComposite) {
+    if (row.actual_value === 1) return "true";
+    if (row.actual_value === 0) return "false";
+    return "—";
+  }
+  return conditionSummary(row);
+};
+
+// Named handler: binding fetchHistory straight to @click would put the
+// MouseEvent in `force`.
+const refreshHistory = () => fetchHistory(true);
+
+const fetchHistory = async (force = false) => {
   const orgId = store.state.selectedOrganization?.identifier;
   if (!orgId || !props.alertId) return;
   loading.value = true;
   try {
     const endTime = Date.now() * 1000;
     const startTime = endTime - (RANGE_MS[range.value] ?? RANGE_MS["1h"]) * 1000;
-    const res = await alertsService.getHistory(orgId, {
-      alert_id: props.alertId,
+    const read = <T,>(options: any): Promise<T> => {
+      if (force) {
+        void queryClient.invalidateQueries({
+          queryKey: options.queryKey,
+          exact: true,
+          refetchType: "none",
+        });
+      }
+      return queryClient.fetchQuery(options);
+    };
+    const opts = alertHistoryQuery(orgId, {
+      // An anomaly id fails the endpoint's `alert_id` existence check outright.
+      ...(props.isAnomaly ? { anomaly_id: props.alertId } : { alert_id: props.alertId }),
       start_time: startTime,
       end_time: endTime,
       from: (currentPage.value - 1) * pageSize.value,
       size: pageSize.value,
     });
-    history.value = res.data?.hits || [];
-    totalCount.value = res.data?.total || 0;
+    const data = await read<any>(opts);
+    // The cache records the fetch time; fetchQuery does not hand it back, so read it here.
+    lastUpdatedAt.value = queryClient.getQueryState(opts.queryKey)?.dataUpdatedAt ?? Date.now();
+    history.value = data?.hits || [];
+    totalCount.value = data?.total || 0;
   } catch {
     history.value = [];
     totalCount.value = 0;
@@ -257,13 +303,38 @@ const columns = computed<OTableColumnDef[]>(() => [
     resizable: true,
     meta: { align: "left" },
   },
+  // An anomaly run reports no threshold and no query timing, but does report a count.
+  ...(props.isAnomaly
+    ? [
+        {
+          id: "anomaly_count",
+          accessorKey: "anomaly_count",
+          header: t("alerts.historyTable.anomalies"),
+          cell: " ",
+          size: 140,
+          resizable: true,
+          meta: { align: "left" },
+        } as OTableColumnDef,
+      ]
+    : [
+        {
+          id: "condition",
+          accessorKey: "actual_value",
+          header: t("alerts.historyTable.condition"),
+          cell: " ",
+          resizable: true,
+          meta: { align: "left", flex: true },
+        } as OTableColumnDef,
+      ]),
   {
-    id: "condition",
-    accessorKey: "actual_value",
-    header: t("alerts.historyTable.condition"),
+    id: "retries",
+    accessorKey: "retries",
+    header: t("alerts.retries"),
     cell: " ",
+    size: 90,
     resizable: true,
-    meta: { align: "left", flex: true },
+    hideable: true,
+    meta: { align: "left" },
   },
   {
     id: "evaluation_time",
@@ -275,16 +346,20 @@ const columns = computed<OTableColumnDef[]>(() => [
     hideable: true,
     meta: { align: "left" },
   },
-  {
-    id: "query_time",
-    accessorKey: "query_took",
-    header: t("alerts.historyTable.queryTime"),
-    cell: " ",
-    size: 120,
-    resizable: true,
-    hideable: true,
-    meta: { align: "left" },
-  },
+  ...(props.isAnomaly
+    ? []
+    : [
+        {
+          id: "query_time",
+          accessorKey: "query_took",
+          header: t("alerts.historyTable.queryTime"),
+          cell: " ",
+          size: 120,
+          resizable: true,
+          hideable: true,
+          meta: { align: "left" },
+        } as OTableColumnDef,
+      ]),
   {
     id: "error",
     accessorKey: "error",

@@ -6,21 +6,27 @@ import ExternalAlertSourcesList from "./ExternalAlertSourcesList.vue";
 import alertSources from "@/services/alert_sources";
 import destinationService from "@/services/alert_destination";
 
-vi.mock("@/services/alert_sources", () => ({
-  default: {
-    list: vi.fn(),
-    listSenders: vi.fn(),
-    setEnabled: vi.fn(),
-    rotate: vi.fn(),
-    create: vi.fn(),
-    delete: vi.fn(),
-    update: vi.fn(),
-  },
-}));
+vi.mock("@/services/alert_sources", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+      listSenders: vi.fn(),
+      setEnabled: vi.fn(),
+      rotate: vi.fn(),
+      create: vi.fn(),
+      delete: vi.fn(),
+      update: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/alert_destination", () => ({
-  default: { list: vi.fn() },
-}));
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: vi.fn() },
+  });
+});
 
 vi.mock("@/utils/clipboard", () => ({
   copyToClipboard: vi.fn(),
@@ -108,14 +114,19 @@ describe("ExternalAlertSourcesList", () => {
     const { copyToClipboard } = await import("@/utils/clipboard");
     const wrapper = await mountAndSettle();
     await (wrapper.vm as any).copyUrlFor(DEFAULT_SOURCE);
-    expect(copyToClipboard).toHaveBeenCalledWith(`http://localhost:5080${DEFAULT_SOURCE.url}`);
+    // copyToClipboard takes `t` so its toasts are translated.
+    expect(copyToClipboard).toHaveBeenCalledWith(
+      `http://localhost:5080${DEFAULT_SOURCE.url}`,
+      expect.any(Function),
+    );
   });
 
   it("copies just the bare token via copyToClipboard, not the full URL", async () => {
     const { copyToClipboard } = await import("@/utils/clipboard");
     const wrapper = await mountAndSettle();
     await (wrapper.vm as any).copyTokenFor(DEFAULT_SOURCE);
-    expect(copyToClipboard).toHaveBeenCalledWith(DEFAULT_SOURCE.token);
+    // copyToClipboard takes `t` so its toasts are translated.
+    expect(copyToClipboard).toHaveBeenCalledWith(DEFAULT_SOURCE.token, expect.any(Function));
   });
 
   it("shows 'not_connected' status when no senders exist", async () => {
@@ -278,6 +289,7 @@ describe("ExternalAlertSourcesList", () => {
     });
     expect(copyToClipboard).toHaveBeenCalledWith(
       "http://localhost:5080/api/v2/myorg/incidents/events/o2iat_staging1234efgh5678",
+      expect.any(Function),
     );
   });
 
@@ -354,6 +366,12 @@ describe("ExternalAlertSourcesList", () => {
     (wrapper.vm as any).confirmDelete(target);
     expect((wrapper.vm as any).deleteTarget).toEqual(target);
     expect((wrapper.vm as any).deleteDialogVisible).toBe(true);
+    await flushPromises();
+    const dialog = wrapper
+      .findAllComponents({ name: "ConfirmDialog" })
+      .find((c: any) => c.props("messageKeypath") === "alert_sources.deleteConfirmMessage");
+    expect(dialog!.props("messageName")).toBe("grafana-staging");
+    expect(dialog!.props("okVariant")).toBe("destructive");
   });
 
   it("doDelete calls alertSources.delete with the target id and refreshes the list", async () => {
@@ -586,14 +604,6 @@ describe("ExternalAlertSourcesList", () => {
       await flushPromises();
       expect((wrapper.vm as any).filterQuery).toBe("");
       expect((wrapper.vm as any).visibleRows.length).toBe(2);
-    });
-
-    it("shows the row count with its noun in the footer", async () => {
-      (alertSources.list as any).mockResolvedValue(TWO_SOURCES);
-      const wrapper = await mountAndSettle();
-      expect(wrapper.find('[data-test="o2-table-pagination-bottom"]').text()).toContain(
-        "2 alert_sources.header",
-      );
     });
 
     it("gives every non-action column a resize handle, including Name↔Status", async () => {

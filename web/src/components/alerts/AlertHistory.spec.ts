@@ -24,12 +24,15 @@ import router from "@/test/unit/helpers/router";
 // ---------------------------------------------------------------------------
 // Service mocks
 // ---------------------------------------------------------------------------
-vi.mock("@/services/alerts", () => ({
-  default: {
-    listByFolderId: vi.fn(),
-    getHistory: vi.fn(),
-  },
-}));
+vi.mock("@/services/alerts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      listByFolderId: vi.fn(),
+      getHistory: vi.fn(),
+    },
+  });
+});
 
 // Mock formatDate from utils/date to prevent the local shadowing recursion
 // (AlertHistory.vue defines its own formatDate that calls the imported one,
@@ -206,6 +209,8 @@ describe("AlertHistory.vue", () => {
         "",
         expect.any(String),
         "",
+        "",
+        // alertType — part of the list key, so it rides along on every call.
         "",
       );
     });
@@ -433,7 +438,9 @@ describe("AlertHistory.vue", () => {
         expect(r.variant, s).toBe("success-soft");
         expect(r.icon, s).toBe("check-circle-outline");
       }
-      expect(resolveBadge("alertState", "ok").label).toBe("Ok");
+      // Wording is a `labelKey` now, resolved by OTag via t() (precedence:
+      // prop → labelKey → label), so the registry asserts on the key.
+      expect(resolveBadge("alertState", "ok").labelKey).toBe("components.badge.alertState.ok");
     });
 
     // Legacy `condition_not_satisfied` and current `normal` are the same state
@@ -441,7 +448,7 @@ describe("AlertHistory.vue", () => {
     it("condition_not_satisfied → green 'Normal' (same as the current `normal`)", () => {
       const r = resolveBadge("alertState", "condition_not_satisfied");
       expect(r.variant).toBe("success-soft");
-      expect(r.label).toBe("Normal");
+      expect(r.labelKey).toBe("components.badge.alertState.normal");
       expect(r.icon).toBe("check-circle-outline");
       expect(resolveBadge("alertState", "normal").variant).toBe("success-soft");
     });
@@ -490,14 +497,14 @@ describe("AlertHistory.vue", () => {
     it("completed → red error-soft, labelled Firing (it is a firing state)", () => {
       const r = resolveBadge("alertState", "completed");
       expect(r.variant).toBe("error-soft");
-      expect(r.label).toBe("Firing");
+      expect(r.labelKey).toBe("components.badge.alertState.firing");
       expect(r.icon).toBe("error-outline");
     });
 
     it("notify_failed → red error-soft (condition matched, delivery failed)", () => {
       const r = resolveBadge("alertState", "notify_failed");
       expect(r.variant).toBe("error-soft");
-      expect(r.label).toBe("Notify Failed");
+      expect(r.labelKey).toBe("components.badge.alertState.notifyfailed");
     });
   });
 

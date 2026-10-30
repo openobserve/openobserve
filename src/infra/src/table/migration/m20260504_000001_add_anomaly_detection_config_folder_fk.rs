@@ -151,7 +151,8 @@ async fn fk_exists(manager: &SchemaManager<'_>) -> Result<bool, DbErr> {
             format!(
                 "SELECT COUNT(*) AS cnt FROM information_schema.table_constraints \
                  WHERE constraint_name = '{FK_NAME}' \
-                 AND table_name = 'anomaly_detection_config'"
+                 AND table_name = 'anomaly_detection_config' \
+                 AND table_schema = current_schema()"
             ),
         ))
         .await?;

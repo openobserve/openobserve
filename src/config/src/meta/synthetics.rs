@@ -13,9 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
+
 use chrono::FixedOffset;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
+use super::{
+    downtimes::ActiveDowntime,
+    synthetics_variables::{placeholder_names, substitute_placeholders},
+};
 
 // ── Frequency ─────────────────────────────────────────────────────────────────
 
@@ -111,7 +118,8 @@ pub struct Synthetic {
     pub id: String,
     #[serde(default)]
     pub org_id: String,
-    /// KSUID of the folder this synthetic belongs to (`folders.id`).
+    /// Folder this synthetic belongs to, as the public folder slug the API
+    /// accepts and returns; it is resolved to the `folders.id` KSUID on write.
     #[serde(default)]
     pub folder_id: String,
     /// Timezone offset in minutes from UTC (e.g. -300 = EST). Used for cron scheduling.
@@ -164,6 +172,9 @@ pub struct Synthetic {
     /// Key-value variables injected into the probe environment.
     #[serde(default)]
     pub variables: Vec<SyntheticVariable>,
+    /// Environments this check runs against, by id.
+    #[serde(default)]
+    pub environments: Vec<String>,
     /// Unix epoch microseconds — when to first run the check ("schedule later").
     /// When set, the scheduler uses this as the initial next_run_at instead of firing immediately.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -205,16 +216,11 @@ pub struct Synthetic {
 pub enum SyntheticType {
     #[default]
     Http,
-    Api,
     Tcp,
     /// TLS/SSL certificate check — checks expiry, chain validity, hostname.
     Tls,
     Ssh,
     Browser,
-    /// ICMP ping — checks host reachability and round-trip time.
-    Ping,
-    /// DNS record check — verifies record type/value from a nameserver.
-    Dns,
 }
 
 /// Retry ceiling for browser checks. Lower than the protocol types because a
@@ -260,11 +266,55 @@ impl SyntheticType {
             // storing those in plaintext is exactly the bug this mechanism
             // exists to prevent. Encrypting non-secret header values is
             // harmless (decrypted at edit-read and probe resolve).
-            Self::Http | Self::Api => &["/headers/*/value"],
+            Self::Http => &["/headers/*/value"],
             Self::Browser => &["/secrets/*/value", "/headers/*/value"],
-            _ => &[],
+            // No `_` arm: a new type silently defaulting to "has no secrets"
+            // is a plaintext-credential bug, so make it a compile error.
+            Self::Tcp | Self::Tls => &[],
         }
     }
+}
+
+/// Applies `f` to every secret-bearing string on a check, in one place.
+///
+/// The set of places a secret can hide is not obvious — `auth`, `variables`,
+/// `cookies`, the extracted `config_secrets` map, and legacy rows that still
+/// hold `AESenc:` values inline in `config` at
+/// [`SyntheticType::secret_config_paths`]. Three callers have to agree on that
+/// list: the synthetics service encrypting on write, the super-cluster producer
+/// decrypting for the wire, and the applier re-encrypting on arrival. Any one
+/// of them missing a field is a silent leak or a silently unreadable
+/// credential, so the list lives here and they share it.
+///
+/// `f` sees each value in place and replaces it. Errors propagate — a caller
+/// that cannot transform one secret must not be left with a half-transformed
+/// check.
+pub fn for_each_secret<E>(
+    check: &mut Synthetic,
+    f: &mut impl FnMut(&mut String) -> Result<(), E>,
+) -> Result<(), E> {
+    if let Some(auth) = check.auth.as_mut() {
+        match auth {
+            SyntheticAuth::Basic { password, .. } => f(password)?,
+            SyntheticAuth::Bearer { token } => f(token)?,
+            _ => {}
+        }
+    }
+    for var in &mut check.variables {
+        f(&mut var.value)?;
+    }
+    for cookie in &mut check.cookies {
+        f(&mut cookie.value)?;
+    }
+    for value in check.config_secrets.values_mut() {
+        f(value)?;
+    }
+    // Legacy rows: secrets never extracted into `config_secrets`.
+    let paths = check.check_type.secret_config_paths();
+    for path in paths {
+        for_each_string_at_path(&mut check.config, path, f)?;
+    }
+    Ok(())
 }
 
 /// Walks `value` along `path` (`/`-separated, `*` = every array element) and
@@ -481,6 +531,8 @@ pub struct SyntheticSettings {
     pub session_replay: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start: Option<i64>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub environments: Vec<String>,
 }
 
 fn default_wait_before_retry_secs_i32() -> i32 {
@@ -525,6 +577,28 @@ pub struct SyntheticListItem {
     pub status: SyntheticStatus,
     pub last_check_at: Option<i64>,
     pub last_response_ms: Option<f64>,
+    /// Executed (expanded) steps, browser only: what bills and draws down the pool (§5.11).
+    pub steps: Option<i32>,
+    /// How many checks embed this one as a subtest.
+    pub referenced_by: i32,
+    /// Subtest steps this browser check holds; None for protocol checks.
+    pub references: Option<i32>,
+    /// Omitted for a check that holds no subtest reference.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reference_state: Option<ReferenceState>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_downtime: Option<ActiveDowntime>,
+}
+
+/// Whether a parent's subtest references can run as stored.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ReferenceState {
+    Ok,
+    /// A referenced child has no row in this region.
+    Missing,
+    /// A referenced child holds a subtest of its own.
+    Nested,
 }
 
 // ── Query params / responses ──────────────────────────────────────────────────
@@ -596,31 +670,6 @@ pub struct TlsConfig {
     pub verify_chain: bool,
     #[serde(default = "bool_true")]
     pub verify_hostname: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PingConfig {
-    /// Number of ICMP packets to send per check.
-    #[serde(default = "default_ping_count")]
-    pub packet_count: u32,
-    /// Packet size in bytes.
-    #[serde(default = "default_ping_packet_size")]
-    pub packet_size: u32,
-    #[serde(default = "default_timeout_ms")]
-    pub timeout_ms: u32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DnsConfig {
-    /// DNS record type to query: "A", "AAAA", "CNAME", "MX", "TXT", "NS".
-    #[serde(default = "default_dns_record_type")]
-    pub record_type: String,
-    /// Optional expected value to assert against (e.g. expected IP or CNAME target).
-    pub expected_value: Option<String>,
-    /// Nameserver to query (e.g. "8.8.8.8"). Defaults to system resolver.
-    pub nameserver: Option<String>,
-    #[serde(default = "default_timeout_ms")]
-    pub timeout_ms: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -763,6 +812,13 @@ pub struct StepAssertion {
     pub attribute: Option<String>,
 }
 
+/// The browser check whose steps replace a `subtest` step at expansion.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct SubtestRef {
+    pub id: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct BrowserStepV2 {
@@ -778,6 +834,18 @@ pub struct BrowserStepV2 {
     pub value: Option<String>,
     #[serde(default)]
     pub key: Option<String>,
+    /// Mouse button for a click step. `None` means "left".
+    ///
+    /// Playwright 1.56's action picker offers "Right click" as an explicit
+    /// choice, so a right click is a deliberate recording rather than an
+    /// accident of which mouse button happened to fire. Every journey stored
+    /// before that omits the field, which is why it is optional with a defined
+    /// default rather than a schema version bump.
+    #[serde(default)]
+    pub button: Option<String>,
+    /// How many clicks a click step performs. `None` means one.
+    #[serde(default)]
+    pub click_count: Option<u32>,
     #[serde(default)]
     pub files: Option<Vec<String>>,
     #[serde(default)]
@@ -794,6 +862,9 @@ pub struct BrowserStepV2 {
     /// is a deliberate author choice, validated into 100..=60000.
     #[serde(default)]
     pub timeout_ms: Option<u32>,
+    /// Present only on a `subtest` step; never reaches a browser (expansion removes it).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subtest: Option<SubtestRef>,
 }
 
 /// A (browser, device) pair for browser check fan-out.
@@ -894,18 +965,6 @@ fn default_min_days() -> u32 {
     30
 }
 
-fn default_ping_count() -> u32 {
-    4
-}
-
-fn default_ping_packet_size() -> u32 {
-    56
-}
-
-fn default_dns_record_type() -> String {
-    "A".to_string()
-}
-
 fn default_browser_devices() -> Vec<BrowserDevice> {
     vec![BrowserDevice {
         browser: "chromium".to_string(),
@@ -978,93 +1037,190 @@ pub const DEFAULT_MAX_CHECK_BUDGET_SECS: i64 = 840;
 pub const DEFAULT_MAX_NET_TIMEOUT_MS: u32 = 300_000;
 const MIN_NET_TIMEOUT_MS: u32 = 1_000;
 
-/// The three stacked bounds, tunable by deployment.
-///
-/// ```text
-/// check worst case  <=  max_check_budget_secs  <  job_lease_secs
-///                              840s                   900s
-///                       (also the Lambda
-///                        function timeout)
-/// ```
-///
-/// Synthetics is enterprise-only, so the values are declared in
-/// `o2_enterprise`'s `SyntheticsConfig` (`O2_SYNTHETICS_*` env vars) and pushed
-/// in here at startup by [`init_limits`]. This crate cannot read them directly —
-/// `config` has no dependency on `o2_enterprise` — so the holder below is the
-/// seam, and it falls back to the `DEFAULT_*` values in OSS builds and in tests.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SyntheticsLimits {
-    pub job_lease_secs: i64,
-    pub max_check_budget_secs: i64,
-    pub max_net_timeout_ms: u32,
+// ── Deployment-shaped values ─────────────────────────────────────────────────
+//
+// Everything below is derived from `ZO_SYNTHETICS_*` and nothing else — no
+// database, no request context. It lives here rather than in
+// `openobserve-synthetics` because both the OSS crate and the enterprise
+// private-agent code need it, and neither may depend on the other: the OSS crate
+// publishes super-cluster messages through `o2_enterprise`, so an edge back the
+// other way is a package cycle cargo rejects outright.
+
+/// Public base URL for probe-facing traffic: sent to probes as
+/// `JOBAPI_ENDPOINT`, returned as the ingest `base_url` at resolve, and used by
+/// the reaper's stream writes. `ZO_SYNTHETICS_API_ENDPOINT` when set, else the
+/// deployment's `ZO_WEB_URL` — so self-hosted works with no synthetics URL
+/// config. Trailing slashes stripped (callers append `/api/...`).
+pub fn api_endpoint() -> String {
+    let cfg = crate::get_config();
+    let endpoint = cfg.synthetics.api_endpoint.trim().trim_end_matches('/');
+    if !endpoint.is_empty() {
+        return endpoint.to_string();
+    }
+    cfg.common.web_url.trim().trim_end_matches('/').to_string()
 }
 
-impl Default for SyntheticsLimits {
-    fn default() -> Self {
-        Self {
-            job_lease_secs: DEFAULT_JOB_LEASE_SECS,
-            max_check_budget_secs: DEFAULT_MAX_CHECK_BUDGET_SECS,
-            max_net_timeout_ms: DEFAULT_MAX_NET_TIMEOUT_MS,
+/// A device class with its viewport dimensions — returned by the capabilities
+/// endpoint.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyntheticsDevice {
+    pub id: String,
+    pub label: String,
+    pub width: u32,
+    pub height: u32,
+}
+
+/// Browser/device capabilities — env-controlled so admins can restrict them per
+/// deployment. Locations are NOT here: `synthetics_locations` (DB table) is the
+/// single source of truth, served separately by `list_locations_for_org` /
+/// `SyntheticsCapabilitiesV2` (`GET /api/{org}/synthetics/locations`).
+#[derive(Debug, Serialize)]
+pub struct SyntheticsCapabilities {
+    pub browsers: Vec<String>,
+    pub devices: Vec<SyntheticsDevice>,
+}
+
+/// Parse `ZO_SYNTHETICS_BROWSERS` env var into a list of browser engine names.
+fn parse_browsers(csv: &str) -> Vec<String> {
+    if csv.is_empty() {
+        // firefox temporarily disabled by default — re-add once ready.
+        return vec!["chromium".to_string()];
+    }
+    csv.split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
+/// Parse one `id:width:height` device token into a `SyntheticsDevice`.
+fn parse_device(token: &str) -> Option<SyntheticsDevice> {
+    let parts: Vec<&str> = token.splitn(3, ':').collect();
+    if parts.len() != 3 {
+        return None;
+    }
+    let id = parts[0].trim().to_string();
+    let width: u32 = parts[1].trim().parse().ok()?;
+    let height: u32 = parts[2].trim().parse().ok()?;
+    let label = device_display_label(&id);
+    Some(SyntheticsDevice {
+        id,
+        label,
+        width,
+        height,
+    })
+}
+
+fn device_display_label(id: &str) -> String {
+    match id {
+        "desktop" | "laptop_large" => "Desktop".to_string(),
+        "tablet" => "Tablet".to_string(),
+        "mobile" | "mobile_small" => "Mobile".to_string(),
+        other => {
+            // Capitalise first char, replace underscores with spaces
+            let mut s = other.replace('_', " ");
+            if let Some(c) = s.get_mut(0..1) {
+                c.make_ascii_uppercase();
+            }
+            s
         }
     }
 }
 
-impl SyntheticsLimits {
-    /// Rejects a set of limits that cannot hold together.
-    ///
-    /// The ordering is the whole point: a budget at or above the lease means a
-    /// check can be accepted, run to its limit, and still have its ack rejected
-    /// as stale — which surfaces to the user as a failure their target never
-    /// had. Operators own these values; this only refuses combinations that
-    /// cannot work.
-    pub fn validate(&self) -> Result<(), String> {
-        if self.max_check_budget_secs >= self.job_lease_secs {
-            return Err(format!(
-                "O2_SYNTHETICS_MAX_CHECK_BUDGET_SECS ({}) must be strictly less than \
-                 O2_SYNTHETICS_JOB_LEASE_SECS ({}) — the gap is what dispatch and the ack need. \
-                 A run that finishes at the budget still has to report before the reaper assumes \
-                 the probe is gone.",
-                self.max_check_budget_secs, self.job_lease_secs
-            ));
-        }
-        if self.max_check_budget_secs <= 0 || self.job_lease_secs <= 0 {
-            return Err("synthetics limits must be positive".to_string());
-        }
-        if self.max_net_timeout_ms as i64 > self.max_check_budget_secs * 1_000 {
-            return Err(format!(
-                "O2_SYNTHETICS_MAX_NET_TIMEOUT_MS ({}) exceeds the check budget ({}s) — a single \
-                 attempt could never fit",
-                self.max_net_timeout_ms, self.max_check_budget_secs
-            ));
-        }
-        Ok(())
+/// Parse `ZO_SYNTHETICS_DEVICES` env var into a list of `SyntheticsDevice`.
+fn parse_devices(csv: &str) -> Vec<SyntheticsDevice> {
+    if csv.is_empty() {
+        return vec![
+            SyntheticsDevice {
+                id: "desktop".to_string(),
+                label: "Desktop".to_string(),
+                width: 1440,
+                height: 900,
+            },
+            SyntheticsDevice {
+                id: "tablet".to_string(),
+                label: "Tablet".to_string(),
+                width: 768,
+                height: 1024,
+            },
+            SyntheticsDevice {
+                id: "mobile".to_string(),
+                label: "Mobile".to_string(),
+                width: 375,
+                height: 667,
+            },
+        ];
     }
+    csv.split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .filter_map(parse_device)
+        .collect()
 }
 
-static LIMITS: std::sync::OnceLock<SyntheticsLimits> = std::sync::OnceLock::new();
+/// Returns available browsers and device definitions. Env-controlled; see
+/// `ZO_SYNTHETICS_BROWSERS` and `ZO_SYNTHETICS_DEVICES`. Locations are not
+/// part of this — see `SyntheticsCapabilities`'s doc comment.
+pub fn list_capabilities() -> SyntheticsCapabilities {
+    let cfg = crate::get_config();
+    let cfg = &cfg.synthetics;
 
-/// Installs deployment-configured limits. Called once from `init_enterprise`.
+    let browsers = parse_browsers(&cfg.browsers);
+    let devices = parse_devices(&cfg.devices);
+
+    SyntheticsCapabilities { browsers, devices }
+}
+
+/// Lowercases and hyphenates a string for use inside an identifier.
 ///
-/// **Not fatal.** A bad synthetics ceiling must not stop the whole application
-/// from starting — synthetics is one feature, and o2 serving ingest, search and
-/// dashboards matters more than it. On rejection nothing is installed, so
-/// [`limits`] keeps returning the `DEFAULT_*` values, which are known to hold
-/// together. The caller logs the error; an operator fixes the env var and
-/// restarts.
-///
-/// Falling back rather than accepting is the safe direction: the defaults are
-/// conservative, whereas an invalid pair (say budget == lease) is what silently
-/// converts healthy targets into alerts.
-pub fn init_limits(limits: SyntheticsLimits) -> Result<(), String> {
-    limits.validate()?;
-    let _ = LIMITS.set(limits);
+/// Lives here rather than beside its callers because both sides need it and
+/// neither may depend on the other: the OSS `create_location` derives a private
+/// location's pool name with it, and the enterprise agent register path derives
+/// the same slug when it upserts a deploy-declared location. They must agree
+/// exactly, or an agent registers into a pool no job is ever queued to.
+pub fn slugify(s: &str) -> String {
+    s.chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>()
+        .split('-')
+        .filter(|p| !p.is_empty())
+        .collect::<Vec<_>>()
+        .join("-")
+}
+
+/// Lookup viewport for a device id from env config. Returns `None` for unknown
+/// devices.
+pub fn device_viewport(device_id: &str) -> Option<(u32, u32)> {
+    let cfg = crate::get_config();
+    parse_devices(&cfg.synthetics.devices)
+        .into_iter()
+        .find(|d| d.id == device_id)
+        .map(|d| (d.width, d.height))
+}
+
+pub fn is_composition_action(action: &str) -> bool {
+    V2_COMPOSITION_ACTIONS.contains(&action)
+}
+
+/// Runs the per-step rules over an already-expanded journey (no `subtest` may remain).
+pub fn validate_expanded_steps(steps: &[serde_json::Value]) -> Result<(), String> {
+    validate_v2_steps(steps)?;
+    if let Some(i) = steps.iter().position(|s| {
+        s.get("action")
+            .and_then(|a| a.as_str())
+            .is_some_and(is_composition_action)
+    }) {
+        return Err(format!(
+            "config.steps[{i}]: a composition action survived expansion"
+        ));
+    }
     Ok(())
-}
-
-/// The active limits — deployment-configured when enterprise has initialised,
-/// otherwise the `DEFAULT_*` values.
-pub fn limits() -> SyntheticsLimits {
-    LIMITS.get().copied().unwrap_or_default()
 }
 
 /// Worst-case wall clock for one leased job, in milliseconds.
@@ -1127,14 +1283,14 @@ fn validate_net_retry_budget(
         .and_then(|v| u32::try_from(v).ok())
         .unwrap_or_else(default_timeout_ms);
 
-    let max_net_timeout_ms = limits().max_net_timeout_ms;
+    let max_net_timeout_ms = crate::get_config().synthetics.max_net_timeout_ms;
     if !(MIN_NET_TIMEOUT_MS..=max_net_timeout_ms).contains(&timeout_ms) {
         return Err(format!(
             "config.timeout_ms: must be {MIN_NET_TIMEOUT_MS}..={max_net_timeout_ms}, got {timeout_ms}"
         ));
     }
 
-    let budget_secs = limits().max_check_budget_secs;
+    let budget_secs = crate::get_config().synthetics.max_check_budget_secs;
     let worst_case_ms = worst_case_run_ms(timeout_ms, 1, retries, wait_before_retry_secs);
     // Bound is the CHECK BUDGET, not the lease (ours). Wording is main's:
     // remedy first, durations rather than raw milliseconds.
@@ -1161,26 +1317,21 @@ fn validate_net_retry_budget(
     Ok(())
 }
 
-/// The complete v2 action vocabulary — exactly Playwright's recorder action
-/// model, minus what a check cannot use.
-///
-/// Deliberately excludes `hover`, `scroll`, `wait`/`waitFor` and `screenshot`:
-/// upstream `ActionName` has no counterpart for any of them, so the recorder
-/// never emitted one and the extension player could never replay one. They
-/// entered journeys only through the manual step editor, and using one aborted
-/// replay entirely. `type` and `keydown` are dropped as redundant aliases of
-/// `fill` and `press`.
-///
-/// Because this set is drawn from Playwright's own model, every stored v2 step
-/// is executable by both the probe and the extension player by construction.
+/// Recorder actions a check can replay; `subtest` is not one, as expansion removes it first.
 const V2_STEP_ACTIONS: &[&str] = &[
-    "navigate", "click", "fill", "press", "select", "check", "uncheck", "upload", "assert",
+    "navigate", "click", "hover", "fill", "press", "select", "check", "uncheck", "upload", "assert",
 ];
 
 /// v2 actions that operate on an element and therefore need a locator.
 const V2_ELEMENT_ACTIONS: &[&str] = &[
-    "click", "fill", "press", "select", "check", "uncheck", "upload", "assert",
+    "click", "hover", "fill", "press", "select", "check", "uncheck", "upload", "assert",
 ];
+
+/// Stored-only actions: expansion replaces them before any browser sees a journey.
+pub const V2_COMPOSITION_ACTIONS: &[&str] = &["subtest"];
+
+/// Row ids the results UI owns ("no step" sentinel, start load row 0); a step may not claim them.
+const STEP_ID_RESERVED: &[&str] = &["__unattributed__", "_start"];
 
 /// The closed set of assertion kinds (spec P5.1).
 ///
@@ -1202,7 +1353,6 @@ const V2_VISIBILITY_ASSERTION_KINDS: &[&str] = &["element_visible", "element_not
 /// Kinds that describe the page rather than an element, and so need no locator.
 const V2_PAGE_LEVEL_ASSERTION_KINDS: &[&str] = &["url_matches", "page_title"];
 
-const MAX_STEPS: usize = 50;
 /// A step carries up to 5 locator candidates and 5 settle patterns. A maximal
 /// 50-step journey lands near 60KB; the cap is set well clear of that. The
 /// `config` column is already JSON (jsonb on PostgreSQL), and steps travel over
@@ -1249,10 +1399,12 @@ pub const DEFAULT_TEST_ID_ATTR: &str = "data-test";
 const MAX_TEST_ID_ATTR_LEN: usize = 64;
 const MAX_SETTLE_RESPONSES: usize = 5;
 const MAX_TAGS: usize = 20;
-const MAX_VARIABLES: usize = 50;
+pub const MAX_VARIABLES: usize = 50;
+
+/// Environments one check may fan out over.
+pub const MAX_ENVIRONMENTS_PER_CHECK: usize = 5;
 const MAX_BROWSER_DEVICE_COMBOS: usize = 12;
-/// Minimum schedule interval (seconds) for protocol checks (http/tcp/ping/…).
-/// Ping-style checks legitimately run at 1s granularity.
+/// Minimum schedule interval (seconds) for protocol checks (http/tcp/tls/ssh).
 /// NOTE: the scheduler ticks every 5s, so sub-5s intervals fire at tick
 /// resolution — allowed here, but effective cadence is bounded by the tick.
 const MIN_INTERVAL_SECS: i64 = 1;
@@ -1260,17 +1412,79 @@ const MIN_INTERVAL_SECS: i64 = 1;
 /// one Lambda invocation per location per browser×device combo.
 const MIN_BROWSER_INTERVAL_SECS: i64 = 60;
 
-fn validate_http_url(field: &str, value: &str) -> Result<(), String> {
-    let parsed =
-        url::Url::parse(value).map_err(|e| format!("{field}: invalid URL '{value}': {e}"))?;
-    if parsed.scheme() != "http" && parsed.scheme() != "https" {
-        return Err(format!(
-            "{field}: URL scheme must be http or https, got '{}'",
-            parsed.scheme()
-        ));
+/// Stand-in for a placeholder while validating a templated URL's shape.
+const TEMPLATE_PROBE_TOKEN: &str = "placeholder";
+
+/// Validates a URL that may be templated.
+pub fn validate_http_url(field: &str, value: &str) -> Result<(), String> {
+    check_http_url(field, value, true)
+}
+
+/// The same rule as [`validate_http_url`], with errors that never quote the value.
+pub fn validate_http_url_quietly(field: &str, value: &str) -> Result<(), String> {
+    check_http_url(field, value, false)
+}
+
+/// A templated or resolved URL with no scheme is read as https, at save time and at run time.
+pub fn with_default_scheme(value: &str) -> String {
+    if value.contains("://") {
+        value.to_string()
+    } else {
+        format!("https://{value}")
     }
-    if parsed.host_str().is_none_or(str::is_empty) {
+}
+
+/// `echo` decides whether an error quotes the value; a resolved URL may hold a secret.
+fn check_http_url(field: &str, value: &str, echo: bool) -> Result<(), String> {
+    let quoted = |sep: &str| {
+        if echo {
+            format!("{sep}'{value}'")
+        } else {
+            String::new()
+        }
+    };
+    if value.contains("{{") {
+        if value.chars().any(char::is_whitespace) {
+            return Err(format!(
+                "{field}: must not contain whitespace{}",
+                quoted(": ")
+            ));
+        }
+        let tokens: HashMap<String, String> = placeholder_names(value)
+            .into_iter()
+            .map(|name| (name, TEMPLATE_PROBE_TOKEN.to_string()))
+            .collect();
+        let probe = substitute_placeholders(value, &tokens);
+        if probe.contains("{{") {
+            return Err(format!(
+                "{field}: unclosed or invalid '{{{{'{}",
+                quoted(" in ")
+            ));
+        }
+        return check_http_url(field, &with_default_scheme(&probe), echo);
+    }
+    let parsed =
+        url::Url::parse(value).map_err(|e| format!("{field}: invalid URL{}: {e}", quoted(" ")))?;
+    if parsed.scheme() != "http" && parsed.scheme() != "https" {
+        let got = if echo {
+            format!(", got '{}'", parsed.scheme())
+        } else {
+            String::new()
+        };
+        return Err(format!("{field}: URL scheme must be http or https{got}"));
+    }
+    let Some(host) = parsed.host_str().filter(|h| !h.is_empty()) else {
         return Err(format!("{field}: URL has no host"));
+    };
+    // Every probe refuses these under every policy, so reject them at save time rather
+    // than schedule a check that can only fail. Private ranges pass: a private location
+    // exists to reach them, and the probe's dialer decides per location.
+    if crate::utils::ssrf_guard::is_always_blocked_host(host) {
+        return Err(format!(
+            "{field}: URL host is a loopback, link-local or cloud metadata address, which no \
+             probe location can reach{}",
+            quoted(": ")
+        ));
     }
     Ok(())
 }
@@ -1400,7 +1614,7 @@ impl Synthetic {
 
         // ── target ─────────────────────────────────────────────────────────
         match self.check_type {
-            SyntheticType::Http | SyntheticType::Api | SyntheticType::Browser => {
+            SyntheticType::Http | SyntheticType::Browser => {
                 validate_http_url("target", &self.target)?
             }
             _ => validate_host_target(&self.target)?,
@@ -1536,8 +1750,31 @@ impl Synthetic {
                     v.name
                 ));
             }
+            if crate::meta::synthetics_variables::has_reserved_prefix(&v.name) {
+                return Err(format!(
+                    "variables: '{}' is reserved for credentials the probe injects itself",
+                    crate::meta::synthetics_variables::RESERVED_VARIABLE_PREFIX
+                ));
+            }
             if !seen_vars.insert(v.name.as_str()) {
                 return Err(format!("variables: duplicate name '{}'", v.name));
+            }
+        }
+
+        // ── environments ───────────────────────────────────────────────────
+        if self.environments.len() > MAX_ENVIRONMENTS_PER_CHECK {
+            return Err(format!(
+                "environments: too many ({} > {MAX_ENVIRONMENTS_PER_CHECK})",
+                self.environments.len()
+            ));
+        }
+        let mut seen_envs = std::collections::HashSet::new();
+        for env in &self.environments {
+            if env.trim().is_empty() {
+                return Err("environments: empty environment id not allowed".to_string());
+            }
+            if !seen_envs.insert(env.as_str()) {
+                return Err(format!("environments: duplicate environment '{env}'"));
             }
         }
 
@@ -1600,7 +1837,7 @@ impl Synthetic {
                     self.wait_before_retry_secs,
                 )
             }
-            SyntheticType::Http | SyntheticType::Api => {
+            SyntheticType::Http => {
                 let cfg: HttpConfig = serde_json::from_value(self.config.clone())
                     .map_err(|e| format!("config: not a valid http config: {e}"))?;
                 const METHODS: &[&str] =
@@ -1641,12 +1878,6 @@ impl Synthetic {
             SyntheticType::Tls => serde_json::from_value::<TlsConfig>(self.config.clone())
                 .map(|_| ())
                 .map_err(|e| format!("config: not a valid tls config: {e}")),
-            SyntheticType::Ping => serde_json::from_value::<PingConfig>(self.config.clone())
-                .map(|_| ())
-                .map_err(|e| format!("config: not a valid ping config: {e}")),
-            SyntheticType::Dns => serde_json::from_value::<DnsConfig>(self.config.clone())
-                .map(|_| ())
-                .map_err(|e| format!("config: not a valid dns config: {e}")),
             SyntheticType::Ssh => {
                 let cfg: SshConfig = serde_json::from_value(self.config.clone())
                     .map_err(|e| format!("config: not a valid ssh config: {e}"))?;
@@ -1823,9 +2054,7 @@ fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
         let step: BrowserStepV2 =
             serde_json::from_value(raw.clone()).map_err(|e| format!("config.steps[{i}]: {e}"))?;
 
-        if step.id.is_empty() {
-            return Err(format!("config.steps[{i}]: 'id' must not be empty"));
-        }
+        validate_step_id(i, &step.id)?;
         if !seen_ids.insert(step.id.clone()) {
             return Err(format!(
                 "config.steps[{i}]: duplicate step id '{}'",
@@ -1833,20 +2062,24 @@ fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
             ));
         }
 
-        if !V2_STEP_ACTIONS.contains(&step.action.as_str()) {
+        if !V2_STEP_ACTIONS.contains(&step.action.as_str()) && !is_composition_action(&step.action)
+        {
             return Err(format!(
-                "config.steps[{i}]: action '{}' is not valid (valid: {}). hover, scroll, wait \
-                 and screenshot have no equivalent in the recorder's action model and cannot be \
+                "config.steps[{i}]: action '{}' is not valid (valid: {}). scroll, wait and \
+                 screenshot have no equivalent in the recorder's action model and cannot be \
                  replayed; type and keydown are aliases of fill and press.",
                 step.action,
                 V2_STEP_ACTIONS.join(", ")
             ));
         }
 
-        // The probe opens about:blank and never auto-navigates.
-        if i == 0 && step.action != "navigate" {
+        if is_composition_action(&step.action) {
+            validate_subtest_step(i, &step)?;
+            continue;
+        }
+        if step.subtest.is_some() {
             return Err(format!(
-                "config.steps[0]: first step must be 'navigate', got '{}'",
+                "config.steps[{i}]: 'subtest' is only valid on a 'subtest' step, not on '{}'",
                 step.action
             ));
         }
@@ -1917,6 +2150,24 @@ fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
             ));
         }
 
+        if let Some(button) = &step.button
+            && !matches!(button.as_str(), "left" | "middle" | "right")
+        {
+            return Err(format!(
+                "config.steps[{i}].button: must be left, middle or right, got '{button}'"
+            ));
+        }
+
+        // Capped at 3 rather than left open: the recorder only ever emits 1 or 2,
+        // and an unbounded count is a way to hold a page's event loop open.
+        if let Some(count) = step.click_count
+            && !(1..=3).contains(&count)
+        {
+            return Err(format!(
+                "config.steps[{i}].click_count: must be 1..=3, got {count}"
+            ));
+        }
+
         if let Some(settle) = &step.settle {
             if settle.responses.len() > MAX_SETTLE_RESPONSES {
                 return Err(format!(
@@ -1942,6 +2193,56 @@ fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
         }
     }
 
+    Ok(())
+}
+
+fn validate_step_id(i: usize, id: &str) -> Result<(), String> {
+    if id.is_empty() {
+        return Err(format!("config.steps[{i}]: 'id' must not be empty"));
+    }
+    if !id
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    {
+        return Err(format!(
+            "config.steps[{i}]: step id '{id}' may only contain letters, digits, '-' and '_'"
+        ));
+    }
+    if STEP_ID_RESERVED.contains(&id) {
+        return Err(format!("config.steps[{i}]: step id '{id}' is reserved"));
+    }
+    Ok(())
+}
+
+fn validate_subtest_step(i: usize, step: &BrowserStepV2) -> Result<(), String> {
+    let target = step.subtest.as_ref().filter(|s| !s.id.trim().is_empty());
+    if target.is_none() {
+        return Err(format!(
+            "config.steps[{i}]: a 'subtest' step requires 'subtest.id'"
+        ));
+    }
+    if step.optional || step.always_run {
+        return Err(format!(
+            "config.steps[{i}]: 'optional' and 'always_run' are not valid on a 'subtest' step \
+             — a subtest failure always fails the parent"
+        ));
+    }
+    // Every optional field of `BrowserStepV2` except `name`: a reference is the reference.
+    let carries_more = step.url.is_some()
+        || step.locator.is_some()
+        || step.value.is_some()
+        || step.key.is_some()
+        || step.files.is_some()
+        || step.assertion.is_some()
+        || step.settle.is_some()
+        || step.button.is_some()
+        || step.click_count.is_some()
+        || step.timeout_ms.is_some();
+    if carries_more {
+        return Err(format!(
+            "config.steps[{i}]: a 'subtest' step carries only 'subtest' (and 'name')"
+        ));
+    }
     Ok(())
 }
 
@@ -1977,7 +2278,7 @@ fn validate_browser_config(
     // duplicate. Which is verbatim what the LEASE_SECS comment in
     // `dispatcher/mod.rs` was written to prevent.
     let devices = i64::try_from(cfg.browser_devices.len().max(1)).unwrap_or(1);
-    let budget_secs = limits().max_check_budget_secs;
+    let budget_secs = crate::get_config().synthetics.max_check_budget_secs;
     let worst_case_ms = worst_case_run_ms(budget_ms, devices, retries, wait_before_retry_secs);
     // Bound is the CHECK BUDGET, not the lease (ours). Wording is main's:
     // remedy first, and journey_budget_ms named last because the UI does not
@@ -2041,9 +2342,10 @@ fn validate_browser_config(
     if cfg.steps.is_empty() {
         return Err("config.steps: at least one step is required".to_string());
     }
-    if cfg.steps.len() > MAX_STEPS {
+    let browser_max_steps = crate::get_config().synthetics.browser_max_steps;
+    if cfg.steps.len() > browser_max_steps {
         return Err(format!(
-            "config.steps: too many steps ({} > {MAX_STEPS})",
+            "config.steps: too many steps ({} > {browser_max_steps})",
             cfg.steps.len()
         ));
     }
@@ -2138,68 +2440,113 @@ fn validate_browser_devices_and_schedule(
 }
 
 #[cfg(test)]
-mod limits_tests {
+mod for_each_secret_tests {
     use super::*;
 
-    #[test]
-    fn defaults_hold_together() {
-        SyntheticsLimits::default()
-            .validate()
-            .expect("shipped defaults must be a valid combination");
-    }
-
-    #[test]
-    fn budget_equal_to_lease_is_rejected() {
-        // The gap is what dispatch and the ack need. Equal means a run that
-        // uses its full budget cannot report before the reaper requeues it.
-        let l = SyntheticsLimits {
-            job_lease_secs: 900,
-            max_check_budget_secs: 900,
+    fn ssh_check_with_every_secret_kind() -> Synthetic {
+        let mut c = Synthetic {
+            check_type: SyntheticType::Ssh,
             ..Default::default()
         };
-        assert!(l.validate().is_err());
+        c.auth = Some(SyntheticAuth::Basic {
+            username: "u".into(),
+            password: "pw".into(),
+        });
+        c.variables = vec![SyntheticVariable {
+            name: "V".into(),
+            value: "vv".into(),
+            secure: true,
+            example: String::new(),
+        }];
+        c.cookies = vec![SyntheticCookie {
+            name: "c".into(),
+            value: "cv".into(),
+            ..Default::default()
+        }];
+        c.config_secrets.insert("/auth/secret".into(), "cs".into());
+        c
+    }
+
+    /// Every secret-bearing field must be visited. A field missed here ships in
+    /// clear on one side or stays unreadable on the other, so the count is
+    /// asserted rather than trusted.
+    #[test]
+    fn visits_auth_variables_cookies_and_config_secrets() {
+        let mut c = ssh_check_with_every_secret_kind();
+        let mut seen = Vec::new();
+        for_each_secret(&mut c, &mut |v: &mut String| {
+            seen.push(v.clone());
+            Ok::<(), ()>(())
+        })
+        .unwrap();
+        seen.sort();
+        assert_eq!(seen, vec!["cs", "cv", "pw", "vv"]);
     }
 
     #[test]
-    fn budget_above_lease_is_rejected() {
-        let l = SyntheticsLimits {
-            job_lease_secs: 900,
-            max_check_budget_secs: 901,
+    fn replacements_are_written_back() {
+        let mut c = ssh_check_with_every_secret_kind();
+        for_each_secret(&mut c, &mut |v: &mut String| {
+            *v = format!("X{v}");
+            Ok::<(), ()>(())
+        })
+        .unwrap();
+        match c.auth.as_ref().unwrap() {
+            SyntheticAuth::Basic { password, .. } => assert_eq!(password, "Xpw"),
+            _ => panic!("auth shape changed"),
+        }
+        assert_eq!(c.variables[0].value, "Xvv");
+        assert_eq!(c.cookies[0].value, "Xcv");
+        assert_eq!(c.config_secrets["/auth/secret"], "Xcs");
+    }
+
+    /// A bearer token is a secret too — the other arm of the auth enum.
+    #[test]
+    fn visits_a_bearer_token() {
+        let mut c = Synthetic {
+            auth: Some(SyntheticAuth::Bearer { token: "t".into() }),
             ..Default::default()
         };
-        assert!(l.validate().is_err());
+        let mut seen = Vec::new();
+        for_each_secret(&mut c, &mut |v: &mut String| {
+            seen.push(v.clone());
+            Ok::<(), ()>(())
+        })
+        .unwrap();
+        assert_eq!(seen, vec!["t"]);
     }
 
+    /// Legacy rows keep secrets inline in `config` rather than in the extracted
+    /// map, and those must be visited as well.
     #[test]
-    fn net_timeout_larger_than_the_budget_is_rejected() {
-        // One attempt could never fit, so every config of that type would fail
-        // validation for a reason the user cannot act on.
-        let l = SyntheticsLimits {
-            max_check_budget_secs: 10,
-            max_net_timeout_ms: 300_000,
+    fn visits_legacy_inline_config_secrets() {
+        let mut c = Synthetic {
+            check_type: SyntheticType::Ssh,
+            config: serde_json::json!({"auth": {"secret": "inline"}}),
             ..Default::default()
         };
-        assert!(l.validate().is_err());
+        let mut seen = Vec::new();
+        for_each_secret(&mut c, &mut |v: &mut String| {
+            seen.push(v.clone());
+            Ok::<(), ()>(())
+        })
+        .unwrap();
+        assert_eq!(seen, vec!["inline"]);
     }
 
+    /// A partially transformed check must never be stored, so the error stops
+    /// the walk.
     #[test]
-    fn a_raised_but_still_ordered_pair_is_accepted() {
-        // Operators own these values; validation only refuses combinations that
-        // cannot work, not ones it merely dislikes.
-        let l = SyntheticsLimits {
-            job_lease_secs: 600,
-            max_check_budget_secs: 540,
-            max_net_timeout_ms: 120_000,
-        };
-        assert!(l.validate().is_ok());
+    fn an_error_propagates() {
+        let mut c = ssh_check_with_every_secret_kind();
+        let r = for_each_secret(&mut c, &mut |_v: &mut String| Err("nope"));
+        assert_eq!(r, Err("nope"));
     }
+}
 
-    #[test]
-    fn limits_fall_back_to_defaults_when_uninitialised() {
-        // Tests and OSS builds never call init_limits, so this is the path the
-        // whole validation suite actually runs on.
-        assert_eq!(limits(), SyntheticsLimits::default());
-    }
+#[cfg(test)]
+mod limits_tests {
+    use super::*;
 
     #[test]
     fn browser_retries_are_capped_lower_than_net() {
@@ -2229,6 +2576,38 @@ mod tests {
         assert_eq!(mt, SyntheticType::Browser);
     }
 
+    /// Wire strings must match the `synthetics_type` column and probe payload
+    /// exactly; drift makes every stored row of that type unreadable.
+    #[test]
+    fn every_live_type_round_trips_through_serde() {
+        for (variant, wire) in [
+            (SyntheticType::Browser, "browser"),
+            (SyntheticType::Http, "http"),
+            (SyntheticType::Tcp, "tcp"),
+            (SyntheticType::Tls, "tls"),
+            (SyntheticType::Ssh, "ssh"),
+        ] {
+            let encoded = serde_json::to_value(&variant).unwrap();
+            assert_eq!(encoded, serde_json::json!(wire), "{wire}: serialize");
+            let decoded: SyntheticType = serde_json::from_value(encoded).unwrap();
+            assert_eq!(decoded, variant, "{wire}: deserialize");
+        }
+    }
+
+    /// Deliberate: `infra`'s `convert_batch` skips-and-logs an undeserializable
+    /// row instead of failing the batch, so the blast radius is that one check.
+    #[test]
+    fn removed_check_types_no_longer_deserialize() {
+        for dead in ["api", "ping", "dns"] {
+            let err = serde_json::from_value::<SyntheticType>(serde_json::json!(dead))
+                .expect_err("a removed check type must not deserialize");
+            assert!(
+                err.to_string().contains("unknown variant"),
+                "{dead}: unexpected error: {err}"
+            );
+        }
+    }
+
     #[test]
     fn test_secret_config_paths() {
         assert_eq!(SyntheticType::Ssh.secret_config_paths(), &["/auth/secret"]);
@@ -2240,14 +2619,8 @@ mod tests {
             SyntheticType::Http.secret_config_paths(),
             &["/headers/*/value"]
         );
-        assert_eq!(
-            SyntheticType::Api.secret_config_paths(),
-            &["/headers/*/value"]
-        );
         assert!(SyntheticType::Tcp.secret_config_paths().is_empty());
         assert!(SyntheticType::Tls.secret_config_paths().is_empty());
-        assert!(SyntheticType::Ping.secret_config_paths().is_empty());
-        assert!(SyntheticType::Dns.secret_config_paths().is_empty());
     }
 
     #[test]
@@ -2516,6 +2889,185 @@ mod tests {
     }
 
     #[test]
+    fn the_probes_own_credential_prefix_is_reserved_on_the_check_tier_too() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_tcp_synthetic();
+        for name in ["_AUTH_COOKIES", "_auth_token", "_Auth_Token"] {
+            s.variables = vec![SyntheticVariable {
+                name: name.to_string(),
+                value: "x".to_string(),
+                secure: false,
+                example: String::new(),
+            }];
+            let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+            assert!(err.contains("reserved"), "{name}: {err}");
+        }
+    }
+
+    #[test]
+    fn a_templated_target_validates_on_its_shape() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_tcp_synthetic();
+        s.check_type = SyntheticType::Http;
+        s.config = serde_json::json!({ "method": "GET", "timeout_ms": 10000 });
+
+        for target in [
+            "{{BASE_URL}}/login",
+            "https://{{TENANT}}.shop.test/login",
+            "{{BASE_URL}}",
+        ] {
+            s.target = target.to_string();
+            assert!(
+                s.validate(&locs, &brs, &devs, true).is_ok(),
+                "{target} should validate"
+            );
+        }
+    }
+
+    #[test]
+    fn a_templated_target_still_has_to_look_like_a_url() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_tcp_synthetic();
+        s.check_type = SyntheticType::Http;
+        s.config = serde_json::json!({ "method": "GET", "timeout_ms": 10000 });
+
+        // Permitting templates must not turn the field into a free-text box.
+        s.target = "{{BASE_URL}} /login".to_string();
+        assert!(s.validate(&locs, &brs, &devs, true).is_err(), "whitespace");
+
+        s.target = "{{BASE_URL/login".to_string();
+        assert!(s.validate(&locs, &brs, &devs, true).is_err(), "unclosed");
+
+        s.target = "ftp://{{HOST}}/x".to_string();
+        assert!(s.validate(&locs, &brs, &devs, true).is_err(), "scheme");
+    }
+
+    #[test]
+    fn an_untemplated_target_validates_exactly_as_before() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_tcp_synthetic();
+        s.check_type = SyntheticType::Http;
+        s.config = serde_json::json!({ "method": "GET", "timeout_ms": 10000 });
+
+        s.target = "https://shop.test/login".to_string();
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+
+        s.target = "not-a-url".to_string();
+        assert!(s.validate(&locs, &brs, &devs, true).is_err());
+    }
+
+    #[test]
+    fn a_quiet_url_error_names_the_field_and_never_the_value() {
+        for bad in [
+            "file:///etc/hunter2",
+            "https://hunter2 x",
+            "hunter2",
+            "https://",
+            "{{A}} hunter2",
+            "{{A/hunter2",
+            "http://127.0.0.1/hunter2",
+        ] {
+            let quiet = validate_http_url_quietly("target", bad).unwrap_err();
+            assert!(quiet.starts_with("target: "), "{quiet}");
+            assert!(!quiet.contains("hunter2"), "{quiet}");
+            assert!(validate_http_url("target", bad).is_err(), "{bad}");
+        }
+        assert!(validate_http_url_quietly("target", "https://shop.test/login").is_ok());
+    }
+
+    #[test]
+    fn a_target_no_probe_can_reach_is_rejected_at_save_time() {
+        for bad in [
+            "http://127.0.0.1/",
+            "http://localhost:8080/",
+            "https://LocalHost/",
+            "http://169.254.169.254/latest/meta-data/",
+            "http://[fd00:ec2::254]/",
+            "http://[::1]/",
+            "http://[fe80::1]/",
+            "http://metadata.google.internal/computeMetadata/v1/",
+            "http://metadata/",
+            "http://0.0.0.0/",
+        ] {
+            let err = validate_http_url("target", bad).unwrap_err();
+            assert!(err.contains("no probe location can reach"), "{bad}: {err}");
+        }
+        // A templated host resolves in the probe, whose dialer is the authoritative control.
+        assert!(validate_http_url("target", "{{HOST}}:8080/health").is_ok());
+        // Private ranges stay valid: private locations exist to reach them.
+        for ok in [
+            "http://10.0.0.5/health",
+            "http://192.168.1.1/",
+            "http://172.16.4.2:9090/metrics",
+            "http://[fd12::1]/",
+            "http://api.internal/",
+            "http://service.local/",
+            "https://shop.test/login",
+        ] {
+            assert!(validate_http_url("target", ok).is_ok(), "{ok}");
+        }
+    }
+
+    #[test]
+    fn a_url_without_a_scheme_is_read_as_https() {
+        assert_eq!(
+            with_default_scheme("shop.test/login"),
+            "https://shop.test/login"
+        );
+        assert_eq!(with_default_scheme("http://shop.test"), "http://shop.test");
+    }
+
+    #[test]
+    fn a_check_may_fan_out_over_several_environments() {
+        let (locs, brs, devs) = allowed();
+
+        let mut s = valid_tcp_synthetic();
+        s.environments = vec![];
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+
+        let mut s = valid_tcp_synthetic();
+        s.environments = vec!["env-1".to_string(), "env-2".to_string()];
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+    }
+
+    #[test]
+    fn the_environment_count_is_bounded_because_it_multiplies_jobs() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_tcp_synthetic();
+        s.environments = (0..=MAX_ENVIRONMENTS_PER_CHECK)
+            .map(|i| format!("env-{i}"))
+            .collect();
+
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.starts_with("environments: too many"), "{err}");
+    }
+
+    #[test]
+    fn a_duplicate_environment_is_rejected_not_collapsed() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_tcp_synthetic();
+        s.environments = vec!["env-1".to_string(), "env-1".to_string()];
+
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("duplicate environment"), "{err}");
+    }
+
+    #[test]
+    fn environments_survive_the_settings_round_trip() {
+        let legacy: SyntheticSettings =
+            serde_json::from_value(serde_json::json!({ "retries": 2 })).unwrap();
+        assert!(legacy.environments.is_empty());
+
+        let packed = serde_json::to_value(SyntheticSettings {
+            environments: vec!["env-1".to_string()],
+            ..Default::default()
+        })
+        .unwrap();
+        let round_tripped: SyntheticSettings = serde_json::from_value(packed).unwrap();
+        assert_eq!(round_tripped.environments, vec!["env-1".to_string()]);
+    }
+
+    #[test]
     fn net_retry_sequence_must_fit_the_check_budget() {
         let (locs, brs, devs) = allowed();
         // The budget covers the whole retry sequence because retries run inside
@@ -2633,13 +3185,6 @@ mod tests {
             "name": "Open",
             "url": "https://example.com"
         })
-    }
-
-    #[test]
-    fn test_v2_minimal_journey_accepted() {
-        let (locs, brs, devs) = allowed();
-        let s = v2_synthetic(serde_json::json!([v2_nav_step(), v2_click_step()]));
-        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
     }
 
     // ── Recorder test-id attribute ───────────────────────────────────────────
@@ -2775,10 +3320,10 @@ mod tests {
     }
 
     #[test]
-    fn test_v2_accepts_exactly_the_nine_action_vocabulary() {
+    fn test_v2_accepts_exactly_the_ten_action_vocabulary() {
         let (locs, brs, devs) = allowed();
         for action in [
-            "click", "fill", "press", "select", "check", "uncheck", "upload",
+            "click", "hover", "fill", "press", "select", "check", "uncheck", "upload",
         ] {
             let mut step = v2_click_step();
             step["action"] = serde_json::json!(action);
@@ -2795,20 +3340,74 @@ mod tests {
     }
 
     #[test]
+    fn test_v2_accepts_hover_as_an_element_action() {
+        // Playwright 1.56 added hover to the recorder action model, reachable from
+        // the action picker, and the probe executes it with Locator.hover. The
+        // vocabulary comment claiming upstream has no counterpart stopped being true.
+        let (locs, brs, devs) = allowed();
+        let mut step = v2_click_step();
+        step["action"] = serde_json::json!("hover");
+        let s = v2_synthetic(serde_json::json!([v2_nav_step(), step]));
+        assert!(
+            s.validate(&locs, &brs, &devs, true).is_ok(),
+            "hover should be accepted: {:?}",
+            s.validate(&locs, &brs, &devs, true)
+        );
+    }
+
+    #[test]
+    fn test_v2_validates_button_and_click_count() {
+        let (locs, brs, devs) = allowed();
+
+        for button in ["left", "middle", "right"] {
+            let mut step = v2_click_step();
+            step["button"] = serde_json::json!(button);
+            let s = v2_synthetic(serde_json::json!([v2_nav_step(), step]));
+            assert!(
+                s.validate(&locs, &brs, &devs, true).is_ok(),
+                "{button} should be accepted"
+            );
+        }
+
+        let mut bad = v2_click_step();
+        bad["button"] = serde_json::json!("sideways");
+        let s = v2_synthetic(serde_json::json!([v2_nav_step(), bad]));
+        assert!(
+            s.validate(&locs, &brs, &devs, true)
+                .unwrap_err()
+                .contains("button")
+        );
+
+        for count in [0, 9] {
+            let mut bad = v2_click_step();
+            bad["click_count"] = serde_json::json!(count);
+            let s = v2_synthetic(serde_json::json!([v2_nav_step(), bad]));
+            assert!(
+                s.validate(&locs, &brs, &devs, true)
+                    .unwrap_err()
+                    .contains("click_count"),
+                "click_count {count} should be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn test_v2_step_without_button_or_click_count_still_validates() {
+        // Backward compatibility: every journey stored before these fields existed
+        // omits them, and must remain valid with no migration. This is what lets
+        // them ship without a schema version bump.
+        let (locs, brs, devs) = allowed();
+        let s = v2_synthetic(serde_json::json!([v2_nav_step(), v2_click_step()]));
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+    }
+
+    #[test]
     fn test_v2_rejects_retired_actions() {
         // Upstream Playwright's recorder action model has no counterpart for any
         // of these, so the recorder never emitted one and the player could never
         // replay one. `type`/`keydown` are redundant aliases of fill/press.
         let (locs, brs, devs) = allowed();
-        for action in [
-            "hover",
-            "scroll",
-            "wait",
-            "waitFor",
-            "screenshot",
-            "type",
-            "keydown",
-        ] {
+        for action in ["scroll", "wait", "waitFor", "screenshot", "type", "keydown"] {
             let mut step = v2_click_step();
             step["action"] = serde_json::json!(action);
             let s = v2_synthetic(serde_json::json!([v2_nav_step(), step]));
@@ -3382,12 +3981,167 @@ mod tests {
         assert!(s.validate(&locs, &brs, &devs, true).is_ok());
     }
 
+    /// The start load opens the Starting URL, so the first step may be any action.
     #[test]
-    fn test_v2_first_step_must_be_navigate() {
+    fn a_journey_may_start_with_click() {
         let (locs, brs, devs) = allowed();
         let s = v2_synthetic(serde_json::json!([v2_click_step()]));
+        s.validate(&locs, &brs, &devs, true).unwrap();
+    }
+
+    /// The expanded parent runs the same rules, so it may also open on a non-navigate step.
+    #[test]
+    fn an_expanded_parent_may_open_on_a_non_navigate_step() {
+        let mut first = v2_click_step();
+        first["id"] = serde_json::json!("r0_c0");
+        let mut second = v2_click_step();
+        second["id"] = serde_json::json!("r0_c1");
+        validate_expanded_steps(&[first, second]).unwrap();
+    }
+
+    fn subtest_journey() -> serde_json::Value {
+        serde_json::json!({
+            "steps": [
+                { "id": "s1", "action": "navigate", "url": "https://example.com" },
+                { "id": "s2", "action": "subtest", "name": "Log in (shared)",
+                  "subtest": { "id": "login-test" } },
+                { "id": "s3", "action": "click", "name": "Logs",
+                  "locator": { "candidates": [ { "kind": "css", "value": "#logs" } ] } }
+            ],
+            "browser_devices": [ { "browser": "chromium", "device": "desktop" } ]
+        })
+    }
+
+    #[test]
+    fn a_subtest_step_is_accepted_by_the_stored_vocabulary() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.config = subtest_journey();
+        s.validate(&locs, &brs, &devs, true).unwrap();
+    }
+
+    #[test]
+    fn a_subtest_step_may_open_the_journey() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.config = serde_json::json!({
+            "steps": [ { "id": "s1", "action": "subtest", "subtest": { "id": "login-test" } } ],
+            "browser_devices": [ { "browser": "chromium", "device": "desktop" } ]
+        });
+        s.validate(&locs, &brs, &devs, true).unwrap();
+    }
+
+    #[test]
+    fn a_subtest_step_must_name_a_check() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.config = serde_json::json!({
+            "steps": [
+                { "id": "s1", "action": "navigate", "url": "https://example.com" },
+                { "id": "s2", "action": "subtest" }
+            ],
+            "browser_devices": [ { "browser": "chromium", "device": "desktop" } ]
+        });
         let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
-        assert!(err.contains("navigate"), "{err}");
+        assert!(err.contains("requires 'subtest.id'"), "{err}");
+    }
+
+    #[test]
+    fn optional_and_always_run_are_rejected_on_a_subtest_step() {
+        let (locs, brs, devs) = allowed();
+        for flag in ["optional", "always_run"] {
+            let mut s = valid_browser_synthetic();
+            let mut cfg = subtest_journey();
+            cfg["steps"][1][flag] = serde_json::json!(true);
+            s.config = cfg;
+            let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+            assert!(err.contains(flag), "{flag}: {err}");
+        }
+    }
+
+    #[test]
+    fn a_subtest_step_carries_nothing_but_the_reference() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        let mut cfg = subtest_journey();
+        cfg["steps"][1]["url"] = serde_json::json!("https://example.com");
+        s.config = cfg;
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("carries only"), "{err}");
+    }
+
+    #[test]
+    fn a_subtest_step_rejects_every_execution_field() {
+        let (locs, brs, devs) = allowed();
+        for (field, value) in [
+            ("timeout_ms", serde_json::json!(5000)),
+            ("button", serde_json::json!("right")),
+            ("click_count", serde_json::json!(2)),
+            ("value", serde_json::json!("x")),
+            ("key", serde_json::json!("Tab")),
+        ] {
+            let mut s = valid_browser_synthetic();
+            let mut cfg = subtest_journey();
+            cfg["steps"][1][field] = value;
+            s.config = cfg;
+            let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+            assert!(err.contains("carries only"), "{field}: {err}");
+        }
+    }
+
+    #[test]
+    fn the_subtest_field_is_rejected_on_an_ordinary_step() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        let mut cfg = subtest_journey();
+        cfg["steps"][2]["subtest"] = serde_json::json!({ "id": "login-test" });
+        s.config = cfg;
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("only valid on a 'subtest' step"), "{err}");
+    }
+
+    #[test]
+    fn step_ids_are_restricted_to_the_composed_id_alphabet() {
+        let (locs, brs, devs) = allowed();
+        for bad in ["s/1", "s,1", "s 1", "__unattributed__", "_start"] {
+            let mut s = valid_browser_synthetic();
+            s.config = serde_json::json!({
+                "steps": [ { "id": bad, "action": "navigate", "url": "https://example.com" } ],
+                "browser_devices": [ { "browser": "chromium", "device": "desktop" } ]
+            });
+            let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+            assert!(err.contains("step id"), "{bad}: {err}");
+        }
+    }
+
+    /// `_start` is the start load's row id; a real step claiming it would collide with row 0.
+    #[test]
+    fn the_start_load_id_is_reserved_alongside_the_unattributed_sentinel() {
+        for reserved in ["_start", "__unattributed__"] {
+            let err = validate_step_id(0, reserved).unwrap_err();
+            assert_eq!(
+                err,
+                format!("config.steps[0]: step id '{reserved}' is reserved")
+            );
+        }
+        for ok in ["start", "r0_start", "_s1"] {
+            assert!(validate_step_id(0, ok).is_ok(), "{ok}");
+        }
+    }
+
+    #[test]
+    fn duplicate_step_ids_are_rejected() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.config = serde_json::json!({
+            "steps": [
+                { "id": "s1", "action": "navigate", "url": "https://example.com" },
+                { "id": "s1", "action": "navigate", "url": "https://example.com/2" }
+            ],
+            "browser_devices": [ { "browser": "chromium", "device": "desktop" } ]
+        });
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("duplicate step id 's1'"), "{err}");
     }
 
     #[test]
@@ -3733,24 +4487,46 @@ mod tests {
         assert!(err.contains("at least one step"), "{err}");
     }
 
+    /// The cap is read through `get_config()` at validation time, which is the
+    /// whole reason `ZO_SYNTHETICS_BROWSER_MAX_STEPS` is hot: a reload has to
+    /// change what the next save accepts, with no restart.
     #[test]
-    fn test_validate_first_step_must_navigate() {
+    fn the_step_cap_follows_the_configured_value() {
         let (locs, brs, devs) = allowed();
+        let mut steps = vec![serde_json::json!({
+            "id": "s1", "action": "navigate", "url": "https://example.com"
+        })];
+        for i in 2..=6 {
+            steps.push(serde_json::json!({
+                "id": format!("s{i}"),
+                "action": "click",
+                "name": "Sign in",
+                "locator": { "candidates": [ { "kind": "css", "value": "#login" } ] }
+            }));
+        }
         let mut s = valid_browser_synthetic();
         s.config = serde_json::json!({
-            "steps": [
-                {
-                    "id": "s1",
-                    "action": "click",
-                    "name": "Sign in",
-                    "locator": { "candidates": [ { "kind": "css", "value": "#x" } ] }
-                }
-            ],
-            "browser_devices": [ { "browser": "chromium", "device": "desktop" } ],
-            "timeout_ms": 30000
+            "steps": steps,
+            "browser_devices": [ { "browser": "chromium", "device": "desktop" } ]
         });
+
+        let install = |cap: usize| {
+            let mut cfg = crate::Config::init().unwrap();
+            cfg.synthetics.browser_max_steps = cap;
+            crate::CONFIG.store(std::sync::Arc::new(cfg));
+        };
+        let saved = crate::CONFIG.load_full();
+
+        install(5);
         let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
-        assert!(err.contains("first step must be 'navigate'"), "{err}");
+        assert!(err.contains("too many steps (6 > 5)"), "{err}");
+
+        // Second read, no restart in between.
+        install(6);
+        let accepted = s.validate(&locs, &brs, &devs, true);
+
+        crate::CONFIG.store(saved);
+        assert!(accepted.is_ok(), "{accepted:?}");
     }
 
     #[test]
@@ -3882,5 +4658,55 @@ mod tests {
         s.check_type = SyntheticType::Http;
         s.config = serde_json::json!({ "method": "GET" });
         assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+    }
+
+    #[test]
+    fn reference_state_is_snake_case_and_omitted_without_a_reference() {
+        assert_eq!(
+            serde_json::to_value([
+                ReferenceState::Ok,
+                ReferenceState::Missing,
+                ReferenceState::Nested
+            ])
+            .unwrap(),
+            serde_json::json!(["ok", "missing", "nested"])
+        );
+        let item = SyntheticListItem {
+            id: "c".into(),
+            org_id: "o".into(),
+            folder_id: "default".into(),
+            name: "c".into(),
+            description: String::new(),
+            tags: vec![],
+            check_type: SyntheticType::Browser,
+            target: String::new(),
+            frequency: SyntheticFrequency {
+                frequency_type: SyntheticFrequencyType::Minutes,
+                interval: 5,
+                cron: String::new(),
+                timezone: None,
+            },
+            locations: vec![],
+            enabled: true,
+            created_at: 0,
+            updated_at: 0,
+            last_triggered_at: 0,
+            status: SyntheticStatus::Unknown,
+            last_check_at: None,
+            last_response_ms: None,
+            steps: Some(1),
+            referenced_by: 0,
+            references: Some(0),
+            reference_state: None,
+            active_downtime: None,
+        };
+        let json = serde_json::to_value(&item).unwrap();
+        assert!(json.get("reference_state").is_none(), "{json}");
+        let json = serde_json::to_value(SyntheticListItem {
+            reference_state: Some(ReferenceState::Missing),
+            ..item
+        })
+        .unwrap();
+        assert_eq!(json["reference_state"], "missing");
     }
 }

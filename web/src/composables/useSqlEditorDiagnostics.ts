@@ -84,7 +84,17 @@ export function useSqlEditorDiagnostics({
     }
   }
 
+  // Markers from a run sit beside the error panel, so focusing the editor to fix them must keep them.
+  let runMarkersShown = false;
+  let runMarkersQuery = "";
+  let blurRangesKey = "";
+  const rawQuery = (): string => queryEditorRef.value?.getValue?.() ?? query.value ?? "";
+  // A run commits the query trimmed while the editor keeps its trailing space, so only a real edit counts.
+  const unchangedSinceRun = (): boolean =>
+    runMarkersShown && rawQuery().trim() === runMarkersQuery.trim();
+
   function clearAll() {
+    runMarkersShown = false;
     if (externalErrors && externalErrors.value?.length) {
       externalErrors.value = [];
     }
@@ -96,6 +106,11 @@ export function useSqlEditorDiagnostics({
     watch(
       externalErrors,
       (ranges) => {
+        // The key marks only blur's own next write; a later server error with equal ranges is a run marker.
+        runMarkersShown = !!ranges?.length && JSON.stringify(ranges) !== blurRangesKey;
+        blurRangesKey = "";
+        // The server located its ranges in the committed query, which lags the editor while an edit is still debounced.
+        runMarkersQuery = runMarkersShown ? (query.value ?? "") : "";
         pushToEditor(ranges ?? []);
       },
       { deep: true },
@@ -106,7 +121,7 @@ export function useSqlEditorDiagnostics({
 
   /** Bind to @focus on the query editor. */
   const onFocus = () => {
-    clearAll();
+    if (!runMarkersShown) clearAll();
   };
 
   /**
@@ -120,7 +135,8 @@ export function useSqlEditorDiagnostics({
     // Read live content directly from the editor to bypass the v-model debounce lag
     // (user may blur within the debounce window, leaving query.value stale).
     // Fall back to the reactive prop when getValue is not available.
-    const q = (queryEditorRef.value?.getValue?.() ?? query.value)?.trim();
+    if (unchangedSinceRun()) return;
+    const q = rawQuery().trim();
     if (!q) {
       clearAll();
       return;
@@ -140,6 +156,7 @@ export function useSqlEditorDiagnostics({
     // Write back to externalErrors so response-handler code stays in sync,
     // then push to editor (watcher fires too but the double-push is a no-op).
     if (externalErrors) {
+      blurRangesKey = JSON.stringify(ranges);
       externalErrors.value = ranges;
     } else {
       pushToEditor(ranges);
@@ -148,6 +165,8 @@ export function useSqlEditorDiagnostics({
 
   /** Bind to @update:query. Clears stale markers after the user starts typing. */
   const onQueryChange = debounce(() => {
+    // The debounce can land after a run's markers arrived; only an edit made since then clears them.
+    if (unchangedSinceRun()) return;
     clearAll();
   }, 500);
 

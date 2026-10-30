@@ -4,10 +4,15 @@
 import type { Row, Table } from "@tanstack/vue-table";
 import { computed, ref, watch, useSlots } from "vue";
 import OTableBodyRow from "./OTableBodyRow.vue";
+// Rows fade only when the body mounts, i.e. when they replace the skeleton or empty state, never on sort or paging.
+import { ENTER_FADE } from "@/lib/styles/motion";
 import { VueDraggableNext } from "vue-draggable-next";
 
 const props = defineProps<{
   rows: Row<any>[];
+  /** Global index of rows[0] when the parent windows the row model to the
+   *  virtualizer's range; virtualRow.index stays global. */
+  rowIndexOffset?: number;
   table: Table<any>;
   clickable?: boolean;
   selectionEnabled?: boolean;
@@ -24,9 +29,11 @@ const props = defineProps<{
   getHighlightedHtml?: (columnId: string, cellValue: any) => string | null;
   wrap?: boolean;
   dense?: boolean;
+  compact?: boolean;
   bordered?: boolean;
   striped?: boolean;
   rowClass?: string | ((row: any) => string);
+  activeRowIndex?: number | null;
   rowStyleFn?: (row: any) => Record<string, any>;
   loading?: boolean;
   /** Enable drag-and-drop row reordering. */
@@ -61,6 +68,12 @@ const props = defineProps<{
   enableCellCopy?: boolean;
   /** Per-cell inline style function */
   getCellStyle?: (params: { columnId: string; row: any; value: any }) => Record<string, any>;
+  /**
+   * Contiguous row runs to render under headings. When set, the plain body
+   * iterates sections instead of `rows` — `rows` is still the flat
+   * concatenation, so nothing else has to branch on it.
+   */
+  sections?: { key: string; rows: Row<any>[] }[];
   /** Pivot row-field cell merge: returns hide flags for a merged cell. */
   getPivotMerge?: (
     row: any,
@@ -139,26 +152,86 @@ function getVirtualRowKey(virtualRow: { key: number | string | bigint }): string
 const isVirtual = () => !!(props.virtualRows && props.virtualRows.length > 0);
 
 function getRowForIndex(index: number) {
-  return props.rows[index];
+  return props.rows[index - (props.rowIndexOffset ?? 0)];
+}
+
+function isActiveRow(row: Row<any> | undefined): boolean {
+  return (
+    props.activeRowIndex !== null &&
+    props.activeRowIndex !== undefined &&
+    row?.index === props.activeRowIndex
+  );
 }
 
 /** Get the TanStack Row from a draggable model item (plain data). */
 function getRowForItem(item: any): Row<any> {
   return rowByOriginal.value.get(item) ?? props.rows[0];
 }
+
+const sectioned = computed(() => !isVirtual() && !rowReorderEnabled.value && !!props.sections);
+
+/** A heading row or a data row, so the plain body renders both from one loop. */
+type BodyItem =
+  | { kind: "heading"; itemKey: string; sectionKey: string; rows: Row<any>[] }
+  | { kind: "row"; itemKey: string; row: Row<any> };
+
+/**
+ * The plain body's render list. Unsectioned, this is just the rows; sectioned,
+ * each run is preceded by its heading. Built as one list so the row markup is
+ * written once rather than duplicated under a second `v-for`.
+ */
+const plainBodyItems = computed<BodyItem[]>(() => {
+  if (!sectioned.value) {
+    return props.rows.map((row) => ({ kind: "row" as const, itemKey: row.id, row }));
+  }
+  const out: BodyItem[] = [];
+  for (const section of props.sections ?? []) {
+    // An empty section renders nothing at all — a heading over no rows reads as
+    // a load that failed rather than a state nothing is in.
+    if (!section.rows.length) continue;
+    out.push({
+      kind: "heading",
+      itemKey: `heading:${section.key}`,
+      sectionKey: section.key,
+      rows: section.rows,
+    });
+    for (const row of section.rows) out.push({ kind: "row", itemKey: row.id, row });
+  }
+  return out;
+});
+
+/**
+ * Columns a heading row has to span. Counted from the table rather than from a
+ * row, so a section whose rows are all filtered out still spans correctly.
+ */
+const headingColspan = computed(
+  () =>
+    props.table.getVisibleLeafColumns().length +
+    (props.expansionEnabled ? 1 : 0) +
+    (props.selectionEnabled ? 1 : 0) +
+    (props.enableRowReorder ? 1 : 0),
+);
 </script>
 
 <template>
+  <!-- Own tbody: VueDraggableNext maps DOM child index to model index, so a foreign leading row would shift every reorder. -->
+  <tbody
+    v-if="!isVirtual() && rowReorderEnabled && slots['body-start']"
+    data-test="o2-table-body-start"
+  >
+    <slot name="body-start" />
+  </tbody>
   <!-- Normal draggable body -->
   <VueDraggableNext
     v-if="!isVirtual() && rowReorderEnabled"
     v-model="draggableModel"
     :item-key="rowKey || 'id'"
     tag="tbody"
+    :class="ENTER_FADE"
     handle="[data-test='o2-table-row-drag-handle']"
     :animation="200"
-    ghost-class="o2-table-drag-ghost"
-    drag-class="o2-table-drag-dragging"
+    ghost-class="table-drag-ghost"
+    drag-class="table-drag-dragging"
     data-test="o2-table-body"
     @start="onDragStart"
     @end="onDragEnd"
@@ -181,9 +254,11 @@ function getRowForItem(item: any): Row<any> {
       :get-highlighted-html="getHighlightedHtml"
       :wrap="wrap"
       :dense="dense"
+      :compact="compact"
       :bordered="bordered"
       :striped="striped"
       :row-class-fn="rowClass"
+      :is-active="isActiveRow(getRowForItem(item))"
       :row-style-fn="rowStyleFn"
       :status-bar-color="getStatusBarColor?.(item)"
       :enable-cell-copy="enableCellCopy"
@@ -210,59 +285,77 @@ function getRowForItem(item: any): Row<any> {
     </OTableBodyRow>
   </VueDraggableNext>
 
-  <!-- Normal (non-virtual, non-draggable) body -->
-  <tbody v-else-if="!isVirtual()" data-test="o2-table-body">
-    <OTableBodyRow
-      v-for="row in rows"
-      :key="row.id"
-      :row="row"
-      :table="table"
-      :clickable="clickable"
-      :selection-enabled="selectionEnabled"
-      :selection-multiple="selectionMultiple"
-      :is-row-selected="isRowSelectedFn?.(row.original)"
-      :is-row-selectable="isRowSelectable"
-      :expansion-enabled="expansionEnabled"
-      :can-expand="getRowExpansionEnabled ? getRowExpansionEnabled(row.original) : true"
-      :is-expanded="isExpandedFn?.(row.original)"
-      :highlight-text="highlightText"
-      :should-highlight-column="shouldHighlightColumn"
-      :get-highlighted-html="getHighlightedHtml"
-      :wrap="wrap"
-      :dense="dense"
-      :bordered="bordered"
-      :striped="striped"
-      :row-class-fn="rowClass"
-      :row-style-fn="rowStyleFn"
-      :status-bar-color="getStatusBarColor?.(row.original)"
-      :enable-cell-copy="enableCellCopy"
-      :get-cell-style="getCellStyle"
-      :get-pivot-merge="getPivotMerge"
-      :enable-row-reorder="props.enableRowReorder"
-      :row-draggable="false"
-      @toggle-selection="emit('toggle-selection', $event)"
-      @toggle-expansion="emit('toggle-expansion', $event)"
-      @row-click="(row: any, evt: MouseEvent) => emit('row-click', row, evt)"
-      @row-dblclick="(row: any, evt: MouseEvent) => emit('row-dblclick', row, evt)"
-      @row-mouseenter="(row: any, evt: MouseEvent) => emit('row-mouseenter', row, evt)"
-      @row-mouseleave="(row: any) => emit('row-mouseleave', row)"
-      @cell-click="emit('cell-click', $event)"
-      @cell-contextmenu="emit('cell-contextmenu', $event)"
-    >
-      <!-- Pass through named cell slots from parent -->
-      <template v-for="(_, slotName) in slots" :key="slotName" #[slotName]="slotProps">
-        <slot :name="slotName" v-bind="slotProps" />
-      </template>
-      <template v-if="slots.expansion" #expansion="expSlotProps">
-        <slot name="expansion" v-bind="expSlotProps" />
-      </template>
-    </OTableBodyRow>
+  <!-- Normal (non-virtual, non-draggable) body. One loop over heading-or-row
+       items, so sectioned and unsectioned bodies share the row markup. -->
+  <tbody v-else-if="!isVirtual()" :class="ENTER_FADE" data-test="o2-table-body">
+    <slot name="body-start" />
+    <template v-for="item in plainBodyItems" :key="item.itemKey">
+      <!-- Spans every visible column: a heading is about the run below it, not
+         about one column. -->
+      <tr
+        v-if="item.kind === 'heading'"
+        :data-test="`o2-table-section-${item.sectionKey}`"
+        class="bg-surface-panel"
+      >
+        <td :colspan="headingColspan" :class="bordered ? 'border-table-row-divider border-b' : ''">
+          <slot name="group-header" :section-key="item.sectionKey" :rows="item.rows" />
+        </td>
+      </tr>
+
+      <OTableBodyRow
+        v-else-if="item.kind === 'row'"
+        :row="item.row"
+        :table="table"
+        :clickable="clickable"
+        :selection-enabled="selectionEnabled"
+        :selection-multiple="selectionMultiple"
+        :is-row-selected="isRowSelectedFn?.(item.row.original)"
+        :is-row-selectable="isRowSelectable"
+        :expansion-enabled="expansionEnabled"
+        :can-expand="getRowExpansionEnabled ? getRowExpansionEnabled(item.row.original) : true"
+        :is-expanded="isExpandedFn?.(item.row.original)"
+        :highlight-text="highlightText"
+        :should-highlight-column="shouldHighlightColumn"
+        :get-highlighted-html="getHighlightedHtml"
+        :wrap="wrap"
+        :dense="dense"
+        :compact="compact"
+        :bordered="bordered"
+        :striped="striped"
+        :row-class-fn="rowClass"
+        :is-active="isActiveRow(item.row)"
+        :row-style-fn="rowStyleFn"
+        :status-bar-color="getStatusBarColor?.(item.row.original)"
+        :enable-cell-copy="enableCellCopy"
+        :get-cell-style="getCellStyle"
+        :get-pivot-merge="getPivotMerge"
+        :enable-row-reorder="props.enableRowReorder"
+        :row-draggable="false"
+        @toggle-selection="emit('toggle-selection', $event)"
+        @toggle-expansion="emit('toggle-expansion', $event)"
+        @row-click="(row: any, evt: MouseEvent) => emit('row-click', row, evt)"
+        @row-dblclick="(row: any, evt: MouseEvent) => emit('row-dblclick', row, evt)"
+        @row-mouseenter="(row: any, evt: MouseEvent) => emit('row-mouseenter', row, evt)"
+        @row-mouseleave="(row: any) => emit('row-mouseleave', row)"
+        @cell-click="emit('cell-click', $event)"
+        @cell-contextmenu="emit('cell-contextmenu', $event)"
+      >
+        <!-- Pass through named cell slots from parent -->
+        <template v-for="(_, slotName) in slots" :key="slotName" #[slotName]="slotProps">
+          <slot :name="slotName" v-bind="slotProps" />
+        </template>
+        <template v-if="slots.expansion" #expansion="expSlotProps">
+          <slot name="expansion" v-bind="expSlotProps" />
+        </template>
+      </OTableBodyRow>
+    </template>
   </tbody>
 
   <!-- Virtual scroll body: rows stay in flow; top/bottom spacer rows
        reserve the offset above first and below last visible row so cells
        inherit the parent table's column layout (same as non-virtual). -->
-  <tbody v-else data-test="o2-table-body">
+  <tbody v-else :class="ENTER_FADE" data-test="o2-table-body">
+    <slot name="body-start" />
     <tr v-if="virtualRows && virtualRows.length && virtualRows[0].start > 0" aria-hidden="true">
       <td
         :style="{ height: `${virtualRows[0].start + (baseOffset ?? 0)}px`, padding: 0, border: 0 }"
@@ -295,9 +388,11 @@ function getRowForItem(item: any): Row<any> {
       :get-highlighted-html="getHighlightedHtml"
       :wrap="wrap"
       :dense="dense"
+      :compact="compact"
       :bordered="bordered"
       :striped="striped"
       :row-class-fn="rowClass"
+      :is-active="isActiveRow(getRowForIndex(virtualRow.index))"
       :status-bar-color="getStatusBarColor?.(getRowForIndex(virtualRow.index)?.original)"
       :enable-cell-copy="enableCellCopy"
       :get-cell-style="getCellStyle"
@@ -331,19 +426,3 @@ function getRowForItem(item: any): Row<any> {
     </tr>
   </tbody>
 </template>
-
-<style scoped>
-/* keep(third-party): VueDraggableNext applies these classes to row clones at
-   RUNTIME (ghost / dragging); no template ever writes them, so they cannot be
-   utilities. Scoped still matches — the clones keep the row's data-v attr. */
-.o2-table-drag-ghost {
-  opacity: 0.3;
-  background: var(--color-primary-50);
-  border: 1px dashed var(--color-accent);
-  border-radius: 0.375rem;
-}
-.o2-table-drag-dragging {
-  opacity: 0.5;
-  box-shadow: var(--shadow-lg);
-}
-</style>

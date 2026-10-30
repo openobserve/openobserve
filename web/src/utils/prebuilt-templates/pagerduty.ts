@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { PrebuiltConfig } from "./types";
+import { gt, raw } from "@/types/i18n";
+import { PrebuiltConfig, PrebuiltType } from "./types";
 
 /**
  * PagerDuty prebuilt destination configuration
@@ -23,7 +24,7 @@ export const pagerdutyTemplate = {
   body: JSON.stringify(
     {
       payload: {
-        summary: "OpenObserve Alert: {alert_name}",
+        summary: "OpenObserve [{alert_status}]: {alert_name}",
         severity: "{severity}",
         source: "{source}",
         component: "{stream_name}",
@@ -63,14 +64,13 @@ export const pagerdutyConfig: PrebuiltConfig = {
     "Content-Type": "application/json",
   },
   method: "post",
-  urlValidator: (url: string) => url === "https://events.pagerduty.com/v2/enqueue",
   credentialFields: [
     {
       key: "integrationKey",
       labelKey: "alerts.prebuiltDestinations.pagerdutyIntegrationKey",
       type: "password",
       required: true,
-      hint: "Get your integration key from PagerDuty service settings",
+      hintKey: "alerts.prebuiltDestinations.pagerdutyIntegrationKeyHelp",
       validator: (key: string) =>
         key.length === 32 || {
           key: "alerts.prebuiltDestinations.pagerdutyIntegrationKeyLength",
@@ -81,11 +81,45 @@ export const pagerdutyConfig: PrebuiltConfig = {
       labelKey: "alerts.prebuiltDestinations.pagerdutySeverity",
       type: "select",
       required: true,
+      // Getters, not resolved strings: this config object is module scope, so a
+      // plain call would freeze the copy at the boot locale.
       options: [
-        { label: "Critical", value: "critical", description: "Highest priority incidents" },
-        { label: "Error", value: "error", description: "Standard error incidents" },
-        { label: "Warning", value: "warning", description: "Warning level incidents" },
-        { label: "Info", value: "info", description: "Informational incidents" },
+        {
+          get label() {
+            return gt("alerts.prebuiltDestinations.severityCritical");
+          },
+          value: "critical",
+          get description() {
+            return gt("alert_destinations.severityCriticalDescription");
+          },
+        },
+        {
+          get label() {
+            return gt("alerts.prebuiltDestinations.severityError");
+          },
+          value: "error",
+          get description() {
+            return gt("alert_destinations.severityErrorDescription");
+          },
+        },
+        {
+          get label() {
+            return gt("alerts.prebuiltDestinations.severityWarning");
+          },
+          value: "warning",
+          get description() {
+            return gt("alert_destinations.severityWarningDescription");
+          },
+        },
+        {
+          get label() {
+            return gt("alerts.prebuiltDestinations.severityInfo");
+          },
+          value: "info",
+          get description() {
+            return gt("alert_destinations.severityInfoDescription");
+          },
+        },
       ],
     },
   ],
@@ -93,10 +127,10 @@ export const pagerdutyConfig: PrebuiltConfig = {
 
 import pagerdutyLogo from "@/assets/images/alerts/destinations/pagerduty.png";
 
-export const pagerdutyDestinationType = {
+export const pagerdutyDestinationType: PrebuiltType = {
   id: "pagerduty",
-  name: "PagerDuty",
-  description: "Create incidents in PagerDuty",
+  name: raw("PagerDuty"),
+  descriptionKey: "alert_destinations.prebuilt.pagerdutyDescription",
   icon: "pagerduty",
   image: pagerdutyLogo,
   popular: true,

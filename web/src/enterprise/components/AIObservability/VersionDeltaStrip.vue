@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`version-delta-strip-delta-${metric.key}`"
         >
           <template v-if="metric.ci">
-            <OTooltip :content="tooltipText(metric)" side="top">
+            <OTooltip :content="raw(tooltipText(metric))" side="top">
               <span :data-test="`version-delta-strip-delta-value-${metric.key}`">{{
                 formatDelta(metric)
               }}</span>
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
@@ -95,9 +95,9 @@ import type {
 } from "@/plugins/traces/versionCompare/compareResult";
 import { formatMicros } from "@/plugins/traces/versionCompare/formatDuration";
 
-const props = defineProps<{ result: CompareResult }>();
+defineProps<{ result: CompareResult }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const metricLabel = (key: MetricKey) => t(`aiObservability.deltaStrip.metricLabel.${key}`);
 
@@ -139,7 +139,15 @@ function tooltipText(metric: MetricResult): string {
   // (humanize), cost bounds are dollars, everything else is a plain number.
   const fmtBound = (v: number): string => {
     if (MS_KEYS.includes(metric.key))
-      return formatMicros(Math.abs(v)) + (v < 0 ? " faster" : " slower");
+      // The result is spliced into the translated ciRange sentence, so the direction
+      // word has to come from the catalogue rather than being appended in English.
+      return v < 0
+        ? t("aiObservability.deltaStrip.tooltip.boundFaster", {
+            value: formatMicros(Math.abs(v)),
+          })
+        : t("aiObservability.deltaStrip.tooltip.boundSlower", {
+            value: formatMicros(Math.abs(v)),
+          });
     if (COST_KEYS.includes(metric.key)) return `$${v.toFixed(4)}`;
     return v.toFixed(4);
   };

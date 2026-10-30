@@ -15,7 +15,10 @@
 
 import { toZonedTime } from "date-fns-tz";
 import { PromQLResponse, ProcessedPromQLData, AggregationFunction } from "./types";
-import { getPromqlLegendName } from "./legendBuilder";
+import { buildPromqlSeriesNames } from "./legendBuilder";
+import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
+import { legendFallbackOf } from "@/utils/dashboard/promql/formula";
+import { PROMETHEUS_HISTOGRAM_MODE, limitWholeHistograms } from "./histogramBuckets";
 
 /**
  * Preprocess PromQL responses into a common format for chart converters
@@ -23,18 +26,53 @@ import { getPromqlLegendName } from "./legendBuilder";
  * @param searchQueryData - Array of PromQL API responses (one per query)
  * @param panelSchema - Panel configuration schema
  * @param store - Vuex store instance
+ * @param shift - each expanded result's panel query index and name suffix (alignShiftedPromQLResults)
  * @returns Processed data array ready for chart-specific conversion
  */
 export async function processPromQLData(
   searchQueryData: PromQLResponse[],
   panelSchema: any,
   store: any,
+  shift: { parentQueryIndex?: number[]; nameSuffixes?: string[] } = {},
 ): Promise<ProcessedPromQLData[]> {
   const result: ProcessedPromQLData[] = [];
+  const queryIndexOf = (index: number) => shift.parentQueryIndex?.[index] ?? index;
 
   // Apply series limit
-  const seriesLimit = panelSchema.config?.promql_series_limit || 100;
-  const limitedData = applySeriesLimit(searchQueryData, seriesLimit);
+  const seriesLimit = getPromqlSeriesLimit(panelSchema.config, store);
+  const histogramMode =
+    panelSchema.type === "heatmap" &&
+    panelSchema.config?.heatmap_mode === PROMETHEUS_HISTOGRAM_MODE;
+  const histogramsLimited: Array<{ shown: number; total: number } | undefined> = [];
+  const limitedData = applySeriesLimit(
+    searchQueryData,
+    seriesLimit,
+    queryIndexOf,
+    shift.nameSuffixes,
+    histogramMode
+      ? (result, limit, index) => {
+          const cut = limitWholeHistograms(result, limit);
+          if (cut.shown < cut.total)
+            histogramsLimited[index] = { shown: cut.shown, total: cut.total };
+          return cut.kept;
+        }
+      : undefined,
+  );
+
+  // Named through the same builder the line/bar path uses, so a panel flipped
+  // from Line to Stacked keeps its legend, its tooltip and its per-series colour
+  // keys instead of reverting to the raw label set.
+  const seriesNames = buildPromqlSeriesNames(
+    limitedData.map((queryData: any, index: number) => ({
+      metrics: ((queryData?.data?.result || queryData?.result) ?? [])
+        .map((metric: any) => metric?.metric)
+        .filter(Boolean),
+      template: panelSchema.queries?.[queryIndexOf(index)]?.config?.promql_legend,
+      fallback: legendFallbackOf(panelSchema.queries, queryIndexOf(index)),
+      expr: panelSchema.queries?.[queryIndexOf(index)]?.query,
+    })),
+    getCachedSemanticGroups(store?.state?.selectedOrganization?.identifier ?? "") ?? [],
+  );
 
   // Collect all unique timestamps across all queries
   const allTimestamps = collectAllTimestamps(limitedData);
@@ -52,11 +90,9 @@ export async function processPromQLData(
     }
 
     const series = resultData.map((metric: any) => {
-      // Generate series name using legend template
-      const seriesName = getPromqlLegendName(
-        metric.metric,
-        panelSchema.queries[index]?.config?.promql_legend,
-      );
+      const suffix = shift.nameSuffixes?.[index];
+      const baseName = seriesNames.get(metric.metric) ?? "";
+      const seriesName = suffix ? `${baseName} (${suffix})` : baseName;
 
       // Extract values (matrix has values[], vector has value)
       const values = metric.values || (metric.value ? [metric.value] : []);
@@ -78,12 +114,25 @@ export async function processPromQLData(
     result.push({
       timestamps: formattedTimestamps,
       series,
-      queryIndex: index,
-      queryConfig: panelSchema.queries[index]?.config || {},
+      queryIndex: queryIndexOf(index),
+      seriesRole: shift.nameSuffixes?.[index] ? "shifted" : "primary",
+      ...(shift.nameSuffixes?.[index] ? { nameSuffix: shift.nameSuffixes[index] } : {}),
+      ...(histogramsLimited[index] ? { histogramsLimited: histogramsLimited[index] } : {}),
+      queryConfig: panelSchema.queries[queryIndexOf(index)]?.config || {},
     });
   });
 
   return result;
+}
+
+/** The per-query series cap, never above the server's; anything but a positive number means 100. */
+export function getPromqlSeriesLimit(
+  config: { promql_series_limit?: unknown } | null | undefined,
+  store: { state?: { zoConfig?: { max_dashboard_series?: number } } } | null | undefined,
+): number {
+  const serverMax = store?.state?.zoConfig?.max_dashboard_series ?? 100;
+  const limit = Math.floor(Number(config?.promql_series_limit));
+  return Math.min(limit > 0 ? limit : 100, serverMax);
 }
 
 /**
@@ -118,7 +167,7 @@ function collectAllTimestamps(data: PromQLResponse[]): Set<number> {
  * @param timezone - Timezone string (e.g., "America/New_York" or "UTC")
  * @returns Array of [unix_ts, formatted_date] tuples
  */
-function formatTimestamps(
+export function formatTimestamps(
   timestamps: Set<number>,
   timezone: string,
 ): Array<[number, Date | string]> {
@@ -135,33 +184,50 @@ function formatTimestamps(
 }
 
 /**
- * Limit number of series per query to prevent performance issues
+ * Limit number of series per query to prevent performance issues; a shifted series follows its primary.
  *
  * @param data - Array of PromQL responses
  * @param limit - Maximum number of series to keep per query
+ * @param queryIndexOf - panel query index of each expanded result
+ * @param nameSuffixes - shift suffix of each expanded result ("" for a primary)
+ * @param sliceResult - keeps at most `limit` series of one result
  * @returns Limited data array
  */
-function applySeriesLimit(data: PromQLResponse[], limit: number): PromQLResponse[] {
-  return data.map((queryData) => {
+function applySeriesLimit(
+  data: PromQLResponse[],
+  limit: number,
+  queryIndexOf: (index: number) => number = (index) => index,
+  nameSuffixes: string[] = [],
+  sliceResult: (result: any[], limit: number, index: number) => any[] = (result, max) =>
+    result.slice(0, max),
+): PromQLResponse[] {
+  const resultOf = (queryData: PromQLResponse) => queryData?.data?.result || queryData?.result;
+  const withResult = (queryData: PromQLResponse, result: any[]): PromQLResponse => {
     // Handle both standard PromQL format and OpenObserve format
-    if (queryData?.data?.result) {
-      // Standard PromQL format
-      return {
-        ...queryData,
-        data: {
-          ...queryData.data,
-          result: queryData.data.result.slice(0, limit),
-        },
-      };
-    } else if (queryData?.result) {
-      // OpenObserve format
-      return {
-        ...queryData,
-        result: queryData.result.slice(0, limit),
-      };
-    }
+    if (queryData?.data?.result) return { ...queryData, data: { ...queryData.data, result } };
+    return { ...queryData, result };
+  };
 
-    return queryData;
+  const limited = data.map((queryData, index) => {
+    const result = resultOf(queryData);
+    return !result || nameSuffixes[index]
+      ? queryData
+      : withResult(queryData, sliceResult(result, limit, index));
+  });
+
+  const kept = new Map<number, Set<any>>();
+  limited.forEach((queryData, index) => {
+    const result = resultOf(queryData);
+    if (nameSuffixes[index] || !result?.length || kept.has(queryIndexOf(index))) return;
+    kept.set(queryIndexOf(index), new Set(result.map((m: any) => m?.metric)));
+  });
+
+  return limited.map((queryData, index) => {
+    const result = resultOf(queryData);
+    if (!result || !nameSuffixes[index]) return queryData;
+    const primaries = kept.get(queryIndexOf(index));
+    const survivors = primaries ? result.filter((m: any) => primaries.has(m?.metric)) : result;
+    return withResult(queryData, sliceResult(survivors, limit, index));
   });
 }
 
@@ -197,7 +263,7 @@ export function fillMissingTimestamps(
  *
  * @param values - Array of [timestamp, value] tuples
  * @param aggregation - Aggregation function to apply
- * @returns Aggregated single value
+ * @returns Aggregated value of the finite samples, NaN when none is finite
  */
 // Unknown aggregation strings from panel config fall through to the `last` default case
 export function applyAggregation(
@@ -205,8 +271,11 @@ export function applyAggregation(
   aggregation: AggregationFunction | (string & {}) = "last",
 ): number {
   if (!values || values.length === 0) return 0;
+  if (aggregation === "count") return values.length;
 
-  const numericValues = values.map(([, val]) => parseFloat(val));
+  // Prometheus sends "NaN"/"+Inf" for empty or unbounded steps; one of them would poison every reducer.
+  const numericValues = values.map(([, val]) => parseFloat(val)).filter(Number.isFinite);
+  if (numericValues.length === 0) return NaN;
 
   switch (aggregation) {
     case "last":
@@ -221,8 +290,6 @@ export function applyAggregation(
       return numericValues.reduce((a, b) => a + b, 0) / numericValues.length;
     case "sum":
       return numericValues.reduce((a, b) => a + b, 0);
-    case "count":
-      return numericValues.length;
     case "range":
       return Math.max(...numericValues) - Math.min(...numericValues);
     case "diff":

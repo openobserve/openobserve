@@ -23,11 +23,47 @@ const {
   mockBuildQueryDetails,
   mockNavigateToLogs,
   mockNavigateToCorrelatedLogs,
+  mockToast,
+  mockPromptResolve,
+  mockFindRelatedTelemetry,
+  mockSearch,
+  mockSearchObj,
+  mockStreamNameList,
+  mockStreamSchema,
 } = vi.hoisted(() => ({
+  mockFindRelatedTelemetry: vi.fn().mockResolvedValue(null),
+  mockStreamNameList: vi.fn().mockResolvedValue({ data: { list: [] } }),
+  mockStreamSchema: vi.fn().mockResolvedValue({ data: { schema: [] } }),
   mockLoadSemanticGroups: vi.fn().mockResolvedValue([]),
   mockBuildQueryDetails: vi.fn().mockReturnValue({}),
   mockNavigateToLogs: vi.fn(),
   mockNavigateToCorrelatedLogs: vi.fn(),
+  mockPromptResolve: vi.fn(),
+  mockToast: vi.fn(),
+  mockSearch: vi.fn().mockResolvedValue({ data: { hits: [] } }),
+  mockSearchObj: {
+    meta: { serviceColors: { scheduler: "#1ab8be" } },
+    data: { traceDetails: {} as Record<string, any> },
+  } as Record<string, any>,
+}));
+
+vi.mock("@/services/search", () => ({
+  default: { search: mockSearch },
+}));
+
+vi.mock("@/services/stream", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/services/stream")>();
+  return {
+    default: { ...actual.default, nameList: mockStreamNameList, schema: mockStreamSchema },
+  };
+});
+
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
+}));
+
+vi.mock("@/services/llm-prompts.service", () => ({
+  default: { resolve: mockPromptResolve },
 }));
 
 vi.mock("@/utils/traces/convertTraceData", () => ({
@@ -36,7 +72,7 @@ vi.mock("@/utils/traces/convertTraceData", () => ({
 
 vi.mock("@/composables/useTraces", () => ({
   default: () => ({
-    searchObj: { meta: { serviceColors: { alertmanager: "#1ab8be" } } },
+    searchObj: mockSearchObj,
     buildQueryDetails: mockBuildQueryDetails,
     navigateToLogs: mockNavigateToLogs,
     navigateToCorrelatedLogs: mockNavigateToCorrelatedLogs,
@@ -52,8 +88,9 @@ vi.mock("@/aws-exports", () => ({
 
 vi.mock("@/composables/useServiceCorrelation", () => ({
   useServiceCorrelation: () => ({
-    findRelatedTelemetry: vi.fn().mockResolvedValue(null),
+    findRelatedTelemetry: mockFindRelatedTelemetry,
     loadSemanticGroups: mockLoadSemanticGroups,
+    semanticGroups: { value: [] },
   }),
 }));
 
@@ -67,10 +104,12 @@ vi.mock("@/composables/traces/useTraceDetails", () => ({
 import componentSource from "@/plugins/traces/TraceDetailsSidebar.vue?raw";
 import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 import TraceDetailsSidebar from "@/plugins/traces/TraceDetailsSidebar.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import useTraceDetails from "@/composables/traces/useTraceDetails";
 import config from "@/aws-exports";
 import i18n from "@/locales";
 import router from "@/test/unit/helpers/router";
+import { queryClient } from "@/composables/query/queryClient";
 import { createStore } from "vuex";
 
 // CSS.supports is not available in jsdom but used by TenstackTable
@@ -131,7 +170,7 @@ const mockSpan = {
   span_id: "d9603ec7f76eb499",
   trace_id: "6262666637a9ae45ad3e25f5111dd59f",
   operation_name: "service:alerts:evaluate_scheduled",
-  service_name: "alertmanager",
+  service_name: "scheduler",
   span_status: "UNSET",
   span_kind: 2, // Server
   parent_id: "6702b0494b2b6e57",
@@ -140,7 +179,7 @@ const mockSpan = {
   http_method: "GET",
   http_status_code: "200",
   http_url: "/api/v1/alerts",
-  service_service_instance: "dev2-openobserve-alertmanager-1",
+  service_service_instance: "dev2-openobserve-scheduler-1",
   service_service_version: "v0.15.0-rc3",
   busy_ns: "40550",
   idle_ns: "321332352",
@@ -289,6 +328,27 @@ describe("TraceDetailsSidebar", async () => {
     expect(serviceName.text()).toContain(mockSpan.service_name);
   });
 
+  describe("span start offset", () => {
+    const startText = () => wrapper.vm.getStartTime;
+
+    it("measures the start from the trace root, not the waterfall axis start", async () => {
+      // A RUM view root begins 10 min before the axis, which fits only the request.
+      const rootStartUs = mockSpan.start_time / 1000;
+      await wrapper.setProps({
+        baseTracePosition: {
+          ...mockBaseTracePosition,
+          startTimeUs: rootStartUs + 600_000_000,
+          traceStartUs: rootStartUs,
+        },
+      });
+      expect(startText()).toBe("0us");
+    });
+
+    it("falls back to the axis start when no trace start is given", () => {
+      expect(startText()).toBe("0us");
+    });
+  });
+
   describe("service icon", () => {
     it("should render service icon img inside the service chip", () => {
       const serviceChip = wrapper.find(
@@ -334,6 +394,17 @@ describe("TraceDetailsSidebar", async () => {
     const spanId = wrapper.find('[data-test="trace-details-sidebar-header-toolbar-span-id"]');
     expect(spanId.exists()).toBe(true);
     expect(spanId.text()).toContain(mockSpan.span_id);
+  });
+
+  it("wraps the header chips and keeps the action group from shrinking", () => {
+    const chips = wrapper.find('[data-test="trace-details-sidebar-header-toolbar-chips"]');
+    const actions = wrapper.find('[data-test="trace-details-sidebar-header-toolbar-actions"]');
+    expect(chips.classes()).toEqual(expect.arrayContaining(["flex-wrap", "min-w-0"]));
+    expect(chips.classes()).not.toContain("flex-nowrap");
+    expect(actions.classes()).toContain("shrink-0");
+    expect(
+      actions.find('[data-test="trace-details-sidebar-header-toolbar-span-id"]').exists(),
+    ).toBe(true);
   });
 
   it("should emit close when close button is clicked", async () => {
@@ -439,16 +510,24 @@ describe("TraceDetailsSidebar", async () => {
       });
     });
 
-    describe("when isEnterprise is true but correlationProps is null (fallback path)", () => {
+    describe("when isEnterprise is true but no correlation was found", () => {
       beforeEach(() => {
         config.isEnterprise = "true";
-        // correlationProps is null — correlation data hasn't been loaded yet
+        // Remount with a streamName so loadCorrelation() runs the real lookup
+        // instead of bailing out on a missing stream. findRelatedTelemetry is
+        // mocked to resolve null, i.e. the lookup succeeds with nothing correlated.
+        viewLogsWrapper.unmount();
+        viewLogsWrapper = mountSidebar({
+          parentMode: "standalone",
+          streamName: "default",
+        });
         viewLogsWrapper.vm.correlationProps = null;
+        mockToast.mockClear();
         dispatchSpy = vi.spyOn(mockStore, "dispatch").mockResolvedValue(undefined);
         pushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined);
       });
 
-      it("should fall back to buildQueryDetails and navigateToLogs when correlationProps is null", async () => {
+      it("should toast a warning instead of navigating when nothing is correlated", async () => {
         const viewLogsBtn = viewLogsWrapper.find(
           '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
         );
@@ -457,11 +536,16 @@ describe("TraceDetailsSidebar", async () => {
         await viewLogsBtn.trigger("click");
         await flushPromises();
 
-        expect(mockBuildQueryDetails).toHaveBeenCalledWith(mockSpan);
-        expect(mockNavigateToLogs).toHaveBeenCalled();
+        expect(mockToast).toHaveBeenCalledWith(
+          expect.objectContaining({
+            variant: "warning",
+            message: "No correlated logs found for this span",
+          }),
+        );
+        expect(pushSpy).not.toHaveBeenCalled();
       });
 
-      it("should not call navigateToCorrelatedLogs when correlationProps is null", async () => {
+      it("should not call navigateToCorrelatedLogs when nothing is correlated", async () => {
         const viewLogsBtn = viewLogsWrapper.find(
           '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
         );
@@ -469,6 +553,131 @@ describe("TraceDetailsSidebar", async () => {
         await flushPromises();
 
         expect(mockNavigateToCorrelatedLogs).not.toHaveBeenCalled();
+      });
+
+      it("waits for an in-flight correlation lookup instead of reporting nothing", async () => {
+        let resolveLookup: (v: any) => void = () => {};
+        mockFindRelatedTelemetry.mockImplementationOnce(
+          () => new Promise((resolve) => (resolveLookup = resolve)),
+        );
+        // The first View Logs starts the lookup; the second arrives mid-flight.
+        const inFlight = viewLogsWrapper.vm.viewSpanLogs();
+        await flushPromises();
+
+        const viewing = viewLogsWrapper.vm.viewSpanLogs();
+        resolveLookup({
+          correlationData: {
+            service_name: "svc",
+            matched_dimensions: {},
+            related_streams: {
+              logs: [{ stream_name: "app_logs", filters: {} }],
+              metrics: [],
+              traces: [],
+              profiles: [],
+            },
+          },
+        });
+        await Promise.all([inFlight, viewing]);
+        await flushPromises();
+
+        expect(mockFindRelatedTelemetry).toHaveBeenCalledTimes(1);
+        // Both callers navigate with the loaded data; neither reports "none".
+        expect(mockNavigateToCorrelatedLogs).toHaveBeenCalledTimes(2);
+        expect(mockNavigateToCorrelatedLogs.mock.calls[1][0].logStreams[0].stream_name).toBe(
+          "app_logs",
+        );
+        expect(mockToast).not.toHaveBeenCalled();
+      });
+
+      it("passes the whole trace's window (padded) for the trace-level fallback", async () => {
+        mockSearchObj.data.traceDetails.selectedTrace = {
+          trace_id: "t",
+          trace_start_time: 1_000_000_000,
+          trace_end_time: 1_002_000_000,
+        };
+        mockFindRelatedTelemetry.mockResolvedValueOnce({
+          correlationData: {
+            service_name: "svc",
+            matched_dimensions: {},
+            related_streams: {
+              logs: [{ stream_name: "app_logs", filters: {} }],
+              metrics: [],
+              traces: [],
+              profiles: [],
+            },
+          },
+        });
+
+        await viewLogsWrapper.vm.viewSpanLogs();
+        await flushPromises();
+        mockSearchObj.data.traceDetails.selectedTrace = undefined;
+
+        const bufferUs = 5 * 60 * 1000000;
+        expect(mockNavigateToCorrelatedLogs.mock.calls[0][0].traceTimeRange).toEqual({
+          startTime: 1_000_000_000 - bufferUs,
+          endTime: 1_002_000_000 + bufferUs,
+        });
+      });
+
+      it("never reuses, applies or navigates with another span's lookup", async () => {
+        const lookupFor = (stream: string) => ({
+          correlationData: {
+            service_name: "svc",
+            matched_dimensions: {},
+            related_streams: {
+              logs: [{ stream_name: stream, filters: {} }],
+              metrics: [],
+              traces: [],
+              profiles: [],
+            },
+          },
+        });
+        let resolveA: (v: any) => void = () => {};
+        mockFindRelatedTelemetry
+          .mockImplementationOnce(() => new Promise((resolve) => (resolveA = resolve)))
+          .mockImplementationOnce(async () => lookupFor("b_logs"));
+
+        // Span A's lookup is in flight when the user moves to span B.
+        const viewingA = viewLogsWrapper.vm.viewSpanLogs();
+        await flushPromises();
+        await viewLogsWrapper.setProps({ span: { ...mockSpan, span_id: "span-b" } });
+
+        await viewLogsWrapper.vm.viewSpanLogs();
+        await flushPromises();
+        // A resolves late; its result must not replace B's.
+        resolveA(lookupFor("a_logs"));
+        await viewingA;
+        await flushPromises();
+
+        expect(mockFindRelatedTelemetry).toHaveBeenCalledTimes(2);
+        expect(viewLogsWrapper.vm.correlationProps.logStreams[0].stream_name).toBe("b_logs");
+        const navigatedStreams = mockNavigateToCorrelatedLogs.mock.calls.map(
+          (call: any[]) => call[0].logStreams[0].stream_name,
+        );
+        // A's click is dropped because the displayed span changed while its lookup ran.
+        expect(navigatedStreams).toEqual(["b_logs"]);
+        expect(mockToast).not.toHaveBeenCalled();
+        expect(viewLogsWrapper.vm.correlationLoading).toBe(false);
+      });
+
+      it("should toast the lookup failure reason when correlation could not be loaded", async () => {
+        // No streamName — loadCorrelation() bails out and records why.
+        viewLogsWrapper.unmount();
+        viewLogsWrapper = mountSidebar({ parentMode: "standalone" });
+        mockToast.mockClear();
+
+        const viewLogsBtn = viewLogsWrapper.find(
+          '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
+        );
+        await viewLogsBtn.trigger("click");
+        await flushPromises();
+
+        expect(mockToast).toHaveBeenCalledWith(
+          expect.objectContaining({
+            variant: "warning",
+            message: "Missing span or stream name",
+          }),
+        );
       });
     });
 
@@ -550,7 +759,7 @@ describe("TraceDetailsSidebar", async () => {
     });
 
     it("should switch to attributes tab by default when span has no db_ attributes", () => {
-      expect(wrapper.vm.activeTab).toBe("attributes");
+      expect(wrapper.vm.activeTabModel).toBe("attributes");
     });
 
     it("should not show database tab when span has no db_ attributes", () => {
@@ -605,6 +814,73 @@ describe("TraceDetailsSidebar", async () => {
     });
   });
 
+  // OTel GenAI semconv v5 (issue #14127): gen_ai_system_instructions is a
+  // Part[] array. This must recognise the same part types as the Preview
+  // message renderer (LLMContentRenderer.vue) and the Thread tab
+  // (threadView.utils.ts), not just `type: "text"`.
+  describe("System instructions parsing (parsedSystemInstructions)", () => {
+    it("renders a reasoning part, not just text parts", () => {
+      const w = mountSidebar({
+        span: {
+          ...mockSpan,
+          gen_ai_system_instructions: JSON.stringify([
+            { type: "reasoning", content: "Always be concise." },
+          ]),
+        },
+      });
+
+      expect(w.vm.parsedSystemInstructions).toBe("Always be concise.");
+    });
+
+    it("still renders a plain text part (regression check)", () => {
+      const w = mountSidebar({
+        span: {
+          ...mockSpan,
+          gen_ai_system_instructions: JSON.stringify([
+            { type: "text", content: "Always be concise." },
+          ]),
+        },
+      });
+
+      expect(w.vm.parsedSystemInstructions).toBe("Always be concise.");
+    });
+
+    it("joins multiple parts with a newline", () => {
+      const w = mountSidebar({
+        span: {
+          ...mockSpan,
+          gen_ai_system_instructions: JSON.stringify([
+            { type: "text", content: "Be concise." },
+            { type: "text", content: "Never make up facts." },
+          ]),
+        },
+      });
+
+      expect(w.vm.parsedSystemInstructions).toBe("Be concise.\nNever make up facts.");
+    });
+
+    it("renders a `thinking`-typed part (a real-world alias for reasoning)", () => {
+      const w = mountSidebar({
+        span: {
+          ...mockSpan,
+          gen_ai_system_instructions: JSON.stringify([
+            { type: "thinking", content: "Always be concise." },
+          ]),
+        },
+      });
+
+      expect(w.vm.parsedSystemInstructions).toBe("Always be concise.");
+    });
+
+    it("returns null when there are no system instructions", () => {
+      const w = mountSidebar({
+        span: { ...mockSpan, gen_ai_system_instructions: undefined },
+      });
+
+      expect(w.vm.parsedSystemInstructions).toBe(null);
+    });
+  });
+
   describe("Service information in Attributes tab", () => {
     it("should display service information", () => {
       const attributesTable = wrapper.find('[data-test="trace-details-sidebar-attributes-table"]');
@@ -614,13 +890,13 @@ describe("TraceDetailsSidebar", async () => {
     it("should display service name in attributes", () => {
       const attributesTable = wrapper.find('[data-test="trace-details-sidebar-attributes-table"]');
       expect(attributesTable.exists()).toBe(true);
-      expect(attributesTable.text()).toContain("alertmanager");
+      expect(attributesTable.text()).toContain("scheduler");
     });
 
     it("should display service instance in attributes", () => {
       const attributesTable = wrapper.find('[data-test="trace-details-sidebar-attributes-table"]');
       expect(attributesTable.exists()).toBe(true);
-      expect(attributesTable.text()).toContain("dev2-openobserve-alertmanager-1");
+      expect(attributesTable.text()).toContain("dev2-openobserve-scheduler-1");
     });
   });
 
@@ -710,6 +986,239 @@ describe("TraceDetailsSidebar", async () => {
           const eventRows = wrapper.findAll('[data-test^="o2-table-row-"]');
           expect(eventRows.length).toBeGreaterThan(0);
         });
+      });
+    });
+
+    describe("event mini-timeline", () => {
+      // Span timing: start_time is nanoseconds, duration is microseconds.
+      // Event `_timestamp` is nanoseconds (OTLP time_unix_nano, stored
+      // unconverted), so the window is built in microseconds from both.
+      const spanStartUs = mockSpan.start_time / 1000;
+      const eventNsAt = (fraction: number) => (spanStartUs + mockSpan.duration * fraction) * 1000;
+
+      const timelineMarkers = () => wrapper.findAll('[data-test="span-event-timeline-marker"]');
+
+      const setSpanEvents = async (events: unknown[]) => {
+        await wrapper.setProps({ span: { ...mockSpan, events: JSON.stringify(events) } });
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+      };
+
+      it("does not render the timeline when the span has no events", () => {
+        expect(wrapper.find('[data-test="trace-details-sidebar-events-timeline"]').exists()).toBe(
+          false,
+        );
+      });
+
+      it("plots each event against the span's own duration", async () => {
+        await setSpanEvents([
+          { name: "cache.miss", _timestamp: eventNsAt(0.25) },
+          { name: "exception", _timestamp: eventNsAt(0.5), "exception.type": "TimeoutError" },
+        ]);
+
+        expect(wrapper.find('[data-test="trace-details-sidebar-events-timeline"]').exists()).toBe(
+          true,
+        );
+        expect(timelineMarkers()).toHaveLength(2);
+        expect(timelineMarkers()[0].attributes("style")).toContain("left: 25%");
+        expect(timelineMarkers()[1].attributes("style")).toContain("left: 50%");
+      });
+
+      it("distinguishes exceptions from ordinary events", async () => {
+        await setSpanEvents([
+          { name: "cache.miss", _timestamp: eventNsAt(0.25) },
+          { name: "exception", _timestamp: eventNsAt(0.5), "exception.type": "TimeoutError" },
+        ]);
+
+        expect(timelineMarkers()[0].attributes("data-event-severity")).toBe("info");
+        expect(timelineMarkers()[1].attributes("data-event-severity")).toBe("error");
+        expect(timelineMarkers()[1].attributes("title")).toContain("TimeoutError");
+      });
+
+      // Regression: 55.1% of default-stream events were hidden behind a
+      // neighbour before clustering.
+      it("renders one marker per cluster", async () => {
+        // The timeline only exists once the span has events, so measure after.
+        await setSpanEvents([
+          { name: "a", _timestamp: eventNsAt(0.5) },
+          { name: "b", _timestamp: eventNsAt(0.5005) },
+        ]);
+        Object.defineProperty((wrapper.vm as any).eventTimelineRef, "clientWidth", {
+          value: 400,
+          configurable: true,
+        });
+        (wrapper.vm as any).onEventTimelineResize();
+        await flushPromises();
+
+        expect(timelineMarkers()).toHaveLength(1);
+        expect(timelineMarkers()[0].attributes("data-event-count")).toBe("2");
+      });
+
+      // Regression: the observer was attached in `onMounted`, but the track is
+      // inside the Events tab panel — rendered `v-if="isActive"` with no
+      // keep-alive — and further gated on the span having events, so it does not
+      // exist at mount. Nothing ever observed it, the width stayed 0, and every
+      // event rendered as its own overlapping marker. The test above hand-calls
+      // `onEventTimelineResize`, so it cannot see that; this one drives the
+      // observer the component attached for itself.
+      it("attaches the resize observer when the timeline appears", async () => {
+        const observed: Array<{ element: Element; notify: () => void }> = [];
+        const OriginalResizeObserver = globalThis.ResizeObserver;
+
+        class CapturingResizeObserver {
+          constructor(private callback: () => void) {}
+          observe(element: Element) {
+            observed.push({ element, notify: () => this.callback() });
+          }
+          unobserve() {}
+          disconnect() {}
+        }
+
+        vi.stubGlobal("ResizeObserver", CapturingResizeObserver);
+
+        try {
+          await setSpanEvents([
+            { name: "a", _timestamp: eventNsAt(0.5) },
+            { name: "b", _timestamp: eventNsAt(0.5005) },
+          ]);
+
+          const track = (wrapper.vm as any).eventTimelineRef;
+          const entry = observed.find((o) => o.element === track);
+          expect(entry).toBeDefined();
+
+          Object.defineProperty(track, "clientWidth", { value: 400, configurable: true });
+          entry!.notify();
+          await flushPromises();
+
+          expect(timelineMarkers()).toHaveLength(1);
+          expect(timelineMarkers()[0].attributes("data-event-count")).toBe("2");
+        } finally {
+          vi.stubGlobal("ResizeObserver", OriginalResizeObserver);
+        }
+      });
+
+      // Regression: the expansion names a row index, not an event, so selecting
+      // a different span left the same index expanded on an unrelated row.
+      it("clears the expanded event when the span changes", async () => {
+        await setSpanEvents([
+          { name: "first", _timestamp: eventNsAt(0.25) },
+          { name: "second", _timestamp: eventNsAt(0.75) },
+        ]);
+        await timelineMarkers()[1].trigger("click");
+        expect((wrapper.vm as any).expandedEventIds).toEqual(["1"]);
+
+        await wrapper.setProps({
+          span: {
+            ...mockSpan,
+            span_id: "a-different-span",
+            events: JSON.stringify([
+              { name: "other first", _timestamp: eventNsAt(0.25) },
+              { name: "other second", _timestamp: eventNsAt(0.75) },
+            ]),
+          },
+        });
+        await flushPromises();
+
+        expect((wrapper.vm as any).expandedEventIds).toEqual([]);
+      });
+
+      // Regression: `duration` is truncated integer microseconds, so an event
+      // firing at the real span end landed past 100% and was dropped here.
+      it("shows an event that fires at the exact span end", async () => {
+        await setSpanEvents([
+          { name: "ResponseReceived", _timestamp: (spanStartUs + mockSpan.duration) * 1000 + 256 },
+        ]);
+
+        expect(timelineMarkers()).toHaveLength(1);
+      });
+
+      // Regression: OTable does not read TanStack's expansion state at all —
+      // it keeps its own private Set, synced from the `expandedIds` prop
+      // (see useTableExpansion). Calling `row.toggleExpanded()` on the table
+      // instance was always a no-op, including from the sidebar's own
+      // mini-timeline click. Driving expansion through the prop instead needs
+      // no table ref, so there's no mount-timing race to arm a watcher for.
+      it("expands the row named by focusEvent", async () => {
+        await setSpanEvents([
+          { name: "first", _timestamp: eventNsAt(0.25) },
+          { name: "second", _timestamp: eventNsAt(0.75) },
+        ]);
+        const vm = wrapper.vm as any;
+
+        vm.focusEvent(1);
+
+        expect(vm.expandedEventIds).toEqual(["1"]);
+      });
+
+      it("expands the row named by focusEventIndex", async () => {
+        await setSpanEvents([
+          { name: "first", _timestamp: eventNsAt(0.25) },
+          { name: "second", _timestamp: eventNsAt(0.75) },
+        ]);
+
+        await wrapper.setProps({ focusEventIndex: 1 });
+        await flushPromises();
+
+        expect((wrapper.vm as any).expandedEventIds).toEqual(["1"]);
+      });
+
+      it("ignores a null focusEventIndex", async () => {
+        await setSpanEvents([{ name: "only", _timestamp: eventNsAt(0.25) }]);
+
+        await wrapper.setProps({ focusEventIndex: null });
+        await flushPromises();
+
+        expect((wrapper.vm as any).expandedEventIds).toEqual([]);
+      });
+
+      it("uses the span window, not the trace window", async () => {
+        // An event one quarter through the span sits at 25% here; against the
+        // whole trace it would land somewhere else entirely.
+        await setSpanEvents([{ name: "quarter", _timestamp: eventNsAt(0.25) }]);
+
+        expect(timelineMarkers()[0].attributes("style")).toContain("left: 25%");
+      });
+
+      it("expands the matching row when a marker is clicked", async () => {
+        await setSpanEvents([
+          { name: "first", _timestamp: eventNsAt(0.25) },
+          { name: "second", _timestamp: eventNsAt(0.75) },
+        ]);
+
+        await timelineMarkers()[1].trigger("click");
+
+        expect((wrapper.vm as any).expandedEventIds).toEqual(["1"]);
+      });
+
+      it("drops events that fall outside the span window", async () => {
+        await setSpanEvents([
+          { name: "before span", _timestamp: eventNsAt(-1) },
+          { name: "inside", _timestamp: eventNsAt(0.5) },
+        ]);
+
+        expect(timelineMarkers()).toHaveLength(1);
+        expect(timelineMarkers()[0].attributes("title")).toContain("inside");
+      });
+
+      it("renders no markers when the event payload is malformed", async () => {
+        await wrapper.setProps({ span: { ...mockSpan, events: "not-json" } });
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+
+        expect(timelineMarkers()).toHaveLength(0);
+      });
+
+      // The sidebar carries no marker styling of its own — it renders
+      // SEVERITY_MARKER_CLASS directly. This asserts that inheritance, so a
+      // future change to the waterfall cannot silently leave this surface behind.
+      it("draws mini-timeline markers with the shared severity vocabulary", async () => {
+        await setSpanEvents([
+          { name: "cache.miss", level: "INFO", _timestamp: eventNsAt(0.25) },
+          { name: "boom", level: "ERROR", _timestamp: eventNsAt(0.75) },
+        ]);
+
+        expect(timelineMarkers()[0].classes()).toContain("bg-trace-event-info");
+        expect(timelineMarkers()[1].classes()).toContain("bg-trace-event-error");
       });
     });
   });
@@ -910,22 +1419,22 @@ describe("TraceDetailsSidebar", async () => {
 
     it("should highlight search terms in service information", async () => {
       await wrapper.setProps({
-        searchQuery: "alertmanager",
+        searchQuery: "scheduler",
       });
 
       await flushPromises();
 
       // Verify search query is set
-      expect(wrapper.vm.searchQuery).toBe("alertmanager");
+      expect(wrapper.vm.searchQuery).toBe("scheduler");
       // Attributes tab is default — verify it contains the search term
       const attributesTable = wrapper.find('[data-test="trace-details-sidebar-attributes-table"]');
-      expect(attributesTable.text()).toContain("alertmanager");
+      expect(attributesTable.text()).toContain("scheduler");
     });
   });
 
   describe("activeTab prop", () => {
     it("should default to 'attributes'", () => {
-      expect(wrapper.vm.activeTab).toBe("attributes");
+      expect(wrapper.vm.activeTabModel).toBe("attributes");
     });
 
     it("should emit update:activeTab when tab changes", async () => {
@@ -939,7 +1448,7 @@ describe("TraceDetailsSidebar", async () => {
       wrapper.unmount();
       wrapper = mountSidebar({ activeTab: "events" });
       await wrapper.vm.$nextTick();
-      expect(wrapper.vm.activeTab).toBe("events");
+      expect(wrapper.vm.activeTabModel).toBe("events");
     });
 
     it("should emit update:activeTab with the new tab value on click", async () => {
@@ -1702,6 +2211,44 @@ describe("TraceDetailsSidebar", async () => {
       ).toBe(true);
     });
 
+    it("resolves Prompt attribution by name and routes with the stable entity ID", async () => {
+      mockPromptResolve.mockResolvedValueOnce({
+        prompt: { entityId: "prompt-entity-1", name: "support-answer" },
+        version: { version: 3 },
+        label: null,
+      });
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+      const hasRoute = vi.spyOn(router, "hasRoute").mockReturnValue(true);
+      const attributed = mountSidebar({
+        span: {
+          ...mockLLMSpan,
+          gen_ai_prompt_name: "support-answer",
+          gen_ai_prompt_version: "3",
+          gen_ai_prompt_label: "production",
+        },
+      });
+      await flushPromises();
+
+      const chip = attributed.find('[data-test="trace-details-sidebar-prompt-attribution"]');
+      expect(chip.text()).toContain("support-answer@v3 · production");
+      await chip.trigger("click");
+      expect(mockPromptResolve).toHaveBeenCalledWith("test-org", {
+        name: "support-answer",
+        version: 3,
+      });
+      expect(push).toHaveBeenCalledWith({
+        name: "aiPrompts",
+        query: {
+          org_identifier: "test-org",
+          selected: "prompt-entity-1",
+          version: "3",
+        },
+      });
+      attributed.unmount();
+      push.mockRestore();
+      hasRoute.mockRestore();
+    });
+
     it("hides evaluation with the Preview tab for an ordinary span", () => {
       const ordinaryWrapper = mountSidebar({ showEvaluateButton: true });
 
@@ -1805,5 +2352,475 @@ describe("TraceDetailsSidebar", async () => {
       // <style> blocks via the ?raw source import.
       expect(componentSource).toMatch(/\.vjs-tree/);
     });
+  });
+
+  describe("Scores block — enterprise/cloud only (scoring itself is not an OSS feature)", () => {
+    const mockScoredLLMSpan = {
+      ...mockSpan,
+      span_id: "score-span-1",
+      gen_ai_operation_name: "chat",
+      gen_ai_response_model: "gpt-4",
+      llm_input: '{"messages": [{"role": "user", "content": "Hi"}]}',
+      llm_output: '{"choices": [{"message": {"content": "Hello!"}}]}',
+    };
+
+    const originalIsEnterprise = config.isEnterprise;
+    const originalIsCloud = config.isCloud;
+
+    afterEach(() => {
+      config.isEnterprise = originalIsEnterprise;
+      config.isCloud = originalIsCloud;
+    });
+
+    function hasScoresLabel(w: ReturnType<typeof mountSidebar>): boolean {
+      return w.findAll("span").some((el) => el.text() === "Scores");
+    }
+
+    it("shows the Scores label for an LLM span on an enterprise build", () => {
+      config.isEnterprise = "true";
+      config.isCloud = "false";
+      const w = mountSidebar({ span: mockScoredLLMSpan });
+      expect(hasScoresLabel(w)).toBe(true);
+      w.unmount();
+    });
+
+    it("hides the Scores block entirely on a true OSS build — _llm_scores can never be written to there", () => {
+      config.isEnterprise = "false";
+      config.isCloud = "false";
+      const w = mountSidebar({ span: mockScoredLLMSpan });
+      expect(hasScoresLabel(w)).toBe(false);
+      w.unmount();
+    });
+
+    it("still shows on a cloud build even with isEnterprise false — cloud registers the same enterprise backend", () => {
+      config.isEnterprise = "false";
+      config.isCloud = "true";
+      const w = mountSidebar({ span: mockScoredLLMSpan });
+      expect(hasScoresLabel(w)).toBe(true);
+      w.unmount();
+    });
+  });
+});
+
+describe("TraceDetailsSidebar — span vs operation percentiles", () => {
+  const SAVED_START = 1752490000000000;
+  const SAVED_END = 1752490900000000;
+  const SPAN_START_US = Math.floor(mockSpan.start_time / 1_000);
+  const HOUR_US = 3_600_000_000;
+  const BUCKET_US = 600_000_000;
+  const fallbackWindow = (spanStartUs: number) => {
+    const bucketUs = Math.floor(spanStartUs / BUCKET_US) * BUCKET_US;
+    return [bucketUs - HOUR_US, bucketUs + HOUR_US + BUCKET_US];
+  };
+  const STATS = { n: 120, p50: 1000, p75: 2000, p90: 4000, p99: 8000 };
+  const PERCENTILE_TAG_ID = "trace-details-sidebar-header-toolbar-operation-percentile";
+  const PERCENTILE_TAG = `[data-test="${PERCENTILE_TAG_ID}"]`;
+
+  function statsResponse(overrides: Record<string, number> = {}) {
+    return { data: { hits: [{ ...STATS, ...overrides }] } };
+  }
+
+  async function mountWith(spanOverrides: Record<string, unknown> = {}, props = {}) {
+    const w = mountSidebar({
+      span: { ...mockSpan, ...spanOverrides },
+      streamName: "default",
+      ...props,
+    });
+    await flushPromises();
+    return w;
+  }
+
+  function percentileTag(w: ReturnType<typeof mountSidebar>) {
+    return w.findAllComponents(OTag).find((c) => c.find(PERCENTILE_TAG).exists());
+  }
+
+  beforeEach(() => {
+    mockSearch.mockReset();
+    mockSearch.mockResolvedValue(statsResponse());
+    mockSearchObj.data = {
+      stream: { selectedStream: { label: "default", value: "default" } },
+      queryPayload: { query: { start_time: SAVED_START, end_time: SAVED_END } },
+      traceDetails: {},
+    };
+  });
+
+  afterEach(() => {
+    delete (mockSearchObj as Record<string, unknown>).data;
+  });
+
+  it("queries the four percentiles with quoted service, operation and stream", async () => {
+    const w = await mountWith({
+      _stream: 'odd"stream',
+      service_name: "o'svc",
+      operation_name: "GET /it's",
+    });
+    expect(mockSearch).toHaveBeenCalledTimes(1);
+    const arg = mockSearch.mock.calls[0][0];
+    const sql: string = arg.query.query.sql;
+    expect(arg.page_type).toBe("traces");
+    expect(arg.org_identifier).toBe("test-org");
+    expect(sql).toContain('FROM "odd""stream"');
+    expect(sql).toContain("service_name = 'o''svc'");
+    expect(sql).toContain("operation_name = 'GET /it''s'");
+    expect(sql).toContain("COUNT(*) AS n");
+    for (const [q, alias] of [
+      ["0.5", "p50"],
+      ["0.75", "p75"],
+      ["0.9", "p90"],
+      ["0.99", "p99"],
+    ]) {
+      expect(sql).toContain(`approx_percentile_cont(duration, ${q}) AS ${alias}`);
+    }
+    w.unmount();
+  });
+
+  it("uses the page's saved query bounds when the span's stream is the page stream", async () => {
+    const w = await mountWith();
+    const q = mockSearch.mock.calls[0][0].query.query;
+    expect([q.start_time, q.end_time]).toEqual([SAVED_START, SAVED_END]);
+    w.unmount();
+  });
+
+  it("falls back to the span's 10-minute bucket ± 1 h for another stream", async () => {
+    const w = await mountWith({ _stream: "other" });
+    const q = mockSearch.mock.calls[0][0].query.query;
+    expect([q.start_time, q.end_time]).toEqual(fallbackWindow(SPAN_START_US));
+    w.unmount();
+  });
+
+  it("falls back to the span's 10-minute bucket ± 1 h in embedded mode", async () => {
+    const w = await mountWith({}, { parentMode: "embedded" });
+    const q = mockSearch.mock.calls[0][0].query.query;
+    expect([q.start_time, q.end_time]).toEqual(fallbackWindow(SPAN_START_US));
+    w.unmount();
+  });
+
+  it("falls back to the span's 10-minute bucket ± 1 h when the page has no saved bounds", async () => {
+    mockSearchObj.data.queryPayload = {};
+    const w = await mountWith();
+    const q = mockSearch.mock.calls[0][0].query.query;
+    expect([q.start_time, q.end_time]).toEqual(fallbackWindow(SPAN_START_US));
+    w.unmount();
+  });
+
+  it("shares one call between sibling spans in the same 10-minute bucket", async () => {
+    const bucketUs = Math.floor(SPAN_START_US / BUCKET_US) * BUCKET_US;
+    const w = await mountWith({ _stream: "other", start_time: (bucketUs + 1_000_000) * 1_000 });
+    await w.setProps({
+      span: {
+        ...mockSpan,
+        _stream: "other",
+        span_id: "sibling",
+        start_time: (bucketUs + 120_000_000) * 1_000,
+      },
+    });
+    await flushPromises();
+    expect(mockSearch).toHaveBeenCalledTimes(1);
+    const q = mockSearch.mock.calls[0][0].query.query;
+    expect([q.start_time, q.end_time]).toEqual([
+      bucketUs - HOUR_US,
+      bucketUs + HOUR_US + BUCKET_US,
+    ]);
+    w.unmount();
+  });
+
+  it("covers a span two hours into a long trace", async () => {
+    const spanStartUs = SPAN_START_US + 2 * HOUR_US;
+    const w = await mountWith(
+      { _stream: "other", start_time: spanStartUs * 1_000 },
+      { baseTracePosition: { ...mockBaseTracePosition, startTimeUs: SPAN_START_US } },
+    );
+    const q = mockSearch.mock.calls[0][0].query.query;
+    expect(q.start_time).toBeLessThanOrEqual(spanStartUs);
+    expect(q.end_time).toBeGreaterThan(spanStartUs);
+    expect([q.start_time, q.end_time]).toEqual(fallbackWindow(spanStartUs));
+    w.unmount();
+  });
+
+  it.each([
+    [500, "operationBandBelowP50", "< p50", "default-soft"],
+    [1000, "operationBandP50ToP75", "p50–p75", "default-soft"],
+    [2000, "operationBandP75ToP90", "p75–p90", "default-soft"],
+    [4000, "operationBandP90ToP99", "p90–p99", "warning-soft"],
+    [8000, "operationBandP90ToP99", "p90–p99", "warning-soft"],
+    [8001, "operationBandAboveP99", "> p99", "error-soft"],
+  ])("a %sµs span reads %s (%s) with the %s variant", async (duration, bandKey, band, variant) => {
+    expect(i18n.global.t(`traces.traceDetailsSidebar.${bandKey}`)).toBe(band);
+    const w = await mountWith({ duration });
+    const tag = percentileTag(w);
+    expect(tag).toBeTruthy();
+    expect(tag!.text()).toBe(`${band} of ${mockSpan.operation_name}`);
+    expect(tag!.props("variant")).toBe(variant);
+    w.unmount();
+  });
+
+  it("puts p50, p75, p90, p99 and a labelled sample count on one tooltip line", async () => {
+    const w = await mountWith();
+    const tooltip = w
+      .findAllComponents({ name: "OTooltip" })
+      .find((c) => String(c.props("content")).includes("p99"));
+    expect(tooltip).toBeTruthy();
+    const content = String(tooltip!.props("content"));
+    for (const part of ["p50 1.00ms", "p75 2.00ms", "p90 4.00ms", "p99 8.00ms", "120 samples"]) {
+      expect(content).toContain(part);
+    }
+    expect(content).not.toContain("n 120");
+    expect(tooltip!.props("contentClass")).toContain("whitespace-nowrap");
+    expect(tooltip!.props("maxWidth")).toBe("none");
+    w.unmount();
+  });
+
+  it("formats a large sample count with thousands separators", async () => {
+    mockSearch.mockResolvedValue(statsResponse({ n: 45989 }));
+    const w = await mountWith();
+    const tooltip = w
+      .findAllComponents({ name: "OTooltip" })
+      .find((c) => String(c.props("content")).includes("p99"));
+    expect(String(tooltip!.props("content"))).toContain("45,989 samples");
+    w.unmount();
+  });
+
+  it.each([
+    ["n < 20", () => mockSearch.mockResolvedValue(statsResponse({ n: 19 }))],
+    ["p50 == 0", () => mockSearch.mockResolvedValue(statsResponse({ p50: 0 }))],
+    ["the search fails", () => mockSearch.mockRejectedValue(new Error("boom"))],
+    ["the search is still loading", () => mockSearch.mockReturnValue(new Promise(() => {}))],
+  ])("hides the tag when %s", async (_label, arrange) => {
+    arrange();
+    const w = await mountWith();
+    expect(mockSearch).toHaveBeenCalledTimes(1);
+    expect(w.find(PERCENTILE_TAG).exists()).toBe(false);
+    w.unmount();
+  });
+
+  it("serves sibling spans from one cached call, each with its own band", async () => {
+    const w = await mountWith({ duration: 500 });
+    expect(percentileTag(w)!.text()).toContain(
+      i18n.global.t("traces.traceDetailsSidebar.operationBandBelowP50"),
+    );
+    await w.setProps({ span: { ...mockSpan, span_id: "sibling", duration: 9000 } });
+    await flushPromises();
+    expect(mockSearch).toHaveBeenCalledTimes(1);
+    expect(percentileTag(w)!.text()).toContain(
+      i18n.global.t("traces.traceDetailsSidebar.operationBandAboveP99"),
+    );
+    w.unmount();
+  });
+});
+
+describe("TraceDetailsSidebar — span to profile link", () => {
+  const SPAN = {
+    ...mockSpan,
+    start_time: 1752490492000000000,
+    end_time: 1752490493000000000,
+  };
+  const WINDOW_START = 1752490492000000 - 60_000_000;
+  const WINDOW_END = 1752490493000000 + 60_000_000;
+  const BUTTON = '[data-test="trace-details-sidebar-header-toolbar-view-profile-btn"]';
+  const FULL_SCHEMA = ["trace_id", "span_id", "service_name", "profile_type"];
+
+  let profileHits: Record<string, unknown[] | Error>;
+  let schemas: Record<string, string[]>;
+
+  const setStreams = (streams: Record<string, string[]>) => {
+    schemas = streams;
+    mockStreamNameList.mockResolvedValue({
+      data: { list: Object.keys(streams).map((name) => ({ name })) },
+    });
+  };
+
+  const profileCalls = () =>
+    mockSearch.mock.calls.filter(([arg]) => arg.page_type === "profiles").map(([arg]) => arg);
+
+  async function mountWith(spanOverrides: Record<string, unknown> = {}, props = {}) {
+    const w = mountSidebar({ span: { ...SPAN, ...spanOverrides }, ...props });
+    await flushPromises();
+    return w;
+  }
+
+  beforeEach(() => {
+    queryClient.clear();
+    mockStreamNameList.mockClear();
+    profileHits = {};
+    setStreams({});
+    mockStreamSchema.mockImplementation(async (_org: string, stream: string) => ({
+      data: { schema: (schemas[stream] ?? []).map((name) => ({ name })) },
+    }));
+    mockSearch.mockReset();
+    mockSearch.mockImplementation(async (arg: any) => {
+      if (arg.page_type !== "profiles") return { data: { hits: [] } };
+      const stream = /FROM "([^"]+)"/.exec(arg.query.query.sql)?.[1] ?? "";
+      const hits = profileHits[stream] ?? [];
+      if (hits instanceof Error) throw hits;
+      return { data: { hits } };
+    });
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+    mockStreamNameList.mockResolvedValue({ data: { list: [] } });
+  });
+
+  it("lists profile streams and queries the span's ids over its window ± 60 s", async () => {
+    setStreams({ prof: FULL_SCHEMA });
+    const w = await mountWith();
+    expect(mockStreamNameList).toHaveBeenCalledWith("test-org", "profiles", false);
+    const calls = profileCalls();
+    expect(calls).toHaveLength(1);
+    expect(calls[0].org_identifier).toBe("test-org");
+    expect(calls[0].query.query).toMatchObject({ start_time: WINDOW_START, end_time: WINDOW_END });
+    expect(calls[0].query.query.sql).toBe(
+      "SELECT profile_type, profile_unit, service_name, COUNT(*) AS c " +
+        `FROM "prof" WHERE trace_id = '${SPAN.trace_id}' AND span_id = '${SPAN.span_id}' ` +
+        "GROUP BY profile_type, profile_unit, service_name",
+    );
+    w.unmount();
+  });
+
+  it("selects service_name only when the stream schema has it", async () => {
+    setStreams({ prof: ["trace_id", "span_id"] });
+    const w = await mountWith();
+    const sql: string = profileCalls()[0].query.query.sql;
+    expect(sql).not.toContain("service_name");
+    expect(sql).toContain("GROUP BY profile_type, profile_unit");
+    w.unmount();
+  });
+
+  it("skips streams whose schema lacks trace_id or span_id without querying them", async () => {
+    setStreams({ noTrace: ["span_id"], noSpan: ["trace_id"], prof: FULL_SCHEMA });
+    const w = await mountWith();
+    const calls = profileCalls();
+    expect(calls).toHaveLength(1);
+    expect(calls[0].query.query.sql).toContain('FROM "prof"');
+    w.unmount();
+  });
+
+  it("shows View Profile only when a stream has matching samples", async () => {
+    setStreams({ prof: FULL_SCHEMA });
+    profileHits.prof = [
+      { profile_type: "cpu", profile_unit: "nanoseconds", service_name: "api", c: 3 },
+    ];
+    const w = await mountWith();
+    expect(w.find(BUTTON).exists()).toBe(true);
+    expect(w.find(BUTTON).text()).toBe("View Profile");
+    w.unmount();
+  });
+
+  it.each([
+    ["no stream has rows", () => {}],
+    [
+      "the search returns 403",
+      () =>
+        (profileHits.prof = Object.assign(new Error("forbidden"), { response: { status: 403 } })),
+    ],
+    ["listing the streams fails", () => mockStreamNameList.mockRejectedValue(new Error("boom"))],
+  ])("hides View Profile when %s", async (_label, arrange) => {
+    setStreams({ prof: FULL_SCHEMA });
+    arrange();
+    const w = await mountWith();
+    expect(w.find(BUTTON).exists()).toBe(false);
+    w.unmount();
+  });
+
+  it("neither detects nor shows View Profile outside standalone mode", async () => {
+    setStreams({ prof: FULL_SCHEMA });
+    profileHits.prof = [{ profile_type: "cpu", profile_unit: "nanoseconds", c: 1 }];
+    const w = await mountWith({}, { parentMode: "embedded" });
+    expect(profileCalls()).toHaveLength(0);
+    expect(w.find(BUTTON).exists()).toBe(false);
+    w.unmount();
+  });
+
+  it("runs at most three profile queries at a time", async () => {
+    setStreams({ a: FULL_SCHEMA, b: FULL_SCHEMA, c: FULL_SCHEMA, d: FULL_SCHEMA, e: FULL_SCHEMA });
+    const pending: Array<() => void> = [];
+    mockSearch.mockImplementation((arg: any) => {
+      if (arg.page_type !== "profiles") return Promise.resolve({ data: { hits: [] } });
+      return new Promise((resolve) => pending.push(() => resolve({ data: { hits: [] } })));
+    });
+    const w = await mountWith();
+    expect(profileCalls()).toHaveLength(3);
+    pending.splice(0).forEach((resolve) => resolve());
+    await flushPromises();
+    expect(profileCalls()).toHaveLength(5);
+    w.unmount();
+  });
+
+  it("stops probing for a span once another span is selected", async () => {
+    setStreams({ a: FULL_SCHEMA, b: FULL_SCHEMA, c: FULL_SCHEMA, d: FULL_SCHEMA, e: FULL_SCHEMA });
+    const pending: Array<() => void> = [];
+    mockSearch.mockImplementation((arg: any) => {
+      if (arg.page_type !== "profiles") return Promise.resolve({ data: { hits: [] } });
+      return new Promise((resolve) => pending.push(() => resolve({ data: { hits: [] } })));
+    });
+    const callsFor = (spanId: string) =>
+      profileCalls().filter((c) => c.query.query.sql.includes(`span_id = '${spanId}'`));
+    const w = await mountWith();
+    expect(callsFor(SPAN.span_id)).toHaveLength(3);
+    await w.setProps({ span: { ...SPAN, span_id: "next-span" } });
+    await flushPromises();
+    expect(callsFor("next-span")).toHaveLength(3);
+
+    pending.splice(0).forEach((resolve) => resolve());
+    await flushPromises();
+    expect(callsFor(SPAN.span_id)).toHaveLength(3);
+    expect(callsFor("next-span")).toHaveLength(5);
+    w.unmount();
+  });
+
+  it("navigates to the first matching stream's flame graph, preferring CPU", async () => {
+    setStreams({ first: FULL_SCHEMA, second: FULL_SCHEMA });
+    profileHits.first = [
+      { profile_type: "alloc_space", profile_unit: "bytes", service_name: "worker", c: 9 },
+      { profile_type: "cpu", profile_unit: "nanoseconds", service_name: "worker", c: 2 },
+    ];
+    profileHits.second = [
+      { profile_type: "cpu", profile_unit: "nanoseconds", service_name: "other", c: 5 },
+    ];
+    const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+    const w = await mountWith({ trace_id: "t,1", span_id: "s=1" });
+    await w.find(BUTTON).trigger("click");
+    expect(push).toHaveBeenCalledWith({
+      name: "profiles",
+      query: {
+        org_identifier: "test-org",
+        stream: "first",
+        from: String(WINDOW_START),
+        to: String(WINDOW_END),
+        service_name: "worker",
+        profile_type: "cpu",
+        profile_unit: "nanoseconds",
+        filters: "trace_id=t%2C1,span_id=s%3D1",
+        view: "flame",
+      },
+    });
+    push.mockRestore();
+    w.unmount();
+  });
+
+  it("omits service_name from the navigation when the profile stream has none", async () => {
+    setStreams({ prof: ["trace_id", "span_id"] });
+    profileHits.prof = [{ profile_type: "cpu", profile_unit: "nanoseconds", c: 1 }];
+    const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+    const w = await mountWith();
+    await w.find(BUTTON).trigger("click");
+    expect(push.mock.calls[0][0]).toMatchObject({ name: "profiles" });
+    expect((push.mock.calls[0][0] as any).query).not.toHaveProperty("service_name");
+    push.mockRestore();
+    w.unmount();
+  });
+
+  it("detects once per span and lists the streams once", async () => {
+    setStreams({ prof: FULL_SCHEMA });
+    profileHits.prof = [{ profile_type: "cpu", profile_unit: "nanoseconds", c: 1 }];
+    const w = await mountWith();
+    await w.setProps({ span: { ...SPAN, span_id: "other-span" } });
+    await flushPromises();
+    await w.setProps({ span: { ...SPAN } });
+    await flushPromises();
+    expect(profileCalls()).toHaveLength(2);
+    expect(mockStreamNameList).toHaveBeenCalledTimes(1);
+    expect(w.find(BUTTON).exists()).toBe(true);
+    w.unmount();
   });
 });

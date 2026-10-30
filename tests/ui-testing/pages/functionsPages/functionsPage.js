@@ -8,6 +8,7 @@ class FunctionsPage {
 
     // Main page elements
     this.addFunctionButton = this.page.locator('[data-test="function-list-add-function-btn"]');
+    this.jsTypeBadge = this.page.locator('[data-test="function-list-type-badge-js"]');
     // OInput wrapper for the list-page search field
     this.searchInputWrapper = this.page.locator('[data-test="functions-list-search-input"]');
     // OInput's auto-derived inner native input
@@ -20,12 +21,11 @@ class FunctionsPage {
     this.rowEditButton = this.page.locator(this.rowEditButtonSelector);
     this.rowDeleteButton = this.page.locator(this.rowDeleteButtonSelector);
 
-    // Function type selection (Reka-UI radios — wrapper divs carry the data-test).
-    // The inner RadioGroupItem renders data-state="checked|unchecked" — we read it
-    // via page.evaluate scoped from the wrapper's data-test locator (no element-tag
-    // or class selectors per AGENT_RULES §2).
-    this.vrlRadio = this.page.locator('[data-test="function-transform-type-vrl-radio"]');
-    this.jsRadio = this.page.locator('[data-test="function-transform-type-js-radio"]');
+    // Language selection — a segmented toggle (OToggleGroup). The data-test lands
+    // on the ToggleGroupItem button itself, which Reka-UI marks with
+    // data-state="on|off" (NOT the radio group's "checked|unchecked").
+    this.vrlOption = this.page.locator('[data-test="function-transform-type-vrl-option"]');
+    this.jsOption = this.page.locator('[data-test="function-transform-type-js-option"]');
 
     // Function form elements. The name is an inline-edited title (OFormInlineEdit):
     // a display trigger swaps to an input on click.
@@ -55,6 +55,10 @@ class FunctionsPage {
     this.confirmDialog = this.page.locator('[data-test="confirm-dialog"]');
     this.confirmDialogPrimaryBtn = this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
     this.confirmDialogSecondaryBtn = this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-secondary-btn"]');
+
+    // Editor drafts: Cancel/Back with unsaved changes opens the shared leave dialog
+    this.draftLeaveDialog = this.page.locator('[data-test="editor-draft-leave-dialog"]');
+    this.draftLeaveDiscardBtn = this.draftLeaveDialog.locator('[data-test="o-dialog-neutral-btn"]');
   }
 
   // ==================== Locator factories (runtime-dynamic) ====================
@@ -126,18 +130,18 @@ class FunctionsPage {
   }
 
   async selectJavaScriptType() {
-    // ORadio forwards the consumer's data-test onto the inner RadioGroupItem
-    // (the ARIA-focusable radio button) — `this.jsRadio` IS the clickable item.
-    await expect(this.jsRadio).toBeVisible();
-    await this.jsRadio.click();
+    // OToggleGroupItem forwards the consumer's data-test onto the item button —
+    // `this.jsOption` IS the clickable item.
+    await expect(this.jsOption).toBeVisible();
+    await this.jsOption.click();
     // Wait for CodeQueryEditor to remount Monaco for the new language
     // (editor-id is re-keyed on currentLanguage in QueryEditor.vue)
     await this.page.waitForTimeout(1500);
   }
 
   async selectVRLType() {
-    await expect(this.vrlRadio).toBeVisible();
-    await this.vrlRadio.click();
+    await expect(this.vrlOption).toBeVisible();
+    await this.vrlOption.click();
     await this.page.waitForTimeout(1500);
   }
 
@@ -186,8 +190,17 @@ class FunctionsPage {
     await this.page.waitForTimeout(2000);
   }
 
+  /** Cancel the editor; unsaved changes are discarded through the leave dialog so no draft is left behind. */
   async clickCancelButton() {
     await this.cancelButton.click();
+    const asked = await this.draftLeaveDialog
+      .waitFor({ state: 'visible', timeout: 2000 })
+      .then(() => true)
+      .catch(() => false);
+    if (asked) {
+      await this.draftLeaveDiscardBtn.click();
+      await this.draftLeaveDialog.waitFor({ state: 'hidden', timeout: 10000 });
+    }
     await this.page.waitForTimeout(1500); // Wait for dialog to fully close
   }
 
@@ -316,23 +329,23 @@ class FunctionsPage {
   }
 
   async expectVrlRadioVisible() {
-    await expect(this.vrlRadio).toBeVisible();
+    await expect(this.vrlOption).toBeVisible();
   }
 
   async expectJsRadioVisible() {
-    await expect(this.jsRadio).toBeVisible();
+    await expect(this.jsOption).toBeVisible();
   }
 
   async expectJsRadioSelected() {
-    // ORadio forwards the consumer's data-test onto the inner RadioGroupItem,
-    // which Reka-UI exposes via `data-state="checked|unchecked"`.
-    await this.jsRadio.waitFor({ state: 'visible' });
-    await expect(this.jsRadio).toHaveAttribute('data-state', 'checked');
+    // OToggleGroupItem forwards the consumer's data-test onto the item button,
+    // which Reka-UI exposes via `data-state="on|off"`.
+    await this.jsOption.waitFor({ state: 'visible' });
+    await expect(this.jsOption).toHaveAttribute('data-state', 'on');
   }
 
   async expectVrlRadioSelected() {
-    await this.vrlRadio.waitFor({ state: 'visible' });
-    await expect(this.vrlRadio).toHaveAttribute('data-state', 'checked');
+    await this.vrlOption.waitFor({ state: 'visible' });
+    await expect(this.vrlOption).toHaveAttribute('data-state', 'on');
   }
 
   async expectTestOutputContains(text) {
@@ -377,11 +390,16 @@ class FunctionsPage {
   }
 
   async isJsRadioVisible() {
-    return await this.jsRadio.isVisible().catch(() => false);
+    return await this.jsOption.isVisible().catch(() => false);
   }
 
   async expectJsRadioHidden() {
-    await expect(this.jsRadio).not.toBeVisible();
+    await expect(this.jsOption).not.toBeVisible();
+  }
+
+  async expectJsRadioLocked() {
+    await expect(this.jsOption).toBeVisible();
+    await expect(this.jsOption.locator('[data-test="function-transform-type-js-lock"]')).toBeVisible();
   }
 
   // ==================== Complex Workflows ====================
@@ -436,6 +454,42 @@ class FunctionsPage {
   }
 
   /**
+   * Click a function row's delete button and wait for the confirm dialog.
+   * @param {string} functionName
+   */
+  async openDeleteConfirmFor(functionName) {
+    const deleteButton = this.getRowByName(functionName).locator(this.rowDeleteButtonSelector);
+    await deleteButton.waitFor({ state: 'visible', timeout: 30000 });
+    await deleteButton.click();
+    await this.confirmDialog.waitFor({ state: 'visible', timeout: 10000 });
+  }
+
+  /** Title + body text of the open confirm dialog. */
+  async getConfirmDialogText() {
+    await this.confirmDialog.waitFor({ state: 'visible', timeout: 10000 });
+    return ((await this.confirmDialog.textContent()) ?? '').trim();
+  }
+
+  async cancelDeleteConfirm() {
+    await this.confirmDialogSecondaryBtn.click();
+    await this.confirmDialog.waitFor({ state: 'hidden', timeout: 10000 });
+  }
+
+  async acceptDeleteConfirm() {
+    await this.confirmDialogPrimaryBtn.click();
+    await this.confirmDialog.waitFor({ state: 'hidden', timeout: 10000 });
+  }
+
+  /** Assert the list shows a function as JavaScript rather than VRL. */
+  async expectFunctionTypeIsJavaScript() {
+    await expect(this.jsTypeBadge.first()).toBeVisible({ timeout: 15000 });
+  }
+
+  async expectFunctionAbsent(functionName) {
+    await expect(this.getFunctionNameCell(functionName)).toHaveCount(0, { timeout: 30000 });
+  }
+
+  /**
    * Test a function with input data and return output.
    * The toolbar "Test Function" button directly triggers the API call using
    * the current function code and events editor content. Default test events
@@ -479,16 +533,16 @@ class FunctionsPage {
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await this.page.waitForTimeout(2000);
 
-    // Wait for radio buttons to be visible
-    await this.jsRadio.waitFor({ state: 'visible', timeout: 10000 });
+    // Wait for the language toggle to be visible
+    await this.jsOption.waitFor({ state: 'visible', timeout: 10000 });
 
-    // ORadio forwards the consumer's data-test onto the inner RadioGroupItem,
-    // which Reka-UI exposes via `data-state="checked|unchecked"`.
-    const jsState = await this.jsRadio.getAttribute('data-state');
-    const vrlState = await this.vrlRadio.getAttribute('data-state');
+    // OToggleGroupItem forwards the consumer's data-test onto the item button,
+    // which Reka-UI exposes via `data-state="on|off"`.
+    const jsState = await this.jsOption.getAttribute('data-state');
+    const vrlState = await this.vrlOption.getAttribute('data-state');
 
-    if (jsState === 'checked') return 'js';
-    if (vrlState === 'checked') return 'vrl';
+    if (jsState === 'on') return 'js';
+    if (vrlState === 'on') return 'vrl';
     return null;
   }
 

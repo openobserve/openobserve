@@ -124,7 +124,7 @@ test.describe(
         await pm.dashboardCreate.waitForDashboardUIStable();
         await pm.dashboardCreate.createDashboard(dashboardName);
 
-        await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
+        await pm.dashboardVariables.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
         // Add a variable
         await pm.dashboardSetting.openSetting();
@@ -140,19 +140,13 @@ test.describe(
         await pm.chartTypeSelector.selectChartType("html");
         await pm.dashboardTimeRefresh.setRelative("30", "m");
 
-        await page
-          .locator('[data-test="dashboard-html-editor"]')
-          .locator(".monaco-editor")
-          .click();
+        await pm.dashboardVariables.clickHtmlEditor();
 
-        await page
-          .locator('[data-test="dashboard-html-editor"]')
-          .locator(".inputarea")
-          .fill(MUSTACHE_HTML_SNIPPET);
+        await pm.dashboardVariables.fillHtmlEditor(MUSTACHE_HTML_SNIPPET);
 
         // Verify heading renders
         await expect(
-          page.locator('[data-test="mustache-heading"]')
+          pm.dashboardVariables.getHtmlContentLocator("mustache-heading")
         ).toBeVisible();
 
         // Wait for values stream and select a value
@@ -167,7 +161,7 @@ test.describe(
 
         // Verify the mustache variable was substituted with the selected value
         await expect(
-          page.locator('[data-test="mustache-value"]')
+          pm.dashboardVariables.getHtmlContentLocator("mustache-value")
         ).toBeVisible();
 
         testLogger.info(
@@ -203,7 +197,7 @@ test.describe(
         await pm.dashboardCreate.waitForDashboardUIStable();
         await pm.dashboardCreate.createDashboard(dashboardName);
 
-        await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
+        await pm.dashboardVariables.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
         // Add a variable
         await pm.dashboardSetting.openSetting();
@@ -219,19 +213,13 @@ test.describe(
         await pm.chartTypeSelector.selectChartType("html");
         await pm.dashboardTimeRefresh.setRelative("30", "m");
 
-        await page
-          .locator('[data-test="dashboard-html-editor"]')
-          .locator(".monaco-editor")
-          .click();
+        await pm.dashboardVariables.clickHtmlEditor();
 
-        await page
-          .locator('[data-test="dashboard-html-editor"]')
-          .locator(".inputarea")
-          .fill(DOLLAR_SIGN_HTML_SNIPPET);
+        await pm.dashboardVariables.fillHtmlEditor(DOLLAR_SIGN_HTML_SNIPPET);
 
         // Verify heading renders
         await expect(
-          page.locator('[data-test="dollar-heading"]')
+          pm.dashboardVariables.getHtmlContentLocator("dollar-heading")
         ).toBeVisible();
 
         // Wait for values stream and select a value
@@ -246,7 +234,7 @@ test.describe(
 
         // Verify the dollar-sign variable was substituted with the selected value
         await expect(
-          page.locator('[data-test="dollar-value"]')
+          pm.dashboardVariables.getHtmlContentLocator("dollar-value")
         ).toBeVisible();
 
         testLogger.info(
@@ -282,7 +270,7 @@ test.describe(
         await pm.dashboardCreate.waitForDashboardUIStable();
         await pm.dashboardCreate.createDashboard(dashboardName);
 
-        await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
+        await pm.dashboardVariables.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
         // Add a variable
         await pm.dashboardSetting.openSetting();
@@ -298,19 +286,13 @@ test.describe(
         await pm.chartTypeSelector.selectChartType("html");
         await pm.dashboardTimeRefresh.setRelative("30", "m");
 
-        await page
-          .locator('[data-test="dashboard-html-editor"]')
-          .locator(".monaco-editor")
-          .click();
+        await pm.dashboardVariables.clickHtmlEditor();
 
-        await page
-          .locator('[data-test="dashboard-html-editor"]')
-          .locator(".inputarea")
-          .fill(MIXED_SYNTAX_HTML_SNIPPET);
+        await pm.dashboardVariables.fillHtmlEditor(MIXED_SYNTAX_HTML_SNIPPET);
 
         // Verify heading renders
         await expect(
-          page.locator('[data-test="mixed-heading"]')
+          pm.dashboardVariables.getHtmlContentLocator("mixed-heading")
         ).toBeVisible();
 
         // Wait for values stream and select a value
@@ -325,7 +307,7 @@ test.describe(
 
         // Verify both mustache and dollar-sign were substituted
         // The rendered output should contain "controller and controller"
-        const renderer = page.locator('[data-test="html-renderer"]');
+        const renderer = pm.dashboardVariables.getHtmlContentLocator("html-renderer");
         const renderedText = await renderer.textContent();
 
         // Both occurrences should be replaced with "controller"
@@ -367,19 +349,13 @@ test.describe(
         await pm.dashboardCreate.addPanel();
         await pm.chartTypeSelector.selectChartType("html");
 
-        await page
-          .locator('[data-test="dashboard-html-editor"]')
-          .locator(".monaco-editor")
-          .click();
+        await pm.dashboardVariables.clickHtmlEditor();
 
-        await page
-          .locator('[data-test="dashboard-html-editor"]')
-          .locator(".inputarea")
-          .fill(UNDEFINED_MUSTACHE_HTML_SNIPPET);
+        await pm.dashboardVariables.fillHtmlEditor(UNDEFINED_MUSTACHE_HTML_SNIPPET);
 
         // Verify the undefined mustache variable remains as literal text
         await expect(
-          page.locator('[data-test="undefined-var-text"]')
+          pm.dashboardVariables.getHtmlContentLocator("undefined-var-text")
         ).toBeVisible();
 
         testLogger.info(
@@ -415,7 +391,7 @@ test.describe(
         await pm.dashboardCreate.waitForDashboardUIStable();
         await pm.dashboardCreate.createDashboard(dashboardName);
 
-        await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
+        await pm.dashboardVariables.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
         // Add a variable
         await pm.dashboardSetting.openSetting();
@@ -438,7 +414,6 @@ test.describe(
 
         // Add a panel with custom SQL query using mustache syntax
         await pm.dashboardCreate.addPanel();
-        await pm.dashboardTimeRefresh.setRelative("30", "m");
 
         // Switch to custom query mode
         await pm.chartTypeSelector.switchToCustomQueryMode();
@@ -447,6 +422,9 @@ test.describe(
         const sqlQuery = `SELECT histogram(_timestamp) as "x_axis_1", count(*) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = '{{variablename}}' GROUP BY x_axis_1 ORDER BY x_axis_1`;
 
         await pm.chartTypeSelector.enterCustomSQL(sqlQuery);
+        await pm.chartTypeSelector.waitForCustomQueryAxes("x_axis_1", "y_axis_1");
+        // setRelative also clicks Apply; on a panel not loaded yet that raised an error toast this test then counted.
+        await pm.dashboardTimeRefresh.setRelative("30", "m");
 
         // Apply the query
         await pm.dashboardPanelActions.applyDashboardBtn();
@@ -455,7 +433,7 @@ test.describe(
         await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         // Verify no error toast appeared — check for OToast error elements
-        const errorToast = page.locator('[data-test-variant="error"]');
+        const errorToast = pm.dashboardVariables.getErrorToastLocator();
         const errorCount = await errorToast.count();
 
         // We expect no errors since the mustache variable should be substituted
@@ -492,7 +470,7 @@ test.describe(
         await pm.dashboardCreate.waitForDashboardUIStable();
         await pm.dashboardCreate.createDashboard(dashboardName);
 
-        await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
+        await pm.dashboardVariables.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
         // Add a variable and select a value
         await pm.dashboardSetting.openSetting();
@@ -527,7 +505,7 @@ test.describe(
         await pm.dashboardPanelConfigs.openConfigPanel();
         await pm.dashboardDrilldown.addDrilldownByURL(
           "Mustache URL Drilldown",
-          "https://openobserve.ai?filter={{variablename}}"
+          "https://www.google.com/?filter={{variablename}}"
         );
 
         await expect(
@@ -550,7 +528,7 @@ test.describe(
         await pm.dashboardDrilldown.drilldownMenuFirstItem.click();
 
         // Wait for navigation — the URL should contain "controller" not "{{variablename}}"
-        await page.waitForURL(/openobserve\.ai/, { timeout: 15000 });
+        await page.waitForURL(/google\.com/, { timeout: 15000 });
         const navigatedUrl = page.url();
 
         expect(navigatedUrl).toContain("filter=controller");
@@ -609,7 +587,7 @@ test.describe(
         await pm.dashboardCreate.waitForDashboardUIStable();
         await pm.dashboardCreate.createDashboard(dashboardName);
 
-        await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
+        await pm.dashboardVariables.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
         // Add a variable
         await pm.dashboardSetting.openSetting();
@@ -625,19 +603,13 @@ test.describe(
         await pm.chartTypeSelector.selectChartType("html");
         await pm.dashboardTimeRefresh.setRelative("30", "m");
 
-        await page
-          .locator('[data-test="dashboard-html-editor"]')
-          .locator(".monaco-editor")
-          .click();
+        await pm.dashboardVariables.clickHtmlEditor();
 
-        await page
-          .locator('[data-test="dashboard-html-editor"]')
-          .locator(".inputarea")
-          .fill(SPACED_MUSTACHE_HTML_SNIPPET);
+        await pm.dashboardVariables.fillHtmlEditor(SPACED_MUSTACHE_HTML_SNIPPET);
 
         // Verify heading renders
         await expect(
-          page.locator('[data-test="spaced-mustache-heading"]')
+          pm.dashboardVariables.getHtmlContentLocator("spaced-mustache-heading")
         ).toBeVisible();
 
         // Wait for values stream and select a value
@@ -652,7 +624,7 @@ test.describe(
 
         // Verify the spaced mustache variable was substituted with the selected value
         await expect(
-          page.locator('[data-test="spaced-mustache-value"]')
+          pm.dashboardVariables.getHtmlContentLocator("spaced-mustache-value")
         ).toBeVisible();
 
         testLogger.info(
@@ -690,7 +662,7 @@ test.describe(
         await pm.dashboardCreate.waitForDashboardUIStable();
         await pm.dashboardCreate.createDashboard(dashboardName);
 
-        await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
+        await pm.dashboardVariables.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
         // Add a variable
         await pm.dashboardSetting.openSetting();
@@ -706,19 +678,13 @@ test.describe(
         await pm.chartTypeSelector.selectChartType("html");
         await pm.dashboardTimeRefresh.setRelative("30", "m");
 
-        await page
-          .locator('[data-test="dashboard-html-editor"]')
-          .locator(".monaco-editor")
-          .click();
+        await pm.dashboardVariables.clickHtmlEditor();
 
-        await page
-          .locator('[data-test="dashboard-html-editor"]')
-          .locator(".inputarea")
-          .fill(SPACED_DOLLAR_BRACE_HTML_SNIPPET);
+        await pm.dashboardVariables.fillHtmlEditor(SPACED_DOLLAR_BRACE_HTML_SNIPPET);
 
         // Verify heading renders
         await expect(
-          page.locator('[data-test="spaced-dollar-heading"]')
+          pm.dashboardVariables.getHtmlContentLocator("spaced-dollar-heading")
         ).toBeVisible();
 
         // Wait for values stream and select a value
@@ -733,7 +699,7 @@ test.describe(
 
         // Verify the spaced dollar-brace variable was substituted with the selected value
         await expect(
-          page.locator('[data-test="spaced-dollar-value"]')
+          pm.dashboardVariables.getHtmlContentLocator("spaced-dollar-value")
         ).toBeVisible();
 
         testLogger.info(
@@ -771,7 +737,7 @@ test.describe(
         await pm.dashboardCreate.waitForDashboardUIStable();
         await pm.dashboardCreate.createDashboard(dashboardName);
 
-        await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
+        await pm.dashboardVariables.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
         // Add a variable
         await pm.dashboardSetting.openSetting();
@@ -787,19 +753,13 @@ test.describe(
         await pm.chartTypeSelector.selectChartType("html");
         await pm.dashboardTimeRefresh.setRelative("30", "m");
 
-        await page
-          .locator('[data-test="dashboard-html-editor"]')
-          .locator(".monaco-editor")
-          .click();
+        await pm.dashboardVariables.clickHtmlEditor();
 
-        await page
-          .locator('[data-test="dashboard-html-editor"]')
-          .locator(".inputarea")
-          .fill(MIXED_SPACED_HTML_SNIPPET);
+        await pm.dashboardVariables.fillHtmlEditor(MIXED_SPACED_HTML_SNIPPET);
 
         // Verify heading renders
         await expect(
-          page.locator('[data-test="mixed-spaced-heading"]')
+          pm.dashboardVariables.getHtmlContentLocator("mixed-spaced-heading")
         ).toBeVisible();
 
         // Wait for values stream and select a value
@@ -814,7 +774,7 @@ test.describe(
 
         // Verify both spaced {{ var }} and non-spaced {{var}} were substituted
         // The rendered output should contain "controller and controller"
-        const renderer = page.locator('[data-test="html-renderer"]');
+        const renderer = pm.dashboardVariables.getHtmlContentLocator("html-renderer");
         const renderedText = await renderer.textContent();
 
         expect(renderedText).toContain("controller and controller");
@@ -854,7 +814,7 @@ test.describe(
         await pm.dashboardCreate.waitForDashboardUIStable();
         await pm.dashboardCreate.createDashboard(dashboardName);
 
-        await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
+        await pm.dashboardVariables.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
         // Add a variable
         await pm.dashboardSetting.openSetting();
@@ -877,7 +837,6 @@ test.describe(
 
         // Add a panel with custom SQL query using spaced mustache syntax
         await pm.dashboardCreate.addPanel();
-        await pm.dashboardTimeRefresh.setRelative("30", "m");
 
         // Switch to custom query mode
         await pm.chartTypeSelector.switchToCustomQueryMode();
@@ -886,6 +845,9 @@ test.describe(
         const sqlQuery = `SELECT histogram(_timestamp) as "x_axis_1", count(*) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = '{{ variablename }}' GROUP BY x_axis_1 ORDER BY x_axis_1`;
 
         await pm.chartTypeSelector.enterCustomSQL(sqlQuery);
+        await pm.chartTypeSelector.waitForCustomQueryAxes("x_axis_1", "y_axis_1");
+        // setRelative also clicks Apply; on a panel not loaded yet that raised an error toast this test then counted.
+        await pm.dashboardTimeRefresh.setRelative("30", "m");
 
         // Apply the query
         await pm.dashboardPanelActions.applyDashboardBtn();
@@ -894,7 +856,7 @@ test.describe(
         await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         // Verify no error toast appeared — check for OToast error elements
-        const errorToast = page.locator('[data-test-variant="error"]');
+        const errorToast = pm.dashboardVariables.getErrorToastLocator();
         const errorCount = await errorToast.count();
 
         // We expect no errors since the spaced mustache variable should be normalized and substituted
@@ -935,7 +897,7 @@ test.describe(
         await pm.dashboardCreate.waitForDashboardUIStable();
         await pm.dashboardCreate.createDashboard(dashboardName);
 
-        await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
+        await pm.dashboardVariables.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
         // Add a variable
         await pm.dashboardSetting.openSetting();
@@ -951,19 +913,13 @@ test.describe(
         await pm.chartTypeSelector.selectChartType("html");
         await pm.dashboardTimeRefresh.setRelative("30", "m");
 
-        await page
-          .locator('[data-test="dashboard-html-editor"]')
-          .locator(".monaco-editor")
-          .click();
+        await pm.dashboardVariables.clickHtmlEditor();
 
-        await page
-          .locator('[data-test="dashboard-html-editor"]')
-          .locator(".inputarea")
-          .fill(EXCESSIVE_SPACES_HTML_SNIPPET);
+        await pm.dashboardVariables.fillHtmlEditor(EXCESSIVE_SPACES_HTML_SNIPPET);
 
         // Verify heading renders
         await expect(
-          page.locator('[data-test="excessive-spaces-heading"]')
+          pm.dashboardVariables.getHtmlContentLocator("excessive-spaces-heading")
         ).toBeVisible();
 
         // Wait for values stream and select a value
@@ -978,7 +934,7 @@ test.describe(
 
         // Verify the excessively-spaced mustache variable was substituted
         await expect(
-          page.locator('[data-test="excessive-value"]')
+          pm.dashboardVariables.getHtmlContentLocator("excessive-value")
         ).toBeVisible();
 
         testLogger.info(

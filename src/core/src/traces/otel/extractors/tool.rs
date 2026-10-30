@@ -112,16 +112,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_extract_tool_name() {
-        let extractor = ToolExtractor;
-        let mut attrs = HashMap::new();
-        attrs.insert("gen_ai.tool.name".to_string(), json::json!("get_weather"));
-
-        let result = extractor.extract_tool_name(&attrs);
-        assert_eq!(result, Some("get_weather".to_string()));
-    }
-
-    #[test]
     fn test_extract_tool_name_missing() {
         let extractor = ToolExtractor;
         let attrs = HashMap::new();

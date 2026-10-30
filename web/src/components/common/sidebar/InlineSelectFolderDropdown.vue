@@ -30,9 +30,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       searchable
       :search-placeholder="t('dashboard.searchFolder')"
       :disabled="disable"
+      :aria-label="t('dashboard.folder')"
       data-test="inline-select-folder-dropdown"
       @update:model-value="$emit('update:modelValue', $event)"
     >
+      <template v-if="modelValue" #icon-left>
+        <FolderIcon :token="selectedFolderIcon" class="text-select-text" />
+      </template>
       <template v-if="!disable" #after-options>
         <OSeparator />
         <!-- Padded, outlined and at the standard 34px control height: flush
@@ -75,13 +79,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="alert-v3-select folder-select"
       :disabled="disable"
       @update:model-value="$emit('update:modelValue', $event)"
-    />
+    >
+      <template v-if="modelValue" #icon-left>
+        <FolderIcon :token="selectedFolderIcon" class="text-select-text" />
+      </template>
+    </OSelect>
     <OButton
       v-if="!disable"
       variant="outline"
       size="icon"
       class="shrink-0"
-      title="Add Folder"
+      :title="t('common.addFolder')"
       @click="showDialog = true"
     >
       <OIcon name="add" size="sm" />
@@ -99,13 +107,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import { queryClient } from "@/composables/query/queryClient";
+import { permittedFoldersQuery } from "@/services/common.queries";
+import { folderKeys } from "@/services/common.querykeys";
+import type { Folder } from "@/services/common";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import AddFolder from "./AddFolder.vue";
 import { getFoldersListByType } from "@/utils/commons";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { useFolderIcons } from "@/composables/useFolderIcons";
+import { folderIconOption } from "./folderIconOption";
+import FolderIcon from "./FolderIcon.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
@@ -116,6 +132,7 @@ export default defineComponent({
     OIcon,
     OSelect,
     OSeparator,
+    FolderIcon,
   },
   emits: ["update:modelValue"],
   props: {
@@ -143,20 +160,48 @@ export default defineComponent({
     },
   },
   setup(props, { emit }) {
+    const { t } = useI18nTyped();
     const store: any = useStore();
-    const { t } = useI18n();
     const showDialog = ref(false);
+    const { iconFor } = useFolderIcons();
 
-    const folderOptions = computed(
+    const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
+
+    // The store list injects "default" for every type; a folder-scoped user may not file a downtime there.
+    const permittedOnly = computed(() => props.type === "downtimes");
+    const permitted = useQuery(
       () =>
-        store.state.organizationData.foldersByType[props.type]?.map((f: any) => ({
-          label: f.name,
-          value: f.folderId,
-        })) ?? [],
+        Object.assign(permittedFoldersQuery(orgId.value, props.type), {
+          enabled: permittedOnly.value && !!orgId.value,
+        }),
+      queryClient,
+    );
+
+    const folders = computed<Folder[]>(() =>
+      permittedOnly.value
+        ? (permitted.data.value ?? [])
+        : (store.state.organizationData.foldersByType[props.type] ?? []),
+    );
+
+    const selectedFolderIcon = computed(() =>
+      iconFor(folders.value.find((f) => f.folderId === props.modelValue)),
+    );
+
+    const folderOptions = computed(() =>
+      folders.value.map((f) => ({
+        label: raw(f.name),
+        value: f.folderId,
+        iconComponent: folderIconOption(iconFor(f)),
+      })),
     );
 
     const onFolderAdded = (newFolder: any) => {
       showDialog.value = false;
+      if (permittedOnly.value) {
+        void queryClient.invalidateQueries({
+          queryKey: folderKeys.permitted(orgId.value, props.type),
+        });
+      }
       if (newFolder?.data?.folderId) {
         emit("update:modelValue", newFolder.data.folderId);
       }
@@ -171,6 +216,7 @@ export default defineComponent({
       store,
       showDialog,
       folderOptions,
+      selectedFolderIcon,
       onFolderAdded,
     };
   },

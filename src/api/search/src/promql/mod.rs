@@ -35,7 +35,10 @@ use promql_service as core_promql;
 use {config::meta::stream::StreamType, o2_openfga::meta::mapping::OFGA_MODELS};
 
 use crate::{
-    common::{meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id},
+    common::{
+        meta::http::HttpResponse as MetaHttpResponse,
+        utils::http::{client_search_type, get_or_create_trace_id},
+    },
     search::error_utils::map_error_to_http_response,
 };
 
@@ -177,46 +180,36 @@ async fn query(
         if let Err(e) = search_service::check_search_allowed(org_id, None) {
             return MetaHttpResponse::too_many_requests(e);
         }
-        use db::org_users::get_cached_user_org;
-
-        use crate::service::auth::AuthExtractor;
-
-        let ast = parser::parse(&req.query.clone().unwrap()).unwrap();
-        let mut visitor = promql::name_visitor::MetricNameVisitor::default();
-        promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
-
-        if !db::user::is_root_user(user_email) {
-            let stream_type_str = StreamType::Metrics.as_str();
-            for name in visitor.into_names() {
-                let user: config::meta::user::User =
-                    get_cached_user_org(org_id, user_email).unwrap();
-                if !openobserve_core::authz::check_permissions(
-                    user_email,
-                    AuthExtractor {
-                        auth: "".to_string(),
-                        method: "GET".to_string(),
-                        o2_type: format!(
-                            "{}:{}",
-                            OFGA_MODELS
-                                .get(stream_type_str)
-                                .map_or(stream_type_str, |model| model.key),
-                            name
-                        ),
-                        org_id: org_id.to_string(),
-                        bypass_check: false,
-                        parent_id: "".to_string(),
-                        use_all_org: false,
-                        use_self_context: false,
-                        use_self_parent: true,
-                    },
-                    user.role,
-                    user.is_external,
+        let ast = match promql::parse(&req.query.clone().unwrap_or_default()) {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("[trace_id: {trace_id}] parse promql error: {e}");
+                return (
+                    StatusCode::BAD_REQUEST,
+                    axum::Json(config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
+                        e.to_string(),
+                        Some(trace_id),
+                    )),
                 )
-                .await
-                {
-                    return MetaHttpResponse::forbidden("Unauthorized Access");
-                }
+                    .into_response();
             }
+        };
+        let mut visitor = promql::ast::name_visitor::MetricNameVisitor::default();
+        if let Err(e) = promql::ast::visitor::walk_expr(&mut visitor, &ast) {
+            log::error!("[trace_id: {trace_id}] promql metric name error: {e}");
+            return (
+                StatusCode::BAD_REQUEST,
+                axum::Json(config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
+                    e.to_string(),
+                    Some(trace_id),
+                )),
+            )
+                .into_response();
+        }
+
+        if let Some(res) = check_metric_permissions(org_id, user_email, visitor.into_names()).await
+        {
+            return res;
         }
     }
 
@@ -250,6 +243,7 @@ async fn query(
         search_type: None,
         regions: vec![],
         clusters: vec![],
+        search_event_context: Some(req.search_event_context),
     };
 
     search(&trace_id, org_id, req, user_email, timeout).await
@@ -447,17 +441,23 @@ async fn query_range(
         tracing::Span::none()
     };
     let trace_id = get_or_create_trace_id(headers, &http_span);
+    if let Some(Err(e)) = req.search_type.map(client_search_type) {
+        return (
+            StatusCode::BAD_REQUEST,
+            axum::Json(config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
+                e.to_string(),
+                Some(trace_id),
+            )),
+        )
+            .into_response();
+    }
     #[cfg(feature = "enterprise")]
     {
-        use db::org_users::get_cached_user_org;
-
-        use crate::service::auth::AuthExtractor;
-
         if let Err(e) = search_service::check_search_allowed(org_id, None) {
             return MetaHttpResponse::too_many_requests(e);
         }
 
-        let ast = match parser::parse(&req.query.clone().unwrap_or_default()) {
+        let ast = match promql::parse(&req.query.clone().unwrap_or_default()) {
             Ok(v) => v,
             Err(e) => {
                 log::error!("[trace_id: {trace_id}] parse promql error: {e}");
@@ -471,42 +471,22 @@ async fn query_range(
                     .into_response();
             }
         };
-        let mut visitor = promql::name_visitor::MetricNameVisitor::default();
-        promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
+        let mut visitor = promql::ast::name_visitor::MetricNameVisitor::default();
+        if let Err(e) = promql::ast::visitor::walk_expr(&mut visitor, &ast) {
+            log::error!("[trace_id: {trace_id}] promql metric name error: {e}");
+            return (
+                StatusCode::BAD_REQUEST,
+                axum::Json(config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
+                    e.to_string(),
+                    Some(trace_id),
+                )),
+            )
+                .into_response();
+        }
 
-        if !db::user::is_root_user(user_email) {
-            let stream_type_str = StreamType::Metrics.as_str();
-            for name in visitor.into_names() {
-                let user: config::meta::user::User =
-                    get_cached_user_org(org_id, user_email).unwrap();
-                if user.is_external
-                    && !openobserve_core::authz::check_permissions(
-                        user_email,
-                        AuthExtractor {
-                            auth: "".to_string(),
-                            method: "GET".to_string(),
-                            o2_type: format!(
-                                "{}:{}",
-                                OFGA_MODELS
-                                    .get(stream_type_str)
-                                    .map_or(stream_type_str, |model| model.key),
-                                name
-                            ),
-                            org_id: org_id.to_string(),
-                            bypass_check: false,
-                            parent_id: "".to_string(),
-                            use_all_org: false,
-                            use_self_context: false,
-                            use_self_parent: true,
-                        },
-                        user.role,
-                        user.is_external,
-                    )
-                    .await
-                {
-                    return MetaHttpResponse::forbidden("Unauthorized Access");
-                }
-            }
+        if let Some(res) = check_metric_permissions(org_id, user_email, visitor.into_names()).await
+        {
+            return res;
         }
     }
 
@@ -580,6 +560,7 @@ async fn query_range(
         search_type: req.search_type,
         regions: req.regions,
         clusters: req.clusters,
+        search_event_context: Some(req.search_event_context),
     };
     if let Some(use_streaming) = req.use_streaming
         && use_streaming
@@ -819,50 +800,10 @@ async fn series(
     }
 
     #[cfg(feature = "enterprise")]
+    if let Some(res) =
+        check_metric_permissions(org_id, _user_email, series_metric_names(selector.as_ref())).await
     {
-        use db::org_users::get_cached_user_org;
-
-        use crate::service::auth::AuthExtractor;
-
-        let metric_name = match selector
-            .as_ref()
-            .and_then(metrics::prom::try_into_metric_name)
-        {
-            Some(name) => name,
-            None => "".to_string(),
-        };
-
-        if !db::user::is_root_user(_user_email) {
-            let user: config::meta::user::User = get_cached_user_org(org_id, _user_email).unwrap();
-            let stream_type_str = StreamType::Metrics.as_str();
-            if user.is_external
-                && !openobserve_core::authz::check_permissions(
-                    _user_email,
-                    AuthExtractor {
-                        auth: "".to_string(),
-                        method: "GET".to_string(),
-                        o2_type: format!(
-                            "{}:{}",
-                            OFGA_MODELS
-                                .get(stream_type_str)
-                                .map_or(stream_type_str, |model| model.key),
-                            metric_name
-                        ),
-                        org_id: org_id.to_string(),
-                        bypass_check: false,
-                        parent_id: "".to_string(),
-                        use_all_org: false,
-                        use_self_context: false,
-                        use_self_parent: true,
-                    },
-                    user.role,
-                    user.is_external,
-                )
-                .await
-            {
-                return MetaHttpResponse::forbidden("Unauthorized Access");
-            }
-        }
+        return res;
     }
 
     match metrics::prom::get_series(org_id, selector, start, end).await {
@@ -1053,7 +994,7 @@ async fn labels(
     tag = "Metrics",
     operation_id = "PrometheusLabelValues",
     summary = "Get label values",
-    description = "Returns all possible values for a specific label name within the specified time range. Optionally filter by series selector to get values for specific metrics. Essential for building filters and understanding label cardinality.",
+    description = "Returns values for a label within the specified time range. Labels other than __name__ require match[] to identify a metric; requests without a metric return 400 because querying all metrics streams is unsupported.",
     security(
         ("Authorization"= [])
     ),
@@ -1072,6 +1013,7 @@ async fn labels(
                "prometheus"
             ]
         })),
+        (status = 400, description = "Invalid parameters or match[] does not identify a metric", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -1129,18 +1071,19 @@ pub async fn label_values(
         start,
         end,
     } = req;
-    let (selector, start, end) = match validate_metadata_params(matcher, start, end) {
-        Ok(v) => v,
-        Err(e) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                axum::Json(config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
-                    e, None,
-                )),
-            )
-                .into_response();
-        }
-    };
+    let (selector, start, end) =
+        match validate_label_values_params(&label_name, matcher, start, end) {
+            Ok(v) => v,
+            Err(e) => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    axum::Json(config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
+                        e, None,
+                    )),
+                )
+                    .into_response();
+            }
+        };
     match metrics::prom::get_label_values(&org_id, label_name, selector, start, end).await {
         Ok(resp) => (
             StatusCode::OK,
@@ -1161,28 +1104,46 @@ pub async fn label_values(
     }
 }
 
-fn validate_metadata_params(
+fn validate_label_values_params(
+    label_name: &str,
+    matcher: Option<String>,
+    start: Option<String>,
+    end: Option<String>,
+) -> Result<(Option<parser::VectorSelector>, i64, i64), String> {
+    if label_name != config::meta::promql::NAME_LABEL {
+        let (selector, start, end) = validate_metadata_params(matcher, start, end)?;
+        metrics::prom::label_values_metric_name(selector.as_ref()).map_err(|e| e.to_string())?;
+        return Ok((selector, start, end));
+    }
+
+    let (selector, start, end) = parse_selector_params(matcher, start, end)?;
+
+    if let Some(ref sel) = selector {
+        metrics::prom::validate_name_label_values_selector(sel).map_err(|e| {
+            let err = e.to_string();
+            log::error!("{err}");
+            err
+        })?;
+    }
+
+    Ok((selector, start, end))
+}
+
+fn parse_selector_params(
     matcher: Option<String>,
     start: Option<String>,
     end: Option<String>,
 ) -> Result<(Option<parser::VectorSelector>, i64, i64), String> {
     let selector = match matcher {
         None => None,
-        Some(matcher) => match parser::parse(&matcher) {
+        Some(matcher) => match promql::parse(&matcher) {
             Err(err) => {
                 let err = format!("parse promql error: {err}");
                 log::error!("{err}");
                 return Err(err);
             }
             Ok(parser::Expr::VectorSelector(sel)) => {
-                let err = if sel.name.is_none()
-                    && sel
-                        .matchers
-                        .find_matchers(config::meta::promql::NAME_LABEL)
-                        .is_empty()
-                {
-                    Some("match[] argument must start with a metric name, e.g. `match[]=up`")
-                } else if sel.offset.is_some() {
+                let err = if sel.offset.is_some() {
                     Some("match[]: unexpected offset modifier")
                 } else if sel.at.is_some() {
                     Some("match[]: unexpected @ modifier")
@@ -1216,6 +1177,27 @@ fn validate_metadata_params(
     } else {
         now_micros()
     };
+    if start > end {
+        let err = "start must not be later than end";
+        log::error!("{err}");
+        return Err(err.to_owned());
+    }
+    Ok((selector, start, end))
+}
+
+fn validate_metadata_params(
+    matcher: Option<String>,
+    start: Option<String>,
+    end: Option<String>,
+) -> Result<(Option<parser::VectorSelector>, i64, i64), String> {
+    let (selector, start, end) = parse_selector_params(matcher, start, end)?;
+    if let Some(ref sel) = selector
+        && metrics::prom::try_into_metric_name(sel).is_none()
+    {
+        let err = "match[] must specify a metric name or a non-empty exact __name__ matcher";
+        log::error!("{err}");
+        return Err(err.to_owned());
+    }
     Ok((selector, start, end))
 }
 
@@ -1268,8 +1250,55 @@ pub async fn format_query_post(
     format_query(query)
 }
 
+/// PromQL as a small JSON tree, for the visual builder to read a hand-written query.
+#[utoipa::path(
+    post,
+    path = "/{org_id}/prometheus/api/v1/parse_tree",
+    context_path = "/api",
+    tag = "Metrics",
+    operation_id = "PrometheusParseTree",
+    summary = "Parse a PromQL query into a tree",
+    description = "Parses a PromQL query and returns OpenObserve's JSON tree of it: selectors, matrices, calls, aggregates, binary operations, numbers and parentheses, with every other construct marked unsupported. Distinct from Prometheus's parse_query, whose response shape differs.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = config::meta::promql::RequestParseTree, description = "The query to parse", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+            "status": "success",
+            "data": { "type": "selector", "name": "up", "matchers": [] }
+        })),
+        (status = 400, description = "The query does not parse", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
+    )
+)]
+pub async fn parse_tree(
+    Path(_org_id): Path<String>,
+    axum::Json(req): axum::Json<config::meta::promql::RequestParseTree>,
+) -> Response {
+    match promql::ast::tree::parse_tree(&req.query) {
+        Ok(tree) => (
+            StatusCode::OK,
+            axum::Json(config::meta::promql::ApiFuncResponse::ok(tree, None)),
+        )
+            .into_response(),
+        Err(err) => (
+            StatusCode::BAD_REQUEST,
+            axum::Json(config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
+                err, None,
+            )),
+        )
+            .into_response(),
+    }
+}
+
 fn format_query(query: &str) -> Response {
-    let expr = match promql_parser::parser::parse(query) {
+    let expr = match promql::parse(query) {
         Ok(expr) => expr,
         Err(err) => {
             return (
@@ -1289,6 +1318,38 @@ fn format_query(query: &str) -> Response {
         )),
     )
         .into_response()
+}
+
+/// Requires read permission on every named metric for any non-root caller; `None` means allowed.
+#[cfg(feature = "enterprise")]
+async fn check_metric_permissions(
+    org_id: &str,
+    user_id: &str,
+    names: impl IntoIterator<Item = String>,
+) -> Option<Response> {
+    for name in names {
+        if let Some(res) = openobserve_core::authz::check_stream_permissions(
+            &name,
+            org_id,
+            user_id,
+            &StreamType::Metrics,
+            openobserve_core::authz::StreamPermissionResourceType::Search,
+        )
+        .await
+        {
+            return Some(res);
+        }
+    }
+    None
+}
+
+/// No `match[]` reads no metric (`get_series` answers `[]`), so it needs no grant.
+#[cfg(any(feature = "enterprise", test))]
+fn series_metric_names(selector: Option<&parser::VectorSelector>) -> Vec<String> {
+    selector
+        .and_then(metrics::prom::try_into_metric_name)
+        .into_iter()
+        .collect()
 }
 
 fn search_timeout(timeout: Option<String>) -> i64 {
@@ -1329,21 +1390,23 @@ async fn search(
     )
     .await
     {
-        Ok(data) if !req.query_exemplars => (
+        Ok(resp) if !req.query_exemplars => (
             StatusCode::OK,
-            axum::Json(config::meta::promql::ApiFuncResponse::ok(
+            axum::Json(config::meta::promql::ApiFuncResponse::ok_with_warnings(
                 config::meta::promql::QueryResult {
-                    result_type: data.get_type().to_string(),
-                    result: data,
+                    result_type: resp.value.get_type().to_string(),
+                    result: resp.value,
                 },
+                resp.warnings,
                 Some(trace_id.to_string()),
             )),
         )
             .into_response(),
-        Ok(data) => (
+        Ok(resp) => (
             StatusCode::OK,
-            axum::Json(config::meta::promql::ApiFuncResponse::ok(
-                data,
+            axum::Json(config::meta::promql::ApiFuncResponse::ok_with_warnings(
+                resp.value,
+                resp.warnings,
                 Some(trace_id.to_string()),
             )),
         )
@@ -1368,7 +1431,7 @@ async fn search(
 async fn search_streaming(
     trace_id: &str,
     org_id: &str,
-    req: core_promql::MetricsQueryRequest,
+    mut req: core_promql::MetricsQueryRequest,
     user_email: &str,
     timeout: i64,
 ) -> Response {
@@ -1381,6 +1444,12 @@ async fn search_streaming(
         .enabled;
 
     // adjust start and end time
+    // each partition is searched as its own query, which would read `end()` as the partition's end
+    if let Ok(Some(query)) =
+        promql::ast::at_modifier::resolve_query(&req.query, req.start, req.end, req.step)
+    {
+        req.query = query;
+    }
     let (start, end) = promql::adjust_start_end(req.start, req.end, req.step);
     // generate partitions
     let partitions = generate_search_partition(&req.query, start, end, req.step);
@@ -1424,12 +1493,13 @@ async fn search_streaming(
             )
             .await
             {
-                Ok(data) => {
+                Ok(resp) => {
                     let res = StreamResponses::PromqlResponse {
                         data: config::meta::promql::QueryResult {
-                            result_type: data.get_type().to_string(),
-                            result: data,
+                            result_type: resp.value.get_type().to_string(),
+                            result: resp.value,
                         },
+                        warnings: resp.warnings,
                         trace_id: Some(req_trace_id.clone()),
                     };
                     if tx.send(Ok(res)).await.is_err() {
@@ -1575,7 +1645,8 @@ fn generate_search_partition(query: &str, start: i64, end: i64, step: i64) -> Ve
 
     // Calculate the offset from the aligned boundary
     // For example, if partition_step is 1 hour and start is 10:23, offset is 23 minutes
-    let offset = start % partition_step;
+    // Boundaries keep start's step phase so every partition evaluates on the query's own grid.
+    let offset = (start - start.rem_euclid(step)).rem_euclid(partition_step);
 
     // Determine where aligned partitions start
     let mut group_start = if offset == 0 {
@@ -1584,14 +1655,16 @@ fn generate_search_partition(query: &str, start: i64, end: i64, step: i64) -> Ve
     } else {
         // First partition: from start to next aligned boundary
         // we need to subtract the step to avoid the overlap of the next partition
-        let mut next_aligned_boundary = start - offset + partition_step - step;
-        if start == next_aligned_boundary {
-            next_aligned_boundary += partition_step - step;
+        let mut first_end = start - offset + partition_step - step;
+        // A single-point first partition is folded into the next aligned partition.
+        if first_end == start {
+            first_end += partition_step;
+            if end - first_end < step * 3 {
+                first_end = end;
+            }
         }
-        if next_aligned_boundary <= end {
-            groups.push((start, next_aligned_boundary));
-        }
-        next_aligned_boundary + step
+        groups.push((start, first_end));
+        first_end + step
     };
     while group_start < end {
         let mut group_end = std::cmp::min(group_start + partition_step, end);
@@ -1621,14 +1694,14 @@ fn generate_search_partition(query: &str, start: i64, end: i64, step: i64) -> Ve
 }
 
 fn get_max_lookback_window(query: &str) -> i64 {
-    let ast = match promql_parser::parser::parse(query) {
+    let ast = match promql::parse(query) {
         Ok(ast) => ast,
         Err(_) => {
             return 0;
         }
     };
     let mut visitor = MaxLookbackWindowVisitor::default();
-    if let Err(err) = promql_parser::util::walk_expr(&mut visitor, &ast) {
+    if let Err(err) = promql::ast::visitor::walk_expr(&mut visitor, &ast) {
         log::error!("visit promql expr error: {err}");
         return 0;
     }
@@ -1663,18 +1736,11 @@ impl promql_parser::util::ExprVisitor for MaxLookbackWindowVisitor {
     type Error = &'static str;
 
     fn pre_visit(&mut self, expr: &Expr) -> Result<bool, Self::Error> {
-        match expr {
-            Expr::VectorSelector(_) => {
-                return Ok(false);
-            }
-            Expr::MatrixSelector(ms) => {
-                if ms.range > self.range {
-                    self.range = ms.range;
-                }
-                return Ok(false);
-            }
-            Expr::NumberLiteral(_) | Expr::StringLiteral(_) => return Ok(false),
-            _ => (),
+        // Ok(false) aborts the whole walk, so a leaf must not return it or later selectors are lost
+        if let Expr::MatrixSelector(ms) = expr
+            && ms.range > self.range
+        {
+            self.range = ms.range;
         }
         Ok(true)
     }
@@ -1684,7 +1750,287 @@ impl promql_parser::util::ExprVisitor for MaxLookbackWindowVisitor {
 mod tests {
     use super::*;
 
-    // --- search_timeout ---
+    #[test]
+    fn metric_reads_check_permission_for_every_non_root_user() {
+        let text = include_str!("mod.rs");
+        for signature in [
+            "async fn query(",
+            "async fn query_range(",
+            "async fn series(",
+        ] {
+            let start = text
+                .find(signature)
+                .unwrap_or_else(|| panic!("{signature} not found"));
+            let body = &text[start..];
+            let body = &body[..body.find("\n}\n").expect("handler end")];
+            assert!(
+                body.contains("check_metric_permissions("),
+                "{signature} must check every metric it reads"
+            );
+        }
+        let flat = text.split_whitespace().collect::<Vec<_>>().join(" ");
+        assert!(
+            !flat.contains(concat!("if user.is_external", " && !")),
+            "a metric permission check must not depend on how the user signed in"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_client_cannot_run_a_range_query_as_a_public_dashboard() {
+        let req: config::meta::promql::RequestRangeQuery =
+            serde_json::from_value(serde_json::json!({
+                "query": "up", "search_type": "public_dashboard"
+            }))
+            .unwrap();
+        let resp = query_range("org", req, "u@example.com", &HeaderMap::new(), false).await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body = String::from_utf8_lossy(&body);
+        assert!(body.contains("public_dashboard"), "{body}");
+    }
+
+    #[test]
+    fn series_without_match_checks_no_metric() {
+        assert!(series_metric_names(None).is_empty());
+        let selector = match parser::parse("up{job=\"x\"}").unwrap() {
+            parser::Expr::VectorSelector(selector) => selector,
+            other => panic!("unexpected {other:?}"),
+        };
+        assert_eq!(series_metric_names(Some(&selector)), ["up"]);
+    }
+
+    async fn parse_tree_response(query: &str) -> (StatusCode, serde_json::Value) {
+        let response = parse_tree(
+            Path("org".to_string()),
+            axum::Json(config::meta::promql::RequestParseTree {
+                query: query.to_string(),
+            }),
+        )
+        .await;
+        let status = response.status();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, serde_json::from_slice(&body).unwrap_or_default())
+    }
+
+    #[tokio::test]
+    async fn parse_tree_returns_the_tree() {
+        let (status, body) = parse_tree_response("rate(x[5m])").await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["data"]["type"], "call");
+        assert_eq!(body["data"]["func"], "rate");
+    }
+
+    #[tokio::test]
+    async fn parse_tree_answers_400_with_the_parser_message() {
+        let (status, body) = parse_tree_response("sum(x").await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert!(
+            body["error"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("unclosed")
+        );
+    }
+
+    #[test]
+    fn test_validate_label_values_params() {
+        assert!(validate_label_values_params("__name__", None, None, None).is_ok());
+        assert!(validate_label_values_params("job", None, None, None).is_err());
+        for matcher in [
+            "",
+            r#"{job="prometheus"}"#,
+            r#"{__name__=~"up.*"}"#,
+            r#"{__name__!="up",job="prometheus"}"#,
+            r#"{__name__!~"up.*",job="prometheus"}"#,
+            r#"{__name__="",job="prometheus"}"#,
+        ] {
+            assert!(
+                validate_label_values_params("job", Some(matcher.to_owned()), None, None).is_err(),
+                "{matcher}"
+            );
+        }
+        for matcher in [
+            "up",
+            r#"{__name__="up"}"#,
+            r#"up{job="prometheus" or job="other"}"#,
+        ] {
+            assert!(
+                validate_label_values_params("job", Some(matcher.to_owned()), None, None).is_ok(),
+                "{matcher}"
+            );
+        }
+        // __name__ accepts regex and negation matchers but rejects non-__name__ and OR matchers
+        for matcher in [
+            "up",
+            r#"{__name__=~"node.*"}"#,
+            r#"{__name__=~".+", __name__!~"up.*"}"#,
+            r#"{__name__=~".+", __name__!="up"}"#,
+        ] {
+            assert!(
+                validate_label_values_params("__name__", Some(matcher.to_owned()), None, None)
+                    .is_ok(),
+                "{matcher}"
+            );
+        }
+        for matcher in [
+            r#"{job="prometheus"}"#,
+            r#"up{job="prometheus"}"#,
+            r#"{__name__=~"node.*", job="prometheus"}"#,
+            r#"{__name__=~"up" or __name__=~"node_cpu"}"#,
+        ] {
+            assert!(
+                validate_label_values_params("__name__", Some(matcher.to_owned()), None, None)
+                    .is_err(),
+                "{matcher}"
+            );
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_label_values_missing_metric_returns_bad_request() {
+        let response = label_values(
+            Path(("default".to_owned(), "job".to_owned())),
+            Query(config::meta::promql::RequestLabelValues {
+                matcher: None,
+                start: None,
+                end: None,
+            }),
+            Headers(UserEmail {
+                user_id: "test@example.com".to_owned(),
+            }),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body["status"], "error");
+        assert_eq!(body["errorType"], "bad_data");
+        assert!(body["error"].as_str().unwrap().contains("match[]"));
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_label_values_name_unsupported_selectors_return_bad_request() {
+        for matcher in [
+            r#"{__name__=~"up" or __name__=~"node_cpu"}"#,
+            r#"{__name__=~"node.*", job="missing"}"#,
+        ] {
+            let response = label_values(
+                Path(("default".to_owned(), "__name__".to_owned())),
+                Query(config::meta::promql::RequestLabelValues {
+                    matcher: Some(matcher.to_owned()),
+                    start: None,
+                    end: None,
+                }),
+                Headers(UserEmail {
+                    user_id: "test@example.com".to_owned(),
+                }),
+            )
+            .await;
+            assert_eq!(response.status(), StatusCode::BAD_REQUEST, "{matcher}");
+            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            assert_eq!(body["status"], "error", "{matcher}");
+            assert_eq!(body["errorType"], "bad_data", "{matcher}");
+            assert!(
+                body["error"].as_str().unwrap().contains("match[]"),
+                "{matcher}"
+            );
+        }
+    }
+
+    // A non-root caller missing from the user/org cache must get 403, not a panic.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_uncached_user_is_forbidden_not_a_panic() {
+        let user = || {
+            Headers(UserEmail {
+                user_id: "uncached-promql-user@example.com".to_owned(),
+            })
+        };
+        let responses = [
+            query_get(
+                Path("default".to_owned()),
+                Query(serde_json::from_value(serde_json::json!({"query": "up"})).unwrap()),
+                user(),
+                HeaderMap::new(),
+            )
+            .await,
+            query_range_get(
+                Path("default".to_owned()),
+                Query(
+                    serde_json::from_value(serde_json::json!({
+                        "query": "up", "start": "1700000000", "end": "1700000600", "step": "60"
+                    }))
+                    .unwrap(),
+                ),
+                user(),
+                HeaderMap::new(),
+            )
+            .await,
+            series_get(
+                Path("default".to_owned()),
+                Query(config::meta::promql::RequestSeries {
+                    matcher: Some("up".to_owned()),
+                    start: None,
+                    end: None,
+                }),
+                user(),
+            )
+            .await,
+        ];
+        for (i, response) in responses.into_iter().enumerate() {
+            assert_eq!(response.status(), StatusCode::FORBIDDEN, "handler #{i}");
+        }
+    }
+
+    #[test]
+    fn test_validate_metadata_params_rejects_non_exact_metric_names() {
+        for query in [
+            r#"{__name__!="up",job="x"}"#,
+            r#"{__name__=~"up.*",job="x"}"#,
+            r#"{__name__=~"up",job="x"}"#,
+            r#"{__name__!~"up.*",job="x"}"#,
+            r#"{__name__="",job="x"}"#,
+            r#"{job="x"}"#,
+        ] {
+            let err = validate_metadata_params(Some(query.to_string()), None, None).unwrap_err();
+            assert_eq!(
+                err, "match[] must specify a metric name or a non-empty exact __name__ matcher",
+                "{query}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_validate_metadata_params_accepts_exact_metric_names() {
+        for query in ["up", r#"up{job="x"}"#, r#"{__name__="up",job="x"}"#] {
+            let (selector, ..) =
+                validate_metadata_params(Some(query.to_string()), None, None).unwrap();
+            assert_eq!(
+                selector
+                    .as_ref()
+                    .and_then(metrics::prom::try_into_metric_name),
+                Some("up".to_string()),
+                "{query}"
+            );
+        }
+        assert!(
+            validate_metadata_params(None, None, None)
+                .unwrap()
+                .0
+                .is_none()
+        );
+    }
 
     #[test]
     fn test_search_timeout_none() {
@@ -1736,19 +2082,6 @@ mod tests {
         assert_eq!(result, 300_000_000);
     }
 
-    #[test]
-    fn test_max_lookback_single_range_5m() {
-        // Single range selector 5m -> 300s -> 300_000_000 micros
-        let result = get_max_lookback_window("rate(http_requests_total[5m])");
-        assert_eq!(result, 300_000_000);
-    }
-
-    #[test]
-    fn test_max_lookback_10m() {
-        let result = get_max_lookback_window("rate(up[10m])");
-        assert_eq!(result, 600_000_000); // 10m in micros
-    }
-
     // --- MaxLookbackWindowVisitor ---
 
     #[test]
@@ -1761,6 +2094,22 @@ mod tests {
     fn test_visitor_new_range_is_zero() {
         let v = MaxLookbackWindowVisitor::new();
         assert_eq!(v.get_range_micros(), 0);
+    }
+
+    #[test]
+    fn test_lookback_window_seen_after_a_vector_selector() {
+        assert_eq!(
+            get_max_lookback_window("a + rate(b[24h])"),
+            24 * 3600 * 1_000_000
+        );
+    }
+
+    #[test]
+    fn test_lookback_window_seen_in_aggregation_param() {
+        assert_eq!(
+            get_max_lookback_window("topk(scalar(max_over_time(k[24h])), m)"),
+            24 * 3600 * 1_000_000
+        );
     }
 
     // --- generate_search_partition ---
@@ -1812,6 +2161,54 @@ mod tests {
         assert_eq!(result.last().unwrap().1, end);
     }
 
+    #[test]
+    fn test_partition_unaligned_start_issue_14764() {
+        // 15m range, step=5m, start in the second half of a 10m partition block
+        let start = 1_790_078_349_759_000_i64;
+        let end = 1_790_079_249_759_000_i64;
+        let step = 300_000_000_i64;
+        let query = r#"sum by (flowid) (increase(x{outcome="submitted"}[5m])) > 0"#;
+        let result = generate_search_partition(query, start, end, step);
+        assert_partitions_valid(&result, start, end, step);
+    }
+
+    #[test]
+    fn test_partition_every_start_phase() {
+        let step = 60_000_000_i64;
+        let base = 1_790_078_400_000_000_i64;
+        for query in ["up", "increase(x[5m])"] {
+            for step_mul in [1, 5] {
+                let step = step * step_mul;
+                for shift in (0..3_600_000_000_i64).step_by(17_000_000) {
+                    let start = base + shift;
+                    for points in [4_i64, 11, 16, 61, 200] {
+                        for tail in [0, step / 3] {
+                            let end = start + step * (points - 1) + tail;
+                            let result = generate_search_partition(query, start, end, step);
+                            assert_partitions_valid(&result, start, end, step);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn assert_partitions_valid(parts: &[(i64, i64)], start: i64, end: i64, step: i64) {
+        assert_eq!(parts.first().unwrap().0, start, "{parts:?}");
+        assert_eq!(parts.last().unwrap().1, end, "{parts:?}");
+        for (s, e) in parts {
+            assert!(s <= e, "partition end before start: {parts:?}");
+            assert_eq!(
+                (s - start) % step,
+                0,
+                "partition off the step grid: {parts:?}"
+            );
+        }
+        for w in parts.windows(2) {
+            assert_eq!(w[1].0, w[0].1 + step, "gap or overlap: {parts:?}");
+        }
+    }
+
     // --- validate_metadata_params ---
 
     #[test]
@@ -1850,5 +2247,25 @@ mod tests {
         // A matcher without a metric name should error
         let result = validate_metadata_params(Some("{job=\"prometheus\"}".to_string()), None, None);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_metadata_params_start_after_end() {
+        let result = validate_metadata_params(
+            None,
+            Some("1700000200".to_string()),
+            Some("1700000100".to_string()),
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_metadata_params_start_equals_end() {
+        let result = validate_metadata_params(
+            None,
+            Some("1700000100".to_string()),
+            Some("1700000100".to_string()),
+        );
+        assert!(result.is_ok());
     }
 }

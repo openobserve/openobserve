@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable
+          ref="oTableRef"
           :frame="false"
           :key="activeTab"
           data-test="pipeline-list-table"
@@ -30,10 +31,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="otableColumns"
           row-key="pipeline_id"
           :loading="loading"
+          :forbidden="forbidden"
           :global-filter="filterQuery"
           :show-global-filter="false"
-          :page-size="20"
+          :page-size="pageSize"
           :page-size-options="[20, 50, 100, 250, 500]"
+          :current-page="currentPage"
+          @update:current-page="onPageChange"
+          @update:page-size="pageSize = $event"
+          :sort-by="sortBy"
+          :sort-order="sortOrder"
+          @update:sort-by="sortBy = $event"
+          @update:sort-order="sortOrder = $event"
           selection="multiple"
           :enable-column-resize="true"
           :persist-columns="true"
@@ -62,21 +71,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="loading"
                 selectable
                 :selected-key="stateFilter"
+                default-key="total"
                 @select="onStatSelect"
               />
             </div>
           </template>
 
           <template #toolbar>
-            <div class="flex w-full items-center gap-2">
+            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
               <OToggleGroup
+                mobile-dropdown
                 :model-value="activeTab"
-                @update:model-value="
-                  (v) => {
-                    activeTab = v as string;
-                    updateActiveTab();
-                  }
-                "
+                @update:model-value="onTabChange"
                 data-test="pipeline-list-tabs"
               >
                 <OToggleGroupItem value="all" size="sm" data-test="tab-all">
@@ -92,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("pipeline_list.tab_realtime") }}
                 </OToggleGroupItem>
               </OToggleGroup>
-              <div class="min-w-0 flex-1">
+              <div class="min-w-0 flex-1 max-md:min-w-40">
                 <OInput
                   data-test="pipeline-list-search-input"
                   v-model="filterQuery"
@@ -107,20 +113,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
-              :loading="loading"
+              :last-run-at="lastUpdatedAt"
+              :loading="fetching"
+              shortcut-id="pipelinesRefresh"
               data-test="pipeline-list-refresh-btn"
-              @click="getPipelines"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="pipelinesRefresh"
-              />
-            </OButton>
+              @click="refreshPipelines"
+            />
           </template>
 
           <template #cell-type="{ row }">
@@ -153,6 +154,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </template>
 
+          <template #cell-name="{ row }">
+            <span class="inline-flex min-w-0 items-center gap-2">
+              <OTruncatedText :data-test="`pipeline-list-name-cell-${row.name}`">{{
+                row.name
+              }}</OTruncatedText>
+              <EditorDraftDot
+                v-if="pipelineDrafts.ids.has(row.pipeline_id)"
+                :saved-at="pipelineDrafts.savedAt(row.pipeline_id)"
+                :data-test="`pipeline-list-${row.name}-draft-dot`"
+              />
+            </span>
+          </template>
+
           <template #cell-actions="{ row }">
             <div class="actions-container flex items-center">
               <OButton
@@ -161,6 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
                 size="icon-sm"
                 :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                class="max-md:hidden"
                 @click.stop="togglePipeline(row)"
               >
                 <OTooltip
@@ -169,11 +184,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :shortcut-id="row.enabled ? 'pipelinesRowPause' : undefined"
                 />
               </OButton>
+              <!-- Hover-only preview with no click action, so it has no menu counterpart below md. -->
               <OButton
                 :data-test="`pipeline-list-${row.name}-view-pipeline`"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('pipeline.view')"
+                class="max-md:hidden"
                 icon-left="visibility"
               >
                 <OTooltip max-width="none" side="left">
@@ -185,6 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="edit"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 @click.stop="editPipeline(row)"
                 icon-left="edit"
               >
@@ -215,6 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdown align="end">
                 <template #trigger>
                   <OButton
+                    :aria-label="t('common.moreActions')"
                     variant="ghost"
                     size="icon-sm"
                     @click.stop
@@ -222,6 +241,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     icon-left="more-vert"
                   />
                 </template>
+                <ODropdownItem
+                  :data-test="`pipeline-list-${row.name}-pause-start-action-menu`"
+                  class="md:hidden"
+                  @select="togglePipeline(row)"
+                >
+                  <template #icon-left>
+                    <OIcon size="sm" :name="row.enabled ? 'pause' : 'play-arrow'" />
+                  </template>
+                  {{ row.enabled ? t("alerts.pause") : t("alerts.start") }}
+                </ODropdownItem>
+                <ODropdownItem
+                  :data-test="`pipeline-list-${row.name}-update-pipeline-menu`"
+                  class="md:hidden"
+                  @select="editPipeline(row)"
+                >
+                  <template #icon-left>
+                    <OIcon size="sm" name="edit" />
+                  </template>
+                  {{ t("alerts.edit") }}
+                </ODropdownItem>
+                <ODropdownSeparator class="md:hidden" />
                 <ODropdownItem
                   :data-test="`pipeline-list-${row.name}-export-action`"
                   shortcut-id="pipelinesRowExport"
@@ -255,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #icon-left>
                     <OIcon size="sm" name="refresh" />
                   </template>
-                  Create Backfill
+                  {{ t("pipeline_list.createBackfill") }}
                 </ODropdownItem>
                 <ODropdownSeparator v-if="row.last_error" />
                 <ODropdownItem
@@ -267,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon size="sm" name="error" />
                   </template>
                   <div class="flex flex-col">
-                    <div>View Error</div>
+                    <div>{{ t("pipeline_list.viewError") }}</div>
                     <div class="text-text-secondary text-xs">
                       {{ new Date(row.last_error.last_error_timestamp / 1000).toLocaleString() }}
                     </div>
@@ -289,7 +329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex items-start justify-center">
                 <div
                   data-test="scheduled-pipeline-expanded-sql"
-                  class="border-border-default border-l-accent bg-surface-subtle text-text-body h-full max-h-50 w-full overflow-y-auto border border-l-[3px] p-2.5 whitespace-normal"
+                  class="border-border-default border-s-accent bg-surface-subtle text-text-body h-full max-h-50 w-full overflow-y-auto border border-s-3 p-2.5 whitespace-normal"
                 >
                   <pre style="text-wrap: wrap">{{ row?.sql_query }} </pre>
                 </div>
@@ -313,51 +353,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
 
-          <template #bottom="bottomProps">
-            <div class="flex w-full items-center justify-between py-1">
-              <div class="mr-4 flex items-center text-xs font-normal">
-                {{ bottomProps.totalRows }} {{ t("pipeline.header") }}
-              </div>
-              <div v-if="selectedPipelineIds.length > 0" class="flex items-center gap-2">
-                <OButton
-                  data-test="pipeline-list-export-pipelines-btn"
-                  variant="outline"
-                  size="sm"
-                  @click="exportBulkPipelines"
-                  icon-left="download"
-                >
-                  {{ t("pipeline_list.export") }}
-                </OButton>
-                <OButton
-                  data-test="pipeline-list-pause-pipelines-btn"
-                  variant="outline"
-                  size="sm"
-                  @click="bulkTogglePipelines('pause')"
-                  icon-left="pause"
-                >
-                  {{ t("pipeline_list.pause") }}
-                </OButton>
-                <OButton
-                  data-test="pipeline-list-resume-pipelines-btn"
-                  variant="outline"
-                  size="sm"
-                  @click="bulkTogglePipelines('resume')"
-                  icon-left="play-arrow"
-                >
-                  {{ t("pipeline_list.resume") }}
-                </OButton>
-                <OButton
-                  data-test="pipeline-list-delete-pipelines-btn"
-                  variant="outline-destructive"
-                  size="sm"
-                  :loading="bulkDeleteLoading"
-                  @click="openBulkDeleteDialog"
-                  icon-left="delete"
-                >
-                  Delete
-                </OButton>
-              </div>
-            </div>
+          <template #selection-actions>
+            <OButton
+              data-test="pipeline-list-export-pipelines-btn"
+              variant="outline"
+              size="sm"
+              :loading="exportLoading"
+              @click="exportBulkPipelines"
+              icon-left="download"
+            >
+              {{ t("pipeline_list.export") }}
+            </OButton>
+            <OButton
+              data-test="pipeline-list-pause-pipelines-btn"
+              variant="outline"
+              size="sm"
+              @click="bulkTogglePipelines('pause')"
+              icon-left="pause"
+            >
+              {{ t("pipeline_list.pause") }}
+            </OButton>
+            <OButton
+              data-test="pipeline-list-resume-pipelines-btn"
+              variant="outline"
+              size="sm"
+              @click="bulkTogglePipelines('resume')"
+              icon-left="play-arrow"
+            >
+              {{ t("pipeline_list.resume") }}
+            </OButton>
+            <OButton
+              data-test="pipeline-list-delete-pipelines-btn"
+              variant="outline-destructive"
+              size="sm"
+              :loading="bulkDeleteLoading"
+              @click="openBulkDeleteDialog"
+              icon-left="delete"
+            >
+              {{ t("common.delete") }}
+            </OButton>
           </template>
         </OTable>
       </div>
@@ -377,6 +411,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ConfirmDialog
     :title="confirmDialogMeta.title"
     :message="confirmDialogMeta.message"
+    :message-keypath="confirmDialogMeta.messageKeypath"
+    :message-name="confirmDialogMeta.messageName"
+    :ok-variant="confirmDialogMeta.okVariant"
     @update:ok="confirmDialogMeta.onConfirm()"
     @update:cancel="resetConfirmDialog"
     v-model="confirmDialogMeta.show"
@@ -408,7 +445,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="errorDialog.data?.name"
     :sub-title="
       errorDialog.data
-        ? `${t('pipeline_list.last_error')}: ${new Date(errorDialog.data.last_error.last_error_timestamp / 1000).toLocaleString()}`
+        ? t('pipeline_list.lastErrorAt', {
+            time: new Date(
+              errorDialog.data.last_error.last_error_timestamp / 1000,
+            ).toLocaleString(),
+          })
         : undefined
     "
     :primary-button-label="t('pipeline_list.close')"
@@ -471,7 +512,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(msg, idx) in nodeErrorMessages(nodeError)"
                 :key="idx"
-                class="error-message rounded-default bg-banner-error-soft-bg border-l-status-negative text-banner-error-soft-text border-l-[3px] p-3 font-mono text-xs leading-[1.5] wrap-break-word whitespace-pre-wrap"
+                class="error-message rounded-default bg-banner-error-soft-bg border-s-status-negative text-banner-error-soft-text border-s-3 p-3 font-mono text-xs leading-[1.5] wrap-break-word whitespace-pre-wrap"
               >
                 {{ msg }}
               </div>
@@ -483,11 +524,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </ODialog>
 </template>
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { pipelinesQuery } from "@/services/pipelines.queries";
+import { downloadFile } from "@/utils/dom";
+import { functionsQuery } from "@/services/jstransform.queries";
+import { pipelineKeys } from "@/services/pipelines.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { ref, computed, watch, onMounted, nextTick } from "vue";
 import { normalizeNodeErrorMessages } from "@/utils/pipelines/nodeErrors";
 import { MarkerType } from "@vue-flow/core";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
+import { useListViewState } from "@/composables/useListViewState";
 import StreamSelection from "./StreamSelection.vue";
 import pipelineService from "@/services/pipelines";
 import { useStore } from "vuex";
@@ -517,13 +566,18 @@ import ResumePipelineDialog from "../ResumePipelineDialog.vue";
 import CreateBackfillJobDialog from "@/components/pipelines/CreateBackfillJobDialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 
 // Row original data rendered by the pipelines table. Only the fields read in the
@@ -532,11 +586,91 @@ interface PipelineRow {
   sql_query?: string;
 }
 
-const filterQuery = ref("");
+const viewState = useListViewState("pipelines", {
+  filterQuery: "",
+  tab: "all",
+  stateFilter: null as "errored" | "paused" | "active" | null,
+  pageSize: 20,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+});
+const filterQuery = ref(viewState.filterQuery);
+const pageSize = ref(viewState.pageSize);
+const sortBy = ref(viewState.sortBy);
+const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
 
 const showCreatePipeline = ref(false);
 
-const pipelines = ref([]);
+/**
+ * Pure: builds a new row per pipeline rather than writing onto the argument, so
+ * this can be derived straight from the cached query data without rewriting the
+ * cache entry in place.
+ */
+const shapePipelines = (list: any[]) =>
+  list.map((pipeline: any) => {
+    const updatedEdges = pipeline.edges.map((edge: any) => ({
+      ...edge,
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        width: 20, // Increase arrow width
+        height: 20, // Increase arrow height
+      },
+      type: "custom",
+
+      style: {
+        strokeWidth: 2,
+      },
+      animated: true,
+      updatable: true,
+    }));
+
+    const derived =
+      pipeline.source.source_type === "realtime"
+        ? {
+            stream_name: pipeline.source.stream_name,
+            stream_type: pipeline.source.stream_type,
+            frequency: "--",
+            period: "--",
+            cron: "--",
+            sql_query: "--",
+          }
+        : {
+            stream_type: pipeline.source.stream_type,
+            // These three feed accessor-only table columns (no #cell-* slot), so
+            // whatever is written here renders verbatim — hence t() rather than
+            // bare literals.
+            frequency:
+              pipeline.source.trigger_condition.frequency_type == "minutes"
+                ? t("pipeline.frequencyMins", {
+                    count: pipeline.source.trigger_condition.frequency,
+                  })
+                : pipeline.source.trigger_condition.cron,
+            period: t("pipeline.frequencyMins", {
+              count: pipeline.source.trigger_condition.period,
+            }),
+            cron:
+              pipeline.source.trigger_condition.frequency_type == "minutes"
+                ? t("common.boolFalse")
+                : t("common.boolTrue"),
+            sql_query: pipeline.source.query_condition.sql,
+          };
+
+    return {
+      ...pipeline,
+      type: pipeline.source.source_type,
+      ...derived,
+      edges: updatedEdges,
+    };
+  });
+
+const orgIdForList = useOrgId();
+const pipelinesList = useQuery(() =>
+  Object.assign(pipelinesQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
+);
+
+// The list is the query, not a copy of it: anything invalidating the pipelines
+// scope repaints these rows with no wiring here.
+const pipelines = computed(() => shapePipelines(pipelinesList.data.value ?? []));
 
 const store = useStore();
 
@@ -549,15 +683,35 @@ const resumePipelineDialogMeta: any = ref({
   onCancel: () => handleCancelResumePipeline(),
 });
 
-const { pipelineObj } = useDragAndDrop();
+const { pipelineObj } = useDragAndDrop(t);
+const pipelineDrafts = useEditorDraftIds("pipeline");
+const dropPipelineDrafts = (ids: string[]) => {
+  const org = store.state.selectedOrganization.identifier;
+  ids.forEach((entityId) => deleteEditorDraftsFor({ kind: "pipeline", org, entityId }));
+};
 
+const oTableRef: any = ref(null);
+// Plain ref, not URL/store-backed: PipelinesList stays mounted across pipelineEditor/import/history/backfill child-route navigation, so this alone survives the round trip.
+const currentPage = ref(1);
+const onPageChange = (page: number) => {
+  currentPage.value = page;
+};
+
+// setTimeout(0) is a macrotask, so it runs after TanStack's own deferred auto-reset-on-data-change (its own microtask queue), letting the restored page win.
+const restorePageIndex = () => {
+  setTimeout(() => {
+    oTableRef.value?.restorePage?.(currentPage.value);
+  }, 0);
+};
+
+// Only re-fetches when landing back on the list itself; the `v-if` swap destroys and recreates OTable for the whole editor/import/history/backfill visit, so its page needs reasserting once this fetch settles.
 watch(
   () => router.currentRoute.value.name,
   async (newName, oldName) => {
-    // Only re-fetch when we land back on the list itself
     if (newName !== "pipelines" || newName === oldName) return;
     await getPipelines();
     updateActiveTab();
+    restorePageIndex();
   },
 );
 
@@ -565,14 +719,25 @@ const confirmDialogMeta: any = ref({
   show: false,
   title: "",
   message: "",
+  messageKeypath: undefined,
+  messageName: "",
+  okVariant: undefined,
   data: null,
   onConfirm: () => {},
 });
-const activeTab = ref("all");
-const filteredPipelines: any = ref([]);
+const activeTab = ref(viewState.tab);
+// Derived, not assigned: a copy written only by updateActiveTab() is empty on a cold mount.
+const filteredPipelines = computed<any[]>(() =>
+  activeTab.value === "all"
+    ? pipelines.value
+    : pipelines.value.filter((pipeline: any) => pipeline.source.source_type === activeTab.value),
+);
 const columns: any = ref([]);
 
 const selectedPipelineIds = ref<string[]>([]);
+// Export fetches the function list before it writes the file, so a second press
+// mid-flight would download twice.
+const exportLoading = ref(false);
 const bulkDeleteLoading = ref(false);
 const selectedPipelines = computed(() =>
   filteredPipelines.value.filter((p: any) => selectedPipelineIds.value.includes(p.pipeline_id)),
@@ -650,13 +815,23 @@ const pipelineRowStyle = (row: any): Record<string, string> => {
       : s === "paused"
         ? "var(--color-grey-400)"
         : "var(--color-success-500)";
-  return { boxShadow: `inset 0.25rem 0 0 0 ${color}` };
+  return { boxShadow: `var(--shadow-rail-geom) ${color}` };
 };
 
 // ── State facet + summary strip ─────────────────────────────────────────────
 // Counts run over the TYPE-filtered rows (not the state-filtered ones) so the
 // tiles keep their totals while a facet is active.
-const stateFilter = ref<"errored" | "paused" | "active" | null>(null);
+const stateFilter = ref<"errored" | "paused" | "active" | null>(viewState.stateFilter);
+watch([filterQuery, activeTab, stateFilter, pageSize, sortBy, sortOrder], () => {
+  Object.assign(viewState, {
+    filterQuery: filterQuery.value,
+    tab: activeTab.value,
+    stateFilter: stateFilter.value,
+    pageSize: pageSize.value,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+  });
+});
 
 const displayedPipelines = computed(() => {
   const rows = filteredPipelines.value || [];
@@ -738,17 +913,14 @@ const summaryStats = computed<StatItem[]>(() => {
 
 const updateActiveTab = () => {
   expandedId.value = [];
-  if (activeTab.value === "all") {
-    columns.value = getColumnsForActiveTab(activeTab.value);
-    filteredPipelines.value = pipelines.value;
-    return;
-  }
-
-  filteredPipelines.value = pipelines.value.filter(
-    (pipeline: any) => pipeline.source.source_type === activeTab.value,
-  );
-
   columns.value = getColumnsForActiveTab(activeTab.value);
+};
+
+// Resets the page too: `:key="activeTab"` remounts OTable, which could otherwise land past the newly-filtered tab's last page.
+const onTabChange = (tab: any) => {
+  activeTab.value = tab as string;
+  currentPage.value = 1;
+  updateActiveTab();
 };
 //this is the function to check whether the pipeline is enabled or not
 //becuase if it is not enabled then we need to show the dialog to resume the pipeline from where it paused / start from now
@@ -772,18 +944,18 @@ const togglePipelineState = (row: any, from_now: boolean) => {
     .then(async () => {
       row.enabled = newState;
       const message = row.enabled
-        ? `${row.name} state resumed successfully`
-        : `${row.name} state paused successfully`;
+        ? t("toastMessages.pipeline.stateResumed", { name: row.name })
+        : t("toastMessages.pipeline.statePaused", { name: row.name });
       toast({
-        message: message,
+        message,
         variant: "success",
       });
-      await getPipelines();
+      await getPipelines(true);
     })
     .catch((error) => {
       if (error.response.status != 403) {
         toast({
-          message: error.response?.data?.message || "Error while updating pipeline state",
+          message: error.response?.data?.message || t("pipeline.updatePipelineStateError"),
           variant: "error",
         });
       }
@@ -924,6 +1096,7 @@ columns.value = getColumnsForActiveTab(activeTab.value);
 onMounted(async () => {
   await getPipelines(); // Ensure pipelines are fetched before updating
   updateActiveTab();
+  restorePageIndex();
 });
 
 // Empty-state "New pipeline" → the dedicated pipeline-builder page (not the
@@ -943,62 +1116,32 @@ const goToImportPipeline = () => {
   });
 };
 
-const loading = ref(true);
-const getPipelines = async () => {
-  loading.value = true;
-  try {
-    const response = await pipelineService.getPipelines(
-      store.state.selectedOrganization.identifier,
-    );
-    pipelines.value = [];
-    // resultTotal.value = response.data.list.length;
-    pipelines.value = response.data.list.map((pipeline: any) => {
-      const updatedEdges = pipeline.edges.map((edge: any) => ({
-        ...edge,
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          width: 20, // Increase arrow width
-          height: 20, // Increase arrow height
-        },
-        type: "custom",
+const loading = pipelinesList.isPending;
+// Request in flight, with rows still on screen — the refresh button's
+// spinner. `loading` stays for the skeleton, which only a cold read wants.
+const fetching = pipelinesList.isFetching;
+// A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+const forbidden = computed(() => {
+  const e: any = pipelinesList.error.value;
+  return e?.status === 403 || e?.response?.status === 403;
+});
+// Epoch ms of the last successful read — drives the button's "1m ago" label.
+const lastUpdatedAt = pipelinesList.dataUpdatedAt;
+// Bound to the refresh button: always hits the server.
+const refreshPipelines = () => getPipelines(true);
 
-        style: {
-          strokeWidth: 2,
-        },
-        animated: true,
-        updatable: true,
-      }));
-      pipeline.type = pipeline.source.source_type;
-      if (pipeline.source.source_type === "realtime") {
-        pipeline.stream_name = pipeline.source.stream_name;
-        pipeline.stream_type = pipeline.source.stream_type;
-        pipeline.frequency = "--";
-        pipeline.period = "--";
-        pipeline.cron = "--";
-        pipeline.sql_query = "--";
-      } else {
-        pipeline.stream_type = pipeline.source.stream_type;
-        pipeline.frequency =
-          pipeline.source.trigger_condition.frequency_type == "minutes"
-            ? pipeline.source.trigger_condition.frequency + " Mins"
-            : pipeline.source.trigger_condition.cron;
-        pipeline.period = pipeline.source.trigger_condition.period + " Mins";
-        pipeline.cron =
-          pipeline.source.trigger_condition.frequency_type == "minutes" ? "False" : "True";
-        pipeline.sql_query = pipeline.source.query_condition.sql;
-      }
-
-      pipeline.edges = updatedEdges;
-      return {
-        ...pipeline,
-      };
-    });
-  } catch (error) {
-    console.error(error);
-  } finally {
-    loading.value = false;
-  }
+// Only an explicit call reads: refresh, post-write reload, search. Mount and
+// invalidation-driven repaints come from the query itself.
+const getPipelines = async (force = false) => {
+  if (force) await pipelinesList.refetch();
+  // `refetch` resolves before vue-query has propagated the new value into its
+  // reactive refs, so callers reading `pipelines` straight after need a tick.
+  await nextTick();
 };
+
+watch(pipelinesList.error, (error: any) => {
+  if (error) console.error(error);
+});
 const editPipeline = (pipeline: any) => {
   pipeline.nodes.forEach((node: any) => {
     node.type = node.io_type;
@@ -1019,14 +1162,17 @@ const editPipeline = (pipeline: any) => {
 const openDeleteDialog = (pipeline: any) => {
   confirmDialogMeta.value.show = true;
   confirmDialogMeta.value.title = t("pipeline.deletePipeline");
-  confirmDialogMeta.value.message = "Are you sure you want to delete this pipeline?";
+  confirmDialogMeta.value.message = "";
+  confirmDialogMeta.value.messageKeypath = "pipeline.deletePipelineConfirm";
+  confirmDialogMeta.value.messageName = pipeline.name;
+  confirmDialogMeta.value.okVariant = "destructive";
   confirmDialogMeta.value.onConfirm = deletePipeline;
   confirmDialogMeta.value.data = pipeline;
 };
 
 const savePipeline = (data: any) => {
   const dismiss = toast({
-    message: "saving pipeline...",
+    message: t("toastMessages.pipeline.savingPipeline"),
     variant: "loading",
     timeout: 0,
   });
@@ -1037,11 +1183,11 @@ const savePipeline = (data: any) => {
       org_identifier: store.state.selectedOrganization.identifier,
     })
     .then(() => {
-      getPipelines();
+      getPipelines(true);
       dismiss();
       showCreatePipeline.value = false;
       toast({
-        message: "Pipeline created successfully",
+        message: t("toastMessages.pipeline.pipelineCreatedSuccessfully"),
         variant: "success",
       });
     })
@@ -1049,7 +1195,7 @@ const savePipeline = (data: any) => {
       dismiss();
       if (error.response.status != 403) {
         toast({
-          message: error.response?.data?.message || "Error while saving pipeline",
+          message: error.response?.data?.message || t("pipeline.errorSavingPipeline"),
           variant: "error",
         });
       }
@@ -1058,7 +1204,7 @@ const savePipeline = (data: any) => {
 
 const deletePipeline = async () => {
   const dismiss = toast({
-    message: "deleting pipeline...",
+    message: t("toastMessages.pipeline.deletingPipeline"),
     variant: "loading",
     timeout: 0,
   });
@@ -1070,22 +1216,28 @@ const deletePipeline = async () => {
       org_id,
     })
     .then(async () => {
+      dropPipelineDrafts([pipeline_id]);
       toast({
-        message: "Pipeline deleted successfully",
+        message: t("toastMessages.pipeline.pipelineDeletedSuccessfully"),
         variant: "success",
       });
+      // Drop the row from the cache first so it disappears now, not when the
+      // reload in `finally` lands.
+      queryClient.setQueriesData({ queryKey: pipelineKeys.all(org_id) }, (list: any) =>
+        Array.isArray(list) ? list.filter((p: any) => p.pipeline_id !== pipeline_id) : list,
+      );
     })
     .catch((error) => {
       if (error.response.status != 403) {
         toast({
-          message: error.response?.data?.message || "Error while deleting pipeline",
+          message: error.response?.data?.message || t("pipeline.deletePipelineError"),
           variant: "error",
         });
       }
     })
     .finally(async () => {
       selectedPipelineIds.value = [];
-      await getPipelines();
+      await getPipelines(true);
       updateActiveTab();
       dismiss();
     });
@@ -1097,56 +1249,126 @@ const resetConfirmDialog = () => {
   confirmDialogMeta.value.show = false;
   confirmDialogMeta.value.title = "";
   confirmDialogMeta.value.message = "";
+  confirmDialogMeta.value.messageKeypath = undefined;
+  confirmDialogMeta.value.messageName = "";
+  confirmDialogMeta.value.okVariant = undefined;
   confirmDialogMeta.value.onConfirm = () => {};
   confirmDialogMeta.value.data = null;
 };
 
-const exportPipeline = (row: any) => {
-  const pipelineToBeExported = row.name;
-
-  const pipelineJson = JSON.stringify(row, null, 2);
-  // Create a Blob from the JSON string
-  const blob = new Blob([pipelineJson], { type: "application/json" });
-
-  // Create an object URL for the Blob
-  const url = URL.createObjectURL(blob);
-
-  // Create an anchor element to trigger the download
-  const link = document.createElement("a");
-  link.href = url;
-
-  // Set the filename of the download
-  link.download = `${pipelineToBeExported}.json`;
-
-  // Trigger the download by simulating a click
-  link.click();
-
-  // Clean up the URL object after download
-  URL.revokeObjectURL(url);
+// The names a pipeline's function nodes call, deduped and in node order.
+const functionNamesIn = (pipeline: any): string[] => {
+  const names = (pipeline?.nodes ?? [])
+    .filter((node: any) => node?.data?.node_type === "function")
+    .map((node: any) => node?.data?.name)
+    .filter((name: any) => typeof name === "string" && name !== "");
+  return Array.from(new Set<string>(names));
 };
 
-const exportBulkPipelines = () => {
-  // Create an array of selected pipelines without modifying their structure
-  const pipelinesToExport = selectedPipelines.value;
+// The same four keys the Functions export writes (FunctionList.vue exportPayload).
+// `streams` is a deprecated association whose names mean nothing in another org,
+// and `numArgs` is derived from `params`, so neither travels.
+const bundledFunctionPayload = (fn: any) => ({
+  name: fn.name,
+  function: fn.function,
+  params: fn.params,
+  transType: fn.transType,
+});
 
-  const exportJson = JSON.stringify(pipelinesToExport, null, 2);
-  const blob = new Blob([exportJson], { type: "application/json" });
+/**
+ * Attaches a `functions` key to every pipeline that calls one, so the import can
+ * recreate them in the target org instead of making the user remap each node.
+ *
+ * Mutates nothing: the rows belong to the pipelines cache. An older server ignores
+ * the extra key on the way back in - `Pipeline` does not set `deny_unknown_fields`.
+ *
+ * Returns the names that could not be bundled: under enterprise RBAC the list is
+ * filtered per user, so a node can name a function this user cannot read.
+ */
+const bundleFunctions = async (pipelines: any[]) => {
+  const wanted = Array.from(new Set<string>(pipelines.flatMap(functionNamesIn)));
+  if (!wanted.length) return { pipelines, missing: [] as string[] };
 
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  const date = new Date().toISOString().split("T")[0];
-  link.download = `pipelines_export_${date}.json`;
+  // GET /functions already returns every body, so one read covers the whole file.
+  let available: any[] = [];
+  try {
+    // staleTime 0: the functions tier caches for an hour, and a stale body would
+    // export logic the org no longer runs -- the drift this bundling removes.
+    available = await queryClient.fetchQuery({
+      ...functionsQuery(store.state.selectedOrganization.identifier),
+      staleTime: 0,
+    });
+  } catch {
+    // The pipeline itself is still worth exporting; the import falls back to remap.
+    return { pipelines, missing: wanted };
+  }
 
-  link.click();
+  const byName = new Map<string, any>(
+    (available ?? []).map((fn: any) => [fn.name, bundledFunctionPayload(fn)]),
+  );
 
-  URL.revokeObjectURL(url);
-
-  selectedPipelineIds.value = [];
-  toast({
-    message: `${pipelinesToExport.length} pipelines exported successfully`,
-    variant: "success",
+  const bundled = pipelines.map((pipeline: any) => {
+    const functions = functionNamesIn(pipeline)
+      .map((name) => byName.get(name))
+      .filter(Boolean);
+    return functions.length ? { ...pipeline, functions } : pipeline;
   });
+
+  return { pipelines: bundled, missing: wanted.filter((name) => !byName.has(name)) };
+};
+
+// Names a node calls but the file cannot carry. Said out loud, because the import
+// will stop on them and the user is the only one who can grant the read.
+const warnAboutMissingFunctions = (missing: string[]) => {
+  if (!missing.length) return;
+  toast({
+    message: t("toastMessages.pipeline.functionsNotBundled", {
+      count: missing.length,
+      names: missing.join(", "),
+    }),
+    variant: "warning",
+  });
+};
+
+const exportPipeline = async (row: any) => {
+  if (exportLoading.value) return;
+  exportLoading.value = true;
+  try {
+    const { pipelines, missing } = await bundleFunctions([row]);
+    downloadFile(`${row.name}.json`, JSON.stringify(pipelines[0], null, 2), "application/json");
+    warnAboutMissingFunctions(missing);
+  } finally {
+    exportLoading.value = false;
+  }
+};
+
+const exportBulkPipelines = async () => {
+  if (exportLoading.value) return;
+  exportLoading.value = true;
+  try {
+    // Stays an array of pipelines, each carrying its own `functions` key, so the
+    // import loop keeps its shape.
+    const selected = selectedPipelines.value;
+    const { pipelines, missing } = await bundleFunctions(selected);
+
+    const date = new Date().toISOString().split("T")[0];
+    downloadFile(
+      `pipelines_export_${date}.json`,
+      JSON.stringify(pipelines, null, 2),
+      "application/json",
+    );
+
+    selectedPipelineIds.value = [];
+    toast({
+      message: t("toastMessages.pipeline.pipelinesExportedSuccessfully", {
+        count: selected.length,
+      }),
+      variant: "success",
+    });
+    warnAboutMissingFunctions(missing);
+  } finally {
+    exportLoading.value = false;
+  }
 };
 //if user clicks on run pipeline button then we need toggle the pipeline state and resume the pipeline from where it paused / start from now as per the user choice
 const handleResumePipeline = () => {
@@ -1181,7 +1403,10 @@ const goToBackfillJobs = () => {
 const bulkTogglePipelines = async (action: "pause" | "resume") => {
   const dismiss = toast({
     variant: "loading",
-    message: `${action === "resume" ? "Resuming" : "Pausing"} pipelines...`,
+    message:
+      action === "resume"
+        ? t("toastMessages.pipeline.resumingPipelines")
+        : t("toastMessages.pipeline.pausingPipelines"),
     timeout: 0,
   });
   try {
@@ -1194,7 +1419,10 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
     if (pipelinesToToggle.length === 0) {
       toast({
         variant: "error",
-        message: `No pipelines to ${action}`,
+        message:
+          action === "resume"
+            ? t("toastMessages.pipeline.noPipelinesToResume")
+            : t("toastMessages.pipeline.noPipelinesToPause"),
       });
       dismiss();
       return;
@@ -1216,19 +1444,25 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
       dismiss();
       toast({
         variant: "success",
-        message: `Pipelines ${action}d successfully`,
+        message:
+          action === "resume"
+            ? t("toastMessages.pipeline.pipelinesResumedSuccessfully")
+            : t("toastMessages.pipeline.pipelinesPausedSuccessfully"),
       });
     }
 
     selectedPipelineIds.value = [];
-    await getPipelines();
+    await getPipelines(true);
     updateActiveTab();
   } catch (error) {
     dismiss();
     console.error(`Error ${action}ing pipelines:`, error);
     toast({
       variant: "error",
-      message: `Error ${action}ing pipelines. Please try again.`,
+      message:
+        action === "resume"
+          ? t("toastMessages.pipeline.errorResumingPipelines")
+          : t("toastMessages.pipeline.errorPausingPipelines"),
     });
   }
 };
@@ -1236,7 +1470,11 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
 const openBulkDeleteDialog = () => {
   confirmDialogMeta.value.show = true;
   confirmDialogMeta.value.title = t("pipeline.deletePipeline");
-  confirmDialogMeta.value.message = `Are you sure you want to delete ${selectedPipelines.value.length} pipeline(s)?`;
+  confirmDialogMeta.value.message = t("pipeline.confirmBulkDeleteMsg", {
+    count: selectedPipelines.value.length,
+  });
+  confirmDialogMeta.value.messageKeypath = undefined;
+  confirmDialogMeta.value.okVariant = "destructive";
   confirmDialogMeta.value.onConfirm = bulkDeletePipelines;
   confirmDialogMeta.value.data = null;
 };
@@ -1245,7 +1483,7 @@ const bulkDeletePipelines = async () => {
   bulkDeleteLoading.value = true;
   const dismiss = toast({
     variant: "loading",
-    message: "Deleting pipelines...",
+    message: t("toastMessages.pipeline.deletingPipelines"),
     timeout: 0,
   });
 
@@ -1253,7 +1491,7 @@ const bulkDeletePipelines = async () => {
     if (selectedPipelines.value.length === 0) {
       toast({
         variant: "error",
-        message: "No pipelines selected for deletion",
+        message: t("toastMessages.pipeline.noPipelinesSelectedForDeletion"),
       });
       dismiss();
       return;
@@ -1274,6 +1512,7 @@ const bulkDeletePipelines = async () => {
     // Handle response based on successful/unsuccessful arrays
     if (response.data) {
       const { successful = [], unsuccessful = [] } = response.data;
+      dropPipelineDrafts(successful.map(String));
       const successCount = successful.length;
       const failCount = unsuccessful.length;
 
@@ -1281,40 +1520,46 @@ const bulkDeletePipelines = async () => {
         // Partial success
         toast({
           variant: "warning",
-          message: `${successCount} pipeline(s) deleted successfully, ${failCount} failed`,
+          message: t("toastMessages.pipeline.pipelinesDeletedWithFailures", {
+            count: successCount,
+            failed: failCount,
+          }),
           timeout: 5000,
         });
       } else if (failCount > 0) {
         // All failed
         toast({
           variant: "error",
-          message: `Failed to delete ${failCount} pipeline(s)`,
+          message: t("toastMessages.pipeline.failedToDeletePipelines", { count: failCount }),
         });
       } else {
         // All successful
         toast({
           variant: "success",
-          message: `${successCount} pipeline(s) deleted successfully`,
+          message: t("toastMessages.pipeline.pipelinesDeletedSuccessfully", {
+            count: successCount,
+          }),
         });
       }
     } else {
+      dropPipelineDrafts(payload.ids);
       // Fallback success message
       toast({
         variant: "success",
-        message: `${selectedPipelines.value.length} pipeline(s) deleted successfully`,
+        message: t("toastMessages.pipeline.pipelinesDeletedSuccessfully", {
+          count: selectedPipelines.value.length,
+        }),
       });
     }
 
     selectedPipelineIds.value = [];
-    await getPipelines();
+    await getPipelines(true);
     updateActiveTab();
   } catch (error: any) {
     dismiss();
     // Show error message from response if available
     const errorMessage =
-      error.response?.data?.message ||
-      error?.message ||
-      "Error deleting pipelines. Please try again.";
+      error.response?.data?.message || error?.message || t("pipeline.bulkDeletePipelinesError");
     if (error.response?.status != 403 || error?.status != 403) {
       toast({
         variant: "error",
@@ -1363,7 +1608,7 @@ useShortcuts([
   {
     id: "pipelinesRefresh",
     handler: () => {
-      if (!isInputFocused()) getPipelines();
+      if (!isInputFocused()) getPipelines(true);
     },
   },
   {

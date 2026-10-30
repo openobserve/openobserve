@@ -11,6 +11,7 @@ pub struct Model {
     pub synthetics_name: String,
     pub org_id: String,
     pub location: String,
+    pub env: Option<String>,
     pub pool: String,
     pub scheduled_ts: i64,
     pub valid_until: i64,
@@ -27,6 +28,10 @@ pub struct Model {
     pub run_id: String,
     /// JSON array of BrowserDevice {execution_id, engine, device} — browser checks only.
     pub browser_devices: Option<String>,
+    /// Steps the journey defined at ENQUEUE time — 1 for protocol checks. Frozen
+    /// here rather than read live at ack: the ack clamps the probe's count at
+    /// `steps_configured x (retries + 1)`, so an edit would reprice dispatched work.
+    pub steps_configured: i32,
     /// JSON blob of check metadata copied at enqueue time e.g. {"tags": ["prod"]}.
     pub metadata: String,
     /// JSON execution summaries written at ack time (no full step data — that's in the stream).
@@ -54,6 +59,7 @@ mod tests {
             synthetics_name: "Login Flow".to_string(),
             org_id: "org1".to_string(),
             location: "aws-us-east-1".to_string(),
+            env: None,
             pool: "aws-browser".to_string(),
             scheduled_ts: 1750000000000000,
             valid_until: 1750000300000000,
@@ -67,6 +73,7 @@ mod tests {
                 r#"[{"execution_id":"3Fze001XX","engine":"chromium","device":"desktop"}]"#
                     .to_string(),
             ),
+            steps_configured: 14,
             metadata: "{}".to_string(),
             result: None,
             started_at: None,
@@ -77,6 +84,7 @@ mod tests {
         assert_eq!(m.synthetics_name, "Login Flow");
         assert_eq!(m.status, 0);
         assert_eq!(m.pool, "aws-browser");
+        assert_eq!(m.steps_configured, 14);
         assert!(m.claimed_by.is_none());
     }
 }

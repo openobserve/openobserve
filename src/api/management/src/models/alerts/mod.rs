@@ -17,7 +17,7 @@ pub mod requests;
 pub mod responses;
 
 use config::meta::{
-    alerts::{self as meta_alerts, deduplication::DeduplicationConfig, default_align_time},
+    alerts::{self as meta_alerts, default_align_time},
     search as meta_search, stream as meta_stream,
     triggers::Trigger,
 };
@@ -159,10 +159,6 @@ pub struct Alert {
     #[schema(read_only)]
     pub last_edited_by: Option<String>,
 
-    /// Optional deduplication configuration to prevent alert spam.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub deduplication: Option<DeduplicationConfig>,
-
     /// When true, this alert routes notifications through the incident system
     /// instead of sending direct alert notifications.
     #[serde(default)]
@@ -190,6 +186,65 @@ pub struct Alert {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[schema(example = json!(["prod", "service:checkout"]))]
     pub tags: Vec<String>,
+
+    /// On-call team (a team id) this alert pages, taking precedence over
+    /// ownership discovery. Omitted or `null` means "work the owner out from the
+    /// identity dimensions", which is the normal case.
+    ///
+    /// Validated at save against the on-call teams of the same org: a team id
+    /// that names nothing routes nowhere, and a page that routes nowhere is
+    /// silence rather than an error.
+    ///
+    /// Save is a full replace, like `tags` — sending the alert back without this
+    /// field clears the binding.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(example = "2f9K3mXQpLrTgYw8vN1cBzHd0Ae")]
+    pub oncall_team: Option<String>,
+
+    /// Where the fix for this alert is written down.
+    ///
+    /// Copied onto every on-call response record the alert opens, so whoever is
+    /// woken is handed the link in the page instead of going to find it while
+    /// the thing is on fire.
+    ///
+    /// Validated at save: `http://` or `https://` with a host, or the save is
+    /// refused. A malformed link stored today is a dead click at 3am, and the
+    /// moment it is read is the worst possible moment to discover it.
+    ///
+    /// Full replace, like `oncall_team`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(example = "https://wiki.example.com/runbooks/checkout")]
+    pub runbook_url: Option<String>,
+
+    /// Whether a scheduler job exists for this alert (runtime status, not a
+    /// stored field). Populated on the composite detail path; omitted otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(read_only)]
+    pub scheduler_job_present: Option<bool>,
+
+    #[serde(default)]
+    #[schema(example = 10)]
+    pub pending_period_sec: i64,
+
+    /// Send one notification when this alert recovers; a multi-alert sends one per recovered
+    /// group.
+    #[serde(default)]
+    pub notify_on_recovery: bool,
+
+    /// Where the recovery message goes. Empty = the firing's own destinations. Ticket closes are
+    /// unaffected: a resolve must reach whatever the firing opened.
+    #[serde(default)]
+    pub recovery_destinations: Vec<String>,
+
+    /// Seconds the condition must stay clear before the alert recovers.
+    /// 0 recovers on the first clear evaluation.
+    #[serde(default)]
+    #[schema(example = 0)]
+    pub keep_firing_for: i64,
+
+    /// Notify once per state change instead of on every firing evaluation. Enterprise only.
+    #[serde(default)]
+    pub suppress_repeats: bool,
 }
 
 /// Configuration for when and how an alert should be triggered.
@@ -208,7 +263,9 @@ pub struct Alert {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct TriggerCondition {
     /// Time window in minutes to evaluate. The query looks back this many minutes.
-    #[serde(rename = "period")]
+    /// Defaulted to `0` so composite alerts — which send only `silence` — can
+    /// omit it; the composite path rejects any non-default period explicitly.
+    #[serde(rename = "period", default)]
     #[schema(example = 15)]
     pub period_minutes: i64,
 
@@ -251,8 +308,11 @@ pub struct TriggerCondition {
     pub cron: String,
 
     /// Schedule type: "minutes" for interval-based or "cron" for cron expressions.
-    #[serde(default)]
-    pub frequency_type: FrequencyType,
+    /// `None` means the field was omitted. Kept optional (rather than defaulting
+    /// to "minutes") so composite alerts can reject an explicit `frequency_type`
+    /// even when its value equals the default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frequency_type: Option<FrequencyType>,
 
     /// Silence period in minutes after an alert fires before it can fire again.
     #[serde(rename = "silence")]
@@ -377,6 +437,9 @@ pub struct QueryCondition {
     /// `by (…)` clause.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub promql_multi_alert: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    /// Match returned PromQL series by presence without separate value thresholds.
+    pub promql_rule_mode: bool,
 
     /// Aggregation configuration for "custom" query type.
     pub aggregation: Option<Aggregation>,
@@ -496,6 +559,10 @@ pub enum Operator {
     LessThanEquals,
     Contains,
     NotContains,
+    IsNull,
+    IsNotNull,
+    IsEmpty,
+    IsNotEmpty,
 }
 
 #[derive(Hash, Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize, ToSchema)]
@@ -512,6 +579,8 @@ pub enum SearchEventType {
     SearchJob,
     Download,
     Insights,
+    #[serde(rename = "public_dashboard")]
+    PublicDashboard,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema, Hash)]
@@ -521,6 +590,7 @@ pub enum StreamType {
     Logs,
     Metrics,
     Traces,
+    Profiles,
     #[serde(rename = "enrichment_tables")]
     EnrichmentTables,
     #[serde(rename = "file_list")]
@@ -549,6 +619,7 @@ impl From<(meta_alerts::alert::Alert, Option<Trigger>)> for Alert {
             query_condition: alert.query_condition.into(),
             trigger_condition: alert.trigger_condition.into(),
             destinations: alert.destinations,
+            recovery_destinations: alert.recovery_destinations,
             template: alert.template,
             context_attributes: alert.context_attributes,
             row_template: alert.row_template,
@@ -561,11 +632,17 @@ impl From<(meta_alerts::alert::Alert, Option<Trigger>)> for Alert {
             owner: alert.owner,
             updated_at: alert.updated_at.map(|t| t.timestamp()),
             last_edited_by: alert.last_edited_by,
-            deduplication: alert.deduplication,
             creates_incident: alert.creates_incident,
             workflows: alert.workflows,
             priority: alert.priority,
             tags: alert.tags,
+            oncall_team: alert.oncall_team,
+            runbook_url: alert.runbook_url,
+            scheduler_job_present: None,
+            pending_period_sec: alert.pending_period_sec,
+            notify_on_recovery: alert.notify_on_recovery,
+            keep_firing_for: alert.keep_firing_for,
+            suppress_repeats: alert.suppress_repeats,
         }
     }
 }
@@ -580,7 +657,7 @@ impl From<meta_alerts::TriggerCondition> for TriggerCondition {
             notify_on_warning: value.notify_on_warning,
             frequency_minutes: value.frequency / 60,
             cron: value.cron,
-            frequency_type: value.frequency_type.into(),
+            frequency_type: Some(value.frequency_type.into()),
             silence_minutes: value.silence,
             timezone: value.timezone,
             tolerance_seconds: value.tolerance_in_secs,
@@ -617,6 +694,7 @@ impl From<meta_alerts::QueryCondition> for QueryCondition {
             promql_condition: value.promql_condition.map(|pc| pc.into()),
             promql_warning_value: value.promql_warning_value,
             promql_multi_alert: value.promql_multi_alert,
+            promql_rule_mode: value.promql_rule_mode,
             aggregation: value.aggregation.map(|a| a.into()),
             vrl_function: value.vrl_function,
             search_event_type: value.search_event_type.map(|t| t.into()),
@@ -691,6 +769,10 @@ impl From<meta_alerts::Operator> for Operator {
             meta_alerts::Operator::LessThanEquals => Self::LessThanEquals,
             meta_alerts::Operator::Contains => Self::Contains,
             meta_alerts::Operator::NotContains => Self::NotContains,
+            meta_alerts::Operator::IsNull => Self::IsNull,
+            meta_alerts::Operator::IsNotNull => Self::IsNotNull,
+            meta_alerts::Operator::IsEmpty => Self::IsEmpty,
+            meta_alerts::Operator::IsNotEmpty => Self::IsNotEmpty,
         }
     }
 }
@@ -709,6 +791,7 @@ impl From<meta_search::SearchEventType> for SearchEventType {
             meta_search::SearchEventType::SearchJob => Self::SearchJob,
             meta_search::SearchEventType::Download => Self::Download,
             meta_search::SearchEventType::Insights => Self::Insights,
+            meta_search::SearchEventType::PublicDashboard => Self::PublicDashboard,
         }
     }
 }
@@ -719,6 +802,7 @@ impl From<meta_stream::StreamType> for StreamType {
             meta_stream::StreamType::Logs => Self::Logs,
             meta_stream::StreamType::Metrics => Self::Metrics,
             meta_stream::StreamType::Traces => Self::Traces,
+            meta_stream::StreamType::Profiles => Self::Profiles,
             meta_stream::StreamType::ServiceGraph => Self::Metadata, // ServiceGraph not
             // alertable, map to
             // Metadata
@@ -753,11 +837,23 @@ impl From<Alert> for meta_alerts::alert::Alert {
         alert.enabled = value.enabled;
         alert.tz_offset = value.tz_offset;
         alert.owner = value.owner;
-        alert.deduplication = value.deduplication;
         alert.creates_incident = value.creates_incident;
         alert.workflows = value.workflows;
         alert.priority = value.priority;
         alert.tags = value.tags;
+        // An empty string is how a form clears a select; it must mean the same
+        // as absent, or the alert would carry a team id of "" that matches no
+        // team and pages nobody.
+        alert.oncall_team = value.oncall_team.filter(|t| !t.trim().is_empty());
+        // Same empty-string-is-absent rule: a form clears a text input by
+        // sending "", and a stored "" would render as a link to nowhere.
+        alert.runbook_url = value.runbook_url.filter(|u| !u.trim().is_empty());
+        alert.pending_period_sec = value.pending_period_sec;
+        alert.notify_on_recovery = value.notify_on_recovery;
+        alert.recovery_destinations = value.recovery_destinations;
+        alert.keep_firing_for = value.keep_firing_for.max(0);
+        alert.suppress_repeats = value.suppress_repeats;
+        alert.normalize_promql_rule_mode();
 
         alert
     }
@@ -772,9 +868,10 @@ impl From<TriggerCondition> for meta_alerts::TriggerCondition {
             threshold: value.threshold_count,
             warning_threshold: value.warning_threshold_count,
             notify_on_warning: value.notify_on_warning,
-            frequency: value.frequency_minutes * 60,
+            // `From` cannot fail; `prepare_alert` rejects the saturated value
+            frequency: value.frequency_minutes.saturating_mul(60),
             cron: value.cron,
-            frequency_type: value.frequency_type.into(),
+            frequency_type: value.frequency_type.unwrap_or_default().into(),
             silence: value.silence_minutes,
             timezone: value.timezone,
             tolerance_in_secs: value.tolerance_seconds,
@@ -810,6 +907,7 @@ impl From<QueryCondition> for meta_alerts::QueryCondition {
             promql_condition: value.promql_condition.map(|pc| pc.into()),
             promql_warning_value: value.promql_warning_value,
             promql_multi_alert: value.promql_multi_alert,
+            promql_rule_mode: value.promql_rule_mode,
             aggregation: value.aggregation.map(|a| a.into()),
             vrl_function: value.vrl_function,
             search_event_type: value.search_event_type.map(|t| t.into()),
@@ -884,6 +982,10 @@ impl From<Operator> for meta_alerts::Operator {
             Operator::LessThanEquals => Self::LessThanEquals,
             Operator::Contains => Self::Contains,
             Operator::NotContains => Self::NotContains,
+            Operator::IsNull => Self::IsNull,
+            Operator::IsNotNull => Self::IsNotNull,
+            Operator::IsEmpty => Self::IsEmpty,
+            Operator::IsNotEmpty => Self::IsNotEmpty,
         }
     }
 }
@@ -902,6 +1004,7 @@ impl From<SearchEventType> for meta_search::SearchEventType {
             SearchEventType::SearchJob => Self::SearchJob,
             SearchEventType::Download => Self::Download,
             SearchEventType::Insights => Self::Insights,
+            SearchEventType::PublicDashboard => Self::PublicDashboard,
         }
     }
 }
@@ -912,6 +1015,7 @@ impl From<StreamType> for meta_stream::StreamType {
             StreamType::Logs => Self::Logs,
             StreamType::Metrics => Self::Metrics,
             StreamType::Traces => Self::Traces,
+            StreamType::Profiles => Self::Profiles,
             StreamType::EnrichmentTables => Self::EnrichmentTables,
             StreamType::Filelist => Self::Filelist,
             StreamType::Metadata => Self::Metadata,
@@ -1192,6 +1296,10 @@ mod tests {
         assert!(matches!(M::from(SearchEventType::SearchJob), M::SearchJob));
         assert!(matches!(M::from(SearchEventType::Download), M::Download));
         assert!(matches!(M::from(SearchEventType::Insights), M::Insights));
+        assert!(matches!(
+            M::from(SearchEventType::PublicDashboard),
+            M::PublicDashboard
+        ));
     }
 
     #[test]
@@ -1255,7 +1363,6 @@ mod tests {
         assert!(!obj.contains_key("template"));
         assert!(!obj.contains_key("context_attributes"));
         assert!(!obj.contains_key("updated_at"));
-        assert!(!obj.contains_key("deduplication"));
     }
 
     #[test]
@@ -1269,6 +1376,24 @@ mod tests {
         assert!(obj.contains_key("template"));
         assert!(obj.contains_key("context_attributes"));
         assert!(obj.contains_key("updated_at"));
+    }
+
+    #[test]
+    fn test_request_with_deduplication_still_saves_without_it() {
+        let alert: Alert = serde_json::from_value(serde_json::json!({
+            "name": "a",
+            "deduplication": {
+                "enabled": true,
+                "fingerprint_fields": ["host"],
+                "time_window_minutes": 30,
+                "grouping": {"enabled": true, "group_wait_seconds": 30}
+            }
+        }))
+        .unwrap();
+        let saved: meta_alerts::alert::Alert = alert.into();
+        let json = serde_json::to_value(&saved).unwrap();
+        assert_eq!(json["name"], "a");
+        assert!(!json.as_object().unwrap().contains_key("deduplication"));
     }
 
     #[test]
@@ -1355,7 +1480,7 @@ mod tests {
             threshold_count: 3,
             frequency_minutes: 5,
             cron: "".to_string(),
-            frequency_type: FrequencyType::Minutes,
+            frequency_type: Some(FrequencyType::Minutes),
             silence_minutes: 30,
             timezone: None,
             tolerance_seconds: None,
@@ -1425,6 +1550,7 @@ mod tests {
             promql_condition: None,
             promql_warning_value: None,
             promql_multi_alert: false,
+            promql_rule_mode: false,
             aggregation: None,
             vrl_function: None,
             search_event_type: None,
@@ -1451,6 +1577,7 @@ mod tests {
             promql_condition: None,
             promql_warning_value: None,
             promql_multi_alert: true,
+            promql_rule_mode: false,
             aggregation: None,
             vrl_function: None,
             search_event_type: None,
@@ -1476,6 +1603,7 @@ mod tests {
             promql_condition: None,
             promql_warning_value: None,
             promql_multi_alert: false,
+            promql_rule_mode: false,
             aggregation: None,
             vrl_function: None,
             search_event_type: None,
@@ -1507,6 +1635,7 @@ mod tests {
             promql_condition: None,
             promql_warning_value: None,
             promql_multi_alert: false,
+            promql_rule_mode: false,
             aggregation: None,
             vrl_function: Some("fn".to_string()),
             search_event_type: None,
@@ -1570,6 +1699,107 @@ mod tests {
         assert!(meta.creates_incident);
     }
 
+    /// The create/update bodies flatten this `Alert`, so a field missing here is
+    /// a field the API can never set. `oncall_team` was exactly that: the column,
+    /// the meta field and the routing tier all existed, and a request carrying
+    /// the team returned 200 with the column still empty.
+    #[test]
+    fn test_oncall_team_survives_the_request_body() {
+        let alert: Alert = serde_json::from_value(serde_json::json!({
+            "name": "checkout-errors",
+            "oncall_team": "team-ksuid-1",
+        }))
+        .unwrap();
+        let meta = meta_alerts::alert::Alert::from(alert);
+        assert_eq!(meta.oncall_team.as_deref(), Some("team-ksuid-1"));
+    }
+
+    /// Absent, explicit null and empty string must all clear the binding — a
+    /// team id of `""` matches no team, so keeping it would page nobody while
+    /// looking bound.
+    #[test]
+    fn test_oncall_team_clears_on_absent_null_and_empty() {
+        for body in [
+            serde_json::json!({"name": "a"}),
+            serde_json::json!({"name": "a", "oncall_team": null}),
+            serde_json::json!({"name": "a", "oncall_team": ""}),
+            serde_json::json!({"name": "a", "oncall_team": "   "}),
+        ] {
+            let alert: Alert = serde_json::from_value(body.clone()).unwrap();
+            let meta = meta_alerts::alert::Alert::from(alert);
+            assert_eq!(meta.oncall_team, None, "{body}");
+        }
+    }
+
+    /// And it has to come back out on a read, or the UI cannot show what the
+    /// alert is bound to.
+    #[test]
+    fn test_oncall_team_is_returned_on_read() {
+        let mut meta_alert = meta_alerts::alert::Alert::default();
+        meta_alert.oncall_team = Some("team-ksuid-1".to_string());
+
+        let alert = Alert::from((meta_alert, None));
+        assert_eq!(alert.oncall_team.as_deref(), Some("team-ksuid-1"));
+
+        let json = serde_json::to_value(&alert).unwrap();
+        assert_eq!(json["oncall_team"], "team-ksuid-1");
+
+        // Unbound alerts serialize exactly as they did before this field.
+        let unbound = Alert::from((meta_alerts::alert::Alert::default(), None));
+        let json = serde_json::to_value(&unbound).unwrap();
+        assert!(json.get("oncall_team").is_none());
+    }
+
+    /// A runbook survives the round trip both ways, and clears the same way
+    /// `oncall_team` does — absent, null and empty all mean "no runbook".
+    #[test]
+    fn test_runbook_url_survives_the_request_body_and_clears() {
+        let body = serde_json::json!({
+            "name": "a",
+            "runbook_url": "https://wiki.example.com/runbooks/checkout",
+        });
+        let alert: Alert = serde_json::from_value(body).unwrap();
+        let meta = meta_alerts::alert::Alert::from(alert);
+        assert_eq!(
+            meta.runbook_url.as_deref(),
+            Some("https://wiki.example.com/runbooks/checkout")
+        );
+
+        for clearing in [
+            serde_json::json!({"name": "a"}),
+            serde_json::json!({"name": "a", "runbook_url": null}),
+            serde_json::json!({"name": "a", "runbook_url": ""}),
+            serde_json::json!({"name": "a", "runbook_url": "   "}),
+        ] {
+            let alert: Alert = serde_json::from_value(clearing.clone()).unwrap();
+            let meta = meta_alerts::alert::Alert::from(alert);
+            assert_eq!(meta.runbook_url, None, "{clearing}");
+        }
+    }
+
+    /// And it comes back on read — an alert whose runbook the API could set but
+    /// never return would be a field nobody could edit twice.
+    #[test]
+    fn test_runbook_url_is_returned_on_read() {
+        let mut meta_alert = meta_alerts::alert::Alert::default();
+        meta_alert.runbook_url = Some("https://rb/x".to_string());
+        let alert = Alert::from((meta_alert, None));
+        assert_eq!(alert.runbook_url.as_deref(), Some("https://rb/x"));
+        assert_eq!(
+            serde_json::to_value(&alert).unwrap()["runbook_url"],
+            "https://rb/x"
+        );
+
+        // Alerts with no runbook serialize exactly as they did before it.
+        let none = Alert::from((meta_alerts::alert::Alert::default(), None));
+        assert!(
+            serde_json::to_value(&none)
+                .unwrap()
+                .get("runbook_url")
+                .is_none()
+        );
+    }
+
     #[test]
     fn test_alert_to_meta_default_fields() {
         let alert: Alert = serde_json::from_value(serde_json::json!({})).unwrap();
@@ -1580,5 +1810,71 @@ mod tests {
         assert!(!meta.creates_incident);
         assert!(meta.id.is_none());
         assert!(meta.owner.is_none());
+    }
+
+    #[test]
+    fn an_out_of_range_frequency_saturates_instead_of_overflowing() {
+        let trigger = TriggerCondition {
+            frequency_minutes: i64::MAX,
+            ..Default::default()
+        };
+        assert_eq!(
+            meta_alerts::TriggerCondition::from(trigger).frequency,
+            i64::MAX
+        );
+    }
+    #[test]
+    fn rule_pending_is_normalized_at_the_api_boundary() {
+        for pending in [0, 240] {
+            let api: Alert = serde_json::from_value(serde_json::json!({
+                "query_condition": {
+                    "type": "promql",
+                    "promql": "up",
+                    "promql_rule_mode": true,
+                    "promql_multi_alert": false
+                },
+                "pending_period_sec": pending
+            }))
+            .unwrap();
+            let meta = meta_alerts::alert::Alert::from(api);
+            assert_eq!(meta.query_condition.promql_multi_alert, pending > 0);
+            assert_eq!(
+                meta.trigger_condition.operator,
+                meta_alerts::Operator::GreaterThanEquals
+            );
+            assert_eq!(meta.trigger_condition.threshold, 1);
+            assert!(
+                meta_alerts::grouping::validate_multi_alert(
+                    &meta.query_condition,
+                    &meta.trigger_condition,
+                    false,
+                )
+                .is_ok()
+            );
+            let response = Alert::from((meta, None));
+            assert_eq!(response.query_condition.promql_multi_alert, pending > 0);
+        }
+    }
+
+    #[test]
+    fn test_promql_rule_mode_survives_api_conversion() {
+        let meta = meta_alerts::QueryCondition {
+            promql_rule_mode: true,
+            promql_multi_alert: true,
+            query_type: meta_alerts::QueryType::PromQL,
+            ..Default::default()
+        };
+        let api = QueryCondition::from(meta);
+        assert!(api.promql_rule_mode);
+        let serialized = serde_json::to_value(&api).unwrap();
+        assert_eq!(
+            serialized.get("promql_rule_mode"),
+            Some(&serde_json::json!(true))
+        );
+        assert!(serialized.get("prom_rule_mode").is_none());
+        let api: QueryCondition = serde_json::from_value(serialized).unwrap();
+        let meta = meta_alerts::QueryCondition::from(api);
+        assert!(meta.promql_rule_mode);
+        assert!(meta.promql_condition.is_none());
     }
 }

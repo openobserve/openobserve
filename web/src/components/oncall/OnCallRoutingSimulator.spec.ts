@@ -1,0 +1,406 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { mount } from "@vue/test-utils";
+import { describe, expect, it } from "vitest";
+
+import OnCallRoutingSimulator from "@/components/oncall/OnCallRoutingSimulator.vue";
+import i18n from "@/locales";
+import type { Channel, RoutingPreview } from "@/ts/interfaces/oncall";
+import store from "@/test/unit/helpers/store";
+
+const stubs = {
+  OTag: { name: "OTag", props: ["variant"], template: "<span><slot /></span>" },
+  OIcon: { name: "OIcon", template: "<i />" },
+  OText: { name: "OText", template: "<span><slot /></span>" },
+  OUserCell: { name: "OUserCell", props: ["value"], template: "<span>{{ value }}</span>" },
+  OButton: {
+    name: "OButton",
+    props: ["disabled"],
+    template: `<button :disabled="disabled"><slot /></button>`,
+  },
+  OInput: {
+    name: "OInput",
+    props: ["modelValue"],
+    emits: ["update:modelValue"],
+    template: `<input :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" />`,
+  },
+  OSelect: {
+    name: "OSelect",
+    props: ["modelValue", "options"],
+    emits: ["update:modelValue"],
+    template: `<select :value="modelValue" />`,
+  },
+  OEmptyState: {
+    name: "OEmptyState",
+    props: ["title", "description"],
+    template: `<div><span>{{ title }}</span></div>`,
+  },
+};
+
+function preview(over: Partial<RoutingPreview> = {}): RoutingPreview {
+  return {
+    decision: { kind: "ownership", path: "service=payments-api" },
+    team_id: "team_1",
+    reason: "routed by ownership rule",
+    ladder: [
+      {
+        priority: "P1",
+        rungs: 3,
+        pages_anyone: true,
+        nobody_after_micros: 1_200_000_000,
+        ends_with_whole_team: true,
+        channels: ["email"],
+      },
+    ],
+    current_responder: {
+      user_email: "aarav@o2.ai",
+      reason: "on call",
+      would_a_page_land: true,
+      deliverable_channels: ["email"],
+    },
+    also_matched: [],
+    notes: [],
+    ...over,
+  };
+}
+
+function render(props: Record<string, unknown> = {}) {
+  return mount(OnCallRoutingSimulator, {
+    props: {
+      teamId: "team_1",
+      teamName: "Payments",
+      teams: [
+        { id: "team_1", name: "Payments" },
+        { id: "team_2", name: "Ledger" },
+      ],
+      aliases: [{ id: "service", display: "Service" }],
+      ...props,
+    },
+    global: { plugins: [i18n, store], stubs },
+  });
+}
+
+type Wrapper = ReturnType<typeof render>;
+
+async function addDimension(wrapper: Wrapper, name: string, value: string) {
+  await wrapper.find('[data-test="oncall-simulator-add-dimension"]').trigger("click");
+  await wrapper
+    .findComponent('[data-test="oncall-simulator-dimension-name"]')
+    .vm.$emit("update:modelValue", name);
+  await wrapper.find('[data-test="oncall-simulator-dimension-value"]').setValue(value);
+  await wrapper.find('[data-test="oncall-simulator-dimension-confirm"]').trigger("click");
+}
+
+/// Priority is offered, never assumed — so a test about the ladder asks for
+/// one first, the way a reader does.
+async function pickPriority(wrapper: Wrapper, priority = "P1") {
+  await wrapper
+    .findComponent('[data-test="oncall-simulator-priority"]')
+    .vm.$emit("update:modelValue", priority);
+}
+
+describe("OnCallRoutingSimulator", () => {
+  /// The title above already explains the concept; a bare form with no
+  /// example of what a run produces left first-time users guessing at what
+  /// to do next.
+  it("guides a first-time user before anything has been tried", () => {
+    const wrapper = render();
+    expect(wrapper.find('[data-test="oncall-simulator-empty"]').exists()).toBe(true);
+  });
+
+  it("drops the guidance once a run has produced a result", () => {
+    const wrapper = render({ preview: preview() });
+    expect(wrapper.find('[data-test="oncall-simulator-empty"]').exists()).toBe(false);
+  });
+
+  /// A pre-filled P1 makes the tester answer a question nobody asked, and the
+  /// answer changes with the priority — so it starts empty.
+  it("assumes no priority until one is chosen", async () => {
+    const wrapper = render();
+    expect(wrapper.find('[data-test="oncall-simulator-chip-priority"]').exists()).toBe(false);
+
+    await pickPriority(wrapper);
+    expect(wrapper.find('[data-test="oncall-simulator-chip-priority"]').text()).toContain("P1");
+    // The picker gives way to the chip it created.
+    expect(wrapper.find('[data-test="oncall-simulator-priority"]').exists()).toBe(false);
+  });
+
+  /// Nothing to test against means the button would ask the server "where does
+  /// an alert with no facts go", which has no useful answer.
+  it("cannot run with no dimensions", () => {
+    expect(
+      render().find('[data-test="oncall-simulator-run"]').attributes("disabled"),
+    ).toBeDefined();
+  });
+
+  // The server lowercases before matching, so testing the un-normalised string
+  // would answer a different question than the one asked.
+  it("normalises a dimension the way the server will match it", async () => {
+    const wrapper = render();
+    await addDimension(wrapper, "service", "  Payments-API ");
+    await pickPriority(wrapper);
+    await wrapper.find('[data-test="oncall-simulator-run"]').trigger("click");
+
+    expect(wrapper.emitted("run")?.[0][0]).toMatchObject({
+      dimensions: { service: "payments-api" },
+      priority: "P1",
+    });
+  });
+
+  it("drops a dimension the reader removes", async () => {
+    const wrapper = render();
+    await addDimension(wrapper, "service", "api");
+    expect(wrapper.find('[data-test="oncall-simulator-chip-service"]').exists()).toBe(true);
+
+    await wrapper.find('[data-test="oncall-simulator-chip-service"] button').trigger("click");
+    expect(wrapper.find('[data-test="oncall-simulator-chip-service"]').exists()).toBe(false);
+  });
+
+  it("shows the whole path — rule, team, ladder, person", async () => {
+    const wrapper = render({ preview: preview() });
+    await pickPriority(wrapper);
+    const result = wrapper.find('[data-test="oncall-simulator-result"]');
+
+    expect(result.text()).toContain("service = payments-api");
+    expect(wrapper.find('[data-test="oncall-simulator-team"]').text()).toContain("Payments");
+    expect(wrapper.find('[data-test="oncall-simulator-ladder"]').text()).toContain("P1 ladder");
+    expect(wrapper.find('[data-test="oncall-simulator-responder"]').text()).toContain(
+      "aarav@o2.ai",
+    );
+  });
+
+  /// "most specific of 1 match" is noise dressed as a finding.
+  it("only claims specificity when something else actually matched", () => {
+    expect(
+      render({ preview: preview() }).find('[data-test="oncall-simulator-specificity"]').exists(),
+    ).toBe(false);
+
+    const contested = render({
+      preview: preview({
+        also_matched: [
+          {
+            rule_id: "r2",
+            team_id: "team_1",
+            path: "k8s-namespace=payments",
+            same_team: true,
+            lost_because: "a longer literal prefix wins",
+          },
+        ],
+      }),
+    });
+    expect(contested.find('[data-test="oncall-simulator-specificity"]').text()).toContain("2");
+  });
+
+  /// A losing rule pointing at ANOTHER team is the case worth naming — that is
+  /// a page that would have gone to a different set of phones.
+  it("renders the server's reason a rule lost, and who it pointed at", () => {
+    const wrapper = render({
+      preview: preview({
+        also_matched: [
+          {
+            rule_id: "r2",
+            team_id: "team_2",
+            team_name: "Ledger",
+            path: "k8s-namespace=payments",
+            same_team: false,
+            lost_because: "`service=payments-api` pins a longer literal prefix",
+          },
+        ],
+      }),
+    });
+    const line = wrapper.find('[data-test="oncall-simulator-also-r2"]');
+    expect(line.text()).toContain("k8s-namespace = payments");
+    expect(line.text()).toContain("Ledger");
+    expect(line.text()).toContain("pins a longer literal prefix");
+  });
+
+  it("says plainly when nothing owns the dimensions", () => {
+    const wrapper = render({ preview: preview({ team_id: null, decision: { kind: "unrouted" } }) });
+    expect(wrapper.find('[data-test="oncall-simulator-team"]').text()).toContain("Nobody");
+    // Nothing to page, so no test page can be offered.
+    expect(wrapper.find('[data-test="oncall-simulator-send-test"]').exists()).toBe(false);
+  });
+
+  /// The reason a page would not land is the server's sentence — never a guess
+  /// assembled here.
+  it("gives the server's reason a responder cannot be reached", () => {
+    const wrapper = render({
+      preview: preview({
+        current_responder: {
+          user_email: "aarav@o2.ai",
+          reason: "on call",
+          would_a_page_land: false,
+          why_not: "this deployment has no SMTP transport configured",
+          deliverable_channels: [],
+        },
+      }),
+    });
+    expect(wrapper.find('[data-test="oncall-simulator-responder"]').text()).toContain(
+      "no SMTP transport configured",
+    );
+  });
+
+  describe("the responder's channels", () => {
+    const withLadder = (ladder: RoutingPreview["ladder"]) =>
+      preview({
+        ladder,
+        current_responder: {
+          user_email: "aarav@o2.ai",
+          reason: "on call",
+          would_a_page_land: true,
+          deliverable_channels: ["email", "sms"],
+        },
+      });
+    const p1 = (channels: Channel[]) => [
+      { priority: "P1", rungs: 1, pages_anyone: true, ends_with_whole_team: true, channels },
+    ];
+    const note = (wrapper: Wrapper) =>
+      wrapper.find('[data-test="oncall-simulator-responder-note"]');
+    const tone = (wrapper: Wrapper) =>
+      note(wrapper)
+        .classes()
+        .find((c) => c.startsWith("text-status"));
+
+    it.each<[string, Channel[], string, string]>([
+      [
+        "names only what the priority sends",
+        ["sms", "voice"],
+        "SMS · now",
+        "text-status-success-text",
+      ],
+      [
+        "lists every channel both sides share",
+        ["email", "sms"],
+        "Email, SMS · now",
+        "text-status-success-text",
+      ],
+      [
+        "warns when the priority sends nothing they receive",
+        ["voice"],
+        "This priority sends nothing they can receive",
+        "text-status-warning-text",
+      ],
+    ])("%s", async (_, sends, expected, colour) => {
+      const wrapper = render({ preview: withLadder(p1(sends)) });
+      await pickPriority(wrapper);
+      expect(note(wrapper).text()).toBe(expected);
+      expect(tone(wrapper)).toBe(colour);
+    });
+
+    it("with no priority chosen, lists what they can receive", () => {
+      const wrapper = render({ preview: withLadder(p1(["voice"])) });
+      expect(note(wrapper).text()).toBe("Email, SMS · now");
+    });
+  });
+
+  it("marks a priority that would wake nobody", async () => {
+    const wrapper = render({
+      preview: preview({
+        ladder: [
+          {
+            priority: "P1",
+            rungs: 0,
+            pages_anyone: false,
+            ends_with_whole_team: false,
+            channels: [],
+          },
+        ],
+      }),
+    });
+    await pickPriority(wrapper);
+    expect(wrapper.find('[data-test="oncall-simulator-ladder"]').text()).toContain("Pages nobody");
+  });
+
+  it("asks the parent to send a real page for the resolved team", async () => {
+    const wrapper = render({ preview: preview() });
+    await pickPriority(wrapper);
+    await wrapper.find('[data-test="oncall-simulator-send-test"]').trigger("click");
+    expect(wrapper.emitted("send-test")?.[0][0]).toEqual({ team_id: "team_1", priority: "P1" });
+  });
+
+  it("renders Send test page disabled once the org is latched read-only", async () => {
+    const wrapper = render({ preview: preview(), canConfigure: false });
+    await pickPriority(wrapper);
+    expect(
+      wrapper.find('[data-test="oncall-simulator-send-test"]').attributes("disabled"),
+    ).toBeDefined();
+  });
+
+  /// Attempts, not people: one person on email and text is two attempts, and the old toast called that "2 people".
+  it("lists each test page attempt in the result card", async () => {
+    const wrapper = await sentTest({
+      reached_anyone: true,
+      channels: ["email", "sms"],
+      attempts: [
+        { channel: "email", recipient: "aarav@o2.ai", reason: "on call", delivered: true },
+        {
+          channel: "sms",
+          recipient: "aarav@o2.ai",
+          reason: "on call",
+          delivered: false,
+          detail: "no phone number",
+        },
+      ],
+    });
+
+    const result = wrapper.find('[data-test="oncall-simulator-test-result"]');
+    expect(result.find('[data-test="oncall-simulator-test-count"]').text()).toBe("Sent 1 of 2");
+    const rows = result.findAll('[data-test^="oncall-simulator-test-attempt-"]');
+    expect(rows.map((row) => row.text())).toEqual([
+      "aarav@o2.ai · Email · Sent",
+      "aarav@o2.ai · SMS · Not sent: no phone number",
+    ]);
+  });
+
+  it("says why nothing was sent when no attempt was made", async () => {
+    const wrapper = await sentTest({
+      reached_anyone: false,
+      not_sent_because: "nobody is on call",
+      channels: ["email"],
+      attempts: [],
+    });
+
+    expect(wrapper.find('[data-test="oncall-simulator-test-result"]').text()).toBe(
+      "Nothing was sent — nobody is on call",
+    );
+  });
+
+  /// A result describes the team and priority it was sent for, never the ones on screen after a change.
+  it("hides the test result once the priority changes", async () => {
+    const wrapper = await sentTest({
+      reached_anyone: true,
+      channels: ["email"],
+      attempts: [
+        { channel: "email", recipient: "aarav@o2.ai", reason: "on call", delivered: true },
+      ],
+    });
+    expect(wrapper.find('[data-test="oncall-simulator-test-result"]').exists()).toBe(true);
+
+    await wrapper.find('[data-test="oncall-simulator-chip-priority"] button').trigger("click");
+    await pickPriority(wrapper, "P2");
+
+    expect(wrapper.find('[data-test="oncall-simulator-test-result"]').exists()).toBe(false);
+  });
+});
+
+/// The parent hands the result back after the click, the way the routing page does.
+async function sentTest(testResult: Record<string, unknown>) {
+  const wrapper = render({ preview: preview() });
+  await pickPriority(wrapper);
+  await wrapper.find('[data-test="oncall-simulator-send-test"]').trigger("click");
+  await wrapper.setProps({ testResult });
+  return wrapper;
+}

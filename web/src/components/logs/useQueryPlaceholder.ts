@@ -1,5 +1,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref } from "vue";
 
+import type { TranslateFn } from "@/types/i18n";
+
 interface StreamField {
   name: string;
   ftsKey?: boolean;
@@ -29,6 +31,7 @@ interface Options {
   noStreamText?: string;
   /** When true, all example queries containing match_all() are omitted (e.g. traces page). */
   excludeMatchAll?: boolean;
+  freeText?: boolean;
 }
 
 const SYSTEM_FIELDS = new Set(["_timestamp", "_all", "_stream"]);
@@ -48,6 +51,7 @@ export function useQueryPlaceholder(
   fieldValues: Ref<Record<string, FieldValuesState>>,
   sqlMode: Ref<boolean>,
   noStream: Ref<boolean>,
+  t: TranslateFn,
   options: Options = {},
 ) {
   const placeholder = ref("");
@@ -76,7 +80,7 @@ export function useQueryPlaceholder(
 
   // Build example query strings from available field+value data
   const examples = computed((): string[] => {
-    if (noStream.value) return [options.noStreamText ?? "Select a stream first"];
+    if (noStream.value) return [options.noStreamText ?? t("search.selectStreamFirst")];
 
     const f = fields.value;
     if (!f || f.length === 0) return [];
@@ -153,9 +157,18 @@ export function useQueryPlaceholder(
       return result;
     }
 
+    const term = ff0 ? ftsVal(ff0) : "error";
+    if (options.freeText) {
+      return freeTextExamples(
+        kf0 ? fieldExpr(kf0) : null,
+        term,
+        sf0 ? `str_match(${sf0.name}, '${strVal(sf0)}')` : null,
+        options,
+      );
+    }
+
     // Filter mode — interleaved variations covering raw filters, match_all, and other functions
     const result: string[] = [];
-    const term = ff0 ? ftsVal(ff0) : "error";
 
     // 1. Simple raw filter
     if (kf0) result.push(fieldExpr(kf0));
@@ -228,5 +241,18 @@ export function useQueryPlaceholder(
     placeholder.value = "";
   });
 
-  return { placeholder };
+  return { placeholder, examples };
+}
+
+function freeTextExamples(
+  fieldFilter: string | null,
+  term: string,
+  strMatch: string | null,
+  options: Options,
+): string[] {
+  const result = ["timeout", '"connection refused"'];
+  if (fieldFilter) result.push(fieldFilter, `${fieldFilter} AND match_all('timeout')`);
+  result.push(`match_all('${term}*')`);
+  if (strMatch) result.push(strMatch);
+  return options.excludeMatchAll ? result.filter((q) => !q.includes("match_all")) : result;
 }

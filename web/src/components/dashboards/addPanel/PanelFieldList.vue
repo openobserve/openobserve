@@ -1,8 +1,11 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="bg-surface-panel border-border-default flex h-full w-full flex-col border-r">
-    <div class="px-page-edge my-3 flex shrink-0 items-center justify-between">
+  <div
+    class="bg-surface-panel flex h-full w-full flex-col"
+    :class="frameless ? '' : 'border-border-default border-e'"
+  >
+    <div v-if="!frameless" class="px-page-edge my-3 flex shrink-0 items-center justify-between">
       <span class="text-base font-bold">{{ t("panel.fields") }}</span>
       <OButton
         variant="outline"
@@ -60,7 +63,6 @@
             searchable
             label-position="inside"
             :disabled="dashboardPanelDataPageKey === 'logs'"
-            :title="currentStream ?? undefined"
             option-tooltip
             @search="onStreamSearch"
             @update:model-value="onStreamChange"
@@ -71,10 +73,9 @@
       <!-- Group header -->
       <template #group-header="{ row }">
         <div
-          class="-ml-page-edge px-page-edge bg-section-header-bg text-text-secondary flex h-7! w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 cursor-default items-center justify-between text-xs font-semibold select-none"
-          :title="row.groupName"
+          class="-ms-page-edge px-page-edge bg-section-header-bg text-text-secondary flex h-7! w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 cursor-default items-center justify-between text-xs font-semibold select-none"
         >
-          <div class="min-w-0 flex-1">{{ row.groupName }}</div>
+          <OTruncatedText as="div" class="flex-1">{{ row.groupName }}</OTruncatedText>
         </div>
       </template>
 
@@ -107,7 +108,7 @@
                 data-test="dashboard-add-x-data"
                 @click.stop="addXAxisItem(row)"
               >
-                {{ dashboardPanelData.data.type != "h-bar" ? "+X" : "+Y" }}
+                {{ dashboardPanelData.data.type != "h-bar" ? raw("+X") : raw("+Y") }}
               </OButton>
               <OButton
                 variant="ghost-neutral"
@@ -116,7 +117,7 @@
                 data-test="dashboard-add-y-data"
                 @click.stop="addYAxisItem(row)"
               >
-                {{ dashboardPanelData.data.type != "h-bar" ? "+Y" : "+X" }}
+                {{ dashboardPanelData.data.type != "h-bar" ? raw("+Y") : raw("+X") }}
               </OButton>
               <OButton
                 v-if="dashboardPanelData.data.type == 'table'"
@@ -126,7 +127,7 @@
                 data-test="dashboard-add-p-data"
                 @click.stop="addBreakDownAxisItem(row)"
               >
-                +P
+                {{ t("panel.addPivotShort") }}
               </OButton>
               <OButton
                 v-if="
@@ -137,7 +138,12 @@
                   dashboardPanelData.data.type == 'h-stacked' ||
                   dashboardPanelData.data.type == 'scatter' ||
                   dashboardPanelData.data.type == 'area-stacked' ||
-                  dashboardPanelData.data.type == 'stacked'
+                  dashboardPanelData.data.type == 'stacked' ||
+                  dashboardPanelData.data.type == 'state-timeline' ||
+                  dashboardPanelData.data.type == 'distribution' ||
+                  dashboardPanelData.data.type == 'treemap' ||
+                  dashboardPanelData.data.type == 'sunburst' ||
+                  dashboardPanelData.data.type == 'hostmap'
                 "
                 variant="ghost-neutral"
                 size="chip"
@@ -145,7 +151,7 @@
                 data-test="dashboard-add-b-data"
                 @click.stop="addBreakDownAxisItem(row)"
               >
-                +B
+                {{ t("panel.addBreakdownShort") }}
               </OButton>
               <OButton
                 v-if="dashboardPanelData.data.type == 'heatmap'"
@@ -155,7 +161,7 @@
                 data-test="dashboard-add-z-data"
                 @click.stop="addZAxisItem(row)"
               >
-                +Z
+                {{ t("panel.addZAxisShort") }}
               </OButton>
               <OButton
                 v-if="
@@ -172,7 +178,7 @@
                 data-test="dashboard-add-filter-data"
                 @click.stop="addFilteredItem(row as { name: string; stream: string })"
               >
-                +F
+                {{ t("panel.addFilterShort") }}
               </OButton>
             </div>
 
@@ -188,7 +194,7 @@
                 data-test="dashboard-add-latitude-data"
                 @click.stop="addLatitude(row)"
               >
-                +Lat
+                {{ t("panel.addLatitudeShort") }}
               </OButton>
               <OButton
                 variant="ghost-neutral"
@@ -200,7 +206,7 @@
                 data-test="dashboard-add-longitude-data"
                 @click.stop="addLongitude(row)"
               >
-                +Lng
+                {{ t("panel.addLongitudeShort") }}
               </OButton>
               <OButton
                 variant="ghost-neutral"
@@ -212,7 +218,7 @@
                 data-test="dashboard-add-weight-data"
                 @click.stop="addWeight(row)"
               >
-                +W
+                {{ t("panel.addWeightShort") }}
               </OButton>
               <OButton
                 v-if="
@@ -229,7 +235,7 @@
                 data-test="dashboard-add-filter-data"
                 @click.stop="addFilteredItem(row as { name: string; stream: string })"
               >
-                +F
+                {{ t("panel.addFilterShort") }}
               </OButton>
             </div>
 
@@ -245,7 +251,7 @@
                 data-test="dashboard-add-x-data"
                 @click.stop="addMapName(row)"
               >
-                +N
+                {{ t("panel.addNameShort") }}
               </OButton>
               <OButton
                 variant="ghost-neutral"
@@ -257,7 +263,7 @@
                 data-test="dashboard-add-y-data"
                 @click.stop="addMapValue(row)"
               >
-                +V
+                {{ t("panel.addValueShort") }}
               </OButton>
               <OButton
                 variant="ghost-neutral"
@@ -265,7 +271,7 @@
                 data-test="dashboard-add-filter-data"
                 @click.stop="addFilteredItem(row as { name: string; stream: string })"
               >
-                +F
+                {{ t("panel.addFilterShort") }}
               </OButton>
             </div>
 
@@ -281,7 +287,7 @@
                 data-test="dashboard-add-source-data"
                 @click.stop="addSource(row)"
               >
-                +S
+                {{ t("panel.addSourceShort") }}
               </OButton>
               <OButton
                 variant="ghost-neutral"
@@ -293,7 +299,7 @@
                 data-test="dashboard-add-target-data"
                 @click.stop="addTarget(row)"
               >
-                +T
+                {{ t("panel.addTargetShort") }}
               </OButton>
               <OButton
                 variant="ghost-neutral"
@@ -305,7 +311,7 @@
                 data-test="dashboard-add-value-data"
                 @click.stop="addValue(row)"
               >
-                +V
+                {{ t("panel.addValueShort") }}
               </OButton>
               <OButton
                 v-if="
@@ -322,7 +328,7 @@
                 data-test="dashboard-add-filter-data"
                 @click.stop="addFilteredItem(row as { name: string; stream: string })"
               >
-                +F
+                {{ t("panel.addFilterShort") }}
               </OButton>
             </div>
           </template>
@@ -343,7 +349,7 @@
       <template #empty>
         <div class="flex items-center justify-center py-[0.725rem] text-center">
           <OIcon name="info" size="xs" />
-          <span class="pl-1.5">{{ t("search.noFieldFound") }}</span>
+          <span class="ps-1.5">{{ t("search.noFieldFound") }}</span>
         </div>
       </template>
 
@@ -358,9 +364,10 @@
             side="left"
             align="center"
             max-width="18.75rem"
-            :content="`Total Fields: ${bottomProps.totalRows}`"
+            :content="t('common.totalFields', { count: bottomProps.totalRows })"
           />
           <OButton
+            :aria-label="t('search.firstPage')"
             variant="ghost-primary"
             size="icon-panel"
             :disabled="bottomProps.isFirstPage"
@@ -380,6 +387,7 @@
             </OButton>
           </template>
           <OButton
+            :aria-label="t('search.lastPage')"
             variant="ghost-primary"
             size="icon-panel"
             :disabled="bottomProps.isLastPage"
@@ -396,15 +404,16 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, inject } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import useStreams from "@/composables/useStreams";
 import { applyPromqlSeed, metricsStreamsOf } from "@/utils/dashboard/promqlSeed";
+import { pickDashboardPanelStream } from "@/utils/streamPersist";
 import { isAutoSeededQuery } from "@/utils/metrics/metricPanelSeed";
 import { buildTypeFilterBuckets } from "@/utils/metrics/metricFamily";
-import { BADGE_LABELS, getBadgeStyle } from "@/utils/metrics/metricPalette";
+import { BADGE_LABEL_KEYS, getBadgeStyle } from "@/utils/metrics/metricPalette";
 import useNotifications from "@/composables/useNotifications";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -416,18 +425,22 @@ import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
 import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
 import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { FieldItem } from "@/lib/lists/FieldList/OFieldList.types";
+import { isFlowChart, isHtmlPanel } from "@/utils/dashboard/chartTypeGroups";
 
 const props = defineProps<{
   editMode?: boolean;
   hideAllFieldsSelection?: boolean;
+  /** Drop the pane's own title row + border when a host (drawer) provides them. */
+  frameless?: boolean;
 }>();
 
 const dashboardPanelDataPageKey: string = inject("dashboardPanelDataPageKey", "dashboard");
 
 const store = useStore();
-const { t } = useI18n();
-const { getStreams } = useStreams();
+const { t } = useI18nTyped();
+const { getStreams } = useStreams(t);
 const { showErrorNotification } = useNotifications();
 const { parsePromQlQuery } = usePromqlSuggestions();
 const emit = defineEmits<{ collapse: [] }>();
@@ -455,7 +468,7 @@ const {
   cleanupDraggingFields,
   updateGroupedFields,
   fetchPromQLLabels,
-} = useDashboardPanelData(dashboardPanelDataPageKey);
+} = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
 const fieldListRef = ref<InstanceType<typeof OFieldList> | null>(null);
 const currentPage = ref(1);
@@ -514,8 +527,14 @@ function onStreamChange(val: SelectModelValue) {
 
 // ── Stream type options ────────────────────────────────────────────────
 
+// Only a dashboard panel searches an enrichment table over its whole lifetime, so only it offers one.
 const streamTypeOptions = computed(() =>
-  ["logs", "metrics", "traces"].map((t: string) => ({ label: t, value: t })),
+  [
+    "logs",
+    "metrics",
+    "traces",
+    ...(dashboardPanelDataPageKey === "dashboard" ? ["enrichment_tables"] : []),
+  ].map((t: string) => ({ label: raw(t), value: t })),
 );
 
 // ── Stream list ────────────────────────────────────────────────────────
@@ -525,23 +544,37 @@ const filteredStreams = ref<any[]>([]);
 const streamListLoading = ref(false);
 
 const currentQueryFields = () =>
-  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields;
+  dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex]?.fields;
+
+// Pages whose stream select is the user's own choice, so the list must load even
+// with no stream picked yet. The list is keyed on stream_type alone anyway.
+const STREAM_LIST_WITHOUT_STREAM = new Set(["metrics", "build"]);
 
 const isEditPanel = props.editMode;
+
+const defaultStreamFor = (streamType: string) => {
+  const streams = dashboardPanelData.meta.stream.streamResults ?? [];
+  if (dashboardPanelDataPageKey !== "dashboard" || isEditPanel) return streams[0]?.name;
+  return pickDashboardPanelStream(
+    store.state.selectedOrganization?.identifier,
+    streamType,
+    streams,
+  );
+};
 let initialStreamsLoaded = false;
 
 const loadStreamsListBasedOnType = async () => {
   initialStreamsLoaded = true;
   streamListLoading.value = true;
   try {
-    await getStreamList(currentQueryFields().stream_type);
+    await getStreamList(currentQueryFields()?.stream_type);
   } finally {
     streamListLoading.value = false;
   }
 };
 
 watch(
-  () => currentQueryFields().stream_type,
+  () => currentQueryFields()?.stream_type,
   () => {
     if (!initialStreamsLoaded) return;
     loadStreamsListBasedOnType();
@@ -550,7 +583,8 @@ watch(
 
 if (isEditPanel) {
   // In edit mode the panel's own data arrives asynchronously, so the list waits
-  // for a stream rather than fetching against a half-built query.
+  // for a stream rather than fetching against a half-built query — except on the
+  // pages listed above, which start blank on purpose.
   //
   // The watch is armed in `onMounted`, NOT at setup, and `immediate` is what
   // handles a stream that is already set. Two reasons it must be this shape:
@@ -571,9 +605,10 @@ if (isEditPanel) {
     let stopEditInitialLoad: (() => void) | undefined;
     const onStream = (streamName: string) => {
       if (loaded) return;
-      // Metrics visualize starts blank by design; load the metric stream list
-      // immediately so the stream dropdown is selectable without a preseeded stream.
-      if (!streamName && dashboardPanelDataPageKey !== "metrics") return;
+      // Metrics and logs Visualize start blank by design, and their selects are
+      // the user's own — waiting for a preseeded stream leaves the dropdown on
+      // "No options found" with no way out. Only a read-only select may wait.
+      if (!streamName && !STREAM_LIST_WITHOUT_STREAM.has(dashboardPanelDataPageKey)) return;
       loaded = true;
       // Undefined on the immediate pass — `watch` has not returned yet, so the
       // handle does not exist. `loaded` is what stops a second run; this is only
@@ -581,7 +616,7 @@ if (isEditPanel) {
       stopEditInitialLoad?.();
       loadStreamsListBasedOnType();
     };
-    stopEditInitialLoad = watch(() => currentQueryFields().stream, onStream, {
+    stopEditInitialLoad = watch(() => currentQueryFields()?.stream, onStream, {
       immediate: true,
     });
     // The immediate pass could not stop a watcher that did not exist yet.
@@ -614,7 +649,7 @@ const streamOptions = computed(() =>
     // The bucket id drives BOTH the label and the colour, so neither is
     // reconstructed from the other.
     const bucket = metricTypeBuckets.value[s.name];
-    const type = bucket ? (BADGE_LABELS[bucket] ?? "Other") : undefined;
+    const type = bucket ? t(BADGE_LABEL_KEYS[bucket] ?? "metrics.badge.other") : undefined;
     return {
       ...s,
       // The chip is the initial; hovering it (the title) spells the type out.
@@ -677,6 +712,8 @@ watch(
     if (!streamChangedForThisQuery && !streamTypeChangedForThisQuery) {
       return;
     }
+
+    if (!dashboardPanelData.data.queries?.[currentIndex]?.fields) return;
 
     const fields: any = dashboardPanelData.meta.stream.streamResults.find(
       (it: any) =>
@@ -761,7 +798,9 @@ watch(
           );
         }
       } catch (error: any) {
-        showErrorNotification(error?.message ?? "Failed to get stream fields");
+        showErrorNotification(
+          error?.message ?? t("dashboard.addSettingVariable.failedToGetStreamFields"),
+        );
       }
     }
   },
@@ -769,18 +808,20 @@ watch(
 
 watch(
   () => [
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type,
+    dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex]?.fields
+      ?.stream_type,
     dashboardPanelData.meta.stream.streamResults,
     dashboardPanelData.meta.stream.streamResultsType,
   ],
   () => {
+    // Current query can be transiently absent (org-switch / panel reset).
+    const currentIndex = dashboardPanelData.layout.currentQueryIndex;
+    if (!dashboardPanelData.data.queries?.[currentIndex]?.fields) return;
     if (
       dashboardPanelData.meta.stream.streamResults.length > 0 &&
       dashboardPanelData.meta.stream.streamResultsType ===
-        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
-          .stream_type
+        dashboardPanelData.data.queries[currentIndex].fields.stream_type
     ) {
-      const currentIndex = dashboardPanelData.layout.currentQueryIndex;
       const existingStream = dashboardPanelData.meta.stream.streamResults.find(
         (it: any) =>
           it.name ==
@@ -793,8 +834,9 @@ watch(
             dashboardPanelData.layout.currentQueryIndex
           ].fields.stream;
       } else {
-        dashboardPanelData.data.queries[currentIndex].fields.stream =
-          dashboardPanelData.meta.stream.streamResults[0]?.name;
+        dashboardPanelData.data.queries[currentIndex].fields.stream = defaultStreamFor(
+          dashboardPanelData.data.queries[currentIndex].fields.stream_type,
+        );
       }
     }
   },
@@ -812,7 +854,7 @@ const flattenGroupedFields = computed(() => {
   if (customQueryFields.length > 0) {
     flattenedFields.push({
       isGroup: true,
-      groupName: "Query Fields",
+      groupName: t("dashboard.dashboards.queryFields"),
     });
     customQueryFields.forEach((field: any) => {
       flattenedFields.push({
@@ -827,7 +869,7 @@ const flattenGroupedFields = computed(() => {
   if (vrlFunctionFields.length > 0) {
     flattenedFields.push({
       isGroup: true,
-      groupName: "Function Fields",
+      groupName: t("dashboard.dashboards.functionFields"),
     });
     vrlFunctionFields.forEach((field: any) => {
       flattenedFields.push({
@@ -908,11 +950,12 @@ const flattenGroupedFields = computed(() => {
 watch(
   () => ({
     stream:
-      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream,
+      dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex]?.fields
+        ?.stream,
     streamType:
-      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
-        .stream_type,
-    joins: dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].joins,
+      dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex]?.fields
+        ?.stream_type,
+    joins: dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex]?.joins,
   }),
   () => {
     updateGroupedFields();
@@ -989,7 +1032,8 @@ function showStandardActions(row: FieldItem): boolean {
     chartType === "geomap" ||
     chartType === "maps" ||
     chartType === "custom_chart" ||
-    chartType === "sankey"
+    isFlowChart(chartType) ||
+    isHtmlPanel(chartType)
   ) {
     return false;
   }
@@ -1033,7 +1077,7 @@ function showSankeyActions(row: FieldItem): boolean {
     return false;
   }
 
-  return dashboardPanelData.data.type === "sankey";
+  return isFlowChart(dashboardPanelData.data.type);
 }
 
 // ── Stream list fetch ──────────────────────────────────────────────────
@@ -1041,8 +1085,8 @@ function showSankeyActions(row: FieldItem): boolean {
 const getStreamList = async (stream_type: any) => {
   await getStreams(stream_type, false).then((res: any) => {
     const currentType =
-      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
-        .stream_type;
+      dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex]?.fields
+        ?.stream_type;
     if (stream_type !== currentType) return;
     dashboardPanelData.meta.stream.streamResults = res.list;
     dashboardPanelData.meta.stream.streamResultsType = stream_type;

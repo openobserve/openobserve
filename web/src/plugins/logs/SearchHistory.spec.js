@@ -3,7 +3,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import i18n from "@/locales";
 import SearchHistory from "./SearchHistory.vue";
 import searchService from "@/services/search";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 
 // Mock Toast
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
@@ -11,15 +12,18 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 // Mock the search service
-vi.mock("@/services/search", () => ({
-  default: {
-    get_history: vi.fn().mockResolvedValue({
-      data: {
-        hits: [],
-      },
-    }),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_history: vi.fn().mockResolvedValue({
+        data: {
+          hits: [],
+        },
+      }),
+    },
+  });
+});
 
 // Mock useLogs composable
 vi.mock("@/composables/useLogs", () => ({
@@ -64,8 +68,10 @@ vi.mock("vue-i18n", async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
+    // Delegate to the real message catalogue instead of echoing the key, so
+    // assertions on rendered copy (e.g. formatTime -> "1500.00 sec") stay real.
     useI18n: () => ({
-      t: (key) => key,
+      t: (...args) => i18n.global.t(...args),
     }),
   };
 });
@@ -76,6 +82,7 @@ describe("SearchHistory Component", () => {
   let routerPushMock;
 
   beforeEach(() => {
+    resetListViewState();
     // Setup mock store
     mockStore = {
       state: {
@@ -116,6 +123,7 @@ describe("SearchHistory Component", () => {
         stubs: {
           OButton: true,
           OIcon: true,
+          OTag: true,
           OSwitch: true,
           OTable: true,
           OSpinner: true,
@@ -229,7 +237,7 @@ describe("SearchHistory Component", () => {
       });
 
       const testSQL = "SELECT * FROM logs";
-      await wrapper.vm.copyToClipboard(testSQL, "SQL Query");
+      await wrapper.vm.copyToClipboard(testSQL, wrapper.vm.t);
       await flushPromises();
 
       expect(mockWriteText).toHaveBeenCalledWith(testSQL);
@@ -263,6 +271,183 @@ describe("SearchHistory Component", () => {
             stream: "test-stream",
             sql_mode: "true",
             type: "search_history_re_apply",
+          }),
+        }),
+      );
+    });
+  });
+
+  describe("Stream-type aware history (Traces/Metrics support)", () => {
+    // Search History must scope both the fetched data and the page's
+    // subtitle indicator to whichever telemetry type/stream the user was on
+    // when they opened it (route query set by Index.vue's showSearchHistoryfn),
+    // not always "logs".
+    const mountWithRouteQuery = (query) => {
+      vi.mocked(useRoute).mockReturnValue({
+        query,
+        params: {},
+        path: "/search-history",
+      });
+
+      return mount(SearchHistory, {
+        global: {
+          plugins: [i18n],
+          provide: { store: mockStore },
+          stubs: {
+            OButton: true,
+            OIcon: true,
+            OTag: true,
+            OSwitch: true,
+            OTable: true,
+            OSpinner: true,
+            DateTime: {
+              template: '<div class="mock-datetime"></div>',
+              methods: { setAbsoluteTime: vi.fn() },
+            },
+            AppTabs: true,
+            QueryEditor: true,
+            TenstackTable: true,
+            NoData: true,
+          },
+          mocks: { $router: { push: routerPushMock } },
+        },
+        props: { isClicked: false },
+      });
+    };
+
+    it("requests history for the active traces stream from the route query", async () => {
+      const tracesWrapper = mountWithRouteQuery({
+        org_identifier: "test-org",
+        stream_type: "traces",
+        stream: "my-trace-stream",
+      });
+      tracesWrapper.vm.dateTimeToBeSent = {
+        valueType: "relative",
+        relativeTimePeriod: "15m",
+        startTime: 0,
+        endTime: 0,
+      };
+
+      await tracesWrapper.vm.fetchSearchHistory();
+      await flushPromises();
+
+      expect(searchService.get_history).toHaveBeenCalledWith(
+        "test-org",
+        expect.any(Number),
+        expect.any(Number),
+        "traces",
+        "my-trace-stream",
+      );
+
+      tracesWrapper.unmount();
+    });
+
+    it("requests history for the active metrics stream from the route query", async () => {
+      const metricsWrapper = mountWithRouteQuery({
+        org_identifier: "test-org",
+        stream_type: "metrics",
+        stream: "my-metric-stream",
+      });
+      metricsWrapper.vm.dateTimeToBeSent = {
+        valueType: "relative",
+        relativeTimePeriod: "15m",
+        startTime: 0,
+        endTime: 0,
+      };
+
+      await metricsWrapper.vm.fetchSearchHistory();
+      await flushPromises();
+
+      expect(searchService.get_history).toHaveBeenCalledWith(
+        "test-org",
+        expect.any(Number),
+        expect.any(Number),
+        "metrics",
+        "my-metric-stream",
+      );
+
+      metricsWrapper.unmount();
+    });
+
+    it("falls back to logs when the route query carries no stream_type", async () => {
+      const logsWrapper = mountWithRouteQuery({ org_identifier: "test-org" });
+      logsWrapper.vm.dateTimeToBeSent = {
+        valueType: "relative",
+        relativeTimePeriod: "15m",
+        startTime: 0,
+        endTime: 0,
+      };
+
+      await logsWrapper.vm.fetchSearchHistory();
+      await flushPromises();
+
+      expect(searchService.get_history).toHaveBeenCalledWith(
+        "test-org",
+        expect.any(Number),
+        expect.any(Number),
+        "logs",
+        "",
+      );
+
+      logsWrapper.unmount();
+    });
+
+    it("exposes the active stream type/name for the page's subtitle indicator", () => {
+      const tracesWrapper = mountWithRouteQuery({
+        org_identifier: "test-org",
+        stream_type: "traces",
+        stream: "my-trace-stream",
+      });
+
+      expect(tracesWrapper.vm.activeStreamType).toBe("traces");
+      expect(tracesWrapper.vm.activeStreamName).toBe("my-trace-stream");
+
+      tracesWrapper.unmount();
+    });
+  });
+
+  describe("Navigation - goToLogs preserves the row's own stream type", () => {
+    it("routes back to the traces stream when the history row is a traces search", async () => {
+      const mockTracesRow = {
+        sql: "SELECT * FROM my-trace-stream",
+        stream_name: "my-trace-stream",
+        stream_type: "traces",
+        org_id: "test-org",
+        toBeStoredStartTime: 1000,
+        toBeStoredEndTime: 2000,
+        duration: "1 second",
+      };
+
+      await wrapper.vm.goToLogs(mockTracesRow);
+
+      expect(routerPushMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: "/logs",
+          query: expect.objectContaining({
+            stream_type: "traces",
+            stream: "my-trace-stream",
+          }),
+        }),
+      );
+    });
+
+    it("routes back to metrics when the history row is a metrics search", async () => {
+      const mockMetricsRow = {
+        sql: "SELECT * FROM my-metric-stream",
+        stream_name: "my-metric-stream",
+        stream_type: "metrics",
+        org_id: "test-org",
+        toBeStoredStartTime: 1000,
+        toBeStoredEndTime: 2000,
+        duration: "1 second",
+      };
+
+      await wrapper.vm.goToLogs(mockMetricsRow);
+
+      expect(routerPushMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({
+            stream_type: "metrics",
           }),
         }),
       );
@@ -420,6 +605,67 @@ describe("SearchHistory Component", () => {
       const columns = wrapper.vm.generateColumns([{ some: "data" }]);
       expect(columns.length).toBeGreaterThan(0);
       expect(columns[0].sortable).toBeDefined();
+    });
+  });
+
+  describe("View state restore", () => {
+    const mountRestored = () =>
+      mount(SearchHistory, {
+        global: {
+          plugins: [i18n],
+          provide: {
+            store: {
+              state: { ...mockStore.state, zoConfig: { usage_enabled: true } },
+            },
+          },
+          stubs: {
+            OTable: true,
+            DateTime: { template: "<div />", methods: { setAbsoluteTime: vi.fn() } },
+            AppTabs: true,
+          },
+        },
+      });
+
+    it("restores date range, page, size and sort", () => {
+      resetListViewState();
+      useListViewState("searchHistory", {
+        valueType: "absolute",
+        relativeTimePeriod: "",
+        startTime: 1700000000000000,
+        endTime: 1700000900000000,
+        pageSize: 20,
+        currentPage: 2,
+        sortBy: "sql",
+        sortOrder: "desc",
+      });
+      const restored = mountRestored();
+      expect(restored.vm.restoredDate.absolute).toEqual({
+        startTime: 1700000000000000,
+        endTime: 1700000900000000,
+      });
+      expect(restored.vm.pageSize).toBe(20);
+      expect(restored.vm.currentPage).toBe(2);
+      expect(restored.vm.sortBy).toBe("sql");
+      expect(restored.vm.sortOrder).toBe("desc");
+      restored.unmount();
+    });
+
+    it("saves table and date changes", async () => {
+      const live = mountRestored();
+      live.vm.pageSize = 50;
+      live.vm.sortBy = "sql";
+      await live.vm.updateDateTime({
+        valueType: "relative",
+        relativeTimePeriod: "1h",
+        startTime: 1,
+        endTime: 2,
+      });
+      await live.vm.$nextTick();
+      live.unmount();
+      const saved = useListViewState("searchHistory", {});
+      expect(saved.pageSize).toBe(50);
+      expect(saved.sortBy).toBe("sql");
+      expect(saved.relativeTimePeriod).toBe("1h");
     });
   });
 });

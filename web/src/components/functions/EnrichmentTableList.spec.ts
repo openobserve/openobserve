@@ -13,11 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import i18n from "@/locales";
 import EnrichmentTableList from "./EnrichmentTableList.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import streamService from "@/services/stream";
+import analytics from "@/services/product_analytics";
 
 // ── Hoist mocks so they can be referenced in vi.mock factories ─────────────────
 
@@ -39,26 +43,37 @@ const {
 
 // ── Service mocks ──────────────────────────────────────────────────────────────
 
-vi.mock("@/services/jstransform", () => ({
-  default: {
-    get_all_enrichment_table_statuses: mockGetAllEnrichmentTableStatuses,
-  },
-}));
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_all_enrichment_table_statuses: mockGetAllEnrichmentTableStatuses,
+    },
+  });
+});
 
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStreams: mockGetStreams,
+    getStreamsFetchedAt: vi.fn(async () => undefined),
     resetStreamType: mockResetStreamType,
     getStream: mockGetStream,
   }),
 }));
 
-vi.mock("@/services/stream", () => ({
-  default: { delete: vi.fn() },
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { delete: vi.fn() },
+  });
+});
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+vi.mock("@/services/reodotdev_analytics", () => ({ useReo: () => ({ track: vi.fn() }) }));
+vi.mock("@/stores", () => ({
+  default: { state: { selectedOrganization: { identifier: "test-org" } } },
 }));
 
-vi.mock("@/services/segment_analytics", () => ({ default: { track: vi.fn() } }));
-vi.mock("@/services/reodotdev_analytics", () => ({ useReo: () => ({ track: vi.fn() }) }));
 vi.mock("@/utils/zincutils", () => ({
   formatSizeFromMB: vi.fn((v) => v + " MB"),
   getImageURL: vi.fn((u) => u),
@@ -87,11 +102,16 @@ vi.mock("vue-router", () => ({
 // ── Component stubs ────────────────────────────────────────────────────────────
 
 const globalStubs = {
-  AddEnrichmentTable: { template: '<div data-test="add-enrichment-table-stub" />' },
+  AddEnrichmentTable: {
+    name: "AddEnrichmentTable",
+    template: '<div data-test="add-enrichment-table-stub" />',
+    props: ["open", "modelValue", "isUpdating"],
+  },
   NoData: { template: '<div data-test="no-data-stub">No Data</div>' },
   ConfirmDialog: {
+    name: "ConfirmDialog",
     template: '<div data-test="confirm-dialog-stub" />',
-    props: ["modelValue"],
+    props: ["modelValue", "title", "okVariant"],
     emits: ["update:modelValue", "update:ok", "update:cancel"],
   },
   EnrichmentSchema: {
@@ -140,11 +160,11 @@ const makeStore = () =>
     },
   });
 
-const mountComponent = () =>
+const mountComponent = (extraStubs: Record<string, unknown> = {}) =>
   mount(EnrichmentTableList, {
     global: {
       plugins: [i18n, store],
-      stubs: globalStubs,
+      stubs: { ...globalStubs, ...extraStubs },
     },
   });
 
@@ -153,6 +173,7 @@ const mountComponent = () =>
 describe("EnrichmentTableList", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetListViewState();
     mockGetStreams.mockResolvedValue({ list: [] });
     mockGetAllEnrichmentTableStatuses.mockResolvedValue({ data: {} });
     store = makeStore();
@@ -315,20 +336,6 @@ describe("EnrichmentTableList", () => {
       expect(vm.visibleRows.length).toBe(1);
       expect(vm.visibleRows[0].name).toBe("url_table");
     });
-
-    it("resultTotal updates when visibleRows changes", async () => {
-      const wrapper = mountComponent();
-      await flushPromises();
-
-      setupTables(wrapper);
-      const vm = wrapper.vm as any;
-      vm.selectedFilter = "uploaded";
-
-      // Allow computed + watcher to flush
-      await flushPromises();
-
-      expect(vm.resultTotal).toBe(1);
-    });
   });
 
   // ── text search ────────────────────────────────────────────────────────────
@@ -402,6 +409,23 @@ describe("EnrichmentTableList", () => {
       expect(vm.showAddJSTransformDialog).toBe(true);
     });
 
+    it("opens the form as a dialog over the list and remounts it on each open", async () => {
+      const wrapper = mountComponent();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+
+      vm.showAddUpdateFn(null);
+      await flushPromises();
+      const firstKey = vm.formKey;
+      expect(wrapper.find('[data-test="enrichment-tables-list-table"]').exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "AddEnrichmentTable" }).props("open")).toBe(true);
+
+      vm.hideForm();
+      vm.showAddUpdateFn({ name: "t1" });
+      await flushPromises();
+      expect(vm.formKey).toBe(firstKey + 1);
+    });
+
     it("showAddUpdateFn(null) sets isUpdated to false (new)", async () => {
       const wrapper = mountComponent();
       await flushPromises();
@@ -437,6 +461,28 @@ describe("EnrichmentTableList", () => {
 
       expect(vm.selectedDelete).toEqual(row);
       expect(vm.confirmDelete).toBe(true);
+    });
+
+    it("names the table in bold in the real confirm dialog with a destructive button", async () => {
+      const wrapper = mountComponent({
+        ConfirmDialog: false,
+        ODialog: { template: "<div><slot /></div>" },
+      });
+      await flushPromises();
+
+      (wrapper.vm as any).showDeleteDialogFn(makeTable({ name: "geo_ip" }));
+      await flushPromises();
+
+      const dialog = wrapper
+        .findAllComponents(ConfirmDialog)
+        .find((c) => c.props("messageKeypath") === "function.deleteEnrichmentTableConfirm");
+      expect(dialog?.props("okVariant")).toBe("destructive");
+      const name = dialog!.find('[data-test="confirm-dialog-name"]');
+      expect(name.text()).toBe("geo_ip");
+      expect(name.classes()).toContain("font-semibold");
+      expect(dialog!.text()).toContain(
+        "Are you sure you want to delete the geo_ip enrichment table?",
+      );
     });
 
     it("confirmDelete is false initially", async () => {
@@ -479,6 +525,13 @@ describe("EnrichmentTableList", () => {
       vm.openBulkDeleteDialog();
 
       expect(vm.confirmBulkDelete).toBe(true);
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find(
+          (c: any) =>
+            c.props("title") === i18n.global.t("function.bulkDeleteEnrichmentTablesTitle"),
+        );
+      expect(dialog!.props("okVariant")).toBe("destructive");
     });
 
     it("selectedEnrichmentTableIds computed returns array of names from selectedEnrichmentTables", async () => {
@@ -492,6 +545,166 @@ describe("EnrichmentTableList", () => {
       ];
 
       expect(vm.selectedEnrichmentTableIds).toEqual(["table_a", "table_b"]);
+    });
+  });
+
+  describe("stream_deleted analytics", () => {
+    const trackedDeletes = () =>
+      vi.mocked(analytics.track).mock.calls.filter((c) => c[0] === "stream_deleted");
+
+    it("tracks a confirmed single delete", async () => {
+      vi.mocked(streamService.delete).mockResolvedValue({ data: { code: 200 } } as any);
+      const vm = mountComponent().vm as any;
+      await flushPromises();
+      vm.showDeleteDialogFn(makeTable({ name: "t1" }));
+
+      vm.deleteLookupTable();
+      await flushPromises();
+
+      expect(trackedDeletes()).toEqual([
+        ["stream_deleted", { stream_type: "enrichment_tables", count: 1 }],
+      ]);
+    });
+
+    it("does not track a single delete the server did not confirm", async () => {
+      vi.mocked(streamService.delete).mockResolvedValue({ data: { code: 500 } } as any);
+      const vm = mountComponent().vm as any;
+      await flushPromises();
+      vm.showDeleteDialogFn(makeTable({ name: "t1" }));
+
+      vm.deleteLookupTable();
+      await flushPromises();
+
+      expect(trackedDeletes()).toEqual([]);
+    });
+
+    it("tracks one event per bulk delete, counting only confirmed deletions", async () => {
+      vi.mocked(streamService.delete)
+        .mockResolvedValueOnce({ data: { code: 200 } } as any)
+        .mockRejectedValueOnce({ response: { status: 500 } })
+        .mockResolvedValueOnce({ data: { code: 200 } } as any);
+      const vm = mountComponent().vm as any;
+      await flushPromises();
+      vm.selectedEnrichmentTables = ["a", "b", "c"].map((name) => makeTable({ name }));
+
+      vm.bulkDeleteEnrichmentTables();
+      await flushPromises();
+
+      expect(trackedDeletes()).toEqual([
+        ["stream_deleted", { stream_type: "enrichment_tables", count: 2 }],
+      ]);
+    });
+
+    it("does not track a bulk delete in which every delete failed", async () => {
+      vi.mocked(streamService.delete).mockRejectedValue({ response: { status: 500 } });
+      const vm = mountComponent().vm as any;
+      await flushPromises();
+      vm.selectedEnrichmentTables = ["a", "b"].map((name) => makeTable({ name }));
+
+      vm.bulkDeleteEnrichmentTables();
+      await flushPromises();
+
+      expect(streamService.delete).toHaveBeenCalledTimes(2);
+      expect(trackedDeletes()).toEqual([]);
+    });
+  });
+
+  // ── page persistence across editor round trip (OTable pagination-reset fix) ─
+
+  describe("page persistence across editor round trip (OTable pagination-reset fix)", () => {
+    // 45 rows / pageSize 20 gives 3 pages, so page 3 is a real target to restore.
+    const manyTables = {
+      list: Array.from({ length: 45 }, (_, i) => ({
+        name: `table${i + 1}`,
+        stream_type: "enrichment_tables",
+        stats: { doc_num: 10, storage_size: 1, compressed_size: 0.5 },
+      })),
+    };
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("starts loading=true before the initial fetch resolves", () => {
+      mockGetStreams.mockResolvedValue(manyTables);
+      const wrapper = mountComponent();
+      expect((wrapper.vm as any).loading).toBe(true);
+    });
+
+    it("defaults currentPage to 1", async () => {
+      mockGetStreams.mockResolvedValue(manyTables);
+      const wrapper = mountComponent();
+      await flushPromises();
+      expect((wrapper.vm as any).currentPage).toBe(1);
+    });
+
+    it("onPageChange updates currentPage", async () => {
+      mockGetStreams.mockResolvedValue(manyTables);
+      const wrapper = mountComponent();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      vm.onPageChange(3);
+      expect(vm.currentPage).toBe(3);
+    });
+
+    it("restorePageIndex reasserts the page via a macrotask (setTimeout(0))", async () => {
+      mockGetStreams.mockResolvedValue(manyTables);
+      const wrapper = mountComponent();
+      await flushPromises();
+      vi.useFakeTimers();
+      const vm = wrapper.vm as any;
+      vm.currentPage = 3;
+      const restorePage = vi.fn();
+      vm.oTableRef = { restorePage };
+
+      vm.restorePageIndex();
+      expect(restorePage).not.toHaveBeenCalled();
+
+      // Pending only: the refresh button's age interval would make runAllTimers loop forever.
+      vi.runOnlyPendingTimers();
+      expect(restorePage).toHaveBeenCalledWith(3);
+    });
+
+    it("keeps OTable mounted on its page while the form dialog is open and after Cancel", async () => {
+      mockGetStreams.mockResolvedValue(manyTables);
+      const wrapper = mountComponent();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+
+      vm.onPageChange(3);
+      await flushPromises();
+      expect(vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
+
+      vm.showAddUpdateFn(null);
+      await flushPromises();
+      expect(vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
+
+      vm.hideForm();
+      await flushPromises();
+
+      expect(vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
+    });
+
+    it("keeps the page after Save triggers an async refetch that races TanStack's own reset", async () => {
+      mockGetStreams.mockResolvedValue(manyTables);
+      const wrapper = mountComponent();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+
+      vm.onPageChange(3);
+      await flushPromises();
+      expect(vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
+
+      vm.showAddJSTransformDialog = true;
+      await flushPromises();
+
+      mockGetStreams.mockResolvedValue(manyTables);
+      vm.refreshList();
+      await flushPromises();
+      // flush the setTimeout(0) macrotask that restorePageIndex scheduled
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
     });
   });
 
@@ -525,6 +738,40 @@ describe("EnrichmentTableList", () => {
 
       expect(vm.showAddJSTransformDialog).toBe(false);
       expect(mockGetStreams).toHaveBeenCalled();
+    });
+  });
+
+  describe("view state restore", () => {
+    it("restores search, tab, page, size and sort", async () => {
+      useListViewState("enrichmentTables", {
+        filterQuery: "geo",
+        filter: "uploaded",
+        pageSize: 50,
+        currentPage: 2,
+        sortBy: "name",
+        sortOrder: "desc",
+      });
+      const wrapper = mountComponent();
+      const vm = wrapper.vm as any;
+      expect(vm.currentPage).toBe(2);
+      await flushPromises();
+      expect(vm.filterQuery).toBe("geo");
+      expect(vm.selectedFilter).toBe("uploaded");
+      expect(vm.selectedPerPage).toBe(50);
+      expect(vm.sortBy).toBe("name");
+      expect(vm.sortOrder).toBe("desc");
+    });
+
+    it("saves changes to the view state", async () => {
+      const wrapper = mountComponent();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      vm.filterQuery = "abc";
+      vm.selectedFilter = "file_url";
+      await flushPromises();
+      const saved: any = useListViewState("enrichmentTables", {});
+      expect(saved.filterQuery).toBe("abc");
+      expect(saved.filter).toBe("file_url");
     });
   });
 });

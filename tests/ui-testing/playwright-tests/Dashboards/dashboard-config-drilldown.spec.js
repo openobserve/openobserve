@@ -330,7 +330,7 @@ test.describe("ConfigPanel — Drilldown Configuration", () => {
 
     await setupTablePanelWithConfig(page, pm, dashboardName);
 
-    await pm.dashboardDrilldown.addDrilldownByURL("URL Same Tab Drilldown", "https://openobserve.ai");
+    await pm.dashboardDrilldown.addDrilldownByURL("URL Same Tab Drilldown", "https://www.google.com/");
 
     await expect(pm.dashboardDrilldown.drilldownItemAt(0)).toContainText("URL Same Tab Drilldown");
 
@@ -343,7 +343,7 @@ test.describe("ConfigPanel — Drilldown Configuration", () => {
     await expect(drilldownMenu).toBeVisible({ timeout: 5000 });
 
     await pm.dashboardDrilldown.drilldownMenuFirstItem.click();
-    await page.waitForURL(/openobserve\.ai/, { timeout: 15000 });
+    await page.waitForURL(/google\.com/, { timeout: 15000 });
     testLogger.info(`Navigated to external URL in same tab: ${page.url()}`);
 
     // Navigate back to the app, then to dashboard list for cleanup
@@ -381,9 +381,15 @@ test.describe("ConfigPanel — Drilldown Configuration", () => {
     const drilldownMenu = await pm.dashboardDrilldown.triggerDrilldownFromTable();
     await expect(drilldownMenu).toBeVisible({ timeout: 5000 });
 
+    // Capture the source url BEFORE the click: the drilldown navigates from one
+    // /dashboards/view to another, so only a change of `dashboard` id proves it moved.
+    const sourceUrl = page.url();
     await pm.dashboardDrilldown.drilldownMenuFirstItem.click();
-    await page.waitForURL(/\/dashboards\/view/, { timeout: 15000 });
+    await pm.dashboardDrilldown.waitForSameTabDashboardNavigation(sourceUrl);
     testLogger.info(`Navigated to destination dashboard (Default tab) in same tab: ${page.url()}`);
+    await expect(
+      pm.dashboardDrilldown.getSelectedDashboardTab()
+    ).toHaveText(/Default/, { timeout: 10000 });
 
     await pm.dashboardList.menuItem("dashboards-item");
     await deleteDashboard(page, mainDashName);
@@ -419,9 +425,17 @@ test.describe("ConfigPanel — Drilldown Configuration", () => {
     const drilldownMenu = await pm.dashboardDrilldown.triggerDrilldownFromTable();
     await expect(drilldownMenu).toBeVisible({ timeout: 5000 });
 
+    // Capture the source url BEFORE the click: the drilldown navigates from one
+    // /dashboards/view to another, so only a change of `dashboard` id proves it moved.
+    const sourceUrl = page.url();
     await pm.dashboardDrilldown.drilldownMenuFirstItem.click();
-    await page.waitForURL(/\/dashboards\/view/, { timeout: 15000 });
+    await pm.dashboardDrilldown.waitForSameTabDashboardNavigation(sourceUrl);
     testLogger.info(`Navigated to destination dashboard in same tab: ${page.url()}`);
+    // The drilldown was configured for "Tab Two" — assert it actually opened there,
+    // so a tab selection that got reset back to "Default" is a failure, not a pass.
+    await expect(
+      pm.dashboardDrilldown.getSelectedDashboardTab()
+    ).toHaveText(/Tab Two/, { timeout: 10000 });
 
     // Now on destination dashboard — go to list and delete both
     await pm.dashboardList.menuItem("dashboards-item");

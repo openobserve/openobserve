@@ -26,32 +26,17 @@ import {
   removeToken,
 } from "./cookies";
 
-// Mock js-cookie
-vi.mock("js-cookie", () => ({
-  default: {
-    get: vi.fn(),
-    set: vi.fn(),
-    remove: vi.fn(),
-  },
-}));
-
-// Mock Keys constant
-vi.mock("../constants/key", () => ({
-  default: {
-    sidebarStatusKey: "vue3-typescript-admin-sidebarStatusKey",
-    languageKey: "vue3-typescript-admin-languageKey",
-    sizeKey: "vue3-typescript-admin-sizeKey",
-    tokenKey: "vue3-typescript-admin-access-token",
-    aseKey: "vue3-typescript-admin-ase-key",
-  },
-}));
-
 import Cookies from "js-cookie";
 import Keys from "../constants/key";
 
+// vi.mock("js-cookie") does not work here: setupTests.ts loads js-cookie before
+// this spec runs, so the cached module keeps its real bindings. Spy instead.
 describe("Cookie Utilities", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
+    vi.spyOn(Cookies, "get").mockReturnValue(undefined as any);
+    vi.spyOn(Cookies, "set").mockImplementation(() => undefined);
+    vi.spyOn(Cookies, "remove").mockImplementation(() => undefined);
   });
 
   describe("getSidebarStatus", () => {

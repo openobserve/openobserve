@@ -150,10 +150,22 @@ describe("EmptyStateActionCard", () => {
   it("renders all three sections: icon tile, text block, and chevron", () => {
     const wrapper = mountCard({ sublabel: "Get started with observability" });
     // The button should have 3 direct children: tile span, text span, chevron icon
-    const root = wrapper.find("button");
     // Stubs or wrapper internals may add extra nodes — check by content instead
     expect(wrapper.text()).toContain("Create Dashboard");
     expect(wrapper.text()).toContain("Get started with observability");
     expect(wrapper.find("[data-icon-name='chevron-right']").exists()).toBe(true);
+  });
+  it("uses compact sizing without appearance overrides", () => {
+    const wrapper = mountCard({ size: "compact" });
+    expect(wrapper.classes()).toContain("max-w-80");
+    expect(wrapper.classes()).toContain("gap-2");
+  });
+
+  it("keeps an unavailable card focusable without emitting its action", async () => {
+    const wrapper = mountCard({ unavailable: true });
+    expect(wrapper.attributes("disabled")).toBeUndefined();
+    expect(wrapper.attributes("aria-disabled")).toBe("true");
+    await wrapper.trigger("click");
+    expect(wrapper.emitted("click")).toBeUndefined();
   });
 });

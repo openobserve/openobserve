@@ -19,9 +19,14 @@
 //! - A custom compressor for UTF8 fields using Zstd compression
 //! - Shared Vortex write strategy and access plan utilities
 
-use std::sync::{Arc, LazyLock};
+use std::{
+    ops::Range,
+    sync::{Arc, LazyLock},
+};
 
 use arrow::buffer::BooleanBuffer;
+use config::VortexCompression;
+use datafusion::{common::stats::Precision, datasource::listing::PartitionedFile};
 use tokio::runtime::Runtime;
 use vortex::{
     array::{ArrayRef, Canonical, ExecutionCtx, IntoArray, arrays::VarBinViewArray},
@@ -33,6 +38,7 @@ use vortex::{
     file::WriteStrategyBuilder,
     layout::{LayoutStrategy, layouts::compressed::CompressorPlugin},
     scan::selection::Selection,
+    session::VortexSession,
 };
 use vortex_btrblocks::{SchemeExt, schemes::integer::IntDictScheme};
 use vortex_datafusion::VortexAccessPlan;
@@ -96,11 +102,9 @@ struct LongTextCompressor {
 }
 
 impl LongTextCompressor {
-    fn new() -> Self {
+    fn new(builder: BtrBlocksCompressorBuilder) -> Self {
         Self {
-            btr_compressor: BtrBlocksCompressorBuilder::default()
-                .exclude_schemes([IntDictScheme.id()])
-                .build(),
+            btr_compressor: builder.build(),
             options: LongTextCompressionOptions::default(),
         }
     }
@@ -162,37 +166,43 @@ impl LongTextCompressor {
     }
 }
 
-impl Default for LongTextCompressor {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl CompressorPlugin for LongTextCompressor {
     fn compress_chunk(&self, chunk: &ArrayRef, ctx: &mut ExecutionCtx) -> VortexResult<ArrayRef> {
         self.compress(chunk, ctx)
     }
 }
 
-/// Build the configured Vortex file write strategy.
-///
-/// OpenObserve's custom UTF8/Zstd compressor is used by default. Vortex's
-/// native compression strategy can be enabled with
-/// `ZO_VORTEX_USE_NATIVE_COMPRESSION=true`.
-pub(super) fn vortex_write_strategy() -> Arc<dyn LayoutStrategy> {
-    build_vortex_write_strategy(config::get_config().common.vortex_use_native_compression)
+/// Build the Vortex file write strategy selected by `ZO_VORTEX_COMPRESSION`.
+pub(super) fn vortex_write_strategy(session: &VortexSession) -> Arc<dyn LayoutStrategy> {
+    build_vortex_write_strategy(session, config::get_config().common.vortex_compression)
 }
 
-fn build_vortex_write_strategy(use_native_compression: bool) -> Arc<dyn LayoutStrategy> {
-    let builder = WriteStrategyBuilder::default();
-    if use_native_compression {
-        builder.build()
-    } else {
-        let compressor = LongTextCompressor::default();
-        builder
-            .with_compressor(compressor.clone())
-            .with_probe_compressor(compressor)
-            .build()
+fn build_vortex_write_strategy(
+    session: &VortexSession,
+    compression: VortexCompression,
+) -> Arc<dyn LayoutStrategy> {
+    let btrblocks = match compression {
+        VortexCompression::Compact => {
+            BtrBlocksCompressorBuilder::from_session(session).with_compact()
+        }
+        VortexCompression::O2 | VortexCompression::Native => {
+            BtrBlocksCompressorBuilder::from_session(session)
+        }
+    };
+    let builder =
+        WriteStrategyBuilder::from_session(session).with_btrblocks_builder(btrblocks.clone());
+    match compression {
+        VortexCompression::Native | VortexCompression::Compact => builder.build(),
+        VortexCompression::O2 => {
+            // probe keeps IntDictScheme so DictStrategy can pick dict; data side must not re-dict
+            // codes
+            let probe = LongTextCompressor::new(btrblocks.clone());
+            let data = LongTextCompressor::new(btrblocks.exclude_schemes([IntDictScheme.id()]));
+            builder
+                .with_compressor(data)
+                .with_probe_compressor(probe)
+                .build()
+        }
     }
 }
 
@@ -201,12 +211,45 @@ pub fn generate_vortex_access_plan(row_ids: &BooleanBuffer) -> Option<VortexAcce
     let indices: Vec<u64> = row_ids.set_indices().map(|i| i as u64).collect();
 
     let buffer = Buffer::from(indices);
-    let selection = VortexAccessPlan::default().with_selection(Selection::IncludeByIndex(buffer));
+    let selection = VortexAccessPlan::default().with_selection(Selection::IncludeByIndex(
+        vortex::scan::strict_sorted_buffer::StrictSortedBuffer::try_new(buffer)
+            .expect("bitmap set indices are strictly increasing"),
+    ));
     Some(selection)
+}
+
+/// Generate a Vortex access plan directly from sorted, non-overlapping row
+/// ranges stored in a Metrics index. A roaring selection preserves the compact
+/// range representation instead of expanding every range into row IDs.
+pub fn generate_vortex_access_plan_from_ranges(
+    file: &PartitionedFile,
+    ranges: impl IntoIterator<Item = Range<usize>>,
+) -> Option<VortexAccessPlan> {
+    let stats = file.statistics.as_ref()?;
+    let Precision::Exact(num_rows) = stats.num_rows else {
+        return None;
+    };
+    let mut selection = Selection::IncludeRoaring(Default::default());
+    let Selection::IncludeRoaring(rows) = &mut selection else {
+        unreachable!()
+    };
+    let mut previous_end = 0;
+    for range in ranges {
+        assert!(
+            previous_end <= range.start && range.start < range.end && range.end <= num_rows,
+            "invalid sorted Vortex row range {range:?} for file {} with {num_rows} rows",
+            file.path().as_ref()
+        );
+        previous_end = range.end;
+        rows.insert_range(u64::try_from(range.start).ok()?..u64::try_from(range.end).ok()?);
+    }
+
+    Some(VortexAccessPlan::default().with_selection(selection))
 }
 
 #[cfg(test)]
 mod tests {
+    use datafusion::common::Statistics;
     use vortex::{
         VortexSessionDefault,
         array::{
@@ -231,9 +274,45 @@ mod tests {
         assert_eq!(options.values_per_page, 8192);
     }
 
+    fn vortex_file_with_rows(num_rows: usize) -> PartitionedFile {
+        let mut file = PartitionedFile::new("test.vortex".to_string(), 100);
+        let mut stats = Statistics::new_unknown(&arrow_schema::Schema::empty());
+        stats.num_rows = Precision::Exact(num_rows);
+        file.statistics = Some(Arc::new(stats));
+        file
+    }
+
+    #[test]
+    fn test_access_plan_from_metrics_index_ranges() {
+        let file = vortex_file_with_rows(12);
+        let plan = generate_vortex_access_plan_from_ranges(&file, [1..3, 5..8, 10..12]).unwrap();
+        let Selection::IncludeRoaring(rows) = plan.selection().unwrap() else {
+            panic!("expected roaring row selection")
+        };
+
+        assert_eq!(rows.iter().collect::<Vec<_>>(), vec![1, 2, 5, 6, 7, 10, 11]);
+    }
+
+    #[test]
+    fn test_access_plan_from_ranges_without_exact_row_count_full_scans() {
+        let mut file = vortex_file_with_rows(12);
+        file.statistics = None;
+
+        assert!(generate_vortex_access_plan_from_ranges(&file, [1..3, 5..8]).is_none());
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid sorted Vortex row range")]
+    fn test_access_plan_from_ranges_rejects_out_of_bounds() {
+        let file = vortex_file_with_rows(7);
+        generate_vortex_access_plan_from_ranges(&file, [1..3, 5..8]);
+    }
+
     #[test]
     fn test_long_utf8_uses_zstd() {
-        let compressor = LongTextCompressor::new();
+        let compressor = LongTextCompressor::new(BtrBlocksCompressorBuilder::from_session(
+            &VortexSession::default(),
+        ));
         let strings = (0..1024)
             .map(|i| Some(format!("long log message {i}: {}", "x".repeat(192))))
             .collect::<Vec<_>>();
@@ -248,7 +327,9 @@ mod tests {
 
     #[test]
     fn test_short_utf8_delegates_to_btrblocks() {
-        let compressor = LongTextCompressor::new();
+        let compressor = LongTextCompressor::new(BtrBlocksCompressorBuilder::from_session(
+            &VortexSession::default(),
+        ));
         let strings: Vec<_> = (0..8192)
             .map(|i| Some(format!("node-{}", i % 32)))
             .collect();
@@ -264,7 +345,9 @@ mod tests {
     fn test_non_utf8_uses_btrblocks() {
         use vortex::array::arrays::PrimitiveArray;
 
-        let compressor = LongTextCompressor::new();
+        let compressor = LongTextCompressor::new(BtrBlocksCompressorBuilder::from_session(
+            &VortexSession::default(),
+        ));
         let array: PrimitiveArray = vec![1i32, 2, 3, 4, 5].into_iter().collect();
 
         let mut ctx = ExecutionCtx::new(VortexSession::default());
@@ -274,7 +357,9 @@ mod tests {
 
     #[test]
     fn test_empty_string_array() {
-        let compressor = LongTextCompressor::new();
+        let compressor = LongTextCompressor::new(BtrBlocksCompressorBuilder::from_session(
+            &VortexSession::default(),
+        ));
 
         let strings: Vec<Option<&str>> = vec![];
         let array =
@@ -287,16 +372,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_native_and_custom_write_strategies_create_files() {
-        for use_native_compression in [true, false] {
-            let strings = vec![Some("test"), Some("data"), Some("test")];
-            let array = VarBinViewArray::from_iter(strings, DType::Utf8(Nullability::NonNullable))
-                .into_array();
+        for compression in [
+            VortexCompression::O2,
+            VortexCompression::Native,
+            VortexCompression::Compact,
+        ] {
+            // Monotonic integers exercise encodings that require opt-in editions.
+            let array = vortex::array::arrays::PrimitiveArray::from_iter(0..8192i64).into_array();
             let dtype = array.dtype().clone();
             let session = VortexSession::default().with_tokio();
-            let write_options = VortexWriteOptions::new(session)
-                .with_strategy(build_vortex_write_strategy(use_native_compression));
+            let write_options = VortexWriteOptions::new(session.clone())
+                .with_strategy(build_vortex_write_strategy(&session, compression));
             let mut buf = Vec::new();
-            let mut writer = write_options.writer(&mut buf, dtype);
+            let mut writer = write_options.writer(&mut buf, dtype.clone());
 
             writer.push(array).await.unwrap();
             writer.finish().await.unwrap();
@@ -328,9 +416,9 @@ mod tests {
         let dtype = array.dtype().clone();
         let session = VortexSession::default().with_tokio();
         let write_options = VortexWriteOptions::new(session.clone())
-            .with_strategy(build_vortex_write_strategy(false));
+            .with_strategy(build_vortex_write_strategy(&session, VortexCompression::O2));
         let mut buf = Vec::new();
-        let mut writer = write_options.writer(&mut buf, dtype);
+        let mut writer = write_options.writer(&mut buf, dtype.clone());
 
         writer.push(array).await.unwrap();
         writer.finish().await.unwrap();
@@ -341,7 +429,7 @@ mod tests {
             .unwrap()
             .scan()
             .unwrap()
-            .with_projection(select(["body", "tag"], root()))
+            .with_projection(select(["body", "tag"], root()).bind(&dtype).unwrap())
             .into_array_stream()
             .unwrap()
             .read_all()
@@ -352,5 +440,95 @@ mod tests {
         assert!(encoding_tree.contains("body: vortex.zstd"));
         assert!(!encoding_tree.contains("body: vortex.dict"));
         assert!(encoding_tree.contains("tag: vortex.dict"));
+    }
+
+    #[tokio::test]
+    async fn test_custom_strategy_dict_encodes_low_cardinality_integers() {
+        // 240 distinct scrape timestamps cycling over series, as in a hash-sorted metrics file
+        let ts = vortex::array::arrays::PrimitiveArray::from_iter(
+            (0..8192i64).map(|i| 1_789_452_000_000_000 + (i % 240) * 15_000_000),
+        )
+        .into_array();
+        let array = StructArray::try_new(
+            FieldNames::from(["ts"]),
+            vec![ts],
+            8192,
+            vortex::array::validity::Validity::NonNullable,
+        )
+        .unwrap()
+        .into_array();
+        let dtype = array.dtype().clone();
+        let session = VortexSession::default().with_tokio();
+        let write_options = VortexWriteOptions::new(session.clone())
+            .with_strategy(build_vortex_write_strategy(&session, VortexCompression::O2));
+        let mut buf = Vec::new();
+        let mut writer = write_options.writer(&mut buf, dtype.clone());
+
+        writer.push(array).await.unwrap();
+        writer.finish().await.unwrap();
+
+        let projected = session
+            .open_options()
+            .open_buffer(buf)
+            .unwrap()
+            .scan()
+            .unwrap()
+            .with_projection(select(["ts"], root()).bind(&dtype).unwrap())
+            .into_array_stream()
+            .unwrap()
+            .read_all()
+            .await
+            .unwrap();
+        let encoding_tree = projected.display_tree_encodings_only().to_string();
+
+        assert!(encoding_tree.contains("ts: vortex.dict"), "{encoding_tree}");
+        assert_eq!(
+            encoding_tree.matches("vortex.dict").count(),
+            1,
+            "{encoding_tree}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_compact_strategy_uses_pco() {
+        // jittered 15s scrape steps defeat dict, sequence and plain bitpacking
+        let ts = vortex::array::arrays::PrimitiveArray::from_iter(
+            (0..8192i64).map(|i| 1_789_452_000_000_000 + i * 15_000_000 + (i % 7) * 1_000),
+        )
+        .into_array();
+        let array = StructArray::try_new(
+            FieldNames::from(["ts"]),
+            vec![ts],
+            8192,
+            vortex::array::validity::Validity::NonNullable,
+        )
+        .unwrap()
+        .into_array();
+        let dtype = array.dtype().clone();
+        let session = VortexSession::default().with_tokio();
+        let write_options = VortexWriteOptions::new(session.clone()).with_strategy(
+            build_vortex_write_strategy(&session, VortexCompression::Compact),
+        );
+        let mut buf = Vec::new();
+        let mut writer = write_options.writer(&mut buf, dtype.clone());
+
+        writer.push(array).await.unwrap();
+        writer.finish().await.unwrap();
+
+        let projected = session
+            .open_options()
+            .open_buffer(buf)
+            .unwrap()
+            .scan()
+            .unwrap()
+            .with_projection(select(["ts"], root()).bind(&dtype).unwrap())
+            .into_array_stream()
+            .unwrap()
+            .read_all()
+            .await
+            .unwrap();
+        let encoding_tree = projected.display_tree_encodings_only().to_string();
+
+        assert!(encoding_tree.contains("vortex.pco"), "{encoding_tree}");
     }
 }

@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSelect
         data-test="log-search-index-list-select-stream"
         :model-value="searchObj.data.stream.selectedStream?.value ?? null"
-        :label="searchObj.data.stream.selectedStream?.label ? '' : t('search.selectIndex')"
+        :label="searchObj.data.stream.selectedStream?.label ? raw('') : t('search.selectIndex')"
         :options="streamOptions"
         data-cy="index-dropdown"
         @search="onStreamSearch"
@@ -93,10 +93,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       v-for="p in PERCENTILE_LABELS"
                       :key="p.key"
-                      class="flex items-center justify-between py-[0.15rem] pl-2"
+                      class="flex items-center justify-between py-[0.15rem] ps-2"
                     >
                       <span class="w-8 shrink-0 text-xs">{{ p.label }}</span>
-                      <span class="flex-1 pr-1 text-right text-xs">
+                      <span class="flex-1 pe-1 text-right text-xs">
                         {{ formatPercentile(durationPercentiles[p.key]) }}
                       </span>
                       <div class="flex w-12">
@@ -104,33 +104,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-if="p.key !== 'max'"
                           variant="ghost"
                           size="icon-xs-circle"
-                          :title="`duration >= ${formatPercentile(durationPercentiles[p.key])}`"
+                          :title="
+                            t('common.durationGte', {
+                              value: formatPercentile(durationPercentiles[p.key]),
+                            })
+                          "
                           @click.stop="
                             addSearchTerm(
                               `duration>='${formatPercentile(durationPercentiles[p.key])}'`,
                             )
                           "
-                          class="o2-custom-button-hover border-card-glass-border! ml-1! border!"
+                          class="o2-custom-button-hover border-card-glass-border! ms-1! border!"
                         >
                           <OIcon name="arrow-forward-ios" size="sm" class="h-2! w-2!" />
                         </OButton>
                         <OButton
                           variant="ghost"
                           size="icon-xs-circle"
-                          :title="`duration <= ${formatPercentile(durationPercentiles[p.key])}`"
+                          :title="
+                            t('common.durationLte', {
+                              value: formatPercentile(durationPercentiles[p.key]),
+                            })
+                          "
                           @click.stop="
                             addSearchTerm(
                               `duration<='${formatPercentile(durationPercentiles[p.key])}'`,
                             )
                           "
-                          class="o2-custom-button-hover border-card-glass-border! mr-2.5! ml-auto! border!"
+                          class="o2-custom-button-hover border-card-glass-border! ms-auto! me-2.5! border!"
                         >
                           <OIcon name="arrow-back-ios" size="sm" class="h-2! w-2!" />
                         </OButton>
                       </div>
                     </div>
                   </template>
-                  <div v-else class="py-1 pl-3 text-sm font-medium">
+                  <div v-else class="py-1 ps-3 text-sm font-medium">
                     {{ durationPercentileErrMsg || t("traces.indexList.noValuesFound") }}
                   </div>
                 </template>
@@ -168,8 +176,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch, defineAsyncComponent, onMounted } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, computed, watch, defineAsyncComponent } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useTraces, { DEFAULT_TRACE_COLUMNS } from "@/composables/useTraces";
@@ -191,6 +199,7 @@ import useDurationPercentiles, {
 } from "@/composables/useDurationPercentiles";
 import { SPAN_KIND_MAP, parseSpanKindWhereClause } from "@/utils/traces/constants";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
+import { escapeSingleQuotes } from "@/utils/queryUtils";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
@@ -226,7 +235,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { searchObj, tracesParser } = useTraces();
     const streamOptions: any = ref(searchObj.data.stream.streamLists);
 
@@ -299,7 +308,7 @@ export default defineComponent({
       // No match clears to the empty-stream sentinel (the codebase's "cleared"
       // convention everywhere else — resetSearchObj, SearchBar, Index).
       searchObj.data.stream.selectedStream = matched ?? {
-        label: "",
+        label: raw(""),
         value: "",
       };
       searchObj.data.query = "";
@@ -357,7 +366,7 @@ export default defineComponent({
     // -----------------------------------------------------------------------
 
     const { fieldValues, fetchFieldValues, cancelFieldStream, resetFieldValues } =
-      useFieldValuesStream();
+      useFieldValuesStream(t);
 
     const {
       percentiles: durationPercentiles,
@@ -365,15 +374,15 @@ export default defineComponent({
       fetchPercentiles,
       cancelFetch: cancelPercentileFetch,
       errMsg: durationPercentileErrMsg,
-    } = useDurationPercentiles();
+    } = useDurationPercentiles(t);
 
     const PERCENTILE_LABELS = [
-      { key: "p25", label: "P25" },
-      { key: "p50", label: "P50" },
-      { key: "p75", label: "P75" },
-      { key: "p95", label: "P95" },
-      { key: "p99", label: "P99" },
-      { key: "max", label: "Max" },
+      { key: "p25", label: raw("P25") },
+      { key: "p50", label: raw("P50") },
+      { key: "p75", label: raw("P75") },
+      { key: "p95", label: raw("P95") },
+      { key: "p99", label: raw("P99") },
+      { key: "max", label: t("traces.max") },
     ] as const;
 
     const hasDurationPercentiles = computed(() =>
@@ -401,9 +410,9 @@ export default defineComponent({
     };
 
     const buildFieldValuesSql = (fieldName: string): string => {
-      const query = searchObj.data.editorValue;
-      const parts = query.split("|");
-      let whereClause = (parts.length > 1 ? parts[1] : parts[0]).trim();
+      // The whole editor value is the where clause — never split it on "|", the
+      // split is quote-unaware and would truncate match_all('text | error').
+      let whereClause = searchObj.data.editorValue.trim();
 
       const durationParseResult = parseDurationWhereClause(
         whereClause,
@@ -504,11 +513,15 @@ export default defineComponent({
     const handleAddSearchTerm = (fieldName: string, value: string, action: string) => {
       if (action === "include") {
         addSearchTerm(
-          fieldName === "duration" ? `${fieldName}>=${value}` : `${fieldName}='${value}'`,
+          fieldName === "duration"
+            ? `${fieldName}>=${value}`
+            : `${fieldName}='${escapeSingleQuotes(value)}'`,
         );
       } else {
         addSearchTerm(
-          fieldName === "duration" ? `${fieldName}<=${value}` : `${fieldName}!='${value}'`,
+          fieldName === "duration"
+            ? `${fieldName}<=${value}`
+            : `${fieldName}!='${escapeSingleQuotes(value)}'`,
         );
       }
     };
@@ -516,7 +529,9 @@ export default defineComponent({
     const handleAddMultipleSearchTerms = (fieldName: string, values: string[], action: string) => {
       const joinOp = action === "include" ? " or " : " and ";
       const expressions = values.map((v) =>
-        action === "include" ? `${fieldName}='${v}'` : `${fieldName}!='${v}'`,
+        action === "include"
+          ? `${fieldName}='${escapeSingleQuotes(v)}'`
+          : `${fieldName}!='${escapeSingleQuotes(v)}'`,
       );
       const combined = expressions.length > 1 ? `(${expressions.join(joinOp)})` : expressions[0];
       addSearchTerm(combined);
@@ -551,6 +566,7 @@ export default defineComponent({
       fieldName === "span_kind" ? spanKindValueMapper : undefined;
 
     return {
+      raw,
       t,
       store,
       router,
@@ -612,6 +628,7 @@ export default defineComponent({
 }
 
 .index-menu .index-table :deep(tr) {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel row gap must not scale with text or it smears at fractional zoom */
   margin-bottom: 1px;
 }
 
@@ -677,6 +694,13 @@ export default defineComponent({
 .index-table :deep(table) {
   width: 100%;
   table-layout: fixed;
+}
+
+/* Touch has no hover — keep the field quick-actions visible. */
+@media (max-width: 47.99rem) {
+  .index-menu :deep(.field_list .field_overlay) {
+    visibility: visible;
+  }
 }
 
 .index-table :deep(table .field-container:hover .field_overlay) {

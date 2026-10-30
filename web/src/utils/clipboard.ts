@@ -1,10 +1,11 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { raw, type TranslateFn, type I18nText } from "@/types/i18n";
 
 export interface CopyToClipboardOptions {
-  successMessage?: string;
-  errorMessage?: string;
+  successMessage?: I18nText;
+  errorMessage?: I18nText;
   timeout?: number;
   silent?: boolean;
 }
@@ -43,6 +44,8 @@ async function writeClipboard(text: string): Promise<void> {
   const focused = document.activeElement === textarea;
   const copied = focused && document.execCommand("copy");
   container.removeChild(textarea);
+  // Removing the focused textarea drops focus to <body>, which an open popover reads as focus-outside and closes.
+  activeEl?.focus({ preventScroll: true });
 
   if (!copied) {
     throw new Error("execCommand copy failed");
@@ -51,6 +54,7 @@ async function writeClipboard(text: string): Promise<void> {
 
 export async function copyToClipboard(
   text: string,
+  t: TranslateFn,
   options: CopyToClipboardOptions = {},
 ): Promise<boolean> {
   const { successMessage, errorMessage, timeout = 2000, silent = false } = options;
@@ -60,7 +64,7 @@ export async function copyToClipboard(
     if (!silent) {
       toast({
         variant: "success",
-        message: successMessage || "Copied to clipboard!",
+        message: raw(successMessage || t("common.copySuccess")),
         timeout,
       });
     }
@@ -69,7 +73,7 @@ export async function copyToClipboard(
     if (!silent) {
       toast({
         variant: "error",
-        message: errorMessage || "Failed to copy to clipboard",
+        message: raw(errorMessage || t("common.copyError")),
         timeout,
       });
     }

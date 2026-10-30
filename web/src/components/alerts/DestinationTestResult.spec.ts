@@ -39,17 +39,12 @@ afterEach(() => {
   wrapper = null;
 });
 
-// NOTE: The component has a bug where the local `formatTimestamp` function calls
-// itself recursively (shadowing the imported util). To avoid stack overflow,
-// tests that would render the timestamp section (v-if="result.timestamp") must
-// use results without a timestamp field.
 const makeResult = (overrides: Record<string, any> = {}) => ({
   success: true,
   statusCode: 200,
   responseTime: 120,
   error: undefined,
   responseBody: undefined,
-  // No `timestamp` field by default — avoids the infinite-recursion bug in the component
   ...overrides,
 });
 
@@ -113,17 +108,12 @@ describe("DestinationTestResult - success state", () => {
     expect(wrapper.find('[data-test="test-success-message"]').exists()).toBe(true);
   });
 
-  it("shows timestamp section in success state when timestamp is provided", async () => {
-    // Passing a timestamp triggers the component's formatTimestamp function.
-    // Because of a known bug in the component (local function shadows imported util
-    // and recurses infinitely), we only assert the element exists — we do not
-    // let this test complete the render that calls formatTimestamp with a value.
-    wrapper = await mountComp({ result: makeResult({ success: true }) });
+  it("shows the formatted timestamp when provided", async () => {
+    wrapper = await mountComp({
+      result: makeResult({ success: true, timestamp: Date.now() }),
+    });
 
-    // The timestamp section always renders (v-if is on result.timestamp)
-    // but since we omit the timestamp from makeResult it won't be rendered.
-    // Assert the success wrapper is visible instead.
-    expect(wrapper.find('[data-test="test-result-success"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="test-success-timestamp"]').text()).not.toBe("");
   });
 
   it("does not show failure or idle when success", async () => {
@@ -131,6 +121,29 @@ describe("DestinationTestResult - success state", () => {
 
     expect(wrapper.find('[data-test="test-result-failure"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="test-result-idle"]').exists()).toBe(false);
+  });
+
+  it("shows Slack's observed success response body only when opted in", async () => {
+    wrapper = await mountComp({
+      result: makeResult({ success: true, statusCode: 200, responseBody: "ok" }),
+      showSuccessResponseBody: true,
+    });
+
+    const response = wrapper.find('[data-test="test-success-response-body"]');
+    expect(response.exists()).toBe(true);
+    expect(response.text()).toBe("ok");
+    expect(wrapper.find('[data-test="test-result-success"]').text()).toContain("200");
+    expect(wrapper.find('[data-test="test-result-success"]').text()).not.toMatch(
+      /workspace|channel/i,
+    );
+  });
+
+  it("keeps successful response bodies hidden by default", async () => {
+    wrapper = await mountComp({
+      result: makeResult({ success: true, statusCode: 200, responseBody: "ok" }),
+    });
+
+    expect(wrapper.find('[data-test="test-success-response-body"]').exists()).toBe(false);
   });
 });
 

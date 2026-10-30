@@ -9,14 +9,22 @@ export class ServiceGraphPage {
     this.page = page;
 
     // ===== NAVIGATION =====
-    this.serviceGraphToggle = '[data-test="traces-service-graph-toggle"]';
+    // Service Graph is reached from the Traces rail tile's hover flyout; since #13852 the
+    // flyout item lands on the Traces page's in-page `?tab=service-graph` view (the old
+    // /traces/service-graph route now only exists as a legacy redirect).
+    this.tracesRailTile = '[data-test="nav-group-traces"]';
+    // #13852 rerouted the flyout children through the Traces page's ?tab= views, so the
+    // Service Graph flyout item is now `nav-group-item-traces-service-graph`
+    // (childDataTest = `nav-group-item-${child.name}-${child.tab}`), not the old
+    // standalone `nav-group-item-serviceGraph`.
+    this.serviceGraphFlyoutItem = '[data-test="nav-group-item-traces-service-graph"]';
 
     // ===== MAIN COMPONENT (ServiceGraph.vue) =====
     this.dateTimePicker = '[data-test="service-graph-date-time-picker"]';
     this.refreshButton = '[data-test="service-graph-refresh-btn"]';
     this.chartContainer = '[data-test="service-graph-chart"]';
 
-    // ===== VIEW TOGGLE BUTTONS (SearchBar.vue — button with .selected class) =====
+    // ===== VIEW TOGGLE BUTTONS (page header #subnav — button with .selected class) =====
     this.graphViewTab = '[data-test="service-graph-graph-view-btn"]';
     this.treeViewTab = '[data-test="service-graph-tree-view-btn"]';
 
@@ -33,6 +41,8 @@ export class ServiceGraphPage {
     this.sidePanelViewRelatedLogsBtn = '[data-test="service-graph-node-panel-view-related-logs-btn"]';
     this.sidePanelViewRelatedTracesBtn = '[data-test="service-graph-node-panel-view-related-traces-btn"]';
     this.sidePanelCloseBtn = '[data-test="service-graph-side-panel"] [data-test="o-drawer-close-btn"]';
+    // reka-ui renders this scrim only for a modal drawer, so a non-modal panel has none.
+    this.overlay = '[data-test="o-drawer-overlay"]';
 
     // RED charts section (Rate/Errors/Duration dashboards)
     this.sidePanelRedCharts = '[data-test="service-graph-side-panel-red-charts"]';
@@ -51,12 +61,34 @@ export class ServiceGraphPage {
     this.nodesTable = '[data-test="service-graph-side-panel-nodes-table"]';
     this.podsPanel = '[data-test="service-graph-side-panel-pods"]';
     this.podsTable = '[data-test="service-graph-side-panel-pods-table"]';
+    // OTable marks headers o2-table-th-<id> and body cells o2-table-cell-<id>.
+    this.tableHeaderPrefix = 'thead th[data-test^="o2-table-th-"]';
+    this.tableHeader = (columnId) => `thead th[data-test="o2-table-th-${columnId}"]`;
+    this.tableCell = (columnId) => `tbody td[data-test="o2-table-cell-${columnId}"]`;
+    this.nodePanelTabPrefix = '[data-test^="service-graph-node-panel-tab-"]';
+    // Resource tabs and their tables are generated per detected OTEL field, so both
+    // data-tests carry a dynamic id (k8s-pod-name, k8s-node-name, ...), never 'pods'/'nodes'.
+    this.resourceTab = (tabId) => `[data-test="service-graph-node-panel-tab-${tabId}"]`;
+    this.resourceTable = (tabId) => `[data-test="service-graph-side-panel-${tabId}-table"]`;
+    this.fixedPanelTabs = ['operations', 'behavior', 'metrics'];
 
     // ===== TELEMETRY CORRELATION (Metrics tab) =====
     this.metricsTab = '[data-test="service-graph-node-panel-tab-metrics"]';
     this.metricsPanel = '[data-test="service-graph-side-panel-metrics"]';
     this.metricsLoadingIndicator = '[data-test="service-graph-side-panel-metrics-loading"]';
-    this.metricsDashboard = '[data-test="service-graph-side-panel-metrics-dashboard"]';
+    // The metrics-tab CONTENT is what we wait on — NOT the panel wrapper. Two hooks that look
+    // usable are not:
+    //   • service-graph-side-panel-metrics is on an OTabPanel whose data-test is swallowed by
+    //     <Transition>, so it never reaches the DOM;
+    //   • service-graph-side-panel-metrics-dashboard is passed to <TelemetryCorrelationDashboard>,
+    //     which has multiple top-level roots (a Vue FRAGMENT) so Vue 3 drops the fallthrough attr.
+    // The reliable, currently-shipping "correlation view rendered" signal is the correlation event
+    // header (renders whenever the metrics tab resolves to a correlation object, with or without
+    // metric streams — this env seeds only traces, so zero-stream is the common case).
+    this.metricsCorrelationHeader = '[data-test^="correlation-event-header-"]';
+    // "Rendered WITH metric data" = real per-metric-stream rows (data-dependent; used only for the
+    // happy-path assertion, never required for the tab to count as resolved).
+    this.metricsStreamItem = '[data-test="telemetry-correlation-metric-stream-item"]';
     this.metricsError = '[data-test="service-graph-side-panel-metrics-error"]';
     this.metricsEmpty = '[data-test="service-graph-side-panel-metrics-empty"]';
 
@@ -69,8 +101,16 @@ export class ServiceGraphPage {
   // ===== NAVIGATION =====
 
   async navigateToServiceGraph() {
-    await this.page.locator(this.serviceGraphToggle).click();
-    await this.page.waitForURL(/tab=service-graph/, { timeout: 10000 });
+    await this.page.locator(this.tracesRailTile).hover();
+    // The flyout is teleported to <body> and opens after ONavGroup's 120ms OPEN_DELAY, so the
+    // item is not in the DOM the instant hover() resolves — wait for it before clicking, else
+    // the click races the debounce and times out.
+    const flyoutItem = this.page.locator(this.serviceGraphFlyoutItem);
+    await flyoutItem.waitFor({ state: 'visible', timeout: 10000 });
+    await flyoutItem.click();
+    // #13852 lands Service Graph on the Traces page as `?tab=service-graph`; the old
+    // /traces/service-graph path now only exists as a legacy redirect.
+    await this.page.waitForURL(/\/traces\?.*tab=service-graph/, { timeout: 10000 });
   }
 
   /**
@@ -92,9 +132,9 @@ export class ServiceGraphPage {
     // Query a WIDE window (default 6h), not the page default of "Past 15 Minutes". The service
     // graph is derived by a backend daemon that runs on a delay after trace ingestion, so with
     // the 15m default the just-ingested topology often falls outside the window and the chart
-    // renders "No service graph data" (no chart element) — the alpha1 failure mode. The tab
+    // renders "No service graph data" (no chart element) — the alpha1 failure mode. The route
     // honours the `period` URL param (verified: label shows "Past 6 Hours").
-    const url = `${baseUrl}/web/traces?tab=service-graph&period=${period}&org_identifier=${org}`;
+    const url = `${baseUrl}/web/traces/service-graph?org_identifier=${org}&period=${period}`;
     await this.page.goto(url);
     await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
   }
@@ -325,6 +365,12 @@ export class ServiceGraphPage {
     await expect(this.page.locator(this.sidePanel)).not.toBeVisible({ timeout: 5000 });
   }
 
+  /** Modal mode renders a scrim and sets `pointer-events: none` on <body>; a non-modal drawer does neither. */
+  async expectSidePanelNonModal() {
+    await expect(this.page.locator(this.overlay)).toHaveCount(0);
+    await expect(this.page.locator('body')).not.toHaveCSS('pointer-events', 'none');
+  }
+
   async expectRedChartsSectionVisible() {
     await expect(this.page.locator(this.sidePanelRedCharts)).toBeVisible({ timeout: 10000 });
   }
@@ -341,6 +387,23 @@ export class ServiceGraphPage {
     // also visible as a styled <span> in the header. The <h2> is sr-only but
     // still has textContent. Scope to panel to avoid picking up other headings.
     return await this.page.locator(this.sidePanel).locator('h2').first().textContent();
+  }
+
+  async expectSidePanelServiceName(name) {
+    await expect
+      .poll(async () => ((await this.getSidePanelServiceName()) || '').trim(), { timeout: 10000 })
+      .toBe(name);
+  }
+
+  /** Tags the open panel node, so a close-and-reopen (which mounts a fresh node) can be told apart from an in-place update. */
+  async markSidePanelNode() {
+    await this.page.locator(this.sidePanel).evaluate((el) => {
+      el.dataset.e2eOriginalNode = 'true';
+    });
+  }
+
+  async expectSidePanelNodeUnchanged() {
+    await expect(this.page.locator(`${this.sidePanel}[data-e2e-original-node="true"]`)).toBeVisible();
   }
 
   async getHealthStatus() {
@@ -396,26 +459,34 @@ export class ServiceGraphPage {
   // ===== TELEMETRY CORRELATION =====
 
   /**
-   * Click the Metrics tab in the side panel and wait for correlation data to load.
-   * Returns true if metrics dashboard rendered, false if error/empty state shown.
+   * Click the Metrics tab in the side panel and wait for the correlation view to RESOLVE.
+   * Deploy-independent: gates only on real, currently-shipping elements (the metrics panel and its
+   * loading spinner) — NOT on the dashboard's data-test, which the fragment-root component drops
+   * (see this.metricsStreamItem). Throws if the panel never renders (a genuinely broken tab).
+   * @returns {Promise<boolean>} true if real metric-stream rows rendered (data present); false for
+   *   a resolved-but-streamless view (zero-stream dashboard / empty / error) — all acceptable.
    */
   async clickMetricsTabAndWait() {
     await this.page.locator(this.metricsTab).click();
 
-    // Wait for loading spinner to appear and disappear
-    const panel = this.page.locator(this.metricsPanel);
-    await panel.locator(this.metricsLoadingIndicator).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-    await panel.locator(this.metricsLoadingIndicator).waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {});
+    // Wait until the metrics tab RESOLVES into a rendered content state — the correlation view
+    // (header) OR a terminal empty/error state. We race real content elements (never the swallowed
+    // panel wrapper); if none appears within the window the race rejects and the caller fails,
+    // which is the correct outcome for a genuinely broken/hung tab.
+    await Promise.race([
+      this.page.locator(this.metricsCorrelationHeader).first().waitFor({ state: 'visible', timeout: 30000 }),
+      this.page.locator(this.metricsError).first().waitFor({ state: 'visible', timeout: 30000 }),
+      this.page.locator(this.metricsEmpty).first().waitFor({ state: 'visible', timeout: 30000 }),
+    ]);
 
-    // Check if the metrics dashboard rendered
-    return await this.page.locator(this.metricsDashboard)
-      .waitFor({ state: 'visible', timeout: 5000 })
-      .then(() => true)
-      .catch(() => false);
+    // Report whether real metric-stream rows rendered (.first() — the selector matches every row,
+    // so an unscoped locator would trip Playwright strict mode).
+    return await this.page.locator(this.metricsStreamItem).first()
+      .isVisible({ timeout: 2000 }).catch(() => false);
   }
 
-  async expectMetricsDashboardVisible() {
-    await expect(this.page.locator(this.metricsDashboard)).toBeVisible({ timeout: 5000 });
+  async expectMetricsStreamsVisible() {
+    await expect(this.page.locator(this.metricsStreamItem).first()).toBeVisible({ timeout: 8000 });
   }
 
   async isMetricsErrorVisible() {
@@ -426,6 +497,20 @@ export class ServiceGraphPage {
   async isMetricsEmptyVisible() {
     return await this.page.locator(this.metricsEmpty)
       .isVisible({ timeout: 3000 }).catch(() => false);
+  }
+
+  /** Terminal state of the Metrics tab: 'correlation', 'error', 'empty', or 'unknown' when none rendered. */
+  async getMetricsTerminalState() {
+    if (await this.page.locator(this.metricsCorrelationHeader).first().isVisible().catch(() => false)) {
+      return 'correlation';
+    }
+    if (await this.page.locator(this.metricsError).first().isVisible().catch(() => false)) {
+      return 'error';
+    }
+    if (await this.page.locator(this.metricsEmpty).first().isVisible().catch(() => false)) {
+      return 'empty';
+    }
+    return 'unknown';
   }
 
   async getSearchInputValue() {
@@ -441,6 +526,12 @@ export class ServiceGraphPage {
     await this.page.waitForTimeout(300);
     const selector = type === 'logs' ? this.sidePanelViewRelatedLogsBtn : this.sidePanelViewRelatedTracesBtn;
     await this.page.locator(selector).click();
+  }
+
+  /** The traces page keeps its filter base64-encoded in ?query=, with '.' standing in for '=' padding. */
+  async getTracesUrlQuery() {
+    const encoded = new URL(this.page.url()).searchParams.get('query') || '';
+    return Buffer.from(encoded.replace(/\./g, '='), 'base64').toString('utf8');
   }
 
   async expectCorrelationDialogVisible() {
@@ -468,6 +559,80 @@ export class ServiceGraphPage {
       tabNames.push((await tabs.nth(i).textContent()).trim());
     }
     return tabNames;
+  }
+
+  // ===== SIDE PANEL TABLES (Operations / resource tabs) =====
+
+  async getOperationsColumnIds() {
+    return await this.getResourceTableColumnIds(this.operationsTable);
+  }
+
+  async sortOperationsByColumn(columnId) {
+    const previousOrder = (await this.getOperationsColumnText('operation')).join('|');
+    await this.page.locator(`${this.operationsTable} ${this.tableHeader(columnId)}`).click();
+    // The re-sort is a client-side computed, so wait for the rendered order to
+    // change rather than guessing a settle time. Data whose keys are all equal
+    // legitimately keeps its order, and the caller's assertions still hold.
+    await this.page
+      .waitForFunction(
+        ([selector, previous]) => {
+          const rows = [...document.querySelectorAll(selector)].map((c) => c.innerText.trim());
+          return rows.length > 0 && rows.join('|') !== previous;
+        },
+        [`${this.operationsTable} ${this.tableCell('operation')}`, previousOrder],
+        { timeout: 10000 },
+      )
+      .catch(() => {});
+  }
+
+  /** Text of one operations column, top to bottom, for comparing row order. */
+  async getOperationsColumnText(columnId) {
+    return await this.page
+      .locator(`${this.operationsTable} ${this.tableCell(columnId)}`)
+      .evaluateAll((cells) => cells.map((c) => c.innerText.trim()));
+  }
+
+  /**
+   * Latency cells render a ServiceCatalogBarCell whose progress bar carries
+   * aria-valuenow = round(value / columnMax * 100), monotonic in the raw duration.
+   * Reading it avoids parsing formatted latencies across us/ms/s units.
+   */
+  async getOperationsDurationRatios(columnId) {
+    return await this.page
+      .locator(`${this.operationsTable} ${this.tableCell(columnId)} [role="progressbar"]`)
+      .evaluateAll((bars) => bars.map((b) => Number(b.getAttribute('aria-valuenow'))));
+  }
+
+  /** Resource tabs are generated per OTEL workload, so the set varies by data. */
+  async getSidePanelTabIds() {
+    return await this.page
+      .locator(this.nodePanelTabPrefix)
+      .evaluateAll((nodes) =>
+        nodes.map((n) => (n.getAttribute('data-test') || '').replace('service-graph-node-panel-tab-', '')),
+      );
+  }
+
+  /** Tab ids for the generated resource tabs, with the fixed tabs removed. */
+  async getResourceTabIds() {
+    const tabIds = await this.getSidePanelTabIds();
+    return tabIds.filter((id) => id && !this.fixedPanelTabs.includes(id));
+  }
+
+  async switchToResourceTab(tabId) {
+    await this.page.locator(this.resourceTab(tabId)).click();
+  }
+
+  async expectResourceTableVisible(tabId) {
+    await expect(this.page.locator(this.resourceTable(tabId))).toBeVisible({ timeout: 15000 });
+  }
+
+  async getResourceTableColumnIds(tableSelector) {
+    const ids = await this.page
+      .locator(`${tableSelector} ${this.tableHeaderPrefix}`)
+      .evaluateAll((nodes) =>
+        nodes.map((n) => (n.getAttribute('data-test') || '').replace('o2-table-th-', '')),
+      );
+    return ids.filter((id) => id && id !== '__spacer__');
   }
 
   // ===== SCREENSHOTS (Visual Verification) =====

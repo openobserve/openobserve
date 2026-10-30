@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use config::{datafusion::request::Request, meta::cluster::NodeInfo};
-use datafusion::{physical_optimizer::PhysicalOptimizerRule, sql::TableReference};
+use datafusion::{common::TableReference, physical_optimizer::PhysicalOptimizerRule};
 use hashbrown::HashMap;
 use infra::errors::Error;
 use parking_lot::Mutex;
@@ -49,7 +49,7 @@ impl StreamingAggregationContext {
         request: &Request,
         is_complete_cache_hit: Arc<Mutex<bool>>,
     ) -> Result<Option<Self>, Error> {
-        if !request.streaming_output || !config::get_config().common.feature_query_streaming_aggs {
+        if !request.streaming_output || !config::get_config().search.feature_query_streaming_aggs {
             return Ok(None);
         }
 

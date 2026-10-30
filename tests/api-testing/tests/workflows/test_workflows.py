@@ -35,10 +35,15 @@ ORG_ID = os.environ.get("TEST_ORG_ID", "default")
 
 @pytest.fixture(scope="module", autouse=True)
 def _require_workflows(create_session, base_url):
-    """Workflows is Enterprise-only. Skip the whole module on OSS / builds where it is not enabled."""
+    # WORKFLOWS_REQUIRED=1 (set in ent CI) turns the skip into a hard fail so
+    # a route-registration regression or accidentally-off feature flag can't
+    # slip through as silent skips.
     resp = create_session.get(f"{base_url}api/{ORG_ID}/workflows")
     if resp.status_code in (403, 404):
-        pytest.skip("Workflows feature not available (enterprise-only / not enabled on this build).")
+        msg = f"Workflows feature not available (/workflows returned {resp.status_code})."
+        if os.environ.get("WORKFLOWS_REQUIRED") == "1":
+            pytest.fail(f"{msg} WORKFLOWS_REQUIRED=1 — expected enabled on this build.")
+        pytest.skip(f"{msg} Enterprise-only / not enabled on this build.")
 
 
 def _suffix():

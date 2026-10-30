@@ -59,11 +59,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span>{{ maxLabel }}</span>
           <span>{{ midLabel }}</span>
-          <span>0</span>
+          <span>{{ t("traces.sessionDetail.axisZeroLabel") }}</span>
         </div>
 
         <div
-          class="border-border-default relative flex min-h-0 min-w-0 flex-1 items-end gap-0.75 border-b border-l"
+          class="border-border-default relative flex min-h-0 min-w-0 flex-1 items-end gap-0.75 border-s border-b"
         >
           <!-- gridlines (top + mid) to echo the dashboard chart grid -->
           <div class="border-border-default absolute inset-x-0 top-0 border-t opacity-60" />
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <!-- selected window: drag the body to pan, or either edge to resize -->
         <div
-          class="rounded-default absolute top-0 bottom-0 border border-[color-mix(in_srgb,var(--color-text-heading)_45%,transparent)] bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)]"
+          class="rounded-default border-text-heading/45 bg-text-heading/8 absolute top-0 bottom-0 border"
           :class="dragging ? 'cursor-grabbing' : 'cursor-grab'"
           :style="{ left: brushLeftPct + '%', width: brushWidthPct + '%' }"
           @pointerdown.stop="(e) => beginDrag('pan', e)"
@@ -148,18 +148,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="absolute top-0 bottom-0 -left-1 flex w-2.25 cursor-ew-resize items-center justify-center"
             @pointerdown.stop="(e) => beginDrag('resize-left', e)"
           >
-            <div
-              class="rounded-default h-[55%] w-0.5 bg-[color-mix(in_srgb,var(--color-text-heading)_60%,transparent)]"
-            />
+            <div class="rounded-default bg-text-heading/60 h-[55%] w-0.5" />
           </div>
           <!-- right resize handle -->
           <div
             class="absolute top-0 -right-1 bottom-0 flex w-2.25 cursor-ew-resize items-center justify-center"
             @pointerdown.stop="(e) => beginDrag('resize-right', e)"
           >
-            <div
-              class="rounded-default h-[55%] w-0.5 bg-[color-mix(in_srgb,var(--color-text-heading)_60%,transparent)]"
-            />
+            <div class="rounded-default bg-text-heading/60 h-[55%] w-0.5" />
           </div>
         </div>
       </div>
@@ -169,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed, watch, onUnmounted } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import TurnPreviewCard from "./TurnPreviewCard.vue";
@@ -185,7 +181,7 @@ const props = defineProps<{
 // Emitted when a bar is clicked — the parent scrolls/expands that turn (S5).
 const emit = defineEmits<{ (e: "jump", turn: number): void }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 type Metric = "cost" | "latency" | "tokens";
 const metric = ref<Metric>("cost");

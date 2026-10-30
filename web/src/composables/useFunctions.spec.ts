@@ -29,11 +29,14 @@ vi.mock("vuex", () => ({
   useStore: () => mockStore,
 }));
 
-vi.mock("@/services/jstransform", () => ({
-  default: {
-    list: vi.fn(),
-  },
-}));
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+    },
+  });
+});
 
 import useFunctions from "./useFunctions";
 import TransformService from "@/services/jstransform";

@@ -9,7 +9,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
      build says so instead of showing an empty queue. -->
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -60,7 +60,7 @@ import {
 import { formatEventCount } from "@/utils/formatters";
 import config from "@/aws-exports";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
@@ -618,7 +618,7 @@ onMounted(() => {
       <div class="border-border-default px-page-edge flex shrink-0 flex-col gap-2 border-b py-3">
         <SecurityNotices :notices="notices" data-test="security-cases-notices" />
         <OStatStrip
-          compact
+          compact-values
           :items="stats"
           :loading="totals.open === null && loading"
           selectable

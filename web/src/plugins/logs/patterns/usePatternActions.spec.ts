@@ -90,19 +90,21 @@ vi.mock("@/composables/useLogs/usePatterns", () => ({
 }));
 
 // patternUtils mock
-vi.mock("./patternUtils", () => ({
-  extractConstantsFromPattern: vi.fn(),
-  escapeForMatchAll: vi.fn((s: string) => s),
-  buildPatternAlertData: vi.fn(() => ({
-    streamName: "test-stream",
-    sqlQuery: "SELECT *",
-    alertName: "Alert_test-stream_User",
-  })),
-}));
+// Partial mock: only the constant extraction is stubbed (tests drive it to
+// simulate usable / unusable patterns). The SQL builder and the pattern cap stay
+// real, so these tests exercise the query the user would actually get.
+vi.mock("./patternUtils", async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    extractConstantsFromPattern: vi.fn(),
+    escapeForMatchAll: vi.fn((s: string) => s),
+  };
+});
 
 // -- Import after mocks --
 import { usePatternActions } from "./usePatternActions";
-import { extractConstantsFromPattern, buildPatternAlertData } from "./patternUtils";
+import { extractConstantsFromPattern } from "./patternUtils";
 
 describe("usePatternActions", () => {
   beforeEach(() => {
@@ -110,9 +112,12 @@ describe("usePatternActions", () => {
     // Reset shared state between tests
     mockSearchObj.data.stream.addToFilter = "";
     mockSearchObj.meta.logsVisualizeToggle = "patterns";
-    const { selectedPattern, showPatternDetails } = usePatternActions();
+    const { selectedPattern, showPatternDetails, setActiveSeverities } = usePatternActions();
     selectedPattern.value = null;
     showPatternDetails.value = false;
+    // The severity filter is module-scoped (shared with the alert builder), so
+    // it must be reset between tests like any other singleton.
+    setActiveSeverities([]);
   });
 
   describe("openPatternDetails", () => {
@@ -260,68 +265,253 @@ describe("usePatternActions", () => {
     });
   });
 
-  describe("createAlertFromPattern", () => {
+  describe("severity filter (shared with the alert builder)", () => {
+    it("is module-scoped so the list and the builder cannot disagree", () => {
+      const a = usePatternActions();
+      const b = usePatternActions();
+
+      a.setActiveSeverities(["error"]);
+      expect(b.activeSeverities.value).toEqual(["error"]);
+    });
+  });
+
+  describe("buildPatternsAlertPrefill", () => {
+    // Templates whose constants survive the real extractConstantsFromPattern,
+    // which the SQL builder calls internally.
+    const ERR = "Connection refused to upstream <*>";
+    const PROBE = "Health probe succeeded for endpoint <*>";
+
     beforeEach(() => {
-      // Provide constants so alert creation proceeds
-      vi.mocked(extractConstantsFromPattern).mockReturnValue(["User logged in"]);
-      // Re-set buildPatternAlertData return value (cleared by outer beforeEach vi.clearAllMocks)
-      vi.mocked(buildPatternAlertData).mockReturnValue({
-        streamName: "test-stream",
-        sqlQuery: "SELECT *",
-        alertName: "Alert_test-stream_User",
-      });
-      // Ensure stream is selected (previous tests may have cleared it)
+      vi.mocked(extractConstantsFromPattern).mockReturnValue(["Connection refused to upstream"]);
       mockSearchObj.data.stream.selectedStream = ["test-stream"];
+      mockSearchObj.meta.sqlMode = false;
+      mockSearchObj.data.query = "";
+      mockPatternsState.value.patterns.patterns = [
+        { pattern_id: "p1", template: ERR, level: "error" },
+        { pattern_id: "p2", template: PROBE, level: "info" },
+      ];
+      usePatternActions().setActiveSeverities([]);
     });
 
-    it("should navigate to addAlert with pattern data", () => {
-      const { createAlertFromPattern } = usePatternActions();
+    it("folds every visible pattern into the filter, excluding by default", () => {
+      const prefill = usePatternActions().buildPatternsAlertPrefill();
 
-      createAlertFromPattern({
-        template: "User <*> logged in",
+      expect(prefill.source).toBe("patterns");
+      expect(prefill.streamName).toBe("test-stream");
+      expect(prefill.patternFilter?.mode).toBe("exclude");
+      expect(prefill.patternFilter?.visibleCount).toBe(2);
+      expect(prefill.patternFilter?.totalCount).toBe(2);
+      expect(prefill.sql).toContain("NOT (");
+    });
+
+    it("honours the mode the dialog asks for", () => {
+      const prefill = usePatternActions().buildPatternsAlertPrefill({ patternMode: "include" });
+
+      expect(prefill.patternFilter?.mode).toBe("include");
+      expect(prefill.sql).not.toContain("NOT (");
+    });
+
+    it("uses only the patterns the severity filter leaves visible", () => {
+      const api = usePatternActions();
+      api.setActiveSeverities(["error"]);
+
+      const prefill = api.buildPatternsAlertPrefill();
+
+      expect(prefill.patternFilter?.visibleCount).toBe(1);
+      expect(prefill.patternFilter?.totalCount).toBe(2);
+      expect(prefill.patternFilter?.filtered).toBe(true);
+    });
+
+    it("reports an unfiltered list as such", () => {
+      expect(usePatternActions().buildPatternsAlertPrefill().patternFilter?.filtered).toBe(false);
+    });
+
+    it("ANDs the current search filter in front of the pattern terms", () => {
+      mockSearchObj.data.query = "code = 500";
+      expect(usePatternActions().buildPatternsAlertPrefill().sql).toContain("(code = 500)");
+    });
+
+    it("renders a bare word as match_all for the patterns' stream, never dropping it (AC6.2)", () => {
+      (mockSearchObj.data as any).streamResults = {
+        list: [{ name: "test-stream", schema: [{ name: "body", type: "Utf8" }], settings: {} }],
+      };
+      (mockSearchObj.data.stream as any).selectedStreamFields = [{ name: "body" }];
+      (mockStore.state as any).zoConfig = { default_fts_keys: ["body"] };
+      mockSearchObj.data.query = "timeout";
+      try {
+        const sql = usePatternActions().buildPatternsAlertPrefill().sql;
+        expect(sql).toContain("(match_all('timeout'))");
+        expect(sql).not.toMatch(/\(timeout\)/);
+        mockSearchObj.data.query = "error AND body='x'";
+        expect(usePatternActions().buildPatternsAlertPrefill().sql).toContain(
+          "(match_all('error') AND body='x')",
+        );
+      } finally {
+        delete (mockSearchObj.data as any).streamResults;
+        delete (mockStore.state as any).zoConfig;
+      }
+    });
+
+    it("carries a -term after a predicate into the alert as an exclusion, never subtraction", () => {
+      (mockSearchObj.data as any).streamResults = {
+        list: [
+          {
+            name: "test-stream",
+            schema: [
+              { name: "body", type: "Utf8" },
+              { name: "status", type: "Int64" },
+            ],
+            settings: { full_text_search_keys: ["body"] },
+          },
+        ],
+      };
+      (mockSearchObj.data.stream as any).selectedStreamFields = [
+        { name: "body" },
+        { name: "status" },
+      ];
+      mockSearchObj.data.query = "status=500 -404";
+      try {
+        const sql = usePatternActions().buildPatternsAlertPrefill().sql;
+        expect(sql).toContain("(status=500 AND NOT match_all('404'))");
+        expect(sql).not.toContain("500 -404");
+      } finally {
+        delete (mockSearchObj.data as any).streamResults;
+      }
+    });
+
+    const PATTERN_TERMS =
+      "(match_all('Connection refused to upstream')) OR (match_all('Health probe succeeded for endpoint'))";
+
+    const withStatusStream = (query: string, run: () => void) => {
+      (mockSearchObj.data as any).streamResults = {
+        list: [
+          {
+            name: "test-stream",
+            schema: [
+              { name: "body", type: "Utf8" },
+              { name: "status", type: "Int64" },
+              { name: "is_error", type: "Boolean" },
+            ],
+            settings: { full_text_search_keys: ["body"] },
+          },
+        ],
+      };
+      (mockSearchObj.data.stream as any).selectedStreamFields = [
+        { name: "body" },
+        { name: "status" },
+        { name: "is_error" },
+      ];
+      mockSearchObj.data.query = query;
+      try {
+        run();
+      } finally {
+        delete (mockSearchObj.data as any).streamResults;
+      }
+    };
+
+    it.each(["status=500 -404 AND is_error", "status=500 -debug AND is_error"])(
+      "carries no base filter for a held filter, never subtraction: %s",
+      (query) => {
+        withStatusStream(query, () => {
+          expect(usePatternActions().buildPatternsAlertPrefill().sql).toBe(
+            `SELECT count(*) AS cnt FROM 'test-stream' WHERE NOT (${PATTERN_TERMS})`,
+          );
+        });
+      },
+    );
+
+    const keysOf = (prefill: any) => prefill.warnings.map((w: any) => w.key);
+
+    it.each(["status=500 -404 AND is_error", "status=500 AND is_error -404"])(
+      "warns that a held filter was dropped, in include mode too: %s",
+      (query) => {
+        withStatusStream(query, () => {
+          for (const patternMode of ["include", "exclude"] as const) {
+            const prefill = usePatternActions().buildPatternsAlertPrefill({ patternMode });
+            expect(keysOf(prefill)).toContain("heldFilterDropped");
+            expect(keysOf(prefill)).not.toContain("textFilterDropped");
+            expect(prefill.sql).not.toContain("404");
+            expect(prefill.sql).not.toContain("is_error");
+          }
+        });
+      },
+    );
+
+    it.each(["status=500 -404", "timeout"])(
+      "carries no base filter and warns when the text cannot run on a no-FTS stream: %s",
+      (query) => {
+        (mockSearchObj.data as any).streamResults = {
+          list: [
+            {
+              name: "test-stream",
+              schema: [
+                { name: "msg_text", type: "Utf8" },
+                { name: "status", type: "Int64" },
+              ],
+              settings: {},
+            },
+          ],
+        };
+        (mockSearchObj.data.stream as any).selectedStreamFields = [
+          { name: "msg_text" },
+          { name: "status" },
+        ];
+        mockSearchObj.data.query = query;
+        try {
+          const prefill = usePatternActions().buildPatternsAlertPrefill();
+          expect(prefill.sql).toBe(
+            `SELECT count(*) AS cnt FROM 'test-stream' WHERE NOT (${PATTERN_TERMS})`,
+          );
+          expect(keysOf(prefill)).toContain("textFilterDropped");
+          expect(keysOf(prefill)).not.toContain("heldFilterDropped");
+          const include = usePatternActions().buildPatternsAlertPrefill({ patternMode: "include" });
+          expect(include.sql).not.toContain(query);
+          expect(keysOf(include)).toContain("textFilterDropped");
+        } finally {
+          delete (mockSearchObj.data as any).streamResults;
+        }
+      },
+    );
+
+    it("does not warn about a dropped filter when the filter is carried", () => {
+      withStatusStream("status=500 -404", () => {
+        const prefill = usePatternActions().buildPatternsAlertPrefill();
+        expect(prefill.sql).toContain("(status=500 AND NOT match_all('404'))");
+        expect(keysOf(prefill)).not.toContain("textFilterDropped");
+        expect(keysOf(prefill)).not.toContain("heldFilterDropped");
+      });
+    });
+
+    it.each(["status=500 --404", "status=500 -- note"])(
+      "keeps the pattern terms when the filter ends in a comment: %s",
+      (query) => {
+        withStatusStream(query, () => {
+          expect(usePatternActions().buildPatternsAlertPrefill().sql).toBe(
+            `SELECT count(*) AS cnt FROM 'test-stream' WHERE (status=500) AND NOT (${PATTERN_TERMS})`,
+          );
+        });
+      },
+    );
+
+    it("says so when a SQL-mode query cannot be spliced in", () => {
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.query = 'SELECT * FROM "test-stream"';
+
+      const prefill = usePatternActions().buildPatternsAlertPrefill();
+
+      expect(prefill.warnings.map((w: any) => w.key)).toContain("sqlModeFilterDropped");
+      expect(prefill.sql).not.toContain('SELECT * FROM "test-stream")');
+    });
+
+    it("builds a single-pattern prefill for the detail drawer", () => {
+      const prefill = usePatternActions().buildSinglePatternAlertPrefill({
+        template: ERR,
         pattern_id: "p1",
-        frequency: 100,
-        percentage: 50,
       });
 
-      expect(mockRouterPush).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: "addAlert",
-          query: expect.objectContaining({ fromPattern: "true" }),
-        }),
-      );
-    });
-
-    it("should warn when no stream is selected", () => {
-      mockSearchObj.data.stream.selectedStream = [];
-      const { createAlertFromPattern } = usePatternActions();
-
-      createAlertFromPattern({ template: "User <*> logged in" });
-
-      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
-      expect(mockRouterPush).not.toHaveBeenCalled();
-    });
-
-    it("should warn when pattern has no long constants", () => {
-      vi.mocked(extractConstantsFromPattern).mockReturnValue([]);
-      const { createAlertFromPattern } = usePatternActions();
-
-      createAlertFromPattern({ template: "<*>" });
-
-      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
-      expect(mockRouterPush).not.toHaveBeenCalled();
-    });
-
-    it("should store patternData in sessionStorage", () => {
-      const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
-      const { createAlertFromPattern } = usePatternActions();
-
-      createAlertFromPattern({
-        template: "User <*> logged in",
-        pattern_id: "p1",
-      });
-
-      expect(setItemSpy).toHaveBeenCalledWith("patternData", expect.any(String));
+      expect(prefill.source).toBe("patterns");
+      expect(prefill.patternFilter?.mode).toBe("include");
+      expect(prefill.meta?.appliedPatterns).toEqual([ERR]);
     });
   });
 });

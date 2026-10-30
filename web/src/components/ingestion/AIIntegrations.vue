@@ -15,17 +15,115 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OSplitter v-model="categorySplitterModel" unit="px" class="h-full">
+  <div v-if="compact" class="flex h-full min-h-0 flex-col">
+    <div class="border-border-default shrink-0 border-b px-2">
+      <OTabs v-model="selectedCategory" dense>
+        <OTab
+          v-for="cat in aiCategories"
+          :key="cat.slug"
+          :name="cat.slug"
+          :label="raw(cat.name)"
+          :data-test="`ai-integrations-category-${cat.slug}`"
+        />
+      </OTabs>
+    </div>
+    <div
+      class="border-border-default flex shrink-0 items-center border-b px-2 py-1"
+      data-drawer-anchor="ai-integrations-list"
+    >
+      <OButton
+        variant="ghost"
+        size="sm"
+        data-test="ai-integrations-list-mobile-btn"
+        @click="listDrawerOpen = true"
+      >
+        <template #icon-left><OIcon name="menu" size="sm" /></template>
+        {{ selectedIntegrationName || t("common.sidePanel") }}
+      </OButton>
+    </div>
+    <div
+      class="bg-card-glass-bg min-h-0 flex-1 overflow-auto pt-0.5"
+      data-test="ai-integrations-detail-pane"
+    >
+      <router-view />
+    </div>
+    <ODrawer
+      v-model:open="listDrawerOpen"
+      side="left"
+      size="sm"
+      bleed
+      seamless
+      anchor='[data-drawer-anchor="ai-integrations-list"]'
+      data-test="ai-integrations-list-mobile-drawer"
+    >
+      <div class="flex h-full flex-col">
+        <div class="ps-2 pe-4 pt-2">
+          <OSearchInput
+            data-test="ai-integrations-search-input"
+            v-model="integrationFilter"
+            clearable
+            class="indexlist-search-input w-full"
+            :placeholder="t('common.search')"
+          />
+        </div>
+        <div class="min-h-0 flex-1 overflow-y-auto">
+          <OTabs
+            v-model="selectedIntegration"
+            orientation="vertical"
+            dense
+            class="px-1"
+            @update:model-value="onIntegrationPicked"
+          >
+            <OTab
+              v-for="integration in filteredIntegrations"
+              :key="integration.slug"
+              :name="integration.routeName"
+              :label="raw(integration.name)"
+              :data-test="`ai-integrations-item-${integration.slug}`"
+            >
+              <template #icon>
+                <img
+                  v-if="
+                    (integration.logo || integration.logoDark) && !failedLogos.has(integration.slug)
+                  "
+                  :src="(isDark && integration.logoDark) || integration.logo"
+                  :alt="t('common.itemLogo', { name: integration.name })"
+                  class="rounded-default h-4.5 w-4.5 flex-none object-contain"
+                  loading="lazy"
+                  referrerpolicy="no-referrer"
+                  @error="onLogoError(integration.slug)"
+                />
+                <span
+                  v-else
+                  class="rounded-default bg-theme-accent text-text-inverse text-3xs grid h-4.5 w-4.5 flex-none place-items-center leading-none font-bold"
+                  aria-hidden="true"
+                  >{{ integration.name.charAt(0) }}</span
+                >
+              </template>
+            </OTab>
+          </OTabs>
+        </div>
+      </div>
+    </ODrawer>
+  </div>
+
+  <OSplitter v-else v-model="categorySplitterModel" unit="px" class="h-full">
     <template v-slot:before>
       <div class="h-full w-full">
-        <div class="bg-surface-panel border-border-default h-full border-r">
+        <div class="bg-surface-panel border-border-default h-full border-e">
           <div class="h-full overflow-y-auto pt-1.5">
             <OTabs v-model="selectedCategory" orientation="vertical" dense class="px-1">
+              <FirstSourcePickGroup
+                v-if="pickTab"
+                rail="ai"
+                :tab="pickTab"
+                :rest-label="t('ingestion.firstSource.categories')"
+              />
               <OTab
-                v-for="cat in aiCategories"
+                v-for="cat in railCategories"
                 :key="cat.slug"
                 :name="cat.slug"
-                :label="cat.name"
+                :label="raw(cat.name)"
                 :data-test="`ai-integrations-category-${cat.slug}`"
               />
             </OTabs>
@@ -38,9 +136,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSplitter v-model="integrationSplitterModel" unit="px" class="h-full">
         <template v-slot:before>
           <div class="h-full w-full">
-            <div class="bg-surface-panel border-border-default h-full border-r">
+            <div class="bg-surface-panel border-border-default h-full border-e">
               <div class="flex h-full flex-col">
-                <div class="pt-2 pr-4 pl-2">
+                <div class="ps-2 pe-4 pt-2">
                   <OSearchInput
                     data-test="ai-integrations-search-input"
                     v-model="integrationFilter"
@@ -61,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-for="integration in filteredIntegrations"
                       :key="integration.slug"
                       :name="integration.routeName"
-                      :label="integration.name"
+                      :label="raw(integration.name)"
                       :data-test="`ai-integrations-item-${integration.slug}`"
                     >
                       <template #icon>
@@ -71,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             !failedLogos.has(integration.slug)
                           "
                           :src="(isDark && integration.logoDark) || integration.logo"
-                          :alt="`${integration.name} logo`"
+                          :alt="t('common.itemLogo', { name: integration.name })"
                           class="rounded-default h-4.5 w-4.5 flex-none object-contain"
                           loading="lazy"
                           referrerpolicy="no-referrer"
@@ -108,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch, onBeforeMount } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter, useRoute } from "vue-router";
@@ -117,12 +215,33 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
+import FirstSourcePickGroup, {
+  type FirstSourcePickTab,
+} from "@/components/ingestion/FirstSourcePickGroup.vue";
+import { firstSourceOption, readFirstSource } from "@/components/login/firstSourceOptions";
+import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "AIIntegrationsPage",
-  components: { OTabs, OTab, OSearchInput, OSplitter },
+  components: {
+    OTabs,
+    OTab,
+    OSearchInput,
+    OSplitter,
+    ODrawer,
+    OButton,
+    OIcon,
+    FirstSourcePickGroup,
+  },
   setup() {
-    const { t } = useI18n();
+    const { lgUp } = useBreakpoint();
+    const compact = computed(() => !lgUp.value);
+    const listDrawerOpen = ref(false);
+    const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
     const router = useRouter();
@@ -214,11 +333,47 @@ export default defineComponent({
       },
     );
 
+    // The LLM pick's guide is this page's landing category, so the pick row stands in for that category.
+    const pickTab = computed<FirstSourcePickTab | undefined>(() => {
+      const option = firstSourceOption(
+        readFirstSource(store.state.selectedOrganization.identifier),
+      );
+      const landing = aiCategories[0];
+      if (option?.route !== "ai-integrations" || !landing) return undefined;
+      return {
+        name: landing.slug,
+        to: {
+          name: landing.integrations[0]?.routeName ?? "ai-integrations",
+          query: { org_identifier: store.state.selectedOrganization.identifier },
+        },
+        label: t(option.labelKey),
+        icon: option.logo ? "img:" + getImageURL(option.logo) : option.icon,
+      };
+    });
+    const railCategories = computed(() =>
+      aiCategories.filter((cat) => cat.slug !== pickTab.value?.name),
+    );
+
+    const selectedIntegrationName = computed(
+      () => filteredIntegrations.value.find((i) => i.routeName === selectedIntegration.value)?.name,
+    );
+    const onIntegrationPicked = (value: string | number) => {
+      navigateToIntegration(value);
+      listDrawerOpen.value = false;
+    };
+
     return {
+      compact,
+      listDrawerOpen,
+      selectedIntegrationName,
+      onIntegrationPicked,
+      raw,
       t,
       store,
       isDark,
       aiCategories,
+      pickTab,
+      railCategories,
       selectedCategory,
       selectedIntegration,
       integrationFilter,

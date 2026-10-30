@@ -14,97 +14,82 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // Windows host agent setup card — the PowerShell twin of ./linux.ts. Shared
-// scaffolding (environment toggle, EC2 IAM prerequisite, host-metrics detection)
+// scaffolding (install code block, host-metrics detection, troubleshooting rows)
 // comes from ./osAgent; this file holds the PowerShell command and the
 // Windows-specific collection list.
+
+import { raw, type TranslateFn } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import {
   AGENTS_REPO,
-  EC2_IAM_NOTE,
   agentCode,
   agentUninstall,
-  envIcons,
+  dashboardReadyStep,
   hostMetricsDetect,
   sharedAgentTroubleshooting,
 } from "./osAgent";
 
-const install = (env: "" | "/ec2") =>
-  `Invoke-WebRequest -Uri ${AGENTS_REPO}/windows${env}/install.ps1 -OutFile install.ps1
+const install = `Invoke-WebRequest -Uri ${AGENTS_REPO}/windows/install.ps1 -OutFile install.ps1
 .\\install.ps1 -URL {url}/api/{org}/ -AUTH_KEY {token}`;
 
-export default function windowsCard(subs: CardSubstitutions): RichCardContent {
-  const icon = envIcons();
+export default function windowsCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   return {
     provider: {
-      name: "Windows",
-      tagline:
-        "Install the OpenObserve agent on any Windows host — Event Log, performance counters and host metrics.",
+      id: "windows",
+      name: raw("Windows"),
+      tagline: t("ingestion.setupCard.taglineWindows"),
       logo: getImageURL("images/common/windows.svg"),
       tone: "#0078d4",
-      runtime: "Host",
-      setupTime: "~1 min",
-      metaBadges: ["Logs", "Metrics"],
+      runtime: t("ingestion.setupCard.runtimeHost"),
+      setupTime: t("ingestion.setupCard.setupTime1Min"),
+      metaBadges: [t("common.logs"), t("common.metrics")],
     },
     steps: [
       {
         id: "install",
-        title: "Install the Agent",
-        description:
-          "Run this in **PowerShell as Administrator**. Pick **AWS EC2** to additionally pick up instance metadata and use the instance's Name tag as the host identifier.",
-        chip: { kind: "terminal", label: "PowerShell" },
+        titleKey: "ingestion.setupCard.installAgentTitle",
+        descriptionKey: "ingestion.setupCard.installAgentWindowsDesc",
+        chip: { kind: "terminal", label: raw("PowerShell") },
         required: true,
         completeOn: "copy",
-        variants: [
-          {
-            id: "generic",
-            label: "Generic Windows",
-            icon: icon.windows,
-            code: agentCode(install(""), subs, "powershell"),
-            note: "Any Windows server or VM.",
-          },
-          {
-            id: "ec2",
-            label: "AWS EC2",
-            icon: icon.ec2,
-            code: agentCode(install("/ec2"), subs, "powershell"),
-            note: EC2_IAM_NOTE,
-          },
-        ],
+        code: agentCode(install, subs, "powershell"),
+        note: t("ingestion.setupCard.anyWindowsHostNote"),
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description:
-          "The agent starts on install. Give it a few seconds, then hit Test — host metrics arrive as `system_*` streams.",
-        chip: { kind: "traces", label: "Metrics" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyWindowsAgentDesc",
+        chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
+        // The four Windows Event Log channels, which the Event Viewer itself
+        // localises — so they are translated rather than raw() tokens.
         pills: [
-          "Application",
-          "Security",
-          "Setup",
-          "System",
-          "Performance Counters",
-          "Host Metrics",
+          t("ingestion.setupCard.pillApplication"),
+          t("ingestion.setupCard.pillSecurity"),
+          t("ingestion.setupCard.pillSetup"),
+          t("ingestion.setupCard.pillSystem"),
+          t("ingestion.setupCard.pillPerformanceCounters"),
+          t("ingestion.setupCard.pillHostMetrics"),
         ],
       },
+      dashboardReadyStep(t),
     ],
     detect: hostMetricsDetect,
     extras: {
-      fixTitle: "Check The Agent Service",
-      fixBody:
-        "The installer registers the agent as a Windows service. If nothing arrives, confirm it is running and read the most recent entries from its log:",
+      fixTitle: t("ingestion.setupCard.agentServiceFixTitle"),
+      fixBody: t("ingestion.setupCard.windowsAgentFixBody"),
       fixLang: "powershell",
       fixSnippet: `Get-Service -Name openobserve-agent
 Get-Content -Tail 50 "$env:ProgramData\\openobserve-agent\\agent.log"`,
       troubleshooting: [
         {
-          q: "The script fails to run at all",
-          a: "PowerShell blocks unsigned scripts by default. Run the console **as Administrator** and, if needed, allow the script for that session with `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`.",
+          q: t("ingestion.setupCard.windowsTroubleScriptQ"),
+          a: t("ingestion.setupCard.windowsTroubleScriptA"),
         },
-        ...sharedAgentTroubleshooting("`Get-Service -Name openobserve-agent`"),
+        ...sharedAgentTroubleshooting(t, "`Get-Service -Name openobserve-agent`"),
       ],
       uninstall: agentUninstall("windows"),
     },

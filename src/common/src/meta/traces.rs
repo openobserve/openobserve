@@ -44,15 +44,6 @@ pub struct Span {
     pub links: String,
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-pub enum SpanRefType {
-    #[default]
-    #[serde(rename = "CHILD_OF")]
-    ChildOf,
-    #[serde(rename = "PARENT_OF")]
-    ParentOf,
-}
-
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Event {
     pub name: String,

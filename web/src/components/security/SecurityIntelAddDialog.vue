@@ -6,7 +6,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
      indicator is named back rather than silently dropped. -->
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -38,7 +38,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ "update:open": [open: boolean]; saved: [table: string] }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const FORM_ID = "security-intel-add-form";
 

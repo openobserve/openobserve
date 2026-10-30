@@ -63,12 +63,15 @@ vi.mock("vue-router", () => ({
   }),
 }));
 
-vi.mock("@/services/synthetics", () => ({
-  default: {
-    getLocation: mockServiceGetLocation,
-    getAgentSetup: mockServiceGetAgentSetup,
-  },
-}));
+vi.mock("@/services/synthetics", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getLocation: mockServiceGetLocation,
+      getAgentSetup: mockServiceGetAgentSetup,
+    },
+  });
+});
 
 vi.mock("@/utils/synthetics/format", () => ({
   formatTimeAgoUs: vi.fn(() => "2 hours ago"),
@@ -88,7 +91,10 @@ import PrivateLocationDetail from "./PrivateLocationDetail.vue";
 // ── Stubs ────────────────────────────────────────────────────────────────
 const baseStubs = {
   OTable: {
-    template: "<div :data-test=\"$attrs['data-test']\"><slot /></div>",
+    // `emptyMessage` is surfaced as an attribute so tests can assert on the
+    // message a table would show for no rows.
+    template:
+      '<div :data-test="$attrs[\'data-test\']" :data-empty-message="emptyMessage"><slot /></div>',
     props: [
       "data",
       "columns",
@@ -113,6 +119,10 @@ const baseStubs = {
     template: '<span class="otag-stub"><slot /></span>',
     props: ["size", "shape", "variant"],
   },
+  OTooltip: {
+    template: '<span class="otooltip-stub" :data-content="content"><slot /></span>',
+    props: ["content"],
+  },
   OIcon: {
     template: "<span />",
     props: ["name", "size"],
@@ -121,9 +131,6 @@ const baseStubs = {
     template: '<div :data-test="$attrs[\'data-test\']"><slot name="actions" /></div>',
     props: ["preset", "size", "title"],
     inheritAttrs: true,
-  },
-  BetaBadge: {
-    template: '<span data-test="beta-badge">BETA</span>',
   },
   AgentSetupDrawer: {
     template: '<div data-test="synthetics-private-location-agent-setup-drawer" />',
@@ -152,6 +159,9 @@ function mountPage() {
 
 describe("PrivateLocationDetail", () => {
   let wrapper: VueWrapper;
+  // The page title carries a cut-off tooltip of its own, so pick the one wrapping the status badge.
+  const statusBadgeTooltip = () =>
+    wrapper.findAll(".otooltip-stub").find((tip) => tip.find(".obadge-stub").exists());
 
   const defaultDetail = {
     data: {
@@ -186,11 +196,6 @@ describe("PrivateLocationDetail", () => {
     it("should render the page shell", () => {
       wrapper = mountPage();
       expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should render the Beta badge in the page title", () => {
-      wrapper = mountPage();
-      expect(wrapper.find('[data-test="beta-badge"]').exists()).toBe(true);
     });
 
     it("should render the status badge when detail is loaded", async () => {
@@ -236,6 +241,75 @@ describe("PrivateLocationDetail", () => {
     });
   });
 
+  /**
+   * Agents register with one region and their rows never replicate, so this
+   * page can load a location whose agents are alive in another region. It used
+   * to render "Pending · 2/3 agents · no agents registered" from local data it
+   * simply does not have.
+   */
+  describe("live status this region cannot see", () => {
+    beforeEach(() => {
+      mockServiceGetLocation.mockResolvedValue({
+        data: {
+          ...defaultDetail.data,
+          status: "pending",
+          live_status_unknown: true,
+          live_agents: 0,
+          agents_total: 0,
+        },
+      });
+    });
+
+    it("should badge the location unknown, with the reason attached", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+
+      const tooltip = statusBadgeTooltip()!;
+      expect(tooltip.text()).toBe("synthetics.privateLocations.status.unknown");
+      expect(tooltip.attributes("data-content")).toBe(
+        "synthetics.privateLocations.status.unknownHint",
+      );
+    });
+
+    it("should withhold the agent count instead of reporting zero", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+
+      expect(wrapper.text()).not.toContain("0/0");
+      expect(wrapper.text()).toContain("—");
+    });
+
+    it("should not tell the user no agent has ever registered", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+
+      const agentsTable = wrapper.find('[data-test="synthetics-private-location-agents-table"]');
+      expect(agentsTable.attributes("data-empty-message")).toBe(
+        "synthetics.privateLocations.detail.agentsUnavailable",
+      );
+    });
+
+    /** A server without super cluster never sends the flag. */
+    it("should be unchanged when the flag is absent", async () => {
+      mockServiceGetLocation.mockResolvedValue({
+        data: { ...defaultDetail.data, status: "pending", live_agents: 0, agents_total: 0 },
+      });
+      wrapper = mountPage();
+      await flushPromises();
+
+      expect(statusBadgeTooltip()).toBeUndefined();
+      expect(wrapper.find(".obadge-stub").text()).toBe(
+        "synthetics.privateLocations.status.pending",
+      );
+      expect(wrapper.text()).toContain("0/0");
+      expect(
+        wrapper
+          .find('[data-test="synthetics-private-location-agents-table"]')
+          .attributes("data-empty-message"),
+      ).toBe("synthetics.privateLocations.detail.noAgents");
+    });
+  });
+
   describe("empty state", () => {
     it("should render OEmptyState when detail is null", async () => {
       mockServiceGetLocation.mockResolvedValue({ data: null });
@@ -272,6 +346,46 @@ describe("PrivateLocationDetail", () => {
           name: "synthetic-monitor-results",
           params: { id: "check-123" },
         }),
+      );
+    });
+  });
+
+  describe("load failures (UI-06)", () => {
+    it("shows a retry state for a 500 and recovers on retry", async () => {
+      mockServiceGetLocation.mockRejectedValueOnce({ response: { status: 500 } });
+      wrapper = mountPage();
+      await flushPromises();
+      expect(wrapper.find('[data-test="synthetics-private-location-detail-error"]').exists()).toBe(
+        true,
+      );
+      await wrapper
+        .find('[data-test="synthetics-private-location-detail-retry-btn"]')
+        .trigger("click");
+      await flushPromises();
+      expect(mockServiceGetLocation).toHaveBeenCalledTimes(2);
+      expect(wrapper.find('[data-test="synthetics-private-location-detail-error"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("shows the retry state for a network error (no response)", async () => {
+      mockServiceGetLocation.mockRejectedValueOnce(new Error("Network Error"));
+      wrapper = mountPage();
+      await flushPromises();
+      expect(wrapper.find('[data-test="synthetics-private-location-detail-error"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("keeps the not-found state for a 404", async () => {
+      mockServiceGetLocation.mockRejectedValueOnce({ response: { status: 404 } });
+      wrapper = mountPage();
+      await flushPromises();
+      expect(wrapper.find('[data-test="synthetics-private-location-detail-error"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="synthetics-private-location-detail-empty"]').exists()).toBe(
+        true,
       );
     });
   });

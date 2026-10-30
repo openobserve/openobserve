@@ -17,19 +17,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
     <OTable
+      ref="oTableRef"
       :data="filteredLocations"
       :columns="columns"
       row-key="id"
       :loading="loading"
       pagination="client"
-      :page-size="20"
+      :page-size="pageSize"
       :page-size-options="[10, 20, 50]"
+      :current-page="currentPage"
+      :sort-by="sortBy"
+      :sort-order="sortOrder"
       :show-global-filter="false"
       :persist-columns="true"
       table-id="synthetics-private-locations-table"
       :enable-column-resize="true"
       data-test="synthetics-private-locations-table"
       @row-click="openDetail"
+      @update:current-page="currentPage = $event"
+      @update:page-size="pageSize = $event"
+      @update:sort-by="sortBy = $event"
+      @update:sort-order="sortOrder = $event"
     >
       <template #toolbar>
         <div class="flex min-w-0 flex-1 items-center gap-2">
@@ -57,9 +65,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
 
-      <!-- Status -->
+      <!-- Status — "unknown" is not a state of the location, it is the limit of
+           what this region can see, so it carries the explanation with it. -->
       <template #cell-status="{ row }">
-        <OBadge :variant="statusVariant((row as any).status)" :dot="true" size="sm">
+        <OTooltip
+          v-if="liveStatus(row as SyntheticLocation) === 'unknown'"
+          :content="t('synthetics.privateLocations.status.unknownHint')"
+        >
+          <OBadge variant="default-outline" :dot="true" size="sm">
+            {{ t("synthetics.privateLocations.status.unknown") }}
+          </OBadge>
+        </OTooltip>
+        <OBadge v-else :variant="statusVariant((row as any).status)" :dot="true" size="sm">
           {{ t(`synthetics.privateLocations.status.${(row as any).status}`) }}
         </OBadge>
       </template>
@@ -67,21 +84,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Label + pool subtext -->
       <template #cell-name="{ row }">
         <div class="flex min-w-0 flex-col">
-          <span class="truncate font-medium">{{ (row as any).label }}</span>
-          <span class="text-text-muted truncate text-xs">{{ (row as any).pool }}</span>
+          <OTruncatedText class="font-medium">{{ (row as any).label }}</OTruncatedText>
+          <OTruncatedText class="text-text-muted text-xs">{{ (row as any).pool }}</OTruncatedText>
         </div>
       </template>
 
       <!-- Agents: live/total count (a location is a pool of interchangeable
            agents). Names/health are on the detail page; shown here on hover. -->
       <template #cell-agents="{ row }">
-        <div class="flex min-w-0 flex-col" :title="agentSubtext(row as any) || ''">
-          <span class="truncate"
+        <div class="flex min-w-0 flex-col">
+          <!-- 0/0 would read as "no agents installed"; this region simply has
+               no count to give. -->
+          <span
+            v-if="liveStatus(row as SyntheticLocation) === 'unknown'"
+            class="text-text-muted"
+            :title="agentSubtext(row as any) || ''"
+            >—</span
+          >
+          <span v-else class="truncate" :title="agentSubtext(row as any) || ''"
             >{{ (row as any).live_agents ?? 0
             }}<span class="text-text-muted">/{{ (row as any).agents_total ?? 0 }}</span></span
           >
-          <span v-if="(row as any).version" class="text-text-muted truncate text-xs"
-            >v{{ (row as any).version }}</span
+          <OTruncatedText v-if="(row as any).version" class="text-text-muted text-xs"
+            >{{ t("synthetics.versionPrefix") }}{{ (row as any).version }}</OTruncatedText
           >
         </div>
       </template>
@@ -123,6 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="ghost"
             size="icon-sm"
             icon-left="content-copy"
+            class="max-md:hidden"
             :title="t('synthetics.privateLocations.copySetupCmd')"
             :data-test="`synthetics-private-locations-copy-btn-${(row as any).id}`"
             @click="emit('copy-setup', row as any)"
@@ -131,6 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="ghost-destructive"
             size="icon-sm"
             icon-left="delete"
+            class="max-md:hidden"
             :disabled="checksUsing(row) > 0"
             :title="
               checksUsing(row) > 0
@@ -142,6 +169,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`synthetics-private-locations-delete-btn-${(row as any).id}`"
             @click="emit('delete', row as any)"
           />
+          <ODropdown side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                :aria-label="t('common.moreActions')"
+                icon-left="more-vert"
+                variant="ghost"
+                size="icon-xs-sq"
+                class="md:hidden"
+                data-test="synthetics-private-locations-row-more-actions"
+                @click.stop
+              />
+            </template>
+            <ODropdownItem
+              icon-left="content-copy"
+              class="md:hidden"
+              :data-test="`synthetics-private-locations-copy-btn-${(row as any).id}-menu`"
+              @select="emit('copy-setup', row as any)"
+            >
+              <span>{{ t("synthetics.privateLocations.copySetupCmd") }}</span>
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="delete"
+              variant="destructive"
+              class="md:hidden"
+              :disabled="checksUsing(row) > 0"
+              :data-test="`synthetics-private-locations-delete-btn-${(row as any).id}-menu`"
+              @select="emit('delete', row as any)"
+            >
+              <span>{{
+                checksUsing(row) > 0
+                  ? t("synthetics.privateLocations.deleteBlocked", {
+                      count: checksUsing(row),
+                    })
+                  : t("synthetics.table.delete")
+              }}</span>
+            </ODropdownItem>
+          </ODropdown>
         </div>
       </template>
 
@@ -161,19 +225,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { SyntheticLocation } from "@/types/synthetics";
 import { formatTimeAgoUs } from "@/utils/synthetics/format";
+import { locationLiveStatus as liveStatus } from "@/utils/synthetics/locationLiveStatus";
+import { useListViewState } from "@/composables/useListViewState";
 import { syntheticsPrivateLocationRoute } from "@/utils/synthetics/routes";
 
 const props = defineProps<{
@@ -186,10 +256,46 @@ const emit = defineEmits<{
   (e: "delete", row: SyntheticLocation): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
-const search = ref("");
+const savedView = useListViewState("synthetics-private-locations", {
+  search: "",
+  currentPage: 1,
+  pageSize: 20,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+});
+const search = ref(savedView.search);
+const currentPage = ref(savedView.currentPage);
+const pageSize = ref(savedView.pageSize);
+const sortBy = ref(savedView.sortBy);
+const sortOrder = ref<"asc" | "desc">(savedView.sortOrder);
+const oTableRef = ref<any>(null);
+
+watch(search, () => {
+  currentPage.value = 1;
+});
+watch([search, currentPage, pageSize, sortBy, sortOrder], () => {
+  Object.assign(savedView, {
+    search: search.value,
+    currentPage: currentPage.value,
+    pageSize: pageSize.value,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+  });
+});
+// Locations arrive after mount and TanStack resets to page 0 on its own deferred queue; setTimeout(0) runs after it so the restored page wins.
+let pageRestored = false;
+watch(
+  () => [props.loading, props.locations.length] as const,
+  ([isLoading, count]) => {
+    if (pageRestored || isLoading || count === 0) return;
+    pageRestored = true;
+    setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
+  },
+  { immediate: true },
+);
 
 const filteredLocations = computed(() => {
   const q = search.value.trim().toLowerCase();
@@ -301,7 +407,7 @@ const columns = computed<OTableColumnDef[]>(() => [
   },
   {
     id: "actions",
-    header: "",
+    header: raw(""),
     accessorKey: "id",
     size: 90,
     minSize: 90,

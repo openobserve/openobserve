@@ -6,7 +6,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 <script setup lang="ts">
 import { displayOrder, stepRow, type NavTable } from "@/utils/security/recordNav";
 import { computed, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -69,7 +69,7 @@ import {
 } from "@/utils/security/severity";
 import { b64EncodeUnicode, formatEventCount } from "@/utils/formatters";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
@@ -929,7 +929,7 @@ async function onSaved() {
     <div v-else class="flex min-h-0 flex-1 flex-col">
       <OContent class="border-border-default flex shrink-0 flex-col gap-2 border-b py-3">
         <OStatStrip
-          compact
+          compact-values
           :items="stats"
           :loading="loading && !indicators.length"
           selectable

@@ -17,13 +17,10 @@
 /* global BufferSource, Event, IDBCursorWithValue, IDBObjectStore, IDBRequest, IDBVersionChangeEvent, queueMicrotask, setTimeout, crypto, TextEncoder */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { gt } from "@/types/i18n";
 import type { ChatMessage } from "@/ts/interfaces/chat";
 
-// ---------------------------------------------------------------------------
-// crypto.subtle mock — deterministic fake hash based on input bytes
-// Must be declared before the composable is imported so the module-level
-// computeUserOrgKey function sees the mock on first call.
-// ---------------------------------------------------------------------------
+// crypto.subtle mock — deterministic fake hash based on input bytes Must be declared before the composable is imported so the module-level computeUserOrgKey function sees the mock on first call.
 vi.stubGlobal("crypto", {
   subtle: {
     digest: vi.fn().mockImplementation(async (_algo: string, data: BufferSource) => {
@@ -40,17 +37,7 @@ vi.stubGlobal("crypto", {
   },
 });
 
-// ---------------------------------------------------------------------------
-// Minimal in-memory IndexedDB mock
-//
-// Implements only the IDB surface used by useChatHistory:
-//   open, objectStore, put, get, getAll, delete, openCursor,
-//   createIndex, transaction, IDBKeyRange.only
-//
-// All callbacks are invoked via microtask (queueMicrotask) so that the
-// composable's Promise chains resolve naturally when the test awaits the
-// returned promise — no setTimeout / sleep required.
-// ---------------------------------------------------------------------------
+// Minimal in-memory IndexedDB mock Implements only the IDB surface used by useChatHistory: open, objectStore, put, get, getAll, delete, openCursor, createIndex, transaction, IDBKeyRange.only All callbacks are invoked via microtask (queueMicrotask) so that the composable's Promise chains resolve naturally when the test awaits the returned promise — no setTimeout / sleep required.
 
 type RecordMap = Map<number, Record<string, unknown>>;
 
@@ -98,14 +85,10 @@ interface MockDB {
   _stores: Map<string, MockObjectStore>;
 }
 
-// In-memory database registry — persists across transactions within a test
-// Also tracks the version at which each DB was last upgraded so we don't
-// repeat the onupgradeneeded sequence on every open() call.
+// In-memory database registry — persists across transactions within a test Also tracks the version at which each DB was last upgraded so we don't repeat the onupgradeneeded sequence on every open() call.
 const dbRegistry = new Map<string, { db: MockDB; version: number }>();
 
-// Global auto-increment counter used by the put mock so that consecutive calls
-// to the composable's saveToHistory (which uses Date.now() as the chatId) never
-// collide even when multiple calls happen within the same millisecond.
+// Global auto-increment counter used by the put mock so that consecutive calls to the composable's saveToHistory (which uses Date.now() as the chatId) never collide even when multiple calls happen within the same millisecond.
 let _autoIdCounter = 1;
 
 function makeRequest(initialResult: unknown = undefined): MockRequest {
@@ -162,8 +145,7 @@ function makeIndex(store: MockObjectStore, indexName: string, keyPath: string): 
             advance: vi.fn(),
             continue: vi.fn().mockImplementation(() => {
               queueMicrotask(() => {
-                // Re-check after potential deletions
-                // rebuild matching keys from current store state
+                // Re-check after potential deletions rebuild matching keys from current store state
                 while (idx < matchingKeys.length && !store.records.has(matchingKeys[idx])) {
                   idx++;
                 }
@@ -267,8 +249,7 @@ function makeTransaction(db: MockDB): MockTransaction {
 
   const tx: MockTransaction = {
     _stores: new Map(),
-    // oncomplete fires via setTimeout(0) so that all pending microtasks
-    // (store.delete() calls) have drained before the transaction resolves.
+    // oncomplete fires via setTimeout(0) so that all pending microtasks (store.delete() calls) have drained before the transaction resolves.
     get oncomplete() {
       return _oncomplete;
     },
@@ -323,6 +304,9 @@ function makeDB(): MockDB {
   return db;
 }
 
+// Last DB handed to the composable — lets beforeEach fire onclose so useChatHistory.ts drops its memoised connection between tests.
+let _lastOpenedDb: MockDB | null = null;
+
 // Replace global indexedDB with the in-memory mock
 const mockIndexedDB = {
   open(name: string, version: number) {
@@ -363,6 +347,7 @@ const mockIndexedDB = {
       }
 
       req.result = db;
+      if (name === "o2ChatDB") _lastOpenedDb = db;
       if (req.onsuccess) req.onsuccess({ target: req } as unknown as Event);
     });
 
@@ -377,14 +362,10 @@ vi.stubGlobal("IDBKeyRange", {
   only: (value: unknown) => ({ value }),
 });
 
-// ---------------------------------------------------------------------------
 // Import composable AFTER mocks are set up
-// ---------------------------------------------------------------------------
 import { useChatHistory } from "./useChatHistory";
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function makeMessages(count = 1): ChatMessage[] {
   return Array.from({ length: count }, (_, i) => ({
@@ -402,9 +383,7 @@ async function resolveKey(email: string, org: string): Promise<string> {
     .join("");
 }
 
-// ---------------------------------------------------------------------------
 // Tests
-// ---------------------------------------------------------------------------
 
 describe("useChatHistory", () => {
   const USER1 = "user1@example.com";
@@ -413,22 +392,19 @@ describe("useChatHistory", () => {
   const ORG2 = "org-beta";
 
   beforeEach(() => {
-    // Reset the DB registry and ID counter so every test starts with a fresh
-    // in-memory database. The composable caches _keyPromise per instance, and
-    // each test creates new instances, so no key cache leaks between tests.
+    // Reset the DB registry and ID counter so every test starts with a fresh in-memory database. The composable caches _keyPromise per instance, and each test creates new instances, so no key cache leaks between tests.
     dbRegistry.clear();
     _autoIdCounter = 1;
+    // Fire onclose so useChatHistory.ts drops its memoised connection to the now-cleared registry's database and reopens fresh.
+    (_lastOpenedDb as { onclose?: () => void } | null)?.onclose?.();
+    _lastOpenedDb = null;
   });
 
   afterEach(() => {
     vi.clearAllMocks();
   });
 
-  /**
-   * Thin wrapper around composable.saveToHistory.
-   * The put mock automatically assigns a unique ID when Date.now() would
-   * collide, so no fake timers or manual ID management is needed here.
-   */
+  // Thin wrapper around composable.saveToHistory. The put mock automatically assigns a unique ID when Date.now() would collide, so no fake timers or manual ID management is needed here.
   async function saveUnique(
     composable: ReturnType<typeof useChatHistory>,
     messages: ChatMessage[],
@@ -439,12 +415,12 @@ describe("useChatHistory", () => {
     return composable.saveToHistory(messages, sessionId, title, existingChatId);
   }
 
-  // -------------------------------------------------------------------------
   describe("saveToHistory", () => {
     it("should return null when messages array is empty", async () => {
       const { saveToHistory } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const result = await saveToHistory([], "session-001");
       expect(result).toBeNull();
@@ -454,6 +430,7 @@ describe("useChatHistory", () => {
       const { saveToHistory } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const result = await saveToHistory(makeMessages(2), "session-001");
       expect(typeof result).toBe("number");
@@ -464,6 +441,7 @@ describe("useChatHistory", () => {
       const { saveToHistory, loadChat } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const chatId = await saveToHistory(makeMessages(1), "session-001", "My Custom Title");
       expect(chatId).not.toBeNull();
@@ -476,6 +454,7 @@ describe("useChatHistory", () => {
       const { saveToHistory, loadChat } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const messages: ChatMessage[] = [
         { role: "user", content: "Hello, world!" },
@@ -492,6 +471,7 @@ describe("useChatHistory", () => {
       const { saveToHistory, loadChat } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const longContent = "A".repeat(50);
       const messages: ChatMessage[] = [{ role: "user", content: longContent }];
@@ -507,6 +487,7 @@ describe("useChatHistory", () => {
       const { saveToHistory, loadChat } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const exactContent = "B".repeat(40);
       const messages: ChatMessage[] = [{ role: "user", content: exactContent }];
@@ -516,10 +497,33 @@ describe("useChatHistory", () => {
       expect(entry!.title).toBe(exactContent);
     });
 
+    it("should drop ephemeral blocks, and replies left with nothing", async () => {
+      const { saveToHistory, loadChat } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+      );
+      const notice = { type: "error" as const, message: "out of credits", ephemeral: true };
+      const messages = [
+        { role: "user", content: "hi" },
+        {
+          role: "assistant",
+          content: "kept",
+          contentBlocks: [{ type: "text", text: "kept" }, notice],
+        },
+        { role: "assistant", content: "", contentBlocks: [notice] },
+      ] as ChatMessage[];
+      const chatId = await saveToHistory(messages, "session-ephemeral");
+      const entry = await loadChat(chatId!);
+      expect(entry!.messages).toHaveLength(2);
+      expect(entry!.messages[1].contentBlocks).toEqual([{ type: "text", text: "kept" }]);
+    });
+
     it("should store the userOrgKey on the saved record", async () => {
       const { saveToHistory, loadChat } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const expectedKey = await resolveKey(USER1, ORG1);
       const chatId = await saveToHistory(makeMessages(1), "session-005");
@@ -533,6 +537,7 @@ describe("useChatHistory", () => {
       const { saveToHistory, loadChat } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const chatId = await saveToHistory(makeMessages(1), "session-006", "Original Title");
       expect(chatId).not.toBeNull();
@@ -550,6 +555,7 @@ describe("useChatHistory", () => {
       const { saveToHistory, loadChat } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const messages: ChatMessage[] = [{ role: "assistant", content: "I am ready to help." }];
       const chatId = await saveToHistory(messages, "session-007");
@@ -560,12 +566,12 @@ describe("useChatHistory", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   describe("loadHistory", () => {
     it("should return an empty array when no history exists", async () => {
       const { loadHistory } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const history = await loadHistory();
       expect(history).toEqual([]);
@@ -575,10 +581,12 @@ describe("useChatHistory", () => {
       const h1 = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const h2 = useChatHistory(
         () => USER2,
         () => ORG2,
+        gt,
       );
 
       await saveUnique(h1, makeMessages(1), "s1", "Chat A");
@@ -593,11 +601,11 @@ describe("useChatHistory", () => {
       const composable = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const { loadHistory } = composable;
 
-      // Each saveUnique advances the fake clock by 1 ms, giving distinct IDs
-      // and distinct ISO timestamps so the sort order is deterministic.
+      // Each saveUnique advances the fake clock by 1 ms, giving distinct IDs and distinct ISO timestamps so the sort order is deterministic.
       const id1 = await saveUnique(composable, makeMessages(1), "s1", "Oldest");
       const id2 = await saveUnique(composable, makeMessages(1), "s2", "Middle");
       const id3 = await saveUnique(composable, makeMessages(1), "s3", "Newest");
@@ -620,6 +628,7 @@ describe("useChatHistory", () => {
       const composable = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const { loadHistory } = composable;
 
@@ -636,10 +645,12 @@ describe("useChatHistory", () => {
       const h1 = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const h2 = useChatHistory(
         () => USER2,
         () => ORG2,
+        gt,
       );
 
       // 105 for user1; saveUnique ensures unique IDs
@@ -659,12 +670,12 @@ describe("useChatHistory", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   describe("loadChat", () => {
     it("should return the chat entry when ID and ownership match", async () => {
       const { saveToHistory, loadChat } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const messages = makeMessages(2);
       const chatId = await saveToHistory(messages, "session-load-1", "Load Test");
@@ -681,6 +692,7 @@ describe("useChatHistory", () => {
       const { loadChat } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const entry = await loadChat(99999);
       expect(entry).toBeNull();
@@ -690,10 +702,12 @@ describe("useChatHistory", () => {
       const h1 = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const h2 = useChatHistory(
         () => USER2,
         () => ORG2,
+        gt,
       );
 
       const chatId = await h1.saveToHistory(makeMessages(1), "s-cross", "User1 Chat");
@@ -709,12 +723,14 @@ describe("useChatHistory", () => {
       const { loadChat } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
 
       // First: ensure DB is initialised by doing a read
       await useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       ).loadHistory();
 
       const legacyId = 777;
@@ -734,12 +750,12 @@ describe("useChatHistory", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   describe("deleteChatById", () => {
     it("should delete an owned record and return true", async () => {
       const { saveToHistory, deleteChatById, loadChat } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const chatId = await saveToHistory(makeMessages(1), "s-del-1", "To Delete");
       expect(chatId).not.toBeNull();
@@ -755,11 +771,13 @@ describe("useChatHistory", () => {
       const { deleteChatById } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       // Initialise DB first
       await useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       ).loadHistory();
       const result = await deleteChatById(99999);
       expect(result).toBe(false);
@@ -769,10 +787,12 @@ describe("useChatHistory", () => {
       const h1 = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const h2 = useChatHistory(
         () => USER2,
         () => ORG2,
+        gt,
       );
 
       const chatId = await h1.saveToHistory(makeMessages(1), "s-del-cross", "User1 Chat");
@@ -787,12 +807,12 @@ describe("useChatHistory", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   describe("clearAllHistory", () => {
     it("should return true and remove all records for the current user+org", async () => {
       const composable = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const { clearAllHistory, loadHistory } = composable;
 
@@ -810,11 +830,13 @@ describe("useChatHistory", () => {
       const { clearAllHistory } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       // Initialise DB
       await useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       ).loadHistory();
       const result = await clearAllHistory();
       expect(result).toBe(true);
@@ -824,10 +846,12 @@ describe("useChatHistory", () => {
       const h1 = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const h2 = useChatHistory(
         () => USER2,
         () => ORG2,
+        gt,
       );
 
       await saveUnique(h1, makeMessages(1), "s1", "User1 Chat 1");
@@ -846,12 +870,12 @@ describe("useChatHistory", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   describe("updateChatTitle", () => {
     it("should update the title and return true for an owned record", async () => {
       const { saveToHistory, updateChatTitle, loadChat } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const chatId = await saveToHistory(makeMessages(1), "s-upd-1", "Old Title");
       expect(chatId).not.toBeNull();
@@ -868,11 +892,13 @@ describe("useChatHistory", () => {
       const { updateChatTitle } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       // Initialise DB
       await useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       ).loadHistory();
       const result = await updateChatTitle(99999, "Any Title");
       expect(result).toBe(false);
@@ -882,10 +908,12 @@ describe("useChatHistory", () => {
       const h1 = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const h2 = useChatHistory(
         () => USER2,
         () => ORG2,
+        gt,
       );
 
       const chatId = await h1.saveToHistory(makeMessages(1), "s-upd-cross", "Original");
@@ -901,7 +929,6 @@ describe("useChatHistory", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   describe("user+org isolation", () => {
     it("should produce different userOrgKeys for different user+org combinations", async () => {
       const key1 = await resolveKey(USER1, ORG1);
@@ -922,10 +949,12 @@ describe("useChatHistory", () => {
       const h1 = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const h2 = useChatHistory(
         () => USER2,
         () => ORG2,
+        gt,
       );
 
       for (let i = 0; i < 3; i++) {
@@ -949,10 +978,12 @@ describe("useChatHistory", () => {
       const h1 = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const h2 = useChatHistory(
         () => USER2,
         () => ORG2,
+        gt,
       );
 
       const chatId = await h1.saveToHistory(makeMessages(2), "s-iso-load", "Isolated Chat");
@@ -966,10 +997,12 @@ describe("useChatHistory", () => {
       const h1 = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const h2 = useChatHistory(
         () => USER2,
         () => ORG2,
+        gt,
       );
 
       const chatId = await h1.saveToHistory(makeMessages(1), "s-iso-del", "Should Stay");
@@ -983,10 +1016,12 @@ describe("useChatHistory", () => {
       const h1 = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const h2 = useChatHistory(
         () => USER2,
         () => ORG2,
+        gt,
       );
 
       await saveUnique(h1, makeMessages(1), "s-clear-1", "User1 A");
@@ -1003,10 +1038,12 @@ describe("useChatHistory", () => {
       const h1 = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const h2 = useChatHistory(
         () => USER2,
         () => ORG2,
+        gt,
       );
 
       const chatId = await h1.saveToHistory(makeMessages(1), "s-iso-upd", "Protected Title");
@@ -1024,10 +1061,12 @@ describe("useChatHistory", () => {
       const h1 = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const h2 = useChatHistory(
         () => USER2,
         () => ORG2,
+        gt,
       );
 
       const id1 = await saveUnique(h1, makeMessages(1), "key-cache-1", "H1 Chat");
@@ -1047,6 +1086,7 @@ describe("useChatHistory", () => {
       const composable = useChatHistory(
         () => USER1,
         () => currentOrg,
+        gt,
       );
 
       // Save a chat while in ORG1
@@ -1070,6 +1110,364 @@ describe("useChatHistory", () => {
       const historyOrg1 = await composable.loadHistory();
       expect(historyOrg1).toHaveLength(1);
       expect(historyOrg1[0].title).toBe("Org1 Chat");
+    });
+  });
+  describe("loadChat against the server", () => {
+    const SESSION = "0190a1b2-c3d4-7000-8000-0000000000aa";
+    const storedTurn = (text: string) => ({
+      user_message_id: `msg_${text}`,
+      user: { text },
+      frames: [{ type: "message_delta", content: `re ${text}` }, { type: "complete" }],
+    });
+    const makeServer = (turns: unknown[], extra: Record<string, unknown> = {}) => ({
+      enabled: () => true,
+      list: vi.fn(),
+      get: vi.fn().mockResolvedValue({
+        session_id: SESSION,
+        title: "Server",
+        created_at: 1,
+        updated_at: 2_000_000,
+        last_committed_seq: 7,
+        not_modified: false,
+        turns,
+        ...extra,
+      }),
+      rename: vi.fn(),
+      remove: vi.fn(),
+      removeAll: vi.fn(),
+    });
+
+    it("keeps a live save whose ended turn the server has not committed yet", async () => {
+      const server = makeServer([storedTurn("first")], { forked_from_share: "share-1" });
+      const { saveToHistory, loadChat } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+        server,
+      );
+      const local = makeMessages(4);
+      const chatId = await saveToHistory(local, SESSION, "Local", null, "turn-2");
+
+      const entry = await loadChat(chatId!);
+      expect(entry!.messages.map((m) => m.content)).toEqual(local.map((m) => m.content));
+      expect(entry!.cachedLastSeq).toBeUndefined();
+      expect(entry!.forkedFromShare).toBe("share-1");
+    });
+
+    it("keeps a live save while the server still reports its turn as running", async () => {
+      const server = makeServer([{ ...storedTurn("first"), turn_id: "turn-1", status: "running" }]);
+      const { saveToHistory, loadChat } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+        server,
+      );
+      const local = makeMessages(2);
+      const chatId = await saveToHistory(local, SESSION, "Local", null, "turn-1");
+
+      const entry = await loadChat(chatId!);
+      expect(entry!.messages.map((m) => m.content)).toEqual(local.map((m) => m.content));
+    });
+
+    // A turn refused before the agent ran never reaches the server, so a count comparison kept the local copy forever.
+    it("takes the server copy over a save that named no ended turn", async () => {
+      const server = makeServer([storedTurn("first")]);
+      const { saveToHistory, loadChat } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+        server,
+      );
+      const chatId = await saveToHistory(makeMessages(4), SESSION, "Local");
+
+      const entry = await loadChat(chatId!);
+      expect(entry!.messages.map((m) => m.content)).toEqual(["first", "re first"]);
+    });
+
+    it("takes the server copy once it has the ended turn settled", async () => {
+      const server = makeServer([
+        { ...storedTurn("first"), turn_id: "turn-1", status: "completed" },
+      ]);
+      const { saveToHistory, loadChat } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+        server,
+      );
+      const chatId = await saveToHistory(makeMessages(4), SESSION, "Local", null, "turn-1");
+
+      const entry = await loadChat(chatId!);
+      expect(entry!.messages.map((m) => m.content)).toEqual(["first", "re first"]);
+    });
+
+    it("opens a chat the server cannot read, flagged, instead of doing nothing", async () => {
+      const server = makeServer([]);
+      server.get.mockRejectedValue(Object.assign(new Error("gap"), { status: 500 }));
+      server.list = vi.fn().mockResolvedValue({
+        chats: [
+          {
+            session_id: SESSION,
+            title: "Broken",
+            created_at: 1,
+            updated_at: 2,
+            last_committed_seq: 3,
+          },
+        ],
+      });
+      const { loadHistory, loadChat } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+        server,
+      );
+      const [listed] = await loadHistory();
+
+      const entry = await loadChat(listed.id);
+      expect(entry).toMatchObject({
+        sessionId: SESSION,
+        title: "Broken",
+        historyUnavailable: true,
+      });
+      expect(entry!.messages).toEqual([]);
+    });
+
+    it("takes the server copy once it has caught up", async () => {
+      const server = makeServer([storedTurn("first"), storedTurn("second")]);
+      const { saveToHistory, loadChat } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+        server,
+      );
+      const chatId = await saveToHistory(makeMessages(4), SESSION, "Local");
+
+      const entry = await loadChat(chatId!);
+      expect(entry!.messages[2].content).toBe("second");
+      expect(entry!.cachedLastSeq).toBe(7);
+      expect(entry!.forkedFromShare).toBeUndefined();
+    });
+
+    const seqTurn = (text: string, first: number, last: number, extra = {}) => ({
+      ...storedTurn(text),
+      first_seq: first,
+      last_seq: last,
+      ...extra,
+    });
+    const detail = (turns: unknown[], extra: Record<string, unknown> = {}) => ({
+      session_id: SESSION,
+      title: "Server",
+      created_at: 1,
+      updated_at: 2_000_000,
+      last_committed_seq: 7,
+      not_modified: false,
+      turns,
+      ...extra,
+    });
+
+    it("sends the cached state version with the seq, and keeps the cache on not_modified", async () => {
+      const server = makeServer([]);
+      server.get.mockResolvedValueOnce(
+        detail([seqTurn("first", 1, 3)], { last_committed_seq: 3, state_version: "v1" }),
+      );
+      const { loadChat, adoptServerChat } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+        server,
+      );
+      const chatId = await adoptServerChat(SESSION, "Server");
+      const first = await loadChat(chatId);
+      expect(first!.cachedStateVersion).toBe("v1");
+
+      server.get.mockResolvedValueOnce(detail([], { not_modified: true, last_committed_seq: 3 }));
+      const again = await loadChat(chatId);
+      expect(server.get).toHaveBeenLastCalledWith(ORG1, SESSION, 3, 50, "v1");
+      expect(again!.messages.map((m) => m.content)).toEqual(["first", "re first"]);
+    });
+
+    it("tops up a stale cache with only the newer turns, merged by first_seq", async () => {
+      const server = makeServer([seqTurn("first", 1, 3), seqTurn("second", 4, 5)]);
+      server.get.mockResolvedValueOnce(
+        detail([seqTurn("first", 1, 3), seqTurn("second", 4, 5)], { last_committed_seq: 5 }),
+      );
+      const { loadChat, adoptServerChat } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+        server,
+      );
+      const chatId = await adoptServerChat(SESSION, "Server");
+      const first = await loadChat(chatId);
+      expect(first!.cachedLastSeq).toBe(5);
+      expect(first!.cachedTurnSpans?.map((s) => s.count)).toEqual([2, 2]);
+
+      server.get.mockResolvedValueOnce(
+        detail([seqTurn("second (more)", 4, 6), seqTurn("third", 7, 7)], {
+          partial_from_seq: 5,
+          last_committed_seq: 7,
+        }),
+      );
+      const entry = await loadChat(chatId);
+      expect(server.get).toHaveBeenLastCalledWith(ORG1, SESSION, 5, 50, undefined);
+      expect(entry!.messages.map((m) => m.content)).toEqual([
+        "first",
+        "re first",
+        "second (more)",
+        "re second (more)",
+        "third",
+        "re third",
+      ]);
+      expect(entry!.cachedLastSeq).toBe(7);
+    });
+
+    it("falls back to a full read when the top-up has a gap", async () => {
+      const server = makeServer([]);
+      server.get.mockResolvedValueOnce(detail([seqTurn("first", 1, 3)], { last_committed_seq: 3 }));
+      const { loadChat, adoptServerChat } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+        server,
+      );
+      const chatId = await adoptServerChat(SESSION, "Server");
+      await loadChat(chatId);
+
+      server.get.mockResolvedValueOnce(
+        detail([seqTurn("late", 90, 91)], { partial_from_seq: 3, has_more: true }),
+      );
+      server.get.mockResolvedValueOnce(
+        detail([seqTurn("first", 1, 3), seqTurn("late", 90, 91)], { last_committed_seq: 91 }),
+      );
+      const entry = await loadChat(chatId);
+      expect(server.get).toHaveBeenLastCalledWith(ORG1, SESSION);
+      expect(entry!.messages.map((m) => m.content)).toEqual([
+        "first",
+        "re first",
+        "late",
+        "re late",
+      ]);
+    });
+
+    it("does not cache the seq of a chat with a running turn", async () => {
+      const server = makeServer([]);
+      server.get.mockResolvedValue(
+        detail([seqTurn("first", 1, 2, { status: "running" })], { active_turn: true }),
+      );
+      const { loadChat, adoptServerChat } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+        server,
+      );
+      const chatId = await adoptServerChat(SESSION, "Server");
+      const entry = await loadChat(chatId);
+      expect(entry!.cachedLastSeq).toBeUndefined();
+      expect(entry!.messages[1].contentBlocks?.at(-1)).toMatchObject({
+        type: "status",
+        turnStatus: "running",
+      });
+      await loadChat(chatId);
+      expect(server.get).toHaveBeenLastCalledWith(ORG1, SESSION, undefined, undefined, undefined);
+    });
+
+    it("carries forked_from_share from the server listing", async () => {
+      const server = makeServer([]);
+      server.list.mockResolvedValue({
+        chats: [
+          {
+            session_id: SESSION,
+            title: "Fork",
+            created_at: 1,
+            updated_at: 2_000_000,
+            last_committed_seq: 3,
+            forked_from_share: "share-9",
+          },
+        ],
+      });
+      const { loadHistory } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+        server,
+      );
+      const [chat] = await loadHistory();
+      expect(chat.forkedFromShare).toBe("share-9");
+    });
+  });
+
+  describe("discardLocalChat", () => {
+    it("drops a server-backed chat from this browser without asking the server", async () => {
+      const server = {
+        enabled: () => true,
+        list: vi.fn(),
+        get: vi.fn(),
+        rename: vi.fn(),
+        remove: vi.fn(),
+        removeAll: vi.fn(),
+      };
+      const { saveToHistory, discardLocalChat } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+        server,
+      );
+      const chatId = await saveToHistory(makeMessages(1), "0190a1b2-c3d4-7000-8000-0000000000bb");
+      expect(await discardLocalChat(chatId!)).toBe(true);
+      expect(server.remove).not.toHaveBeenCalled();
+      expect(await discardLocalChat(chatId!)).toBe(false);
+    });
+  });
+
+  describe("adoptServerChat", () => {
+    const SESSION = "0190a1b2-c3d4-7000-8000-000000000001";
+    const makeServer = () => ({
+      enabled: () => true,
+      list: vi.fn(),
+      get: vi.fn().mockResolvedValue({
+        session_id: SESSION,
+        title: "Fork",
+        created_at: 1,
+        updated_at: 2_000_000,
+        last_committed_seq: 0,
+        not_modified: false,
+        turns: [],
+      }),
+      rename: vi.fn(),
+      remove: vi.fn(),
+      removeAll: vi.fn(),
+    });
+
+    it("caches a forked server chat so loadChat opens it from the server", async () => {
+      const server = makeServer();
+      const { adoptServerChat, loadChat } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+        server,
+      );
+      const id = await adoptServerChat(SESSION, "Fork");
+      expect(id).toBe(parseInt("0190a1b2c3d4", 16));
+      const chat = await loadChat(id);
+      expect(server.get).toHaveBeenCalledWith(ORG1, SESSION, undefined, undefined, undefined);
+      expect(chat?.sessionId).toBe(SESSION);
+      expect(chat?.title).toBe("Fork");
+      expect(chat?.serverBacked).toBe(true);
+    });
+
+    it("keeps an already cached entry when adopted again", async () => {
+      const server = makeServer();
+      const { adoptServerChat, loadChat } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+        server,
+      );
+      const first = await adoptServerChat(SESSION, "Fork");
+      await loadChat(first);
+      const second = await adoptServerChat(SESSION, "Other title");
+      expect(second).toBe(first);
+      server.get.mockResolvedValue({ not_modified: true });
+      expect((await loadChat(second))?.title).toBe("Fork");
     });
   });
 });

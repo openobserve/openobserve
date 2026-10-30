@@ -16,12 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="sessions_page flex min-h-0 flex-1 flex-col overflow-hidden">
-    <template v-if="isSessionReplayEnabled">
+    <template v-if="isRumEnabled || isSessionReplayEnabled">
       <div>
-        <div class="bg-card-glass-bg border-border-default px-page-edge border-b py-1.5">
-          <div class="flex items-start gap-1">
+        <div
+          class="bg-card-glass-bg border-border-default px-page-edge border-b py-1.5"
+          data-drawer-anchor="rum-sessions-toolbar"
+        >
+          <div class="flex items-start gap-1 max-md:flex-wrap">
             <!-- Query editor (flex-grow to fill available space) -->
-            <div class="relative min-w-0 flex-1">
+            <div class="relative min-w-0 flex-1 max-md:basis-full">
               <QueryEditor
                 ref="sessionQueryEditorRef"
                 editor-id="session-replay-query-editor"
@@ -35,7 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   queryEditorHeight,
                 ]"
                 v-model:query="sessionState.data.editorValue"
-                :debounce-time="300"
+                :debounce-time="100"
+                :filter-mode="true"
                 :keywords="effectiveKeywords"
                 :suggestions="effectiveSuggestions"
                 :field-value-resolver="resolveFieldValues"
@@ -45,14 +49,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <div
                 v-if="!sessionState.data.editorValue && !editorFocused"
-                class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] select-none"
+                class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 pb-0 select-none"
               >
                 <span class="query-editor-placeholder-typewriter">{{ editorPlaceholder }}</span>
               </div>
             </div>
 
             <!-- Controls on the right -->
-            <div class="flex shrink-0 items-start gap-1">
+            <div class="flex shrink-0 items-start gap-1 max-md:w-full max-md:flex-wrap">
+              <OButton
+                variant="outline"
+                size="icon-toolbar"
+                icon-left="menu"
+                class="md:hidden"
+                data-test="rum-sessions-mobile-fields-btn"
+                @click="mobileFieldsOpen = true"
+              >
+                <OTooltip :content="t('search.showFields')" />
+              </OButton>
               <SyntaxGuide />
               <DateTime
                 auto-apply
@@ -98,6 +112,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   shortcut-id="rumSessionsRefresh"
                 />
               </OButton>
+              <ShareButton
+                ref="shareButtonRef"
+                data-test="rum-app-sessions-share-link-btn"
+                :url="shareUrl"
+                variant="outline"
+                size="icon-toolbar"
+                shortcut-id="rumSessionsCopyUrl"
+                class="shrink-0"
+              />
             </div>
             <!-- end controls -->
           </div>
@@ -107,14 +130,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <!-- end toolbar wrapper -->
 
+      <ODrawer
+        v-if="isMobile"
+        v-model:open="mobileFieldsOpen"
+        side="left"
+        :width="80"
+        bleed
+        :title="t('search.showFields')"
+        anchor='[data-drawer-anchor="rum-sessions-toolbar"]'
+        data-test="rum-sessions-mobile-fields-drawer"
+      >
+        <SearchFieldList
+          :fields="streamFields"
+          :time-stamp="{
+            startTime: dateTime.startTime,
+            endTime: dateTime.endTime,
+          }"
+          :stream-name="rumSessionStreamName"
+          stream-type="logs"
+          :enable-grouping="true"
+          :query="sessionState.data.editorValue"
+          :base-filter="fieldListBaseFilter"
+          :show-count="false"
+          @event-emitted="handleSidebarEvent"
+        />
+      </ODrawer>
       <OSplitter
         class="logs-horizontal-splitter min-h-0 flex-1"
         v-model="splitterModel"
         unit="px"
         :horizontal="false"
+        :limits="isMobile ? [0, 0] : undefined"
       >
         <template #before>
-          <div class="bg-surface-panel border-border-default h-full overflow-auto border-r py-1">
+          <div
+            v-if="!isMobile"
+            class="bg-surface-panel border-border-default h-full overflow-auto border-e py-1"
+          >
             <SearchFieldList
               :fields="streamFields"
               :time-stamp="{
@@ -296,8 +348,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <NoData v-else />
                 </template>
-                <template #cell-action_play>
+                <template #cell-action_play="{ row }">
                   <OIcon
+                    v-if="row.has_replay"
                     name="play-circle-filled"
                     size="md"
                     class="session-play-icon text-icon-color hover:text-button-primary cursor-pointer"
@@ -305,7 +358,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template #cell-session="{ row }">
                   <div class="flex min-w-0 flex-col justify-center gap-0.5">
-                    <OUserCell :value="row.user_email || 'Unknown'" class="truncate font-medium" />
+                    <OUserCell
+                      :value="row.user_email || unknownUserLabel"
+                      class="truncate font-medium"
+                    />
                     <div class="text-text-secondary flex items-center gap-1.5 text-xs">
                       <span
                         class="font-mono"
@@ -417,12 +473,15 @@ import {
   onBeforeMount,
   defineAsyncComponent,
   computed,
+  watch,
 } from "vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { rangesFromServerError, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
 import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
@@ -430,10 +489,12 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import { isSessionLive } from "@/utils/rum/sessionReplayLive";
+import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { durationFormatter, b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
-import { useRouter } from "vue-router";
+import { useRouter, type LocationQuery } from "vue-router";
 import { useStore } from "vuex";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
@@ -460,6 +521,8 @@ import useStreams from "@/composables/useStreams";
 import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ShareButton from "@/components/common/ShareButton.vue";
+import useRum from "@/composables/rum/useRum";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -496,13 +559,17 @@ interface SessionInsight {
   count: number;
   target?: string;
   view?: string;
-  message?: string;
+  message?: I18nText;
   rate?: number;
 }
 
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
 defineProps({
+  isRumEnabled: {
+    type: Boolean,
+    default: false,
+  },
   isSessionReplayEnabled: {
     type: Boolean,
     default: false,
@@ -515,7 +582,7 @@ const { getTimeInterval, buildQueryPayload, parseQuery } = useQuery();
 const { sessionState } = useSession();
 const store = useStore();
 const isLoading = ref<boolean[]>([]);
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const dateTime = ref({
   startTime: 0,
   endTime: 0,
@@ -524,14 +591,8 @@ const dateTime = ref({
 });
 const rumSessionStreamName = "_rumdata";
 
-// Non-editable part of the sessions query, kept verbatim in step with the
-// WHERE clause getSessions() builds so the sidebar's value counts describe the
-// same rows the table does. Passed separately from the editor value: `query`
-// drives the sidebar's include/exclude checkbox state, and a clause the user
-// cannot edit would show there as permanently ticked.
-// The health/type/device segments stay out — they filter the fetched rows
-// client-side (see tableRows), not the underlying query.
-const fieldListBaseFilter = "session_has_replay IS NOT NULL";
+// Mirrors getSessions()'s WHERE clause minus the editor value, so the sidebar's checkbox state reflects the query, not what the user is still typing (health/type/device segments are excluded too — they filter client-side, see tableRows).
+const fieldListBaseFilter = "1 = 1";
 
 // Dynamic editor height based on content lines
 const queryEditorHeight = computed(() => {
@@ -570,7 +631,7 @@ const onQueryEditorBlur = async () => {
 };
 
 const schemaMapping: Ref<{ [key: string]: boolean }> = ref({});
-const { getStream } = useStreams();
+const { getStream } = useStreams(t);
 
 // Autosuggestions — field names, operators, filter values
 const {
@@ -582,14 +643,22 @@ const {
   resolveFieldValues,
 } = useSqlSuggestions();
 
+// Set as soon as the page mounts, so a value lookup on the first keystroke is not left without a stream.
+const syncSuggestStreamContext = () => {
+  autoCompleteData.value.org = store.state.selectedOrganization?.identifier ?? "";
+  autoCompleteData.value.streamType = "logs";
+  autoCompleteData.value.streamName = rumSessionStreamName;
+};
+watch(() => store.state.selectedOrganization?.identifier, syncSuggestStreamContext, {
+  immediate: true,
+});
+
 const updateAutoComplete = (value: string) => {
   _sqlOnQueryChange();
   autoCompleteData.value.query = value;
   autoCompleteData.value.cursorIndex = sessionQueryEditorRef.value?.getCursorIndex?.();
   autoCompleteData.value.popup.open = sessionQueryEditorRef.value?.triggerAutoComplete;
-  autoCompleteData.value.org = store.state.selectedOrganization.identifier;
-  autoCompleteData.value.streamType = "logs";
-  autoCompleteData.value.streamName = rumSessionStreamName;
+  syncSuggestStreamContext();
   getSuggestions();
 };
 
@@ -601,6 +670,7 @@ const { placeholder: editorPlaceholder } = useQueryPlaceholder(
   computed(() => ({})),
   _sqlMode,
   _noStream,
+  t,
 );
 
 const userDataSet = new Set([
@@ -627,6 +697,9 @@ const userDataSet = new Set([
   "oosource",
   "oo_evp_origin",
   "oo_evp_origin_version",
+  "o2source",
+  "o2_evp_origin",
+  "o2_evp_origin_version",
   "source",
   "api",
   "usr_email",
@@ -638,10 +711,16 @@ const userDataSet = new Set([
 
 const { columnVisibility, setColumnVisibility } = useExternalColumnToggle("rum-sessions-list");
 
+// Resolved once, then used for BOTH the rendered cell and the `session`
+// accessorFn. The accessor value is the table's global-filter search corpus
+// (OTable has no custom globalFilterFn), so display and corpus have to stay
+// the same string or users would search for what they see and match nothing.
+const unknownUserLabel = t("rum.unknown");
+
 const tableColumns = [
   {
     id: "action_play",
-    header: "",
+    header: raw(""),
     accessorKey: "action_play",
     sortable: false,
     size: 56,
@@ -650,7 +729,7 @@ const tableColumns = [
   {
     id: "session",
     header: t("rum.userSession"),
-    accessorFn: (row: any) => row["user_email"] || "Unknown",
+    accessorFn: (row: any) => row["user_email"] || unknownUserLabel,
     sortable: true,
     hideable: true,
     meta: { align: "left", autoWidth: true },
@@ -703,8 +782,17 @@ const tableColumns = [
   },
 ];
 
+// The filter the list was last built from, so a return that brings a new one (from Product analytics) re-applies it.
+let lastAppliedUrlFilter: string | null = null;
+
+// The router returns every value as a string, so the list's own numeric from/to must compare as strings too.
+function urlFilterSignature(query: LocationQuery | Record<string, unknown>): string {
+  return JSON.stringify(["query", "from", "to", "period"].map((k) => String(query[k] ?? "")));
+}
+
 onBeforeMount(() => {
   restoreUrlQueryParams();
+  lastAppliedUrlFilter = urlFilterSignature(router.currentRoute.value.query);
 });
 
 onMounted(async () => {
@@ -746,6 +834,18 @@ onActivated(() => {
     activatedBefore = true;
     return;
   }
+  const signature = urlFilterSignature(router.currentRoute.value.query);
+  if (
+    router.currentRoute.value.name === "Sessions" &&
+    enteredFromAnalytics &&
+    signature !== lastAppliedUrlFilter
+  ) {
+    lastAppliedUrlFilter = signature;
+    restoreUrlQueryParams();
+    syncDateTimeFromSession();
+    getSessions();
+    return;
+  }
   if (!hasCompleteResult.value) getSessions();
 });
 
@@ -766,6 +866,7 @@ const getStreamFields = () => {
           "action_frustration_type",
           "action_target_name",
           "error_message",
+          "session_has_replay",
         ]);
 
         // Define priority fields that should appear at the top
@@ -812,6 +913,8 @@ const getStreamFields = () => {
         // Feed full schema into autosuggestion (all fields, not just userDataSet subset)
         updateFieldKeywords(stream.schema);
       })
+      // An org that has not ingested RUM yet has no session stream; the field list stays empty.
+      .catch(() => {})
       .finally(() => {
         isLoading.value.pop();
         resolve(true);
@@ -881,7 +984,7 @@ const getSessions = () => {
     streamName: "_rumdata",
   };
 
-  const req = buildQueryPayload(queryPayload);
+  const req = buildQueryPayload(queryPayload, t);
 
   // Build optional fields based on schema
   let geoFields = "";
@@ -905,8 +1008,15 @@ const getSessions = () => {
       "SUM(CASE WHEN type='action' AND action_frustration_type IS NOT NULL THEN 1 ELSE 0 END) AS frustration_count";
   }
 
-  // Build WHERE clause with session replay filter
-  let whereClause = "session_has_replay IS NOT NULL";
+  // has_replay only toggles the per-row play icon — it never excludes a session from the
+  // list, since replay recording is optional and most sessions won't have it.
+  let hasReplayField = "0 AS has_replay";
+  if (schemaMapping.value["session_has_replay"]) {
+    hasReplayField =
+      "MAX(CASE WHEN session_has_replay IS NOT NULL THEN 1 ELSE 0 END) AS has_replay";
+  }
+
+  let whereClause = "1 = 1";
   if (sessionState.data.editorValue.length) {
     whereClause += " AND (" + sessionState.data.editorValue.trim() + ")";
   }
@@ -919,12 +1029,14 @@ const getSessions = () => {
   req.query.sql = `
     SELECT
       min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp,
+      max(${store.state.zoConfig.timestamp_column}) as zo_sql_end_timestamp,
       min(type) as type,
       min(source) as source,
       SUM(CASE WHEN type='error' THEN 1 ELSE 0 END) AS error_count,
       ${frustrationCountField},
       SUM(CASE WHEN type!='null' THEN 1 ELSE 0 END) AS events,
       ${geoFields}
+      ${hasReplayField},
       session_id
     FROM "_rumdata"
     WHERE ${whereClause}
@@ -975,13 +1087,25 @@ const getSessions = () => {
           country: hit.country,
           city: hit.city,
           country_iso_code: hit.country_iso_code?.toLowerCase(),
+          has_replay: hit.has_replay === 1 || hit.has_replay === true,
+          // _rumdata-derived fallback (us → ms) for sessions with no replay recording;
+          // getSessionTimeFromReplay overwrites it with the replay-authoritative value.
+          time_spent: (hit.zo_sql_end_timestamp - hit.zo_sql_timestamp) / 1000,
         };
       });
 
-      const sessionIds = hits.map((hit: any) => hit.session_id);
+      // Paint from _rumdata alone — don't wait on a second query to a stream that may not exist.
+      rows.value = Object.values(sessionState.data.sessions);
 
-      // Query 2: Get start/end times from _sessionreplay
-      await getSessionTimeFromReplay(req, sessionIds, signal);
+      // Only this page's hits, so a later scroll page doesn't re-query sessions already enriched.
+      const replaySessionIds = hits
+        .filter((hit: any) => sessionState.data.sessions[hit.session_id]?.has_replay)
+        .map((hit: any) => hit.session_id);
+
+      // Query 2: Get start/end times from _sessionreplay, only for sessions that have it
+      if (replaySessionIds.length) {
+        await getSessionTimeFromReplay(req, replaySessionIds, signal);
+      }
       return "loaded" as const;
     })
     .catch((err) => {
@@ -992,7 +1116,7 @@ const getSessions = () => {
       hasCompleteResult.value = false;
       rows.value = [];
       toast({
-        message: err.response?.data?.message || "Error while fetching sessions",
+        message: err.response?.data?.message || t("rum.errorWhileFetchingSessions"),
         variant: "error",
       });
 
@@ -1052,10 +1176,9 @@ function clearWindowAggregates() {
   errorCluster.value = null;
 }
 
-// Query 2: Get start/end times from _sessionreplay for the sessions
+// Only ever called with replay-tagged session IDs, so an empty/sanitized-away list means nothing to enrich — rows.value must be left alone.
 const getSessionTimeFromReplay = (req: any, sessionIds: string[], signal?: AbortSignal) => {
   if (sessionIds.length === 0) {
-    rows.value = [];
     isLoading.value.pop();
     return Promise.resolve();
   }
@@ -1069,7 +1192,6 @@ const getSessionTimeFromReplay = (req: any, sessionIds: string[], signal?: Abort
     .join(", ");
 
   if (!sanitizedIds) {
-    rows.value = [];
     isLoading.value.pop();
     return Promise.resolve();
   }
@@ -1119,7 +1241,7 @@ const getSessionTimeFromReplay = (req: any, sessionIds: string[], signal?: Abort
     .catch((err) => {
       if (isAbortError(err)) return;
       toast({
-        message: err.response?.data?.message || "Error while fetching session replay data",
+        message: err.response?.data?.message || t("rum.errorWhileFetchingSessionReplay"),
         variant: "error",
       });
     })
@@ -1297,6 +1419,15 @@ const updateDateChange = (date: any) => {
 };
 
 const splitterModel = ref(250);
+const { isMobile } = useBreakpoint();
+const mobileFieldsOpen = ref(false);
+watch(
+  isMobile,
+  (mobile) => {
+    splitterModel.value = mobile ? 0 : 250;
+  },
+  { immediate: true },
+);
 
 const rows = ref<Session[]>([]);
 
@@ -1311,10 +1442,8 @@ const previousWindowTotals = ref<WindowTotals | null>(null);
 const frustrationCluster = ref<SessionInsight | null>(null);
 const errorCluster = ref<SessionInsight | null>(null);
 
-// A session with ≤1 event or under 10s of activity counts as a bounce; a
-// session whose last replay event is within the last 5 minutes is still live.
+// A session with ≤1 event or under 10s of activity counts as a bounce.
 const BOUNCE_MAX_MS = 10_000;
-const ACTIVE_WINDOW_MS = 5 * 60_000;
 
 // Heuristic bucketing of the UA device/os family into the segment values.
 const classifyDevice = (family?: string, os?: string): DeviceSegment => {
@@ -1329,11 +1458,11 @@ const classifyDevice = (family?: string, os?: string): DeviceSegment => {
 // The SDK `source` field identifies the platform that produced the session.
 // Browser RUM omits it (or sends "browser"); mobile RUM sends the platform slug.
 const PLATFORM_LABELS: Record<string, string> = {
-  browser: "Browser",
-  "react-native": "React Native",
-  ios: "iOS",
-  android: "Android",
-  flutter: "Flutter",
+  browser: raw("Browser"),
+  "react-native": raw("React Native"),
+  ios: raw("iOS"),
+  android: raw("Android"),
+  flutter: raw("Flutter"),
 };
 const classifySource = (source?: string): string => {
   const s = (source || "").toLowerCase();
@@ -1349,7 +1478,7 @@ const enrichedRows = computed(() =>
   rows.value.map((row: any) => ({
     ...row,
     is_bounce: (row.events ?? 0) <= 1 || (row.time_spent ?? 0) < BOUNCE_MAX_MS,
-    is_active: !!row.end_time && Date.now() - row.end_time <= ACTIVE_WINDOW_MS,
+    is_active: isSessionLive(row.end_time, Date.now()),
     device_type: classifyDevice(row.device_family, row.os),
     platform: classifySource(row.source),
   })),
@@ -1570,6 +1699,18 @@ const getSessionStatusColor = (row: any) => {
 
 const router = useRouter();
 
+// A RUM tab switch pushes Performance's range, so only a Product Analytics handoff may replace the list's own.
+let enteredFromAnalytics = false;
+const stopEntryTracking = router.afterEach((to, from) => {
+  if (to.name === "Sessions") {
+    enteredFromAnalytics = from.matched.some((r) => r.name === PA_ROUTES.shell);
+  }
+});
+onBeforeUnmount(stopEntryTracking);
+
+const { shareUrl } = useRum();
+const shareButtonRef = ref<InstanceType<typeof ShareButton> | null>(null);
+
 const handleRowClick = (row: any) => {
   if (!row.session_id) return;
   handleCellClick({ columnName: "action_play", row });
@@ -1655,6 +1796,16 @@ function restoreUrlQueryParams() {
   }
 }
 
+function syncDateTimeFromSession() {
+  const date = sessionState.data.datetime;
+  if (date.valueType === "relative") {
+    const resolved = getConsumableRelativeTime(date.relativeTimePeriod);
+    if (resolved) dateTime.value = { ...dateTime.value, ...date, ...resolved };
+  } else {
+    dateTime.value = { ...dateTime.value, ...date };
+  }
+}
+
 function updateUrlQueryParams() {
   if (!isMounted.value) return;
 
@@ -1675,6 +1826,7 @@ function updateUrlQueryParams() {
   if (deviceSegment.value !== "all") query["device"] = deviceSegment.value;
 
   query["org_identifier"] = store.state.selectedOrganization.identifier;
+  lastAppliedUrlFilter = urlFilterSignature(query);
   router.push({ query });
 }
 
@@ -1690,6 +1842,10 @@ useShortcuts([
     handler: () => {
       if (!isInputFocused()) runQuery();
     },
+  },
+  {
+    id: "rumSessionsCopyUrl",
+    handler: () => shareButtonRef.value?.handleShareClick(),
   },
 ]);
 </script>

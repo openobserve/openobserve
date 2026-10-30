@@ -3,6 +3,8 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import OSelect from "./OSelect.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 describe("OSelect", () => {
   let wrapper: VueWrapper;
@@ -14,6 +16,14 @@ describe("OSelect", () => {
   it("renders without errors", () => {
     wrapper = mount(OSelect);
     expect(wrapper.exists()).toBe(true);
+  });
+
+  it.each([
+    ["sm", "h-[2.125rem]"],
+    ["md", "h-[2.125rem]"],
+  ] as const)("sizes the trigger for %s", (size, expected) => {
+    wrapper = mount(OSelect, { props: { size } });
+    expect(wrapper.find("button").classes()).toContain(expected);
   });
 
   it("renders a label when prop is provided", () => {
@@ -138,6 +148,68 @@ describe("OSelect", () => {
     expect(docSpy).toHaveBeenCalled();
   });
 
+  it("emits close once when Escape closes the dropdown", async () => {
+    wrapper = mount(OSelect, {
+      attachTo: document.body,
+      props: {
+        multiple: true,
+        searchable: true,
+        options: [
+          { label: "A", value: "a" },
+          { label: "B", value: "b" },
+        ],
+      },
+    });
+    await wrapper.find("button").trigger("click");
+    await flushPromises();
+    expect(wrapper.emitted("open")).toHaveLength(1);
+
+    const input = document.body.querySelector('input[placeholder="Search..."]') as HTMLInputElement;
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await flushPromises();
+
+    expect(wrapper.emitted("close")).toHaveLength(1);
+  });
+
+  it("emits close when the dropdown is closed programmatically", async () => {
+    wrapper = mount(OSelect, {
+      attachTo: document.body,
+      props: { multiple: true, options: [{ label: "A", value: "a" }] },
+    });
+    await wrapper.find("button").trigger("click");
+    await flushPromises();
+
+    (wrapper.vm as any).close();
+    await flushPromises();
+
+    expect(wrapper.emitted("close")).toHaveLength(1);
+  });
+
+  it("emits open when typing on the closed trigger opens the dropdown", async () => {
+    wrapper = mount(OSelect, {
+      attachTo: document.body,
+      props: { multiple: true, searchable: true, options: [{ label: "A", value: "a" }] },
+    });
+
+    await wrapper.find("button").trigger("keydown", { key: "a" });
+    await flushPromises();
+
+    expect(wrapper.find("button").attributes("aria-expanded")).toBe("true");
+    expect(wrapper.emitted("open")).toHaveLength(1);
+  });
+
+  it("emits open when focus() opens the dropdown", async () => {
+    wrapper = mount(OSelect, {
+      attachTo: document.body,
+      props: { multiple: true, options: [{ label: "A", value: "a" }] },
+    });
+
+    (wrapper.vm as any).focus();
+    await flushPromises();
+
+    expect(wrapper.emitted("open")).toHaveLength(1);
+  });
+
   it("does not emit create on Enter when creatable is false", async () => {
     wrapper = mount(OSelect, {
       attachTo: document.body,
@@ -158,6 +230,77 @@ describe("OSelect", () => {
     input!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     await flushPromises();
     expect(wrapper.emitted("create")).toBeFalsy();
+  });
+
+  describe("opening a large single-select scrolls to the current value", () => {
+    // Regression for a virtualised 48-option time-of-day picker always opening
+    // scrolled to its first entry: single-select now seeds highlightedIndex
+    // with the selected option and scrolls the virtualizer to it on open.
+    const MANY_OPTIONS = Array.from({ length: 48 }, (_, i) => ({
+      label: `Option ${i}`,
+      value: i,
+    }));
+
+    it("does not throw when the selected value is deep in the list", async () => {
+      wrapper = mount(OSelect, {
+        attachTo: document.body,
+        props: { modelValue: 24, options: MANY_OPTIONS },
+      });
+      await wrapper.find("button").trigger("click");
+      await flushPromises();
+
+      // Popover opened successfully (search input mounted) and nothing threw
+      // while resolving/scrolling to the selected index.
+      const input = document.body.querySelector('input[placeholder="Search..."]');
+      expect(input).not.toBeNull();
+    });
+
+    it("does not throw when the current value has no matching option", async () => {
+      wrapper = mount(OSelect, {
+        attachTo: document.body,
+        props: { modelValue: "not-an-option", options: MANY_OPTIONS },
+      });
+      await wrapper.find("button").trigger("click");
+      await flushPromises();
+
+      const input = document.body.querySelector('input[placeholder="Search..."]');
+      expect(input).not.toBeNull();
+    });
+
+    it("still resets the multi-select highlight on open instead of scrolling to a single value", async () => {
+      wrapper = mount(OSelect, {
+        attachTo: document.body,
+        props: { modelValue: [24], multiple: true, options: MANY_OPTIONS },
+      });
+      await wrapper.find("button").trigger("click");
+      await flushPromises();
+
+      const input = document.body.querySelector('input[placeholder="Search..."]');
+      expect(input).not.toBeNull();
+    });
+
+    it("starts a new search from the top of the list, not the offset it opened at", async () => {
+      wrapper = mount(OSelect, {
+        attachTo: document.body,
+        props: {
+          modelValue: 150,
+          options: Array.from({ length: 200 }, (_, i) => ({ label: `Option ${i}`, value: i })),
+        },
+      });
+      await wrapper.find("button").trigger("click");
+      await flushPromises();
+      const scroller = document.body.querySelector<HTMLElement>(".overflow-auto.max-h-72")!;
+      scroller.scrollTop = 600;
+
+      const input = document.body.querySelector<HTMLInputElement>(
+        'input[placeholder="Search..."]',
+      )!;
+      input.value = "Option 1";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      await flushPromises();
+
+      expect(scroller.scrollTop).toBe(0);
+    });
   });
 
   describe("trigger keyboard focus behavior", () => {
@@ -198,6 +341,29 @@ describe("OSelect", () => {
       expect(input!.value).toBe("s");
     });
 
+    it("leaves the seeded character unselected so the next keystroke appends to it", async () => {
+      wrapper = mount(OSelect, {
+        attachTo: document.body,
+        props: {
+          searchable: true,
+          options: [
+            { label: "sample", value: "s1" },
+            { label: "other", value: "o1" },
+          ],
+        },
+      });
+      await wrapper.find("button").trigger("keydown", { key: "s" });
+      await flushPromises();
+      // ListboxFilter's own autoFocus fires on a 1 ms timer.
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const input = document.body.querySelector(
+        'input[placeholder="Search..."]',
+      ) as HTMLInputElement;
+      expect(document.activeElement).toBe(input);
+      expect([input.selectionStart, input.selectionEnd]).toEqual([1, 1]);
+    });
+
     it("should not open the dropdown when a modifier combo is pressed on the trigger", async () => {
       wrapper = mount(OSelect, {
         attachTo: document.body,
@@ -207,6 +373,36 @@ describe("OSelect", () => {
         },
       });
       await wrapper.find("button").trigger("keydown", { key: "s", ctrlKey: true });
+      await flushPromises();
+      expect(document.body.querySelector('input[placeholder="Search..."]')).toBeNull();
+    });
+
+    // A caller driving the trigger programmatically (an empty state's "add"
+    // action landing the cursor in the field) wants more than a focus ring —
+    // it wants the picker actually open, the same as a click would.
+    it("opens the dropdown when focus() is called programmatically", async () => {
+      wrapper = mount(OSelect, {
+        attachTo: document.body,
+        props: {
+          searchable: true,
+          options: [{ label: "sample", value: "s1" }],
+        },
+      });
+      (wrapper.vm as unknown as { focus: () => void }).focus();
+      await flushPromises();
+      expect(document.body.querySelector('input[placeholder="Search..."]')).not.toBeNull();
+    });
+
+    it("does not open a disabled select", async () => {
+      wrapper = mount(OSelect, {
+        attachTo: document.body,
+        props: {
+          searchable: true,
+          disabled: true,
+          options: [{ label: "sample", value: "s1" }],
+        },
+      });
+      (wrapper.vm as unknown as { focus: () => void }).focus();
       await flushPromises();
       expect(document.body.querySelector('input[placeholder="Search..."]')).toBeNull();
     });
@@ -226,6 +422,76 @@ describe("OSelect", () => {
       );
       document.removeEventListener("keydown", docSpy);
       expect(docSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("accessible name", () => {
+    const options = [{ label: "Option A", value: "a" }];
+
+    it("points the popover trigger at the outside label", () => {
+      wrapper = mount(OSelect, { props: { label: "Country", options } });
+      const label = wrapper.find("label");
+      const trigger = wrapper.find('button[role="combobox"]');
+      expect(label.attributes("id")).toBeTruthy();
+      expect(trigger.attributes("aria-labelledby")).toBe(label.attributes("id"));
+    });
+
+    it("lets an explicit aria-label stand instead of the label", () => {
+      wrapper = mount(OSelect, {
+        props: { label: "Country", options },
+        attrs: { "aria-label": "Pick a country" },
+      });
+      const trigger = wrapper.find('button[role="combobox"]');
+      expect(trigger.attributes("aria-label")).toBe("Pick a country");
+      expect(trigger.attributes("aria-labelledby")).toBeUndefined();
+    });
+
+    it("adds no labelledby without an outside label", () => {
+      wrapper = mount(OSelect, { props: { options } });
+      expect(wrapper.find('button[role="combobox"]').attributes("aria-labelledby")).toBeUndefined();
+    });
+  });
+
+  describe("cut-off text", () => {
+    const OPTIONS = [
+      { label: "payment-service-production-eu-west-1", value: "a" },
+      { label: "inventory-service", value: "b" },
+    ];
+
+    it("shows each selected chip as cut-only text with no always-on tooltip", () => {
+      wrapper = mount(OSelect, {
+        props: { modelValue: ["a", "b"], multiple: true, options: OPTIONS },
+      });
+      const chips = wrapper
+        .findAllComponents(OTruncatedText)
+        .filter((c) => c.classes().includes("max-w-40"));
+      expect(chips.map((c) => c.text())).toEqual([
+        "payment-service-production-eu-west-1",
+        "inventory-service",
+      ]);
+      expect(chips[0].classes()).toContain("inline-block");
+      expect(wrapper.findAllComponents(OTooltip).every((t) => t.props("overflowOnly"))).toBe(true);
+    });
+
+    it("gives the listbox trigger label a cut-only tooltip", () => {
+      wrapper = mount(OSelect, { props: { modelValue: "a", searchable: true, options: OPTIONS } });
+      const tip = wrapper.findComponent(OTooltip);
+      expect(tip.props("overflowOnly")).toBe(true);
+      expect(tip.props("content")).toBeUndefined();
+    });
+
+    it("wraps the native trigger value so it cuts, with no tooltip over a custom trigger", () => {
+      wrapper = mount(OSelect, { props: { modelValue: "a", searchable: false, options: OPTIONS } });
+      const value = wrapper.findComponent(OTruncatedText);
+      expect(value.classes()).toContain("flex-1");
+      expect(value.props("tooltip")).toBeUndefined();
+
+      wrapper.unmount();
+      wrapper = mount(OSelect, {
+        props: { modelValue: "a", searchable: false, options: OPTIONS },
+        slots: { trigger: "<b>Custom</b>" },
+      });
+      expect(wrapper.findComponent(OTruncatedText).props("tooltip")).toBe(false);
     });
   });
 });

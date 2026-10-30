@@ -14,17 +14,24 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { CancelledError } from "@tanstack/vue-query";
 import useStreams from "@/composables/useStreams";
 import StreamService from "@/services/stream";
+import { queryClient } from "@/composables/query/queryClient";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import i18nInstance from "@/locales";
+const t = (i18nInstance.global as any).t;
 
 // Mock Stream Service
-vi.mock("@/services/stream", () => ({
-  default: {
-    nameList: vi.fn(),
-    schema: vi.fn(),
-  },
-}));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      nameList: vi.fn(),
+      schema: vi.fn(),
+    },
+  });
+});
 
 // Mock Toast
 const mockToastDismiss = vi.fn();
@@ -103,7 +110,7 @@ describe("useStreams Composable", () => {
       },
     });
 
-    streamsInstance = useStreams();
+    streamsInstance = useStreams(t);
   });
 
   afterEach(() => {
@@ -206,6 +213,20 @@ describe("useStreams Composable", () => {
       expect(result).toHaveProperty("list");
     });
 
+    it("caches a profiles stream list like any other type", async () => {
+      vi.mocked(StreamService.nameList).mockResolvedValueOnce({
+        data: { list: [{ name: "prof1", stream_type: "profiles" }] },
+      } as any);
+
+      const result = await streamsInstance.getStreams("profiles", false, false);
+
+      expect(result).toHaveProperty("list", [{ name: "prof1", stream_type: "profiles" }]);
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "streams/setStreams",
+        expect.objectContaining({ streamType: "profiles" }),
+      );
+    });
+
     it("should get all streams when streamName is 'all'", async () => {
       mockStore.state.streams.areStreamsFetched = false;
 
@@ -214,15 +235,32 @@ describe("useStreams Composable", () => {
       expect(result).toHaveProperty("name", "all");
     });
 
-    it("should return cached streams if already fetched", async () => {
-      // Mock streams as already fetched
+    /// The QUERY decides freshness, not the store copy: a populated store must
+    /// not suppress the read, or a refetch could never reach the sidebar.
+    it("serves a fresh query entry without a request, even with a stale store copy", async () => {
+      queryClient.clear();
+      queryClient.setQueryData(
+        ["org", "test-org", "streams", "nameList", "logs"],
+        [{ name: "from-query" }],
+      );
       mockStore.state.streams.logs = { list: [{ name: "cached" }] };
-      mockStore.state.streams.areStreamsFetched = false;
 
-      const result = await streamsInstance.getStreams("logs", false, false);
+      const result: any = await streamsInstance.getStreams("logs", false, false);
 
-      expect(result).toEqual({ list: [{ name: "cached" }] });
       expect(StreamService.nameList).not.toHaveBeenCalled();
+      expect(result.list).toEqual([{ name: "from-query" }]);
+    });
+
+    it("rejects with the CancelledError itself when the fetch is cancelled", async () => {
+      queryClient.clear();
+      mockStore.state.streams.logs = null;
+      vi.mocked(StreamService.nameList).mockReturnValueOnce(new Promise(() => {}) as any);
+
+      const pending = streamsInstance.getStreams("logs", false, false);
+      await vi.waitFor(() => expect(StreamService.nameList).toHaveBeenCalled());
+      await queryClient.cancelQueries();
+
+      await expect(pending).rejects.toBeInstanceOf(CancelledError);
     });
 
     it("should force fetch streams when force parameter is true", async () => {
@@ -231,6 +269,37 @@ describe("useStreams Composable", () => {
       await streamsInstance.getStreams("logs", false, false, true);
 
       expect(StreamService.nameList).toHaveBeenCalled();
+    });
+
+    it("a forced read of one type reaches the server and leaves the other types' cached lists alone", async () => {
+      queryClient.clear();
+      const key = (type: string) => ["org", "test-org", "streams", "nameList", type];
+      queryClient.setQueryData(key("logs"), [{ name: "stale" }]);
+      queryClient.setQueryData(key("metrics"), [{ name: "stale" }]);
+      mockStore.state.streams.logs = { list: [{ name: "stale" }] };
+      vi.mocked(StreamService.nameList).mockResolvedValueOnce({
+        data: { list: [{ name: "test-stream", stream_type: "logs" }] },
+      } as any);
+
+      await streamsInstance.getStreams("logs", false, false, true);
+
+      expect(StreamService.nameList).toHaveBeenCalledTimes(1);
+      expect(queryClient.getQueryData(key("logs"))).toEqual([
+        { name: "test-stream", stream_type: "logs" },
+      ]);
+      expect(queryClient.getQueryState(key("metrics"))?.isInvalidated).toBe(false);
+    });
+
+    it("removeStream still invalidates when Vuex holds no copy of that type", async () => {
+      delete (mockStore.state.streams.streamsIndexMapping as any).traces;
+      const spy = vi.spyOn(queryClient, "invalidateQueries");
+      try {
+        streamsInstance.removeStream("gone", "traces");
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(spy).toHaveBeenCalledWith({ queryKey: ["org", "test-org", "streams"] });
+      } finally {
+        spy.mockRestore();
+      }
     });
 
     it("should handle getPaginatedStreams with all parameters", async () => {
@@ -261,6 +330,40 @@ describe("useStreams Composable", () => {
   });
 
   // Test 11-15: Individual Stream Functions
+  describe("Stream error messages", () => {
+    beforeEach(() => {
+      queryClient.clear();
+      mockStore.state.streams.logs = null;
+    });
+
+    it("uses the server message when the failure carries no message of its own", async () => {
+      vi.mocked(StreamService.nameList).mockRejectedValueOnce({
+        response: { status: 404, data: { message: "Stream _sessionreplay not found" } },
+      });
+
+      await expect(streamsInstance.getStreams("logs", false, false)).rejects.toThrow(
+        "Stream _sessionreplay not found",
+      );
+    });
+
+    it.each([undefined, null, {}])(
+      "falls back to a readable message instead of stringifying %s",
+      async (failure) => {
+        vi.mocked(StreamService.nameList).mockRejectedValueOnce(failure);
+
+        await expect(streamsInstance.getStreams("logs", false, false)).rejects.toThrow(
+          /^Stream request failed$/,
+        );
+      },
+    );
+
+    it("never rejects with an empty message for a bare string failure", async () => {
+      vi.mocked(StreamService.nameList).mockRejectedValueOnce("boom");
+
+      await expect(streamsInstance.getStreams("logs", false, false)).rejects.toThrow("boom");
+    });
+  });
+
   describe("Individual Stream Functions", () => {
     it("should return null for getStream with empty parameters", async () => {
       const result = await streamsInstance.getStream("", "logs", false);
@@ -333,6 +436,59 @@ describe("useStreams Composable", () => {
 
       expect(result.schema).toHaveLength(2);
       expect(result.schema.map((f: any) => f.name)).toEqual(["field1", "field2"]);
+    });
+
+    it("records the removed columns in removedSchemaFields and leaves schema as before", () => {
+      const streamData = {
+        name: "test",
+        schema: [
+          { name: "field1", type: "Utf8" },
+          { name: "_o2_id", type: "Int64" },
+          { name: "_original", type: "Utf8" },
+          { name: "_all_values", type: "LargeUtf8" },
+          { name: "field2", type: "Int64" },
+        ],
+      };
+
+      const result = streamsInstance.removeSchemaFields(streamData);
+
+      expect(result.schema).toEqual([
+        { name: "field1", type: "Utf8" },
+        { name: "field2", type: "Int64" },
+      ]);
+      expect(result.removedSchemaFields).toEqual([
+        { name: "_o2_id", type: "Int64" },
+        { name: "_original", type: "Utf8" },
+        { name: "_all_values", type: "LargeUtf8" },
+      ]);
+    });
+
+    it("records an empty removedSchemaFields when nothing is removed", () => {
+      const result = streamsInstance.removeSchemaFields({
+        name: "test",
+        schema: [{ name: "field1", type: "Utf8" }],
+      });
+
+      expect(result.schema).toEqual([{ name: "field1", type: "Utf8" }]);
+      expect(result.removedSchemaFields).toEqual([]);
+    });
+
+    it("stores removedSchemaFields on a fetched stream", async () => {
+      mockStore.state.streams.logs = { list: [{ name: "test-stream", schema: [] }] } as any;
+      mockStore.state.streams.streamsIndexMapping.logs["test-stream"] = 0;
+
+      await streamsInstance.getStream("test-stream", "logs", true);
+
+      const setStreams = mockStore.dispatch.mock.calls.filter(
+        (call: any[]) => call[0] === "streams/setStreams",
+      );
+      const stream = setStreams.at(-1)?.[1].streams.list[0];
+      expect(stream.schema.map((f: any) => f.name)).toEqual(["field1"]);
+      expect(stream.removedSchemaFields.map((f: any) => f.name)).toEqual([
+        "_o2_id",
+        "_original",
+        "_all_values",
+      ]);
     });
 
     it("should handle removeSchemaFields with no schema", () => {
@@ -629,6 +785,13 @@ describe("useStreams Composable", () => {
       expect(result.list).toEqual([{ name: "log1" }, { name: "metric1" }]);
     });
 
+    it("leaves cached profiles streams out of the all-streams payload", () => {
+      mockStore.state.streams.logs = { list: [{ name: "log1" }] };
+      (mockStore.state.streams as any).profiles = { list: [{ name: "prof1" }] };
+
+      expect(streamsInstance.getAllStreamsPayload().list).toEqual([{ name: "log1" }]);
+    });
+
     it("should add new streams only if they don't exist", () => {
       const existingStreams = [{ name: "existing", stream_type: "logs" }];
       const newStreams = [
@@ -820,6 +983,26 @@ describe("useStreams Composable", () => {
       expect(mockStore.dispatch).not.toHaveBeenCalledWith("setIsDataIngested", expect.anything());
     });
 
+    it("should not set isDataIngested for internal streams or non-user types", () => {
+      mockStore.state.organizationData.isDataIngested = false;
+
+      streamsInstance.setStreams("logs", [
+        { name: "usage", stream_type: "logs" },
+        { name: "_o2_db_stats", stream_type: "logs" },
+      ]);
+      streamsInstance.setStreams("metadata", [{ name: "default", stream_type: "metadata" }]);
+
+      expect(mockStore.dispatch).not.toHaveBeenCalledWith("setIsDataIngested", expect.anything());
+    });
+
+    it("should set isDataIngested for a RUM stream", () => {
+      mockStore.state.organizationData.isDataIngested = false;
+
+      streamsInstance.setStreams("logs", [{ name: "_rumdata", stream_type: "logs" }]);
+
+      expect(mockStore.dispatch).toHaveBeenCalledWith("setIsDataIngested", true);
+    });
+
     it("should handle deepEqual with nested objects", () => {
       const obj1 = { a: { b: { c: 1 } } };
       const obj2 = { a: { b: { c: 1 } } };
@@ -829,47 +1012,65 @@ describe("useStreams Composable", () => {
       expect(streamsInstance.deepEqual(obj1, obj3)).toBe(false);
     });
 
-    it("should handle setStreams force parameter behavior", () => {
+    /// A write always lands. The caller only reaches setStreams with a list the
+    /// query just produced, so declining to store it would discard a refetch.
+    it("stores the list every time, including over an existing one", () => {
       const streamList = [{ name: "test", stream_type: "logs" }];
 
-      // Test 1: setStreams with force=true always sets streams
       vi.clearAllMocks();
-      streamsInstance.setStreams("logs", streamList, true);
+      mockStore.state.streams.logs = { list: [{ name: "already-here" }] };
+      streamsInstance.setStreams("logs", streamList);
       expect(mockStore.dispatch).toHaveBeenCalledWith(
         "streams/setStreams",
         expect.objectContaining({
           streamType: "logs",
-          streams: expect.objectContaining({
-            list: streamList,
-            name: "logs",
-          }),
+          streams: expect.objectContaining({ list: streamList, name: "logs" }),
         }),
       );
 
-      // Test 2: setStreams with force=true again should still work
+      // And again, over the list it just wrote.
       vi.clearAllMocks();
-      streamsInstance.setStreams("logs", streamList, true);
+      streamsInstance.setStreams("logs", streamList);
       expect(mockStore.dispatch).toHaveBeenCalledWith(
         "streams/setStreams",
-        expect.objectContaining({
-          streamType: "logs",
-        }),
+        expect.objectContaining({ streamType: "logs" }),
       );
 
-      // Test 3: Verify that force parameter is passed correctly to the function
+      // An empty list is a real answer too — a type whose streams were all deleted.
       vi.clearAllMocks();
       const emptyStreamList: any[] = [];
-      streamsInstance.setStreams("metrics", emptyStreamList, true);
+      streamsInstance.setStreams("metrics", emptyStreamList);
       expect(mockStore.dispatch).toHaveBeenCalledWith(
         "streams/setStreams",
         expect.objectContaining({
           streamType: "metrics",
-          streams: expect.objectContaining({
-            name: "metrics",
-            list: emptyStreamList,
-          }),
+          streams: expect.objectContaining({ name: "metrics", list: emptyStreamList }),
         }),
       );
+    });
+  });
+
+  describe("Forced full read and fetched-at", () => {
+    it("a forced read of the whole list fetches every type, memory hits included", async () => {
+      queryClient.clear();
+      for (const type of ["logs", "metrics", "traces", "enrichment_tables", "index", "metadata"]) {
+        (mockStore.state.streams as any)[type] = { list: [{ name: "cached" }] };
+      }
+
+      await streamsInstance.getStreams("all", false, false, true);
+
+      expect(StreamService.nameList).toHaveBeenCalledTimes(6);
+    });
+
+    it("getStreamsFetchedAt reports the oldest type list, or nothing when none is cached", async () => {
+      queryClient.clear();
+      const key = (type: string) => ["org", "test-org", "streams", "nameList", type];
+      queryClient.setQueryData(key("logs"), [], { updatedAt: 2000 });
+      queryClient.setQueryData(key("metrics"), [], { updatedAt: 1000 });
+
+      expect(await streamsInstance.getStreamsFetchedAt()).toBe(1000);
+      expect(await streamsInstance.getStreamsFetchedAt("logs")).toBe(2000);
+      expect(await streamsInstance.getStreamsFetchedAt("traces")).toBeUndefined();
     });
   });
 });

@@ -15,9 +15,9 @@
 
 //! Make the "location down" one-shot cluster-wide instead of per-process.
 //!
-//! The staleness watcher runs on every alert_manager node and suppressed repeat
+//! The staleness watcher runs on every scheduler node and suppressed repeat
 //! notifications with an in-memory `HashSet<String>`. That set is process-local,
-//! so N alert managers sent N notifications for the same outage — and did it
+//! so N schedulers sent N notifications for the same outage — and did it
 //! again on every down → recover → down cycle.
 //!
 //! One column, defaulted, so existing rows need no backfill:

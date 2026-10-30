@@ -125,12 +125,12 @@
           ],
           [
             "SORT-M3",
-            "manual",
+            "auto",
             "2"
           ],
           [
             "SORT-M3",
-            "auto",
+            "manual",
             "2"
           ],
           [
@@ -839,14 +839,14 @@
           ],
           [
             "US-WEST",
-            "ZONE-3",
+            "ZONE-1",
             "1",
             "320.0",
             "67.9"
           ],
           [
             "US-WEST",
-            "ZONE-1",
+            "ZONE-3",
             "1",
             "320.0",
             "67.9"
@@ -1017,17 +1017,17 @@
         "results": [
           [
             "errors",
-            "E001",
-            "1"
-          ],
-          [
-            "errors",
             "E009",
             "1"
           ],
           [
             "errors",
             "E003",
+            "1"
+          ],
+          [
+            "errors",
+            "E001",
             "1"
           ],
           [
@@ -1055,14 +1055,14 @@
         ],
         "results": [
           [
-            "non-Android",
-            "0",
-            "4"
-          ],
-          [
             "Android",
             "1",
             "2"
+          ],
+          [
+            "non-Android",
+            "0",
+            "4"
           ],
           [
             "TOTAL",
@@ -1163,11 +1163,6 @@
           ],
           [
             "component_err",
-            "batch-sync",
-            "2"
-          ],
-          [
-            "component_err",
             "zone-controller",
             "1"
           ],
@@ -1180,6 +1175,11 @@
             "component_err",
             "track-router",
             "1"
+          ],
+          [
+            "component_err",
+            "batch-sync",
+            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -1276,12 +1276,12 @@
           ],
           [
             "error_bucket",
-            "E003",
+            "E005",
             "1"
           ],
           [
             "error_bucket",
-            "E005",
+            "E003",
             "1"
           ],
           [
@@ -1693,12 +1693,12 @@
           ],
           [
             "ZONE-2",
-            "SORT-Z9",
+            "SORT-Q5",
             "stream2"
           ],
           [
             "ZONE-2",
-            "SORT-Q5",
+            "SORT-Z9",
             "stream2"
           ],
           [
@@ -1763,22 +1763,22 @@
           [
             "track-router",
             "230.0",
-            "stream2"
+            "stream1"
           ],
           [
             "track-router",
             "230.0",
-            "stream1"
-          ],
-          [
-            "scan-hub",
-            "45.0",
-            "stream1"
+            "stream2"
           ],
           [
             "scan-hub",
             "45.0",
             "stream2"
+          ],
+          [
+            "scan-hub",
+            "45.0",
+            "stream1"
           ],
           [
             "conveyor-driver",
@@ -1931,11 +1931,11 @@
             "3"
           ],
           [
-            "ZONE-4",
+            "ZONE-2",
             "3"
           ],
           [
-            "ZONE-2",
+            "ZONE-4",
             "3"
           ]
         ],
@@ -2018,12 +2018,12 @@
             "1"
           ],
           [
-            "ZONE-3",
+            "ZONE-1",
             "305.0",
             "2"
           ],
           [
-            "ZONE-1",
+            "ZONE-3",
             "305.0",
             "2"
           ]
@@ -2190,15 +2190,15 @@
         ],
         "results": [
           [
+            "ZONE-3",
+            "2"
+          ],
+          [
             "ZONE-1",
             "2"
           ],
           [
             "ZONE-2",
-            "2"
-          ],
-          [
-            "ZONE-3",
             "2"
           ],
           [
@@ -2246,11 +2246,11 @@
         ],
         "results": [
           [
-            "warehouse-west",
+            "warehouse-south",
             "3"
           ],
           [
-            "warehouse-south",
+            "warehouse-west",
             "3"
           ],
           [
@@ -2258,11 +2258,11 @@
             "3"
           ],
           [
-            "warehouse-central",
+            "warehouse-east",
             "2"
           ],
           [
-            "warehouse-east",
+            "warehouse-central",
             "2"
           ]
         ],
@@ -2314,11 +2314,11 @@
             "725.0"
           ],
           [
-            "PL-005",
+            "PL-003",
             "610.0"
           ],
           [
-            "PL-003",
+            "PL-005",
             "610.0"
           ],
           [
@@ -2362,15 +2362,15 @@
         ],
         "results": [
           [
-            "ZONE-3",
-            "4",
-            "640.0",
-            "840.0"
-          ],
-          [
             "ZONE-1",
             "3",
             "745.0",
+            "840.0"
+          ],
+          [
+            "ZONE-3",
+            "4",
+            "640.0",
             "840.0"
           ],
           [
@@ -2404,11 +2404,11 @@
         ],
         "results": [
           [
-            "conveyor-driver",
+            "temp-regulator",
             "3"
           ],
           [
-            "temp-regulator",
+            "conveyor-driver",
             "3"
           ],
           [
@@ -2568,13 +2568,13 @@
             "3"
           ],
           [
-            "ZONE-3",
+            "ZONE-1",
             "rate",
             "610.0",
             "1"
           ],
           [
-            "ZONE-1",
+            "ZONE-3",
             "rate",
             "610.0",
             "1"

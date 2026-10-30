@@ -36,10 +36,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
     ider::init();
     // init metrics
     metrics::init();
+    utils::ssrf_guard::init_allowlist();
 
     // initialize chrome launch options, so that if chrome download is
     // needed, it will happen now and not during serving report API
-    if cluster::LOCAL_NODE.is_alert_manager() {
+    if cluster::LOCAL_NODE.is_scheduler() {
         let _ = get_chrome_launch_options().await;
     }
     Ok(())

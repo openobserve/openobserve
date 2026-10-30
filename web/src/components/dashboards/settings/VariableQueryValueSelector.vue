@@ -15,7 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
+  <div class="relative">
+    <!-- A disabled control swallows its own pointer events, so the tooltip
+         trigger has to be an overlay above it rather than the control itself. -->
+    <div
+      v-if="disabled && disabledTooltipKey"
+      class="absolute inset-0 z-10"
+      data-test="variable-disabled-tooltip"
+    >
+      <OTooltip :content="t(disabledTooltipKey, disabledTooltipParams ?? {})" side="bottom" />
+    </div>
     <OSelect
       ref="selectRef"
       :model-value="oSelectModelValue"
@@ -28,6 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :loading="variableItem.isLoading && !isOpen"
       :data-test="`variable-selector-${variableItem.name}-inner`"
       :multiple="variableItem.multiSelect"
+      :disabled="!!disabled"
+      :clearable="clearable"
       @search="onSearch"
       @open="onPopupShow"
       @close="onPopupHide"
@@ -35,10 +46,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="onUpdateValue"
     >
       <template #trigger>
-        <span
-          class="text-select-text flex-1 truncate text-start text-xs leading-4 font-semibold"
+        <OTruncatedText
+          class="text-select-text flex-1 text-start text-xs leading-4 font-semibold"
           :data-test="`variable-selector-${variableItem.name}-inner-value`"
-          >{{ displayValue }}</span
+          >{{ displayValue }}</OTruncatedText
         >
       </template>
       <template #before-options>
@@ -120,21 +131,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { SELECT_ALL_VALUE, CUSTOM_VALUE } from "@/utils/dashboard/constants";
-import { debounce } from "lodash-es";
+import { debounce, isEqual } from "lodash-es";
 import { defineComponent, ref, watch, computed, onUnmounted } from "vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import { useI18n } from "vue-i18n";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useI18nTyped } from "@/types/i18n";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 export default defineComponent({
   name: "VariableQueryValueSelector",
-  components: { OSeparator, OSelect, OCheckbox, OSpinner },
-  props: ["modelValue", "variableItem", "loadOptions"],
+  components: { OTruncatedText, OSeparator, OSelect, OCheckbox, OSpinner, OTooltip },
+  props: {
+    modelValue: { type: null, default: undefined },
+    variableItem: { type: Object, default: undefined },
+    loadOptions: { type: Function, default: undefined },
+    // Declared Boolean so a valueless `disabled` attribute coerces to true
+    // rather than passing the falsy "" an array-form prop would hand through.
+    disabled: { type: Boolean, default: false },
+    disabledTooltipKey: { type: String, default: undefined },
+    disabledTooltipParams: { type: Object, default: undefined },
+    clearable: { type: Boolean, default: false },
+  },
   emits: ["update:modelValue", "search"],
   setup(props: any, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const selectedValue = ref(props.variableItem?.value);
     const currentSearchTerm = ref("");
     const selectRef = ref(null);
@@ -147,7 +170,10 @@ export default defineComponent({
       return availableOptions.value.map((opt: any) => {
         if (typeof opt.value === "string" && opt.value.endsWith(`${CUSTOM_VALUE}`)) {
           const base = opt.value.replace(new RegExp(`${CUSTOM_VALUE}$`), "");
-          return { ...opt, label: `${base} ${t("dashboard.variableQueryValueSelector.custom")}` };
+          return {
+            ...opt,
+            label: t("dashboard.variableQueryValueSelector.customValue", { value: base }),
+          };
         }
         return opt;
       });
@@ -225,9 +251,22 @@ export default defineComponent({
       );
     });
 
+    // Ticking every loaded option by hand shows as "all", but the selection stays an explicit list rather than SELECT_ALL_VALUE.
+    const everyOptionSelected = computed(() => {
+      if (!Array.isArray(selectedValue.value) || props.variableItem.isLoading) return false;
+      const optionValues = computedOptions.value
+        .map((opt: any) => opt.value)
+        .filter((v: any) => !(typeof v === "string" && v.endsWith(`${CUSTOM_VALUE}`)));
+      const selected = new Set(selectedValue.value);
+      return optionValues.length > 0 && optionValues.every((v: any) => selected.has(v));
+    });
+
     const isAllSelected = computed(() => {
       if (props.variableItem.multiSelect) {
-        return Array.isArray(selectedValue.value) && selectedValue.value?.[0] === SELECT_ALL_VALUE;
+        return (
+          (Array.isArray(selectedValue.value) && selectedValue.value?.[0] === SELECT_ALL_VALUE) ||
+          everyOptionSelected.value
+        );
       }
       return selectedValue.value === SELECT_ALL_VALUE;
     });
@@ -256,8 +295,9 @@ export default defineComponent({
         : SELECT_ALL_VALUE;
 
       selectedValue.value = newValue;
-      emit("update:modelValue", newValue);
+      // Multi-select applies on close (onPopupHide), like every other tick.
       if (!props.variableItem.multiSelect) {
+        emit("update:modelValue", newValue);
         await closePopUpWhenValueIsSet();
       }
     };
@@ -292,9 +332,10 @@ export default defineComponent({
       isOpen.value = false;
 
       filterText.value = "";
-      if (props.variableItem.multiSelect) {
-        emit("update:modelValue", selectedValue.value);
-      }
+      if (!props.variableItem.multiSelect) return;
+      // An unchanged value still resets every dependent variable downstream.
+      if (isEqual(selectedValue.value, props.variableItem.value)) return;
+      emit("update:modelValue", selectedValue.value);
     };
 
     const displayValue = computed(() => {
@@ -308,7 +349,9 @@ export default defineComponent({
                 if (it === SELECT_ALL_VALUE)
                   return t("dashboard.variableQueryValueSelector.allSelected");
                 if (typeof it === "string" && it.endsWith(`${CUSTOM_VALUE}`))
-                  return `${it.replace(new RegExp(`${CUSTOM_VALUE}$`), "")} ${t("dashboard.variableQueryValueSelector.custom")}`;
+                  return t("dashboard.variableQueryValueSelector.customValue", {
+                    value: it.replace(new RegExp(`${CUSTOM_VALUE}$`), ""),
+                  });
                 return it;
               })
               .join(", ");
@@ -329,7 +372,9 @@ export default defineComponent({
                 if (it === SELECT_ALL_VALUE)
                   return t("dashboard.variableQueryValueSelector.allSelected");
                 if (typeof it === "string" && it.endsWith(`${CUSTOM_VALUE}`))
-                  return `${it.replace(new RegExp(`${CUSTOM_VALUE}$`), "")} ${t("dashboard.variableQueryValueSelector.custom")}`;
+                  return t("dashboard.variableQueryValueSelector.customValue", {
+                    value: it.replace(new RegExp(`${CUSTOM_VALUE}$`), ""),
+                  });
                 return it;
               })
               .join(", ");
@@ -350,7 +395,9 @@ export default defineComponent({
           typeof selectedValue.value === "string" &&
           selectedValue.value.endsWith(`${CUSTOM_VALUE}`)
         ) {
-          return `${selectedValue.value.replace(new RegExp(`${CUSTOM_VALUE}$`), "")} ${t("dashboard.variableQueryValueSelector.custom")}`;
+          return t("dashboard.variableQueryValueSelector.customValue", {
+            value: selectedValue.value.replace(new RegExp(`${CUSTOM_VALUE}$`), ""),
+          });
         } else {
           return selectedValue.value;
         }

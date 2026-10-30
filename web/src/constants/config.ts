@@ -26,6 +26,7 @@ export const config = {
 export const siteURL = {
   contactSales: "https://openobserve.ai/contactus/",
   contactSupport: "https://openobserve.ai/contactus/",
+  // Schema (pricingOptions, inPriceBlock, additionalInfo) is documented in website5 src/content/pages/pricing.json `_comment`.
   pricingJsonUrl: "https://openobserve.ai/pricing.json",
 };
 

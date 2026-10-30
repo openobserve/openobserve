@@ -20,6 +20,7 @@
 import { test, expect } from '@playwright/test';
 import PageManager from '../../pages/page-manager.js';
 import { isCloudEnvironment } from '../utils/cloud-auth.js';
+import testLogger from '../utils/test-logger.js';
 
 const VALID_EMAIL = 'user@example.com';
 const NATIVELY_VALID_BUT_BAD_EMAIL = 'user@invalid'; // passes browser, fails zod
@@ -35,7 +36,8 @@ test.describe('Login form validation', () => {
 
   let loginPage;
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
     const pm = new PageManager(page);
     loginPage = pm.loginPage;
     await loginPage.openInternalLoginForm();

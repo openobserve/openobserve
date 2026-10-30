@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { flushPromises, mount } from "@vue/test-utils";
 import CodeQueryEditor from "./CodeQueryEditor.vue";
 import { createStore } from "vuex";
 
@@ -34,6 +34,7 @@ const mockModel = {
   getLineContent: vi.fn(() => ""),
   getValueInRange: vi.fn(() => ""),
   getWordUntilPosition: vi.fn(() => ({ word: "", startColumn: 1, endColumn: 1 })),
+  getValueLength: vi.fn(() => 13),
 };
 
 // Stable mock editor instance so tests can reference it directly
@@ -41,8 +42,12 @@ const mockEditorObj = {
   onDidChangeModelContent: vi.fn(),
   createContextKey: vi.fn(),
   addCommand: vi.fn(),
+  onKeyDown: vi.fn(),
   onDidFocusEditorWidget: vi.fn(),
   onDidBlurEditorWidget: vi.fn(),
+  onDidBlurEditorText: vi.fn(),
+  onDidChangeCursorPosition: vi.fn(),
+  createDecorationsCollection: vi.fn(() => ({ set: vi.fn(), clear: vi.fn() })),
   dispose: vi.fn(),
   getValue: vi.fn(() => ""),
   setValue: vi.fn(),
@@ -66,6 +71,13 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
     defineTheme: vi.fn(),
     setTheme: vi.fn(),
     setModelMarkers: vi.fn(),
+    setModelLanguage: vi.fn(),
+    TrackedRangeStickiness: { NeverGrowsWhenTypingAtEdges: 1 },
+    addCommand: vi.fn(() => ({ dispose: vi.fn() })),
+    addKeybindingRule: vi.fn(() => ({ dispose: vi.fn() })),
+    addKeybindingRules: vi.fn(() => ({ dispose: vi.fn() })),
+    registerCommand: vi.fn(() => ({ dispose: vi.fn() })),
+    getEditors: vi.fn(() => []),
   },
   languages: {
     // Real values, mirroring monaco-editor/esm/vs/editor/common/languages.js
@@ -97,8 +109,27 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
     registerSignatureHelpProvider: vi.fn(() => ({ dispose: vi.fn() })),
     registerHoverProvider: vi.fn(() => ({ dispose: vi.fn() })),
   },
-  KeyMod: { CtrlCmd: 1 },
-  KeyCode: { Enter: 13 },
+  KeyMod: { CtrlCmd: 2048, WinCtrl: 256 },
+  KeyCode: {
+    Backspace: 1,
+    Tab: 2,
+    Enter: 13,
+    Escape: 9,
+    Space: 10,
+    PageUp: 11,
+    PageDown: 12,
+    UpArrow: 16,
+    DownArrow: 18,
+    KeyI: 39,
+    KeyN: 44,
+    KeyP: 46,
+    KeyZ: 56,
+  },
+  Range: class {
+    constructor(...args: number[]) {
+      Object.assign(this, { args });
+    }
+  },
 }));
 
 // Mock dynamic imports
@@ -108,6 +139,7 @@ vi.mock("monaco-editor/esm/vs/language/html/monaco.contribution.js", () => ({}))
 vi.mock("monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js", () => ({}));
 vi.mock("monaco-editor/esm/vs/basic-languages/python/python.contribution.js", () => ({}));
 vi.mock("monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js", () => ({}));
+vi.mock("monaco-editor/esm/vs/basic-languages/hcl/hcl.contribution.js", () => ({}));
 
 // Fix: component imports default from "@/composables/useLogs/searchState"
 vi.mock("@/composables/useLogs/searchState", () => ({
@@ -119,15 +151,27 @@ vi.mock("@/composables/useLogs/searchState", () => ({
   }),
 }));
 
-vi.mock("@/composables/useNLQuery", () => ({
-  useNLQuery: () => ({
-    detectNaturalLanguage: vi.fn(() => false),
-    generateSQL: vi.fn(() => Promise.resolve(null)),
-    transformToSQL: vi.fn((_nl: string, sql: string) => sql),
-    isGenerating: { value: false },
-    streamingResponse: { value: "" },
-  }),
+const nlq = vi.hoisted(() => ({
+  generateSQL: vi.fn(() => Promise.resolve(null as string | null)),
+  refusalNotice: null as unknown as { value: string },
+  showErrorNotification: vi.fn(),
 }));
+
+vi.mock("@/composables/useNLQuery", async () => {
+  // A real ref, so the exposed refusalNotice unwraps on the component like it does in the app.
+  const { ref } = await import("vue");
+  nlq.refusalNotice = ref("");
+  return {
+    useNLQuery: () => ({
+      detectNaturalLanguage: vi.fn(() => false),
+      generateSQL: nlq.generateSQL,
+      transformToSQL: vi.fn((_nl: string, sql: string) => sql),
+      isGenerating: { value: false },
+      streamingResponse: { value: "" },
+      refusalNotice: nlq.refusalNotice,
+    }),
+  };
+});
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
@@ -137,7 +181,7 @@ vi.mock("vue-i18n", () => ({
 
 vi.mock("@/composables/useNotifications", () => ({
   default: () => ({
-    showErrorNotification: vi.fn(),
+    showErrorNotification: nlq.showErrorNotification,
     showPositiveNotification: vi.fn(),
   }),
 }));
@@ -203,6 +247,76 @@ describe("CodeQueryEditor", () => {
       },
     });
   };
+
+  // A surface that switches language, such as the export dialog's JSON and
+  // Terraform tabs, used to force a remount to get new highlighting: that throws
+  // away the DOM, the scroll position and the undo stack on every toggle.
+  describe("language switching", () => {
+    it("retokenizes the existing model instead of recreating the editor", async () => {
+      attachEditorHost();
+      const monacoApi: any = await import("monaco-editor/esm/vs/editor/editor.api");
+      const wrapper = createWrapper({ language: "json", query: "{}" });
+      await vi.waitFor(() => expect(monacoApi.editor.create).toHaveBeenCalled());
+
+      const createdBefore = monacoApi.editor.create.mock.calls.length;
+      monacoApi.editor.setModelLanguage.mockClear();
+
+      await wrapper.setProps({ language: "hcl" });
+      await vi.waitFor(() => expect(monacoApi.editor.setModelLanguage).toHaveBeenCalled());
+
+      expect(monacoApi.editor.setModelLanguage.mock.calls[0][1]).toBe("hcl");
+      // No second editor: the same instance was retokenized.
+      expect(monacoApi.editor.create.mock.calls.length).toBe(createdBefore);
+      wrapper.unmount();
+    });
+  });
+
+  describe("free-text decorations (item 1 AC1.4)", () => {
+    it("decorates each searched range with o2-free-text-term and the hover, and clears them", async () => {
+      attachEditorHost();
+      const monacoApi: any = await import("monaco-editor/esm/vs/editor/editor.api");
+      mockModel.getPositionAt.mockImplementation((offset: number) => ({
+        lineNumber: 1,
+        column: offset + 1,
+      }));
+      mockEditorObj.deltaDecorations.mockImplementation(((_old: string[], next: any[]) =>
+        next.map((_d: any, i: number) => `d${i}`)) as any);
+      const wrapper = createWrapper({ query: "timeout error" });
+      await vi.waitFor(() => expect(monacoApi.editor.create).toHaveBeenCalled());
+
+      await wrapper.setProps({
+        freeTextDecorations: {
+          ranges: [
+            { start: 0, end: 7 },
+            { start: 8, end: 13 },
+          ],
+          hover: "Full-text search in: body\n\nRuns as match_all('timeout')",
+        },
+      });
+      await vi.waitFor(() => expect(mockEditorObj.deltaDecorations).toHaveBeenCalled());
+
+      const [previous, next] = mockEditorObj.deltaDecorations.mock.calls.at(-1) as any[];
+      expect(previous).toEqual([]);
+      expect(next.map((d: any) => d.range.args)).toEqual([
+        [1, 1, 1, 8],
+        [1, 9, 1, 14],
+      ]);
+      expect(next[0].options.inlineClassName).toBe("o2-free-text-term");
+      expect(next[0].options.hoverMessage.map((m: any) => m.value)).toEqual([
+        "Full\\-text search in: body",
+        "Runs as match\\_all\\('timeout'\\)",
+      ]);
+
+      await wrapper.setProps({ freeTextDecorations: null });
+      await vi.waitFor(() =>
+        expect(mockEditorObj.deltaDecorations.mock.calls.at(-1)).toEqual([["d0", "d1"], []]),
+      );
+      mockModel.getPositionAt.mockReset();
+      mockModel.getPositionAt.mockImplementation(() => ({ lineNumber: 1, column: 1 }));
+      mockEditorObj.deltaDecorations.mockImplementation((() => []) as any);
+      wrapper.unmount();
+    });
+  });
 
   describe("Component Rendering", () => {
     it("should render the component", () => {
@@ -345,6 +459,29 @@ describe("CodeQueryEditor", () => {
     it("should have empty fields array as default", () => {
       const wrapper = createWrapper({ fields: undefined });
       expect(wrapper.props("fields")).toEqual([]);
+    });
+  });
+
+  describe("query generation refused by the server", () => {
+    afterEach(() => {
+      nlq.refusalNotice.value = "";
+    });
+
+    it("shows the refusal notice a single time and does not throw", async () => {
+      const notice = "Your organization has used all of its AI credits.";
+      nlq.generateSQL.mockImplementationOnce(() => {
+        nlq.refusalNotice.value = notice;
+        return Promise.resolve(null);
+      });
+      const wrapper = createWrapper();
+
+      await expect(wrapper.vm.handleGenerateSQL("show error rows")).resolves.toBeUndefined();
+      // Exposed so the AI bar records it instead of the unchanged query.
+      expect(wrapper.vm.refusalNotice).toBe(notice);
+
+      expect(nlq.showErrorNotification).toHaveBeenCalledTimes(1);
+      expect(nlq.showErrorNotification).toHaveBeenCalledWith(notice);
+      wrapper.unmount();
     });
   });
 
@@ -558,10 +695,10 @@ describe("CodeQueryEditor", () => {
         },
         global: { plugins: [store] },
       });
-      // Wait until the async setupEditor completes and addCommand is recorded
+      // Wait until the async setupEditor completes and the key handler is bound
       await vi.waitFor(
         () => {
-          expect(mockEditorObj.addCommand).toHaveBeenCalled();
+          expect(mockEditorObj.onKeyDown).toHaveBeenCalled();
         },
         { timeout: 10000 },
       );
@@ -573,28 +710,144 @@ describe("CodeQueryEditor", () => {
       shortcutWrapper = null;
     });
 
-    it("should call addCommand with CtrlCmd+Enter keybinding", async () => {
+    // The shortcut is bound via onKeyDown rather than addCommand: monaco's
+    // addCommand discards the disposable it gets back, so its CommandsRegistry
+    // entry outlives the editor and retains this component.
+    it("should bind the shortcut through onKeyDown, not addCommand", async () => {
       await mountAndSetup();
-      expect(mockEditorObj.addCommand).toHaveBeenCalled();
-      const firstCall = mockEditorObj.addCommand.mock.calls[0];
-      // KeyMod.CtrlCmd | KeyCode.Enter = 1 | 13 (bitwise OR of the mock values)
-      expect(firstCall[0]).toBe(1 | 13);
+      expect(mockEditorObj.onKeyDown).toHaveBeenCalled();
+      expect(mockEditorObj.addCommand).not.toHaveBeenCalled();
     });
 
-    it("should emit run-query when CtrlCmd+Enter handler is invoked", async () => {
+    it("should emit run-query when CtrlCmd+Enter is pressed", async () => {
       const wrapper = await mountAndSetup();
-      expect(mockEditorObj.addCommand).toHaveBeenCalled();
-      const handler = mockEditorObj.addCommand.mock.calls[0][1];
+      const handler = mockEditorObj.onKeyDown.mock.calls[0][0];
       expect(typeof handler).toBe("function");
-      handler();
+      handler({
+        keyCode: 13,
+        ctrlKey: true,
+        metaKey: false,
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
+      });
       expect(wrapper.emitted("run-query")).toBeTruthy();
     });
 
-    it("should register addCommand with ctrlenter context", async () => {
-      await mountAndSetup();
-      expect(mockEditorObj.addCommand).toHaveBeenCalled();
-      const firstCall = mockEditorObj.addCommand.mock.calls[0];
-      expect(firstCall[2]).toBe("ctrlenter");
+    it("should ignore Enter without a modifier", async () => {
+      const wrapper = await mountAndSetup();
+      const handler = mockEditorObj.onKeyDown.mock.calls[0][0];
+      handler({
+        keyCode: 13,
+        ctrlKey: false,
+        metaKey: false,
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
+      });
+      expect(wrapper.emitted("run-query")).toBeFalsy();
+    });
+
+    // Monaco reports a widget blur on a timer, after a fast click on Run has already read the query.
+    it("commits a pending edit as soon as the text loses focus", async () => {
+      const wrapper = await mountAndSetup();
+      const onChange = mockEditorObj.onDidChangeModelContent.mock.calls[0][0];
+      mockEditorObj.getValue.mockReturnValue("up");
+      onChange({});
+      expect(wrapper.emitted("update:query")).toBeFalsy();
+
+      mockEditorObj.onDidBlurEditorText.mock.calls[0][0]();
+
+      expect(wrapper.emitted("update:query")?.at(-1)?.[0]).toBe("up");
+      mockEditorObj.getValue.mockReturnValue("");
+    });
+
+    describe("user-edit (AC4.4 dirty editor)", () => {
+      const changeHandler = () => mockEditorObj.onDidChangeModelContent.mock.calls[0][0];
+
+      afterEach(() => {
+        mockModel.pushEditOperations.mockReset();
+        mockModel.setValue.mockReset();
+        mockEditorObj.setValue.mockReset();
+        mockModel.getValue.mockReturnValue("");
+      });
+
+      it("emits user-edit at once for a keystroke, before the debounced update", async () => {
+        const wrapper = await mountAndSetup();
+        changeHandler()({ isFlush: false });
+        expect(wrapper.emitted("user-edit")).toHaveLength(1);
+        expect(wrapper.emitted("update:query")).toBeFalsy();
+      });
+
+      it("passes whether the text is blank and was blank, counting a programmatic restore", async () => {
+        const lines = (...text: string[]) => {
+          mockModel.getLineCount.mockReturnValue(text.length);
+          mockModel.getLineContent.mockImplementation((line: number) => text[line - 1]);
+        };
+        const wrapper = await mountAndSetup();
+        mockEditorObj.setValue.mockImplementation(() => changeHandler()({ isFlush: false }));
+        lines("level='error'");
+        const editorApi = wrapper.vm as unknown as { setValue: (value: string) => void };
+        editorApi.setValue("level='error'");
+        expect(wrapper.emitted("user-edit")).toBeFalsy();
+
+        lines("  ", "");
+        changeHandler()({ isFlush: false });
+        lines("", "u");
+        changeHandler()({ isFlush: false });
+        expect(wrapper.emitted("user-edit")).toEqual([
+          [true, false],
+          [false, true],
+        ]);
+        lines("");
+      });
+
+      it("reads only up to the first non-blank line on an edit, never the whole document", async () => {
+        await mountAndSetup();
+        mockModel.getLineCount.mockReturnValue(10_000);
+        mockModel.getLineContent.mockImplementation((line: number) => (line === 1 ? "up" : "x"));
+        mockModel.getLineContent.mockClear();
+        mockModel.getValue.mockClear();
+        mockEditorObj.getValue.mockClear();
+        changeHandler()({ isFlush: false });
+        expect(mockModel.getLineContent).toHaveBeenCalledTimes(1);
+        expect(mockModel.getValue).not.toHaveBeenCalled();
+        expect(mockEditorObj.getValue).not.toHaveBeenCalled();
+        mockModel.getLineCount.mockReturnValue(1);
+        mockModel.getLineContent.mockImplementation(() => "");
+      });
+
+      it("ignores a flush (a whole-model replace)", async () => {
+        const wrapper = await mountAndSetup();
+        changeHandler()({ isFlush: true });
+        expect(wrapper.emitted("user-edit")).toBeFalsy();
+      });
+
+      it("never marks the editor dirty for its own setValue", async () => {
+        const wrapper = await mountAndSetup();
+        mockEditorObj.setValue.mockImplementation(() => changeHandler()({ isFlush: false }));
+        (wrapper.vm as any).setValue("level='error'");
+        expect(wrapper.emitted("user-edit")).toBeFalsy();
+      });
+
+      it("never marks the editor dirty for the blur trim of a URL query with trailing whitespace", async () => {
+        const wrapper = await mountAndSetup();
+        mockModel.getValue.mockReturnValue("status=500   ");
+        mockModel.getLineCount.mockReturnValue(1);
+        mockModel.getLineLength.mockReturnValue(13);
+        mockModel.pushEditOperations.mockImplementation(() => changeHandler()({ isFlush: false }));
+        mockEditorObj.onDidBlurEditorWidget.mock.calls[0][0]();
+        expect(mockModel.pushEditOperations).toHaveBeenCalled();
+        expect(wrapper.emitted("user-edit")).toBeFalsy();
+      });
+
+      it("never marks the editor dirty for the unfocused prop sync", async () => {
+        const wrapper = await mountAndSetup();
+        mockEditorObj.hasWidgetFocus.mockReturnValue(false);
+        mockModel.setValue.mockImplementation(() => changeHandler()({ isFlush: false }));
+        await wrapper.setProps({ query: "SELECT * FROM other" });
+        await flushPromises();
+        expect(mockModel.setValue).toHaveBeenCalled();
+        expect(wrapper.emitted("user-edit")).toBeFalsy();
+      });
     });
   });
 
@@ -619,7 +872,7 @@ describe("CodeQueryEditor", () => {
 
       await vi.waitFor(
         () => {
-          expect(mockEditorObj.addCommand).toHaveBeenCalled();
+          expect(mockEditorObj.onKeyDown).toHaveBeenCalled();
         },
         { timeout: 10000 },
       );

@@ -3,22 +3,31 @@
 <script setup lang="ts">
 import type { HeaderGroup, Table } from "@tanstack/vue-table";
 import { FlexRender } from "@tanstack/vue-table";
-import { computed, inject, reactive } from "vue";
-import { useI18n } from "vue-i18n";
+import { computed, inject, reactive, useId } from "vue";
+import type { I18nText } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import { isElementTruncated, readElementText } from "@/lib/overlay/Tooltip/useIsTruncated";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
+import type { OTableColumnMeta } from "../OTable.types";
 import { TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH } from "../OTable.types";
 
+const { t } = useI18nTyped();
 const props = defineProps<{
   headerGroups: HeaderGroup<any>[];
   table: Table<any>;
   columnOrder: string[];
   selectionMultiple?: boolean;
+  /** Render the header select-all checkbox. The `th` is kept either way so the
+   *  body's selection gutter stays aligned. */
+  showSelectAll?: boolean;
   isAllSelected?: boolean;
   isIndeterminate?: boolean;
   expansionEnabled?: boolean;
@@ -36,17 +45,20 @@ const props = defineProps<{
   sortOrder?: string;
   sortFieldMap?: Record<string, string>;
   getSortIcon?: (columnId: string) => "asc" | "desc" | "none";
+  sortDisabled?: boolean;
+  sortDisabledReason?: I18nText;
   stickyHeader?: boolean;
   bordered?: boolean;
   pivotHeaderLevels?: any[];
   pivotRowColumns?: any[];
   stickyColTotals?: boolean;
   dense?: boolean;
+  compact?: boolean;
   /** Show the per-column value-filter dropdown on filterable columns. */
   enableColumnFilter?: boolean;
+  /** Show the per-column "format this column" icon on formattable columns. */
+  enableColumnFormat?: boolean;
 }>();
-
-const { t } = useI18n();
 
 // ── Per-column value filter ─────────────────────────────────────
 // Filter state lives in the TanStack instance (column.getFilterValue /
@@ -114,6 +126,8 @@ const emit = defineEmits<{
   /** Per-column close ("x"). Emits the column definition so the consumer can
    *  drop the field - distinct from hiding it. */
   "close-column": [column: any];
+  /** Per-column format icon click. Emits the column id. */
+  "format-column": [columnId: string];
 }>();
 
 // Notify the parent BEFORE the resize begins so it can freeze any flex columns
@@ -130,9 +144,15 @@ const boundedFillTable = inject<{ value: boolean } | null>("o2TableBoundedFill",
 
 function handleSort(columnId: string, toggleHandler?: (event: Event) => void, event?: MouseEvent) {
   const meta = props.table.getColumn(columnId)?.columnDef?.meta as any;
-  if (!meta?.sortable) return;
+  if (!meta?.sortable || props.sortDisabled) return;
   emit("sort", columnId);
   if (event) toggleHandler?.(event);
+}
+
+// Clicks on the checkbox itself are stopped by OCheckbox, so this only sees misses on the cell padding.
+function onSelectAllCellClick() {
+  if (props.showSelectAll === false) return;
+  emit("toggle-all-rows");
 }
 
 function handleDragStart(event: any) {
@@ -205,6 +225,12 @@ function isAutoWidthColumn(header: any): boolean {
   return (header.column.columnDef.meta as any)?.autoWidth === true;
 }
 
+// A fillRemaining column stretches past its content, so a growing label would
+// strand the close button at the cell's far right instead of beside the label.
+function isFillRemainingColumn(header: any): boolean {
+  return (header.column.columnDef.meta as any)?.fillRemaining === true;
+}
+
 // Mirrors the autoWidth branch of OTableBodyCell's `cellStyle`.
 function autoWidthHeaderStyle(header: any): Record<string, string> {
   const style: Record<string, string> = {};
@@ -222,6 +248,28 @@ function headerAlignClass(header: any): string {
   return "";
 }
 
+const headerIdPrefix = useId();
+
+// A component header may hold its own controls, which must not be nested inside the sort button.
+function isPlainLabelHeader(header: any): boolean {
+  const content = header.column.columnDef.header;
+  return (
+    header.isPlaceholder || content === undefined || content === null || typeof content === "string"
+  );
+}
+
+function headerLabelId(header: any): string {
+  return `${headerIdPrefix}-th-${header.id.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+}
+
+function headerAriaSort(header: any): "ascending" | "descending" | "none" | undefined {
+  if (!props.sortingEnabled || !(header.column.columnDef.meta as any)?.sortable) return undefined;
+  const direction = props.getSortIcon?.(header.id);
+  if (direction === "asc") return "ascending";
+  if (direction === "desc") return "descending";
+  return "none";
+}
+
 function headerPaddingClass(header: any): string {
   const m = header.column.columnDef.meta as any;
   if (m?.spacer) return "px-0"; // the invisible spacer must be able to reach 0 width
@@ -230,6 +278,55 @@ function headerPaddingClass(header: any): string {
 
 function headerSizeVar(header: any): string {
   return `var(--header-${header.id.replace(/[^a-zA-Z0-9]/g, "-")}-size)`;
+}
+
+// ── Header sub-label / tooltip ──────────────────────────────────
+// A column whose label is plain English can carry the technical name it stands
+// for on a second, quieter line ("Slow calls" over "p95"), plus a tooltip
+// saying what the number actually measures.
+
+function headerSubLabel(header: any): I18nText | undefined {
+  return (
+    (header.column.columnDef.meta as OTableColumnMeta | undefined)?.headerSubLabel || undefined
+  );
+}
+
+function headerTooltip(header: any): I18nText | undefined {
+  return (header.column.columnDef.meta as OTableColumnMeta | undefined)?.headerTooltip || undefined;
+}
+
+// The help bubble covers the whole <th>, so a second bubble on the cut label would open on top of it.
+function labelTooltip(header: any): false | undefined {
+  return headerTooltip(header) ? false : undefined;
+}
+
+// Filled on hover, before the help bubble's delay ends, so the bubble can lead with a cut name.
+const cutHeaderNames = reactive<Record<string, { name: string; subLabel: string }>>({});
+
+function noteCutHeaderName(header: any, event: MouseEvent) {
+  if (!headerTooltip(header)) return;
+  const th = event.currentTarget as HTMLElement;
+  const name = th.querySelector("[data-o2-th-label]");
+  const subLabel = th.querySelector("[data-o2-th-sublabel]");
+  if (!isElementTruncated(name) && !isElementTruncated(subLabel)) {
+    delete cutHeaderNames[header.id];
+    return;
+  }
+  cutHeaderNames[header.id] = {
+    name: name ? readElementText(name) : "",
+    subLabel: subLabel ? readElementText(subLabel) : "",
+  };
+}
+
+// Stacking the label turns the row into a COLUMN, where the main axis is
+// vertical — so the horizontal alignment `headerAlignClass` expresses as
+// `justify-*` has to be restated on the cross axis as `items-*`, or a
+// right-aligned numeric header would stack flush left.
+function headerStackAlignClass(header: any): string {
+  const align = (header.column.columnDef.meta as any)?.align;
+  if (align === "center") return "text-center items-center";
+  if (align === "right") return "text-right items-end";
+  return "items-start";
 }
 
 // ── Pivot helpers ───────────────────────────────────────────────
@@ -244,7 +341,7 @@ function getPivotRowColStyle(colId: string): Record<string, any> {
     position: "sticky",
     left: `${leftOffset}px`,
     zIndex: 12,
-    boxShadow: leftOffset > 0 ? "2px 0 4px -2px var(--color-border-default)" : "none",
+    boxShadow: leftOffset > 0 ? "var(--shadow-sticky-left)" : "none",
     backgroundColor: "var(--color-table-header-bg)",
   };
 }
@@ -266,7 +363,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
     backgroundColor: "var(--color-table-header-bg)",
     // Same separator the pinned/actions columns use; the body and grand-total
     // cells carry it too, so the whole column reads as one shadowed column.
-    boxShadow: "-2px 0 4px -2px var(--color-border-default)",
+    boxShadow: "var(--shadow-sticky-right)",
   };
 }
 
@@ -285,7 +382,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
     minWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     maxWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     backgroundColor: "var(--color-table-header-bg)",
-    boxShadow: "-2px 0 4px -2px var(--color-border-default)",
+    boxShadow: "var(--shadow-sticky-right)",
   };
 }
 </script>
@@ -351,7 +448,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           {
             // Bottom divider on the cells along the header's bottom edge, since
             // the <thead> border-b doesn't paint in border-separate mode. Uses
-            // the directional border-b color so it doesn't clash with border-l.
+            // the directional border-b color so it doesn't clash with border-s.
             'border-b-table-header-border border-b': level.isLeaf || cell._isTotalHeader,
           },
           {
@@ -369,7 +466,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             level.isLeaf ? 'justify-start' : 'justify-center',
           ]"
         >
-          <span class="truncate" :title="String(cell.label ?? '')">{{ cell.label }}</span>
+          <OTruncatedText>{{ cell.label }}</OTruncatedText>
           <OIcon
             v-if="level.isLeaf && cell._sortColumn && getSortIcon?.(cell._sortColumn) === 'asc'"
             name="arrow-upward"
@@ -435,7 +532,10 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
       <!-- Selection checkbox header -->
       <th
         v-if="selectionMultiple"
-        class="border-table-header-border border-b text-left"
+        :class="[
+          'border-table-header-border border-b text-left',
+          showSelectAll !== false ? 'cursor-pointer' : '',
+        ]"
         :style="{
           width: TABLE_CHECKBOX_COL_WIDTH + 'px',
           minWidth: TABLE_CHECKBOX_COL_WIDTH + 'px',
@@ -443,11 +543,14 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           paddingLeft: 'var(--spacing-table-edge)',
         }"
         data-test="o2-table-th-select"
+        @click="onSelectAllCellClick"
       >
         <OTableSelectCheckbox
+          v-if="showSelectAll !== false"
           :model-value="isAllSelected ?? false"
           :indeterminate="isIndeterminate ?? false"
           row-id="all"
+          :label="t('components.table.selectAllRows')"
           @update:model-value="emit('toggle-all-rows')"
         />
       </th>
@@ -461,16 +564,19 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
       />
 
       <!-- Column headers -->
+      <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — the pinned-column edge shadow would bloom if it scaled with text -->
       <th
         v-for="header in headerGroup.headers"
         :key="header.id"
         :colspan="header.colSpan"
         :rowspan="header.rowSpan"
         :data-test="`o2-table-th-${header.id}`"
+        @mouseenter="noteCutHeaderName(header, $event)"
+        :aria-sort="headerAriaSort(header)"
         :class="[
           `${headerPaddingClass(header)} text-table-header-text relative text-left text-xs font-medium select-none`,
           'table-head',
-          dense ? 'h-8' : 'h-9',
+          compact ? 'h-6' : dense ? 'h-8' : 'h-9',
           'border-table-header-border border-b',
           'group',
           // Sortable's `filter` selector — this header can't start a drag, so it
@@ -504,7 +610,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 position: 'sticky',
                 left: `${header.column.getStart?.('left') ?? 0}px`,
                 zIndex: 20,
-                boxShadow: '2px 0 4px -2px var(--color-border-default)',
+                boxShadow: 'var(--shadow-sticky-left)',
               }
             : {}),
           ...(header.column.getIsPinned?.() === 'right'
@@ -512,13 +618,38 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 position: 'sticky',
                 right: `${header.column.getAfter?.('right') ?? 0}px`,
                 zIndex: 20,
-                boxShadow: '-2px 0 4px -2px var(--color-border-default)',
+                boxShadow: 'var(--shadow-sticky-right)',
               }
             : {}),
           // Sticky pivot total column in single-level pivots (last, so it wins).
           ...getStandardStickyTotalStyle(header),
         }"
       >
+        <!-- eslint-enable local/no-hardcoded-px -->
+        <!-- Child-mode tooltip on the <th> itself: placed first so it has no
+             previous sibling and anchors to its parent cell, giving the whole
+             header a hover target rather than just the label text. -->
+        <OTooltip
+          v-if="headerTooltip(header)"
+          side="top"
+          :data-test="`o2-table-th-tooltip-${header.id}`"
+        >
+          <template #content>
+            <span
+              v-if="cutHeaderNames[header.id]?.name"
+              class="block font-semibold"
+              data-test="o2-table-th-tooltip-name"
+              >{{ cutHeaderNames[header.id].name }}</span
+            >
+            <span
+              v-if="cutHeaderNames[header.id]?.subLabel"
+              class="text-text-secondary block"
+              data-test="o2-table-th-tooltip-sublabel"
+              >{{ cutHeaderNames[header.id].subLabel }}</span
+            >
+            {{ headerTooltip(header) }}
+          </template>
+        </OTooltip>
         <div
           :class="[
             'flex h-full min-w-0 items-center gap-1 overflow-hidden',
@@ -526,64 +657,188 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           ]"
         >
           <!-- Sortable header -->
-          <div
-            v-if="(header.column.columnDef.meta as any)?.sortable"
-            :class="[
-              'flex min-w-0 flex-1 cursor-pointer items-center gap-1',
-              headerAlignClass(header),
-            ]"
-            data-test="o2-table-th-sort-trigger"
-            @click="
-              (e: MouseEvent) => handleSort(header.id, header.column.getToggleSortingHandler(), e)
-            "
+          <OTooltip
+            v-if="(header.column.columnDef.meta as any)?.sortable && isPlainLabelHeader(header)"
+            :content="sortDisabledReason"
+            :disabled="!(sortDisabled && sortDisabledReason)"
+            side="top"
           >
-            <span class="min-w-0 truncate">
+            <button
+              type="button"
+              :class="[
+                'rounded-default focus-visible:ring-focus-ring-accent flex min-w-0 items-center gap-1 text-start focus-visible:ring-2 focus-visible:outline-none',
+                sortDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
+                isFillRemainingColumn(header) ? 'flex-none' : 'flex-1',
+                headerAlignClass(header),
+              ]"
+              data-test="o2-table-th-sort-trigger"
+              :aria-disabled="sortDisabled ? 'true' : undefined"
+              @click="
+                (e: MouseEvent) => handleSort(header.id, header.column.getToggleSortingHandler(), e)
+              "
+            >
+              <span
+                class="flex min-w-0 shrink flex-col justify-center"
+                :class="headerSubLabel(header) ? ['gap-px', headerStackAlignClass(header)] : ''"
+              >
+                <OTruncatedText
+                  class="w-full leading-tight"
+                  data-o2-th-label
+                  :tooltip="labelTooltip(header)"
+                >
+                  <FlexRender
+                    v-if="!header.isPlaceholder"
+                    :render="header.column.columnDef.header"
+                    :props="header.getContext()"
+                  />
+                </OTruncatedText>
+                <OTruncatedText
+                  v-if="headerSubLabel(header)"
+                  class="text-text-secondary text-2xs w-full leading-tight font-normal normal-case"
+                  data-o2-th-sublabel
+                  :data-test="`o2-table-th-sublabel-${header.id}`"
+                  :tooltip="labelTooltip(header)"
+                >
+                  {{ headerSubLabel(header) }}
+                </OTruncatedText>
+              </span>
+              <span
+                v-if="sortingEnabled && (header.column.columnDef.meta as any)?.sortable"
+                class="flex shrink-0 items-center"
+              >
+                <OIcon
+                  v-if="getSortIcon?.(header.id) === 'asc'"
+                  name="arrow-upward"
+                  size="sm"
+                  class="text-table-sort-icon-active"
+                  data-test="o2-table-sort-icon-active"
+                  data-test-sort-direction="asc"
+                />
+                <OIcon
+                  v-else-if="getSortIcon?.(header.id) === 'desc'"
+                  name="arrow-downward"
+                  size="sm"
+                  class="text-table-sort-icon-active"
+                  data-test="o2-table-sort-icon-active"
+                  data-test-sort-direction="desc"
+                />
+                <OIcon
+                  v-else
+                  name="unfold-more"
+                  size="sm"
+                  class="opacity-40"
+                  data-test="o2-table-sort-icon-inactive"
+                  data-test-sort-direction="none"
+                />
+              </span>
+            </button>
+          </OTooltip>
+
+          <!-- A button must not nest interactive content, so a component header sorts from a sibling button -->
+          <template v-else-if="(header.column.columnDef.meta as any)?.sortable">
+            <div
+              :id="headerLabelId(header)"
+              :class="[
+                'flex min-w-0 flex-col justify-center',
+                isFillRemainingColumn(header) ? 'flex-none' : 'flex-1',
+                headerSubLabel(header)
+                  ? ['gap-px', headerStackAlignClass(header)]
+                  : headerAlignClass(header),
+              ]"
+              data-test="o2-table-th-custom-header"
+            >
+              <OTruncatedText
+                class="w-full leading-tight"
+                data-o2-th-label
+                :tooltip="labelTooltip(header)"
+              >
+                <FlexRender :render="header.column.columnDef.header" :props="header.getContext()" />
+              </OTruncatedText>
+              <OTruncatedText
+                v-if="headerSubLabel(header)"
+                class="text-text-secondary text-2xs w-full leading-tight font-normal normal-case"
+                data-o2-th-sublabel
+                :data-test="`o2-table-th-sublabel-${header.id}`"
+                :tooltip="labelTooltip(header)"
+              >
+                {{ headerSubLabel(header) }}
+              </OTruncatedText>
+            </div>
+            <OTooltip
+              v-if="sortingEnabled"
+              :content="sortDisabledReason"
+              :disabled="!(sortDisabled && sortDisabledReason)"
+              side="top"
+            >
+              <button
+                type="button"
+                :class="[
+                  'rounded-default focus-visible:ring-focus-ring-accent flex shrink-0 items-center focus-visible:ring-2 focus-visible:outline-none',
+                  sortDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
+                ]"
+                data-test="o2-table-th-sort-trigger"
+                :aria-labelledby="headerLabelId(header)"
+                :aria-disabled="sortDisabled ? 'true' : undefined"
+                @click="
+                  (e: MouseEvent) =>
+                    handleSort(header.id, header.column.getToggleSortingHandler(), e)
+                "
+              >
+                <OIcon
+                  v-if="getSortIcon?.(header.id) === 'asc'"
+                  name="arrow-upward"
+                  size="sm"
+                  class="text-table-sort-icon-active"
+                  data-test="o2-table-sort-icon-active"
+                  data-test-sort-direction="asc"
+                />
+                <OIcon
+                  v-else-if="getSortIcon?.(header.id) === 'desc'"
+                  name="arrow-downward"
+                  size="sm"
+                  class="text-table-sort-icon-active"
+                  data-test="o2-table-sort-icon-active"
+                  data-test-sort-direction="desc"
+                />
+                <OIcon
+                  v-else
+                  name="unfold-more"
+                  size="sm"
+                  class="opacity-40"
+                  data-test="o2-table-sort-icon-inactive"
+                  data-test-sort-direction="none"
+                />
+              </button>
+            </OTooltip>
+          </template>
+
+          <!-- Non-sortable header -->
+          <div
+            v-else
+            :class="[
+              'flex min-w-0 flex-col justify-center',
+              isFillRemainingColumn(header) ? 'flex-none' : 'flex-1',
+              headerSubLabel(header)
+                ? ['gap-px', headerStackAlignClass(header)]
+                : headerAlignClass(header),
+            ]"
+          >
+            <OTruncatedText class="w-full" data-o2-th-label :tooltip="labelTooltip(header)">
               <FlexRender
                 v-if="!header.isPlaceholder"
                 :render="header.column.columnDef.header"
                 :props="header.getContext()"
               />
-            </span>
-            <!-- Sort icons — `shrink-0` so they're never clipped even when the
-                 header title truncates. -->
-            <span
-              v-if="sortingEnabled && (header.column.columnDef.meta as any)?.sortable"
-              class="flex shrink-0 items-center"
+            </OTruncatedText>
+            <OTruncatedText
+              v-if="headerSubLabel(header)"
+              class="text-text-secondary text-2xs w-full leading-tight font-normal normal-case"
+              data-o2-th-sublabel
+              :data-test="`o2-table-th-sublabel-${header.id}`"
+              :tooltip="labelTooltip(header)"
             >
-              <OIcon
-                v-if="getSortIcon?.(header.id) === 'asc'"
-                name="arrow-upward"
-                size="sm"
-                class="text-table-sort-icon-active"
-                data-test="o2-table-sort-icon-active"
-                data-test-sort-direction="asc"
-              />
-              <OIcon
-                v-else-if="getSortIcon?.(header.id) === 'desc'"
-                name="arrow-downward"
-                size="sm"
-                class="text-table-sort-icon-active"
-                data-test="o2-table-sort-icon-active"
-                data-test-sort-direction="desc"
-              />
-              <OIcon
-                v-else
-                name="unfold-more"
-                size="sm"
-                class="opacity-40"
-                data-test="o2-table-sort-icon-inactive"
-                data-test-sort-direction="none"
-              />
-            </span>
-          </div>
-
-          <!-- Non-sortable header -->
-          <div v-else :class="['min-w-0 flex-1 truncate', headerAlignClass(header)]">
-            <FlexRender
-              v-if="!header.isPlaceholder"
-              :render="header.column.columnDef.header"
-              :props="header.getContext()"
-            />
+              {{ headerSubLabel(header) }}
+            </OTruncatedText>
           </div>
 
           <!-- Column close ("x"), shown on hover for columns marked closable. -->
@@ -591,8 +846,8 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             v-if="(header.column.columnDef.meta as any)?.closable"
             type="button"
             :data-test="`o2-table-th-remove-${header.id}-btn`"
-            class="rounded-default text-text-secondary hover:text-text-body hover:bg-table-row-hover-bg inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5 opacity-0 transition-opacity group-hover:opacity-100"
-            aria-label="Remove column"
+            class="rounded-default text-text-secondary hover:text-text-body hover:bg-table-row-hover-bg inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
+            :aria-label="t('components.table.removeColumnAria')"
             @click.stop="emit('close-column', header.column.columnDef)"
           >
             <OIcon name="close" size="xs" />
@@ -615,7 +870,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               <button
                 type="button"
                 :data-test="`o2-table-column-filter-btn-${header.column.id}`"
-                class="rounded-default ml-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
+                class="rounded-default ms-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
                 @click.stop
               >
                 <OIcon
@@ -655,12 +910,13 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                   <OCheckbox
                     :model-value="colFilterValues(header.column.id).includes(rawVal)"
                     size="sm"
+                    :aria-label="raw(filterDisplayValue(header.column.id, rawVal))"
                     @update:model-value="toggleColFilterValue(header.column.id, rawVal)"
                     @click.stop
                   />
-                  <span class="flex-1 truncate text-sm select-none">
+                  <OTruncatedText class="flex-1 text-sm select-none">
                     {{ filterDisplayValue(header.column.id, rawVal) }}
-                  </span>
+                  </OTruncatedText>
                 </li>
                 <li
                   v-if="filteredUniqueValues(header.column.id).length === 0"
@@ -679,13 +935,24 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               </div>
             </div>
           </ODropdown>
+
+          <button
+            v-if="enableColumnFormat && (header.column.columnDef.meta as any)?.formattable"
+            type="button"
+            :data-test="`o2-table-column-format-btn-${header.column.id}`"
+            class="rounded-default ms-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
+            :aria-label="t('components.table.formatColumnAria')"
+            @click.stop="emit('format-column', header.column.id)"
+          >
+            <OIcon name="tune" size="xs" class="opacity-50" />
+          </button>
         </div>
 
         <!-- Column resize handle -->
         <div
           v-if="header.column.getCanResize()"
           class="resizer group/resizer absolute top-0 right-0 z-10 flex h-full w-1.25 cursor-col-resize touch-none items-center justify-end select-none"
-          :title="'Drag to resize · double-click to reset'"
+          :title="t('common.dragToResizeResetHint')"
           @dblclick="header.column.resetSize()"
           @mousedown.prevent.stop="startResize(header, $event)"
           @touchstart.prevent.stop="startResize(header, $event)"
@@ -722,7 +989,10 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
 
       <th
         v-if="selectionMultiple"
-        class="border-table-header-border border-b text-left"
+        :class="[
+          'border-table-header-border border-b text-left',
+          showSelectAll !== false ? 'cursor-pointer' : '',
+        ]"
         :style="{
           width: TABLE_CHECKBOX_COL_WIDTH + 'px',
           minWidth: TABLE_CHECKBOX_COL_WIDTH + 'px',
@@ -730,11 +1000,14 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           paddingLeft: 'var(--spacing-table-edge)',
         }"
         data-test="o2-table-th-select"
+        @click="onSelectAllCellClick"
       >
         <OTableSelectCheckbox
+          v-if="showSelectAll !== false"
           :model-value="isAllSelected ?? false"
           :indeterminate="isIndeterminate ?? false"
           row-id="all"
+          :label="t('components.table.selectAllRows')"
           @update:model-value="emit('toggle-all-rows')"
         />
       </th>
@@ -746,13 +1019,16 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
         aria-hidden="true"
       />
 
+      <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — the pinned-column edge shadow would bloom if it scaled with text -->
       <th
         v-for="header in headerGroup.headers"
         :key="header.id"
         :data-test="`o2-table-th-${header.id}`"
+        @mouseenter="noteCutHeaderName(header, $event)"
+        :aria-sort="headerAriaSort(header)"
         :class="[
           `${headerPaddingClass(header)} text-table-header-text relative text-left text-xs font-medium select-none`,
-          dense ? 'group h-8' : 'group h-9',
+          compact ? 'group h-6' : dense ? 'group h-8' : 'group h-9',
           'border-table-header-border border-b',
           header.column.getIsPinned?.() ? 'bg-table-header-bg' : '',
           (header.column.columnDef.meta as any)?.headerClass ?? '',
@@ -782,7 +1058,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 position: 'sticky',
                 left: `${header.column.getStart?.('left') ?? 0}px`,
                 zIndex: 20,
-                boxShadow: '2px 0 4px -2px var(--color-border-default)',
+                boxShadow: 'var(--shadow-sticky-left)',
               }
             : {}),
           ...(header.column.getIsPinned?.() === 'right'
@@ -790,79 +1066,202 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 position: 'sticky',
                 right: `${header.column.getAfter?.('right') ?? 0}px`,
                 zIndex: 20,
-                boxShadow: '-2px 0 4px -2px var(--color-border-default)',
+                boxShadow: 'var(--shadow-sticky-right)',
               }
             : {}),
           // Sticky pivot total column in single-level pivots (last, so it wins).
           ...getStandardStickyTotalStyle(header),
         }"
       >
+        <!-- eslint-enable local/no-hardcoded-px -->
+        <!-- Child-mode tooltip on the <th> itself: placed first so it has no
+             previous sibling and anchors to its parent cell, giving the whole
+             header a hover target rather than just the label text. -->
+        <OTooltip
+          v-if="headerTooltip(header)"
+          side="top"
+          :data-test="`o2-table-th-tooltip-${header.id}`"
+        >
+          <template #content>
+            <span
+              v-if="cutHeaderNames[header.id]?.name"
+              class="block font-semibold"
+              data-test="o2-table-th-tooltip-name"
+              >{{ cutHeaderNames[header.id].name }}</span
+            >
+            <span
+              v-if="cutHeaderNames[header.id]?.subLabel"
+              class="text-text-secondary block"
+              data-test="o2-table-th-tooltip-sublabel"
+              >{{ cutHeaderNames[header.id].subLabel }}</span
+            >
+            {{ headerTooltip(header) }}
+          </template>
+        </OTooltip>
         <div
           :class="[
             'flex h-full min-w-0 items-center gap-1 overflow-hidden',
             headerAlignClass(header),
           ]"
         >
-          <div
-            v-if="(header.column.columnDef.meta as any)?.sortable"
+          <OTooltip
+            v-if="(header.column.columnDef.meta as any)?.sortable && isPlainLabelHeader(header)"
+            :content="sortDisabledReason"
+            :disabled="!(sortDisabled && sortDisabledReason)"
+            side="top"
+          >
+            <button
+              type="button"
+              :class="[
+                'rounded-default focus-visible:ring-focus-ring-accent flex items-center gap-1 overflow-hidden text-start whitespace-nowrap focus-visible:ring-2 focus-visible:outline-none',
+                sortDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
+                isFillRemainingColumn(header) ? 'flex-none' : 'flex-1',
+                headerAlignClass(header),
+              ]"
+              data-test="o2-table-th-sort-trigger"
+              :aria-disabled="sortDisabled ? 'true' : undefined"
+              @click="
+                (e: MouseEvent) => handleSort(header.id, header.column.getToggleSortingHandler(), e)
+              "
+            >
+              <span
+                class="flex min-w-0 shrink flex-col justify-center"
+                :class="headerSubLabel(header) ? ['gap-px', headerStackAlignClass(header)] : ''"
+              >
+                <OTruncatedText
+                  class="w-full leading-tight"
+                  data-o2-th-label
+                  :tooltip="labelTooltip(header)"
+                >
+                  <FlexRender
+                    v-if="!header.isPlaceholder"
+                    :render="header.column.columnDef.header"
+                    :props="header.getContext()"
+                  />
+                </OTruncatedText>
+                <OTruncatedText
+                  v-if="headerSubLabel(header)"
+                  class="text-text-secondary text-2xs w-full leading-tight font-normal normal-case"
+                  data-o2-th-sublabel
+                  :data-test="`o2-table-th-sublabel-${header.id}`"
+                  :tooltip="labelTooltip(header)"
+                >
+                  {{ headerSubLabel(header) }}
+                </OTruncatedText>
+              </span>
+              <template v-if="sortingEnabled && (header.column.columnDef.meta as any)?.sortable">
+                <OIcon
+                  v-if="getSortIcon?.(header.id) === 'asc'"
+                  name="arrow-upward"
+                  size="sm"
+                  class="text-table-sort-icon-active shrink-0"
+                  data-test="o2-table-sort-icon-active"
+                  data-test-sort-direction="asc"
+                />
+                <OIcon
+                  v-else-if="getSortIcon?.(header.id) === 'desc'"
+                  name="arrow-downward"
+                  size="sm"
+                  class="text-table-sort-icon-active shrink-0"
+                  data-test="o2-table-sort-icon-active"
+                  data-test-sort-direction="desc"
+                />
+                <OIcon
+                  v-else
+                  name="unfold-more"
+                  size="sm"
+                  class="shrink-0 opacity-40"
+                  data-test="o2-table-sort-icon-inactive"
+                  data-test-sort-direction="none"
+                />
+              </template>
+            </button>
+          </OTooltip>
+          <template v-else-if="(header.column.columnDef.meta as any)?.sortable">
+            <OTruncatedText
+              :id="headerLabelId(header)"
+              as="div"
+              :class="[
+                isFillRemainingColumn(header) ? 'flex-none' : 'flex-1',
+                headerAlignClass(header),
+              ]"
+              data-o2-th-label
+              data-test="o2-table-th-custom-header"
+              :tooltip="labelTooltip(header)"
+            >
+              <FlexRender :render="header.column.columnDef.header" :props="header.getContext()" />
+            </OTruncatedText>
+            <OTooltip
+              v-if="sortingEnabled"
+              :content="sortDisabledReason"
+              :disabled="!(sortDisabled && sortDisabledReason)"
+              side="top"
+            >
+              <button
+                type="button"
+                :class="[
+                  'rounded-default focus-visible:ring-focus-ring-accent flex shrink-0 items-center focus-visible:ring-2 focus-visible:outline-none',
+                  sortDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
+                ]"
+                data-test="o2-table-th-sort-trigger"
+                :aria-labelledby="headerLabelId(header)"
+                :aria-disabled="sortDisabled ? 'true' : undefined"
+                @click="
+                  (e: MouseEvent) =>
+                    handleSort(header.id, header.column.getToggleSortingHandler(), e)
+                "
+              >
+                <OIcon
+                  v-if="getSortIcon?.(header.id) === 'asc'"
+                  name="arrow-upward"
+                  size="sm"
+                  class="text-table-sort-icon-active shrink-0"
+                  data-test="o2-table-sort-icon-active"
+                  data-test-sort-direction="asc"
+                />
+                <OIcon
+                  v-else-if="getSortIcon?.(header.id) === 'desc'"
+                  name="arrow-downward"
+                  size="sm"
+                  class="text-table-sort-icon-active shrink-0"
+                  data-test="o2-table-sort-icon-active"
+                  data-test-sort-direction="desc"
+                />
+                <OIcon
+                  v-else
+                  name="unfold-more"
+                  size="sm"
+                  class="shrink-0 opacity-40"
+                  data-test="o2-table-sort-icon-inactive"
+                  data-test-sort-direction="none"
+                />
+              </button>
+            </OTooltip>
+          </template>
+          <OTruncatedText
+            v-else
+            as="div"
             :class="[
-              'flex flex-1 cursor-pointer items-center gap-1 overflow-hidden whitespace-nowrap',
+              isFillRemainingColumn(header) ? 'flex-none' : 'flex-1',
               headerAlignClass(header),
             ]"
-            data-test="o2-table-th-sort-trigger"
-            @click="
-              (e: MouseEvent) => handleSort(header.id, header.column.getToggleSortingHandler(), e)
-            "
+            data-o2-th-label
+            :tooltip="labelTooltip(header)"
           >
-            <span class="min-w-0 truncate">
-              <FlexRender
-                v-if="!header.isPlaceholder"
-                :render="header.column.columnDef.header"
-                :props="header.getContext()"
-              />
-            </span>
-            <template v-if="sortingEnabled && (header.column.columnDef.meta as any)?.sortable">
-              <OIcon
-                v-if="getSortIcon?.(header.id) === 'asc'"
-                name="arrow-upward"
-                size="sm"
-                class="text-table-sort-icon-active shrink-0"
-                data-test="o2-table-sort-icon-active"
-                data-test-sort-direction="asc"
-              />
-              <OIcon
-                v-else-if="getSortIcon?.(header.id) === 'desc'"
-                name="arrow-downward"
-                size="sm"
-                class="text-table-sort-icon-active shrink-0"
-                data-test="o2-table-sort-icon-active"
-                data-test-sort-direction="desc"
-              />
-              <OIcon
-                v-else
-                name="unfold-more"
-                size="sm"
-                class="shrink-0 opacity-40"
-                data-test="o2-table-sort-icon-inactive"
-                data-test-sort-direction="none"
-              />
-            </template>
-          </div>
-          <div v-else :class="['min-w-0 flex-1 truncate', headerAlignClass(header)]">
             <FlexRender
               v-if="!header.isPlaceholder"
               :render="header.column.columnDef.header"
               :props="header.getContext()"
             />
-          </div>
+          </OTruncatedText>
 
           <!-- Column close ("x"), shown on hover for columns marked closable. -->
           <button
             v-if="(header.column.columnDef.meta as any)?.closable"
             type="button"
             :data-test="`o2-table-th-remove-${header.id}-btn`"
-            class="rounded-default text-text-secondary hover:text-text-body hover:bg-table-row-hover-bg inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5 opacity-0 transition-opacity group-hover:opacity-100"
-            aria-label="Remove column"
+            class="rounded-default text-text-secondary hover:text-text-body hover:bg-table-row-hover-bg inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
+            :aria-label="t('components.table.removeColumnAria')"
             @click.stop="emit('close-column', header.column.columnDef)"
           >
             <OIcon name="close" size="xs" />
@@ -885,7 +1284,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               <button
                 type="button"
                 :data-test="`o2-table-column-filter-btn-${header.column.id}`"
-                class="rounded-default ml-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
+                class="rounded-default ms-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
                 @click.stop
               >
                 <OIcon
@@ -925,12 +1324,13 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                   <OCheckbox
                     :model-value="colFilterValues(header.column.id).includes(rawVal)"
                     size="sm"
+                    :aria-label="raw(filterDisplayValue(header.column.id, rawVal))"
                     @update:model-value="toggleColFilterValue(header.column.id, rawVal)"
                     @click.stop
                   />
-                  <span class="flex-1 truncate text-sm select-none">
+                  <OTruncatedText class="flex-1 text-sm select-none">
                     {{ filterDisplayValue(header.column.id, rawVal) }}
-                  </span>
+                  </OTruncatedText>
                 </li>
                 <li
                   v-if="filteredUniqueValues(header.column.id).length === 0"
@@ -949,11 +1349,22 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               </div>
             </div>
           </ODropdown>
+
+          <button
+            v-if="enableColumnFormat && (header.column.columnDef.meta as any)?.formattable"
+            type="button"
+            :data-test="`o2-table-column-format-btn-${header.column.id}`"
+            class="rounded-default ms-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
+            :aria-label="t('components.table.formatColumnAria')"
+            @click.stop="emit('format-column', header.column.id)"
+          >
+            <OIcon name="tune" size="xs" class="opacity-50" />
+          </button>
         </div>
         <div
           v-if="header.column.getCanResize()"
           class="resizer group/resizer absolute top-0 right-0 z-10 flex h-full w-1.25 cursor-col-resize touch-none items-center justify-end select-none"
-          :title="'Drag to resize · double-click to reset'"
+          :title="t('common.dragToResizeResetHint')"
           @dblclick="header.column.resetSize()"
           @mousedown.prevent.stop="startResize(header, $event)"
           @touchstart.prevent.stop="startResize(header, $event)"

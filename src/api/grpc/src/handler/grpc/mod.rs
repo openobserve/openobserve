@@ -37,6 +37,7 @@ mod tests {
             search_type: None,
             regions: vec![],
             clusters: vec![],
+            search_event_context: None,
         }
     }
 

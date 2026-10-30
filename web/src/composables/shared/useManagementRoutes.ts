@@ -1,5 +1,8 @@
 import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
+import { withFeatureGate } from "@/utils/enterpriseFeatures";
+import { oncallRouteGuard } from "./oncallRouteGuard";
+import { slackRouteGuard } from "./slackRouteGuard";
 
 const Settings = () => import("@/components/settings/index.vue");
 
@@ -11,8 +14,9 @@ const useManagementRoutes = () => {
       component: Settings,
       meta: {
         keepAlive: true,
-        title: "Settings",
+        titleKey: "menu.settings",
       },
+      redirect: (to: any) => ({ name: "general", query: to.query }),
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -21,7 +25,8 @@ const useManagementRoutes = () => {
           path: "general",
           name: "general",
           meta: {
-            title: "General",
+            titleKey: "settings.groupGeneral",
+            allowOnEmptyData: true,
           },
           component: () => import("@/components/settings/General.vue"),
           beforeEnter(to: any, from: any, next: any) {
@@ -32,7 +37,7 @@ const useManagementRoutes = () => {
           path: "organization",
           name: "organizationSettings",
           meta: {
-            title: "Organization Parameters",
+            titleKey: "settings.orgLabel",
           },
           component: () => import("@/components/settings/OrganizationSettings.vue"),
           beforeEnter(to: any, from: any, next: any) {
@@ -47,29 +52,6 @@ const useManagementRoutes = () => {
         {
           path: "alert_destinations",
           redirect: (to: any) => ({ name: "alertDestinations", query: to.query }),
-        },
-        {
-          path: "model_pricing",
-          name: "modelPricing",
-          meta: {
-            keepAlive: true,
-            title: "LLM Model Pricing",
-          },
-          component: () => import("@/components/settings/ModelPricingList.vue"),
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
-        },
-        {
-          path: "model_pricing/edit",
-          name: "modelPricingEditor",
-          meta: {
-            title: "Model Pricing Editor",
-          },
-          component: () => import("@/components/settings/ModelPricingEditor.vue"),
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
         },
         // Alert templates moved to /alert-templates (Reliability). Redirect kept
         // for the same reason as alert_destinations above, query included.
@@ -88,40 +70,115 @@ const useManagementRoutes = () => {
       ],
     },
   ];
-  // LLM Providers and GenAI Agent Mapping (used by the AI Observability /
-  // Online Evals flows) are enterprise/cloud-only features — the backend routes
-  // only exist behind the enterprise feature flag, so they must not be exposed
-  // in OSS builds.
-  if (config.isEnterprise == "true" || config.isCloud == "true") {
-    routes[0].children.push({
-      path: "llm_providers",
-      name: "llmProviders",
-      component: () => import("@/components/settings/LlmProvidersSettings.vue"),
-      meta: {
-        title: "LLM Providers",
-      },
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
-    });
-    routes[0].children.push({
-      path: "gen_ai_agent_mapping",
-      name: "genAiAgentMapping",
-      component: () => import("@/components/settings/GenAiAgentMappingSettings.vue"),
-      meta: {
-        keepAlive: true,
-        title: "GenAI Agent Mapping",
-      },
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
-    });
-    // Alert Sources moved to a flat top-level route (router.ts, name
-    // "alertSources") — no longer pushed here. It used to be conditional on
-    // this same enterprise/cloud check; that gating now lives on the target
-    // route's own beforeEnter instead.
-  }
-  if (config.isEnterprise == "true") {
+
+  // Shared stand-in page for any enterprise/cloud-only route this build
+  // doesn't unlock — every `withFeatureGate` redirect lands here.
+  routes.push({
+    path: "enterprise-locked",
+    name: "enterpriseFeatureLocked",
+    component: () => import("@/components/EnterpriseFeatureLocked.vue"),
+    meta: { titleKey: "enterpriseFeature.lockedTitle" },
+    beforeEnter(to: any, from: any, next: any) {
+      routeGuard(to, from, next);
+    },
+  });
+
+  // Full-page listing of every enterprise feature (the same offer the header's
+  // "Get enterprise for free" button shows in a modal) — a locked left-nav
+  // item or left-side tab now routes here on click instead of a hover tooltip.
+  routes.push({
+    path: "enterprise-features",
+    name: "enterpriseFeatures",
+    component: () => import("@/views/EnterpriseFeatures.vue"),
+    meta: { titleKey: "enterpriseFeature.featuresPageTitle" },
+    beforeEnter(to: any, from: any, next: any) {
+      routeGuard(to, from, next);
+    },
+  });
+
+  // Public synthetics locations are the registry the Lambda venue dispatches
+  // against, and synthetics ships in OSS — so this registers in every build. The
+  // page itself lists public rows only; private locations stay enterprise.
+  routes[0].children.push({
+    path: "synthetics_locations",
+    name: "syntheticsLocations",
+    component: () => import("@/components/settings/SyntheticsLocationsList.vue"),
+    // Locations are set up before the first check can run, so an empty org must reach this.
+    meta: {
+      keepAlive: true,
+      titleKey: "routeTitles.syntheticsLocations",
+      allowOnEmptyData: true,
+    },
+    beforeEnter(to: any, from: any, next: any) {
+      routeGuard(to, from, next);
+    },
+  });
+
+  // LLM Model Pricing, LLM Providers, GenAI Agent Mapping (used by the AI
+  // Observability / Online Evals flows), and the enterprise-only operations/
+  // security pages below are all always registered; a direct URL redirects
+  // to the shared locked page (see `withFeatureGate`) when the edition
+  // doesn't unlock them, instead of landing on the real page or a 404.
+  routes[0].children.push({
+    path: "model_pricing",
+    name: "modelPricing",
+    meta: {
+      keepAlive: true,
+      titleKey: "settings.llmModelPricing",
+    },
+    component: () => import("@/components/settings/ModelPricingList.vue"),
+    beforeEnter: withFeatureGate("modelPricing", routeGuard),
+  });
+  routes[0].children.push({
+    path: "model_pricing/edit",
+    name: "modelPricingEditor",
+    meta: {
+      titleKey: "routeTitles.modelPricingEditor",
+    },
+    component: () => import("@/components/settings/ModelPricingEditor.vue"),
+    beforeEnter: withFeatureGate("modelPricing", routeGuard),
+  });
+  routes[0].children.push({
+    path: "llm_providers",
+    name: "llmProviders",
+    component: () => import("@/components/settings/LlmProvidersSettings.vue"),
+    meta: {
+      titleKey: "llmProviders.title",
+    },
+    beforeEnter: withFeatureGate("llmProviders", routeGuard),
+  });
+  routes[0].children.push({
+    path: "gen_ai_agent_mapping",
+    name: "genAiAgentMapping",
+    component: () => import("@/components/settings/GenAiAgentMappingSettings.vue"),
+    meta: {
+      keepAlive: true,
+      titleKey: "settings.genAiAgentMapping.title",
+    },
+    beforeEnter: withFeatureGate("genAiAgentMapping", routeGuard),
+  });
+  // Registered in every build; slackRouteGuard and the rail both hide it unless the org config turns Slack on.
+  routes[0].children.push({
+    path: "slack",
+    name: "slack",
+    component: () => import("@/components/settings/Slack.vue"),
+    meta: {
+      titleKey: "routeTitles.slackApp",
+    },
+    beforeEnter: slackRouteGuard,
+  });
+  // Alert Sources moved to a flat top-level route (router.ts, name
+  // "alertSources") — no longer pushed here. It used to be conditional on
+  // this same enterprise/cloud check; that gating now lives on the target
+  // route's own beforeEnter instead.
+  //
+  // This batch is self-hosted-only — it does not exist on Cloud at all (not
+  // even locked): Cloud users can't "upgrade" into managing their own nodes,
+  // license, or cipher keys, so a pure-cloud build keeps excluding it
+  // entirely, exactly as it did before this gating existed. OSS keeps
+  // registering it (redirects to the locked page); self-hosted enterprise
+  // gets the real pages.
+  if (config.isEnterprise == "true" || config.isCloud != "true") {
     routes[0].children.push(
       ...[
         {
@@ -130,11 +187,9 @@ const useManagementRoutes = () => {
           component: () => import("@/components/queries/RunningQueries.vue"),
           meta: {
             keepAlive: true,
-            title: "Query Management",
+            titleKey: "settings.queryManagement",
           },
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
+          beforeEnter: withFeatureGate("queryManagement", routeGuard),
         },
         {
           path: "cipher_keys",
@@ -142,11 +197,9 @@ const useManagementRoutes = () => {
           component: () => import("@/components/settings/CipherKeys.vue"),
           meta: {
             keepAlive: true,
-            title: "Cipher Keys",
+            titleKey: "settings.cipherKeys",
           },
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
+          beforeEnter: withFeatureGate("cipherKeys", routeGuard),
         },
         {
           path: "ai_toolsets",
@@ -154,33 +207,37 @@ const useManagementRoutes = () => {
           component: () => import("@/components/settings/AiToolsets.vue"),
           meta: {
             keepAlive: true,
-            title: "AI Toolsets",
+            titleKey: "aiToolset.header",
           },
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
+          beforeEnter: withFeatureGate("aiToolsets", routeGuard),
         },
         {
           path: "pipeline_destinations",
           name: "pipelineDestinations",
           meta: {
-            title: "Pipeline Destinations",
+            titleKey: "pipeline_destinations.header",
           },
           component: () => import("@/components/alerts/PipelinesDestinationList.vue"),
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
+          beforeEnter: withFeatureGate("pipelineDestinations", routeGuard),
+        },
+        // Its API is mounted with on-call's, so the page exists only where on-call is on.
+        {
+          path: "telephony",
+          name: "telephonySettings",
+          meta: {
+            titleKey: "telephony.title",
           },
+          component: () => import("@/components/settings/TelephonySettings.vue"),
+          beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
         },
         {
           path: "storage_settings",
           name: "storageSettings",
           component: () => import("@/components/settings/OrgStorageSettings.vue"),
           meta: {
-            title: "Storage Settings",
+            titleKey: "routeTitles.storageSettings",
           },
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
+          beforeEnter: withFeatureGate("storageSettings", routeGuard),
         },
         {
           path: "nodes",
@@ -188,11 +245,9 @@ const useManagementRoutes = () => {
           component: () => import("@/components/settings/Nodes.vue"),
           meta: {
             keepAlive: true,
-            title: "Nodes",
+            titleKey: "settings.nodes",
           },
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
+          beforeEnter: withFeatureGate("nodes", routeGuard),
         },
         {
           path: "domain_management",
@@ -200,11 +255,9 @@ const useManagementRoutes = () => {
           component: () => import("@/components/settings/DomainManagement.vue"),
           meta: {
             keepAlive: true,
-            title: "Domain Management",
+            titleKey: "routeTitles.domainManagement",
           },
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
+          beforeEnter: withFeatureGate("domainManagement", routeGuard),
         },
         {
           path: "regex_patterns",
@@ -212,23 +265,19 @@ const useManagementRoutes = () => {
           component: () => import("@/components/settings/RegexPatternList.vue"),
           meta: {
             keepAlive: true,
-            title: "Regex Patterns",
+            titleKey: "routeTitles.regexPatterns",
           },
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
+          beforeEnter: withFeatureGate("regexPatterns", routeGuard),
         },
         {
-          path: "synthetics_locations",
-          name: "syntheticsLocations",
-          component: () => import("@/components/settings/SyntheticsLocationsList.vue"),
+          path: "password_policy",
+          name: "passwordPolicy",
+          component: () => import("@/components/settings/PasswordPolicy.vue"),
           meta: {
             keepAlive: true,
-            title: "Synthetics Locations",
+            titleKey: "routeTitles.passwordPolicy",
           },
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
+          beforeEnter: withFeatureGate("passwordPolicy", routeGuard),
         },
         {
           path: "correlation/:tab?",
@@ -236,16 +285,42 @@ const useManagementRoutes = () => {
           component: () => import("@/components/settings/CorrelationSettings.vue"),
           meta: {
             keepAlive: true,
-            title: "Correlation Settings",
+            titleKey: "settings.correlationSettings",
+          },
+          beforeEnter: withFeatureGate("correlationSettings", routeGuard),
+        },
+        {
+          path: "license",
+          name: "license",
+          component: () => import("@/components/settings/License.vue"),
+          beforeEnter: withFeatureGate("license", routeGuard),
+        },
+      ],
+    );
+  }
+  // Announcements has no locked OSS page: its API exists only in enterprise.
+  if (config.isEnterprise == "true") {
+    routes[0].children.push(
+      ...[
+        {
+          path: "announcements",
+          name: "announcementBanners",
+          component: () => import("@/components/settings/AnnouncementBannerList.vue"),
+          meta: {
+            keepAlive: true,
+            titleKey: "announcements.settings.label",
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
         },
         {
-          path: "license",
-          name: "license",
-          component: () => import("@/components/settings/License.vue"),
+          path: "announcements/edit",
+          name: "announcementBannerEditor",
+          component: () => import("@/components/settings/AnnouncementBannerEditor.vue"),
+          meta: {
+            titleKey: "announcements.editor.routeTitle",
+          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -262,7 +337,7 @@ const useManagementRoutes = () => {
           component: () => import("@/components/settings/OrganizationManagement.vue"),
           meta: {
             keepAlive: true,
-            title: "Organization Management",
+            titleKey: "settings.organizationManagement",
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);

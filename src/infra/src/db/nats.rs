@@ -18,7 +18,7 @@ use std::{
         Arc, LazyLock as Lazy,
         atomic::{AtomicU8, Ordering},
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 pub use async_nats::Event as NatsEvent;
@@ -35,7 +35,7 @@ use config::{
 use futures::{StreamExt, TryStreamExt};
 use hashbrown::HashMap;
 use tokio::{
-    sync::{Mutex, OnceCell, mpsc},
+    sync::{Mutex, OnceCell, mpsc, watch},
     task::JoinHandle,
 };
 
@@ -47,62 +47,23 @@ use crate::{
 };
 
 const SUPER_CLUSTER_PREFIX: &str = "super_cluster_kv_";
+/// Equals the first-event watch stop, so a reason is written at most once per org per watch.
+pub const INGEST_REJECTION_MAX_AGE_SECS: u64 = 3_600;
+// Every watcher recreation leaves a consumer on the server, so a failing one must back off.
+const KV_WATCH_BACKOFF_MIN: u64 = 1; // seconds
+const KV_WATCH_BACKOFF_MAX: u64 = 30; // seconds
+// consecutive errors without a single healthy entry before the watcher is recreated
+const KV_WATCH_MAX_ERRORS: usize = 3;
+// Even when the watcher is silent the key is re-checked this often (seconds).
+const LOCKER_WATCHER_CHECK_TTL: u64 = 1;
+const LOCKER_WATCHER_UPDATE_TTL: i64 = 10;
+const LOCKER_STATE_LOCKING: u8 = 1;
+const LOCKER_STATE_RELEASED: u8 = 2;
+const LOCKER_STATE_LOST: u8 = 3;
 
 static NATS_CLIENT: OnceCell<Client> = OnceCell::const_new();
-
-pub async fn get_nats_client() -> &'static Client {
-    NATS_CLIENT.get_or_init(connect).await
-}
-
-async fn get_bucket_by_key<'a>(
-    prefix: &'a str,
-    key: &'a str,
-) -> Result<(jetstream::kv::Store, &'a str)> {
-    let cfg = get_config();
-    let client = get_nats_client().await.clone();
-    let jetstream = jetstream::new(client);
-    let key = key.trim_start_matches('/');
-    let bucket_name = key.split('/').next().unwrap();
-    let mut bucket = jetstream::kv::Config {
-        bucket: format!("{prefix}{bucket_name}"),
-        num_replicas: cfg.nats.replicas,
-        history: cfg.nats.history,
-        ..Default::default()
-    };
-    if bucket_name == "nodes"
-        || bucket_name == "clusters"
-        || bucket_name == "locker"
-        || bucket_name == "lockers"
-    {
-        // if changed ttl need recreate the bucket
-        // CMD: nats kv del -f o2_nodes
-        let ttl = if bucket_name.starts_with("locker") {
-            cfg.nats.lock_max_age
-        } else {
-            cfg.limit.node_heartbeat_ttl as u64
-        };
-        let ttl = Duration::from_secs(ttl);
-        bucket.max_age = ttl;
-        if cfg.nats.v211_support {
-            bucket.limit_markers = Some(ttl);
-        }
-    }
-    // Try to get the existing bucket first to avoid conflicts when the bucket was created
-    // with different parameters
-    let kv = match jetstream.get_key_value(&bucket.bucket).await {
-        Ok(kv) => kv,
-        Err(_) => jetstream.create_key_value(bucket).await.map_err(|e| {
-            Error::Message(format!(
-                "[NATS:get_bucket_by_key] create jetstream kv {bucket_name} error: {e}"
-            ))
-        })?,
-    };
-    Ok((kv, key.trim_start_matches(bucket_name)))
-}
-
-pub async fn init() {
-    _ = get_nats_client().await;
-}
+static LOCAL_LOCKER: Lazy<Mutex<HashMap<String, Arc<Mutex<bool>>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 
 pub struct NatsDb {
     prefix: String,
@@ -158,6 +119,10 @@ impl NatsDb {
         let prefix = prefix.to_string();
         let self_prefix = self.prefix.to_string();
         let _task: JoinHandle<Result<()>> = tokio::task::spawn(async move {
+            // A recreated watcher resumes after this revision instead of dropping what was
+            // published.
+            let mut last_revision: u64 = 0;
+            let mut backoff = KV_WATCH_BACKOFF_MIN;
             loop {
                 if cluster::is_offline() {
                     break;
@@ -166,7 +131,7 @@ impl NatsDb {
                     Ok(v) => v,
                     Err(e) => {
                         log::error!("[NATS:kv_watch] prefix: {prefix}, get bucket error: {e}");
-                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                        backoff = kv_watch_backoff(backoff).await;
                         continue;
                     }
                 };
@@ -176,33 +141,56 @@ impl NatsDb {
                     bucket.name,
                     prefix
                 );
-                let mut entries = match bucket.watch_all().await {
+                // if the bucket was recreated, our resume point is meaningless
+                if last_revision > bucket.stream.cached_info().state.last_sequence {
+                    last_revision = 0;
+                }
+                let entries = if last_revision == 0 {
+                    bucket.watch_all().await
+                } else {
+                    bucket.watch_all_from_revision(last_revision + 1).await
+                };
+                let mut entries = match entries {
                     Ok(v) => v,
                     Err(e) => {
                         log::error!(
                             "[NATS:kv_watch] prefix: {prefix}, bucket.watch_all error: {e}"
                         );
-                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                        backoff = kv_watch_backoff(backoff).await;
                         continue;
                     }
                 };
+                // Each recreation leaves a server-side consumer, so only persistent errors recreate
+                // it.
+                let mut errors = 0;
                 loop {
                     match entries.next().await {
                         None => {
-                            log::error!("[NATS:kv_watch] prefix: {prefix}, get message error");
+                            log::error!("[NATS:kv_watch] prefix: {prefix}, watcher closed");
                             break;
                         }
-                        Some(entry) => {
-                            let entry = match entry {
-                                Ok(entry) => entry,
-                                Err(e) => {
-                                    log::error!(
-                                        "[NATS:kv_watch] prefix: {prefix}, get message error: {e}"
-                                    );
-                                    break;
-                                }
+                        Some(Err(e)) => {
+                            errors += 1;
+                            if errors >= KV_WATCH_MAX_ERRORS {
+                                log::error!(
+                                    "[NATS:kv_watch] prefix: {prefix}, get message error: {e}, recreating watcher"
+                                );
+                                break;
+                            }
+                            log::warn!("[NATS:kv_watch] prefix: {prefix}, get message error: {e}");
+                        }
+                        Some(Ok(entry)) => {
+                            errors = 0;
+                            backoff = KV_WATCH_BACKOFF_MIN;
+                            last_revision = entry.revision;
+                            let Some(item_key) = key_decode(&entry.key) else {
+                                log::warn!(
+                                    "[NATS:kv_watch] prefix: {prefix}, skipping undecodable key: \
+                                     {}",
+                                    entry.key
+                                );
+                                continue;
                             };
-                            let item_key = key_decode(&entry.key);
                             if !item_key.starts_with(new_key) {
                                 continue;
                             }
@@ -232,6 +220,8 @@ impl NatsDb {
                         }
                     }
                 }
+                // Without a pause a nats disruption becomes a cluster-wide consumer churn storm.
+                backoff = kv_watch_backoff(backoff).await;
             }
             Ok(())
         });
@@ -294,6 +284,15 @@ impl super::Db for NatsDb {
         }
     }
 
+    /// Exact-key lookup, skipping `get`'s costly `start_dt` prefix-scan fallback.
+    async fn get_if_exists(&self, key: &str) -> Result<Option<Bytes>> {
+        let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
+        bucket
+            .get(&key_encode(new_key))
+            .await
+            .map_err(|e| Error::Message(format!("[NATS:get_if_exists] bucket.get error: {e}")))
+    }
+
     async fn put(
         &self,
         key: &str,
@@ -339,7 +338,16 @@ impl super::Db for NatsDb {
         log::info!("Acquired lock for cluster key: {lock_key}");
 
         // get value and update
-        let value = self.get_key_value(key).await.ok();
+        let value = match found_or_missing(self.get_key_value(key).await) {
+            Ok(value) => value,
+            Err(e) => {
+                if let Err(e) = dist_lock::unlock(&locker).await {
+                    log::error!("dist_lock unlock err: {e}");
+                }
+                log::info!("Released lock for cluster key: {lock_key}");
+                return Err(e);
+            }
+        };
         let old_key = value.as_ref().map(|v| v.0.clone());
         let old_value = value.map(|v| v.1);
         let ret = match update_fn(old_value) {
@@ -416,8 +424,9 @@ impl super::Db for NatsDb {
                 .purge(encode_key)
                 .await
                 .map_err(|e| Error::Message(format!("[NATS:delete] bucket.purge error: {e}")))?;
-            if need_watch && !use_kv_watcher(&purge_key) {
-                coordinator::events::delete_event(&purge_key, start_dt).await?;
+            let event_key = watched_key(&self.prefix, &bucket.name, &purge_key);
+            if need_watch && !use_kv_watcher(&event_key) {
+                coordinator::events::delete_event(&event_key, start_dt).await?;
             }
         }
         Ok(())
@@ -573,93 +582,12 @@ impl super::Db for NatsDb {
     }
 }
 
-pub async fn create_table() -> Result<()> {
-    Ok(())
-}
-
-pub async fn connect() -> async_nats::Client {
-    let cfg = get_config();
-    if cfg.common.print_key_config {
-        log::info!("Nats init get_config(): {:?}", cfg.nats);
-    }
-
-    let mut opts = async_nats::ConnectOptions::new()
-        .connection_timeout(Duration::from_secs(cfg.nats.connect_timeout));
-    if cfg.nats.subscription_capacity > 0 {
-        opts = opts.subscription_capacity(cfg.nats.subscription_capacity);
-    }
-    if !cfg.nats.user.is_empty() {
-        opts = opts.user_and_password(cfg.nats.user.to_string(), cfg.nats.password.to_string());
-    }
-    let addrs = cfg
-        .nats
-        .addr
-        .split(',')
-        .map(|a| a.parse().unwrap())
-        .collect::<Vec<ServerAddr>>();
-    match async_nats::connect_with_options(addrs.clone(), opts).await {
-        Ok(client) => client,
-        Err(e) => {
-            log::error!("NATS connect failed for address(es): {addrs:?}, err: {e}");
-            panic!("NATS connect failed");
-        }
-    }
-}
-
-async fn keys(kv: &jetstream::kv::Store, prefix: &str) -> Result<Vec<String>> {
-    let mut consumer = kv
-        .stream
-        .create_consumer(jetstream::consumer::push::OrderedConfig {
-            deliver_subject: ider::uuid(),
-            description: Some("kv history consumer".to_string()),
-            headers_only: true,
-            replay_policy: jetstream::consumer::ReplayPolicy::Instant,
-            // We only need to know the latest state for each key, not the whole history
-            deliver_policy: jetstream::consumer::DeliverPolicy::All,
-            ..Default::default()
-        })
-        .await?;
-
-    let mut keys = Vec::new();
-    if let Ok(info) = consumer.info().await
-        && info.num_pending == 0
-    {
-        return Ok(keys);
-    }
-    let mut messages = consumer.messages().await?;
-    while let Ok(Some(message)) = messages.try_next().await {
-        let key = message
-            .subject
-            .splitn(2, kv.prefix.as_str())
-            .last()
-            .unwrap()
-            .to_string();
-        let key = key_decode(&key);
-        if key.starts_with(prefix) {
-            keys.push(key);
-        }
-        if let Ok(info) = message.info()
-            && info.pending == 0
-        {
-            break;
-        }
-    }
-    keys.sort();
-    keys.dedup();
-    Ok(keys)
-}
-
-// global locker for nats
-static LOCAL_LOCKER: Lazy<Mutex<HashMap<String, Arc<Mutex<bool>>>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
-// even the watcher no response still need to check if the key exists. unit: second
-const LOCKER_WATCHER_CHECK_TTL: u64 = 1;
-const LOCKER_WATCHER_UPDATE_TTL: i64 = 10;
-
 pub(crate) struct Locker {
     pub key: String,
     lock_id: String,
-    state: Arc<AtomicU8>, // 0: init, 1: locking, 2: release
+    // 0: init, 1: locking, 2: released, 3: lost to another holder or expired
+    state: Arc<AtomicU8>,
+    lost: Arc<watch::Sender<bool>>,
     tx: Option<mpsc::Sender<()>>,
     keep_alive: Mutex<Option<JoinHandle<()>>>,
 }
@@ -670,9 +598,15 @@ impl Locker {
             key: format!("/locker{key}"),
             lock_id: ider::uuid(),
             state: Arc::new(AtomicU8::new(0)),
+            lost: Arc::new(watch::channel(false).0),
             tx: None,
             keep_alive: Mutex::new(None),
         }
+    }
+
+    /// Turns `true` once the keep-alive finds the lock taken over or expired.
+    pub(crate) fn lost_signal(&self) -> watch::Receiver<bool> {
+        self.lost.subscribe()
     }
 
     /// lock with timeout, 0 means use default timeout, unit: second
@@ -704,25 +638,39 @@ impl Locker {
             }
         };
         drop(local_mutex);
-        let _lock_guard = locker.lock().await;
+        let expiration = now + second_micros(timeout);
+        let Ok(_lock_guard) = tokio::time::timeout(remaining(expiration), locker.lock()).await
+        else {
+            return Err(Error::Message(format!(
+                "nats lock for key: {}, acquire timeout in {timeout}s",
+                self.key
+            )));
+        };
 
         // removes locks that are expired or acquired by nodes that are no longer alive
         _ = check_exist_lock(&bucket, &key, &self.key).await?;
 
-        let mut last_err = None;
+        let mut last_err: Option<String>;
+        let mut revision = 0;
 
-        let expiration = now + second_micros(timeout);
-        while expiration > now_micros() {
+        // Always try once, so a deadline spent queueing locally is never reported as acquired.
+        loop {
             match bucket.create(&key, value.clone()).await {
-                Ok(_) => {
-                    self.state.store(1, Ordering::SeqCst);
+                Ok(created) => {
+                    self.state.store(LOCKER_STATE_LOCKING, Ordering::SeqCst);
+                    revision = created;
                     last_err = None;
                     break;
                 }
                 Err(err) => {
                     // created error, means the key locked by other thread, wait and retry
                     last_err = Some(err.to_string());
-                    if let Err(e) = wait_for_delete(&bucket, &key, &self.key).await {
+                    if expiration <= now_micros() {
+                        break;
+                    }
+                    // The holder may keep the key far past our timeout, so never wait beyond it.
+                    let wait = wait_for_delete(&bucket, &key, &self.key);
+                    if let Ok(Err(e)) = tokio::time::timeout(remaining(expiration), wait).await {
                         log::error!("nats wait_for_delete key: {key}, error: {e}");
                     }
                 }
@@ -749,10 +697,15 @@ impl Locker {
         let lock_key = self.key.clone();
         let bucket_key = key.clone();
         let state = self.state.clone();
+        let lost = self.lost.clone();
         let handle = tokio::task::spawn(async move {
-            if let Err(e) =
-                keep_alive_lock(&mut rx, &bucket, &bucket_key, &lock_key, &lock_id, state).await
-            {
+            let held = HeldLock {
+                bucket: &bucket,
+                key: &bucket_key,
+                orig_key: &lock_key,
+                lock_id: &lock_id,
+            };
+            if let Err(e) = keep_alive_lock(&mut rx, held, revision, &state, &lost).await {
                 log::error!("nats keep alive for key: {lock_key}, error: {e}");
             }
         });
@@ -762,28 +715,21 @@ impl Locker {
     }
 
     pub(crate) async fn unlock(&self) -> Result<()> {
-        if self.state.load(Ordering::SeqCst) != 1 {
+        if self.state.load(Ordering::SeqCst) != LOCKER_STATE_LOCKING {
             return Ok(());
         }
 
         let cfg = get_config();
         let (bucket, new_key) = get_bucket_by_key(&cfg.nats.prefix, &self.key).await?;
         let key = key_encode(new_key);
-        let ret = bucket.get(&key).await?;
-        let Some(ret) = ret else {
-            return Ok(());
-        };
-        let ret = String::from_utf8_lossy(&ret).to_string();
-        if !ret.starts_with(&self.lock_id) {
-            return Ok(());
-        }
-        self.state.store(2, Ordering::SeqCst);
-        if let Err(e) = self.tx.as_ref().unwrap().send(()).await {
+        self.state.store(LOCKER_STATE_RELEASED, Ordering::SeqCst);
+        if let Some(tx) = self.tx.as_ref()
+            && let Err(e) = tx.send(()).await
+        {
             log::error!("nats unlock sender for key: {}, error: {e}", self.key);
         }
 
-        // Wait for the keep-alive task to fully exit before purging. Otherwise an
-        // in-flight `put` could resurrect the key right after we purge it.
+        // An in-flight keep-alive `update` could otherwise land after the purge below.
         let keep_alive = self.keep_alive.lock().await.take();
         if let Some(handle) = keep_alive
             && let Err(e) = handle.await
@@ -793,12 +739,189 @@ impl Locker {
                 self.key
             );
         }
-        if let Err(e) = bucket.purge(&key).await {
-            log::error!("nats unlock for key: {}, error: {e}", self.key);
-            return Err(Error::Message("nats unlock error".to_string()));
+        let entry = bucket.entry(&key).await?;
+        let Some(revision) = revision_if_held(
+            entry
+                .as_ref()
+                .map(|e| (&e.value[..], e.revision, e.operation)),
+            &self.lock_id,
+        ) else {
+            return Ok(());
         };
-        Ok(())
+        match bucket.purge_expect_revision(&key, Some(revision)).await {
+            Ok(()) => Ok(()),
+            // Another holder wrote the key since we read it: the lock is theirs now.
+            Err(e) if e.kind() == jetstream::kv::UpdateErrorKind::WrongLastRevision => Ok(()),
+            Err(e) => {
+                log::error!("nats unlock for key: {}, error: {e}", self.key);
+                Err(Error::Message("nats unlock error".to_string()))
+            }
+        }
     }
+}
+
+/// A lock this process holds, as the keep-alive task sees it.
+struct HeldLock<'a> {
+    bucket: &'a jetstream::kv::Store,
+    key: &'a str,
+    orig_key: &'a str,
+    lock_id: &'a str,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum Renewal {
+    /// The key now carries this revision.
+    Renewed(u64),
+    /// A transient failure; try again on the next tick.
+    Retry,
+    /// Another holder owns the key.
+    Lost,
+}
+
+pub async fn get_nats_client() -> &'static Client {
+    NATS_CLIENT
+        .get_or_try_init(connect)
+        .await
+        .unwrap_or_else(|e| panic!("{e}"))
+}
+
+/// Like [`get_nats_client`], but reports a failed connect instead of panicking.
+pub async fn try_get_nats_client() -> Result<&'static Client> {
+    NATS_CLIENT.get_or_try_init(connect).await
+}
+
+pub async fn kv_store(key: &str) -> Result<jetstream::kv::Store> {
+    let prefix = get_config().nats.prefix.clone();
+    Ok(get_bucket_by_key(&prefix, key).await?.0)
+}
+
+pub async fn init() -> Result<()> {
+    NATS_CLIENT.get_or_try_init(connect).await?;
+    Ok(())
+}
+
+pub async fn create_table() -> Result<()> {
+    Ok(())
+}
+
+async fn get_bucket_by_key<'a>(
+    prefix: &'a str,
+    key: &'a str,
+) -> Result<(jetstream::kv::Store, &'a str)> {
+    let cfg = get_config();
+    let client = get_nats_client().await.clone();
+    let jetstream = jetstream::new(client);
+    let key = key.trim_start_matches('/');
+    let bucket_name = key.split('/').next().unwrap();
+    let mut bucket = jetstream::kv::Config {
+        bucket: format!("{prefix}{bucket_name}"),
+        num_replicas: cfg.nats.replicas,
+        history: cfg.nats.history,
+        ..Default::default()
+    };
+    if let Some(ttl) = bucket_ttl(bucket_name) {
+        bucket.max_age = ttl;
+        if cfg.nats.v211_support {
+            bucket.limit_markers = Some(ttl);
+        }
+    }
+    // An existing bucket created with different parameters would make `create` conflict.
+    let kv = match jetstream.get_key_value(&bucket.bucket).await {
+        Ok(kv) => kv,
+        Err(_) => jetstream.create_key_value(bucket).await.map_err(|e| {
+            Error::Message(format!(
+                "[NATS:get_bucket_by_key] create jetstream kv {bucket_name} error: {e}"
+            ))
+        })?,
+    };
+    Ok((kv, key.trim_start_matches(bucket_name)))
+}
+
+// sleep for the current backoff, then return the next one
+async fn kv_watch_backoff(secs: u64) -> u64 {
+    tokio::time::sleep(Duration::from_secs(secs)).await;
+    std::cmp::min(secs * 2, KV_WATCH_BACKOFF_MAX)
+}
+
+async fn connect() -> Result<async_nats::Client> {
+    let cfg = get_config();
+    if cfg.common.print_key_config {
+        log::info!("Nats init get_config(): {:?}", cfg.nats);
+    }
+
+    let mut opts = async_nats::ConnectOptions::new()
+        .connection_timeout(Duration::from_secs(cfg.nats.connect_timeout));
+    if cfg.nats.subscription_capacity > 0 {
+        opts = opts.subscription_capacity(cfg.nats.subscription_capacity);
+    }
+    if !cfg.nats.user.is_empty() {
+        opts = opts.user_and_password(cfg.nats.user.to_string(), cfg.nats.password.to_string());
+    }
+    let addrs = cfg
+        .nats
+        .addr
+        .split(',')
+        .map(|a| a.parse())
+        .collect::<std::result::Result<Vec<ServerAddr>, _>>()
+        .map_err(|e| Error::Message(format!("invalid NATS address {}: {e}", cfg.nats.addr)))?;
+    async_nats::connect_with_options(addrs.clone(), opts)
+        .await
+        .map_err(|e| {
+            Error::Message(format!(
+                "NATS connect failed for address(es): {addrs:?}, err: {e}"
+            ))
+        })
+}
+
+async fn keys(kv: &jetstream::kv::Store, prefix: &str) -> Result<Vec<String>> {
+    let mut consumer = kv
+        .stream
+        .create_consumer(jetstream::consumer::push::OrderedConfig {
+            deliver_subject: ider::uuid(),
+            description: Some("kv history consumer".to_string()),
+            headers_only: true,
+            replay_policy: jetstream::consumer::ReplayPolicy::Instant,
+            // We only need to know the latest state for each key, not the whole history
+            deliver_policy: jetstream::consumer::DeliverPolicy::All,
+            ..Default::default()
+        })
+        .await?;
+
+    let mut keys = Vec::new();
+    if let Ok(info) = consumer.info().await
+        && info.num_pending == 0
+    {
+        return Ok(keys);
+    }
+    let mut messages = consumer.messages().await?;
+    while let Ok(Some(message)) = messages.try_next().await {
+        let key = message
+            .subject
+            .splitn(2, kv.prefix.as_str())
+            .last()
+            .unwrap()
+            .to_string();
+        match key_decode(&key) {
+            Some(key) if key.starts_with(prefix) => keys.push(key),
+            Some(_) => {}
+            None => log::warn!(
+                "[NATS:keys] bucket {}, skipping undecodable key: {key}",
+                kv.name
+            ),
+        }
+        if let Ok(info) = message.info()
+            && info.pending == 0
+        {
+            break;
+        }
+    }
+    keys.sort();
+    keys.dedup();
+    Ok(keys)
+}
+
+fn remaining(expiration_micros: i64) -> Duration {
+    Duration::from_micros((expiration_micros - now_micros()).max(0) as u64)
 }
 
 async fn wait_for_delete(bucket: &jetstream::kv::Store, key: &str, orig_key: &str) -> Result<()> {
@@ -808,8 +931,7 @@ async fn wait_for_delete(bucket: &jetstream::kv::Store, key: &str, orig_key: &st
     let mut watcher = bucket.watch(key).await?;
     let mut stream_exited = false;
     loop {
-        // Sometimes the NATS streams just...terminate, so make sure if we have a stream
-        // termination, we retry the connection
+        // NATS watch streams can terminate on their own; reconnect when one does.
         if stream_exited {
             stream_exited = false;
             watcher = bucket.watch(key).await?;
@@ -877,18 +999,19 @@ async fn check_exist_lock(
 
 async fn keep_alive_lock(
     rx: &mut mpsc::Receiver<()>,
-    bucket: &jetstream::kv::Store,
-    key: &str,
-    orig_key: &str,
-    lock_id: &str,
-    state: Arc<AtomicU8>,
+    held: HeldLock<'_>,
+    mut revision: u64,
+    state: &AtomicU8,
+    lost: &watch::Sender<bool>,
 ) -> Result<()> {
     let interval = std::cmp::max(1, LOCKER_WATCHER_UPDATE_TTL as u64 / 3);
+    let expires_after = Duration::from_secs(LOCKER_WATCHER_UPDATE_TTL as u64);
     let mut ticker = tokio::time::interval(tokio::time::Duration::from_secs(interval));
     ticker.tick().await; // first tick will be immediate
+    let mut renewed_at = Instant::now();
     loop {
         tokio::select! {
-            // prefer the stop signal so we never issue a `put` once unlock began
+            // prefer the stop signal so we never issue an update once unlock began
             biased;
             _ = rx.recv() => {
                 break;
@@ -896,35 +1019,137 @@ async fn keep_alive_lock(
             _ = ticker.tick() => {}
         }
         // the lock has been released, stop keeping it alive
-        if state.load(Ordering::SeqCst) != 1 {
+        if state.load(Ordering::SeqCst) != LOCKER_STATE_LOCKING {
             break;
         }
-        // update the locker time to keep alive
-        let value = Bytes::from(format!(
-            "{}:{}:{}",
-            lock_id,
-            cluster::LOCAL_NODE.uuid,
-            now_micros() + second_micros(LOCKER_WATCHER_UPDATE_TTL),
-        ));
-        if let Err(e) = bucket.put(&key, value).await {
-            log::error!("nats keep alive for key: {orig_key}, error: {e}");
+        let renewal = match renew_lock(&held, revision).await {
+            Renewal::Retry if renewed_at.elapsed() >= expires_after => Renewal::Lost,
+            renewal => renewal,
+        };
+        match renewal {
+            Renewal::Renewed(next) => {
+                revision = next;
+                renewed_at = Instant::now();
+                log::debug!("nats keep alive for key: {} updated", held.orig_key);
+            }
+            Renewal::Retry => {}
+            Renewal::Lost => {
+                log::error!(
+                    "nats keep alive for key: {} lost the lock (taken over or expired); \
+                     no longer renewing it",
+                    held.orig_key
+                );
+                mark_lost(state, lost);
+                break;
+            }
         }
-        log::debug!("nats keep alive for key: {orig_key} updated");
     }
 
-    log::debug!("nats keep alive for key: {orig_key} exit");
+    log::debug!("nats keep alive for key: {} exit", held.orig_key);
 
     Ok(())
 }
 
-#[inline]
-fn key_encode(key: &str) -> String {
-    base64::encode(key).replace('+', "-").replace('/', "_")
+/// Record a lost lock, unless `unlock` already released it.
+fn mark_lost(state: &AtomicU8, lost: &watch::Sender<bool>) {
+    if state
+        .compare_exchange(
+            LOCKER_STATE_LOCKING,
+            LOCKER_STATE_LOST,
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        )
+        .is_ok()
+    {
+        lost.send_replace(true);
+    }
+}
+
+/// Extend the lock only at the revision we last wrote, never overwriting another holder's lock.
+async fn renew_lock(held: &HeldLock<'_>, revision: u64) -> Renewal {
+    let value = Bytes::from(format!(
+        "{}:{}:{}",
+        held.lock_id,
+        cluster::LOCAL_NODE.uuid,
+        now_micros() + second_micros(LOCKER_WATCHER_UPDATE_TTL),
+    ));
+    let err = match held.bucket.update(held.key, value, revision).await {
+        Ok(next) => return Renewal::Renewed(next),
+        Err(e) => e,
+    };
+    if err.kind() != jetstream::kv::UpdateErrorKind::WrongLastRevision {
+        log::error!("nats keep alive for key: {}, error: {err}", held.orig_key);
+        return Renewal::Retry;
+    }
+    // A timed-out update may still have landed; the key is ours if it carries our lock id.
+    match held.bucket.entry(held.key).await {
+        Ok(entry) => revision_if_held(
+            entry
+                .as_ref()
+                .map(|e| (&e.value[..], e.revision, e.operation)),
+            held.lock_id,
+        )
+        .map_or(Renewal::Lost, Renewal::Renewed),
+        Err(e) => {
+            log::error!("nats keep alive for key: {}, error: {e}", held.orig_key);
+            Renewal::Retry
+        }
+    }
+}
+
+/// The entry's revision when it is a live value written by `lock_id`'s holder.
+fn revision_if_held(
+    entry: Option<(&[u8], u64, jetstream::kv::Operation)>,
+    lock_id: &str,
+) -> Option<u64> {
+    let (value, revision, operation) = entry?;
+    let owner = value.split(|b| *b == b':').next()?;
+    (operation == jetstream::kv::Operation::Put && owner == lock_id.as_bytes()).then_some(revision)
 }
 
 #[inline]
-fn key_decode(key: &str) -> String {
-    base64::decode(key.replace('-', "+").replace('_', "/")).unwrap()
+pub(crate) fn key_encode(key: &str) -> String {
+    base64::encode(key).replace('+', "-").replace('/', "_")
+}
+
+/// Inverse of [`key_encode`]; `None` for a plain key an older o2-ai peer wrote to a shared bucket.
+#[inline]
+fn key_decode(key: &str) -> Option<String> {
+    base64::decode(key.replace('-', "+").replace('_', "/")).ok()
+}
+
+fn bucket_ttl(bucket_name: &str) -> Option<Duration> {
+    let cfg = get_config();
+    // Named literally: this layer does not import from the domain modules, whose tests pin these.
+    let secs = match bucket_name {
+        "locker" | "lockers" => cfg.nats.lock_max_age,
+        "ai_session_owners" => cfg.limit.ai_session_owner_ttl as u64,
+        // o2-ai replicas heartbeat on the same contract as cluster nodes.
+        "nodes" | "clusters" | "ai_replicas" => cfg.limit.node_heartbeat_ttl as u64,
+        "ingest_rejection" => INGEST_REJECTION_MAX_AGE_SECS,
+        _ => return None,
+    };
+    Some(Duration::from_secs(secs))
+}
+
+/// Whether `get_bucket_by_key` gives `bucket_name` a `max_age`, for the domain modules' tests.
+#[cfg(test)]
+pub(crate) fn bucket_has_ttl(bucket_name: &str) -> bool {
+    bucket_ttl(bucket_name).is_some()
+}
+
+/// A missing key reads as `None`; any other read error must not look like one to an updater.
+fn found_or_missing(read: Result<(String, Bytes)>) -> Result<Option<(String, Bytes)>> {
+    match read {
+        Ok(value) => Ok(Some(value)),
+        Err(Error::DbError(DbError::KeyNotExists(_))) => Ok(None),
+        Err(e) => Err(e),
+    }
+}
+
+/// The full key watchers filter on, from a key relative to its bucket.
+fn watched_key(nats_prefix: &str, bucket_name: &str, relative: &str) -> String {
+    format!("/{}{relative}", bucket_name.trim_start_matches(nats_prefix))
 }
 
 #[inline]
@@ -939,6 +1164,31 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_get_for_update_reads_only_a_missing_key_as_none() {
+        let found = found_or_missing(Ok(("/k/a/b".to_string(), Bytes::from("v")))).unwrap();
+        assert_eq!(found, Some(("/k/a/b".to_string(), Bytes::from("v"))));
+        let missing = Err(Error::from(DbError::KeyNotExists("/k/a/b".to_string())));
+        assert_eq!(found_or_missing(missing).unwrap(), None);
+        let failed = Err(Error::Message("bucket.get error".to_string()));
+        assert!(
+            found_or_missing(failed).is_err(),
+            "a failed read reached the updater as a missing key"
+        );
+    }
+
+    #[test]
+    fn test_prefix_delete_events_carry_the_full_key() {
+        assert_eq!(
+            watched_key("o2_", "o2_function", "/t1/f1"),
+            "/function/t1/f1"
+        );
+        assert_eq!(
+            watched_key("", "metrics_leader", "/t1/c1"),
+            "/metrics_leader/t1/c1"
+        );
+    }
+
+    #[test]
     fn test_use_kv_watcher() {
         assert!(!use_kv_watcher("/super_cluster_kv_nodes/"));
         assert!(!use_kv_watcher("/super_cluster_kv_clusters/"));
@@ -946,16 +1196,38 @@ mod tests {
     }
 
     #[test]
-    fn test_key_encode_simple() {
-        let key = "test_key";
-        let encoded = key_encode(key);
-        assert!(!encoded.contains('/'));
-        assert!(!encoded.contains('+'));
+    fn test_bucket_ttl_pins_ingest_rejection_to_one_hour() {
+        let cfg = get_config();
+        assert_eq!(
+            bucket_ttl("ingest_rejection"),
+            Some(Duration::from_secs(3_600))
+        );
+        assert_eq!(
+            bucket_ttl("nodes"),
+            Some(Duration::from_secs(cfg.limit.node_heartbeat_ttl as u64))
+        );
+        assert_eq!(
+            bucket_ttl("lockers"),
+            Some(Duration::from_secs(cfg.nats.lock_max_age))
+        );
+        assert_eq!(bucket_ttl("schema"), None);
+        assert_eq!(bucket_ttl("organization"), None);
     }
 
     #[test]
-    fn test_key_encode_with_special_chars() {
-        let key = "test/key+with/special";
+    fn test_key_decode_returns_none_for_garbage() {
+        let encoded = key_encode("/compact/delete/org/logs/stream");
+        assert_eq!(
+            key_decode(&encoded).as_deref(),
+            Some("/compact/delete/org/logs/stream")
+        );
+        // a malformed key that came off the wire must not panic
+        assert_eq!(key_decode("!!not-base64!!"), None);
+    }
+
+    #[test]
+    fn test_key_encode_simple() {
+        let key = "test_key";
         let encoded = key_encode(key);
         assert!(!encoded.contains('/'));
         assert!(!encoded.contains('+'));
@@ -978,7 +1250,7 @@ mod tests {
 
         for key in keys {
             let encoded = key_encode(key);
-            let decoded = key_decode(&encoded);
+            let decoded = key_decode(&encoded).expect("we just encoded it");
             assert_eq!(
                 decoded, key,
                 "Failed roundtrip for key: '{}', encoded: '{}', decoded: '{}'",
@@ -988,10 +1260,17 @@ mod tests {
     }
 
     #[test]
+    fn test_key_decode_rejects_a_plain_key_instead_of_panicking() {
+        // A plain key left by an older o2-ai peer must be skipped, not panic.
+        assert_eq!(key_decode("not base64 at all!"), None);
+        assert_eq!(key_decode("ai_replicas/o2ai-0"), None);
+    }
+
+    #[test]
     fn test_key_encode_empty_string() {
         let key = "";
         let encoded = key_encode(key);
-        let decoded = key_decode(&encoded);
+        let decoded = key_decode(&encoded).expect("we just encoded it");
         assert_eq!(decoded, key);
     }
 
@@ -1001,7 +1280,7 @@ mod tests {
 
         for key in keys {
             let encoded = key_encode(key);
-            let decoded = key_decode(&encoded);
+            let decoded = key_decode(&encoded).expect("we just encoded it");
             assert_eq!(decoded, key, "Failed roundtrip for unicode key: '{}'", key);
         }
     }
@@ -1073,6 +1352,89 @@ mod tests {
     }
 
     #[test]
+    fn test_renewal_keeps_a_lock_still_written_by_us() {
+        let ours = format!("{}:node-1:123", "lock-a");
+        assert_eq!(
+            revision_if_held(
+                Some((ours.as_bytes(), 7, jetstream::kv::Operation::Put)),
+                "lock-a"
+            ),
+            Some(7)
+        );
+    }
+
+    #[test]
+    fn test_renewal_gives_up_a_lock_taken_by_another_holder() {
+        let theirs = "lock-b:node-2:456";
+        assert_eq!(
+            revision_if_held(
+                Some((theirs.as_bytes(), 9, jetstream::kv::Operation::Put)),
+                "lock-a"
+            ),
+            None
+        );
+        // A prefix of another id is not ours either.
+        assert_eq!(
+            revision_if_held(
+                Some((b"lock-ab:node-2:456", 9, jetstream::kv::Operation::Put)),
+                "lock-a"
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn test_renewal_gives_up_a_purged_or_missing_lock() {
+        assert_eq!(revision_if_held(None, "lock-a"), None);
+        assert_eq!(
+            revision_if_held(
+                Some((b"lock-a:node-1:1", 4, jetstream::kv::Operation::Purge)),
+                "lock-a"
+            ),
+            None
+        );
+        assert_eq!(
+            revision_if_held(
+                Some((b"lock-a:node-1:1", 4, jetstream::kv::Operation::Delete)),
+                "lock-a"
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn test_unlock_of_a_lost_lock_is_a_no_op() {
+        let locker = Locker::new("/lost");
+        locker.state.store(LOCKER_STATE_LOST, Ordering::SeqCst);
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap();
+        assert!(rt.block_on(locker.unlock()).is_ok());
+    }
+
+    #[test]
+    fn test_a_lost_lock_is_signalled_to_its_holder() {
+        let locker = Locker::new("/lost-signal");
+        let mut signal = locker.lost_signal();
+        assert!(!*signal.borrow_and_update());
+        locker.state.store(LOCKER_STATE_LOCKING, Ordering::SeqCst);
+        mark_lost(&locker.state, &locker.lost);
+        assert!(signal.has_changed().unwrap());
+        assert!(*signal.borrow_and_update());
+        assert_eq!(locker.state.load(Ordering::SeqCst), LOCKER_STATE_LOST);
+    }
+
+    #[test]
+    fn test_a_released_lock_is_never_reported_lost() {
+        let locker = Locker::new("/released");
+        let signal = locker.lost_signal();
+        locker.state.store(LOCKER_STATE_RELEASED, Ordering::SeqCst);
+        mark_lost(&locker.state, &locker.lost);
+        assert!(!*signal.borrow());
+        assert_eq!(locker.state.load(Ordering::SeqCst), LOCKER_STATE_RELEASED);
+    }
+
+    #[test]
     fn test_key_decode_handles_url_safe_chars() {
         // Test that decode properly reverses the URL-safe encoding
         let original = "test/key+value";
@@ -1082,7 +1444,7 @@ mod tests {
         assert!(!encoded.contains('/'));
         assert!(!encoded.contains('+'));
 
-        let decoded = key_decode(&encoded);
+        let decoded = key_decode(&encoded).expect("we just encoded it");
         assert_eq!(decoded, original);
     }
 
@@ -1120,36 +1482,8 @@ mod tests {
     fn test_key_encode_long_string() {
         let long_key = "a".repeat(1000);
         let encoded = key_encode(&long_key);
-        let decoded = key_decode(&encoded);
+        let decoded = key_decode(&encoded).expect("we just encoded it");
         assert_eq!(decoded, long_key);
-    }
-
-    #[test]
-    fn test_key_encode_newlines_and_tabs() {
-        let key = "key\nwith\nnewlines\tand\ttabs";
-        let encoded = key_encode(key);
-        let decoded = key_decode(&encoded);
-        assert_eq!(decoded, key);
-    }
-
-    #[test]
-    fn test_key_encode_binary_like_data() {
-        let key = "key\0with\0null\0bytes";
-        let encoded = key_encode(key);
-        let decoded = key_decode(&encoded);
-        assert_eq!(decoded, key);
-    }
-
-    #[test]
-    fn test_nats_db_prefix_no_modification_without_slash() {
-        let db = NatsDb::new("no_slash_prefix");
-        assert_eq!(db.prefix, "no_slash_prefix");
-    }
-
-    #[test]
-    fn test_nats_db_empty_prefix() {
-        let db = NatsDb::new("");
-        assert_eq!(db.prefix, "");
     }
 
     #[test]
@@ -1165,7 +1499,7 @@ mod tests {
 
         for key in keys {
             let encoded = key_encode(key);
-            let decoded = key_decode(&encoded);
+            let decoded = key_decode(&encoded).expect("we just encoded it");
             assert_eq!(decoded, key, "Failed for key of length: {}", key.len());
         }
     }

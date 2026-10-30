@@ -30,14 +30,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-right>
       <div
         v-if="indexData.name"
-        class="rounded-default bg-surface-panel border-border-default flex items-center gap-1.5 border px-2 py-1"
+        class="rounded-default bg-surface-panel border-border-default flex items-center gap-1.5 border px-2 py-1 max-md:hidden"
       >
-        <img :src="getTimelineIcon" alt="Timeline Icon" class="h-3.5 w-3.5 opacity-70" />
+        <img
+          :src="getTimelineIcon"
+          :alt="t('logStream.timelineIcon')"
+          class="h-3.5 w-3.5 opacity-70"
+        />
         <div class="flex items-center gap-1.5">
           <span
             class="text-3xs rounded-default text-text-secondary bg-surface-subtle px-1.5 py-0.5 font-medium"
           >
-            UTC
+            {{ displayTimezone }}
           </span>
           <div class="text-text-body text-xs font-semibold">
             {{ indexData.stats.doc_time_min }}
@@ -66,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="height: calc(100vh - 3.75rem)"
           >
             <!-- this the grid section the tiles section -->
-            <div class="stats-grid mb-2 grid grid-cols-4 gap-2">
+            <div class="stats-grid mb-2 grid grid-cols-4 gap-2 max-md:grid-cols-2">
               <!-- Docs Count Tile -->
               <div
                 v-if="store.state.zoConfig.show_stream_stats_doc_num"
@@ -78,12 +82,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <div class="tile-header flex items-start justify-between">
                     <div class="tile-title text-text-secondary text-left text-xs font-bold">
-                      Events
+                      {{ t("common.events") }}
                     </div>
                     <div class="tile-icon opacity-80">
                       <img
                         src="@/assets/images/home/records.svg"
-                        alt="Records Icon"
+                        :alt="t('logStream.recordsIcon')"
                         class="h-6 w-6"
                       />
                     </div>
@@ -105,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="tile-icon opacity-80">
                       <img
                         src="@/assets/images/home/ingested_size.svg"
-                        alt="Ingested Size Icon"
+                        :alt="t('logStream.ingestedSizeIcon')"
                         class="h-6 w-6"
                       />
                     </div>
@@ -127,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="tile-icon opacity-80">
                       <img
                         src="@/assets/images/home/compressed_size.svg"
-                        alt="Compressed Size Icon"
+                        :alt="t('logStream.compressedSizeIcon')"
                         class="h-6 w-6"
                       />
                     </div>
@@ -149,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="tile-icon opacity-80">
                       <img
                         src="@/assets/images/home/index_size.svg"
-                        alt="Index Size Icon"
+                        :alt="t('logStream.indexSizeIcon')"
                         class="h-6 w-6"
                       />
                     </div>
@@ -166,13 +170,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="rounded-default bg-surface-base border-border-default flex h-full min-h-0 w-full flex-col overflow-hidden border p-2"
               >
                 <div>
-                  <div class="flex justify-start">
+                  <!-- min-w-0/max-w-full let OTabs' own arrow-scroller engage instead of clipping silently. -->
+                  <div class="flex justify-start max-md:max-w-full max-md:min-w-0">
                     <OTabs v-model="activeMainTab" dense>
                       <!-- Schema Settings Tab with conditional class -->
                       <OTab
                         name="schemaSettings"
                         icon="settings"
-                        label="Schema Settings"
+                        :label="t('logStream.schemaSettingsTab')"
                         data-test="schema-settings-tab"
                       />
 
@@ -180,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OTab
                         name="redButton"
                         icon="backup"
-                        label="Extended Retention"
+                        :label="t('logStream.extendedRetentionTab')"
                         data-test="schema-extended-retention-tab"
                       />
 
@@ -188,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OTab
                         name="configuration"
                         icon="tune"
-                        label="Configuration"
+                        :label="t('logStream.configurationTab')"
                         data-test="schema-configuration-tab"
                       />
                       <!-- Cross-Linking Tab -->
@@ -220,14 +225,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <div v-if="indexData.defaultFts" class="mt-3 font-normal">
                         <label
-                          class="bg-banner-warning-bg rounded-default border-banner-warning-border text-banner-warning-text border px-4 py-1 font-semibold"
+                          class="bg-banner-warning-bg rounded-default border-banner-warning-border text-banner-warning-text border px-4 py-1 font-semibold max-md:inline-block max-md:max-w-full"
                         >
-                          {{ t("logStream.mapping") }} Default FTS keys used (no custom keys
-                          set).</label
+                          {{ t("logStream.mapping") }}
+                          {{ t("logStream.defaultFtsKeysUsed") }}</label
                         >
                       </div>
                     </div>
-                    <div class="flex w-full items-center justify-between">
+                    <div class="flex w-full items-center justify-between py-2">
                       <div class="flex items-center">
                         <div class="app-tabs-container">
                           <OToggleGroup
@@ -244,18 +249,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <template #icon-left
                                 ><OIcon name="verified-user" size="sm"
                               /></template>
-                              User Defined Schema ({{ indexData.defined_schema_fields.length }})
+                              {{
+                                t("logStream.userDefinedSchemaCount", {
+                                  count: indexData.defined_schema_fields.length,
+                                })
+                              }}
                             </OToggleGroupItem>
                             <OToggleGroupItem value="allFields" size="sm">
                               <template #icon-left
                                 ><OIcon name="format-list-bulleted" size="sm"
                               /></template>
-                              {{ computedSchemaFieldsName }} ({{ indexData.schema.length }})
+                              {{
+                                t("logStream.allFieldsCount", { count: indexData.schema.length })
+                              }}
                             </OToggleGroupItem>
                           </OToggleGroup>
                         </div>
 
-                        <div v-if="hasUserDefinedSchema" class="ml-2 flex items-center">
+                        <div v-if="hasUserDefinedSchema" class="ms-2 flex items-center">
                           <OIcon
                             name="info"
                             size="sm"
@@ -263,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           />
                           <OTooltip
                             side="right"
-                            content="Other fields show only the schema fields that existed before the stream was configured to use a user-defined schema."
+                            :content="t('logStream.otherFieldsSchemaTooltip')"
                           />
                         </div>
                       </div>
@@ -273,7 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="schema-field-search-input"
                           v-model="filterField"
                           data-cy="schema-index-field-search-input"
-                          class="no-border o2-search-input ml-auto"
+                          class="no-border o2-search-input ms-auto"
                           :placeholder="t('search.searchField')"
                         />
                         <OButton
@@ -282,9 +293,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :disabled="isDialogOpen"
                           variant="outline"
                           size="icon-sm"
-                          class="my-2"
                           @click.stop="openDialog"
-                          title="Add Field(s)"
+                          :title="t('logStream.addFieldsTitle')"
                           icon-left="add"
                         />
                       </div>
@@ -293,11 +303,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="mb-3" v-if="isDialogOpen">
                       <OCard class="flex w-screen max-w-full flex-col">
                         <!-- Header Section -->
-                        <OCardSection class="p-0" style="padding: 4px 16px 4px 16px">
+                        <OCardSection class="p-0" style="padding: 0.25rem 1rem 0.25rem 1rem">
                           <div class="flex items-center justify-between">
-                            <div class="text-xl font-semibold">Add Field(s)</div>
+                            <div class="text-xl font-semibold">
+                              {{ t("logStream.addFieldsTitle") }}
+                            </div>
                             <div>
                               <OButton
+                                :aria-label="t('common.close')"
                                 data-test="add-stream-cancel-btn"
                                 variant="ghost"
                                 size="icon-sm"
@@ -308,10 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </OCardSection>
                         <!-- Main Content (Scrollable if necessary) -->
-                        <OCardSection
-                          class="mb-0.5 flex-1 overflow-y-auto p-0"
-                          style="padding: 0px 16px 0px 16px"
-                        >
+                        <OCardSection class="mb-0.5 flex-1 overflow-y-auto px-4 py-0">
                           <OForm :form="newSchemaFieldsForm" @keyup="onAddFieldsKeyup">
                             <StreamFieldsInputs
                               form-field-name="newSchemaFields"
@@ -329,10 +339,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- OTable fills the remaining height inside the schemaSettings flex column -->
                     <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
+                      <!-- horizontal-scroll: otherwise the elastic name column collapses to 0 beside the fixed ones. -->
                       <OTable
                         data-test="schema-log-stream-field-mapping-table"
                         :data="filteredSchemaData"
                         :columns="columns"
+                        horizontal-scroll
                         row-key="name"
                         selection="multiple"
                         :selected-ids="selectedSchemaIds"
@@ -358,7 +370,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </span>
                             <span
                               v-if="isEnvQuickModeField(row.name)"
-                              class="ml-1 flex items-center"
+                              class="ms-1 flex items-center"
                             >
                               <img
                                 :src="quickModeIcon"
@@ -395,12 +407,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :options="indexTypeOptionsForRow(row)"
                               label-key="label"
                               value-key="value"
-                              class="text-compact h-6! max-h-6! min-h-6!"
+                              class="text-compact"
                               multiple
                               clearable
                               size="sm"
                               :data-test="`schema-field-${row.name}-index-type-select`"
-                              style="width: 190px"
+                              style="width: 11.875rem"
                               @update:model-value="
                                 (val) => updateIndexType({ row }, enforceMaxIndexTypes(val))
                               "
@@ -408,10 +420,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <OTooltip
                               v-if="row.index_type && row.index_type.length > 0"
                               :content="
-                                streamIndexType
-                                  .filter((opt) => row.index_type.includes(opt.value))
-                                  .map((opt) => opt.label)
-                                  .join(', ')
+                                raw(
+                                  streamIndexType
+                                    .filter((opt) => row.index_type.includes(opt.value))
+                                    .map((opt) => opt.label)
+                                    .join(', '),
+                                )
                               "
                             />
                           </div>
@@ -419,7 +433,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <template #cell-patterns="{ row }">
                           <template
                             v-if="
-                              config.isEnterprise == 'true' &&
                               !(row.name == store.state.zoConfig.timestamp_column) &&
                               (row.type == 'Utf8' || row.type == 'utf8')
                             "
@@ -431,10 +444,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             >
                               {{
                                 patternAssociations[row.name]?.length
-                                  ? `View ${patternAssociations[row.name]?.length} Patterns`
-                                  : "Add Pattern"
+                                  ? t(
+                                      "logStream.viewPatternsCount",
+                                      { count: patternAssociations[row.name]?.length },
+                                      patternAssociations[row.name]?.length,
+                                    )
+                                  : t("logStream.addPattern")
                               }}
-                              <OIcon name="arrow-forward" size="xs" />
+                              <OIcon
+                                :name="sdrAccess.allowed ? 'arrow-forward' : 'lock'"
+                                size="xs"
+                                :class="sdrAccess.allowed ? '' : 'text-warning-600'"
+                              />
                             </span>
                           </template>
                         </template>
@@ -452,7 +473,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <!-- Data Retention -->
                         <div v-if="showDataRetention" class="flex flex-col gap-1 p-3">
                           <label class="text-compact text-text-heading font-[500]">
-                            Data Retention (days)
+                            {{ t("logStream.dataRetentionDaysLabel") }}
                           </label>
                           <OInput
                             data-test="stream-details-data-retention-input"
@@ -464,20 +485,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           />
                           <!-- casts: number input can hold "" at runtime while cleared -->
                           <small v-if="dataRetentionDays > 0 && (dataRetentionDays as any) != ''">
-                            Global retention is {{ store.state.zoConfig.data_retention_days }} days
+                            {{
+                              t("logStream.globalRetentionDays", {
+                                days: store.state.zoConfig.data_retention_days,
+                              })
+                            }}
                           </small>
                           <small
                             v-if="dataRetentionDays <= 0 || (dataRetentionDays as any) == ''"
                             class="text-status-error-text"
                           >
-                            Retention period must be at least 1 day
+                            {{ t("logStream.retentionMinOneDay") }}
                           </small>
                         </div>
 
                         <!-- Max Query Range -->
                         <div class="flex flex-col gap-1 p-3">
                           <label class="text-compact text-text-heading font-[500]">
-                            Max Query Range (hours)
+                            {{ t("logStream.maxQueryRangeHoursLabel") }}
                           </label>
                           <OInput
                             data-test="stream-details-max-query-range-input"
@@ -487,10 +512,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="max-w-55"
                             @update:model-value="markFormDirty"
                           />
-                          <small
-                            >Maximum time range allowed for queries. Set 0 for unlimited
-                            range.</small
-                          >
+                          <small>{{ t("logStream.maxQueryRangeHelp") }}</small>
                         </div>
 
                         <!-- Flatten Level -->
@@ -506,14 +528,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="max-w-55"
                             @update:model-value="markFormDirty"
                           />
-                          <small
-                            >Global is {{ store.state.zoConfig.ingest_flatten_level || 3 }}</small
-                          >
+                          <small>{{
+                            t("logStream.globalFlattenLevel", {
+                              level: store.state.zoConfig.ingest_flatten_level || 3,
+                            })
+                          }}</small>
                         </div>
 
                         <!-- Toggles -->
                         <div class="text-compact flex items-center justify-between px-3 py-2.5">
-                          <span>Use Stream Stats for Partitioning</span>
+                          <span>{{ t("logStream.approxPartition") }}</span>
                           <OSwitch
                             data-test="log-stream-use_approx-toggle-btn"
                             v-model="approxPartition"
@@ -525,7 +549,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-if="showStoreOriginalDataToggle"
                           class="text-compact flex items-center justify-between px-3 py-2.5"
                         >
-                          <span>Store Original Data</span>
+                          <span>{{ t("logStream.storeOriginalData") }}</span>
                           <OSwitch
                             data-test="log-stream-store-original-data-toggle-btn"
                             v-model="storeOriginalData"
@@ -534,7 +558,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
 
                         <div class="text-compact flex items-center justify-between px-3 py-2.5">
-                          <span>Enable Distinct Values</span>
+                          <span>{{ t("logStream.enableDistinctValues") }}</span>
                           <OSwitch
                             data-test="log-stream-enabled-distinct-values-toggle-btn"
                             v-model="enableDistinctFields"
@@ -555,17 +579,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="width: fit-content"
                     >
                       <span class="font-semibold">
-                        <OIcon name="info" class="mr-1" size="sm" />
+                        <OIcon name="info" class="me-1" size="sm" />
 
-                        Additional
-                        {{ store.state.zoConfig.extended_data_retention_days }}
-                        days of extension will be applied to the selected date ranges</span
+                        {{
+                          t("logStream.extendedRetentionInfo", {
+                            days: store.state.zoConfig.extended_data_retention_days,
+                          })
+                        }}</span
                       >
                     </div>
                     <div class="mt-2 flex min-h-0 flex-1 flex-col">
                       <div class="mt-2 flex items-center text-center">
                         <div class="flex items-center">
-                          <span class="font-bold"> Select Date</span>
+                          <span class="font-bold"> {{ t("logStream.selectDate") }}</span>
                           <DateTime
                             class="mx-2"
                             @on:date-change="dateChangeValue"
@@ -575,7 +601,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :minDate="minDate ?? undefined"
                           />
                         </div>
-                        <span class="font-bold"> (UTC Timezone) </span>
+                        <span class="font-bold"> {{ t("logStream.utcTimezone") }} </span>
                       </div>
 
                       <div class="mt-2 flex min-h-0 flex-1 flex-col">
@@ -583,6 +609,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="schema-log-stream-field-mapping-table"
                           :data="redBtnRows"
                           :columns="redBtnColumns"
+                          horizontal-scroll
                           row-key="index"
                           selection="multiple"
                           v-model:selected-ids="selectedDateIds"
@@ -628,11 +655,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="bg-card-glass-solid sticky bottom-0 z-1 mt-auto w-full flex-shrink-0 px-2 py-1"
                 >
-                  <div v-if="indexData.schema.length > 0" class="flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                      <span v-if="activeMainTab == 'schemaSettings'" class="px-2 py-2"
-                        ><strong> {{ selectedFields.length }}</strong> fields selected</span
+                  <div
+                    v-if="indexData.schema.length > 0"
+                    class="flex items-center justify-between max-md:flex-wrap max-md:gap-y-1"
+                  >
+                    <div class="flex items-center gap-2 max-md:flex-wrap">
+                      <i18n-t
+                        v-if="activeMainTab == 'schemaSettings'"
+                        keypath="logStream.fieldsSelected"
+                        :plural="selectedFields.length"
+                        tag="span"
+                        class="px-2 py-2"
+                        data-test="schema-fields-selected-count"
                       >
+                        <template #count
+                          ><strong>{{ selectedFields.length }}</strong></template
+                        >
+                      </i18n-t>
                       <OButton
                         v-if="isSchemaUDSEnabled && activeMainTab == 'schemaSettings'"
                         data-test="schema-add-field-button"
@@ -641,7 +680,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :disabled="!selectedFields.length || hasUDSFieldInSelection"
                         @click="updateDefinedSchemaFields"
                       >
-                        <span class="mr-1 flex items-center justify-start gap-1">
+                        <span class="me-1 flex items-center justify-start gap-1">
                           <OIcon name="verified-user" size="sm" />
                           <OIcon name="format-list-bulleted" size="sm" />
                         </span>
@@ -662,11 +701,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="schema-delete-button"
                         variant="outline"
                         size="sm-action"
-                        @click="
-                          activeMainTab == 'schemaSettings'
-                            ? (confirmQueryModeChangeDialog = true)
-                            : (confirmDeleteDatesDialog = true)
-                        "
+                        @click="openDeleteConfirm"
                         icon-left="delete"
                       >
                         {{ t("logStream.delete") }}
@@ -700,7 +735,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div v-else class="p-3">
-      <h5>Wait while loading...</h5>
+      <h5>{{ t("logStream.waitLoading") }}</h5>
     </div>
   </ODrawer>
   <ODrawer
@@ -727,7 +762,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="schema-pattern-association-cancel-btn"
           @click="patternAssociationDialog.show = false"
         >
-          Cancel
+          {{ t("common.cancel") }}
         </OButton>
         <OButton
           variant="primary"
@@ -736,22 +771,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="!assocPatternsRef?.isFormDirty"
           @click="assocPatternsRef?.updateRegexPattern()"
         >
-          Update Changes
+          {{ t("logStream.updateChanges") }}
         </OButton>
       </div>
     </template>
   </ODrawer>
 
   <ConfirmDialog
-    title="Delete Action"
-    :message="t('logStream.deleteActionMessage')"
+    :title="t('logStream.deleteActionTitle', deleteConfirmCount)"
+    :message="t('logStream.deleteActionMessage', { count: deleteConfirmCount })"
+    ok-variant="destructive"
     @update:ok="deleteFields()"
     @update:cancel="confirmQueryModeChangeDialog = false"
     v-model="confirmQueryModeChangeDialog"
   />
   <ConfirmDialog
-    title="Delete Dates"
-    :message="t('logStream.deleteDatesMessage')"
+    :title="t('logStream.deleteDatesTitle')"
+    :message="t('logStream.deleteDatesMessage', { count: deleteConfirmCount })"
+    ok-variant="destructive"
     @update:ok="deleteDates()"
     @update:cancel="confirmDeleteDatesDialog = false"
     v-model="confirmDeleteDatesDialog"
@@ -769,12 +806,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import { computed, defineComponent, onBeforeMount, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
-import { convertUnixToDateFormat as convertUnixToFormat, formatTimestamp } from "@/utils/date";
-import streamService from "../../services/stream";
-import segment from "../../services/segment_analytics";
+import {
+  convertUnixToDateFormat as convertUnixToFormat,
+  formatTimestampInTimezone,
+} from "@/utils/date";
+import {
+  deleteStreamFieldsMutation,
+  updateStreamSettingsMutation,
+} from "@/services/stream.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query";
+import analytics from "../../services/product_analytics";
 import {
   formatSizeFromMB,
   getImageURL,
@@ -793,6 +838,8 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 
 import DateTime from "@/components/DateTime.vue";
 
@@ -894,9 +941,21 @@ export default defineComponent({
       start: number;
       end: number;
     }
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
+    // The "SDR" (Sensitive Data Redaction) column is the same capability as
+    // Settings → Regex Patterns, surfaced per-field here — shown locked (not
+    // hidden) in builds that don't unlock it.
+    const sdrAccess = computed(() =>
+      checkFeatureAccess("regexPatterns", buildFeatureGateContext(store.state.zoConfig)),
+    );
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+    // Timezone used for the stream-stats time range: the user's selected
+    // timezone, falling back to the browser's zone (never a hardcoded "UTC").
+    const displayTimezone = computed(
+      () => store.state.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+    );
     const indexData: any = ref(defaultValue());
     const updateSettingsForm: any = ref(null);
     const isCloud = config.isCloud;
@@ -907,11 +966,17 @@ export default defineComponent({
     const flattenLevel = ref<number | undefined>(undefined);
     const confirmQueryModeChangeDialog = ref(false);
     const confirmDeleteDatesDialog = ref(false);
+    // Snapshot at open: the selection is cleared while the dialog is still closing.
+    const deleteConfirmCount = ref(0);
     const confirmAddPerformanceFieldsDialog = ref(false);
     const missingPerformanceFields = ref<MissingPerformanceField[]>([]);
     const pendingSelectedFields = ref<string[]>([]);
     const formDirtyFlag = ref(false);
     const loadingState = ref(true);
+
+    const streamOrgId = useOrgId();
+    const updateStreamSettings = useMutation(() => updateStreamSettingsMutation(streamOrgId.value));
+    const deleteStreamFields = useMutation(() => deleteStreamFieldsMutation(streamOrgId.value));
     const rowsPerPage = ref(20);
     const filterField = ref("");
     const qTable = ref(null);
@@ -964,16 +1029,16 @@ export default defineComponent({
     const redDaysList = ref<ExtendedRetentionRange[]>([]);
     const resultTotal = ref<number>(0);
     const perPageOptions: any = [
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "250", value: 250 },
-      { label: "500", value: 500 },
+      { label: raw("20"), value: 20 },
+      { label: raw("50"), value: 50 },
+      { label: raw("100"), value: 100 },
+      { label: raw("250"), value: 250 },
+      { label: raw("500"), value: 500 },
     ];
 
     const perPageOptionsList = [20, 50, 100, 250, 500];
 
-    const changePagination = (val: { label: string; value: any }) => {
+    const changePagination = (val: { label: I18nText; value: any }) => {
       selectedPerPage.value = val.value;
     };
 
@@ -1086,13 +1151,17 @@ export default defineComponent({
     const tabs = computed(() => [
       {
         value: "schemaFields",
-        label: `User Defined Schema (${indexData.value.defined_schema_fields.length})`,
+        label: t("logStream.userDefinedSchemaCount", {
+          count: indexData.value.defined_schema_fields.length,
+        }),
         disabled: !hasUserDefinedSchema.value,
         hide: !hasUserDefinedSchema.value,
       },
       {
         value: "allFields",
-        label: `${computedSchemaFieldsName} (${indexData.value.schema.length})`,
+        // Whole sentence in the message, matching the userDefinedSchemaCount
+        // sibling above — the count's placement is per-language.
+        label: t("logStream.allFieldsCount", { count: indexData.value.schema.length }),
         disabled: false,
         hide: false,
       },
@@ -1100,32 +1169,47 @@ export default defineComponent({
     const mainTabs = computed(() => [
       {
         value: "schemaSettings",
-        label: `Schema Settings`,
+        label: t("logStream.schemaSettingsTab"),
         disabled: false,
       },
       {
         value: "redButton",
-        label: `Extended Retention`,
+        label: t("logStream.extendedRetentionTab"),
         disabled: false,
       },
     ]);
     // here we are setting the schema field name always be "All Fields"
-    const computedSchemaFieldsName = "All Fields";
+    const computedSchemaFieldsName = t("logStream.allFields");
 
     const streamIndexType = [
-      { label: "Full text search", value: "fullTextSearchKey" },
-      { label: "Secondary index", value: "secondaryIndexKey" },
-      { label: "Bloom filter", value: "bloomFilterKey" },
-      { label: "KeyValue partition", value: "keyPartition" },
-      { label: "Prefix partition", value: "prefixPartition" },
+      { label: t("logStream.indexTypeOptions.fullTextSearch"), value: "fullTextSearchKey" },
+      { label: t("logStream.indexTypeOptions.secondaryIndex"), value: "secondaryIndexKey" },
+      { label: t("logStream.indexTypeOptions.bloomFilter"), value: "bloomFilterKey" },
+      { label: t("logStream.indexTypeOptions.keyValuePartition"), value: "keyPartition" },
+      { label: t("logStream.indexTypeOptions.prefixPartition"), value: "prefixPartition" },
 
-      { label: "Hash partition (8 Buckets)", value: "hashPartition_8" },
-      { label: "Hash partition (16 Buckets)", value: "hashPartition_16" },
-      { label: "Hash partition (32 Buckets)", value: "hashPartition_32" },
-      { label: "Hash partition (64 Buckets)", value: "hashPartition_64" },
-      { label: "Hash partition (128 Buckets)", value: "hashPartition_128" },
+      {
+        label: t("logStream.indexTypeOptions.hashPartition", { buckets: 8 }),
+        value: "hashPartition_8",
+      },
+      {
+        label: t("logStream.indexTypeOptions.hashPartition", { buckets: 16 }),
+        value: "hashPartition_16",
+      },
+      {
+        label: t("logStream.indexTypeOptions.hashPartition", { buckets: 32 }),
+        value: "hashPartition_32",
+      },
+      {
+        label: t("logStream.indexTypeOptions.hashPartition", { buckets: 64 }),
+        value: "hashPartition_64",
+      },
+      {
+        label: t("logStream.indexTypeOptions.hashPartition", { buckets: 128 }),
+        value: "hashPartition_128",
+      },
     ];
-    const { getStream, getUpdatedSettings } = useStreams();
+    const { getStream, getUpdatedSettings } = useStreams(t);
 
     onBeforeMount(() => {
       dataRetentionDays.value = store.state.zoConfig.data_retention_days || 0;
@@ -1173,19 +1257,20 @@ export default defineComponent({
     };
     const deleteFields = async () => {
       loadingState.value = true;
-      await streamService
-        .deleteFields(
-          store.state.selectedOrganization.identifier,
-          indexData.value.name,
-          indexData.value.stream_type,
+      await deleteStreamFields
+        .mutateAsync({
+          name: indexData.value.name,
+          type: indexData.value.stream_type,
           // Cast: service signature mistypes `fields` as the empty tuple `[]`.
-          selectedFields.value.map((field: any) => field.name) as [],
-        )
+          fields: selectedFields.value.map((field: any) => field.name) as [],
+        })
         .then(async (res) => {
           loadingState.value = false;
           if (res.data.code == 200) {
             toast({
-              message: "Field(s) deleted successfully.",
+              message: t("toastMessages.logstream.fieldsDeletedSuccessfully", {
+                count: selectedFields.value.length,
+              }),
               variant: "success",
             });
             confirmQueryModeChangeDialog.value = false;
@@ -1318,13 +1403,15 @@ export default defineComponent({
       indexData.value.stats.original_doc_time_max = streamResponse.stats.doc_time_max;
       indexData.value.stats.original_doc_time_min = streamResponse.stats.doc_time_min;
 
-      indexData.value.stats.doc_time_max = formatTimestamp(
+      indexData.value.stats.doc_time_max = formatTimestampInTimezone(
         parseInt(streamResponse.stats.doc_time_max),
         "YYYY-MM-DDTHH:mm:ss:SS",
+        displayTimezone.value,
       );
-      indexData.value.stats.doc_time_min = formatTimestamp(
+      indexData.value.stats.doc_time_min = formatTimestampInTimezone(
         parseInt(streamResponse.stats.doc_time_min),
         "YYYY-MM-DDTHH:mm:ss:SS",
+        displayTimezone.value,
       );
 
       indexData.value.defined_schema_fields = streamResponse.settings.defined_schema_fields || [];
@@ -1381,7 +1468,7 @@ export default defineComponent({
     const getSchema = async () => {
       dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading stats...",
+        message: t("toastMessages.logstream.pleaseWaitWhileLoadingStats"),
         timeout: 0,
       });
 
@@ -1447,7 +1534,7 @@ export default defineComponent({
 
       if (showDataRetention.value && dataRetentionDays.value < 1) {
         toast({
-          message: "Invalid Data Retention Period: Retention period must be at least 1 day.",
+          message: t("toastMessages.logstream.invalidDataRetentionPeriodRetentionPeriod"),
           variant: "error",
         });
         return;
@@ -1602,14 +1689,15 @@ export default defineComponent({
         };
       }
 
-      await streamService
-        .updateSettings(
-          store.state.selectedOrganization.identifier,
-          indexData.value.name,
-          indexData.value.stream_type,
-          modifiedSettings,
-        )
+      await updateStreamSettings
+        .mutateAsync({
+          name: indexData.value.name,
+          type: indexData.value.stream_type,
+          settings: modifiedSettings,
+        })
         .then(async () => {
+          if (modifiedSettings.cross_links)
+            analytics.track("cross_link_saved", { scope: "stream" });
           if (
             store.state.logs?.logs?.data?.stream?.selectedStream?.includes(indexData.value.name)
           ) {
@@ -1625,15 +1713,14 @@ export default defineComponent({
               isDialogOpen.value = false;
               toast({
                 variant: "success",
-                message: "Stream settings updated successfully.",
+                message: t("toastMessages.logstream.streamSettingsUpdatedSuccessfully"),
               });
             },
           );
 
-          segment.track("Button Click", {
+          analytics.track("Button Click", {
             button: "Update Settings",
             user_org: store.state.selectedOrganization.identifier,
-            user_id: store.state.userInfo.email,
             stream_name: indexData.value.name,
             page: "Schema Details",
           });
@@ -1801,7 +1888,7 @@ export default defineComponent({
       },
       {
         id: "settings",
-        header: "",
+        header: raw(""),
         accessorFn: (row: any) => (row.isUserDefined ? 0 : 1),
         sortable: true,
         size: COL.method,
@@ -1823,19 +1910,19 @@ export default defineComponent({
         size: 220,
         meta: { align: "left" },
       },
-      // Only show patterns column for enterprise builds
-      ...(config.isEnterprise == "true"
-        ? [
-            {
-              id: "patterns",
-              header: t("logStream.regexPatterns"),
-              accessorKey: "patterns",
-              sortable: false,
-              size: COL.template,
-              meta: { align: "left" },
-            },
-          ]
-        : []),
+      // SDR column — shown locked (not hidden) in builds that don't unlock
+      // the regex-pattern association feature; see sdrAccess.
+      {
+        id: "patterns",
+        header: raw("SDR"),
+        accessorKey: "patterns",
+        sortable: false,
+        size: COL.template,
+        meta: {
+          align: "left",
+          headerTooltip: sdrAccess.value.allowed ? undefined : sdrAccess.value.message,
+        },
+      },
     ];
 
     const redBtnColumns: OTableColumnDef<any>[] = [
@@ -2025,7 +2112,11 @@ export default defineComponent({
         if (maxFieldsLength && newSchemaFieldLength > maxFieldsLength) {
           toast({
             variant: "error",
-            message: `Cannot add fields. Maximum allowed fields in User Defined Schema is ${maxFieldsLength}. Current: ${currentDefinedSchemaLength}, Attempting to add: ${selectedFieldsSet.size}`,
+            message: t("toastMessages.logstream.cannotAddFieldsMaximumAllowedFields", {
+              max: maxFieldsLength,
+              current: currentDefinedSchemaLength,
+              adding: selectedFieldsSet.size,
+            }),
           });
           selectedFields.value = [];
           return;
@@ -2213,6 +2304,16 @@ export default defineComponent({
       onSubmit();
     };
 
+    const openDeleteConfirm = () => {
+      if (activeMainTab.value == "schemaSettings") {
+        deleteConfirmCount.value = selectedFields.value.length;
+        confirmQueryModeChangeDialog.value = true;
+      } else {
+        deleteConfirmCount.value = selectedDateFields.value.length;
+        confirmDeleteDatesDialog.value = true;
+      }
+    };
+
     const groupPatternAssociationsByField = (
       associations: PatternAssociation[],
     ): Record<string, PatternAssociation[]> => {
@@ -2234,6 +2335,10 @@ export default defineComponent({
     };
 
     const openPatternAssociationDialog = (field: string) => {
+      if (!sdrAccess.value.allowed) {
+        openUpgradeDialog();
+        return;
+      }
       patternAssociationDialog.value.show = true;
       patternAssociationDialog.value.data = patternAssociations.value[field] || [];
       patternAssociationDialog.value.fieldName = field;
@@ -2396,7 +2501,9 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       store,
+      displayTimezone,
       config,
       dateChangeValue,
       isCloud,
@@ -2418,6 +2525,8 @@ export default defineComponent({
       formatSizeFromMB,
       confirmQueryModeChangeDialog,
       confirmDeleteDatesDialog,
+      deleteConfirmCount,
+      openDeleteConfirm,
       confirmAddPerformanceFieldsDialog,
       missingPerformanceFields,
       pendingSelectedFields,
@@ -2483,6 +2592,7 @@ export default defineComponent({
       IsdeleteBtnVisible,
       showStoreOriginalDataToggle,
       patternAssociations,
+      sdrAccess,
       patternAssociationDialog,
       assocPatternsRef,
       openPatternAssociationDialog,
@@ -2542,7 +2652,7 @@ export default defineComponent({
   height: 2.1875rem;
 }
 
-.indexDetailsContainer :deep(.o2-schema-table .o2-schema-table tbody td:after) {
+.indexDetailsContainer :deep(.o2-schema-table .o2-schema-table tbody td::after) {
   background: none !important;
 }
 

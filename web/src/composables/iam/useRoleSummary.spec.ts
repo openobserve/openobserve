@@ -1,0 +1,646 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+// Characterization suite for the role summary and the pending-changes model. It records
+// what useRoleSummary does TODAY. Never edit a test to make it pass.
+
+import { describe, it, expect, afterEach } from "vitest";
+import { computed, effectScope, ref, type EffectScope } from "vue";
+import { flushPromises } from "@vue/test-utils";
+
+import i18n from "@/locales";
+import { raw } from "@/types/i18n";
+import { useRoleSummary } from "@/composables/iam/useRoleSummary";
+import type { RoleModule } from "@/components/iam/roles/roleModules";
+import type { RailModule } from "@/components/iam/roles/ModuleRail.vue";
+
+const ORG = "default";
+const ALL = `_all_${ORG}`;
+
+const ACTION_ORDER = ["AllowAll", "AllowList", "AllowGet", "AllowPost", "AllowPut", "AllowDelete"];
+
+const ACTION_LABEL_KEYS = {
+  AllowAll: "iam.all",
+  AllowList: "iam.list",
+  AllowGet: "iam.get",
+  AllowPost: "iam.create",
+  AllowPut: "iam.update",
+  AllowDelete: "iam.delete",
+} as const;
+
+const RESOURCES = [
+  { key: "stream", display_name: "Streams", parent: "" },
+  { key: "logs", display_name: "Logs", parent: "stream" },
+  { key: "metrics", display_name: "Metrics", parent: "stream" },
+  { key: "dfolder", display_name: "Dash Folders", parent: "" },
+  { key: "dashboard", display_name: "Dashboards", parent: "dfolder" },
+];
+
+const STREAM_KEYS = ["stream", "logs", "metrics"];
+
+let scope: EffectScope | undefined;
+
+function setup() {
+  const selectedPermissionsHash = ref(new Set<string>());
+  const addedPermissions = ref<Record<string, unknown>>({});
+  const removedPermissions = ref<Record<string, unknown>>({});
+  const resourceMapper = ref<Record<string, any>>({});
+  const heavyResourceEntities = ref<Record<string, any[]>>({});
+  const unsavedDrawerOpen = ref(false);
+  const permissionsState = { resources: RESOURCES };
+
+  const resourceLabel = (key: string) =>
+    permissionsState.resources.find((resource) => resource.key === key)?.display_name ?? key;
+
+  const roleModules = computed<RoleModule[]>(() => [
+    {
+      key: "stream",
+      group: "data",
+      icon: "window",
+      hasEntities: true,
+      scopeKeys: ["stream"],
+      countedKeys: STREAM_KEYS,
+    } as RoleModule,
+    {
+      key: "dfolder",
+      group: "dashboards",
+      icon: "dashboard",
+      hasEntities: true,
+      scopeKeys: ["dfolder"],
+      countedKeys: ["dfolder", "dashboard"],
+    } as RoleModule,
+  ]);
+  const railModules = computed<RailModule[]>(() => [
+    {
+      key: "stream",
+      label: raw("Streams"),
+      icon: "window",
+      groupId: "data",
+      groupLabel: raw("Data"),
+      granted: 2,
+      added: 0,
+      removed: 0,
+    } as RailModule,
+  ]);
+
+  scope = effectScope();
+  const summary = scope.run(() =>
+    useRoleSummary({
+      selectedPermissionsHash,
+      addedPermissions,
+      removedPermissions,
+      permissionsState,
+      resourceMapper,
+      heavyResourceEntities,
+      roleModules,
+      railModules,
+      unsavedDrawerOpen,
+      resourceLabel,
+      moduleLabel: (key) => raw(resourceLabel(key)),
+      getOrgId: () => ORG,
+      t: i18n.global.t as any,
+      ACTION_ORDER,
+      ACTION_LABEL_KEYS,
+    }),
+  )!;
+
+  // Mirrors the grant store: saved keys are shown, staged adds are shown and recorded, staged removals are hidden and recorded.
+  const seed = ({
+    saved = [],
+    added = [],
+    removed = [],
+  }: {
+    saved?: string[];
+    added?: string[];
+    removed?: string[];
+  }) => {
+    selectedPermissionsHash.value = new Set(
+      [...saved, ...added].filter((key) => !removed.includes(key)),
+    );
+    addedPermissions.value = Object.fromEntries(added.map((key) => [key, true]));
+    removedPermissions.value = Object.fromEntries(removed.map((key) => [key, true]));
+  };
+
+  return { ...summary, seed, heavyResourceEntities, resourceMapper, unsavedDrawerOpen };
+}
+
+afterEach(() => {
+  scope?.stop();
+  scope = undefined;
+});
+
+describe("useRoleSummary - summary model [characterization]", () => {
+  it("groups grants by resource and entity, keeping staged removals visible", () => {
+    const summary = setup();
+    summary.seed({
+      saved: ["logs:app:AllowGet", "logs:app:AllowList"],
+      added: ["metrics:cpu:AllowGet"],
+      removed: ["logs:app:AllowList"],
+    });
+
+    const byResource = summary.grantsByResource.value;
+    expect(byResource.get("logs")!.get("app")).toEqual([
+      { action: "AllowGet", state: "saved" },
+      { action: "AllowList", state: "removed" },
+    ]);
+    expect(byResource.get("metrics")!.get("cpu")).toEqual([{ action: "AllowGet", state: "added" }]);
+  });
+
+  it("drops an entity from heldGrants once its only action is staged for removal", () => {
+    const summary = setup();
+    summary.seed({
+      saved: ["logs:app:AllowGet", "logs:sys:AllowGet"],
+      removed: ["logs:app:AllowGet"],
+    });
+
+    expect(summary.heldGrants("logs")).toEqual([["sys", [{ action: "AllowGet", state: "saved" }]]]);
+  });
+
+  it("describes a type level grant as reaching every stream", () => {
+    const summary = setup();
+    summary.seed({ saved: [`stream:${ALL}:AllowGet`] });
+
+    expect(summary.moduleDescription("stream", STREAM_KEYS)).toBe(
+      i18n.global.t("iam.editRole.summaryReachEveryStream"),
+    );
+  });
+
+  it("describes a type level grant on a plain module as all of it", () => {
+    const summary = setup();
+    summary.seed({ saved: [`dfolder:${ALL}:AllowGet`] });
+
+    expect(summary.moduleDescription("dfolder", ["dfolder", "dashboard"])).toBe(
+      i18n.global.t("iam.editRole.summaryReachAllOf", { module: "Dash Folders" }),
+    );
+  });
+
+  // Two or more granted resources fall back to a bare label list, with no reach at all.
+  it("lists the resource labels when more than one is granted", () => {
+    const summary = setup();
+    summary.seed({ saved: ["logs:app:AllowGet", "metrics:cpu:AllowGet"] });
+
+    expect(summary.moduleDescription("stream", STREAM_KEYS)).toBe("Logs, Metrics");
+  });
+
+  it("counts the entities when only one resource is granted and no list is loaded", () => {
+    const summary = setup();
+    summary.seed({ saved: ["logs:app:AllowGet", "logs:sys:AllowGet"] });
+
+    expect(summary.moduleDescription("stream", STREAM_KEYS)).toBe(
+      i18n.global.t("iam.editRole.summaryReachOne", {
+        label: "Logs",
+        reach: i18n.global.t("iam.editRole.summaryGrantCount", { count: 2 }, 2),
+      }),
+    );
+  });
+
+  it("reads N of M once the resource's list is loaded", () => {
+    const summary = setup();
+    summary.heavyResourceEntities.value = { metrics: [{ name: "cpu" }, { name: "mem" }] };
+    summary.seed({ saved: ["metrics:cpu:AllowGet"] });
+
+    expect(summary.moduleDescription("stream", STREAM_KEYS)).toBe(
+      i18n.global.t("iam.editRole.summaryReachOne", {
+        label: "Metrics",
+        reach: i18n.global.t("iam.editRole.summaryReachSome", { count: "1", total: "2" }),
+      }),
+    );
+  });
+
+  it("describes a type level grant in words, not the raw _all_ id", () => {
+    const summary = setup();
+    summary.seed({ saved: [`stream:${ALL}:AllowAll`] });
+
+    const [stream] = summary.summaryModules.value;
+
+    expect(String(stream.description)).not.toContain("_all_");
+    expect(stream.description).toBe(i18n.global.t("iam.editRole.summaryReachEveryStream"));
+  });
+
+  it("builds a summary card from the rail module it mirrors", () => {
+    const summary = setup();
+    summary.seed({ saved: ["logs:app:AllowGet", "logs:app:AllowList"] });
+
+    const [card] = summary.summaryModules.value;
+    expect(card).toMatchObject({
+      moduleKey: "stream",
+      label: "Streams",
+      icon: "window",
+      group: "data",
+      granted: 2,
+    });
+    expect(card.actions.map((action) => action.action)).toEqual(["AllowList", "AllowGet"]);
+  });
+
+  it("lists each held action once, in column order", () => {
+    const summary = setup();
+    summary.seed({
+      saved: ["metrics:cpu:AllowGet", "metrics:cpu:AllowList", "logs:app:AllowGet"],
+    });
+
+    const [stream] = summary.summaryModules.value;
+
+    expect(stream.actions.map((action) => action.action)).toEqual(["AllowList", "AllowGet"]);
+  });
+
+  it("labels each summary action with its column name", () => {
+    const summary = setup();
+    summary.seed({ saved: ["logs:app:AllowGet"] });
+
+    expect(summary.summaryModules.value[0].actions).toEqual([
+      { action: "AllowGet", label: i18n.global.t("iam.get") },
+    ]);
+  });
+});
+
+describe("useRoleSummary - pending changes [characterization]", () => {
+  it("keys a change by resource, entity and state, and carries the grant keys", () => {
+    const summary = setup();
+    summary.seed({ added: ["metrics:cpu:AllowGet", "metrics:cpu:AllowList"] });
+
+    expect(summary.pendingChanges.value).toEqual([
+      {
+        id: "metrics-cpu-added",
+        state: "added",
+        label: "cpu",
+        moduleLabel: "Metrics",
+        actions: [
+          { action: "AllowList", label: i18n.global.t("iam.list") },
+          { action: "AllowGet", label: i18n.global.t("iam.get") },
+        ],
+        keys: ["metrics:cpu:AllowGet", "metrics:cpu:AllowList"],
+        moduleKey: "stream",
+        effect: "Can view the cpu metrics stream.",
+        neededBy: [],
+        notes: [],
+      },
+    ]);
+  });
+
+  it("names a wildcard entity in words rather than as _all_", () => {
+    const summary = setup();
+    summary.seed({ added: [`dfolder:${ALL}:AllowGet`, `stream:${ALL}:AllowGet`] });
+
+    expect(summary.pendingChanges.value.map((change) => change.label)).toEqual([
+      i18n.global.t("iam.editRole.scopeAllOf", { module: "Dash Folders" }),
+      i18n.global.t("iam.editRole.scopeEveryStream"),
+    ]);
+  });
+
+  it("splits one entity's additions and removals into two changes", () => {
+    const summary = setup();
+    summary.seed({
+      saved: ["logs:app:AllowGet"],
+      added: ["logs:app:AllowPut"],
+      removed: ["logs:app:AllowGet"],
+    });
+
+    expect(summary.pendingChanges.value.map((change) => [change.state, change.keys])).toEqual([
+      ["added", ["logs:app:AllowPut"]],
+      ["removed", ["logs:app:AllowGet"]],
+    ]);
+  });
+
+  it("keeps the review drawer open while any change remains", async () => {
+    const summary = setup();
+    summary.seed({ added: ["metrics:cpu:AllowGet", "metrics:mem:AllowGet"] });
+    summary.unsavedDrawerOpen.value = true;
+    await flushPromises();
+
+    summary.seed({ added: ["metrics:mem:AllowGet"] });
+    await flushPromises();
+
+    expect(summary.unsavedDrawerOpen.value).toBe(true);
+  });
+
+  it("closes the review drawer once the last change is undone", async () => {
+    const summary = setup();
+    summary.seed({ added: ["metrics:cpu:AllowGet"] });
+    summary.unsavedDrawerOpen.value = true;
+    await flushPromises();
+
+    summary.seed({});
+    await flushPromises();
+
+    expect(summary.unsavedDrawerOpen.value).toBe(false);
+  });
+});
+
+describe("useRoleSummary - review drawer model", () => {
+  // Dash Folders need streams to load panels, so a role with a folder and no stream grant lacks Streams.
+  const withCompanionModules = (summary: ReturnType<typeof setup>) => {
+    summary.resourceMapper.value = { stream: {}, dfolder: {}, destination: {} };
+  };
+
+  it("keeps the drawer open while a module is missing, even with no change left", async () => {
+    const summary = setup();
+    withCompanionModules(summary);
+    summary.seed({ saved: ["dfolder:f1:AllowGet"], added: ["metrics:cpu:AllowGet"] });
+    summary.unsavedDrawerOpen.value = true;
+    await flushPromises();
+
+    summary.seed({ saved: ["dfolder:f1:AllowGet"] });
+    await flushPromises();
+
+    expect(summary.companionGaps.value.map((gap) => [gap.module, gap.actions])).toEqual([
+      ["stream", ["AllowList", "AllowGet"]],
+    ]);
+    expect(summary.unsavedDrawerOpen.value).toBe(true);
+  });
+
+  it("closes the drawer once nothing is staged and nothing is missing", async () => {
+    const summary = setup();
+    withCompanionModules(summary);
+    summary.seed({ saved: ["dfolder:f1:AllowGet"], added: [`stream:${ALL}:AllowAll`] });
+    summary.unsavedDrawerOpen.value = true;
+    await flushPromises();
+
+    summary.seed({ saved: ["dfolder:f1:AllowGet", `stream:${ALL}:AllowAll`] });
+    await flushPromises();
+
+    expect(summary.unsavedDrawerOpen.value).toBe(false);
+  });
+
+  it("groups changes by rail module, with unknown resources in a trailing Other group", () => {
+    const summary = setup();
+    summary.seed({
+      added: ["mystery:x1:AllowGet", "dashboard:f1/d1:AllowGet", "logs:app:AllowGet"],
+      saved: ["metrics:cpu:AllowGet"],
+      removed: ["metrics:cpu:AllowGet"],
+    });
+
+    expect(
+      summary.pendingGroups.value.map((group) => [
+        group.key,
+        String(group.label),
+        group.changes.map((change) => change.id),
+      ]),
+    ).toEqual([
+      ["stream", "Streams", ["logs-app-added", "metrics-cpu-removed"]],
+      ["dfolder", "Dash Folders", ["dashboard-f1/d1-added"]],
+      ["other", i18n.global.t("iam.editRole.changeOtherGroup"), ["mystery-x1-added"]],
+    ]);
+  });
+
+  it.each([
+    [
+      `stream:${ALL}:AllowList`,
+      "added",
+      "Can see the list of every stream (logs, metrics, traces and indices), including new ones.",
+    ],
+    [`logs:${ALL}:AllowGet`, "added", "Can open all logs streams."],
+    ["dfolder:f1:AllowList", "added", "Can see the list of dashboards in the f1 folder."],
+    [
+      "dashboard:f1/d1:AllowAll",
+      "removed",
+      "Can no longer view, create, edit, and delete the f1/d1 dashboard.",
+    ],
+    [`destination:${ALL}:AllowList`, "added", "Can load the destinations list."],
+    ["mystery:x1:AllowPut", "added", "Can edit x1 in mystery."],
+  ])("describes %s (%s) in one sentence", (key, state, effect) => {
+    const summary = setup();
+    summary.seed(state === "added" ? { added: [key] } : { saved: [key], removed: [key] });
+
+    expect(summary.pendingChanges.value.map((change) => change.effect)).toEqual([effect]);
+  });
+
+  it.each([
+    ["added", "Can delete all logs_cache, including new ones."],
+    ["removed", "Can no longer delete all logs_cache, including new ones."],
+  ])("describes All (%s) by the actions the resource shows", (state, effect) => {
+    const summary = setup();
+    const hidden = ["AllowList", "AllowGet", "AllowPost", "AllowPut"];
+    summary.resourceMapper.value.logs_cache = {
+      permission: Object.fromEntries(
+        ACTION_ORDER.map((action) => [action, { show: !hidden.includes(action), value: false }]),
+      ),
+    };
+    const key = `logs_cache:${ALL}:AllowAll`;
+    summary.seed(state === "added" ? { added: [key] } : { saved: [key], removed: [key] });
+
+    expect(summary.pendingChanges.value.map((change) => change.effect)).toEqual([effect]);
+  });
+
+  it("joins List and a write action without reading as view", () => {
+    const summary = setup();
+    summary.seed({ added: ["dfolder:f1:AllowList", "dfolder:f1:AllowPost"] });
+
+    expect(summary.pendingChanges.value[0].effect).toBe(
+      "Can list and create dashboards in the f1 folder.",
+    );
+  });
+
+  it("notes that a list-only destination grant shows only the destinations they can open", () => {
+    const summary = setup();
+    withCompanionModules(summary);
+    summary.seed({ added: [`destination:${ALL}:AllowList`] });
+
+    expect(summary.pendingChanges.value[0].notes).toEqual([
+      i18n.global.t("iam.editRole.noteDestinationsFiltered"),
+    ]);
+  });
+
+  it("notes which module an added grant serves, and which one still needs a removed grant", () => {
+    const summary = setup();
+    withCompanionModules(summary);
+    summary.seed({
+      saved: ["dfolder:f1:AllowGet", "logs:app:AllowGet"],
+      added: [`stream:${ALL}:AllowList`],
+      removed: ["logs:app:AllowGet"],
+    });
+
+    const notesOf = (id: string) =>
+      summary.pendingChanges.value.find((change) => change.id === id)?.notes;
+    expect(notesOf(`stream-${ALL}-added`)).toEqual(["Dash Folders needs this to load panel data."]);
+    expect(notesOf("logs-app-removed")).toEqual([
+      "Dash Folders still needs this to load panel data.",
+    ]);
+    const neededByOf = (id: string) =>
+      summary.pendingChanges.value.find((change) => change.id === id)?.neededBy;
+    expect(neededByOf(`stream-${ALL}-added`)).toEqual(["Dash Folders"]);
+    expect(neededByOf("logs-app-removed")).toEqual(["Dash Folders"]);
+  });
+
+  it("passes the rail's staged counts to the overview card", () => {
+    const summary = setup();
+    summary.seed({ saved: ["logs:app:AllowGet"] });
+
+    expect(summary.summaryModules.value[0]).toMatchObject({ added: 0, removed: 0 });
+  });
+});
+
+describe("useRoleSummary - a removal a kept grant still covers", () => {
+  // The catalogue nodes a role load builds; Streams lists no types until it is opened, so stream coverage must not need them.
+  const withScopes = (summary: ReturnType<typeof setup>) => {
+    summary.resourceMapper.value = { destination: {}, dfolder: {}, stream: { entities: [] } };
+  };
+
+  it.each([
+    ["the same object's AllowAll", `destination:${ALL}:AllowAll`, `destination:${ALL}:AllowGet`],
+    ["a module-wide grant", `destination:${ALL}:AllowGet`, "destination:d1:AllowGet"],
+    ["every stream", `stream:${ALL}:AllowGet`, "logs:app:AllowGet"],
+    ["every stream", `stream:${ALL}:AllowGet`, `logs:${ALL}:AllowGet`],
+    ["the stream type", `logs:${ALL}:AllowAll`, "logs:app:AllowGet"],
+    ["the folder", "dfolder:f1:AllowGet", "dashboard:f1/d1:AllowGet"],
+    ["every folder", `dfolder:${ALL}:AllowGet`, "dashboard:f1/d1:AllowGet"],
+  ])("reports no access change when %s (%s) still allows %s", (_, kept, removed) => {
+    const summary = setup();
+    withScopes(summary);
+    summary.seed({ saved: [kept, removed], removed: [removed] });
+
+    expect(summary.pendingChanges.value.map((change) => change.effect)).toEqual([
+      i18n.global.t("iam.editRole.effectStillAllowed"),
+    ]);
+  });
+
+  // AllowAll also grants List, so keeping only Get still loses the folder's list.
+  it.each([
+    [
+      ["dfolder:f1:AllowList", "dfolder:f1:AllowGet"],
+      "Can no longer create, edit, and delete dashboards in the f1 folder.",
+    ],
+    [
+      ["dfolder:f1:AllowGet"],
+      "Can no longer list, create, edit, and delete dashboards in the f1 folder.",
+    ],
+  ])("names only what a removed AllowAll loses when %j is kept", (kept, effect) => {
+    const summary = setup();
+    withScopes(summary);
+    summary.seed({ saved: [...kept, "dfolder:f1:AllowAll"], removed: ["dfolder:f1:AllowAll"] });
+
+    expect(summary.pendingChanges.value.map((change) => change.effect)).toEqual([effect]);
+  });
+
+  it("keeps the full sentence when the kept grants cover another action or item", () => {
+    const summary = setup();
+    withScopes(summary);
+    summary.seed({
+      saved: [`destination:${ALL}:AllowList`, "destination:d2:AllowGet", "destination:d1:AllowGet"],
+      removed: ["destination:d1:AllowGet"],
+    });
+
+    expect(summary.pendingChanges.value.map((change) => change.effect)).toEqual([
+      "Can no longer open the d1 destination.",
+    ]);
+  });
+});
+
+describe("useRoleSummary - grants inside a drill-in row", () => {
+  const traces = { name: "traces", type: "Type", has_entities: true, childName: "traces" };
+  const folder = { name: "f1", type: "Resource", has_entities: true, childName: "dashboard" };
+
+  it("names the streams granted inside a stream type, leaving out the type-wide grant", () => {
+    const s = setup();
+    s.seed({ saved: [`traces:${ALL}:AllowList`, "traces:_evaluator:AllowAll"] });
+
+    expect(s.innerGrants(traces, 10)).toEqual({ count: 1, names: ["_evaluator"] });
+  });
+
+  it("names only the dashboards inside this folder, without the folder prefix", () => {
+    const s = setup();
+    s.seed({ saved: ["dashboard:f1/d1:AllowGet", "dashboard:f2/d9:AllowGet"] });
+
+    expect(s.innerGrants(folder, 10)).toEqual({ count: 1, names: ["d1"] });
+  });
+
+  it("uses a loaded dashboard's title over its id", () => {
+    const s = setup();
+    s.resourceMapper.value.dfolder = {
+      entities: [{ name: "f1", entities: [{ name: "f1/d1", display_name: "Latency" }] }],
+    };
+    s.seed({ saved: ["dashboard:f1/d1:AllowGet"] });
+
+    expect(s.innerGrants(folder, 10)).toEqual({ count: 1, names: ["Latency"] });
+  });
+
+  // An unticked grant is leaving, so it must stop being advertised on the row above it.
+  it("drops a grant that is staged for removal", () => {
+    const s = setup();
+    s.seed({ saved: ["traces:_evaluator:AllowAll"], removed: ["traces:_evaluator:AllowAll"] });
+
+    expect(s.innerGrants(traces, 10)).toEqual({ count: 0, names: [] });
+  });
+
+  it("names nothing for a row that cannot be opened", () => {
+    const s = setup();
+    s.seed({ saved: ["traces:_evaluator:AllowAll"] });
+
+    expect(s.innerGrants({ name: "traces", has_entities: false }, 10)).toEqual({
+      count: 0,
+      names: [],
+    });
+  });
+
+  // Synthetics and workflow ids carry no folder prefix, so the folder's loaded items place them.
+  it("places a plain-id monitor in the folder whose loaded items contain it", () => {
+    const s = setup();
+    const synthFolder = {
+      name: "f1",
+      type: "Resource",
+      has_entities: true,
+      childName: "synthetics",
+      entities: [{ name: "m1", display_name: "Checkout" }],
+    };
+    s.resourceMapper.value.synthetic_folder = { entities: [synthFolder] };
+    s.seed({ saved: ["synthetics:m1:AllowGet", "synthetics:m9:AllowGet"] });
+
+    expect(s.innerGrants(synthFolder, 10)).toEqual({ count: 1, names: ["Checkout"] });
+  });
+
+  // The badge needs the full count; only the few names a tooltip shows are labelled.
+  it("counts every grant inside but names only up to the limit", () => {
+    const s = setup();
+    s.seed({ saved: ["traces:a:AllowGet", "traces:b:AllowGet", "traces:c:AllowGet"] });
+
+    expect(s.innerGrants(traces, 2)).toEqual({ count: 3, names: ["a", "b"] });
+  });
+});
+
+describe("useRoleSummary - grants inside an All Modules row", () => {
+  // A stream type's own wide grant is still inside Streams; only `stream:_all_` is the row's own box.
+  it("counts every grant under the module except its own module-wide one", () => {
+    const s = setup();
+    s.seed({
+      saved: [`stream:${ALL}:AllowList`, `logs:${ALL}:AllowGet`, "metrics:cpu:AllowGet"],
+    });
+
+    expect(s.moduleInnerGrants({ name: "stream" }, 10)).toEqual({
+      count: 2,
+      names: [String(i18n.global.t("iam.editRole.scopeAllOf", { module: "Logs" })), "cpu"],
+    });
+  });
+
+  it("reports a role that grants a single dashboard on its folder module", () => {
+    const s = setup();
+    s.seed({ saved: ["dashboard:f1/d1:AllowGet"] });
+
+    expect(s.moduleInnerGrants({ name: "dfolder" }, 10).count).toBe(1);
+    expect(s.moduleInnerGrants({ name: "stream" }, 10).count).toBe(0);
+  });
+
+  it("drops a grant that is staged for removal", () => {
+    const s = setup();
+    s.seed({ saved: ["metrics:cpu:AllowGet"], removed: ["metrics:cpu:AllowGet"] });
+
+    expect(s.moduleInnerGrants({ name: "stream" }, 10)).toEqual({ count: 0, names: [] });
+  });
+
+  it("reports nothing for a node that is not a module", () => {
+    const s = setup();
+    s.seed({ saved: ["metrics:cpu:AllowGet"] });
+
+    expect(s.moduleInnerGrants({ name: "metrics" }, 10)).toEqual({ count: 0, names: [] });
+  });
+});

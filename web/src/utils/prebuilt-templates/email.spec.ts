@@ -85,13 +85,6 @@ describe("email template", () => {
         expect(validator("test@example.com,invalid-email")).not.toBe(true);
       }
     });
-
-    it("URL validator always returns false for email type", () => {
-      // Email type doesn't use URLs - should always return false
-      expect(emailConfig.urlValidator("https://example.com")).toBe(false);
-      expect(emailConfig.urlValidator("invalid")).toBe(false);
-      expect(emailConfig.urlValidator("")).toBe(false);
-    });
   });
 
   describe("emailDestinationType", () => {
@@ -104,8 +97,8 @@ describe("email template", () => {
     });
 
     it("has description", () => {
-      expect(emailDestinationType.description).toBeTruthy();
-      expect(typeof emailDestinationType.description).toBe("string");
+      expect(emailDestinationType.descriptionKey).toBeTruthy();
+      expect(typeof emailDestinationType.descriptionKey).toBe("string");
     });
 
     it("has correct category", () => {

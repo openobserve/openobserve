@@ -141,10 +141,7 @@ export class CipherKeysFormValidationPage {
     await this.continueButton.click();
   }
 
-  async clickSave() {
-    await this.saveButton.waitFor({ state: 'visible' });
-    await this.saveButton.click();
-  }
+
 
   // ── OpenObserve secret ──────────────────────────────────────────────────────
 

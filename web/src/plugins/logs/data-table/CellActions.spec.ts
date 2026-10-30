@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { mount, config } from "@vue/test-utils";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import i18n from "@/locales";
 import CellActions from "./CellActions.vue";
 
@@ -95,20 +95,16 @@ describe("CellActions", () => {
     });
   });
 
-  // ── backgroundClass computed ──────────────────────────────────────────────────
-  describe("backgroundClass computed", () => {
-    // The dark/light pair collapsed to a single semantic token; the overlay now
-    // always renders bg-surface-base and dark mode is handled by the token itself.
-    it("applies the surface-base background token in dark theme", () => {
-      mockStore.state.theme = "dark";
-      const wrapper = mountComponent();
-      expect(wrapper.find(".field_overlay").classes()).toContain("bg-surface-base");
-    });
-
-    it("applies the surface-base background token in light theme", () => {
-      mockStore.state.theme = "light";
-      const wrapper = mountComponent();
-      expect(wrapper.find(".field_overlay").classes()).toContain("bg-surface-base");
+  // ── Layout ────────────────────────────────────────────────────────────────────
+  describe("layout", () => {
+    // OTable's hover-action toolbar supplies the surface and the positioning, so
+    // this component must stay flow content — an absolute/background of its own
+    // would paint over the log line again.
+    it("renders as a plain flow row with no surface or positioning of its own", () => {
+      const classes = mountComponent().find(".field_overlay").classes();
+      expect(classes).toContain("flex");
+      expect(classes).not.toContain("absolute");
+      expect(classes).not.toContain("bg-surface-base");
     });
   });
 
@@ -136,6 +132,17 @@ describe("CellActions", () => {
         selectedStreamFields: [{ name: "status", isSchemaField: true }],
       });
       expect(wrapper.vm.isStreamField).toBe(false);
+    });
+
+    it("returns true for _stream_name, which is in no stream schema", () => {
+      const wrapper = mountComponent({
+        column: { id: "_stream_name" },
+        row: { _stream_name: "app" },
+        selectedStreamFields: [{ name: "status", isSchemaField: true }],
+      });
+      expect(wrapper.vm.isStreamField).toBe(true);
+      expect(wrapper.find('[data-test="log-details-include-field-app"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="log-details-exclude-field-app"]').exists()).toBe(true);
     });
 
     it("returns false when selectedStreamFields is empty", () => {
@@ -252,6 +259,35 @@ describe("CellActions", () => {
   });
 
   // ── Props defaults ────────────────────────────────────────────────────────────
+  describe("value prop", () => {
+    // Logs' `source` column is JSON.stringify(row): nothing sits under
+    // row["source"], so the caller hands the rendered value in.
+    it("acts on the passed value when the row has nothing under column.id", async () => {
+      const wrapper = mountComponent({
+        column: { id: "source" },
+        row: { status: "200", message: "OK" },
+        value: '{"status":"200"}',
+        selectedStreamFields: [],
+      });
+
+      await wrapper.find("button").trigger("click");
+
+      expect(wrapper.emitted("copy")?.[0]).toEqual(['{"status":"200"}']);
+      // The title/data-test follow the same value, so they never read "undefined".
+      expect(wrapper.find(".table-cell-actions").attributes("data-test")).toBe(
+        'log-add-data-from-column-{"status":"200"}',
+      );
+    });
+
+    it("falls back to row[column.id] when no value is passed", async () => {
+      const wrapper = mountComponent();
+
+      await wrapper.find("button").trigger("click");
+
+      expect(wrapper.emitted("copy")?.[0]).toEqual(["200"]);
+    });
+  });
+
   describe("Props defaults", () => {
     it("defaults hideSearchTermActions to false", () => {
       const wrapper = mountComponent();

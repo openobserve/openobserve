@@ -17,17 +17,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import useDragAndDrop from "./useDnD";
 import { ref, computed, type PropType } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import { defaultDestinationNodeWarningMessage } from "@/utils/pipelines/constants";
-import { getTruncatedConditions as getTruncatedConditionsUtil } from "@/utils/conditionPreview";
+import { defaultDestinationNodeWarningKey } from "@/utils/pipelines/constants";
+import { buildConditionPreview } from "@/utils/conditionPreview";
 import { formatNodeErrorText } from "@/utils/pipelines/nodeErrors";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import FlowNodeCard from "@/components/flow/FlowNodeCard.vue";
 
 // Shapes are derived from the pipeline runtime (`useDnD` reactive store + API
@@ -66,7 +67,7 @@ interface PipelineEdge {
 }
 
 interface NodeType {
-  label: string;
+  label: I18nText;
   icon: string;
   subtype?: string;
   io_type?: string;
@@ -96,8 +97,9 @@ const props = defineProps({
 });
 
 defineEmits(["delete:node"]);
+const { t } = useI18nTyped();
 const { pipelineObj, deletePipelineNode, checkIfDefaultDestinationNode, openStepPicker } =
-  useDragAndDrop();
+  useDragAndDrop(t);
 const showButtons = ref(false);
 let hideButtonsTimeout: number | null = null;
 
@@ -264,8 +266,6 @@ const navigateToFunction = (functionName: string | undefined) => {
 // feature that no longer exists, and were the only writers of the now-deleted
 // userClickedNode/userSelectedNode. Adding a downstream node is done via the
 // hover-`+` step picker (useDnD.addNodeAfter).)
-
-const { t } = useI18n();
 const router = useRouter();
 const store = useStore();
 
@@ -299,32 +299,30 @@ const deleteNode = (id: string) => {
   openCancelDialog(id);
 };
 
-// Condition preview reuses the shared util (also used by workflow nodes).
-const getTruncatedConditions = (conditionData: unknown) =>
-  getTruncatedConditionsUtil(conditionData);
-
 const confirmDialogMeta = ref({
   show: false,
-  title: "",
-  message: "",
+  // raw("") is only the empty placeholder — the real values are assigned from t().
+  title: raw(""),
+  message: raw(""),
   data: null,
-  warningMessage: "",
+  warningMessage: raw(""),
   onConfirm: () => {},
 });
 
 const openCancelDialog = (id: string) => {
   confirmDialogMeta.value.show = true;
   confirmDialogMeta.value.title = t("common.delete");
-  confirmDialogMeta.value.message = "Are you sure you want to delete node?";
+  confirmDialogMeta.value.message = t("pipeline.confirmDeleteNode");
   //here we will check if the destination node is added by default if yes then we will show a warning message to the user
   if (
     Object.prototype.hasOwnProperty.call(props.data ?? {}, "node_type") &&
     props.data.node_type === "stream" &&
     checkIfDefaultDestinationNode(id)
   ) {
-    confirmDialogMeta.value.warningMessage = defaultDestinationNodeWarningMessage;
+    confirmDialogMeta.value.warningMessage = t(defaultDestinationNodeWarningKey);
   } else {
-    confirmDialogMeta.value.warningMessage = "";
+    // raw("") clears the field back to the empty placeholder.
+    confirmDialogMeta.value.warningMessage = raw("");
   }
   confirmDialogMeta.value.onConfirm = () => {
     deletePipelineNode(id);
@@ -333,8 +331,9 @@ const openCancelDialog = (id: string) => {
 
 const resetConfirmDialog = () => {
   confirmDialogMeta.value.show = false;
-  confirmDialogMeta.value.title = "";
-  confirmDialogMeta.value.message = "";
+  // raw("") clears the fields back to the empty placeholder.
+  confirmDialogMeta.value.title = raw("");
+  confirmDialogMeta.value.message = raw("");
   confirmDialogMeta.value.onConfirm = () => {};
 };
 
@@ -390,7 +389,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
           align="left"
         >
           {{ data.name }} -
-          <strong>{{ data.after_flatten ? "[RAF]" : "[RBF]" }}</strong>
+          <strong>{{ data.after_flatten ? raw("[RAF]") : raw("[RBF]") }}</strong>
         </div>
 
         <template v-else-if="data.node_type == 'stream'">
@@ -422,12 +421,13 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
           {{ data.destination_name }}
         </div>
 
-        <div
+        <OTruncatedText
           v-else-if="data.node_type == 'condition'"
-          class="w-auto text-left text-sm! leading-[1.4]! font-bold! text-wrap text-ellipsis"
+          as="div"
+          class="w-auto max-w-44 text-left text-sm! leading-[1.4]! font-bold!"
         >
-          {{ getTruncatedConditions(data.condition || data.conditions) }}
-        </div>
+          {{ buildConditionPreview(data.condition || data.conditions) }}
+        </OTruncatedText>
       </template>
 
       <!-- Error badge (function nodes) + delete button, shared across types -->
@@ -435,21 +435,21 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
         <div
           v-if="data.node_type == 'function' && hasNodeError"
           data-test="pipeline-node-error-badge"
-          class="bg-status-negative error-badge absolute -top-3 -right-3 z-15 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border-2 border-white shadow-[0_0.125rem_0.375rem_color-mix(in_srgb,var(--color-status-negative)_50%,transparent)] transition-all duration-200"
+          class="bg-status-negative error-badge shadow-status-negative/50 absolute -top-3 -right-3 z-15 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border-2 border-white shadow-sm transition-all duration-200"
           @click.stop="navigateToFunction(data.name)"
         >
           <OIcon name="error" size="sm" />
           <span
             data-test="pipeline-node-error-count"
             v-if="nodeErrorCount"
-            class="bg-status-negative text-3xs absolute -top-1.5 -right-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full border-[0.09375rem] border-solid border-white px-0.75 font-bold text-white shadow-[0_0.0625rem_0.1875rem_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
+            class="bg-status-negative text-3xs absolute -top-1.5 -right-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full border-[0.09375rem] border-solid border-white px-0.75 font-bold text-white shadow-xs"
           >
             {{ nodeErrorCount }}
           </span>
-          <OTooltip side="top" align="center" :sideOffset="10" max-width="600px">
+          <OTooltip side="top" align="center" :sideOffset="10" max-width="37.5rem">
             <template #content>
               <div class="max-h-75 overflow-y-auto">
-                {{ getNodeErrorInfo || "Error occurred" }}
+                {{ getNodeErrorInfo || t("common.errorOccurred") }}
               </div>
             </template>
           </OTooltip>
@@ -518,7 +518,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
   border: 0.1875rem solid color-mix(in srgb, var(--color-white) 90%, transparent);
   border-radius: 50% !important;
   background: var(--color-grey-500);
-  box-shadow: 0 0.125rem 0.5rem color-mix(in srgb, var(--color-black) 15%, transparent);
+  box-shadow: var(--shadow-glow-sm-geom) color-mix(in srgb, var(--color-black) 15%, transparent);
   transition: all 0.3s ease;
 }
 
@@ -568,6 +568,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
   width: 9.375rem;
   font-size: var(--text-xs);
   text-align: center;
+  /* eslint-disable-next-line local/no-hardcoded-px -- 1px outline on the flow node: a border width — optical, not layout; it must not thicken with the node label */
   border-width: 1px;
   border-style: solid;
   color: var(--vf-node-text);

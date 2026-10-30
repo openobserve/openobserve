@@ -27,7 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Output Section with Destination-specific Error Display -->
     <template #output-content>
-      <div class="border-border-default flex h-full w-full min-w-100 flex-col border-l">
+      <div
+        class="border-border-default flex h-full w-full min-w-100 flex-col border-s max-md:min-w-0"
+      >
         <div
           v-if="destinationErrorsToDisplay.length > 0 || destinationCreators.length > 0"
           class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
@@ -42,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("alert_destinations.import.outputMessages") }}
         </div>
         <OSeparator class="mt-1 shrink-0" />
-        <div class="min-h-0 w-full min-w-100 flex-1 [resize:none] overflow-auto">
+        <div class="min-h-0 w-full min-w-100 flex-1 [resize:none] overflow-auto max-md:min-w-0">
           <!-- Destination Errors Section -->
           <div class="error-section mb-2.5 p-2.5" v-if="destinationErrorsToDisplay.length > 0">
             <div class="error-list">
@@ -74,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             updateDestinationName(val, index);
                           }
                         "
-                        :label="t('alert_destinations.import.destinationName') + ' *'"
+                        :label="raw(t('alert_destinations.import.destinationName') + ' *')"
                         class="showLabelOnTop"
                         tabindex="0"
                       />
@@ -97,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             updateDestinationUrl(val, index);
                           }
                         "
-                        :label="t('alert_destinations.import.destinationUrl') + ' *'"
+                        :label="raw(t('alert_destinations.import.destinationUrl') + ' *')"
                         class="showLabelOnTop"
                         tabindex="0"
                       />
@@ -121,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           }
                         "
                         :options="destinationTypes"
-                        :label="t('alert_destinations.destination_type') + ' *'"
+                        :label="raw(t('alert_destinations.destination_type') + ' *')"
                         class="showLabelOnTop no-case py-2"
                       />
                     </div>
@@ -144,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           }
                         "
                         :options="destinationMethods"
-                        :label="t('alert_destinations.import.destinationMethod') + ' *'"
+                        :label="raw(t('alert_destinations.import.destinationMethod') + ' *')"
                         class="showLabelOnTop no-case py-2"
                       />
                     </div>
@@ -170,10 +172,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           }
                         "
                         :options="filteredTemplates"
-                        :label="t('alert_destinations.import.templates') + ' *'"
+                        :label="raw(t('alert_destinations.import.templates') + ' *')"
                         class="showLabelOnTop no-case py-2"
                         :error="!!templateErrors[index]"
-                        :error-message="templateErrors[index]"
+                        :error-message="raw(templateErrors[index])"
                         @search="filterTemplates"
                       />
                     </div>
@@ -197,40 +199,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             updateDestinationEmails(val, index);
                           }
                         "
-                        :label="t('alert_destinations.import.emails') + ' *'"
+                        :label="raw(t('alert_destinations.import.emails') + ' *')"
                         class="showLabelOnTop"
                         tabindex="0"
-                      />
-                    </div>
-                  </span>
-
-                  <!-- Action ID Error -->
-                  <span
-                    class="text-status-negative"
-                    v-else-if="
-                      typeof errorMessage === 'object' && errorMessage.field == 'action_id'
-                    "
-                  >
-                    {{ errorMessage.message }}
-                    <div>
-                      <OSelect
-                        data-test="destination-import-action-input"
-                        :model-value="userSelectedActionId[index] || ''"
-                        @update:model-value="
-                          (val) => {
-                            userSelectedActionId[index] = val;
-                            updateDestinationAction(val, index);
-                            actionErrors[index] = getCorrectionRequiredError(val);
-                          }
-                        "
-                        :options="filteredActions"
-                        :label="t('alert_destinations.import.actions') + ' *'"
-                        labelKey="label"
-                        valueKey="value"
-                        class="showLabelOnTop no-case w-75! py-2"
-                        :error="!!actionErrors[index]"
-                        :error-message="actionErrors[index]"
-                        @search="filterActions"
                       />
                     </div>
                   </span>
@@ -263,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Destination Creation Success Messages -->
           <div class="error-section mb-2.5 p-2.5" v-if="destinationCreators.length > 0">
             <div
-              class="text-primary mb-2.5 text-base uppercase"
+              class="text-primary mb-2.5 text-base"
               data-test="destination-import-creation-title"
             >
               {{ t("alert_destinations.import.destinationCreation") }}
@@ -284,8 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <pre
                   class="m-0 font-[inherit] [overflow-wrap:break-word] [word-break:break-word] [white-space:pre-wrap] [word-wrap:break-word]"
-                  >{{ val.message }}</pre
-                >
+                  >{{ val.message }}</pre>
               </div>
             </div>
           </div>
@@ -296,13 +266,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, reactive, onMounted } from "vue";
-import { useI18n } from "vue-i18n";
+import { saveDestinationMutation } from "@/services/alert_destination.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
+import { defineComponent, ref, computed, reactive } from "vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import destinationService from "@/services/alert_destination";
 import BaseImport from "../common/BaseImport.vue";
-import useActions from "@/composables/useActions";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
@@ -331,18 +302,17 @@ export default defineComponent({
   setup(props, { emit }) {
     type ErrorMessage = {
       field: string;
-      message: string;
+      message: I18nText;
     };
     type destinationCreator = {
-      message: string;
+      message: I18nText;
       success: boolean;
     }[];
     type destinationErrors = (ErrorMessage | string)[][];
 
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
-    const { isActionsEnabled } = useActions();
 
     const baseImportRef = ref<any>(null);
     const destinationErrorsToDisplay = ref<destinationErrors>([]);
@@ -358,12 +328,9 @@ export default defineComponent({
     const userSelectedDestinationName = ref<any[]>([]);
     const userSelectedDestinationUrl = ref<any[]>([]);
     const userSelectedEmails = ref<any[]>([]);
-    const userSelectedActionId = ref<any[]>([]);
     const userSelectedSkipTlsVerify = ref<SwitchValue[]>([]);
     const filteredTemplates = ref<string[]>([]);
-    const filteredActions = ref<any[]>([]);
     const templateErrors = reactive<Record<number, string>>({});
-    const actionErrors = reactive<Record<number, string>>({});
 
     // Use computed to directly reference BaseImport's jsonArrayOfObj
     const jsonArrayOfObj = computed({
@@ -381,7 +348,10 @@ export default defineComponent({
           const currentDestinationType =
             jsonArrayOfObj.value[destinationErrorsToDisplay.value.length - 1]?.type;
 
-          if (currentDestinationType === "email" && template.type === "email") {
+          if (
+            currentDestinationType === "email" &&
+            (template.type === "email" || template.kind === "content")
+          ) {
             return true;
           } else if (currentDestinationType !== "email") {
             return true;
@@ -390,34 +360,6 @@ export default defineComponent({
         })
         .map((template: any) => template.name);
     });
-
-    const userSelectedActionOptions = ref([]);
-
-    onMounted(async () => {
-      try {
-        const actionsData = await store.dispatch("getActions", {
-          org_identifier: store.state.selectedOrganization.identifier,
-        });
-        // Filter to only show service-type actions
-        userSelectedActionOptions.value = actionsData.list
-          .filter((action: any) => action.execution_details_type === "service")
-          .map((action: any) => ({
-            label: action.name,
-            value: action.id,
-          }));
-        filteredActions.value = userSelectedActionOptions.value;
-      } catch (error) {
-        console.error("Error fetching actions:", error);
-      }
-    });
-
-    const getServiceActions = () => {
-      return (
-        store.state.organizationData.actions.filter(
-          (action: any) => action.execution_details_type === "service",
-        ) || []
-      );
-    };
 
     const updateDestinationType = (type: any, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
@@ -459,14 +401,6 @@ export default defineComponent({
       }
     };
 
-    const updateDestinationAction = (id: SelectModelValue, index: number) => {
-      if (baseImportRef.value?.jsonArrayOfObj[index]) {
-        baseImportRef.value.jsonArrayOfObj[index].action_id = id;
-        // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
-      }
-    };
-
     const updateDestinationEmails = (emails: string | number, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         // OInput is a text field here, so the emitted value is always a string.
@@ -498,18 +432,7 @@ export default defineComponent({
       );
     };
 
-    const filterActions = (val: string) => {
-      if (!val) {
-        filteredActions.value = userSelectedActionOptions.value;
-        return;
-      }
-      const needle = val.toLowerCase();
-      filteredActions.value = userSelectedActionOptions.value.filter(
-        (v: any) => v.label.toLowerCase().indexOf(needle) > -1,
-      );
-    };
-
-    const importJson = async ({ jsonStr: jsonString, jsonArray }: any) => {
+    const importJson = async ({ jsonStr: jsonString }: any) => {
       // Validate correction fields that are currently displayed
       let hasCorrectionErrors = false;
       destinationErrorsToDisplay.value.forEach((errorGroup, idx) => {
@@ -522,18 +445,11 @@ export default defineComponent({
                 hasCorrectionErrors = true;
               }
             }
-            if (msg.field === "action_id") {
-              const requiredError = getCorrectionRequiredError(userSelectedActionId.value[idx]);
-              if (requiredError) {
-                actionErrors[idx] = requiredError;
-                hasCorrectionErrors = true;
-              }
-            }
           }
         }
       });
       if (hasCorrectionErrors) {
-        if (baseImportRef.value) baseImportRef.value.isImporting = false;
+        if (baseImportRef.value) baseImportRef.value.isImportingLocal = false;
         return;
       }
 
@@ -554,7 +470,7 @@ export default defineComponent({
         });
         // Reset BaseImport's importing flag on validation error
         if (baseImportRef.value) {
-          baseImportRef.value.isImporting = false;
+          baseImportRef.value.isImportingLocal = false;
         }
         return;
       }
@@ -589,7 +505,7 @@ export default defineComponent({
       isDestinationImporting.value = false;
 
       if (baseImportRef.value) {
-        baseImportRef.value.isImporting = false;
+        baseImportRef.value.isImportingLocal = false;
       }
     };
 
@@ -615,14 +531,14 @@ export default defineComponent({
     };
 
     // Single source of truth for the correction "required" rule. The template
-    // and action correction controls plus the pre-import correction gate below
+    // correction control plus the pre-import correction gate below
     // all defer to this instead of re-deriving the required message inline, so
     // the destination JS validator owns the rule in one place.
     const getCorrectionRequiredError = (value: any): string =>
       value ? "" : t("alerts.validation.fieldRequired");
 
     const validateDestinationInputs = async (input: any, index: number) => {
-      let destinationErrors: (string | { message: string; field: string })[] = [];
+      let destinationErrors: (string | ErrorMessage)[] = [];
 
       // Validate name
       if (!input.name || typeof input.name !== "string" || input.name.trim() === "") {
@@ -641,36 +557,10 @@ export default defineComponent({
       }
 
       // Validate type
-      if (
-        !input.type ||
-        (input.type !== "email" && input.type !== "http" && input.type !== "action")
-      ) {
+      if (!input.type || (input.type !== "email" && input.type !== "http")) {
         destinationErrors.push({
           message: t("alert_destinations.import.typeInvalid", { index }),
           field: "type",
-        });
-      }
-
-      // Check if action type is supported when actions are not enabled
-      if (input.type === "action" && !isActionsEnabled.value) {
-        destinationErrors.push(t("alert_destinations.import.actionTypeNotSupported", { index }));
-      }
-
-      // Validate action_id exists when type is action
-      const availableActions = getServiceActions().map((action: any) => action.id);
-
-      if (
-        isActionsEnabled.value &&
-        input.type === "action" &&
-        !availableActions.includes(input.action_id)
-      ) {
-        destinationErrors.push({
-          message: t("alert_destinations.import.actionNotFound", {
-            index,
-            actionId: input.action_id,
-            type: input.type,
-          }),
-          field: "action_id",
         });
       }
 
@@ -753,7 +643,11 @@ export default defineComponent({
       if (input.template) {
         const availableTemplates = props.templates
           .filter((template: any) => {
-            if (input.type === "email" && template.type === "email") return true;
+            if (
+              input.type === "email" &&
+              (template.type === "email" || template.kind === "content")
+            )
+              return true;
             else if (input.type !== "email") return true;
             return false;
           })
@@ -771,16 +665,6 @@ export default defineComponent({
         }
       }
 
-      // Validate action_id if actions are enabled
-      if (isActionsEnabled.value) {
-        if (input.action_id && typeof input.action_id !== "string") {
-          destinationErrors.push({
-            message: t("alert_destinations.import.actionIdInvalid", { index }),
-            field: "action_id",
-          });
-        }
-      }
-
       if (destinationErrors.length > 0) {
         destinationErrorsToDisplay.value.push(destinationErrors);
         return false;
@@ -789,10 +673,15 @@ export default defineComponent({
       return true;
     };
 
+    const orgIdForWrites = useOrgId();
+    const createDestinationWrite = useMutation(() =>
+      saveDestinationMutation(orgIdForWrites.value, () => false),
+    );
+
     const createDestination = async (input: any, index: number) => {
       try {
-        await destinationService.create({
-          org_identifier: store.state.selectedOrganization.identifier,
+        // Was: invalidate, then create — the refetch raced the write.
+        await createDestinationWrite.mutateAsync({
           destination_name: input.name,
           data: input,
         });
@@ -831,6 +720,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       t,
       importJson,
       router,
@@ -846,23 +736,17 @@ export default defineComponent({
       userSelectedDestinationUrl,
       userSelectedTemplates,
       userSelectedEmails,
-      userSelectedActionId,
       userSelectedSkipTlsVerify,
       filteredTemplates,
-      filteredActions,
       templateErrors,
-      actionErrors,
       updateDestinationType,
       updateDestinationMethod,
       updateDestinationName,
       updateDestinationUrl,
       updateDestinationTemplate,
-      updateDestinationAction,
       updateDestinationEmails,
       updateSkipTlsVerify,
       filterTemplates,
-      filterActions,
-      getServiceActions,
       getCorrectionRequiredError,
       arrowBackFn,
       isDestinationImporting,

@@ -3,11 +3,13 @@
  * Extracted from AddAlert.vue to reduce file complexity
  */
 
+import type { I18nText } from "@/types/i18n";
+
 import { buildConditionsString } from "./conditionsFormatter";
 
 export interface StreamFieldsMap {
   [key: string]: {
-    label: string;
+    label: I18nText;
     value: string;
     type: string;
   };

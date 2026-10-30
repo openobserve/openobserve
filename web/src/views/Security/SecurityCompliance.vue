@@ -5,7 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
      (evidence, not certification); the per-control rules live in utils/security/compliance.ts. -->
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -59,7 +59,7 @@ import {
   type SourceSignal,
 } from "@/utils/security/compliance";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
@@ -585,7 +585,7 @@ function go(path: string) {
       </div>
 
       <OStatStrip
-        compact
+        compact-values
         :items="stats"
         :loading="!ready"
         selectable
@@ -778,7 +778,7 @@ function go(path: string) {
           </div>
           <div
             v-if="req.evidence.length || req.shortfall.length"
-            class="flex flex-wrap gap-1.5 pl-6"
+            class="flex flex-wrap gap-1.5 ps-6"
           >
             <OTag
               v-for="name in req.evidence"

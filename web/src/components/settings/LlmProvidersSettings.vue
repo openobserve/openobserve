@@ -29,6 +29,10 @@
         <OSpinner size="md" />
       </div>
 
+      <div v-else-if="forbidden" class="flex flex-1 items-center justify-center">
+        <OEmptyState size="hero" preset="no-access" data-test="llm-providers-forbidden" />
+      </div>
+
       <div v-else-if="!providers.length" class="flex flex-1 items-center justify-center">
         <!-- First-run state — uses the same `no-llm-providers` preset the
              OTable's #empty slot uses for the filtered case, so the empty
@@ -46,12 +50,13 @@
 
       <div v-else class="min-h-0 flex-1">
         <OTable
+          ref="oTableRef"
           data-test="llm-providers-table"
           :data="filteredProviders"
           :columns="columns"
           row-key="id"
           :loading="isLoading"
-          :footer-title="t('llmProviders.title')"
+          :forbidden="forbidden"
           :global-filter="searchQuery"
           :show-global-filter="false"
           :default-columns="false"
@@ -59,8 +64,15 @@
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="settings-llm-providers"
-          :page-size="20"
+          :page-size="pageSize"
           :page-size-options="[20, 50, 100]"
+          :current-page="currentPage"
+          :sort-by="sortBy"
+          :sort-order="sortOrder"
+          @update:page-size="pageSize = $event"
+          @update:current-page="currentPage = $event"
+          @update:sort-by="sortBy = $event"
+          @update:sort-order="sortOrder = $event"
           width="100%"
           class="h-full w-full"
           @row-click="(row: any) => openEdit(row)"
@@ -74,20 +86,15 @@
             />
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
-              :loading="isLoading"
+              :last-run-at="lastUpdatedAt"
+              :loading="isFetching"
+              shortcut-id="llmProvidersRefresh"
               data-test="llm-providers-list-refresh-btn"
-              @click="loadProviders"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="llmProvidersRefresh"
-              />
-            </OButton>
+              @click="() => loadProviders(true)"
+            />
           </template>
           <template #empty>
             <OEmptyState
@@ -103,7 +110,7 @@
           </template>
 
           <template #cell-endpoint="{ row }">
-            <span class="font-mono text-xs">{{ row.endpoint || endpointFallback(row) }}</span>
+            <span class="font-mono text-xs">{{ resolvedEndpointOf(row) || "—" }}</span>
           </template>
 
           <template #cell-defaultModel="{ row }">
@@ -117,6 +124,7 @@
                 data-row-action="edit"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 :title="t('onlineEvals.actions.edit')"
                 icon-left="edit"
                 @click.stop="openEdit(row)"
@@ -126,10 +134,41 @@
                 data-row-action="delete"
                 variant="ghost-destructive"
                 size="icon-sm"
+                class="max-md:hidden"
                 :title="t('onlineEvals.actions.delete')"
                 icon-left="delete"
                 @click.stop="confirmDelete(row)"
               />
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    :aria-label="t('common.moreActions')"
+                    icon-left="more-vert"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    class="md:hidden"
+                    data-test="llm-providers-row-more-actions"
+                    @click.stop
+                  />
+                </template>
+                <ODropdownItem
+                  icon-left="edit"
+                  class="md:hidden"
+                  :data-test="`llm-providers-${row.name}-edit-btn-menu`"
+                  @select="openEdit(row)"
+                >
+                  <span>{{ t("onlineEvals.actions.edit") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="delete"
+                  variant="destructive"
+                  class="md:hidden"
+                  :data-test="`llm-providers-${row.name}-delete-btn-menu`"
+                  @select="confirmDelete(row)"
+                >
+                  <span>{{ t("onlineEvals.actions.delete") }}</span>
+                </ODropdownItem>
+              </ODropdown>
             </div>
           </template>
         </OTable>
@@ -139,7 +178,9 @@
     <ConfirmDialog
       v-model="confirmDeleteOpen"
       :title="t('onlineEvals.deleteTitle', { label: t('onlineEvals.singular.providers') })"
-      :message="t('onlineEvals.deleteConfirmMessage', { name: pendingDeleteRow?.name ?? '' })"
+      message-keypath="onlineEvals.deleteConfirmMessage"
+      :message-name="pendingDeleteRow?.name ?? ''"
+      ok-variant="destructive"
       @update:ok="performDelete"
       @update:cancel="cancelDelete"
     />
@@ -148,20 +189,25 @@
 
 <script setup lang="ts">
 import { computed, onBeforeMount, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import onlineEvalsService, { type Provider } from "@/services/online-evals.service";
+import { type Provider } from "@/services/online-evals.service";
+import { deleteProviderMutation, providersQuery } from "@/services/online-evals.service.queries";
+import { useMutation, useQuery } from "@tanstack/vue-query";
 import {
   defaultModelOf,
   providerTypeOf,
+  resolvedEndpointOf,
 } from "@/enterprise/components/onlineEvals/utils/evalEntity";
 import { showError } from "@/enterprise/components/onlineEvals/utils/evalFormat";
 import ProviderFormPage from "@/enterprise/components/onlineEvals/forms/ProviderFormPage.vue";
@@ -171,21 +217,71 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { useListViewState } from "@/composables/useListViewState";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
 
-const providers = ref<Provider[]>([]);
-const isLoading = ref(false);
-const searchQuery = ref("");
+const viewState = useListViewState("llm-providers", {
+  searchQuery: "",
+  pageSize: 20,
+  currentPage: 1,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+});
+const searchQuery = ref(viewState.searchQuery);
+const pageSize = ref(viewState.pageSize);
+const currentPage = ref(viewState.currentPage);
+const sortBy = ref(viewState.sortBy);
+const sortOrder = ref(viewState.sortOrder);
+const oTableRef = ref<any>(null);
+
+watch([searchQuery, pageSize, currentPage, sortBy, sortOrder], () => {
+  Object.assign(viewState, {
+    searchQuery: searchQuery.value,
+    pageSize: pageSize.value,
+    currentPage: currentPage.value,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+  });
+});
 const formPage = ref<{ mode: "create" | "edit"; row: Provider | null } | null>(null);
 
 const confirmDeleteOpen = ref(false);
 const pendingDeleteRow = ref<Provider | null>(null);
 
 const orgId = computed(() => store.state.selectedOrganization?.identifier);
+
+// The same entry the Online Evals surfaces read, so a write on either page reaches both.
+const providersList = useQuery(() =>
+  Object.assign(providersQuery(orgId.value), { enabled: !!orgId.value }),
+);
+const providers = computed<Provider[]>(() => providersList.data.value ?? []);
+const isLoading = providersList.isPending;
+// setTimeout(0) runs after TanStack's deferred auto-reset-on-data-change, so the restored page wins.
+watch(
+  isLoading,
+  (v) => {
+    if (v) return;
+    setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
+  },
+  { once: true, immediate: true },
+);
+const isFetching = providersList.isFetching;
+// A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+const forbidden = computed(() => {
+  const e: any = providersList.error.value;
+  return e?.status === 403 || e?.response?.status === 403;
+});
+const lastUpdatedAt = providersList.dataUpdatedAt;
+// The grouped access toast already reports a 403; a second red toast adds nothing.
+watch(providersList.error, (err: any) => {
+  if (err && !forbidden.value) showError(err, t("llmProviders.loadError"));
+});
+
+const deleteProvider = useMutation(() => deleteProviderMutation(orgId.value));
 
 const columns = computed(() => [
   {
@@ -212,7 +308,7 @@ const columns = computed(() => [
   {
     id: "endpoint",
     header: t("llmProviders.columns.endpoint"),
-    accessorFn: (row: Provider) => row.endpoint || endpointFallback(row),
+    accessorFn: (row: Provider) => resolvedEndpointOf(row),
     sortable: false,
     resizable: true,
     hideable: true,
@@ -244,7 +340,7 @@ const filteredProviders = computed(() => {
   const filtered = !query
     ? providers.value
     : providers.value.filter((p) =>
-        [p.name, providerTypeOf(p), p.endpoint]
+        [p.name, providerTypeOf(p), resolvedEndpointOf(p)]
           .filter(Boolean)
           .some((v) => String(v).toLowerCase().includes(query)),
       );
@@ -253,6 +349,8 @@ const filteredProviders = computed(() => {
 
 onBeforeMount(async () => {
   await loadProviders();
+  // An edit deep link pre-fills the form from this read, so it must not come from the disk copy.
+  if (route.query.action === "update") await loadProviders(true);
   syncFromRoute();
 });
 
@@ -261,27 +359,11 @@ watch(
   () => syncFromRoute(),
 );
 
-async function loadProviders() {
+// The mount read is the query's own; only an explicit refresh forces the server.
+async function loadProviders(force = false) {
   if (!orgId.value) return;
-  isLoading.value = true;
-  try {
-    providers.value = await onlineEvalsService.providers.list(orgId.value);
-  } catch (err: any) {
-    showError(err, t("llmProviders.loadError"));
-  } finally {
-    isLoading.value = false;
-  }
-}
-
-const DEFAULT_ENDPOINTS: Record<string, string> = {
-  openai: "api.openai.com",
-  deepseek: "api.deepseek.com",
-  anthropic: "api.anthropic.com",
-};
-
-function endpointFallback(provider: Provider) {
-  const type = providerTypeOf(provider).toLowerCase();
-  return DEFAULT_ENDPOINTS[type] ?? "—";
+  if (force) await providersList.refetch();
+  else await providersList.suspense();
 }
 
 function pushRouteAction(extra: Record<string, string | undefined>) {
@@ -313,10 +395,10 @@ function closeForm() {
   clearRouteAction();
 }
 
-async function handleSaved() {
+// The save mutation's `invalidates` already refetches the list.
+function handleSaved() {
   formPage.value = null;
   clearRouteAction();
-  await loadProviders();
 }
 
 function syncFromRoute() {
@@ -350,12 +432,11 @@ async function performDelete() {
   const row = pendingDeleteRow.value;
   if (!row) return;
   try {
-    await onlineEvalsService.providers.delete(orgId.value, row.id);
+    await deleteProvider.mutateAsync(row.id);
     toast({
       variant: "success",
       message: t("onlineEvals.deleted", { label: t("onlineEvals.singular.providers") }),
     });
-    await loadProviders();
   } catch (err: any) {
     showError(
       err,
@@ -370,7 +451,7 @@ useShortcuts([
   {
     id: "llmProvidersRefresh",
     handler: () => {
-      if (!isInputFocused()) loadProviders();
+      if (!isInputFocused()) loadProviders(true);
     },
   },
 ]);

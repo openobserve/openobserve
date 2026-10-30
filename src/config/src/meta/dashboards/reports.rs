@@ -20,6 +20,9 @@ use utoipa::ToSchema;
 use super::datetime_now;
 use crate::meta::alerts::default_align_time;
 
+/// Header carrying the shared secret between OpenObserve and the report server.
+pub const REPORT_SECRET_HEADER: &str = "x-o2-report-secret";
+
 #[derive(Serialize, Debug, Deserialize, Clone, ToSchema)]
 pub enum ReportDestination {
     #[serde(rename = "email")]
@@ -319,12 +322,6 @@ impl ListReportsParams {
         self
     }
 
-    /// Filter reports by that are associated with the specified dashboard.
-    pub fn for_dashboard(mut self, dashboard_snowflake_id: &str) -> Self {
-        self.dashboard_snowflake_id = Some(dashboard_snowflake_id.to_string());
-        self
-    }
-
     /// Filter reports by whether they have any destinations or not.
     pub fn has_destinations(mut self, has_destinations: bool) -> Self {
         self.has_destinations = Some(has_destinations);
@@ -336,23 +333,6 @@ impl ListReportsParams {
         self.page_size_and_idx = Some((page_size, page_idx));
         self
     }
-
-    /// Filter reports by name substring (case-insensitive).
-    pub fn with_name_substring(mut self, name_substring: &str) -> Self {
-        self.name_substring = Some(name_substring.to_string());
-        self
-    }
-}
-
-/// An item in a list of reports which only includes a subset of all the report fields.
-#[derive(Debug, Clone)]
-pub struct ListReportItem {
-    pub name: String,
-    pub owner: String,
-    pub description: Option<String>,
-
-    /// The last time the report was triggered in Unix microseconds.
-    pub last_triggered_at: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -376,9 +356,26 @@ impl ReportListFilters {
     }
 }
 
+/// Percent-encodes both sides so a `&`, `#` or `"` in a variable can't break out of the URL.
+pub fn format_dashb_var(key: &str, value: &str) -> String {
+    format!(
+        "var-{}={}",
+        urlencoding::encode(key),
+        urlencoding::encode(value)
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_format_dashb_var_encodes_special_characters() {
+        let encoded = format_dashb_var("k", "a&b#c\"d");
+        assert_eq!(encoded, "var-k=a%26b%23c%22d");
+        let decoded_value = urlencoding::decode(encoded.strip_prefix("var-k=").unwrap()).unwrap();
+        assert_eq!(decoded_value, "a&b#c\"d");
+    }
 
     #[test]
     fn test_recipients_backwards_compatibility() {
@@ -661,33 +658,13 @@ mod tests {
     fn test_list_reports_params_builder_methods() {
         let params = ListReportsParams::new("test_org")
             .in_folder("folder_123")
-            .for_dashboard("dashboard_456")
             .has_destinations(true)
             .paginate(10, 0);
 
         assert_eq!(params.org_id, "test_org");
         assert_eq!(params.folder_snowflake_id, Some("folder_123".to_string()));
-        assert_eq!(
-            params.dashboard_snowflake_id,
-            Some("dashboard_456".to_string())
-        );
         assert_eq!(params.has_destinations, Some(true));
         assert_eq!(params.page_size_and_idx, Some((10, 0)));
-    }
-
-    #[test]
-    fn test_list_report_item() {
-        let item = ListReportItem {
-            name: "test_report".to_string(),
-            owner: "test_owner".to_string(),
-            description: Some("Test description".to_string()),
-            last_triggered_at: 1640995200000000,
-        };
-
-        assert_eq!(item.name, "test_report");
-        assert_eq!(item.owner, "test_owner");
-        assert_eq!(item.description, Some("Test description".to_string()));
-        assert_eq!(item.last_triggered_at, 1640995200000000);
     }
 
     #[test]

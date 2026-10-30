@@ -15,7 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-default copy-content-block bg-surface-subtle relative overflow-hidden">
+  <!-- an empty passcode would substitute into a valid-looking but non-functional snippet -->
+  <OBanner
+    v-if="passcodeForbidden && contentNeedsPasscode"
+    variant="warning"
+    data-test="copy-content-passcode-forbidden"
+    :content="t('ingestion.passcodeForbiddenMessage')"
+  />
+  <div v-else class="rounded-default copy-content-block bg-surface-subtle relative overflow-hidden">
     <div class="absolute top-2 right-2 z-10">
       <OButton
         data-test="rum-copy-btn"
@@ -24,34 +31,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="copyToClipboardFn()"
       >
         <OIcon name="content-copy" size="sm" />
-        <OTooltip content="Copy" side="top" />
+        <OTooltip :content="t('common.copy')" side="top" />
       </OButton>
     </div>
     <pre
       data-test="rum-content-text"
-      class="m-0 p-3 pr-10 text-sm leading-5 wrap-break-word whitespace-pre-wrap"
-      >{{ computedContent }}</pre
-    >
+      class="m-0 p-3 pe-10 text-sm leading-5 wrap-break-word whitespace-pre-wrap"
+      >{{ computedContent }}</pre>
   </div>
 </template>
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, type PropType } from "vue";
+import { type I18nText, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
+import analytics from "@/services/product_analytics";
 import { maskText, b64EncodeStandard } from "../utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+
+const PASSCODE_PLACEHOLDERS = ["[PASSCODE]", "[BASIC_PASSCODE]"];
 
 export default defineComponent({
   name: "CopyContent",
-  components: { OButton, OIcon, OTooltip },
+  components: { OButton, OIcon, OTooltip, OBanner },
   props: {
     content: {
-      type: String,
+      type: String as unknown as PropType<I18nText>,
       default: "", // Default value for content prop (empty string in this case)
     },
     displayContent: {
@@ -61,7 +72,8 @@ export default defineComponent({
   },
   setup(props) {
     const store = useStore();
-    const { t } = useI18n();
+    const router = useRouter();
+    const { t } = useI18nTyped();
     const email = ref(store.state.userInfo.email);
     const passcode = ref(store.state.organizationData.organizationPasscode);
     const basicPasscode = ref();
@@ -87,10 +99,16 @@ export default defineComponent({
 
     const copyToClipboardFn = () => {
       const content = replaceValues(props.content, false);
-      copyToClipboard(content, {
-        successMessage: "Content Copied Successfully!",
-        errorMessage: "Error while copy content.",
+      copyToClipboard(content, t, {
+        successMessage: t("common.contentCopiedSuccessfully"),
+        errorMessage: t("common.copyContentError"),
         timeout: 5000,
+      }).then((copied) => {
+        if (copied) {
+          analytics.track("snippet_copied", {
+            route: router?.currentRoute.value.name,
+          });
+        }
       });
     };
 
@@ -115,6 +133,13 @@ export default defineComponent({
   computed: {
     computedData() {
       return this.store.state.organizationData.organizationPasscode;
+    },
+    passcodeForbidden() {
+      return !!this.store.state.organizationData.organizationPasscodeForbidden;
+    },
+    contentNeedsPasscode() {
+      const source = this.displayContent || this.content || "";
+      return PASSCODE_PLACEHOLDERS.some((token) => source.includes(token));
     },
   },
   watch: {

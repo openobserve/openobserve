@@ -13,6 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { I18nText } from "@/types/i18n";
+import type { AlertGroupRef, EndOnClear } from "@/services/downtimes";
+
 export interface Condition {
   column: string;
   ignore_case: null | boolean;
@@ -39,23 +42,21 @@ export interface Alert {
     threshold: number;
     silence: number;
   };
+  /** Seconds. A condition must hold continuously this long before the alert
+   *  transitions from `pending` to `firing`. 0 = fire immediately (default). */
+  pending_period_sec: number;
   is_real_time: boolean;
   enabled: boolean;
   context_attributes: { [key: string]: string };
-  description: string;
+  description: I18nText;
   uuid?: string;
-  deduplication?: {
-    enabled: boolean;
-    fingerprint_fields: string[];
-    time_window_minutes?: number;
-    grouping?: {
-      enabled: boolean;
-      max_group_size: number;
-      send_strategy: "first_with_count" | "summary" | "all";
-      group_wait_seconds: number;
-    };
-  };
   creates_incident?: boolean;
+  /** Send one notification to the firing's destinations when the alert recovers. */
+  notify_on_recovery?: boolean;
+  /** Seconds the condition must stay clear before the alert recovers. 0 = immediately. */
+  keep_firing_for?: number;
+  /** Notify once per state change instead of on every firing evaluation. Enterprise only. */
+  suppress_repeats?: boolean;
 }
 
 // Alert object which is modified in frontend to display in table and form
@@ -66,7 +67,7 @@ export interface AlertListItem {
   stream_type: string;
   enabled: boolean;
   alert_type: string;
-  description: string;
+  description: I18nText;
   uuid?: string;
 }
 
@@ -80,7 +81,12 @@ export interface Template {
   // delete actions for them and the backend will refuse mutations.
   isPrebuilt?: boolean;
   type: "http" | "email";
-  title?: string;
+  title?: I18nText;
+  // Distinguishes a structured "content" template (built via the fields/links/
+  // rows editor, body is a serialized ContentSpec JSON string) from a
+  // "custom" raw-payload template (body is an arbitrary user string). Absent
+  // on templates created before this field existed — treat as "custom".
+  kind?: "content" | "custom";
 }
 
 // Template object which is modified in frontend to display in table and form
@@ -93,6 +99,12 @@ export interface Headers {
   [key: string]: string;
 }
 export interface DestinationMetadata {
+  prebuilt_type?: string;
+  setup_method?: "oauth" | "manifest" | "webhook";
+  slack_team_id?: string;
+  slack_team_name?: string;
+  slack_channel_id?: string;
+  slack_app_name?: string;
   // Splunk specific fields
   source?: string;
   sourcetype?: string;
@@ -104,6 +116,7 @@ export interface DestinationMetadata {
   ddtags?: string;
   service?: string;
   // hostname is shared between Splunk and Datadog
+  [key: string]: string | undefined;
 }
 
 export interface Destination {
@@ -115,8 +128,7 @@ export interface Destination {
   headers?: Headers;
   template?: string | Template;
   emails?: string;
-  type: "http" | "email" | "sns" | "action";
-  action_id?: string;
+  type: "http" | "email" | "sns" | "slack_app";
   output_format?: "json" | "ndjson" | "nestedevent" | string | any; // string allows esbulk with dynamic index, any for stringseparated object
   destination_type?: string; // Frontend internal use
   destination_type_name?: string; // From backend
@@ -133,8 +145,7 @@ export interface DestinationPayload {
   headers?: Headers;
   template?: string; // Persisted/sent as the template name
   emails?: string[];
-  type: "http" | "email" | "sns" | "action";
-  action_id?: string;
+  type: "http" | "email" | "sns" | "slack_app";
   output_format?: "json" | "ndjson" | "nestedevent" | string | any; // string allows esbulk with dynamic index, any for stringseparated object
   destination_type?: string; // New field added
   separator?: string; // For stringseparated format separator value
@@ -171,6 +182,121 @@ export interface AlertGroup {
   last_seen?: number;
   silenced_until?: number;
   last_notified_level?: string;
+  /** Microseconds; absent when the group is not firing or an older node wrote the row. */
+  firing_started_at?: number;
+  /** Present only while the ack is in force for the current firing. */
+  ack?: AckView;
+}
+
+export type AckSource = "ui" | "api" | "slack" | "oncall" | "incident";
+
+/** One group's ack in force (`AckView` of `POST /alerts/{id}/ack`). */
+export interface AckView {
+  /** `""` for a single-row or composite alert. */
+  group_key: string;
+  firing_started_at: number;
+  acked_by: string;
+  acked_at: number;
+  ack_source: AckSource;
+  taken_over_from?: string;
+}
+
+/** The `ack` object on an alert list item. */
+export interface AlertListAck {
+  acked_by: string;
+  acked_at: number;
+  ack_source: AckSource;
+  groups_acked: number;
+}
+
+export interface AckAlertRequest {
+  group_key?: string;
+  /** The firing the caller saw; a newer firing answers 409 `firing_changed`. */
+  firing_started_at?: number;
+  take_over?: boolean;
+  all_groups?: boolean;
+}
+
+export interface AckAlertResponse {
+  changed: boolean;
+  acks: AckView[];
+  incident?: { id: string; status: string };
+  oncall?: {
+    acknowledged: string[];
+    still_paging: { response_id: string; team: string }[];
+  };
+  other_groups_unacked: number;
+}
+
+export interface UnackAlertRequest {
+  group_key: string;
+  firing_started_at?: number;
+}
+
+export interface UnackAlertResponse {
+  changed: boolean;
+  ack?: AckView;
+}
+
+export interface AlertAcksResponse {
+  acks: AckView[];
+}
+
+export interface AlertActionPerson {
+  email: string;
+  name?: string;
+}
+
+/** 403 body of the ack and mute routes: who is on call and who could act instead. */
+export interface AlertActionRefusal {
+  code: "ack_refused" | "mute_refused";
+  message: string;
+  rule: "role" | "fga";
+  on_call: (AlertActionPerson & { team: string })[];
+  can_act: AlertActionPerson[];
+}
+
+/** Every 403/409 `code` the ack and mute routes answer with. */
+export type AlertActionError =
+  | AlertActionRefusal
+  | { code: "not_firing" }
+  | { code: "firing_changed"; firing_started_at: number }
+  | { code: "downtime_cap"; message: string }
+  | { code: "already_muted"; downtime_id: string; version: number; ends_at: number }
+  | { code: "version_changed"; version: number; ends_at: number }
+  | { code: "not_a_quick_mute" };
+
+/** Body of `POST /alerts/{id}/mute`: exactly one of `until_clear`, `minutes`, `ends_at`. */
+export interface MuteAlertRequest {
+  until_clear?: boolean;
+  /** 1..=1440. */
+  minutes?: number;
+  /** Microseconds UTC. */
+  ends_at?: number;
+  group_keys?: string[];
+  all_groups?: boolean;
+  firing_started_at?: number;
+  reason?: string;
+  folder_id?: string;
+}
+
+export interface MuteAlertResponse {
+  downtime_id: string;
+  version: number;
+  ends_at: number;
+  end_on_clear?: EndOnClear;
+  alert_groups?: AlertGroupRef[];
+}
+
+/** Body of `POST /alerts/{id}/mute/{downtime_id}/extend`, with the version the caller saw. */
+export type ExtendAlertMuteRequest = { version: number } & (
+  { minutes: number } | { until_clear: true } | { ends_at: number }
+);
+
+export interface ExtendAlertMuteResponse {
+  version: number;
+  ends_at: number;
+  end_on_clear?: EndOnClear;
 }
 
 /**
@@ -204,4 +330,154 @@ export interface AlertGroupTransition {
   /** Absent where nothing was observed — a vanished group has no reading, and
    *  rendering 0 would read as a real measurement. */
   value?: number;
+  rule_value?: string;
+}
+
+export type StaleChildPolicy = "treat_as_false" | "treat_as_true" | "use_last_state";
+
+export interface CompositeAlertCondition {
+  expression: string;
+  warning_counts_as_firing: boolean;
+  stale_child_policy: StaleChildPolicy;
+}
+
+export interface CompositeAlertChildBase {
+  alert_id: string;
+  accessible: boolean;
+}
+
+export interface CompositeAlertReadableChild extends CompositeAlertChildBase {
+  accessible: true;
+  name: string;
+  alert_type: string;
+  folder_id: string;
+  folder_name?: string;
+  enabled: boolean;
+  level?: string | null;
+  last_outcome?: string | null;
+  level_at?: number | null;
+  effective_cadence_seconds?: number | null;
+  stale_deadline?: number | null;
+  stale?: boolean;
+  stale_reason?: string;
+  policy_decision?: string;
+  truth?: boolean;
+}
+
+export interface CompositeAlertHiddenChild extends CompositeAlertChildBase {
+  accessible: false;
+}
+
+export type CompositeAlertChild = CompositeAlertReadableChild | CompositeAlertHiddenChild;
+
+export interface CompositeAlertEvaluation {
+  result: boolean | null;
+  level: string | null;
+  evaluated_at: number | null;
+}
+
+export interface CompositeAlertDraft {
+  id?: string;
+  alert_type: "composite";
+  name: string;
+  description?: string;
+  enabled: boolean;
+  destinations: string[];
+  template?: string;
+  context_attributes?: Record<string, string> | Array<Record<string, unknown>>;
+  trigger_condition: { silence: number };
+  creates_incident?: boolean;
+  workflows?: string[];
+  priority?: number | null;
+  tags?: string[];
+  composite_condition: CompositeAlertCondition;
+  children?: CompositeAlertChild[];
+}
+
+export interface CompositeAlertDetail extends Omit<CompositeAlertDraft, "destinations"> {
+  id: string;
+  destinations?: string[];
+  scheduler_job_present: boolean;
+  children: CompositeAlertChild[];
+  evaluation?: CompositeAlertEvaluation | null;
+  referenced_by_composite_count?: number;
+}
+
+export interface CompositeAlertListItem {
+  alert_id: string;
+  alert_type: "composite";
+  name: string;
+  enabled: boolean;
+  condition: null;
+  child_count: number;
+  referenced_by_composite_count: number;
+  expression_summary: string;
+}
+
+export interface CompositeAlertReference {
+  alert_id: string;
+  name: string;
+  folder_id?: string;
+}
+
+export interface CompositeAlertReferenceResponse {
+  references: CompositeAlertReference[];
+  hidden_reference_count: number;
+}
+
+export interface CompositeAlertDiagnostic {
+  code: string;
+  message?: string;
+  child_alert_id?: string;
+}
+
+export interface CompositeExpressionValidation {
+  valid: boolean;
+  used_child_ids: string[];
+  unused_child_ids: string[];
+  unknown_child_ids: string[];
+}
+
+export interface CompositeAlertValidationRequest {
+  composite_condition: CompositeAlertCondition;
+  composite_id?: string;
+  folder_id?: string;
+}
+
+export interface CompositeAlertValidationResponse {
+  valid: boolean;
+  canonical_expression: string;
+  children: CompositeAlertChild[];
+  warnings: CompositeAlertDiagnostic[];
+  errors: CompositeAlertDiagnostic[];
+  result: boolean | null;
+  result_level: string | null;
+  stale_child_policy?: StaleChildPolicy;
+  warning_counts_as_firing?: boolean;
+}
+
+/** One child-level change inside a composite status timeline window. */
+export interface CompositeTimelineTransition {
+  from_level?: string | null;
+  to_level?: string | null;
+  at: number;
+}
+
+/** A single status lane: one child (or the composite itself) over a window. */
+export interface CompositeTimelineLane {
+  alert_id: string;
+  slot?: number | null;
+  name?: string | null;
+  accessible: boolean;
+  current_level?: string | null;
+  level_since?: number | null;
+  transitions: CompositeTimelineTransition[];
+}
+
+/** Response of the composite status-timeline endpoint. */
+export interface CompositeTimelineResponse {
+  from: number;
+  to: number;
+  children: CompositeTimelineLane[];
+  result: CompositeTimelineLane;
 }

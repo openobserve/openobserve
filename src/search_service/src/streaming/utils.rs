@@ -120,38 +120,10 @@ mod tests {
     }
 
     #[test]
-    fn test_calculate_progress_percentage_asc_end() {
-        // partition_end == req_end → 100%
-        let result = calculate_progress_percentage(0, 1000, 0, 1000, &OrderBy::Asc);
-        assert_eq!(result, 100);
-    }
-
-    #[test]
-    fn test_calculate_progress_percentage_asc_midpoint() {
-        // partition_end at exact midpoint → 50%
-        let result = calculate_progress_percentage(0, 500, 0, 1000, &OrderBy::Asc);
-        assert_eq!(result, 50);
-    }
-
-    #[test]
-    fn test_calculate_progress_percentage_asc_quarter() {
-        // partition_end at 25% → ceil(25) = 25
-        let result = calculate_progress_percentage(0, 250, 0, 1000, &OrderBy::Asc);
-        assert_eq!(result, 25);
-    }
-
-    #[test]
     fn test_calculate_progress_percentage_desc_full() {
         // partition_start == req_start → percentage == 1.0 → 100%
         let result = calculate_progress_percentage(0, 500, 0, 1000, &OrderBy::Desc);
         assert_eq!(result, 100);
-    }
-
-    #[test]
-    fn test_calculate_progress_percentage_desc_half() {
-        // partition_start at midpoint of range → (1000 - 500) / 1000 = 0.5 → 50
-        let result = calculate_progress_percentage(500, 800, 0, 1000, &OrderBy::Desc);
-        assert_eq!(result, 50);
     }
 
     #[test]

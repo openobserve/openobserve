@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *    the only one who can actually resolve either.
  */
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { LocatorCandidate, StepLocator } from "@/types/synthetics";
 import { isFrameworkGeneratedId, isPositionalSelector } from "@/utils/synthetics/locatorStability";
 import { deriveLocatorKind } from "@/utils/synthetics/deriveLocatorKind";
@@ -51,6 +51,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import LocatorComposeDialog from "./LocatorComposeDialog.vue";
@@ -68,7 +69,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ "update:locator": [value: StepLocator] }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const candidates = computed(() => props.locator.candidates ?? []);
 
@@ -89,10 +90,10 @@ const isEmpty = computed(() => !candidates.value.length);
  * nothing checked.
  */
 const columns = computed<OTableColumnDef<LocatorCandidate>[]>(() => [
-  { id: "order", header: "", size: 36 },
-  { id: "locator", header: "", size: 200, meta: { autoWidth: true } },
-  { id: "origin", header: "", size: 160 },
-  { id: "actions", header: "", size: 10 },
+  { id: "order", header: raw(""), size: 36 },
+  { id: "locator", header: raw(""), size: 200, meta: { autoWidth: true } },
+  { id: "origin", header: raw(""), size: 160 },
+  { id: "actions", header: raw(""), size: 10 },
 ]);
 
 const selectedIds = ref<string[]>([]);
@@ -217,15 +218,17 @@ const hasPendingDraft = computed(() => !!draft.value.trim());
  * hint that sits alongside a contradictory error.
  */
 const inputErrorMessage = computed(() => {
-  if (!props.errorMessage) return "";
-  return hasPendingDraft.value ? t("synthetics.journey.locatorDraftPending") : props.errorMessage;
+  if (!props.errorMessage) return raw("");
+  return hasPendingDraft.value
+    ? t("synthetics.journey.locatorDraftPending")
+    : raw(props.errorMessage);
 });
 
 /** The same sentence before anything is wrong — teaching the model, not rescuing it. */
 const inputHelpText = computed(() =>
   !inputErrorMessage.value && hasPendingDraft.value
     ? t("synthetics.journey.locatorDraftPending")
-    : "",
+    : raw(""),
 );
 
 function onCombine(built: { value: string; from: CompositePart[] }) {
@@ -318,11 +321,9 @@ function onCombine(built: { value: string; from: CompositePart[] }) {
             <OBadge variant="default" size="sm">
               {{ t(`synthetics.journey.locatorKind.${row.kind}`) }}
             </OBadge>
-            <OTooltip :content="row.value" interactive>
-              <span class="text-text-body min-w-0 flex-1 truncate font-mono text-xs">
-                {{ row.value }}
-              </span>
-            </OTooltip>
+            <OTruncatedText class="text-text-body flex-1 font-mono text-xs">
+              {{ row.value }}
+            </OTruncatedText>
             <!-- Per row, not per block. The old whole-block notice fired only when
                EVERY candidate was positional — that is, only when nothing could
                be done about it — and stayed silent when something could. -->
@@ -372,6 +373,7 @@ function onCombine(built: { value: string; from: CompositePart[] }) {
 
         <template #cell-actions="{ row }">
           <OButton
+            :aria-label="t('common.delete')"
             variant="ghost"
             size="xs"
             data-test="synthetics-journey-step-locator-delete-btn"

@@ -16,11 +16,15 @@
 <!--
   Simple vs Multi alert choice (alerts_2.md M-9 / §5.4).
 
-  Rendered only when the alert has at least one Group By column — multi is a
-  deliberate monitor choice, never inferred from `by {host}` being present.
-  Turning it on for an existing grouped alert would silently change its paging
-  cadence and reset its silence fingerprints, which is exactly what the opt-in
-  exists to prevent.
+  For Custom (builder), rendered only when the alert has at least one Group
+  By column — multi is a deliberate monitor choice, never inferred from
+  `by {host}` being present. Turning it on for an existing grouped alert
+  would silently change its paging cadence and reset its silence
+  fingerprints, which is exactly what the opt-in exists to prevent.
+
+  The SQL tab has no group-by picker (that flow classifies the whole result
+  set as one aggregate value, see `onSqlMultiAlertChange`), so it renders
+  this choice unconditionally instead of gating on a group-by field.
 
   The switch is bound by `name=` only; the parent normalises the group-count
   gate when it flips, because M-10 rejects any count rule other than
@@ -28,7 +32,7 @@
 -->
 <template>
   <div
-    class="rounded-default text-compact flex items-start gap-3 px-3 py-2"
+    class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
     data-test="alerts-alertmultitoggle-row"
   >
     <span
@@ -51,6 +55,7 @@
           orientation="horizontal"
           size="sm"
           :options="options"
+          :disabled="disabled"
           data-test="alerts-alertmultitoggle-choice"
           @update:model-value="emit('change', $event)"
         />
@@ -64,7 +69,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import OFormOptionGroup from "@/lib/forms/OptionGroup/OFormOptionGroup.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -72,6 +77,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 const props = withDefaults(
   defineProps<{
     enabled: boolean;
+    disabled?: boolean;
     /**
      * Field this choice writes. Defaults to the aggregation flag; a PromQL
      * alert passes `query_condition.promql_multi_alert`, because it has no
@@ -88,13 +94,14 @@ const props = withDefaults(
   }>(),
   {
     name: "query_condition.aggregation.multi_alert",
+    disabled: false,
     unit: "group",
   },
 );
 
 const emit = defineEmits<{ change: [value: unknown] }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const onLabelKey = computed(() =>
   props.unit === "series" ? "alerts.multiAlert.perSeries" : "alerts.multiAlert.perGroup",

@@ -36,6 +36,9 @@ export class StreamsFormValidationPage {
         this.saveBtn   = '[data-test="add-stream-dialog"] [data-test="o-dialog-primary-btn"]';
         this.cancelBtn = '[data-test="add-stream-dialog"] [data-test="o-dialog-secondary-btn"]';
 
+        // OSelect data type picker for a stream field
+        this.fieldDataTypeSelect = '[data-test="add-stream-field-data-type-select"]';
+
         // Toast selectors
         this.toastSuccess = '[data-test-variant="success"]';
     }
@@ -140,6 +143,10 @@ export class StreamsFormValidationPage {
 
     getDialogLocator() {
         return this.page.locator(this.addStreamDialog);
+    }
+
+    getFieldDataTypeSelectLocator() {
+        return this.page.locator(this.fieldDataTypeSelect);
     }
 
     getNameErrorLocator() {

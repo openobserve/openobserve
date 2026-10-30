@@ -42,6 +42,10 @@ vi.mock("vuex", () => ({
   useStore: () => ({ state: { selectedOrganization: { identifier: "org-1" } } }),
 }));
 
+vi.mock("@/stores", () => ({
+  default: { state: { selectedOrganization: { identifier: "org-1" } } },
+}));
+
 vi.mock("@/utils/synthetics/format", () => ({
   formatTimeAgoUs: vi.fn((us: number) => `formatted-${us}`),
 }));
@@ -49,6 +53,7 @@ vi.mock("@/utils/synthetics/format", () => ({
 // ── Component under test ───────────────────────────────────────────────────
 
 import PrivateLocations from "./PrivateLocations.vue";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -107,12 +112,21 @@ const OTableStub = {
     "pagination",
     "pageSize",
     "pageSizeOptions",
+    "currentPage",
+    "sortBy",
+    "sortOrder",
     "showGlobalFilter",
     "persistColumns",
     "tableId",
     "enableColumnResize",
   ],
-  emits: ["row-click"],
+  emits: [
+    "row-click",
+    "update:currentPage",
+    "update:pageSize",
+    "update:sortBy",
+    "update:sortOrder",
+  ],
 };
 
 const OButtonStub = {
@@ -138,6 +152,11 @@ const OTagStub = {
   props: ["size", "shape", "variant"],
 };
 
+const OTooltipStub = {
+  template: '<span class="otooltip-stub" :data-content="content"><slot /></span>',
+  props: ["content"],
+};
+
 const OEmptyStateStub = {
   template: '<div :data-test="$attrs[\'data-test\']" class="oemptystate-stub" />',
   props: ["size", "illustration", "filtered", "title", "description"],
@@ -156,6 +175,7 @@ function makeWrapper(props: { locations?: SyntheticLocation[]; loading?: boolean
         OInput: OInputStub,
         OBadge: OBadgeStub,
         OTag: OTagStub,
+        OTooltip: OTooltipStub,
         OEmptyState: OEmptyStateStub,
       },
     },
@@ -170,10 +190,52 @@ describe("PrivateLocations", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRouterPush.mockReset();
+    resetListViewState();
   });
 
   afterEach(() => {
     wrapper?.unmount();
+  });
+
+  describe("list view state", () => {
+    const seed = () =>
+      useListViewState("synthetics-private-locations", {
+        search: "",
+        currentPage: 1,
+        pageSize: 20,
+        sortBy: "",
+        sortOrder: "asc" as "asc" | "desc",
+      });
+
+    it("restores search, page, page size and sort", () => {
+      Object.assign(seed(), {
+        search: "eu",
+        currentPage: 2,
+        pageSize: 10,
+        sortBy: "label",
+        sortOrder: "desc",
+      });
+      wrapper = makeWrapper({ locations: [makeLocation({ label: "eu-1", region: "eu" })] });
+      const table = wrapper.findComponent(OTableStub);
+      expect(table.props("currentPage")).toBe(2);
+      expect(table.props("pageSize")).toBe(10);
+      expect(table.props("sortBy")).toBe("label");
+      expect(table.props("sortOrder")).toBe("desc");
+      expect((wrapper.find("input").element as HTMLInputElement).value).toBe("eu");
+    });
+
+    it("saves search and table changes", async () => {
+      wrapper = makeWrapper({ locations: [makeLocation()] });
+      await wrapper.find("input").setValue("abc");
+      const table = wrapper.findComponent(OTableStub);
+      table.vm.$emit("update:currentPage", 3);
+      table.vm.$emit("update:sortBy", "label");
+      await wrapper.vm.$nextTick();
+      const saved = seed();
+      expect(saved.search).toBe("abc");
+      expect(saved.currentPage).toBe(3);
+      expect(saved.sortBy).toBe("label");
+    });
   });
 
   describe("rendering", () => {
@@ -557,6 +619,64 @@ describe("PrivateLocations", () => {
 
       const statusCell = wrapper.find(".otable-cell-status");
       expect(statusCell.text()).toContain("synthetics.privateLocations.status.pending");
+    });
+  });
+
+  /**
+   * Agents register with one region and their rows never replicate, so a
+   * location whose agents live elsewhere reaches this region with none — and
+   * used to render as "Pending, 0/0", telling the customer to install an agent
+   * they already installed.
+   */
+  describe("live status this region cannot see", () => {
+    it("badges the location unknown instead of pending", () => {
+      wrapper = makeWrapper({
+        locations: [makeLocation({ status: "pending", live_status_unknown: true })],
+      });
+
+      const statusCell = wrapper.find(".otable-cell-status");
+      expect(statusCell.text()).toContain("synthetics.privateLocations.status.unknown");
+      expect(statusCell.text()).not.toContain("synthetics.privateLocations.status.pending");
+    });
+
+    it("explains the badge rather than leaving it bare", () => {
+      wrapper = makeWrapper({
+        locations: [makeLocation({ status: "pending", live_status_unknown: true })],
+      });
+
+      const tooltip = wrapper.find(".otable-cell-status .otooltip-stub");
+      expect(tooltip.attributes("data-content")).toBe(
+        "synthetics.privateLocations.status.unknownHint",
+      );
+    });
+
+    it("withholds the agent count instead of reporting zero", () => {
+      wrapper = makeWrapper({
+        locations: [
+          makeLocation({
+            status: "pending",
+            live_status_unknown: true,
+            live_agents: 0,
+            agents_total: 0,
+            agent_names: [],
+          }),
+        ],
+      });
+
+      const agentsCell = wrapper.find(".otable-cell-agents");
+      expect(agentsCell.text()).not.toContain("0/0");
+      expect(agentsCell.text()).toContain("—");
+    });
+
+    /** A server without super cluster never sends the flag. */
+    it("is unchanged when the flag is absent", () => {
+      wrapper = makeWrapper({
+        locations: [makeLocation({ status: "pending", live_agents: 0, agents_total: 0 })],
+      });
+
+      const statusCell = wrapper.find(".otable-cell-status");
+      expect(statusCell.text()).toContain("synthetics.privateLocations.status.pending");
+      expect(wrapper.find(".otable-cell-agents").text()).toContain("0/0");
     });
   });
 

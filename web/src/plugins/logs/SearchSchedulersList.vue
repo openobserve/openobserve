@@ -33,6 +33,8 @@
       </template>
       <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
         <OTable
+          ref="oTableRef"
+          :forbidden="forbidden"
           :frame="false"
           class="search-scheduler-otable"
           data-test="search-scheduler-table"
@@ -42,6 +44,15 @@
           row-key="trace_id"
           :loading="isLoading"
           pagination="client"
+          :page-size="pageSize"
+          :page-size-options="pageSizeOptions"
+          :current-page="currentPage"
+          @update:current-page="currentPage = $event"
+          @update:page-size="pageSize = $event"
+          :sort-by="sortBy"
+          :sort-order="sortOrder"
+          @update:sort-by="sortBy = $event"
+          @update:sort-order="sortOrder = $event"
           expansion="single"
           :expand-on-row-click="true"
           v-model:expanded-ids="expandedIds"
@@ -72,6 +83,7 @@
               variant="ghost"
               size="icon-sm"
               icon-left="cancel"
+              class="max-md:hidden"
               :title="t('search_scheduler_job.cancel')"
               :disabled="row.status_code !== 0 && row.status_code !== 1"
               @click="confirmCancelJob(row)"
@@ -83,6 +95,7 @@
               variant="ghost-destructive"
               size="icon-sm"
               icon-left="delete"
+              class="max-md:hidden"
               :title="t('search_scheduler_job.delete')"
               @click="confirmDeleteJob(row)"
             />
@@ -92,6 +105,7 @@
               variant="ghost"
               size="icon-sm"
               icon-left="refresh"
+              class="max-md:hidden"
               :title="t('search_scheduler_job.restart')"
               :disabled="row.status_code !== 2 && row.status_code !== 3"
               @click="retrySearchJob(row)"
@@ -102,16 +116,66 @@
               variant="ghost"
               size="icon-sm"
               icon-left="search"
+              class="max-md:hidden"
               :title="t('search_scheduler_job.explore')"
               :disabled="row.status_code == 0 || row.status_code == 3"
               @click="fetchSearchResults(row)"
             />
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  :aria-label="t('search.moreActions')"
+                  icon-left="more-vert"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="search-scheduler-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                icon-left="cancel"
+                class="md:hidden"
+                :disabled="row.status_code !== 0 && row.status_code !== 1"
+                data-test="search-scheduler-cancel-btn-menu"
+                @select="confirmCancelJob(row)"
+              >
+                <span>{{ t("search_scheduler_job.cancel") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="delete"
+                variant="destructive"
+                class="md:hidden"
+                data-test="search-scheduler-delete-btn-menu"
+                @select="confirmDeleteJob(row)"
+              >
+                <span>{{ t("search_scheduler_job.delete") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="refresh"
+                class="md:hidden"
+                :disabled="row.status_code !== 2 && row.status_code !== 3"
+                data-test="search-scheduler-restart-btn-menu"
+                @select="retrySearchJob(row)"
+              >
+                <span>{{ t("search_scheduler_job.restart") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="search"
+                class="md:hidden"
+                :disabled="row.status_code == 0 || row.status_code == 3"
+                data-test="search-scheduler-explore-btn-menu"
+                @select="fetchSearchResults(row)"
+              >
+                <span>{{ t("search_scheduler_job.explore") }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </template>
           <template #expansion="{ row }">
             <div class="app-tabs-schedule-list h-fit w-fit px-4 py-2">
               <AppTabs
                 data-test="expanded-list-tabs"
-                class="mr-3"
+                class="me-3"
                 :tabs="tabs"
                 v-model:active-tab="activeTab"
               />
@@ -125,13 +189,14 @@
                     >{{ t("search_scheduler_job.sql_query") }} :
                     <span>
                       <OButton
+                        :aria-label="t('common.copyToClipboard')"
                         variant="outline"
                         size="icon-chip"
-                        class="ml-2"
+                        class="ms-2"
                         data-test="search-scheduler-copy-sql-btn"
                         @click.stop="
-                          copyToClipboard(row.sql, {
-                            successMessage: `${t('logs.searchSchedulersList.sqlQuery')} ${t('search_scheduler_job.copy_success')}`,
+                          copyToClipboard(row.sql, t, {
+                            successMessage: t('logs.searchSchedulersList.sqlQueryCopied'),
                             timeout: 5000,
                           })
                         "
@@ -151,7 +216,7 @@
                 </div>
                 <div class="flex items-start justify-center">
                   <div
-                    class="border-border-default border-l-sql-accent bg-surface-subtle text-text-body o2-colorized-query h-full max-h-50 w-full overflow-y-auto border border-l-3 p-2.5"
+                    class="border-border-default border-s-sql-accent bg-surface-subtle text-text-body h-full max-h-50 w-full overflow-y-auto border border-s-3 p-2.5"
                   >
                     <!-- Monaco-colorized SQL (sanitized in colorizeRow). Falls
                            back to plain text before colorize resolves / if it throws. -->
@@ -164,8 +229,7 @@
                     <pre
                       v-else
                       class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
-                      >{{ row?.sql }}</pre
-                    >
+                      >{{ row?.sql }}</pre>
                   </div>
                 </div>
               </div>
@@ -178,13 +242,14 @@
                     >{{ t("search_scheduler_job.function_definition") }} :
                     <span>
                       <OButton
+                        :aria-label="t('common.copyToClipboard')"
                         data-test="search-scheduler-copy-function-btn"
                         variant="outline"
                         size="icon-chip"
-                        class="ml-2"
+                        class="ms-2"
                         @click.stop="
-                          copyToClipboard(row.function, {
-                            successMessage: `${t('logs.searchSchedulersList.functionDefinationCopy')} ${t('search_scheduler_job.copy_success')}`,
+                          copyToClipboard(row.function, t, {
+                            successMessage: t('logs.searchSchedulersList.functionDefinitionCopied'),
                             timeout: 5000,
                           })
                         "
@@ -195,7 +260,7 @@
 
                 <div class="flex items-start justify-center">
                   <div
-                    class="border-border-default border-l-function-accent bg-surface-subtle text-text-body o2-colorized-query h-full max-h-50 w-full overflow-y-auto border border-l-3 p-2.5"
+                    class="border-border-default border-s-function-accent bg-surface-subtle text-text-body h-full max-h-50 w-full overflow-y-auto border border-s-3 p-2.5"
                   >
                     <pre
                       v-if="colorizedFunction[row.trace_id]"
@@ -206,8 +271,7 @@
                     <pre
                       v-else
                       class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
-                      >{{ row?.function }}</pre
-                    >
+                      >{{ row?.function }}</pre>
                   </div>
                 </div>
               </div>
@@ -217,7 +281,7 @@
                 class="mb-2 flex max-h-screen w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] flex-col overflow-hidden px-4 py-0 text-left"
               >
                 <QueryEditor
-                  style="height: 130px"
+                  style="height: 8.125rem"
                   :key="row.trace_id"
                   :ref="`QueryEditorRef${row.trace_id}`"
                   :editor-id="`alerts-query-editor${row.trace_id}`"
@@ -229,15 +293,11 @@
               </div>
             </div>
           </template>
-          <template #bottom>
-            <div class="flex h-12 w-full items-center justify-between">
-              <div class="mr-md flex w-25 items-center text-xs font-normal">
-                {{ resultTotal }} {{ t("search_scheduler_job.results") }}
-              </div>
-              <div class="mr-2 ml-auto">
-                {{ t("search_scheduler_job.max_limit") }} : <b>1000</b>
-              </div>
-            </div>
+          <template v-if="dataToBeLoaded.length > 0" #footer-note>
+            <span class="max-md:hidden">
+              {{ t("search_scheduler_job.max_limit") }} :
+              <b>1000</b>
+            </span>
           </template>
           <template #empty>
             <div v-if="!isLoading" class="flex w-full">
@@ -248,6 +308,7 @@
         <ConfirmDialog
           :title="t('search_scheduler_job.delete_job_title')"
           :message="t('search_scheduler_job.delete_job_message')"
+          ok-variant="destructive"
           @update:ok="deleteSearchJob"
           @update:cancel="confirmDelete = false"
           v-model="confirmDelete"
@@ -267,17 +328,25 @@
 </template>
 <script lang="ts">
 //@ts-nocheck
-import { ref, onMounted, onUnmounted, computed } from "vue";
+import {
+  onMounted,
+  ref,
+  computed,
+  defineAsyncComponent,
+  defineComponent,
+  reactive,
+  watch,
+} from "vue";
+import { useListViewState } from "@/composables/useListViewState";
 import { b64EncodeUnicode, b64DecodeUnicode } from "@/utils/zincutils";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
-import { defineAsyncComponent, defineComponent, reactive } from "vue";
 import { searchState } from "@/composables/useLogs/searchState";
 import searchService from "@/services/search";
 import DOMPurify from "dompurify";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { convertUnixToDateFormat } from "@/utils/date";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
@@ -293,11 +362,13 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
-import { useShortcuts, getManager } from "@/lib/vue-shortcut-manager";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
@@ -313,6 +384,8 @@ export default defineComponent({
     AppTabs,
     OButton,
     OTooltip,
+    ODropdown,
+    ODropdownItem,
     QueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
     OIcon,
     OPageLayout,
@@ -333,7 +406,7 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const confirmDelete = ref(false);
     const toBeDeletedJob = ref({});
 
@@ -345,13 +418,33 @@ export default defineComponent({
     );
     const expandedIds = ref<string[]>([]);
     const isLoading = ref(false);
+    const forbidden = ref(false);
     const showSearchResults = ref(false);
     const toBeCancelled = ref({});
     const confirmCancel = ref(false);
     const activeTab = ref("query");
     const query = ref("");
 
-    const pageSize = ref(100);
+    const viewState = useListViewState("searchSchedulers", {
+      pageSize: 100,
+      currentPage: 1,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+    });
+    const oTableRef: any = ref(null);
+    const pageSize = ref(viewState.pageSize);
+    const currentPage = ref(viewState.currentPage);
+    const sortBy = ref(viewState.sortBy);
+    const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
+    let pendingPageRestore = true;
+    watch([pageSize, currentPage, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        pageSize: pageSize.value,
+        currentPage: currentPage.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
+    });
     const pageSizeOptions = [5, 10, 20, 50, 100];
     const tabs = reactive([
       {
@@ -369,8 +462,6 @@ export default defineComponent({
     // onMounted(async ()=>{
     //   await fetchSearchHistory();
     // })
-
-    const resultTotal = ref<number>(0);
 
     // Columns are a fixed schema (not derived from the response), so they can be
     // built up front — the table needs them present during loading to render the
@@ -461,6 +552,7 @@ export default defineComponent({
         expandedIds.value = [];
         query.value = "";
         isLoading.value = true;
+        forbidden.value = false;
         let responseToBeFetched = [];
         searchService
           .get_scheduled_search_list({
@@ -468,7 +560,6 @@ export default defineComponent({
           })
           .then((res) => {
             responseToBeFetched = res.data;
-            resultTotal.value = res.data.length;
 
             columnsToBeRendered.value = generateColumns();
 
@@ -496,9 +587,15 @@ export default defineComponent({
 
             dataToBeLoaded.value = responseToBeFetched;
             isLoading.value = false;
+            if (pendingPageRestore) {
+              pendingPageRestore = false;
+              // Macrotask so the restored page wins over the table's own reset on data change.
+              setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
+            }
           })
           .catch((e) => {
-            if (e.response.status != 403) {
+            forbidden.value = e?.response?.status === 403;
+            if (!forbidden.value) {
               toast({
                 variant: "error",
                 message: t("search_scheduler_job.fetch_failed"),
@@ -605,15 +702,15 @@ export default defineComponent({
     const delayMessage = computed(() => {
       const delay = store.state.zoConfig.usage_publish_interval;
       if (delay <= 60) {
-        return "60 seconds";
+        return t("logs.searchHistory.sixtySeconds");
       } else {
         const minutes = Math.floor(delay / 60);
-        return `${minutes} minute(s)`;
+        return t("logs.searchHistory.minutes", { count: minutes });
       }
     });
 
     const formatTime = (took) => {
-      return `${took.toFixed(2)} sec`;
+      return t("logs.searchSchedulersList.tookSeconds", { seconds: took.toFixed(2) });
     };
     const calculateDuration = (startTime, endTime) => {
       const durationMicroseconds = endTime - startTime;
@@ -812,15 +909,10 @@ export default defineComponent({
         },
       },
     ]);
-    // Own page: claim the keyboard scope and load jobs on mount, then hand the
-    // scope back to the logs page on leave.
     onMounted(() => {
-      getManager()?.setScope("search-schedulers");
       fetchSearchHistory();
     });
-    onUnmounted(() => {
-      getManager()?.setScope("logs");
-    });
+
     return {
       searchObj,
       store,
@@ -834,8 +926,13 @@ export default defineComponent({
       t,
       route,
       isLoading,
+      forbidden,
       pageSize,
       pageSizeOptions,
+      currentPage,
+      sortBy,
+      sortOrder,
+      oTableRef,
       expandedIds,
       goToLogs,
       onExpandedIdsChange,
@@ -844,7 +941,6 @@ export default defineComponent({
       copyToClipboard,
       formatTime,
       delayMessage,
-      resultTotal,
       getStatusText,
       getStatusIcon,
       getStatusColor,
@@ -878,14 +974,5 @@ export default defineComponent({
    detail panel; keep it on the normal cell surface like the rest of the list. */
 .search-scheduler-otable :deep([data-test^="o2-table-expanded-row-"]) {
   background-color: var(--color-table-cell-bg);
-}
-
-/* keep(generated-content): Monaco's colorize() injects .mtkN token spans via
-   v-html, so these can't be template utilities. Every colour but .mtk1 comes
-   from Monaco's own global stylesheet; .mtk1 is its default-text token, which
-   we point back at the block's own colour so the query inherits our theme
-   instead of Monaco's. Mirrors dashboards/QueryInspector.vue. */
-.o2-colorized-query :deep(.mtk1) {
-  color: inherit;
 }
 </style>

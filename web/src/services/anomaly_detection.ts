@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
 
 const anomaly_detection = {
   list: (org_identifier: string) => {
@@ -30,13 +31,29 @@ const anomaly_detection = {
   },
 
   // POST /api/v2/{org}/alerts — delegates to anomaly config creation when alert_type is "anomaly_detection"
-  create: (org_identifier: string, data: object) => {
-    return http().post(`/api/v2/${org_identifier}/alerts`, data);
+  // The folder travels as ?folder=: it is what the permission gate authorizes,
+  // so the body copy alone would create the config in the default folder.
+  create: (org_identifier: string, data: object, folder_id?: string) => {
+    let url = `/api/v2/${org_identifier}/alerts`;
+    if (folder_id) {
+      url += `?folder=${encodeURIComponent(folder_id)}`;
+    }
+    return http()
+      .post(url, data)
+      .then((res) => {
+        analytics.track("alert_created");
+        return res;
+      });
   },
 
   // PUT /api/v2/{org}/alerts/{id} — delegates to anomaly config update when alert_type is "anomaly_detection"
   update: (org_identifier: string, anomaly_id: string, data: object) => {
-    return http().put(`/api/v2/${org_identifier}/alerts/${anomaly_id}`, data);
+    return http()
+      .put(`/api/v2/${org_identifier}/alerts/${anomaly_id}`, data)
+      .then((res) => {
+        analytics.track("alert_updated");
+        return res;
+      });
   },
 
   // DELETE /api/v2/{org}/alerts/{id} — falls back to anomaly config delete when ID not in alerts
@@ -53,7 +70,12 @@ const anomaly_detection = {
   },
 
   triggerTraining: (org_identifier: string, anomaly_id: string) => {
-    return http().post(`/api/${org_identifier}/anomaly_detection/${anomaly_id}/train`, {});
+    return http()
+      .post(`/api/${org_identifier}/anomaly_detection/${anomaly_id}/train`, {})
+      .then((res) => {
+        analytics.track("anomaly_detection_training_started");
+        return res;
+      });
   },
 
   cancelTraining: (org_identifier: string, anomaly_id: string) => {

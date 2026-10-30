@@ -23,7 +23,7 @@ use datafusion::{
         tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor},
     },
     physical_plan::{
-        ExecutionPlan,
+        ChildrenPropertiesMode, ExecutionPlan, ReplaceChildrenOptions,
         aggregates::AggregateExec,
         coalesce_partitions::CoalescePartitionsExec,
         joins::{HashJoinExec, PartitionMode},
@@ -216,7 +216,7 @@ impl TreeNodeRewriter for BroadcastJoinRewriter {
         if node.name() == "HashJoinExec" {
             // 1. get the left table, apply limit, and rewrite it use RemoteScanRewriter
             let left_max_rows = config::get_config()
-                .common
+                .search
                 .feature_broadcast_join_left_side_max_rows;
             let left = node.children()[0].clone();
             let left: Arc<dyn ExecutionPlan> =
@@ -238,7 +238,10 @@ impl TreeNodeRewriter for BroadcastJoinRewriter {
 
             // 3. add remoteScan at the top of the hash join
             let right = node.children()[1].clone();
-            let hash_join = node.with_new_children(vec![tmp_exec, right])?;
+            let hash_join = node.replace_children(
+                vec![tmp_exec, right],
+                ReplaceChildrenOptions::new(ChildrenPropertiesMode::Recompute),
+            )?;
             let hash_join =
                 remote_scan_to_top_if_needed(hash_join, self.remote_scan_nodes.clone())?;
 

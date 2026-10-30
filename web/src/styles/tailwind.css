@@ -13,6 +13,10 @@
 /* App-wide @keyframes referenced from template `[animation:…]` arbitrary
    utilities — must be global, as Vue's scoped rewriter can't follow them. */
 @import "./keyframes.css";
+/* App-level `@utility` classes for treatments a template utility can't express
+   (pseudo-elements, non-utility CSS properties) but that are not one
+   component's private look. See the file header for when a rule belongs here. */
+@import "./utilities.css";
 
 @plugin "@tailwindcss/typography";
 
@@ -147,6 +151,14 @@ html.theme-switching *::after {
   [data-test="o-drawer-overlay"] {
     animation-duration: 0.01ms !important;
     animation-timing-function: linear !important;
+  }
+
+  /* 0.01ms, not none: transitionend still fires for code that waits on it. */
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
   }
 }
 

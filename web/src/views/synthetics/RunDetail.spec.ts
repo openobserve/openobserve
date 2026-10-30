@@ -16,6 +16,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { ref, shallowRef } from "vue";
+import { useI18n } from "vue-i18n";
 import RunDetail from "./RunDetail.vue";
 import StepPageActivity from "@/components/synthetics/results/StepPageActivity.vue";
 import EvidencePanel from "@/components/synthetics/results/EvidencePanel.vue";
@@ -41,7 +42,10 @@ vi.mock("vue-i18n", () => ({
   })),
 }));
 
-vi.mock("vuex", () => ({
+// Partial: the overlaid synthetics service loads `@/stores`, which needs the real
+// `createStore` — a wholesale vuex mock leaves it undefined at import time.
+vi.mock("vuex", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("vuex")>()),
   useStore: () => ({
     state: {
       timezone: "UTC",
@@ -164,18 +168,21 @@ vi.mock("@/composables/useSyntheticResults", () => ({
 const mockGetSynthetics = vi.fn().mockResolvedValue({ data: { type: "browser" } });
 const mockGetLocations = vi.fn().mockResolvedValue({ data: { locations: [] } });
 
-vi.mock("@/services/synthetics", () => ({
-  default: {
-    get: (...args: any[]) => mockGetSynthetics(...args),
-    getLocations: (...args: any[]) => mockGetLocations(...args),
-    presignArtifacts: vi.fn().mockResolvedValue({ data: { urls: [] } }),
-    artifactUrl: vi.fn(() => ""),
-    // useSyntheticEvidence asks this before fetching, to decide whether the URL
-    // is our cookie-authed proxy or a presigned object URL. Omitting it threw
-    // inside the load path, so no fetch was ever issued.
-    isProxyArtifactUrl: vi.fn(() => false),
-  },
-}));
+vi.mock("@/services/synthetics", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get: (...args: any[]) => mockGetSynthetics(...args),
+      getLocations: (...args: any[]) => mockGetLocations(...args),
+      presignArtifacts: vi.fn().mockResolvedValue({ data: { urls: [] } }),
+      artifactUrl: vi.fn(() => ""),
+      // useSyntheticEvidence asks this before fetching, to decide whether the URL
+      // is our cookie-authed proxy or a presigned object URL. Omitting it threw
+      // inside the load path, so no fetch was ever issued.
+      isProxyArtifactUrl: vi.fn(() => false),
+    },
+  });
+});
 
 const stubs = {
   OCard: {
@@ -200,9 +207,6 @@ const stubs = {
   OBadge: {
     template: '<span class="obadge-stub"><slot /></span>',
     props: ["variant", "size", "icon"],
-  },
-  BetaBadge: {
-    template: '<span data-test="beta-badge">BETA</span>',
   },
   // Protocol (non-browser) runs delegate entirely to ProtocolRunSummary —
   // stub it so branch-selection tests don't need to satisfy its own
@@ -270,10 +274,6 @@ describe("RunDetail", () => {
 
   it("should render the back button", () => {
     expect(wrapper.find('[data-test="synthetics-run-detail-back-btn"]').exists()).toBe(true);
-  });
-
-  it("should render the Beta badge in the page title", () => {
-    expect(wrapper.find('[data-test="beta-badge"]').exists()).toBe(true);
   });
 
   describe("monitor type resolution (drawer mode override)", () => {
@@ -454,6 +454,20 @@ describe("RunDetail — per-step page activity", () => {
     w.unmount();
   });
 
+  /**
+   * A flex item defaults to `min-width: auto`, so it refuses to shrink below its
+   * content. Without the clamp, one long URL or the evidence table's own
+   * content width pushes this column past the expansion and every card in it
+   * overflows — and `truncate` and `overflow-x-auto` both go inert, because each
+   * needs a bounded parent to act on.
+   */
+  it("clamps the expansion's content column so wide content scrolls instead of overflowing", async () => {
+    const w = await mountWithRun({ ...mockFailedWithEvidence });
+    const column = w.find('[data-test="synthetics-step-page-activity"]').element.parentElement;
+    expect(column?.className).toContain("min-w-0");
+    w.unmount();
+  });
+
   it("sends view-all to the Evidence tab filtered to that step", async () => {
     const w = await mountWithRun({ ...mockFailedWithEvidence });
     w.findComponent(StepPageActivity).vm.$emit("view-all", "s19");
@@ -464,10 +478,408 @@ describe("RunDetail — per-step page activity", () => {
     w.unmount();
   });
 
+  it("numbers evidence step options from the executed steps list, not recordedSteps position", async () => {
+    // recordedSteps carries a step (s1) that never actually ran this attempt —
+    // a journey typically has ~13 recorded steps and only a few execute. If the
+    // select's numbering came from recordedSteps position, s19 here would read
+    // "Step 2" (its position in recordedSteps) instead of "Step 1" (its
+    // position among the steps that actually ran, which is what the Steps tab
+    // and "Failed at Step N" both show).
+    const w = await mountWithRun({
+      ...mockFailedWithEvidence,
+      recordedSteps: [
+        { id: "s1", action: "click", name: "Go home", selector: null, url: "" },
+        ...mockFailedWithEvidence.recordedSteps,
+      ],
+    });
+    // EvidencePanel only mounts on the Evidence tab (v-if, not v-show).
+    w.findComponent(StepPageActivity).vm.$emit("view-all", "s19");
+    await flushPromises();
+    const panel = w.findComponent(EvidencePanel);
+    const stepOptions = panel.props("stepOptions") as {
+      stepId: string;
+      number: number;
+      name: string;
+    }[];
+    expect(stepOptions).toEqual([{ stepId: "s19", number: 1, name: "Click Sign In" }]);
+    w.unmount();
+  });
+
   it("issues no bundle request when the attempt has no evidence", async () => {
     const w = await mountWithRun({ ...mockFailedWithEvidence, evidenceKey: null });
     expect(globalThis.fetch).not.toHaveBeenCalled();
     expect(w.find('[data-test="synthetics-step-page-activity"]').exists()).toBe(false);
+    w.unmount();
+  });
+});
+
+describe("RunDetail — id-less error override (quota / reaper rows)", () => {
+  let w: VueWrapper;
+
+  const overrideError = {
+    errorSource: "quota",
+    message: "the organization's included synthetics steps are exhausted, so this run was skipped",
+    timestamp: 1_700_000_000_000,
+    location: "aws-us-east-1",
+    browser: "chromium",
+    device: "desktop",
+  };
+
+  afterEach(() => {
+    w?.unmount();
+    vi.clearAllMocks();
+    mockLoading.value = false;
+  });
+
+  it("renders the error banner from the row and issues NO per-execution query", async () => {
+    mockRunDetailRef.value = null; // nothing fetched — the row has no ids
+    mockFetchRun.mockClear();
+    w = mountComponent({ drawerMode: true, overrideMonitorType: "browser", overrideError });
+    await flushPromises();
+
+    expect(w.find('[data-test="synthetics-run-detail-steps-error-banner"]').exists()).toBe(true);
+    expect(mockFetchRun).not.toHaveBeenCalled();
+  });
+
+  it("shows the quota source label and its FE explanation", async () => {
+    mockRunDetailRef.value = null;
+    w = mountComponent({ drawerMode: true, overrideMonitorType: "browser", overrideError });
+    await flushPromises();
+
+    expect(w.find('[data-test="synthetics-run-detail-error-source"]').text()).toBe(
+      "synthetics.runDetail.errorSourceQuota",
+    );
+    expect(w.find('[data-test="synthetics-run-detail-error-desc"]').text()).toBe(
+      "synthetics.runDetail.errorSourceQuotaDesc",
+    );
+  });
+
+  it("shows a source label but no explanation for a non-quota source", async () => {
+    mockRunDetailRef.value = null;
+    w = mountComponent({
+      drawerMode: true,
+      overrideMonitorType: "browser",
+      overrideError: { ...overrideError, errorSource: "dispatch" },
+    });
+    await flushPromises();
+
+    expect(w.find('[data-test="synthetics-run-detail-error-source"]').text()).toBe(
+      "synthetics.runDetail.errorSourceDispatch",
+    );
+    expect(w.find('[data-test="synthetics-run-detail-error-desc"]').exists()).toBe(false);
+  });
+
+  it("renders the error view even for a protocol monitor type (skips ProtocolRunSummary)", async () => {
+    mockRunDetailRef.value = null;
+    w = mountComponent({ drawerMode: true, overrideMonitorType: "http", overrideError });
+    await flushPromises();
+
+    expect(w.find('[data-test="protocol-run-summary-stub"]').exists()).toBe(false);
+    expect(w.find('[data-test="synthetics-run-detail-steps-error-banner"]').exists()).toBe(true);
+  });
+});
+
+// `startLoad` is a sibling of the steps array: row 0 has no number and no place in any count.
+describe("RunDetail — start load (row 0)", () => {
+  const startLoad = (overrides: Record<string, unknown> = {}) => ({
+    step_id: "_start",
+    status: "ok",
+    duration_ms: 420,
+    error: "",
+    screenshot_key: null,
+    url: "https://app.test/",
+    ...overrides,
+  });
+
+  const withStartLoad = (overrides: Record<string, unknown> = {}) => ({
+    ...mockRunDetail,
+    recordedSteps: [
+      { id: "s1", action: "click", name: "Click Sign In", selector: "[data-test=signin]", url: "" },
+    ],
+    lastAttemptSteps: [
+      { step_id: "s1", status: "ok", duration_ms: 300, error: "", screenshot_key: null },
+    ],
+    startLoad: startLoad(),
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    // The label interpolates the URL; a `t` that only echoes the key would hide it.
+    vi.mocked(useI18n).mockImplementation(
+      () =>
+        ({
+          t: (key: string, params?: Record<string, unknown>) =>
+            params && typeof params.url === "string" ? `${key} ${params.url}` : key,
+        }) as any,
+    );
+  });
+
+  afterEach(() => {
+    vi.mocked(useI18n).mockImplementation(() => ({ t: (key: string) => key }) as any);
+    mockRunDetailRef.value = { ...mockRunDetail };
+  });
+
+  async function mountWithRun(detail: Record<string, unknown>) {
+    mockRunDetailRef.value = null;
+    const w = mountComponent();
+    await flushPromises();
+    mockRunDetailRef.value = detail;
+    await flushPromises();
+    return w;
+  }
+
+  function precedes(a: Element, b: Element): boolean {
+    return !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+  }
+
+  it("renders row 0 above Step 1 with the Open label and its timing, and no step number", async () => {
+    const w = await mountWithRun(withStartLoad());
+
+    const row0 = w.find('[data-test="synthetics-journey-start-row"]');
+    expect(row0.exists(), "no start row rendered").toBe(true);
+    const step1 = w.find('[data-test="o2-table-row-0"]');
+    expect(step1.exists()).toBe(true);
+    expect(precedes(row0.element, step1.element)).toBe(true);
+    expect(row0.text()).toContain("synthetics.runDetail.startLoadLabel https://app.test/");
+    expect(row0.text()).toContain("420ms");
+    expect(row0.text()).not.toMatch(/^\s*\d/);
+    // Step 1 keeps its number: row 0 shifted nothing.
+    expect(step1.text()).toContain("1");
+    expect(step1.text()).toContain("Click Sign In");
+    w.unmount();
+  });
+
+  it("excludes row 0 from the Steps badge", async () => {
+    const w = await mountWithRun(withStartLoad());
+
+    const tab = w.find('[data-test="synthetics-run-detail-tab-steps"]');
+    expect(tab.find(".obadge-stub").text()).toBe("1");
+    expect(
+      w
+        .findAll("[data-test]")
+        .filter((el) => /^o2-table-row-\d+$/.test(el.attributes("data-test")!)),
+    ).toHaveLength(1);
+    w.unmount();
+  });
+
+  it("names the start load, not a Step, when the run failed opening the Starting URL", async () => {
+    const w = await mountWithRun(
+      withStartLoad({
+        status: "failed",
+        failedStep: "_start",
+        error: "net::ERR_NAME_NOT_RESOLVED",
+        startLoad: startLoad({ status: "fail", error: "net::ERR_NAME_NOT_RESOLVED" }),
+        failureDetail: {
+          stepId: "_start",
+          stepName: "",
+          stepIndex: 0,
+          error: "net::ERR_NAME_NOT_RESOLVED",
+          candidatesTried: [],
+          settleSignals: [],
+          settleMs: null,
+          cls: 0,
+          ttfbMs: 0,
+        },
+      }),
+    );
+
+    const infoBar = w.find('[data-test="synthetics-run-detail-info-bar"]');
+    expect(infoBar.text()).toContain("synthetics.runDetail.failedAtStartLoad");
+    expect(infoBar.text()).not.toContain("synthetics.runDetail.failedAtStep");
+    expect(w.text()).not.toContain("_start");
+    w.unmount();
+  });
+
+  it("shows the start load's error and screenshot on row 0", async () => {
+    const w = await mountWithRun(
+      withStartLoad({
+        status: "failed",
+        failedStep: "_start",
+        startLoad: startLoad({
+          status: "fail",
+          error: "net::ERR_NAME_NOT_RESOLVED",
+          screenshot_key: "shots/_start.png",
+        }),
+      }),
+    );
+
+    const row0 = w.find('[data-test="synthetics-journey-start-row"]');
+    expect(row0.exists(), "no start row rendered").toBe(true);
+    expect(row0.text()).toContain("net::ERR_NAME_NOT_RESOLVED");
+    expect(row0.find("img").exists()).toBe(true);
+    w.unmount();
+  });
+
+  it("renders a run with no start load exactly as before", async () => {
+    const w = await mountWithRun(withStartLoad({ startLoad: null }));
+
+    expect(w.find('[data-test="synthetics-journey-start-row"]').exists()).toBe(false);
+    expect(
+      w.find('[data-test="synthetics-run-detail-tab-steps"]').find(".obadge-stub").text(),
+    ).toBe("1");
+    expect(w.find('[data-test="o2-table-row-0"]').text()).toContain("Click Sign In");
+    w.unmount();
+  });
+
+  // The probe stops at the failure, so a start load that failed ran no Step at all.
+  it("renders row 0 alone when the start load failed before any Step ran", async () => {
+    const w = await mountWithRun(
+      withStartLoad({
+        status: "failed",
+        failedStep: "_start",
+        error: "net::ERR_NAME_NOT_RESOLVED",
+        lastAttemptSteps: [],
+        startLoad: startLoad({ status: "fail", error: "net::ERR_NAME_NOT_RESOLVED" }),
+        failureDetail: {
+          stepId: "_start",
+          stepName: "",
+          stepIndex: 0,
+          error: "net::ERR_NAME_NOT_RESOLVED",
+          candidatesTried: [],
+          settleSignals: [],
+          settleMs: null,
+          cls: 0,
+          ttfbMs: 0,
+        },
+      }),
+    );
+
+    const row0 = w.find('[data-test="synthetics-journey-start-row"]');
+    expect(row0.exists(), "no start row rendered").toBe(true);
+    expect(row0.text()).toContain("synthetics.runDetail.startLoadLabel https://app.test/");
+    expect(row0.text()).toContain("net::ERR_NAME_NOT_RESOLVED");
+    expect(
+      w
+        .findAll("[data-test]")
+        .filter((el) => /^o2-table-row-\d+$/.test(el.attributes("data-test")!)),
+    ).toHaveLength(0);
+    expect(
+      w.find('[data-test="synthetics-run-detail-tab-steps"]').find(".obadge-stub").text(),
+    ).toBe("0");
+    expect(w.find('[data-test="synthetics-run-detail-info-bar"]').text()).toContain(
+      "synthetics.runDetail.failedAtStartLoad",
+    );
+    w.unmount();
+  });
+
+  // Initial-load events are attributed to `_start`, which names no recorded Step.
+  it("names row 0's evidence by its label, never by the raw id", async () => {
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      text: async () =>
+        [
+          '{"ts":50,"kind":"console","level":"error","text":"boot failed","step_id":"_start"}',
+          '{"ts":200,"kind":"console","level":"error","text":"boom","step_id":"s1"}',
+        ].join("\n"),
+    })) as any;
+    const w = await mountWithRun(
+      withStartLoad({
+        status: "failed",
+        failedStep: "s1",
+        evidenceKey: "synthetics/org/mon/RUN/EXEC/evidence.ndjson",
+        lastAttemptSteps: [
+          { step_id: "s1", status: "fail", duration_ms: 300, error: "boom", screenshot_key: null },
+        ],
+      }),
+    );
+    w.findComponent(StepPageActivity).vm.$emit("view-all", "s1");
+    await flushPromises();
+
+    const panel = w.findComponent(EvidencePanel);
+    expect(panel.exists()).toBe(true);
+    const defs = panel.props("stepDefs") as Map<string, { name: string }>;
+    expect(defs.get("_start")?.name).toBe("synthetics.runDetail.startLoadLabel https://app.test/");
+    expect(panel.text()).not.toContain("_start");
+    w.unmount();
+  });
+});
+
+// ── Step outcomes and locators (ENT#3140 B2/B3) ──────────────────────────────
+describe("RunDetail — skipped / unknown steps and locators", () => {
+  const detail = {
+    ...mockRunDetail,
+    status: "failed",
+    recordedSteps: [
+      { id: "s1", action: "navigate", name: "Open home", url: "https://app.test/" },
+      {
+        id: "s2",
+        action: "click",
+        name: "Dismiss banner",
+        locator: { candidates: [{ kind: "role", value: "button[name=Close]" }] },
+      },
+      { id: "s3", action: "click", name: "Sign in", selector: "#signin" },
+      { id: "s4", action: "wait", name: "Settle" },
+    ],
+    lastAttemptSteps: [
+      { step_id: "s1", status: "ok", duration_ms: 10, error: "", screenshot_key: null },
+      {
+        step_id: "s2",
+        status: "skipped",
+        duration_ms: 5,
+        error: "optional step: banner not present",
+        screenshot_key: null,
+      },
+      { step_id: "s3", status: "fail", duration_ms: 20, error: "timeout", screenshot_key: null },
+      { step_id: "s4", status: "weird", duration_ms: 1, error: "", screenshot_key: null },
+    ],
+  };
+
+  afterEach(() => {
+    mockRunDetailRef.value = { ...mockRunDetail };
+  });
+
+  async function mountWith() {
+    mockRunDetailRef.value = null;
+    const w = mountComponent();
+    await flushPromises();
+    mockRunDetailRef.value = { ...detail };
+    await flushPromises();
+    return w;
+  }
+
+  it("keeps pass, fail, skipped and unknown distinct", async () => {
+    const w = await mountWith();
+    const steps = (w.vm as any).steps;
+    expect(steps.map((s: any) => s.status)).toEqual(["pass", "skipped", "fail", "unknown"]);
+    expect((w.vm as any).stepDotState(steps[1])).toBe("skip");
+    // Unknown must never take the pass colour.
+    expect((w.vm as any).stepDotState(steps[3])).toBeUndefined();
+    expect((w.vm as any).stepStatusBadge(steps[1])?.label).toBe(
+      "synthetics.runDetail.stepStatusSkipped",
+    );
+    expect((w.vm as any).stepStatusBadge(steps[0])).toBeNull();
+    w.unmount();
+  });
+
+  it("shows the skipped count on the steps tab", async () => {
+    const w = await mountWith();
+    expect(w.find('[data-test="synthetics-run-detail-skipped-count"]').exists()).toBe(true);
+    w.unmount();
+  });
+
+  it("resolves the locator with effectiveSelector and never falls back to the step id", async () => {
+    const w = await mountWith();
+    const steps = (w.vm as any).steps;
+    expect(steps[1].selector).toBe("button[name=Close]");
+    expect(steps[2].selector).toBe("#signin");
+    expect(steps[0].selector).toBeNull();
+    expect(steps[3].selector).toBeNull();
+    expect(steps[3].detail).toBe("");
+    w.unmount();
+  });
+
+  it("renders Selector and Step ID on the failed step, and the skip reason when expanded", async () => {
+    const w = await mountWith();
+    // The failed step auto-expands.
+    expect(w.find('[data-test="synthetics-run-detail-step-selector"]').text()).toContain("#signin");
+    expect(w.find('[data-test="synthetics-run-detail-step-id"]').text()).toContain("s3");
+    (w.vm as any).handleUpdateExpanded(["2"]);
+    await flushPromises();
+    expect(w.find('[data-test="synthetics-run-detail-step-skip-reason"]').text()).toContain(
+      "banner not present",
+    );
     w.unmount();
   });
 });

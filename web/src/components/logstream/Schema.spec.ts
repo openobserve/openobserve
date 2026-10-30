@@ -18,6 +18,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 // @ts-ignore
 import store from "@/test/unit/helpers/store";
+import config from "@/aws-exports";
 
 const {
   mockToast,
@@ -54,16 +55,22 @@ vi.mock("@/composables/useStreams", () => ({
   }),
 }));
 
-vi.mock("@/services/stream", () => ({
-  default: {
-    schema: mockStreamServiceSchema,
-    list: mockStreamServiceList,
-    deleteFields: vi.fn().mockResolvedValue({ data: { code: 200 } }),
-    updateSettings: mockUpdateSettings,
-    nameList: vi.fn().mockResolvedValue({ data: [] }),
-    getStreamStats: vi.fn().mockResolvedValue({ data: {} }),
-  },
-}));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      schema: mockStreamServiceSchema,
+      list: mockStreamServiceList,
+      deleteFields: vi.fn().mockResolvedValue({ data: { code: 200 } }),
+      updateSettings: mockUpdateSettings,
+      nameList: vi.fn().mockResolvedValue({ data: [] }),
+      getStreamStats: vi.fn().mockResolvedValue({ data: {} }),
+    },
+  });
+});
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
 
 import LogStream from "@/components/logstream/schema.vue";
 
@@ -166,7 +173,14 @@ describe("Schema Component Tests", () => {
 
   // Additional comprehensive tests for schema.vue functions from lines 697-1784
   describe("Comprehensive Schema Function Tests", () => {
+    const originalIsEnterprise = (config as any).isEnterprise;
+
     beforeEach(async () => {
+      // The SDR column/action is shown locked (not hidden) in builds that
+      // don't unlock it — these tests exercise the unlocked action itself,
+      // so they need an entitled build. `columns` reads this once at setup,
+      // so it must be set before mount, not inside an individual `it`.
+      (config as any).isEnterprise = "true";
       mockGetStream.mockResolvedValue({
         name: "test-stream",
         storage_type: "s3",
@@ -242,6 +256,10 @@ describe("Schema Component Tests", () => {
         },
       });
       await flushPromises();
+    });
+
+    afterEach(() => {
+      (config as any).isEnterprise = originalIsEnterprise;
     });
 
     // Test 1: Component initialization with default values
@@ -1440,8 +1458,14 @@ describe("Schema Component Tests", () => {
     });
 
     let w: any;
+    const originalIsEnterprise = (config as any).isEnterprise;
 
     beforeEach(async () => {
+      // The pattern-association drawer's trigger is shown locked (not
+      // hidden) in builds that don't unlock it — `columns` reads this once
+      // at setup, so it must be set before mount, not inside an individual
+      // `it`. These tests exercise opening the drawer itself.
+      (config as any).isEnterprise = "true";
       w = mount(LogStream, {
         props: buildProps(true),
         global: {
@@ -1456,6 +1480,7 @@ describe("Schema Component Tests", () => {
     afterEach(() => {
       w?.unmount();
       vi.clearAllMocks();
+      (config as any).isEnterprise = originalIsEnterprise;
     });
 
     it("should render both ODrawer instances (schema drawer + pattern association drawer)", () => {
@@ -2307,6 +2332,68 @@ describe("Schema Component Tests", () => {
       expect(wrapper.vm.confirmQueryModeChangeDialog).toBe(false);
     });
 
+    const findConfirmDialog = (title: string) =>
+      wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((d: any) => d.props("title") === title)!;
+
+    it("shows the selected field count in a red Delete Fields dialog", async () => {
+      wrapper.vm.selectedFields = [{ name: "message" }, { name: "level" }];
+      await wrapper.vm.$nextTick();
+      await wrapper.find('[data-test="schema-delete-button"]').trigger("click");
+      await flushPromises();
+
+      expect(wrapper.vm.confirmQueryModeChangeDialog).toBe(true);
+      const dialog = findConfirmDialog("Delete Fields");
+      expect(dialog.props("message")).toBe(
+        "Are you sure you want to delete 2 fields? This action cannot be undone.",
+      );
+      expect(dialog.props("okVariant")).toBe("destructive");
+    });
+
+    it("uses the singular form and keeps the count after the selection clears", async () => {
+      wrapper.vm.selectedFields = [{ name: "message" }];
+      wrapper.vm.openDeleteConfirm();
+      wrapper.vm.selectedFields = [];
+      await flushPromises();
+
+      expect(findConfirmDialog("Delete Field").props("message")).toBe(
+        "Are you sure you want to delete 1 field? This action cannot be undone.",
+      );
+    });
+
+    it("counts the selected fields in the footer in the singular and the plural", async () => {
+      wrapper.vm.activeMainTab = "schemaSettings";
+      wrapper.vm.selectedFields = [{ name: "message" }];
+      await flushPromises();
+      const footer = () => wrapper.find('[data-test="schema-fields-selected-count"]');
+      expect(footer().text()).toBe("1 field selected");
+      expect(footer().find("strong").text()).toBe("1");
+
+      wrapper.vm.selectedFields = [{ name: "message" }, { name: "level" }];
+      await flushPromises();
+      expect(footer().text()).toBe("2 fields selected");
+    });
+
+    it("shows the selected date range count in a red Delete Dates dialog", async () => {
+      wrapper.vm.activeMainTab = "redButton";
+      wrapper.vm.selectedDateFields = [
+        { index: 0, original_start: 1, original_end: 2 },
+        { index: 1, original_start: 3, original_end: 4 },
+        { index: 2, original_start: 5, original_end: 6 },
+      ];
+      wrapper.vm.openDeleteConfirm();
+      wrapper.vm.selectedDateFields = [];
+      await flushPromises();
+
+      expect(wrapper.vm.confirmDeleteDatesDialog).toBe(true);
+      const dialog = findConfirmDialog("Delete Dates");
+      expect(dialog.props("message")).toBe(
+        "Are you sure you want to delete 3 date ranges? This action cannot be undone.",
+      );
+      expect(dialog.props("okVariant")).toBe("destructive");
+    });
+
     it("should handle deleteFields error gracefully", async () => {
       vi.hoisted(() => ({
         mockStreamServiceDeleteFields: vi.fn(),
@@ -2681,6 +2768,48 @@ describe("Schema Component Tests", () => {
     });
   });
 
+  describe("Pattern count label", () => {
+    const originalIsEnterprise = (config as any).isEnterprise;
+    let w: any;
+
+    beforeEach(() => {
+      (config as any).isEnterprise = "true";
+    });
+
+    afterEach(() => {
+      w?.unmount();
+      (config as any).isEnterprise = originalIsEnterprise;
+    });
+
+    it.each([
+      [1, "View 1 Pattern"],
+      [2, "View 2 Patterns"],
+    ])("labels %i pattern(s) as %s", async (count, label) => {
+      mockGetStream.mockResolvedValue({
+        name: "test-stream",
+        stream_type: "logs",
+        stats: {},
+        schema: [{ name: "message", type: "Utf8" }],
+        settings: { full_text_search_keys: [], index_fields: [], bloom_filter_fields: [] },
+        pattern_associations: Array.from({ length: count }, (_, i) => ({
+          field: "message",
+          pattern_name: `p${i}`,
+          pattern_id: `id${i}`,
+          policy: "Redact",
+          apply_at: "AtIngestion",
+        })),
+      });
+      w = mount(LogStream, {
+        props: { open: true, modelValue: { name: "test-stream", stream_type: "logs", schema: [] } },
+        global: { provide: { store }, plugins: [i18n], stubs: { ODrawer: ODrawerStub } },
+      });
+      await flushPromises();
+      const action = w.find('[data-test="schema-field-message-pattern-action"]');
+      expect(action.exists()).toBe(true);
+      expect(action.text().trim()).toBe(label);
+    });
+  });
+
   // ==========================================
   // Phase 2 tests — OTable selection syncing
   // ==========================================
@@ -2887,6 +3016,43 @@ describe("Schema Component Tests", () => {
           }),
         }),
       );
+    });
+
+    it("tracks cross_link_saved once a save with changed cross-links succeeds", async () => {
+      wrapper.vm.streamCrossLinks = [
+        { name: "new-link", url: "https://example.com", fields: ["_timestamp"] },
+      ];
+      mockUpdateSettings.mockResolvedValue({ data: { code: 200 } });
+
+      await wrapper.vm.onSubmit();
+      await flushPromises();
+
+      expect(analytics.track).toHaveBeenCalledWith("cross_link_saved", { scope: "stream" });
+    });
+
+    it("does not track cross_link_saved when the cross-links are unchanged", async () => {
+      vi.mocked(analytics.track).mockClear();
+      mockUpdateSettings.mockResolvedValue({ data: { code: 200 } });
+
+      await wrapper.vm.onSubmit();
+      await flushPromises();
+
+      expect(mockUpdateSettings).toHaveBeenCalled();
+      expect(analytics.track).not.toHaveBeenCalledWith("cross_link_saved", expect.anything());
+    });
+
+    it("does not track cross_link_saved when the save fails", async () => {
+      vi.mocked(analytics.track).mockClear();
+      wrapper.vm.streamCrossLinks = [
+        { name: "new-link", url: "https://example.com", fields: ["_timestamp"] },
+      ];
+      mockUpdateSettings.mockRejectedValueOnce({ response: { data: { message: "boom" } } });
+
+      await wrapper.vm.onSubmit();
+      await flushPromises();
+
+      expect(mockUpdateSettings).toHaveBeenCalled();
+      expect(analytics.track).not.toHaveBeenCalledWith("cross_link_saved", expect.anything());
     });
   });
 
@@ -3873,7 +4039,7 @@ describe("Schema Component Tests", () => {
     });
 
     it("should block onSubmit when a field has no data type", async () => {
-      // The data-type select is visible + required in the Add Field(s) card, so a
+      // The data-type select is visible + required in the Add Fields card, so a
       // row with a valid name but no type also blocks the save.
       wrapper.vm.isDialogOpen = true;
       wrapper.vm.newSchemaFieldsForm.setFieldValue("newSchemaFields", [
@@ -3892,7 +4058,7 @@ describe("Schema Component Tests", () => {
     });
 
     it("should save on Enter from a field-name input", async () => {
-      // Enter in the Add Field(s) name input triggers the settings save (the
+      // Enter in the Add Fields name input triggers the settings save (the
       // nested <form> otherwise swallows Enter with 2+ rows).
       wrapper.vm.isDialogOpen = true;
       wrapper.vm.newSchemaFieldsForm.setFieldValue("newSchemaFields", [

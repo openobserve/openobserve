@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // HTTP request + assertions card. Edits `check.http` and re-emits the whole
 // check — same update:check contract as the other configure sections.
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { HttpCheckConfig, ProtocolCheck } from "@/types/synthetics";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -27,10 +27,10 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
-const props = defineProps<{ check: ProtocolCheck }>();
+const props = defineProps<{ check: ProtocolCheck; validationErrors?: Record<string, string> }>();
 const emit = defineEmits<{ "update:check": [value: ProtocolCheck] }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const cfg = computed<HttpCheckConfig>(() => props.check.http!);
 
@@ -40,7 +40,7 @@ function update(patch: Partial<HttpCheckConfig>) {
 
 // Server-side whitelist (validate_config)
 const METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"];
-const methodOptions = METHODS.map((m) => ({ label: m, value: m }));
+const methodOptions = METHODS.map((m) => ({ label: raw(m), value: m }));
 
 const ASSERTION_FIELDS = ["status_code", "body", "response_time_ms"] as const;
 const fieldOptions = computed(() =>
@@ -100,7 +100,7 @@ function removeAssertion(index: number) {
 <template>
   <div class="rounded-default border-border-default mb-4 border">
     <div class="border-border-default flex items-center border-b px-3 py-2.5">
-      <div class="rounded-default bg-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+      <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0" />
       <h3 class="text-text-heading text-base font-semibold">
         {{ t("synthetics.protocolConfig.http.title") }}
       </h3>
@@ -150,6 +150,8 @@ function removeAssertion(index: number) {
             <OInput
               :model-value="h.value"
               :placeholder="t('synthetics.protocolConfig.http.headerValue')"
+              :error="!!validationErrors?.[`http.headers.${i}.value`]"
+              :error-message="raw(validationErrors?.[`http.headers.${i}.value`])"
               :data-test="`synthetics-check-http-header-value-${i}`"
               @update:model-value="
                 (v: string | number) =>

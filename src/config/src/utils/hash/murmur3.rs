@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{hash::Hasher, io::Cursor};
+use std::io::Cursor;
 
 use murmur3::murmur3_x64_128;
 
@@ -23,10 +23,6 @@ pub struct Mr3 {}
 
 pub fn new() -> Mr3 {
     Mr3 {}
-}
-
-pub fn new_hasher() -> impl Hasher {
-    ahash::AHasher::default()
 }
 
 impl Sum64 for Mr3 {
@@ -61,20 +57,6 @@ mod tests {
     }
 
     #[test]
-    fn test_murmur3_new_hasher_produces_consistent_hash() {
-        use std::hash::Hasher;
-        let mut hasher1 = new_hasher();
-        hasher1.write(b"test");
-        let hash1 = hasher1.finish();
-
-        let mut hasher2 = new_hasher();
-        hasher2.write(b"test");
-        let hash2 = hasher2.finish();
-
-        assert_eq!(hash1, hash2);
-    }
-
-    #[test]
     fn test_murmur3_empty_string() {
         let mut h = new();
         let sum = h.sum64("");
@@ -86,14 +68,5 @@ mod tests {
         let mut h = new();
         assert_ne!(h.sum64("abc"), h.sum64("def"));
         assert_ne!(h.sum64("abc"), h.sum64("abcd"));
-    }
-
-    #[test]
-    fn test_murmur3_new_hasher_empty_write() {
-        use std::hash::Hasher;
-        let mut hasher = new_hasher();
-        hasher.write(b"");
-        let hash = hasher.finish();
-        assert_eq!(hash, hash);
     }
 }

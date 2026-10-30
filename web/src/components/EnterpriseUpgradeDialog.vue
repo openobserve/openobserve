@@ -27,7 +27,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- Close Button -->
       <div class="text-text-secondary hover:text-text-body absolute top-4 right-4 z-100">
-        <OButton variant="ghost" size="icon" @click="showDialog = false">
+        <OButton
+          :aria-label="t('common.close')"
+          variant="ghost"
+          size="icon"
+          @click="showDialog = false"
+        >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="14"
@@ -56,9 +61,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="hero-panel relative flex min-h-0 [flex:0_0_35%] flex-col overflow-y-auto bg-[linear-gradient(135deg,var(--color-theme-accent)_0%,color-mix(in_srgb,var(--color-theme-accent)_85%,black_15%)_100%)] p-10 text-white max-[56.25rem]:min-h-100 max-[56.25rem]:flex-none"
         >
           <div class="m-auto flex w-full max-w-100 flex-1 flex-col items-center justify-center">
+            <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
             <div
               class="rounded-default mb-6 flex h-20 w-20 items-center justify-center bg-[rgba(255,255,255,0.15)] backdrop-blur-[10px]"
             >
+              <!-- eslint-enable local/no-hardcoded-px -->
               <OIcon name="workspace-premium" size="xl" />
             </div>
 
@@ -82,26 +89,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OSkeleton
                   class="rounded-default shrink-0"
-                  style="width: 200px; height: 44px"
+                  style="width: 12.5rem; height: 2.75rem"
                   data-test="enterprise-upgrade-offer-badge-skeleton"
                 />
               </template>
 
               <!-- Loaded State: Show actual data -->
               <template v-else>
+                <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling shadow and blur with text makes elevation bloom -->
                 <div
                   data-test="enterprise-upgrade-offer-badge"
-                  class="rounded-default inline-flex items-center bg-[linear-gradient(135deg,#22c55e_0%,#4ade80_100%)] px-5 py-2.5 text-sm font-bold text-white shadow-[0_4px_16px_rgba(34,197,94,0.4)] backdrop-blur-[10px]"
+                  class="rounded-default shadow-success-500/40 inline-flex items-center bg-[linear-gradient(135deg,#22c55e_0%,#4ade80_100%)] px-5 py-2.5 text-sm font-bold text-white shadow-lg backdrop-blur-[10px]"
                   :class="{
-                    'bg-[rgba(255,255,255,0.2)]! shadow-[0_4px_12px_rgba(0,0,0,0.15)]!':
-                      dialogConfig.isLicensed,
+                    'bg-[rgba(255,255,255,0.2)]! shadow-md!': dialogConfig.isLicensed,
                   }"
                 >
+                  <!-- eslint-enable local/no-hardcoded-px -->
                   <OIcon
                     v-if="!dialogConfig.showUsageIndicator"
                     :name="dialogConfig.badgeIcon"
                     size="md"
-                    class="mr-1"
+                    class="me-1"
                   />
                   <span>{{ dialogConfig.badgeText }}</span>
                 </div>
@@ -109,15 +117,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Usage Chart (only for Enterprise with license) -->
+            <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling the backdrop blur with text makes elevation bloom -->
             <div
               v-if="dialogConfig.isLicensed"
               class="rounded-default mb-6 w-full border border-[rgba(255,255,255,0.2)] bg-[rgba(255,255,255,0.1)] p-4 backdrop-blur-[10px]"
             >
+              <!-- eslint-enable local/no-hardcoded-px -->
               <!-- Loading skeleton -->
               <template v-if="isLoadingLicense">
                 <OSkeleton
                   class="chart-skeleton rounded-default"
-                  style="height: 150px"
+                  style="height: 9.375rem"
                   data-test="enterprise-upgrade-chart-skeleton"
                 />
               </template>
@@ -126,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="relative w-full">
                   <div
                     class="usage-chart-container mx-auto max-h-37.5 min-h-37.5 w-full overflow-visible p-0"
-                    style="height: 150px"
+                    style="height: 9.375rem"
                   >
                     <ChartRenderer :key="dashboardRenderKey" :data="chartData" />
                   </div>
@@ -142,14 +152,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <div class="flex w-full flex-col gap-3">
+              <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — shadow offsets/blurs and the 1px active-press nudge must not scale with text -->
               <OButton
                 v-if="dialogConfig.showPrimaryButton"
                 variant="on-dark-primary"
                 size="lg"
                 @click="handlePrimaryButtonClick"
                 data-test="enterprise-upgrade-download-btn"
-                class="rounded-default! bg-white! px-8 py-2.5 text-sm font-bold! [letter-spacing:0.3px] text-[var(--color-theme-accent)]! shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-all duration-300 [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] hover:[transform:translateY(-3px)_scale(1.02)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.25)] active:[transform:translateY(-1px)_scale(0.98)]"
+                class="rounded-default! text-theme-accent! bg-white! px-8 py-2.5 text-sm font-bold! [letter-spacing:0.01875rem] shadow-md transition-all duration-300 [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] hover:[transform:translateY(-0.1875rem)_scale(1.02)] hover:shadow-lg active:[transform:translateY(-1px)_scale(0.98)]"
               >
+                <!-- eslint-enable local/no-hardcoded-px -->
                 {{ dialogConfig.primaryButtonText }}
                 <template v-if="dialogConfig.primaryButtonIcon" #icon-right>
                   <OIcon :name="dialogConfig.primaryButtonIcon" size="sm" />
@@ -160,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="on-dark-ghost"
                 size="lg"
                 @click="contactSales"
-                class="rounded-default! border-2 border-[rgba(255,255,255,0.3)] bg-transparent px-6 py-2.5 text-sm font-semibold! [letter-spacing:0.2px] transition-all duration-300 hover:[transform:translateX(4px)] hover:border-[rgba(255,255,255,0.5)] hover:bg-[rgba(255,255,255,0.15)] active:[transform:scale(0.96)]"
+                class="rounded-default! border-2 border-[rgba(255,255,255,0.3)] bg-transparent px-6 py-2.5 text-sm font-semibold! [letter-spacing:0.0125rem] transition-all duration-300 hover:[transform:translateX(0.25rem)] hover:border-[rgba(255,255,255,0.5)] hover:bg-[rgba(255,255,255,0.15)] active:[transform:scale(0.96)]"
               >
                 {{ t("about.enterprise_offer.buttons.contact_sales") }}
               </OButton>
@@ -170,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="lg"
                 @click="openDocsLink"
                 data-test="enterprise-upgrade-learn-more-btn"
-                class="rounded-default! border-2 border-[rgba(255,255,255,0.3)] bg-transparent px-6 py-2.5 text-sm font-semibold! [letter-spacing:0.2px] transition-all duration-300 hover:[transform:translateX(4px)] hover:border-[rgba(255,255,255,0.5)] hover:bg-[rgba(255,255,255,0.15)] active:[transform:scale(0.96)]"
+                class="rounded-default! border-2 border-[rgba(255,255,255,0.3)] bg-transparent px-6 py-2.5 text-sm font-semibold! [letter-spacing:0.0125rem] transition-all duration-300 hover:[transform:translateX(0.25rem)] hover:border-[rgba(255,255,255,0.5)] hover:bg-[rgba(255,255,255,0.15)] active:[transform:scale(0.96)]"
               >
                 {{ t("about.enterprise_offer.buttons.learn_more") }}
               </OButton>
@@ -179,192 +191,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Right Panel - Features List -->
-        <div
-          class="bg-surface-base flex flex-1 flex-col overflow-hidden"
-          :class="[{ 'max-w-full': dialogConfig.isCloudLayout }]"
-        >
-          <div
-            class="bg-surface-base border-border-default sticky top-0 z-10 border-b px-8 pt-4 pb-3 text-center"
-          >
-            <div
-              data-test="enterprise-upgrade-features-title"
-              class="text-text-heading mb-1 text-lg font-bold [letter-spacing:-0.3px]"
-            >
-              {{ dialogConfig.featuresTitle }}
-            </div>
-            <div class="text-text-secondary text-xs font-medium">
-              {{ dialogConfig.featuresSubtitle }}
-            </div>
-          </div>
-
-          <!-- Cloud 3-column layout -->
-          <div
-            v-if="dialogConfig.isCloudLayout"
-            data-test="enterprise-upgrade-features-list-cloud"
-            class="grid flex-1 grid-cols-3 content-start gap-x-[14px] gap-y-[7px] overflow-y-auto px-8 pt-2 pb-4"
-          >
-            <!-- Column 1: Core Features -->
-            <div
-              v-for="feature in coreFeatures"
-              :key="feature.name"
-              data-test="enterprise-upgrade-feature-item"
-              class="rounded-default flex gap-2.5 border p-[8px_12px] transition-all duration-200"
-              :class="[
-                'border-border-default',
-                feature.link
-                  ? isDark
-                    ? 'cursor-pointer hover:[transform:translateX(2px)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_40%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] active:[transform:translateX(0)]'
-                    : 'cursor-pointer hover:[transform:translateX(2px)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)] active:[transform:translateX(0)]'
-                  : isDark
-                    ? 'hover:bg-[rgba(255,255,255,0.05)]'
-                    : 'hover:border-[rgba(0,0,0,0.12)] hover:bg-[rgba(0,0,0,0.03)]',
-              ]"
-              @click="feature.link && openFeatureLink(feature.link)"
-            >
-              <div
-                class="rounded-default flex h-7.5 w-7.5 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] text-[var(--color-theme-accent)] dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]"
-              >
-                <OIcon :name="feature.icon" size="sm" />
-              </div>
-              <div class="min-w-0 flex-1">
-                <div
-                  class="text-compact mb-0.5 flex items-center gap-1.5 leading-[1.25] font-semibold"
-                  :class="'text-text-heading'"
-                >
-                  {{ feature.name }}
-                  <OIcon
-                    v-if="feature.link"
-                    name="open-in-new"
-                    size="xs"
-                    class="ml-1 align-middle opacity-60"
-                  />
-                </div>
-                <div class="text-2xs leading-[1.25]" :class="'text-text-secondary'">
-                  {{ feature.note }}
-                </div>
-              </div>
-            </div>
-
-            <!-- Columns 2 & 3: Enterprise Features -->
-            <div
-              v-for="feature in enterpriseFeatures"
-              v-show="!feature.cloudHidden"
-              :key="feature.name"
-              data-test="enterprise-upgrade-feature-item"
-              class="rounded-default flex gap-2.5 border p-[8px_12px] transition-all duration-200"
-              :class="[
-                'border-border-default',
-                feature.link
-                  ? isDark
-                    ? 'cursor-pointer hover:[transform:translateX(2px)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_40%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] active:[transform:translateX(0)]'
-                    : 'cursor-pointer hover:[transform:translateX(2px)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)] active:[transform:translateX(0)]'
-                  : isDark
-                    ? 'hover:bg-[rgba(255,255,255,0.05)]'
-                    : 'hover:border-[rgba(0,0,0,0.12)] hover:bg-[rgba(0,0,0,0.03)]',
-              ]"
-              @click="feature.link && openFeatureLink(feature.link)"
-            >
-              <div
-                class="rounded-default flex h-7.5 w-7.5 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] text-[var(--color-theme-accent)] dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]"
-              >
-                <OIcon :name="feature.icon" size="sm" />
-              </div>
-              <div class="min-w-0 flex-1">
-                <div
-                  class="text-compact mb-0.5 flex items-center gap-1.5 leading-[1.25] font-semibold"
-                  :class="'text-text-heading'"
-                >
-                  {{ feature.name }}
-                  <OIcon
-                    v-if="feature.link"
-                    name="open-in-new"
-                    size="xs"
-                    class="ml-1 align-middle opacity-60"
-                  />
-                  <OTag
-                    v-if="feature.beta"
-                    type="featureFlag"
-                    value="beta"
-                    data-test="enterprise-upgrade-feature-beta-badge"
-                  />
-                </div>
-                <div class="text-2xs leading-[1.25]" :class="'text-text-secondary'">
-                  {{ feature.note }}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Standard 2-column layout for non-Cloud -->
-          <div
-            v-else
-            data-test="enterprise-upgrade-features-list-standard"
-            class="grid flex-1 grid-cols-2 content-start gap-x-[14px] gap-y-[7px] overflow-y-auto px-8 pt-2 pb-4"
-          >
-            <div
-              v-for="feature in enterpriseFeatures"
-              v-show="!feature.cloudOnly"
-              :key="feature.name"
-              data-test="enterprise-upgrade-feature-item"
-              class="rounded-default flex gap-2.5 border p-[8px_12px] transition-all duration-200"
-              :class="[
-                'border-border-default',
-                feature.link
-                  ? isDark
-                    ? 'cursor-pointer hover:[transform:translateX(2px)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_40%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] active:[transform:translateX(0)]'
-                    : 'cursor-pointer hover:[transform:translateX(2px)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)] active:[transform:translateX(0)]'
-                  : isDark
-                    ? 'hover:bg-[rgba(255,255,255,0.05)]'
-                    : 'hover:border-[rgba(0,0,0,0.12)] hover:bg-[rgba(0,0,0,0.03)]',
-              ]"
-              @click="feature.link && openFeatureLink(feature.link)"
-            >
-              <div
-                class="rounded-default flex h-7.5 w-7.5 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] text-[var(--color-theme-accent)] dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]"
-              >
-                <OIcon :name="feature.icon" size="sm" />
-              </div>
-              <div class="min-w-0 flex-1">
-                <div
-                  data-test="enterprise-upgrade-feature-name"
-                  class="text-compact mb-0.5 flex items-center gap-1.5 leading-[1.25] font-semibold"
-                  :class="'text-text-heading'"
-                >
-                  {{ feature.name }}
-                  <OIcon
-                    v-if="feature.link"
-                    name="open-in-new"
-                    size="xs"
-                    data-test="enterprise-upgrade-feature-external-link"
-                    class="ml-1 align-middle opacity-60"
-                  />
-                  <OTag
-                    v-if="feature.beta"
-                    type="featureFlag"
-                    value="beta"
-                    data-test="enterprise-upgrade-feature-beta-badge"
-                  />
-                  <span v-if="feature.requiresHA" class="inline-flex">
-                    <OTag
-                      type="featureFlag"
-                      value="ha"
-                      data-test="enterprise-upgrade-feature-ha-badge"
-                    />
-                    <OTooltip
-                      side="top"
-                      align="center"
-                      :sideOffset="8"
-                      :content="t('about.enterprise_offer.tooltip.high_availability_mode_only')"
-                    />
-                  </span>
-                </div>
-                <div class="text-2xs leading-[1.25]" :class="'text-text-secondary'">
-                  {{ feature.note }}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <EnterpriseOfferFeatureGrid
+          :is-cloud-layout="dialogConfig.isCloudLayout"
+          :features-title="dialogConfig.featuresTitle"
+          :features-subtitle="dialogConfig.featuresSubtitle"
+          :core-features="coreFeatures"
+          :enterprise-features="enterpriseFeatures"
+          :is-dark="isDark"
+        />
       </div>
     </div>
   </ODialog>
@@ -373,63 +207,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed, watch, defineAsyncComponent } from "vue";
 import { useStore } from "vuex";
-import { useTheme } from "@/composables/useTheme";
-import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
-import config from "@/aws-exports";
-import licenseServer from "@/services/license_server";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
-import { toast } from "@/lib/feedback/Toast/useToast";
+import EnterpriseOfferFeatureGrid from "@/components/EnterpriseOfferFeatureGrid.vue";
+import { useEnterpriseOfferContent } from "@/composables/useEnterpriseOfferContent";
 
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue"),
 );
-
-// Feature documentation links configuration
-const FEATURE_DOCS_BASE_URL = "https://o2.ws/";
-
-const FEATURE_LINKS = {
-  // Core Features
-  logs_metrics_traces: "logs_metrics_traces",
-  rum: "rum",
-  alerts: "alerts",
-  dashboards: "dashboards",
-  reports: "reports",
-  vrl_functions: "vrl_func",
-  pipelines: "pipelines",
-  high_availability: "high_avail",
-  multitenancy: "multitenancy",
-  dynamic_schema: "dynamic_schema",
-  multilingual_gui: "multilang_gui",
-
-  // Enterprise Features
-  single_sign_on: "sso",
-  rbac: "rbac",
-  federated_search: "fed_search",
-  query_management: "query_mgmt",
-  workload_management: "workload_mgmt",
-  audit_trail: "audit_trail",
-  sensitive_data_redaction: "data_redact",
-  pipeline_remote_destinations: "pipeline_remote",
-  query_optimizer: "query_opt",
-  incident_management: "incident_mgmt",
-  sre_agent: "sre_agent",
-  ai_assistant: "ai_assistant",
-  anomaly_detection: "anomaly_detect",
-  metrics_auto_downsampling: "metrics_downsample",
-  log_patterns: "log_patterns",
-  mcp_server: "mcp_server",
-  rate_limiting: "rate_limit",
-  broadcast_join: "broadcast_join",
-  logs_metrics_traces_correlation: "telemetry_corr",
-  service_maps: "service_maps",
-  byob: "byob",
-};
 
 export default defineComponent({
   name: "EnterpriseUpgradeDialog",
@@ -439,8 +227,7 @@ export default defineComponent({
     OButton,
     ODialog,
     OSkeleton,
-    OTooltip,
-    OTag,
+    EnterpriseOfferFeatureGrid,
   },
   props: {
     modelValue: {
@@ -452,486 +239,28 @@ export default defineComponent({
   setup(props, { emit }) {
     const showDialog = ref(props.modelValue);
     const store = useStore();
-    const router = useRouter();
-    const { t } = useI18n();
-    const licenseData = ref<any>(null);
-    const isLoadingLicense = ref(false);
+    const { t } = useI18nTyped();
     const chartData = ref<any>(null);
     const dashboardRenderKey = ref(0);
-
-    // Dark-mode flag from the sanctioned theme seam; used to toggle classes via
-    // :class bindings for the few genuinely theme-divergent (translucent) styles.
-    const { isDark } = useTheme();
-
-    // Fetch license data when dialog opens for Enterprise with license
-    const fetchLicenseData = async () => {
-      const isEnterprise = config.isEnterprise === "true";
-      const isCloud = config.isCloud === "true";
-      const hasLicense =
-        store.state.zoConfig?.license_expiry && store.state.zoConfig.license_expiry !== 0;
-
-      // Only fetch for Enterprise with license (not Cloud)
-      if (isEnterprise && hasLicense && !isCloud) {
-        isLoadingLicense.value = true;
-        try {
-          const response = await licenseServer.get_license();
-          licenseData.value = response.data;
-          // Generate dashboard after license data is fetched
-          generateUsageDashboard();
-        } catch (error) {
-          console.error("Failed to fetch license data:", error);
-          // On error, set default values (0% usage, unlimited)
-          licenseData.value = {
-            license: {
-              limits: {
-                Ingestion: {
-                  value: 0,
-                },
-              },
-            },
-            ingestion_used: 0,
-          };
-        } finally {
-          isLoadingLicense.value = false;
-        }
-      }
-    };
-
-    // Dialog configuration based on deployment type
-    const dialogConfig = computed(() => {
-      const isEnterprise = config.isEnterprise === "true";
-      const isCloud = config.isCloud === "true";
-      const hasLicense =
-        store.state.zoConfig?.license_expiry && store.state.zoConfig.license_expiry !== 0;
-
-      // Calculate ingestion quota limit for non-licensed enterprise
-      // Use ingestion_quota (the limit), not ingestion_quota_used (the usage percentage)
-      const ingestionQuota = store.state.zoConfig?.ingestion_quota ?? 50; // Use nullish coalescing to allow 0
-
-      // Get usage percentage for circular indicator (this is already a percentage)
-      const usagePercentage = store.state.zoConfig?.ingestion_quota_used ?? 0;
-
-      // Cloud (check this first because Cloud has both isCloud=true and isEnterprise=true)
-      if (isCloud) {
-        return {
-          heroTitle: t("about.enterprise_offer.cloud.hero_title"),
-          offerText: t("about.enterprise_offer.cloud.offer_text"),
-          badgeText: t("about.enterprise_offer.cloud.badge_text"),
-          badgeIcon: "bolt",
-          featuresTitle: t("about.enterprise_offer.cloud.features_title"),
-          featuresSubtitle: t("about.enterprise_offer.cloud.features_subtitle"),
-          primaryButtonText: t("about.enterprise_offer.cloud.primary_button_text"),
-          primaryButtonIcon: "download",
-          showPrimaryButton: true,
-          isCloudLayout: true,
-        };
-      }
-
-      // Enterprise without license
-      if (isEnterprise && !hasLicense) {
-        return {
-          heroTitle: t("about.enterprise_offer.enterprise_without_license.hero_title"),
-          offerText: t("about.enterprise_offer.enterprise_without_license.offer_text"),
-          badgeText: t("about.enterprise_offer.enterprise_without_license.badge_text", {
-            quota: ingestionQuota,
-          }),
-          badgeIcon: "data_usage",
-          showUsageIndicator: true,
-          usagePercentage: usagePercentage,
-          featuresTitle: t("about.enterprise_offer.enterprise_without_license.features_title"),
-          featuresSubtitle: t(
-            "about.enterprise_offer.enterprise_without_license.features_subtitle",
-          ),
-          primaryButtonText: t(
-            "about.enterprise_offer.enterprise_without_license.primary_button_text",
-          ),
-          primaryButtonIcon: "key",
-          showPrimaryButton: true,
-          showLicenseNote: true, // Show note about license limits
-          licenseNoteText: t("about.enterprise_offer.enterprise_without_license.license_note"),
-        };
-      }
-
-      // Enterprise with license
-      if (isEnterprise && hasLicense) {
-        // Calculate ingestion usage from license data
-        const ingestionLimit = licenseData.value?.license?.limits?.Ingestion?.value || 0;
-        const ingestionUsedPercentage = licenseData.value?.ingestion_used || 0;
-        const badgeText =
-          ingestionLimit > 0
-            ? t("about.enterprise_offer.enterprise_with_license.badge_text_limited", {
-                limit: ingestionLimit,
-              })
-            : t("about.enterprise_offer.enterprise_with_license.badge_text_unlimited");
-
-        return {
-          heroTitle: t("about.enterprise_offer.enterprise_with_license.hero_title"),
-          offerText: t("about.enterprise_offer.enterprise_with_license.offer_text"),
-          badgeText: badgeText,
-          badgeIcon: "verified",
-          showUsageIndicator: true,
-          usagePercentage: ingestionUsedPercentage,
-          featuresTitle: t("about.enterprise_offer.enterprise_with_license.features_title"),
-          featuresSubtitle: t("about.enterprise_offer.enterprise_with_license.features_subtitle"),
-          primaryButtonText: t(
-            "about.enterprise_offer.enterprise_with_license.primary_button_text",
-          ),
-          primaryButtonIcon: "key",
-          showPrimaryButton: true,
-          showContactSales: true,
-          isLicensed: true, // Flag to apply different badge styling
-        };
-      }
-
-      // Open Source (both false) - Default fallback
-      return {
-        heroTitle: t("about.enterprise_offer.open_source.hero_title"),
-        offerText: t("about.enterprise_offer.open_source.offer_text"),
-        badgeText: t("about.enterprise_offer.open_source.badge_text"),
-        badgeIcon: "card_giftcard",
-        featuresTitle: t("about.enterprise_offer.open_source.features_title"),
-        featuresSubtitle: t("about.enterprise_offer.open_source.features_subtitle"),
-        primaryButtonText: t("about.enterprise_offer.open_source.primary_button_text"),
-        primaryButtonIcon: "download",
-        showPrimaryButton: true,
-      };
-    });
-
-    // Core features list - available in all versions (for Cloud 3-column layout)
-    const coreFeatures = [
-      {
-        name: t("about.enterprise_offer.core_features.logs_metrics_traces.name"),
-        note: t("about.enterprise_offer.core_features.logs_metrics_traces.note"),
-        icon: "storage",
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.logs_metrics_traces,
-      },
-      {
-        name: t("about.enterprise_offer.core_features.rum.name"),
-        note: t("about.enterprise_offer.core_features.rum.note"),
-        icon: "visibility",
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.rum,
-      },
-      {
-        name: t("about.enterprise_offer.core_features.alerts.name"),
-        note: t("about.enterprise_offer.core_features.alerts.note"),
-        icon: "notifications-active",
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.alerts,
-      },
-      {
-        name: t("about.enterprise_offer.core_features.dashboards.name"),
-        note: t("about.enterprise_offer.core_features.dashboards.note"),
-        icon: "dashboard",
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.dashboards,
-      },
-      {
-        name: t("about.enterprise_offer.core_features.reports.name"),
-        note: t("about.enterprise_offer.core_features.reports.note"),
-        icon: "description",
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.reports,
-      },
-      {
-        name: t("about.enterprise_offer.core_features.vrl_functions.name"),
-        note: t("about.enterprise_offer.core_features.vrl_functions.note"),
-        icon: "functions",
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.vrl_functions,
-      },
-      {
-        name: t("about.enterprise_offer.core_features.pipelines.name"),
-        note: t("about.enterprise_offer.core_features.pipelines.note"),
-        icon: "account-tree",
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.pipelines,
-      },
-      {
-        name: t("about.enterprise_offer.core_features.high_availability.name"),
-        note: t("about.enterprise_offer.core_features.high_availability.note"),
-        icon: "cloud-done",
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.high_availability,
-      },
-      {
-        name: t("about.enterprise_offer.core_features.multitenancy.name"),
-        note: t("about.enterprise_offer.core_features.multitenancy.note"),
-        icon: "corporate-fare",
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.multitenancy,
-      },
-      {
-        name: t("about.enterprise_offer.core_features.dynamic_schema.name"),
-        note: t("about.enterprise_offer.core_features.dynamic_schema.note"),
-        icon: "schema",
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.dynamic_schema,
-      },
-      {
-        name: t("about.enterprise_offer.core_features.multilingual_gui.name"),
-        note: t("about.enterprise_offer.core_features.multilingual_gui.note"),
-        icon: "language",
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.multilingual_gui,
-      },
-    ];
-
-    // Enterprise features list - all 21 features
-    const enterpriseFeatures: {
-      name: string;
-      note: string;
-      icon: string;
-      link?: string;
-      requiresHA?: boolean;
-      beta?: boolean;
-      cloudOnly?: boolean;
-      cloudHidden?: boolean;
-    }[] = [
-      {
-        name: t("about.enterprise_offer.enterprise_features.single_sign_on.name"),
-        note: t("about.enterprise_offer.enterprise_features.single_sign_on.note"),
-        icon: "key",
-        requiresHA: true,
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.single_sign_on,
-      },
-      {
-        name: t("about.enterprise_offer.enterprise_features.rbac.name"),
-        note: t("about.enterprise_offer.enterprise_features.rbac.note"),
-        icon: "admin-panel-settings",
-        requiresHA: true,
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.rbac,
-      },
-      {
-        name: t("about.enterprise_offer.enterprise_features.federated_search.name"),
-        note: t("about.enterprise_offer.enterprise_features.federated_search.note"),
-        icon: "hub",
-        requiresHA: true,
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.federated_search,
-      },
-      {
-        name: t("about.enterprise_offer.enterprise_features.query_management.name"),
-        note: t("about.enterprise_offer.enterprise_features.query_management.note"),
-        icon: "insights",
-        requiresHA: false,
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.query_management,
-      },
-      {
-        name: t("about.enterprise_offer.enterprise_features.workload_management.name"),
-        note: t("about.enterprise_offer.enterprise_features.workload_management.note"),
-        icon: "speed",
-        requiresHA: false,
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.workload_management,
-      },
-      {
-        name: t("about.enterprise_offer.enterprise_features.audit_trail.name"),
-        note: t("about.enterprise_offer.enterprise_features.audit_trail.note"),
-        icon: "fact-check",
-        requiresHA: false,
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.audit_trail,
-      },
-      {
-        name: t("about.enterprise_offer.enterprise_features.sensitive_data_redaction.name"),
-        note: t("about.enterprise_offer.enterprise_features.sensitive_data_redaction.note"),
-        icon: "shield",
-        requiresHA: false,
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.sensitive_data_redaction,
-      },
-      {
-        name: t("about.enterprise_offer.enterprise_features.pipeline_remote_destinations.name"),
-        note: t("about.enterprise_offer.enterprise_features.pipeline_remote_destinations.note"),
-        icon: "alt-route",
-        requiresHA: false,
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.pipeline_remote_destinations,
-      },
-      {
-        name: t("about.enterprise_offer.enterprise_features.query_optimizer.name"),
-        note: t("about.enterprise_offer.enterprise_features.query_optimizer.note"),
-        icon: "memory",
-        requiresHA: false,
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.query_optimizer,
-      },
-      {
-        name: t("about.enterprise_offer.enterprise_features.incident_management.name"),
-        note: t("about.enterprise_offer.enterprise_features.incident_management.note"),
-        icon: "emergency",
-        requiresHA: true,
-        beta: true,
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.incident_management,
-      },
-      {
-        name: t("about.enterprise_offer.enterprise_features.sre_agent.name"),
-        note: t("about.enterprise_offer.enterprise_features.sre_agent.note"),
-        icon: "smart-toy",
-        requiresHA: true,
-        beta: true,
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.sre_agent,
-      },
-      {
-        name: t("about.enterprise_offer.enterprise_features.ai_assistant.name"),
-        note: t("about.enterprise_offer.enterprise_features.ai_assistant.note"),
-        icon: "psychology",
-        requiresHA: true,
-        beta: true,
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.ai_assistant,
-      },
-      {
-        name: t("about.enterprise_offer.enterprise_features.anomaly_detection.name"),
-        note: t("about.enterprise_offer.enterprise_features.anomaly_detection.note"),
-        icon: "query-stats",
-        requiresHA: false,
-        beta: true,
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.anomaly_detection,
-      },
-      {
-        name: t("about.enterprise_offer.enterprise_features.metrics_auto_downsampling.name"),
-        note: t("about.enterprise_offer.enterprise_features.metrics_auto_downsampling.note"),
-        icon: "compress",
-        requiresHA: false,
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.metrics_auto_downsampling,
-      },
-      {
-        name: t("about.enterprise_offer.enterprise_features.log_patterns.name"),
-        note: t("about.enterprise_offer.enterprise_features.log_patterns.note"),
-        icon: "pattern",
-        requiresHA: false,
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.log_patterns,
-      },
-      {
-        name: t("about.enterprise_offer.enterprise_features.mcp_server.name"),
-        note: t("about.enterprise_offer.enterprise_features.mcp_server.note"),
-        icon: "dns",
-        requiresHA: true,
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.mcp_server,
-      },
-      {
-        name: t("about.enterprise_offer.enterprise_features.rate_limiting.name"),
-        note: t("about.enterprise_offer.enterprise_features.rate_limiting.note"),
-        icon: "speed",
-        requiresHA: false,
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.rate_limiting,
-      },
-      {
-        name: t("about.enterprise_offer.enterprise_features.broadcast_join.name"),
-        note: t("about.enterprise_offer.enterprise_features.broadcast_join.note"),
-        icon: "call-merge",
-        requiresHA: true,
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.broadcast_join,
-      },
-      {
-        name: t("about.enterprise_offer.enterprise_features.logs_metrics_traces_correlation.name"),
-        note: t("about.enterprise_offer.enterprise_features.logs_metrics_traces_correlation.note"),
-        icon: "auto-graph",
-        requiresHA: false,
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.logs_metrics_traces_correlation,
-      },
-      {
-        name: t("about.enterprise_offer.enterprise_features.service_maps.name"),
-        note: t("about.enterprise_offer.enterprise_features.service_maps.note"),
-        icon: "account-tree",
-        requiresHA: false,
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.service_maps,
-      },
-      {
-        name: t("about.enterprise_offer.enterprise_features.byob.name"),
-        note: t("about.enterprise_offer.enterprise_features.byob.note"),
-        icon: "database",
-        requiresHA: false,
-        beta: true,
-        cloudOnly: true,
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.byob,
-      },
-    ];
 
     const onDialogHide = () => {
       emit("update:modelValue", false);
     };
 
-    const openDownloadPage = () => {
-      window.open("https://o2.ws/download_resources", "_blank");
-    };
-
-    const openDocsLink = () => {
-      const isEnterprise = config.isEnterprise === "true";
-      const isCloud = config.isCloud === "true";
-      const hasLicense =
-        store.state.zoConfig?.license_expiry && store.state.zoConfig.license_expiry !== 0;
-
-      let docsUrl = "https://openobserve.ai/docs/";
-
-      // Enterprise without license - redirect to license docs
-      if (isEnterprise && !hasLicense) {
-        docsUrl = "https://o2.ws/license_guide";
-      }
-      // Open Source or Cloud - redirect to enterprise edition installation guide
-      else if (!isEnterprise || isCloud) {
-        docsUrl = "https://o2.ws/ent_install_guide";
-      }
-
-      window.open(docsUrl, "_blank");
-    };
-
-    const contactSales = () => {
-      window.open("https://o2.ws/contact_us", "_blank");
-    };
-
-    const openFeatureLink = (url: string) => {
-      window.open(url, "_blank");
-    };
-
-    const navigateToLicense = () => {
-      // Get meta org identifier
-      const metaOrgIdentifier = store.state.zoConfig.meta_org;
-
-      // Find the meta org from the organizations list
-      const metaOrg = store.state.organizations?.find(
-        (org: any) => org.identifier === metaOrgIdentifier,
-      );
-
-      if (metaOrg) {
-        // Create the org option object so that it will be used to switch to meta org
-        const metaOrgOption = {
-          label: metaOrg.name,
-          id: metaOrg.id,
-          identifier: metaOrg.identifier,
-          user_email: store.state.userInfo.email,
-          ingest_threshold: metaOrg.ingest_threshold,
-          search_threshold: metaOrg.search_threshold,
-        };
-
-        // Set the selected organization using dispatch
-        store.dispatch("setSelectedOrganization", metaOrgOption);
-
-        // Close the dialog
-        emit("update:modelValue", false);
-
-        // Navigate to license page with the meta org identifier
-        router.push({
-          name: "license",
-          query: { org_identifier: metaOrgIdentifier },
-        });
-      } else {
-        // Show error notification when user doesn't have access to meta org
-        toast({
-          message: t("about.enterprise_offer.error_messages.not_authorized_manage_license"),
-          variant: "error",
-        });
-      }
-    };
-
-    const handlePrimaryButtonClick = () => {
-      const isEnterprise = config.isEnterprise === "true";
-      const isCloud = config.isCloud === "true";
-      const hasLicense =
-        store.state.zoConfig?.license_expiry && store.state.zoConfig.license_expiry !== 0;
-
-      // Cloud - open download page
-      if (isCloud) {
-        openDownloadPage();
-      }
-      // Enterprise with license - navigate to license page
-      else if (isEnterprise && hasLicense) {
-        navigateToLicense();
-      }
-      // Enterprise without license - navigate to license page
-      else if (isEnterprise && !hasLicense) {
-        navigateToLicense();
-      }
-      // Open Source - open download page
-      else {
-        openDownloadPage();
-      }
-    };
+    const {
+      dialogConfig,
+      coreFeatures,
+      enterpriseFeatures,
+      isDark,
+      licenseData,
+      isLoadingLicense,
+      fetchLicenseData,
+      openDownloadPage,
+      openDocsLink,
+      contactSales,
+      navigateToLicense,
+      handlePrimaryButtonClick,
+    } = useEnterpriseOfferContent({ onBeforeNavigateAway: onDialogHide });
 
     // Function to get progress color based on percentage
     const getProgressColor = (percentage: number): string => {
@@ -1174,13 +503,17 @@ export default defineComponent({
                   return date.getDate() === parseInt(dayNum);
                 });
 
+                // The <br/> stays in code — each line is a whole translated
+                // sentence, so the markup never has to live in a message.
+                const usageLine = t("about.usageChartUsage", { value: formattedValue });
                 if (matchingEntry) {
                   const fullDate = new Date(matchingEntry.ts);
                   const monthName = fullDate.toLocaleString("default", { month: "short" });
-                  return `${monthName} ${dayNum}<br/>Usage: ${formattedValue}`;
+                  const dateLine = t("about.usageChartDate", { month: monthName, day: dayNum });
+                  return `${dateLine}<br/>${usageLine}`;
                 }
 
-                return `Day ${dayNum}<br/>Usage: ${formattedValue}`;
+                return `${t("about.usageChartDay", { day: dayNum })}<br/>${usageLine}`;
               },
             },
             animation: true,
@@ -1193,10 +526,10 @@ export default defineComponent({
       }
     };
 
-    // Watch for dialog opening to fetch license data
+    // Watch for dialog opening to fetch license data, then redraw the usage chart
     watch(showDialog, (newVal) => {
       if (newVal) {
-        fetchLicenseData();
+        fetchLicenseData().then(generateUsageDashboard);
       }
     });
 
@@ -1209,7 +542,6 @@ export default defineComponent({
       openDownloadPage,
       openDocsLink,
       contactSales,
-      openFeatureLink,
       navigateToLicense,
       handlePrimaryButtonClick,
       getProgressColor,

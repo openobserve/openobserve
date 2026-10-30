@@ -21,71 +21,78 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import organizationsService from "@/services/organizations";
 import apiKeysService from "@/services/api_keys";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
+import { queryClient } from "@/composables/query/queryClient";
 
 // Mock services with default resolved values
-vi.mock("@/services/organizations", () => ({
-  default: {
-    get_organization_passcode: vi.fn(() =>
-      Promise.resolve({
-        data: {
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_organization_passcode: vi.fn(() =>
+        Promise.resolve({
           data: {
-            token: "default-token",
-            passcode: "default-passcode",
+            data: {
+              token: "default-token",
+              passcode: "default-passcode",
+            },
           },
-        },
-      }),
-    ),
-    update_organization_passcode: vi.fn(() =>
-      Promise.resolve({
-        data: {
+        }),
+      ),
+      update_organization_passcode: vi.fn(() =>
+        Promise.resolve({
           data: {
-            token: "updated-token",
-            passcode: "updated-passcode",
+            data: {
+              token: "updated-token",
+              passcode: "updated-passcode",
+            },
           },
-        },
-      }),
-    ),
-    list_org_ingestion_tokens: vi.fn(() =>
-      Promise.resolve({
-        data: {
-          data: [],
-        },
-      }),
-    ),
-  },
-}));
+        }),
+      ),
+      list_org_ingestion_tokens: vi.fn(() =>
+        Promise.resolve({
+          data: {
+            data: [],
+          },
+        }),
+      ),
+    },
+  });
+});
 
-vi.mock("@/services/api_keys", () => ({
-  default: {
-    createRUMToken: vi.fn(() =>
-      Promise.resolve({
-        data: {
+vi.mock("@/services/api_keys", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      createRUMToken: vi.fn(() =>
+        Promise.resolve({
           data: {
-            new_key: "default-rum-token",
+            data: {
+              new_key: "default-rum-token",
+            },
           },
-        },
-      }),
-    ),
-    updateRUMToken: vi.fn(() =>
-      Promise.resolve({
-        data: { success: true },
-      }),
-    ),
-    listRUMTokens: vi.fn(() =>
-      Promise.resolve({
-        data: {
+        }),
+      ),
+      updateRUMToken: vi.fn(() =>
+        Promise.resolve({
+          data: { success: true },
+        }),
+      ),
+      listRUMTokens: vi.fn(() =>
+        Promise.resolve({
           data: {
-            rum_token: "default-rum-token",
-            id: "default-rum-id",
+            data: {
+              rum_token: "default-rum-token",
+              id: "default-rum-id",
+            },
           },
-        },
-      }),
-    ),
-  },
-}));
+        }),
+      ),
+    },
+  });
+});
 
-vi.mock("@/services/segment_analytics", () => ({
+vi.mock("@/services/product_analytics", () => ({
   default: {
     track: vi.fn(),
   },
@@ -127,6 +134,12 @@ describe("Ingestion", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    // clearAllMocks keeps a previous test's mockRejectedValue, which onBeforeMount would settle into
+    queryClient.clear();
+    organizationsService.get_organization_passcode.mockResolvedValue({
+      data: { data: { token: "default-token", passcode: "default-passcode" } },
+    });
+    store.state.organizationData.organizationPasscodeForbidden = false;
 
     try {
       wrapper = mount(Ingestion, {
@@ -269,10 +282,9 @@ describe("Ingestion", () => {
         message: "RUM Token generated successfully.",
         timeout: 5000,
       });
-      expect(segment.track).toHaveBeenCalledWith("Button Click", {
+      expect(analytics.track).toHaveBeenCalledWith("Button Click", {
         button: "Generate RUM Token",
         user_org: "default",
-        user_id: "example@gmail.com",
         page: "Ingestion",
       });
     });
@@ -375,10 +387,9 @@ describe("Ingestion", () => {
         message: "RUM Token updated successfully.",
         timeout: 5000,
       });
-      expect(segment.track).toHaveBeenCalledWith("Button Click", {
+      expect(analytics.track).toHaveBeenCalledWith("Button Click", {
         button: "Update RUM Token",
         user_org: "default",
-        user_id: "example@gmail.com",
         page: "Ingestion",
       });
     });
@@ -454,6 +465,265 @@ describe("Ingestion", () => {
     });
   });
 
+  // mounts the component so the lifecycle wiring itself is under test, not just the method
+  describe("passcode 403 via the real mount path", () => {
+    const mountIngestion = async () => {
+      const w = mount(Ingestion, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router],
+          stubs: {
+            ConfirmDialog: { template: "<div />" },
+            OButton: { template: "<button><slot /></button>" },
+            OTabs: { template: "<div><slot /></div>" },
+            ORouteTab: { template: "<div><slot /></div>" },
+            "router-view": { template: "<div />" },
+          },
+        },
+      });
+      await flushPromises();
+      return w;
+    };
+
+    beforeEach(() => {
+      queryClient.clear();
+      store.state.organizationData.organizationPasscodeForbidden = false;
+    });
+
+    it("sets organizationPasscodeForbidden on mount when /passcode returns 403", async () => {
+      organizationsService.get_organization_passcode.mockRejectedValue({
+        response: { status: 403 },
+      });
+
+      const w = await mountIngestion();
+
+      expect(store.state.organizationData.organizationPasscodeForbidden).toBe(true);
+      expect(store.state.organizationData.organizationPasscode).not.toBe("");
+      w.unmount();
+    });
+
+    it("leaves organizationPasscodeForbidden false on mount for a non-403 failure", async () => {
+      organizationsService.get_organization_passcode.mockRejectedValue({
+        response: { status: 500 },
+      });
+
+      const w = await mountIngestion();
+
+      expect(store.state.organizationData.organizationPasscodeForbidden).toBe(false);
+      w.unmount();
+    });
+
+    it("leaves organizationPasscodeForbidden false on mount when the passcode loads", async () => {
+      organizationsService.get_organization_passcode.mockResolvedValue({
+        data: { data: { passcode: "live-passcode", user: "a@b.c" } },
+      });
+
+      const w = await mountIngestion();
+
+      expect(store.state.organizationData.organizationPasscodeForbidden).toBe(false);
+      expect(store.state.organizationData.organizationPasscode).toBe("live-passcode");
+      w.unmount();
+    });
+  });
+
+  // assertions read `w.vm.store`: the `store` helper this file provides is not the one the component writes to
+  describe("passcode 403 is authoritative over a concurrent /ingestion-tokens", () => {
+    const ORG_TOKEN = "o2oi_orgwide_token_value";
+
+    const mountIngestion = async () => {
+      const w = mount(Ingestion, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router],
+          stubs: {
+            ConfirmDialog: { template: "<div />" },
+            OButton: { template: "<button><slot /></button>" },
+            OTabs: { template: "<div><slot /></div>" },
+            ORouteTab: { template: "<div><slot /></div>" },
+            "router-view": { template: "<div />" },
+          },
+        },
+      });
+      await flushPromises();
+      return w;
+    };
+
+    const orgData = (w: any) => w.vm.store.state.organizationData;
+
+    const tokenRow = {
+      name: "default",
+      token: ORG_TOKEN,
+      enabled: true,
+      is_default: true,
+      description: "",
+      created_by: "a@b.c",
+      created_at: 0,
+    };
+
+    const stubNonEmptyTokens = () => {
+      // fetchOrgTokens dispatches `.data` of the body, so the array sits one level deeper
+      organizationsService.list_org_ingestion_tokens.mockResolvedValue({
+        data: { data: [tokenRow] },
+      });
+    };
+
+    beforeEach(() => {
+      queryClient.clear();
+      organizationsService.list_org_ingestion_tokens.mockResolvedValue({ data: { data: [] } });
+    });
+
+    afterEach(() => {
+      organizationsService.list_org_ingestion_tokens.mockResolvedValue({ data: { data: [] } });
+    });
+
+    it("keeps the banner when /ingestion-tokens succeeds and /passcode 403s", async () => {
+      stubNonEmptyTokens();
+      organizationsService.get_organization_passcode.mockRejectedValue({
+        response: { status: 403 },
+      });
+
+      const w = await mountIngestion();
+
+      // without this the test would re-prove the empty-list case, not the race
+      expect(orgData(w).orgTokens).toHaveLength(1);
+      expect(orgData(w).organizationPasscodeForbidden).toBe(true);
+      expect(orgData(w).organizationPasscode).not.toBe(ORG_TOKEN);
+      w.unmount();
+    });
+
+    it("keeps the banner when the tokens response lands AFTER the 403", async () => {
+      // the opposite interleaving: passcode rejects first, tokens resolve on a later macrotask
+      organizationsService.get_organization_passcode.mockRejectedValue({
+        response: { status: 403 },
+      });
+      organizationsService.list_org_ingestion_tokens.mockImplementation(
+        () =>
+          new Promise((resolve) => setTimeout(() => resolve({ data: { data: [tokenRow] } }), 0)),
+      );
+
+      const w = await mountIngestion();
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await flushPromises();
+
+      expect(orgData(w).orgTokens).toHaveLength(1);
+      expect(orgData(w).organizationPasscodeForbidden).toBe(true);
+      expect(orgData(w).organizationPasscode).not.toBe(ORG_TOKEN);
+      w.unmount();
+    });
+
+    it("does not let picking a token from the dropdown clear an observed 403", async () => {
+      stubNonEmptyTokens();
+      organizationsService.get_organization_passcode.mockRejectedValue({
+        response: { status: 403 },
+      });
+
+      const w = await mountIngestion();
+      expect(orgData(w).organizationPasscodeForbidden).toBe(true);
+
+      w.vm.onTokenSelected("default");
+      await flushPromises();
+
+      expect(orgData(w).organizationPasscodeForbidden).toBe(true);
+      expect(orgData(w).organizationPasscode).not.toBe(ORG_TOKEN);
+      w.unmount();
+    });
+
+    it("still shows tokens to a caller the passcode endpoint allows", async () => {
+      stubNonEmptyTokens();
+      organizationsService.get_organization_passcode.mockResolvedValue({
+        data: { data: { passcode: "allowed-passcode", user: "a@b.c" } },
+      });
+
+      const w = await mountIngestion();
+
+      expect(orgData(w).organizationPasscodeForbidden).toBe(false);
+      expect(orgData(w).orgTokens).toHaveLength(1);
+
+      w.vm.onTokenSelected("default");
+      await flushPromises();
+
+      expect(orgData(w).organizationPasscode).toBe(ORG_TOKEN);
+      expect(orgData(w).organizationPasscodeForbidden).toBe(false);
+      w.unmount();
+    });
+
+    it("keeps the picked org token when /passcode answers after /ingestion-tokens", async () => {
+      stubNonEmptyTokens();
+      organizationsService.get_organization_passcode.mockImplementation(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(
+              () => resolve({ data: { data: { passcode: "user-passcode", user: "a@b.c" } } }),
+              0,
+            ),
+          ),
+      );
+
+      const w = await mountIngestion();
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await flushPromises();
+
+      expect(orgData(w).organizationPasscode).toBe(ORG_TOKEN);
+      expect(w.vm.selectedTokenName).toBe("default");
+      w.unmount();
+    });
+
+    it("keeps a token picked on the page over a later /passcode answer", async () => {
+      const second = { ...tokenRow, name: "second", token: "o2oi_second_token", is_default: false };
+      organizationsService.list_org_ingestion_tokens.mockResolvedValue({
+        data: { data: [tokenRow, second] },
+      });
+      organizationsService.get_organization_passcode.mockResolvedValue({
+        data: { data: { passcode: "user-passcode", user: "a@b.c" } },
+      });
+
+      const w = await mountIngestion();
+      w.vm.onTokenSelected("second");
+      queryClient.clear();
+      await w.vm.getOrganizationPasscode();
+      await flushPromises();
+
+      expect(orgData(w).organizationPasscode).toBe("o2oi_second_token");
+      w.unmount();
+    });
+
+    it("re-evaluates after an org switch instead of latching forever", async () => {
+      stubNonEmptyTokens();
+      organizationsService.get_organization_passcode.mockRejectedValue({
+        response: { status: 403 },
+      });
+
+      const w = await mountIngestion();
+      expect(orgData(w).organizationPasscodeForbidden).toBe(true);
+
+      // MainLayout wipes organizationData on an org switch, so the new read decides afresh
+      const componentStore = w.vm.store;
+      const previous = componentStore.state.selectedOrganization.identifier;
+      componentStore.state.selectedOrganization = {
+        ...componentStore.state.selectedOrganization,
+        identifier: `${previous}-other`,
+      };
+      componentStore.dispatch("setOrganizationPasscodeForbidden", false);
+      await flushPromises();
+
+      organizationsService.get_organization_passcode.mockResolvedValue({
+        data: { data: { passcode: "other-org-passcode", user: "a@b.c" } },
+      });
+      queryClient.clear();
+      await w.vm.getOrganizationPasscode();
+      await flushPromises();
+
+      expect(orgData(w).organizationPasscodeForbidden).toBe(false);
+      expect(orgData(w).organizationPasscode).toBe(ORG_TOKEN);
+
+      componentStore.state.selectedOrganization = {
+        ...componentStore.state.selectedOrganization,
+        identifier: previous,
+      };
+      w.unmount();
+    });
+  });
+
   describe("getOrganizationPasscode", () => {
     it("should successfully get organization passcode", async () => {
       if (!wrapper) {
@@ -473,6 +743,8 @@ describe("Ingestion", () => {
       organizationsService.get_organization_passcode.mockResolvedValue(mockResponse);
       const dispatchSpy = vi.spyOn(wrapper.vm.store, "dispatch");
 
+      // onBeforeMount already cached this read, so the call under test would not reach the mock
+      queryClient.clear();
       await wrapper.vm.getOrganizationPasscode();
 
       expect(organizationsService.get_organization_passcode).toHaveBeenCalledWith("default");
@@ -497,6 +769,7 @@ describe("Ingestion", () => {
 
       organizationsService.get_organization_passcode.mockResolvedValue(mockResponse);
 
+      queryClient.clear();
       await wrapper.vm.getOrganizationPasscode();
 
       expect(mockNotify).toHaveBeenCalledWith({
@@ -504,6 +777,42 @@ describe("Ingestion", () => {
         message: "Passcode not found.",
         timeout: 5000,
       });
+    });
+
+    it("should flag passcode as forbidden on 403 so snippets are withheld", async () => {
+      if (!wrapper) {
+        expect.fail("Component failed to mount");
+        return;
+      }
+
+      organizationsService.get_organization_passcode.mockRejectedValue({
+        response: { status: 403 },
+      });
+      const dispatchSpy = vi.spyOn(wrapper.vm.store, "dispatch");
+
+      queryClient.clear();
+      await wrapper.vm.getOrganizationPasscode();
+
+      expect(dispatchSpy).toHaveBeenCalledWith("setOrganizationPasscodeForbidden", true);
+      expect(dispatchSpy).not.toHaveBeenCalledWith("setOrganizationPasscode", "");
+    });
+
+    it("should stay silent and not flag forbidden on a non-403 error", async () => {
+      if (!wrapper) {
+        expect.fail("Component failed to mount");
+        return;
+      }
+
+      organizationsService.get_organization_passcode.mockRejectedValue({
+        response: { status: 500 },
+      });
+      const dispatchSpy = vi.spyOn(wrapper.vm.store, "dispatch");
+
+      queryClient.clear();
+      await wrapper.vm.getOrganizationPasscode();
+
+      expect(dispatchSpy).not.toHaveBeenCalledWith("setOrganizationPasscodeForbidden", true);
+      expect(mockNotify).not.toHaveBeenCalled();
     });
   });
 
@@ -526,6 +835,8 @@ describe("Ingestion", () => {
       apiKeysService.listRUMTokens.mockResolvedValue(mockResponse);
       const dispatchSpy = vi.spyOn(wrapper.vm.store, "dispatch");
 
+      // mounting already cached this read, so the call under test would not reach the mock
+      queryClient.clear();
       await wrapper.vm.getRUMToken();
 
       expect(apiKeysService.listRUMTokens).toHaveBeenCalledWith("default");
@@ -561,10 +872,9 @@ describe("Ingestion", () => {
         message: "Token reset successfully.",
         timeout: 5000,
       });
-      expect(segment.track).toHaveBeenCalledWith("Button Click", {
+      expect(analytics.track).toHaveBeenCalledWith("Button Click", {
         button: "Update Passcode",
         user_org: "default",
-        user_id: "example@gmail.com",
         page: "Ingestion",
       });
     });
@@ -669,7 +979,7 @@ describe("Ingestion", () => {
       await wrapper.vm.copyToClipboardFn(mockContent);
       await flushPromises();
 
-      expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", {
+      expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", expect.any(Function), {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
@@ -695,7 +1005,7 @@ describe("Ingestion", () => {
       await flushPromises();
 
       // Verify that copyToClipboard was called
-      expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", {
+      expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", expect.any(Function), {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
@@ -795,8 +1105,8 @@ describe("Ingestion", () => {
     });
   });
 
-  describe("Warning Message Display Logic", () => {
-    it("should show warning message when restricted routes condition is met", async () => {
+  describe("Empty-data redirection banner", () => {
+    it("is gone with the flag on and no data ingested", async () => {
       if (!wrapper) {
         expect.fail("Component failed to mount");
         return;
@@ -806,36 +1116,9 @@ describe("Ingestion", () => {
       wrapper.vm.store.state.organizationData.isDataIngested = false;
       await wrapper.vm.$nextTick();
 
-      const shouldShowWarning =
-        Object.prototype.hasOwnProperty.call(
-          wrapper.vm.store.state.zoConfig,
-          "restricted_routes_on_empty_data",
-        ) &&
-        wrapper.vm.store.state.zoConfig.restricted_routes_on_empty_data === true &&
-        wrapper.vm.store.state.organizationData.isDataIngested === false;
-
-      expect(shouldShowWarning).toBe(true);
-    });
-
-    it("should not show warning message when data is ingested", async () => {
-      if (!wrapper) {
-        expect.fail("Component failed to mount");
-        return;
-      }
-
-      wrapper.vm.store.state.zoConfig.restricted_routes_on_empty_data = true;
-      wrapper.vm.store.state.organizationData.isDataIngested = true;
-      await wrapper.vm.$nextTick();
-
-      const shouldShowWarning =
-        Object.prototype.hasOwnProperty.call(
-          wrapper.vm.store.state.zoConfig,
-          "restricted_routes_on_empty_data",
-        ) &&
-        wrapper.vm.store.state.zoConfig.restricted_routes_on_empty_data === true &&
-        wrapper.vm.store.state.organizationData.isDataIngested === false;
-
-      expect(shouldShowWarning).toBe(false);
+      expect(wrapper.text()).not.toContain(
+        "data ingestion must be initiated within the current organization",
+      );
     });
   });
 
@@ -1007,10 +1290,9 @@ describe("Ingestion", () => {
 
       await wrapper.vm.generateRUMToken();
 
-      expect(segment.track).toHaveBeenCalledWith("Button Click", {
+      expect(analytics.track).toHaveBeenCalledWith("Button Click", {
         button: "Generate RUM Token",
         user_org: "test-org",
-        user_id: "test@example.com",
         page: "Ingestion",
       });
     });
@@ -1033,13 +1315,28 @@ describe("Ingestion", () => {
       await wrapper.vm.copyToClipboardFn(mockContent);
       await flushPromises();
 
-      expect(segment.track).toHaveBeenCalledWith("Button Click", {
+      expect(analytics.track).toHaveBeenCalledWith("Button Click", {
         button: "Copy to Clipboard",
         ingestion: "custom",
         user_org: "default",
-        user_id: "example@gmail.com",
         page: "Ingestion",
       });
+    });
+  });
+  describe("Global search over AWS integrations", () => {
+    it("matches an AWS service by its translated description", async () => {
+      const replace = vi.spyOn(router, "replace").mockResolvedValue(undefined as any);
+
+      wrapper.vm.globalSearchQuery = "account activity";
+      await flushPromises();
+
+      expect(replace).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "AWSConfig",
+          query: expect.objectContaining({ search: "account activity" }),
+        }),
+      );
+      replace.mockRestore();
     });
   });
 });

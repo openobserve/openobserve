@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Kubernetes data-source setup card. The collector ships logs, k8s events and
-// cluster/pod metrics, and (via the OpenTelemetry operator) can auto-instrument
-// workloads for traces with no code change — so the card has three steps:
-// install → optionally annotate for traces → verify.
+// Kubernetes setup card: install → optionally instrument for traces (language libraries or eBPF) → verify.
 //
 // Step 1 deliberately offers ONLY the two endpoint choices — external (reach
 // OpenObserve over the network) and internal (OpenObserve runs in this same
@@ -29,9 +26,16 @@
 // The raw Helm sequence stays a secondary, collapsed path (extras.advanced),
 // mirroring the "Advanced Installation" accordion it replaces.
 
+import { raw, type TranslateFn } from "@/types/i18n";
+
 import config from "@/aws-exports";
 import { getImageURL } from "@/utils/zincutils";
-import type { CardSubstitutions, RichCardContent, RichCardStepVariant } from "../types";
+import type {
+  CardSubstitutions,
+  RichCardContent,
+  RichCardStepVariant,
+  RichCardStepVariantGroup,
+} from "../types";
 import { applySubs, applySubsMasked } from "../subs";
 
 /** Pinned cert-manager release the manual sequence installs. Bump in one place. */
@@ -102,59 +106,98 @@ const codeFor = (template: string, subs: CardSubstitutions, lang = "bash") => ({
 /**
  * Annotating a namespace makes the operator inject the language's auto-
  * instrumentation into every pod in it — no application code or image change.
- * Go is the exception: its eBPF instrumentation also needs the path to the
- * compiled binary inside the container.
  */
-const annotate = (key: string, extra = "") =>
+const annotate = (key: string) =>
   `# Every pod in the namespace is instrumented — no code or image change.
 kubectl annotate namespace my-namespace \\
-  instrumentation.opentelemetry.io/inject-${key}="openobserve-collector/openobserve-${key}"${extra}
+  instrumentation.opentelemetry.io/inject-${key}="openobserve-collector/openobserve-${key}"
 
 # Restart so running pods pick up the injection
 kubectl rollout restart deployment -n my-namespace`;
 
-const LANGUAGES: { id: string; label: string; icon: string; extra?: string }[] = [
+const LANGUAGES: { id: string; label: string; icon: string }[] = [
   { id: "java", label: "Java", icon: "images/ingestion/java.svg" },
   { id: "dotnet", label: ".NET", icon: "images/ingestion/dotnet.svg" },
   { id: "nodejs", label: "Node.js", icon: "images/ingestion/nodejs.svg" },
   { id: "python", label: "Python", icon: "images/ingestion/python.svg" },
+];
+
+const EBPF_DOC_URL =
+  "https://github.com/openobserve/openobserve-helm-chart/blob/main/charts/openobserve-collector/docs/traces.md#ebpf-tracing";
+
+// --reuse-values would keep the old chart's defaults and lose the ebpf ones 0.6.0 adds.
+const EBPF_UPGRADE = `helm repo update openobserve
+helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-collector \\
+  --version '>=0.6.0' --reset-then-reuse-values \\
+  --set ebpf.enabled=true{flags}`;
+
+const instrumentVariants = (t: TranslateFn): RichCardStepVariant[] =>
+  LANGUAGES.map((l) => ({
+    id: l.id,
+    label: raw(l.label),
+    icon: getImageURL(l.icon),
+    code: { lang: "bash", raw: annotate(l.id) },
+    note: t("ingestion.setupCard.k8sAnnotatePodNote"),
+  }));
+
+const instrumentChoices = (t: TranslateFn): (RichCardStepVariant | RichCardStepVariantGroup)[] => [
   {
-    id: "go",
-    label: "Go (eBPF)",
-    icon: "images/ingestion/golang.svg",
-    // eBPF attaches to the binary, so the operator needs its in-container path.
-    extra: ` \\
-  instrumentation.opentelemetry.io/otel-go-auto-target-exe="/path/to/container/executable"`,
+    id: "libraries",
+    labelKey: "ingestion.setupCard.k8sLibrariesVariant",
+    variants: instrumentVariants(t),
+  },
+  {
+    id: "ebpf",
+    labelKey: "ingestion.setupCard.k8sEbpfVariant",
+    code: { lang: "bash", raw: EBPF_UPGRADE },
+    inputs: [
+      {
+        id: "ebpfPorts",
+        helmSet: "ebpf.trace.ports",
+        labelKey: "ingestion.setupCard.tracePortsLabel",
+        // A port matches on every node, so nothing is selected until the user chooses.
+        default: "",
+        placeholder: raw("8080,9000-9100"),
+        helpKey: "ingestion.setupCard.tracePortsHelp",
+      },
+      {
+        id: "ebpfExe",
+        helmSet: "ebpf.trace.exePaths",
+        labelKey: "ingestion.setupCard.traceExeLabel",
+        default: "",
+        placeholder: raw("/app/checkout*"),
+      },
+      {
+        id: "ebpfCmd",
+        helmSet: "ebpf.trace.cmdLines",
+        labelKey: "ingestion.setupCard.traceCmdLabel",
+        default: "",
+        placeholder: raw("*reports.py*"),
+        helpKey: "ingestion.setupCard.traceCmdHelp",
+      },
+    ],
+    // The chart refuses to render with all three lists empty.
+    requireOneOf: {
+      ids: ["ebpfPorts", "ebpfExe", "ebpfCmd"],
+      messageKey: "ingestion.setupCard.traceSelectorRequired",
+    },
+    note: t("ingestion.setupCard.k8sEbpfNote"),
   },
 ];
 
-const instrumentVariants = (): RichCardStepVariant[] =>
-  LANGUAGES.map((l) => ({
-    id: l.id,
-    label: l.label,
-    icon: getImageURL(l.icon),
-    code: { lang: "bash", raw: annotate(l.id, l.extra) },
-    note:
-      l.id === "go"
-        ? "Point otel-go-auto-target-exe at the compiled binary inside the container — eBPF attaches to that executable, not to the pod."
-        : "Annotate a single pod spec instead of the namespace to instrument one workload at a time.",
-  }));
-
 // ── card ─────────────────────────────────────────────────────────────────────
 
-export default function kubernetesCard(subs: CardSubstitutions): RichCardContent {
+export default function kubernetesCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   const isCloud = config.isCloud === "true";
 
-  const INSTALLER_NOTE =
-    "This installs cert-manager, the OpenTelemetry operator and the OpenObserve collector automatically.";
+  const INSTALLER_NOTE = t("ingestion.setupCard.k8sInstallerNote");
 
   // The manual Helm path sits in a collapsed section below the steps, which is
   // past the auto-instrument and verify steps — point at it from here, where the
   // user is actually choosing how to install. `(#advanced)` renders as a jump
   // link that opens that accordion and scrolls to it (see noteMd in
   // SetupCardRenderer), so the user never has to go looking for it.
-  const ADVANCED_HINT =
-    "Prefer Helm, or need to pin versions and customise chart values? Go to [Advanced Installation (Manual Steps)](#advanced).";
+  const ADVANCED_HINT = t("ingestion.setupCard.k8sAdvancedHint");
 
   const externalCode = codeFor(scriptInstall("--o2-url={url}"), subs);
 
@@ -165,28 +208,30 @@ export default function kubernetesCard(subs: CardSubstitutions): RichCardContent
     : [
         {
           id: "external",
-          label: "External Endpoint",
+          labelKey: "ingestion.setupCard.externalEndpointVariant",
           code: externalCode,
-          note: `${INSTALLER_NOTE} ${ADVANCED_HINT}`,
+          note: raw(`${INSTALLER_NOTE} ${ADVANCED_HINT}`),
         },
         {
           id: "internal",
-          label: "Internal Endpoint",
+          labelKey: "ingestion.setupCard.internalEndpointVariant",
           code: codeFor(scriptInstall(`--internal-endpoint=${IN_CLUSTER_URL}`), subs),
-          note: `Use this when OpenObserve runs in this same cluster — traffic never leaves it. ${INSTALLER_NOTE} ${ADVANCED_HINT}`,
+          note: raw(
+            `${t("ingestion.setupCard.k8sInternalEndpointNote")} ${INSTALLER_NOTE} ${ADVANCED_HINT}`,
+          ),
         },
       ];
 
   return {
     provider: {
-      name: "Kubernetes",
-      tagline:
-        "Deploy the OpenObserve collector to your cluster — container logs, Kubernetes events and cluster metrics, plus zero-code traces for your workloads.",
+      id: "kubernetes",
+      name: raw("Kubernetes"),
+      tagline: t("ingestion.setupCard.taglineKubernetes"),
       logo: getImageURL("images/common/kubernetes.svg"),
       tone: "#326ce5",
-      runtime: "Cluster",
-      setupTime: "~3 min",
-      metaBadges: ["Logs", "Metrics", "Events", "Traces"],
+      runtime: t("ingestion.setupCard.runtimeCluster"),
+      setupTime: t("ingestion.setupCard.setupTime3Min"),
+      metaBadges: [t("common.logs"), t("common.metrics"), t("common.events"), t("common.traces")],
     },
     steps: [
       {
@@ -194,46 +239,49 @@ export default function kubernetesCard(subs: CardSubstitutions): RichCardContent
         // "(Recommended)" is carried in the title, as it was on the page this
         // replaces — it is the path the overwhelming majority should take, and
         // the manual Helm sequence below must not read as an equal alternative.
-        title: "Quick Install (Recommended)",
-        description:
-          "Install the OpenObserve collector with a **single command** — just set your cluster name and run. The name tags every record, so you can tell clusters apart once several are reporting.",
-        chip: { kind: "terminal", label: "Terminal" },
+        titleKey: "ingestion.setupCard.quickInstallTitle",
+        descriptionKey: "ingestion.setupCard.quickInstallDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
         required: true,
         completeOn: "copy",
         inputs: [
           {
             id: "cluster",
-            label: "Cluster Name",
+            labelKey: "ingestion.setupCard.clusterNameLabel",
             default: "cluster1",
-            placeholder: "production",
-            help: "Identifies this cluster in your logs, metrics and dashboards.",
+            placeholder: raw("production"),
+            helpKey: "ingestion.setupCard.clusterNameHelp",
           },
         ],
         // Cloud: one command, no toggle. Self-hosted: external / internal.
         // The note rides on each variant when there are variants, so it only
         // lives on the step itself in the cloud (no-variant) case.
         code: isCloud ? externalCode : undefined,
-        note: isCloud ? `${INSTALLER_NOTE} ${ADVANCED_HINT}` : undefined,
+        note: isCloud ? raw(`${INSTALLER_NOTE} ${ADVANCED_HINT}`) : undefined,
         variants: installVariants,
       },
       {
         id: "instrument",
-        title: "Auto-Instrument Your Applications for Traces",
-        description:
-          "Optional. The OpenTelemetry operator injects instrumentation into annotated workloads, so you get **distributed traces without touching application code or rebuilding images**. Pick a language, then annotate the namespace it runs in.",
-        chip: { kind: "editor", label: "Optional" },
+        titleKey: "ingestion.setupCard.autoInstrumentTracesTitle",
+        descriptionKey: "ingestion.setupCard.autoInstrumentTracesDesc",
+        chip: { kind: "editor", labelKey: "ingestion.setupCard.optionalLabel" },
         completeOn: "copy",
-        variants: instrumentVariants(),
+        variants: instrumentChoices(t),
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description:
-          "Give the collector a few seconds to start, then hit Test — cluster logs land in the `default` stream.",
-        chip: { kind: "traces", label: "Logs" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyK8sDataDesc",
+        chip: { kind: "traces", labelKey: "ingestion.setupCard.chipLogs" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Container Logs", "Kubernetes Events", "Node Metrics", "Pod Metrics", "Traces"],
+        pills: [
+          t("ingestion.setupCard.pillContainerLogs"),
+          t("ingestion.setupCard.pillKubernetesEvents"),
+          t("ingestion.setupCard.pillNodeMetrics"),
+          t("ingestion.setupCard.pillPodMetrics"),
+          t("common.traces"),
+        ],
       },
     ],
     // Collector logs carry the k8sattributes processor's resource attributes;
@@ -249,41 +297,42 @@ export default function kubernetesCard(subs: CardSubstitutions): RichCardContent
       // boxes with a "wait 2 minutes" instruction between them; the explicit
       // `kubectl wait` on the webhook makes that deterministic.
       advanced: {
-        label: "Advanced Installation (Manual Steps)",
+        labelKey: "ingestion.setupCard.advancedInstallLabel",
+        // Not `descriptionKey`: the self-hosted copy interpolates the in-cluster
+        // URL, which key-only resolution (no params) can't express.
         description: isCloud
-          ? "For custom configurations, or to pin versions and customise the chart values. Run the steps in order."
-          : `For custom configurations, or to pin versions and customise the chart values. Run the steps in order. If OpenObserve runs in this same cluster, replace the exporter endpoints with \`${IN_CLUSTER_URL}\`.`,
+          ? t("ingestion.setupCard.advancedInstallDescCloud")
+          : t("ingestion.setupCard.advancedInstallDescSelfHosted", { url: IN_CLUSTER_URL }),
         code: codeFor(helmInstall("{url}"), subs),
       },
-      fixTitle: "Wait For The cert-manager Webhook",
-      fixBody:
-        "The OpenTelemetry operator fails to start until cert-manager's webhook is serving, and a collector that never starts sends nothing. Check that both are running, then test again:",
+      fixTitle: t("ingestion.setupCard.k8sFixTitle"),
+      fixBody: t("ingestion.setupCard.k8sFixBody"),
       fixLang: "bash",
       fixSnippet: `kubectl wait --for=condition=Available --timeout=300s \\
   -n cert-manager deployment/cert-manager-webhook
 kubectl get pods -n openobserve-collector`,
       troubleshooting: [
         {
-          q: "The install fails with an error about the admission webhook",
-          a: "The OpenTelemetry operator's webhook needs cert-manager's webhook to be serving first. Run `kubectl wait --for=condition=Available --timeout=300s -n cert-manager deployment/cert-manager-webhook`, then re-run the install — it is idempotent.",
+          q: t("ingestion.setupCard.k8sTroubleWebhookQ"),
+          a: t("ingestion.setupCard.k8sTroubleWebhookA"),
         },
         {
-          q: "The collector pods are running but nothing arrives",
-          a: "Check the collector's own logs with `kubectl logs -n openobserve-collector -l app.kubernetes.io/name=openobserve-collector`. A 401 means the access key is stale — re-copy the command from this page. A connection timeout usually means the cluster cannot reach the endpoint: if OpenObserve runs in this same cluster, switch to an **In-Cluster** variant above.",
+          q: t("ingestion.setupCard.k8sTroubleNoDataQ"),
+          a: t("ingestion.setupCard.k8sTroubleNoDataA"),
         },
         {
-          q: "Which endpoint should I use — external or in-cluster?",
-          a: `Use **In-Cluster** only when OpenObserve itself runs in this cluster; traffic then stays inside it and never crosses the network. The URL is \`http://<helm-release>-openobserve-router.<namespace>.svc.cluster.local:5080\` — the default assumes release \`o2\` in namespace \`openobserve\`, so edit it if yours differ. Everyone else uses the external endpoint.`,
+          q: t("ingestion.setupCard.k8sTroubleEndpointQ"),
+          a: t("ingestion.setupCard.k8sTroubleEndpointA"),
         },
         {
-          q: "I annotated a namespace but no traces appear",
-          a: "Injection happens at pod creation, so existing pods are unaffected until they restart — run `kubectl rollout restart deployment -n my-namespace`. Confirm the annotation landed with `kubectl get ns my-namespace -o yaml`, and check that the value matches `openobserve-collector/openobserve-<language>`. For Go, `otel-go-auto-target-exe` must be the binary's path **inside** the container.",
+          q: t("ingestion.setupCard.k8sTroubleAnnotationQ"),
+          a: t("ingestion.setupCard.k8sTroubleAnnotationA"),
         },
         {
-          q: "Can I see a working example?",
+          q: t("ingestion.setupCard.k8sTroubleExampleQ"),
           // inlineMd renders **bold** and `code` only, so both references are
           // real links in the footer (docLinks) rather than text here.
-          a: "Yes — **HOT commerce** is a sample application wired up end to end, and the **OpenTelemetry Operator** docs carry the full annotation reference. Both are linked at the bottom of this page.",
+          a: t("ingestion.setupCard.k8sTroubleExampleA"),
         },
       ],
     },
@@ -291,13 +340,14 @@ kubectl get pods -n openobserve-collector`,
     // Both links the page carried before the migration, restored as anchors.
     docLinks: [
       {
-        label: "HOT Commerce Example",
+        label: t("ingestion.setupCard.hotCommerceExampleLink"),
         url: "https://github.com/openobserve/hotcommerce",
       },
       {
-        label: "OpenTelemetry Operator",
+        label: raw("OpenTelemetry Operator"),
         url: "https://github.com/open-telemetry/opentelemetry-operator",
       },
+      { label: t("ingestion.setupCard.ebpfTracingGuideLink"), url: EBPF_DOC_URL },
     ],
   };
 }

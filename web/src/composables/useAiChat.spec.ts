@@ -5,8 +5,10 @@ import store from "@/test/unit/helpers/store";
 vi.mock("@/stores", () => ({
   default: store,
 }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 import useAiChat from "./useAiChat";
+import analytics from "@/services/product_analytics";
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -671,6 +673,52 @@ describe("useAiChat", () => {
       const requestBody = JSON.parse(callArgs.body);
 
       expect(requestBody.messages[0].content).toBe("Test");
+    });
+  });
+
+  describe("submitFeedback", () => {
+    it("tracks the feedback type once the server accepts it", async () => {
+      mockFetch.mockResolvedValue({ ok: true });
+
+      expect(await aiChatComposable.submitFeedback("thumbs_up", "org123")).toBe(true);
+
+      expect(analytics.track).toHaveBeenCalledWith("ai_assistant_feedback_given", {
+        type: "thumbs_up",
+      });
+    });
+
+    it("does not track feedback the server rejected", async () => {
+      mockFetch.mockResolvedValue({ ok: false });
+
+      expect(await aiChatComposable.submitFeedback("thumbs_down", "org123")).toBe(false);
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it("does not track feedback that never reached the server", async () => {
+      mockFetch.mockRejectedValue(new Error("offline"));
+
+      expect(await aiChatComposable.submitFeedback("thumbs_down", "org123")).toBe(false);
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+  });
+  describe("server-side chat requests", () => {
+    it("cancels a turn with a JSON body the server can tell from a form post", async () => {
+      mockFetch.mockResolvedValue({ ok: true });
+      await aiChatComposable.cancelAiChat("org1", "s/1");
+      const [url, init] = mockFetch.mock.calls[0];
+      expect(url).toContain("/api/org1/ai/chats/s%2F1/cancel");
+      expect(init).toMatchObject({ method: "POST", body: "{}", keepalive: true });
+      expect(init.headers["Content-Type"]).toBe("application/json");
+    });
+
+    it("sends known_version only alongside known_seq", async () => {
+      mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      await aiChatComposable.getServerChat("org1", "s1", 4, 50, "v2");
+      await aiChatComposable.getServerChat("org1", "s1", undefined, undefined, "v2");
+      expect(mockFetch.mock.calls[0][0]).toContain("?known_seq=4&known_version=v2&limit=50");
+      expect(mockFetch.mock.calls[1][0]).not.toContain("known_version");
     });
   });
 });

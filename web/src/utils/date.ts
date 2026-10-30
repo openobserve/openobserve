@@ -14,7 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { format as dfFormat, sub } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { DateTime as _DateTime } from "luxon";
+
+import { gt } from "@/types/i18n";
+import { resolveCalendarPeriod } from "@/utils/dashboard/calendarPeriods";
 
 // ---------------------------------------------------------------------------
 // Duration helpers
@@ -81,7 +85,7 @@ export const generateDurationLabel = (seconds: number) => {
   }
 
   if (label === "") {
-    label = `Off`;
+    label = gt("common.off");
   }
 
   return label;
@@ -191,8 +195,13 @@ export const getDurationObjectFromParams = (params: any) => {
   return obj;
 };
 
-export const getConsumableRelativeTime = (period: string) => {
-  const periodString = period?.match(/(\d+)([smhdwM])/);
+export const RELATIVE_PERIOD_PATTERN = /(\d+)([smhdwM])/;
+
+export const getConsumableRelativeTime = (period: string, timezone?: string | null) => {
+  const calendarRange = resolveCalendarPeriod(period, timezone);
+  if (calendarRange) return calendarRange;
+
+  const periodString = period?.match(RELATIVE_PERIOD_PATTERN);
   if (periodString) {
     let periodValue: number = parseInt(periodString[1]);
     let periodUnit: string = periodString[2];
@@ -265,6 +274,15 @@ export function formatDate(value: number | string | Date, formatStr: string): st
  */
 export function formatTimestamp(us: number, format: string): string {
   return formatDate(us / 1000, format);
+}
+
+/**
+ * Format a microsecond timestamp in a specific IANA timezone.
+ * Mirrors formatTimestamp but renders in the given timezone instead of the
+ * browser's local zone, so the displayed value matches a timezone label.
+ */
+export function formatTimestampInTimezone(us: number, format: string, timezone: string): string {
+  return formatInTimeZone(us / 1000, timezone, normalizeFormat(format));
 }
 
 /**

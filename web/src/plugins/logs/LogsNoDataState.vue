@@ -19,14 +19,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Each card routes to a distinct, real ingestion path in OpenObserve.
 -->
 <template>
-  <OEmptyState illustration="connect" size="hero" :hide-action="true">
-    <template #title>{{ t("logs.noData.title") }}</template>
+  <OEmptyState v-bind="shell" :hide-action="true">
+    <template #title>
+      <span
+        v-if="alternativesOnly"
+        class="text-text-secondary text-sm font-normal"
+        data-test="logs-no-data-another-way"
+        >{{ t("ingestion.firstDataPanel.anotherWay") }}</span
+      >
+      <template v-else>{{ t("logs.noData.title", { product: raw("OpenObserve") }) }}</template>
+    </template>
 
-    <template #description>
+    <template v-if="!alternativesOnly" #description>
       <span v-html="description" />
     </template>
 
     <template #actions>
+      <div v-if="$slots.status" class="flex basis-full justify-center">
+        <slot name="status" />
+      </div>
+
       <!-- Curl / HTTP API — simplest quick-start -->
       <EmptyStateIngestionCard
         icon="code"
@@ -40,7 +52,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <EmptyStateIngestionCard
         icon="alt-route"
         :label="t('logs.noData.shippers')"
-        :sublabel="t('logs.noData.shippersDesc')"
+        :sublabel="
+          t('logs.noData.shippersDesc', {
+            product1: raw('Filebeat'),
+            product2: raw('Fluentbit'),
+            product3: raw('Fluentd'),
+            product4: raw('Vector'),
+            product5: raw('SyslogNg'),
+          })
+        "
         icon-variant="teal"
         data-test="logs-no-data-shippers-card"
         @click="go('ingestLogs')"
@@ -48,8 +68,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- OpenTelemetry -->
       <EmptyStateIngestionCard
-        icon="hub"
-        :label="t('logs.noData.otel')"
+        :image="getImageURL('images/ingestion/otlp.svg')"
+        :label="raw('OpenTelemetry')"
         :sublabel="t('logs.noData.otelDesc')"
         icon-variant="amber"
         data-test="logs-no-data-otel-card"
@@ -59,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template #extra>
       <div class="flex flex-wrap items-center justify-center gap-2">
-        <span class="text-text-secondary mr-1 text-sm font-semibold">
+        <span class="text-text-secondary me-1 text-sm font-semibold">
           {{ t("logs.noData.or") }}
         </span>
         <EmptyStateIngestionChip
@@ -71,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="h-3.5 w-3.5 shrink-0 object-contain"
             alt=""
           />
-          {{ t("logs.noData.kubernetes") }}
+          {{ raw("Kubernetes") }}
         </EmptyStateIngestionChip>
         <EmptyStateIngestionChip data-test="logs-no-data-aws-btn" @click="go('AWSConfig')">
           <img
@@ -87,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="h-3.5 w-3.5 shrink-0 object-contain"
             alt=""
           />
-          {{ t("logs.noData.linux") }}
+          {{ raw("Linux") }}
         </EmptyStateIngestionChip>
         <EmptyStateIngestionChip
           data-test="logs-no-data-windows-btn"
@@ -98,11 +118,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="h-3.5 w-3.5 shrink-0 object-contain"
             alt=""
           />
-          {{ t("logs.noData.windows") }}
+          {{ raw("Windows") }}
         </EmptyStateIngestionChip>
         <EmptyStateIngestionChip
           v-if="aiEnabled"
-          class="ai-hover-btn"
+          variant="ai"
           data-test="logs-no-data-ask-ai-btn"
           @click="emit('ask-ai')"
         >
@@ -116,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -125,15 +145,22 @@ import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionCh
 import { useAiIcon } from "@/composables/useAiIcon";
 import { getImageURL } from "@/utils/zincutils";
 
-defineProps<{
+const props = defineProps<{
   aiEnabled: boolean;
+  /** Under FirstDataPanel's card: only the cards and chips, under an "Or start another way" caption. */
+  alternativesOnly?: boolean;
+}>();
+
+defineSlots<{
+  /** A line between the description and the cards. */
+  status?(): unknown;
 }>();
 
 const emit = defineEmits<{
   "ask-ai": [];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
 const { aiIconSrc } = useAiIcon();
@@ -141,6 +168,13 @@ const { aiIconSrc } = useAiIcon();
 const orgQuery = computed(() => ({
   org_identifier: store.state.selectedOrganization.identifier,
 }));
+
+// v-bind keeps the hero's own defaults untouched; the caption form drops the illustration and backdrop.
+const shell = computed(() =>
+  props.alternativesOnly
+    ? { size: "block" as const, backdrop: false }
+    : { size: "hero" as const, illustration: "connect" as const },
+);
 
 // Uses v-html — fully i18n-controlled, no user input.
 const description = computed(() => t("logs.noData.description"));

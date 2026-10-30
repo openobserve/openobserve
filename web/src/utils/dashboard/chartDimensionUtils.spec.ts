@@ -245,7 +245,7 @@ describe("chartDimensionUtils", () => {
       applyMeasuredYAxisLeftInset(options);
 
       // "60000c/s" is the widest label; grid.left should equal its measured width
-      expect(options.grid.left).toBe(calculateWidthText("60000c/s"));
+      expect(options.grid.left).toBe(calculateWidthText("60000c/s") + 12);
       expect(options.grid.containLabel).toBe(false);
     });
 
@@ -283,7 +283,7 @@ describe("chartDimensionUtils", () => {
 
       applyMeasuredYAxisLeftInset(options);
 
-      expect(options.grid.left).toBe(calculateWidthText("60000c/s"));
+      expect(options.grid.left).toBe(calculateWidthText("60000c/s") + 12);
       expect(options.grid.containLabel).toBe(false);
     });
 

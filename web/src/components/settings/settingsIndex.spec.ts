@@ -5,12 +5,15 @@ import { nextTick } from "vue";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import enLocale from "@/locales/languages/en-US.json";
+import config from "@/aws-exports";
 import SettingsIndex from "./index.vue";
 
-// Mock composables and config with factory functions
+// Settable rather than a fixed `false`: meta-org-only sections cannot be covered otherwise.
+const { isMetaOrgRef } = vi.hoisted(() => ({ isMetaOrgRef: { value: false } }));
+
 vi.mock("@/composables/useIsMetaOrg", () => ({
   default: () => ({
-    isMetaOrg: { value: false },
+    isMetaOrg: isMetaOrgRef,
   }),
 }));
 
@@ -219,21 +222,6 @@ describe("SettingsIndex.vue", () => {
       mockReplace.mockClear();
     });
 
-    it("should redirect via replace to general when on settings route", () => {
-      mockRouter.currentRoute.value.name = "settings";
-      wrapper = createWrapper();
-      mockReplace.mockClear();
-
-      wrapper.vm.handleSettingsRouting();
-
-      expect(mockReplace).toHaveBeenCalledWith({
-        path: "/settings/general",
-        query: {
-          org_identifier: "test-org",
-        },
-      });
-    });
-
     it("should not redirect when on general route", () => {
       mockRouter.currentRoute.value.name = "general";
       wrapper = createWrapper();
@@ -254,9 +242,7 @@ describe("SettingsIndex.vue", () => {
 
       wrapper.vm.handleSettingsRouting();
 
-      // nodes route is not "settings" so replace is not called;
-      // notMeta guard may or may not apply depending on zoConfig.meta_org
-      // Without meta_org set, notMeta is falsy → no redirect
+      // Without meta_org set, the notMeta guard is falsy, so nodes is not redirected.
       expect(mockReplace).not.toHaveBeenCalled();
     });
 
@@ -278,20 +264,6 @@ describe("SettingsIndex.vue", () => {
 
       expect(() => wrapper.vm.handleSettingsRouting()).not.toThrow();
       expect(mockReplace).not.toHaveBeenCalled();
-    });
-
-    it("should handle missing selectedOrganization gracefully", () => {
-      wrapper = createWrapper({ selectedOrganization: null });
-      mockRouter.currentRoute.value.name = "settings";
-      mockReplace.mockClear();
-
-      expect(() => wrapper.vm.handleSettingsRouting()).not.toThrow();
-      expect(mockReplace).toHaveBeenCalledWith({
-        path: "/settings/general",
-        query: {
-          org_identifier: undefined,
-        },
-      });
     });
 
     it("should not redirect when on other non-settings routes", () => {
@@ -328,17 +300,6 @@ describe("SettingsIndex.vue", () => {
   });
 
   describe("Lifecycle Hooks", () => {
-    it("should call handleSettingsRouting on mount (settings route)", () => {
-      mockRouter.currentRoute.value.name = "settings";
-      wrapper = createWrapper();
-
-      // During mount, handleSettingsRouting is called via onBeforeMount
-      // It should have triggered a replace call for the "settings" route
-      expect(mockReplace).toHaveBeenCalledWith(
-        expect.objectContaining({ path: "/settings/general" }),
-      );
-    });
-
     it("should not redirect during mount when on a valid child route", () => {
       mockRouter.currentRoute.value.name = "general";
       mockReplace.mockClear();
@@ -380,6 +341,107 @@ describe("SettingsIndex.vue", () => {
       expect(keys).toContain("pipeline_destinations");
       expect(keys).not.toContain("alert_destinations");
       expect(keys).not.toContain("templates");
+    });
+  });
+
+  describe("Slack (Integrations group)", () => {
+    const findSlack = (w: any) =>
+      w.vm.sectionGroups.flatMap((group: any) => group.items).find((i: any) => i.key === "slack");
+    const slackConfig = (enabled: boolean, reason: string | null = null) => ({
+      zoConfig: {
+        service_streams_enabled: true,
+        slack_enabled: enabled,
+        slack_disabled_reason: reason,
+      },
+    });
+
+    afterEach(() => {
+      config.isEnterprise = "false";
+      config.isCloud = "false";
+      mockRouter.currentRoute.value.name = "settings";
+    });
+
+    it("AC-12.5 puts an Integrations group holding Slack right after Destinations", () => {
+      config.isEnterprise = "true";
+      mockRouter.currentRoute.value.name = "general";
+      wrapper = createWrapper(slackConfig(true));
+      const labels = wrapper.vm.sectionGroups.map((g: any) => g.label);
+      expect(labels.indexOf("Integrations")).toBe(labels.indexOf("Destinations") + 1);
+      const group = wrapper.vm.sectionGroups.find((g: any) => g.label === "Integrations");
+      expect(group.items.map((i: any) => i.key)).toEqual(["slack"]);
+      expect(group.items[0].icon).toMatch(/^img:.*slack/);
+    });
+
+    it.each(["flag", "master_key", "super_cluster"])(
+      "AC-1.5 hides Slack on self-hosted enterprise for disabled reason %s",
+      (reason) => {
+        config.isEnterprise = "true";
+        wrapper = createWrapper(slackConfig(false, reason));
+        expect(findSlack(wrapper)?.visible).toBe(false);
+      },
+    );
+
+    it("AC-1.5 sends a self-hosted deep link to General while Slack is off", () => {
+      config.isEnterprise = "true";
+      mockRouter.currentRoute.value.name = "slack";
+      mockPush.mockClear();
+      wrapper = createWrapper(slackConfig(false, "flag"));
+      expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ path: "/settings/general" }));
+    });
+
+    it.each(["home_region_unset", "other_region", "allowlist"])(
+      "hides Slack for the removed reason %s",
+      (reason) => {
+        config.isEnterprise = "true";
+        wrapper = createWrapper(slackConfig(false, reason));
+        expect(findSlack(wrapper)?.visible).toBe(false);
+      },
+    );
+
+    it("AC-1.4 hides Slack on Cloud while it is disabled", () => {
+      config.isEnterprise = "true";
+      config.isCloud = "true";
+      wrapper = createWrapper(slackConfig(false, "flag"));
+      expect(findSlack(wrapper)?.visible).toBe(false);
+    });
+
+    it("shows Slack on Cloud once it is enabled", () => {
+      config.isEnterprise = "true";
+      config.isCloud = "true";
+      wrapper = createWrapper(slackConfig(true));
+      expect(findSlack(wrapper)?.visible).toBe(true);
+    });
+
+    it("AC-1.10 hides Slack in the open-source build", () => {
+      wrapper = createWrapper(slackConfig(false, "edition"));
+      expect(findSlack(wrapper)?.visible).toBe(false);
+    });
+
+    it("AC-1.11 sends a direct URL to a hidden Slack item back to General", () => {
+      config.isEnterprise = "true";
+      config.isCloud = "true";
+      mockRouter.currentRoute.value.name = "slack";
+      mockPush.mockClear();
+      wrapper = createWrapper(slackConfig(false, "flag"));
+      expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ path: "/settings/general" }));
+    });
+
+    it("waits for the org config before redirecting a Slack deep link", () => {
+      config.isEnterprise = "true";
+      mockRouter.currentRoute.value.name = "slack";
+      mockPush.mockClear();
+      wrapper = createWrapper({ zoConfig: {} });
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it("keeps a visible Slack route and renders it in the reading column", () => {
+      config.isEnterprise = "true";
+      mockRouter.currentRoute.value.name = "slack";
+      mockPush.mockClear();
+      wrapper = createWrapper(slackConfig(true));
+      expect(mockPush).not.toHaveBeenCalled();
+      expect(wrapper.vm.activeSection).toBe("slack");
+      expect(wrapper.vm.isConstrainedSection).toBe(true);
     });
   });
 
@@ -435,6 +497,61 @@ describe("SettingsIndex.vue", () => {
     });
   });
 
+  describe("password policy section", () => {
+    const findEntry = (w: any) =>
+      w.vm.sectionGroups
+        .flatMap((group: any) => group.items)
+        .find((item: any) => item.key === "password_policy");
+
+    afterEach(() => {
+      isMetaOrgRef.value = false;
+      config.isEnterprise = "false";
+      mockRouter.currentRoute.value.name = "settings";
+    });
+
+    it("is offered in the meta org of an enterprise build", () => {
+      config.isEnterprise = "true";
+      isMetaOrgRef.value = true;
+      wrapper = createWrapper();
+
+      expect(findEntry(wrapper)?.visible).toBe(true);
+    });
+
+    it("is hidden outside the meta org", () => {
+      config.isEnterprise = "true";
+      isMetaOrgRef.value = false;
+      wrapper = createWrapper();
+
+      expect(findEntry(wrapper)?.visible).toBe(false);
+    });
+
+    it("shows locked (not hidden) in an OSS build, even in the meta org", () => {
+      config.isEnterprise = "false";
+      isMetaOrgRef.value = true;
+      wrapper = createWrapper();
+
+      expect(findEntry(wrapper)?.visible).toBe(true);
+      expect(findEntry(wrapper)?.locked).toBe(true);
+    });
+
+    it("sends an enterprise non-meta org back to General", () => {
+      config.isEnterprise = "true";
+      isMetaOrgRef.value = false;
+      mockRouter.currentRoute.value.name = "passwordPolicy";
+      mockPush.mockClear();
+      wrapper = createWrapper({ zoConfig: { meta_org: "_meta" } });
+
+      expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ path: "/settings/general" }));
+    });
+
+    it("renders in the centered reading column, like the other form sections", () => {
+      mockRouter.currentRoute.value.name = "passwordPolicy";
+      wrapper = createWrapper();
+
+      expect(wrapper.vm.isConstrainedSection).toBe(true);
+    });
+  });
+
   describe("Template Rendering", () => {
     it("should render without errors", () => {
       mockRouter.currentRoute.value.name = "general";
@@ -450,17 +567,6 @@ describe("SettingsIndex.vue", () => {
   });
 
   describe("Integration Tests", () => {
-    it("should handle workflow for non-enterprise org", async () => {
-      mockRouter.currentRoute.value.name = "settings";
-      wrapper = createWrapper();
-      mockReplace.mockClear();
-
-      wrapper.vm.handleSettingsRouting();
-      expect(mockReplace).toHaveBeenCalledWith(
-        expect.objectContaining({ path: "/settings/general" }),
-      );
-    });
-
     it("should have stable activeSection after mount on general", () => {
       mockRouter.currentRoute.value.name = "general";
       wrapper = createWrapper();
@@ -484,15 +590,6 @@ describe("SettingsIndex.vue", () => {
       mockRouter.currentRoute.value.name = "alertDestinations";
       wrapper = createWrapper();
       expect(() => wrapper.vm.handleSettingsRouting()).not.toThrow();
-    });
-
-    it("should handle router replace failures gracefully", () => {
-      mockRouter.currentRoute.value.name = "settings";
-      // replace returns a rejected promise — the component wraps it in Promise.resolve().catch()
-      mockReplace.mockReturnValue(Promise.reject(new Error("nav failed")));
-      expect(() => {
-        wrapper = createWrapper();
-      }).not.toThrow();
     });
   });
 

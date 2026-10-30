@@ -23,6 +23,7 @@ import { createI18n } from "vue-i18n";
 import { ref } from "vue";
 import OpenTelemetry from "./OpenTelemetry.vue";
 import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
+import { gt } from "@/types/i18n";
 
 const mockConfig = { isCloud: "false" };
 vi.mock("@/aws-exports", () => ({
@@ -68,7 +69,7 @@ const SUBS = {
 };
 
 const buildCard = async () =>
-  (await import("@/components/ingestion/setupCard/content/otlpTraces")).default(SUBS);
+  (await import("@/components/ingestion/setupCard/content/otlpTraces")).default(SUBS, gt);
 
 describe("otlpTracesCard builder", () => {
   beforeEach(() => {
@@ -133,7 +134,7 @@ describe("OpenTelemetry.vue", () => {
   });
 
   it("renders the shared setup card for the otlpTraces slug", () => {
-    expect(getDataSourceCard("otlpTraces", SUBS)?.provider.name).toContain("Traces");
+    expect(getDataSourceCard("otlpTraces", SUBS, gt)?.provider.name).toContain("Traces");
     wrapper = mount(OpenTelemetry, {
       global: { plugins: [mockStore, mockI18n] },
     });

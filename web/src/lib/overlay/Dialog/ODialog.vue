@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { DIALOG_DEPTH_KEY } from "./dialogStacking";
 // Copyright 2026 OpenObserve Inc.
 
 import type { DialogProps, DialogEmits, DialogSlots } from "./ODialog.types";
@@ -22,11 +23,17 @@ import {
   useAttrs,
   inject,
   provide,
+  onActivated,
+  onDeactivated,
 } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
 import { FORM_SUBMIT_STATE_KEY } from "@/lib/forms/Form/OForm.types";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { useI18nTyped } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -37,8 +44,8 @@ const $attrs = useAttrs();
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
 // Stacking support: each nested ODialog gets a higher z-index layer
-const dialogDepth = inject<number>("o2DialogDepth", 0);
-provide("o2DialogDepth", dialogDepth + 1);
+const dialogDepth = inject<number>(DIALOG_DEPTH_KEY, 0);
+provide(DIALOG_DEPTH_KEY, dialogDepth + 1);
 
 // Auto loading: an OForm nested in the body (linked via `form-id`) mirrors its
 // `isSubmitting` into this ref, so the footer Save button shows its spinner
@@ -55,6 +62,7 @@ const props = withDefaults(defineProps<DialogProps>(), {
   showClose: true,
   width: undefined,
   maxHeight: undefined,
+  primaryButtonDataTest: "o-dialog-primary-btn",
   primaryButtonVariant: "primary",
   secondaryButtonVariant: "outline",
   neutralButtonVariant: "ghost",
@@ -64,6 +72,7 @@ const props = withDefaults(defineProps<DialogProps>(), {
   primaryButtonLoading: false,
   secondaryButtonLoading: false,
   neutralButtonLoading: false,
+  initialFocus: "primary",
 });
 
 const emit = defineEmits<DialogEmits>();
@@ -84,13 +93,46 @@ watch(
   },
 );
 
+// A kept-alive view's portal stays in <body> when the view is away, so it hides then and returns open.
+const hostAway = ref(false);
+const shown = computed(() => internalOpen.value && !hostAway.value);
+
+// Remounting on return re-records focus from wherever navigation left it, so keep the opener.
+let openedFrom: HTMLElement | null = null;
+let awaySinceOpen = false;
+watch(
+  internalOpen,
+  (open) => {
+    if (!open) return;
+    openedFrom = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    awaySinceOpen = false;
+  },
+  { immediate: true },
+);
+onDeactivated(() => {
+  hostAway.value = true;
+  if (internalOpen.value && !shown.value) awaySinceOpen = true;
+});
+onActivated(() => (hostAway.value = false));
+
+function handleCloseAutoFocus(event: Event) {
+  if (hostAway.value || awaySinceOpen) event.preventDefault();
+  if (hostAway.value || !awaySinceOpen) return;
+  awaySinceOpen = false;
+  if (openedFrom?.isConnected) openedFrom.focus();
+}
+
 function handleOpenChange(v: boolean) {
   internalOpen.value = v;
   emit("update:open", v);
 }
 
+// Escape pressed inside an open dropdown or select belongs to that popup, not the dialog.
+const ESCAPE_OWNED_BY_POPUP = "[data-reka-popper-content-wrapper]";
+
 function handleEscapeKeyDown(e: KeyboardEvent) {
-  if (props.persistent) {
+  const target = e.target instanceof Element ? e.target : null;
+  if (props.persistent || target?.closest(ESCAPE_OWNED_BY_POPUP)) {
     e.preventDefault();
     return;
   }
@@ -107,7 +149,8 @@ function handleEscapeKeyDown(e: KeyboardEvent) {
 // non-printable keys — Escape must keep reaching reka's dismiss layer.
 function handleContentKeydown(e: KeyboardEvent) {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
-  if (e.key.length !== 1) return;
+  // Browser autofill dispatches keydown events with no `key`.
+  if (typeof e.key !== "string" || e.key.length !== 1) return;
   if (isInputFocused(e.target)) return;
   e.stopPropagation();
 }
@@ -181,19 +224,19 @@ const sizeClasses = computed(() => {
   }
   switch (props.size) {
     case "xs":
-      return "max-w-[min(320px,calc(100vw-2rem))] w-full";
+      return "max-w-[min(20rem,calc(100vw-2rem))] w-full";
     case "sm":
-      return "max-w-[min(480px,calc(100vw-2rem))] w-full";
+      return "max-w-[min(30rem,calc(100vw-2rem))] w-full";
     case "md":
-      return "max-w-[min(640px,calc(100vw-2rem))] w-full";
+      return "max-w-[min(40rem,calc(100vw-2rem))] w-full";
     case "lg":
-      return "max-w-[min(800px,calc(100vw-2rem))] w-full";
+      return "max-w-[min(50rem,calc(100vw-2rem))] w-full";
     case "xl":
-      return "max-w-[min(1024px,calc(100vw-2rem))] w-full";
+      return "max-w-[min(64rem,calc(100vw-2rem))] w-full";
     case "full":
       return "w-screen h-screen max-w-none rounded-none";
     default:
-      return "max-w-[min(640px,calc(100vw-2rem))] w-full";
+      return "max-w-[min(40rem,calc(100vw-2rem))] w-full";
   }
 });
 
@@ -210,6 +253,7 @@ const contentStyle = computed(() => {
 // ── Auto-focus logic ─────────────────────────────────────────────────────────
 const bodyRef = ref<HTMLElement | null>(null);
 const primaryBtnRef = ref<InstanceType<typeof OButton> | null>(null);
+const secondaryBtnRef = ref<InstanceType<typeof OButton> | null>(null);
 
 // Text fields take priority; a select/combobox trigger (OSelect listbox
 // trigger, reka SelectTrigger) is the second tier so a dialog whose
@@ -244,8 +288,9 @@ function handleOpenAutoFocus(event: Event) {
       field.focus();
       return;
     }
-    // No form field found → focus primary button (confirm dialog pattern)
-    const btnEl = (primaryBtnRef.value as any)?.$el as HTMLElement | undefined;
+    // No form field found → focus the chosen footer button (confirm dialog pattern)
+    const btnRef = props.initialFocus === "secondary" ? secondaryBtnRef : primaryBtnRef;
+    const btnEl = (btnRef.value as any)?.$el as HTMLElement | undefined;
     if (btnEl) {
       btnEl.focus();
     }
@@ -261,7 +306,7 @@ function handleOpenAutoFocus(event: Event) {
 // move focus to the first field of the newly added content — unless the user
 // is still focused in a field that survived the swap.
 watchEffect((cleanup) => {
-  if (!internalOpen.value) return;
+  if (!shown.value) return;
   const body = bodyRef.value;
   if (!body) return;
 
@@ -304,7 +349,7 @@ watchEffect((cleanup) => {
 // document-level handlers never fire when focus moves to/from a portaled
 // reka-ui element (ODropdown, OSelect listbox, etc.).
 watchEffect((cleanup) => {
-  if (!internalOpen.value) return;
+  if (!shown.value) return;
 
   function isPortalElement(el: Element | null): boolean {
     return !!el?.closest("[data-reka-popper-content-wrapper]");
@@ -339,7 +384,8 @@ const {
   detach: detachShadow,
 } = useScrollShadow(bodyRef);
 
-watch(internalOpen, (open) => {
+// The body unmounts while a kept-alive host is away, so its listeners follow what is shown.
+watch(shown, (open) => {
   if (open) {
     nextTick(() => {
       attachShadow();
@@ -352,7 +398,7 @@ watch(internalOpen, (open) => {
 </script>
 
 <template>
-  <DialogRoot :open="internalOpen" @update:open="handleOpenChange">
+  <DialogRoot :open="shown" @update:open="handleOpenChange">
     <!-- Trigger slot — omit when controlling exclusively via v-model:open -->
     <DialogTrigger v-if="hasTrigger" as-child>
       <slot name="trigger" />
@@ -409,6 +455,7 @@ watch(internalOpen, (open) => {
         @escape-key-down="handleEscapeKeyDown"
         @interact-outside="handleInteractOutside"
         @open-auto-focus="handleOpenAutoFocus"
+        @close-auto-focus="handleCloseAutoFocus"
         @keydown="handleContentKeydown"
       >
         <!--
@@ -417,12 +464,12 @@ watch(internalOpen, (open) => {
           The visible title in the header is a plain <span> to avoid <h2> browser styles.
         -->
         <DialogTitle class="sr-only absolute">
-          {{ title ?? "Dialog" }}
+          {{ title ?? t("common.dialog") }}
         </DialogTitle>
 
         <!-- Required by Reka; hidden from view -->
         <DialogDescription class="sr-only absolute">
-          {{ title ?? "Dialog" }}
+          {{ title ?? t("common.dialog") }}
         </DialogDescription>
 
         <!-- ── Header ───────────────────────────────────────── -->
@@ -443,20 +490,19 @@ watch(internalOpen, (open) => {
 
           <!-- CASE 2: Default / structured layout -->
           <template v-else>
-            <!-- Title + subtitle block — fixed width, never grows -->
-            <div v-if="title || subTitle" class="min-w-0 shrink-0">
-              <span
+            <div v-if="title || subTitle" class="min-w-0">
+              <OTruncatedText
                 v-if="title"
-                class="text-dialog-header-text block truncate text-base font-semibold"
+                class="text-dialog-header-text block text-base font-semibold"
               >
                 {{ title }}
-              </span>
-              <span
+              </OTruncatedText>
+              <OTruncatedText
                 v-if="subTitle"
-                class="text-dialog-content-text mt-0.5 block truncate text-sm opacity-70"
+                class="text-dialog-content-text mt-0.5 block text-sm opacity-70"
               >
                 {{ subTitle }}
-              </span>
+              </OTruncatedText>
             </div>
 
             <!-- #header-left sub-slot — grows to fill space, content flows left-to-right after title -->
@@ -480,7 +526,7 @@ watch(internalOpen, (open) => {
           <DialogClose v-if="showClose" as-child>
             <button
               type="button"
-              aria-label="Close dialog"
+              :aria-label="t('components.dialog.closeDialog')"
               data-test="o-dialog-close-btn"
               @mousedown.prevent
               :class="[
@@ -525,12 +571,9 @@ watch(internalOpen, (open) => {
             isFullSize ? 'flex-1 overflow-hidden p-0' : 'overflow-y-auto',
             !isFullSize && 'px-dialog-content-px py-dialog-content-py',
             'text-dialog-content-text',
-            !isFullSize && canScrollUp && '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1)]',
-            !isFullSize && canScrollDown && '[box-shadow:inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
-            !isFullSize &&
-              canScrollUp &&
-              canScrollDown &&
-              '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1),inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
+            !isFullSize && canScrollUp && 'shadow-scroll-top',
+            !isFullSize && canScrollDown && 'shadow-scroll-bottom',
+            !isFullSize && canScrollUp && canScrollDown && 'shadow-scroll-both',
           ]"
         >
           <slot />
@@ -549,8 +592,9 @@ watch(internalOpen, (open) => {
         >
           <!-- ── Built-in footer buttons ──────────────────────────────────────── -->
           <div v-if="!slots.footer" class="flex items-center justify-between gap-2">
-            <!-- Left: neutral button -->
-            <div>
+            <!-- Left: optional footer-left content, then neutral button -->
+            <div class="flex items-center gap-2">
+              <slot name="footer-left" />
               <OButton
                 v-if="neutralButtonLabel"
                 data-test="o-dialog-neutral-btn"
@@ -568,6 +612,7 @@ watch(internalOpen, (open) => {
             <div class="flex items-center gap-2">
               <OButton
                 v-if="secondaryButtonLabel"
+                ref="secondaryBtnRef"
                 data-test="o-dialog-secondary-btn"
                 :variant="secondaryButtonVariant"
                 size="sm-action"
@@ -581,7 +626,7 @@ watch(internalOpen, (open) => {
               <OButton
                 v-if="primaryButtonLabel"
                 ref="primaryBtnRef"
-                data-test="o-dialog-primary-btn"
+                :data-test="primaryButtonDataTest"
                 :variant="primaryButtonVariant"
                 size="sm-action"
                 :type="formId ? 'submit' : 'button'"

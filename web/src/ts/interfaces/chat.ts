@@ -1,6 +1,8 @@
+import type { I18nText } from "@/types/i18n";
+
 export interface ToolCall {
   tool: string;
-  message: string;
+  message: I18nText;
   context: Record<string, any>;
   call_id?: string; // Unique ID from ADK function_call.id for matching tool_result to tool_call
 }
@@ -9,7 +11,7 @@ export interface ToolCall {
 export interface NavigationAction {
   resource_type: string; // Generic - not enum limited (logs, metrics, traces, dashboard, alert, pipeline, etc.)
   action: "load_query" | "navigate_direct";
-  label: string;
+  label: I18nText;
   target: {
     // For load_query action (string) or navigate_direct action (record)
     query?: string | Record<string, any>;
@@ -31,10 +33,10 @@ export interface NavigationAction {
 
 // Content block for interleaved display (tool calls and text in order)
 export interface ContentBlock {
-  type: "tool_call" | "text" | "error" | "navigation";
+  type: "tool_call" | "text" | "error" | "navigation" | "status";
   // For tool_call type:
   tool?: string;
-  message?: string;
+  message?: I18nText;
   context?: Record<string, any>;
   call_id?: string; // Unique ID for matching tool_result to tool_call
   // For text type:
@@ -52,8 +54,11 @@ export interface ContentBlock {
   suggestion?: string; // remediation hint
   details?: Record<string, any>; // error details
   recoverable?: boolean; // for stream-level errors
+  ephemeral?: boolean; // shown in the live chat, never saved to history
   // Navigation action (from navigation_action events):
   navigationAction?: NavigationAction; // Optional navigation button for tool calls
+  // Marker of a turn still being generated, or one the user stopped:
+  turnStatus?: "running" | "stopped";
 }
 
 // Image attachment for multimodal chat
@@ -70,17 +75,39 @@ export const ALLOWED_IMAGE_TYPES = ["image/png", "image/jpeg"] as const;
 
 export interface ChatMessage {
   role: "user" | "assistant";
-  content: string; // Final/complete content for backward compat
+  content: I18nText; // Final/complete content for backward compat
   contentBlocks?: ContentBlock[]; // Sequential blocks for interleaved display
   images?: ImageAttachment[]; // Optional images for multimodal messages
   feedback?: "thumbs_up" | "thumbs_down"; // User feedback vote for assistant messages
 }
 
+/** Where one stored turn's messages sit in a folded message list, for incremental merges. */
+export interface TurnSpan {
+  turn_id?: string;
+  first_seq?: number | null;
+  last_seq?: number | null;
+  /** Number of messages the turn produced. */
+  count: number;
+}
+
 export interface ChatHistoryEntry {
   id: number;
   timestamp: string;
-  title: string;
+  title: I18nText;
   messages: ChatMessage[];
   sessionId?: string; // UUID v7 for tracking all API calls in this chat session
   userOrgKey?: string; // SHA-256 hash of "email:orgIdentifier" for per-user/org isolation
+  // A cache of a server-stored chat; cachedLastSeq is unset while a live turn may still change it.
+  serverBacked?: boolean;
+  cachedLastSeq?: number;
+  // The server's state_version for cachedLastSeq, so a status-only change is not served from cache.
+  cachedStateVersion?: string;
+  // Per-turn seq ranges of `messages`, so a stale cache can be topped up with only the newer turns.
+  cachedTurnSpans?: TurnSpan[];
+  forkedFromShare?: string;
+  // The last turn this browser streamed into a live save; the save is ahead until the server has it settled.
+  liveTurnId?: string;
+  liveSavedAt?: number;
+  // Not stored: the server could not return this chat's history.
+  historyUnavailable?: boolean;
 }

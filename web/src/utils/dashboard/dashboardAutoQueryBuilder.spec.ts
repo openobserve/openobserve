@@ -547,6 +547,48 @@ describe("dashboardAutoQueryBuilder", () => {
       expect(result).toBe("");
     });
 
+    it("reads a string state column with max, grouped by time and entity", () => {
+      const field = (alias: string, column: string, functionName: string | null) => ({
+        alias,
+        column,
+        isDerived: false,
+        functionName,
+        args: [{ type: "field", value: { field: column } }],
+      });
+      mockQueryData.fields.x = [field("x_axis_1", "_timestamp", null)];
+      mockQueryData.fields.breakdown = [field("breakdown_1", "port", null)];
+      mockQueryData.fields.y = [field("y_axis_1", "link_state", "max")];
+
+      const result = buildSQLChartQuery({
+        queryData: mockQueryData,
+        chartType: "state-timeline",
+        dashboardPanelData: mockDashboardPanelData,
+      });
+      expect(result).toContain('max(link_state) as "y_axis_1"');
+      expect(result).toContain("GROUP BY x_axis_1, breakdown_1");
+    });
+
+    it("drops a y HAVING filter on a distribution, whose raw rows are not grouped", () => {
+      mockQueryData.fields.y = [
+        {
+          alias: "y_axis_1",
+          column: "latency",
+          isDerived: false,
+          functionName: null,
+          args: [{ type: "field", value: { field: "latency" } }],
+          havingConditions: [{ operator: ">", value: 5 }],
+        },
+      ];
+
+      const result = buildSQLChartQuery({
+        queryData: mockQueryData,
+        chartType: "distribution",
+        dashboardPanelData: mockDashboardPanelData,
+      });
+      expect(result).toContain('latency as "y_axis_1"');
+      expect(result).not.toContain("HAVING");
+    });
+
     it("should build query with x-axis fields only", () => {
       mockQueryData.fields.x = [
         {
@@ -672,6 +714,151 @@ describe("dashboardAutoQueryBuilder", () => {
       };
       const result = buildSQLChartQuery(config);
       expect(result).toContain("GROUP BY x_alias, y_alias");
+    });
+
+    describe("heatmap numeric y bucketing", () => {
+      const yFieldOf = (field: string, extra: Record<string, unknown> = {}) => ({
+        alias: "y_axis_1",
+        isDerived: false,
+        functionName: null,
+        args: [{ type: "field", value: { field } }],
+        ...extra,
+      });
+      const heatmapQuery = (config: Record<string, unknown>, yField: any = yFieldOf("age")) => {
+        mockQueryData.fields.x = [
+          {
+            alias: "x_axis_1",
+            isDerived: false,
+            functionName: "histogram",
+            args: [{ type: "field", value: { field: "_timestamp" } }],
+          },
+        ];
+        mockQueryData.fields.y = [yField];
+        mockQueryData.fields.z = [
+          {
+            alias: "z_axis_1",
+            isDerived: false,
+            functionName: "count",
+            args: [{ type: "field", value: { field: "_timestamp" } }],
+          },
+        ];
+        mockDashboardPanelData.data.config = config;
+        return buildSQLChartQuery({
+          queryData: mockQueryData,
+          chartType: "heatmap",
+          dashboardPanelData: mockDashboardPanelData,
+        });
+      };
+
+      it("is unchanged when bucketing is unset", () => {
+        expect(heatmapQuery({})).toBe(
+          'SELECT histogram(_timestamp) as "x_axis_1", age as "y_axis_1", count(_timestamp) as "z_axis_1" FROM "logs"  GROUP BY x_axis_1, y_axis_1',
+        );
+      });
+
+      it("groups by the lower bound of a fixed-size bucket", () => {
+        expect(heatmapQuery({ heatmap_y_bucket: { mode: "size", size: 10 } })).toBe(
+          'SELECT histogram(_timestamp) as "x_axis_1", floor(CAST(age AS DOUBLE) / 10) * 10 as "y_axis_1", count(_timestamp) as "z_axis_1" FROM "logs"  GROUP BY x_axis_1, y_axis_1',
+        );
+      });
+
+      it("groups by the power of the log base, with <= 0 in one bucket", () => {
+        const sql = heatmapQuery({ heatmap_y_bucket: { mode: "log", base: 2 } });
+        expect(sql).toContain(
+          'CASE WHEN age > 0 THEN pow(2, floor(log2(CAST(age AS DOUBLE)))) WHEN age <= 0 THEN 0 END as "y_axis_1"',
+        );
+        expect(sql).toContain("GROUP BY x_axis_1, y_axis_1");
+      });
+
+      it("references the y column through the stream alias when joins exist", () => {
+        mockQueryData.joins = [
+          { stream: "other", streamAlias: "b", joinType: "inner", conditions: [] },
+        ];
+        const sql = heatmapQuery({
+          heatmap_y_bucket: { mode: "size", size: 5 },
+          heatmap_y_min: 1,
+        });
+        expect(sql).toContain('floor(CAST(logs.age AS DOUBLE) / 5) * 5 as "y_axis_1"');
+        expect(sql).toContain("WHERE logs.age >= 1");
+      });
+
+      it("adds the y range to the WHERE clause, keeping the user's OR group intact", () => {
+        mockQueryData.fields.filter.conditions = [
+          {
+            type: "condition",
+            column: { field: "status" },
+            operator: "=",
+            value: "a",
+            logicalOperator: "AND",
+          },
+          {
+            type: "condition",
+            column: { field: "status" },
+            operator: "=",
+            value: "b",
+            logicalOperator: "OR",
+          },
+        ];
+        const sql = heatmapQuery({
+          heatmap_y_bucket: { mode: "size", size: 10 },
+          heatmap_y_min: -5,
+          heatmap_y_max: 500,
+        });
+        expect(sql).toContain(
+          "WHERE (status = 'a' OR status = 'b') AND age >= -5 AND age <= 500 GROUP BY",
+        );
+      });
+
+      it("adds a WHERE for the y range when there are no filters", () => {
+        expect(heatmapQuery({ heatmap_y_bucket: { mode: "log" }, heatmap_y_max: 1000 })).toContain(
+          'FROM "logs"  WHERE age <= 1000 GROUP BY',
+        );
+      });
+
+      it("ignores an inverted y range", () => {
+        const sql = heatmapQuery({
+          heatmap_y_bucket: { mode: "size", size: 10 },
+          heatmap_y_min: 50,
+          heatmap_y_max: 10,
+        });
+        expect(sql).not.toContain("WHERE");
+        expect(sql).toContain("floor(CAST(age AS DOUBLE) / 10) * 10");
+      });
+
+      it.each([0, -1, null, "abc"])("generates no query for bucket size %s", (size) => {
+        expect(heatmapQuery({ heatmap_y_bucket: { mode: "size", size } })).toBe("");
+      });
+
+      it("generates no query when the known range exceeds the cell budget", () => {
+        expect(
+          heatmapQuery({
+            heatmap_y_bucket: { mode: "size", size: 0.001 },
+            heatmap_y_min: 0,
+            heatmap_y_max: 1000,
+          }),
+        ).toBe("");
+      });
+
+      it("leaves a non-numeric or aggregated y as it is", () => {
+        const config = { heatmap_y_bucket: { mode: "size", size: 10 }, heatmap_y_min: 1 };
+        expect(heatmapQuery(config, yFieldOf("status"))).toContain('status as "y_axis_1"');
+        expect(heatmapQuery(config, yFieldOf("status"))).not.toContain("WHERE");
+        expect(heatmapQuery(config, yFieldOf("age", { functionName: "max" }))).toContain(
+          'max(age) as "y_axis_1"',
+        );
+      });
+
+      it("does not bucket other chart types", () => {
+        mockQueryData.fields.x = [yFieldOf("status", { alias: "x_axis_1" })];
+        mockQueryData.fields.y = [yFieldOf("age")];
+        mockDashboardPanelData.data.config = { heatmap_y_bucket: { mode: "size", size: 10 } };
+        const sql = buildSQLChartQuery({
+          queryData: mockQueryData,
+          chartType: "bar",
+          dashboardPanelData: mockDashboardPanelData,
+        });
+        expect(sql).toContain('age as "y_axis_1"');
+      });
     });
 
     it("should build query with breakdown fields", () => {
@@ -1995,6 +2182,81 @@ describe("dashboardAutoQueryBuilder", () => {
       expect(result).toContain("country");
       expect(result).toContain("name_alias");
     });
+
+    describe("WHERE clause with skipped conditions (issue 16022)", () => {
+      const cond = (operator: string, value: any, extra: any = {}) => ({
+        type: "condition",
+        values: [],
+        column: { field: "country", streamAlias: null },
+        operator,
+        value,
+        logicalOperator: "AND",
+        filterType: "condition",
+        ...extra,
+      });
+      const setConditions = (conditions: any[]) => {
+        mockDashboardPanelData.data.queries[0].fields.filter.conditions = conditions;
+      };
+
+      it("keeps a <> '' parsed from SQL and leaves no trailing AND", () => {
+        setConditions([cond("Is Not Null", null), cond("<>", "", { emptyLiteral: true })]);
+        expect(mapChart(mockDashboardPanelData)).toContain(
+          "WHERE country IS NOT NULL AND country <> '' GROUP BY",
+        );
+      });
+
+      it("keeps a lone <> '' parsed from SQL", () => {
+        setConditions([cond("<>", "", { emptyLiteral: true })]);
+        expect(mapChart(mockDashboardPanelData)).toContain("WHERE country <> '' GROUP BY");
+      });
+
+      it("keeps = '' parsed from SQL on a non-string column", () => {
+        setConditions([
+          { ...cond("=", "", { emptyLiteral: true }), column: { field: "id", streamAlias: null } },
+        ]);
+        expect(mapChart(mockDashboardPanelData)).toContain("WHERE id = '' GROUP BY");
+      });
+
+      it("skips an empty value not entered yet without a trailing AND", () => {
+        setConditions([cond("Is Not Null", null), cond("=", "")]);
+        const result = mapChart(mockDashboardPanelData);
+        expect(result).toContain("WHERE country IS NOT NULL GROUP BY");
+        expect(result).not.toMatch(/AND\s+GROUP BY/);
+      });
+
+      it("drops the WHERE clause when every condition is empty", () => {
+        setConditions([cond("=", "")]);
+        expect(mapChart(mockDashboardPanelData)).not.toContain("WHERE");
+      });
+
+      it("keeps each condition's own operator when a middle one is skipped", () => {
+        setConditions([
+          cond("=", "a"),
+          cond("=", ""),
+          { ...cond("=", "b"), logicalOperator: "OR" },
+        ]);
+        expect(mapChart(mockDashboardPanelData)).toContain(
+          "WHERE country = 'a' OR country = 'b' GROUP BY",
+        );
+      });
+
+      it("keeps each condition's own operator inside a group", () => {
+        setConditions([
+          {
+            filterType: "group",
+            logicalOperator: "AND",
+            conditions: [
+              cond("=", "a"),
+              { ...cond("=", ""), logicalOperator: "AND" },
+              { ...cond("=", "b"), logicalOperator: "OR" },
+            ],
+          },
+        ]);
+        expect(mapChart(mockDashboardPanelData)).toContain(
+          "WHERE (country = 'a' OR country = 'b') GROUP BY",
+        );
+      });
+    });
   });
 
   describe("geoMapChart", () => {
@@ -2236,5 +2498,144 @@ describe("dashboardAutoQueryBuilder", () => {
       expect(result).toContain("SELECT");
       expect(result).toContain("source_alias");
     });
+  });
+});
+
+describe("buildSQLQueryFromInput — cast", () => {
+  const defaultStream = "aws_cost_cur";
+  const fieldArg = { type: "field", value: { field: "lineitem_usageamount" } };
+
+  it("renders a safe cast as TRY_CAST", () => {
+    const result = buildSQLQueryFromInput(
+      {
+        functionName: "try_cast",
+        args: [fieldArg, { type: "castType", value: "DOUBLE" }],
+      },
+      defaultStream,
+    );
+    expect(result).toBe("TRY_CAST(aws_cost_cur.lineitem_usageamount AS DOUBLE)");
+  });
+
+  it("renders a strict cast as CAST", () => {
+    const result = buildSQLQueryFromInput(
+      {
+        functionName: "cast",
+        args: [fieldArg, { type: "castType", value: "BIGINT" }],
+      },
+      defaultStream,
+    );
+    expect(result).toBe("CAST(aws_cost_cur.lineitem_usageamount AS BIGINT)");
+  });
+
+  it("nests inside an aggregation", () => {
+    const result = buildSQLQueryFromInput(
+      {
+        functionName: "sum",
+        args: [
+          {
+            type: "function",
+            value: {
+              functionName: "try_cast",
+              args: [fieldArg, { type: "castType", value: "DOUBLE" }],
+            },
+          },
+        ],
+      },
+      defaultStream,
+    );
+    expect(result).toBe("sum(TRY_CAST(aws_cost_cur.lineitem_usageamount AS DOUBLE))");
+  });
+
+  it("nests inside a percentile, which appends its own argument", () => {
+    const result = buildSQLQueryFromInput(
+      {
+        functionName: "p95",
+        args: [
+          {
+            type: "function",
+            value: {
+              functionName: "try_cast",
+              args: [fieldArg, { type: "castType", value: "DOUBLE" }],
+            },
+          },
+        ],
+      },
+      defaultStream,
+    );
+    expect(result).toBe(
+      "approx_percentile_cont(TRY_CAST(aws_cost_cur.lineitem_usageamount AS DOUBLE), 0.95)",
+    );
+  });
+
+  it("reads the target type by kind, not by position", () => {
+    const result = buildSQLQueryFromInput(
+      {
+        functionName: "try_cast",
+        args: [{ type: "castType", value: "BIGINT" }, fieldArg],
+      },
+      defaultStream,
+    );
+    expect(result).toBe("TRY_CAST(aws_cost_cur.lineitem_usageamount AS BIGINT)");
+  });
+
+  it("still casts when a saved panel carries no target type", () => {
+    const result = buildSQLQueryFromInput(
+      { functionName: "try_cast", args: [fieldArg] },
+      defaultStream,
+    );
+    expect(result).toBe("TRY_CAST(aws_cost_cur.lineitem_usageamount AS DOUBLE)");
+  });
+
+  it("ignores a stray argument that is not a value or a type", () => {
+    const result = buildSQLQueryFromInput(
+      {
+        functionName: "try_cast",
+        args: [
+          fieldArg,
+          { type: "string", value: "DOUBLE) FROM secrets --" },
+          { type: "castType", value: "DOUBLE" },
+        ],
+      },
+      defaultStream,
+    );
+    expect(result).toBe("TRY_CAST(aws_cost_cur.lineitem_usageamount AS DOUBLE)");
+  });
+
+  it("returns an empty string when only a target type is present", () => {
+    const result = buildSQLQueryFromInput(
+      { functionName: "try_cast", args: [{ type: "castType", value: "DOUBLE" }] },
+      defaultStream,
+    );
+    expect(result).toBe("");
+  });
+
+  it("falls back to the default type rather than emitting an unknown one", () => {
+    const result = buildSQLQueryFromInput(
+      {
+        functionName: "try_cast",
+        args: [fieldArg, { type: "castType", value: "DOUBLE) FROM secrets --" }],
+      },
+      defaultStream,
+    );
+    expect(result).toBe("TRY_CAST(aws_cost_cur.lineitem_usageamount AS DOUBLE)");
+  });
+
+  it("returns an empty string when the value argument is missing", () => {
+    const result = buildSQLQueryFromInput(
+      {
+        functionName: "try_cast",
+        args: [
+          { type: "field", value: {} },
+          { type: "castType", value: "DOUBLE" },
+        ],
+      },
+      defaultStream,
+    );
+    expect(result).toBe("");
+  });
+
+  it("adds the target type argument when a saved panel omits it", () => {
+    const result = addMissingArgs({ functionName: "try_cast", args: [fieldArg] });
+    expect(result.args[1]).toEqual({ type: "castType", value: "DOUBLE" });
   });
 });

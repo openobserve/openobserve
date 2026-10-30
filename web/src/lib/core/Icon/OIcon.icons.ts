@@ -45,6 +45,7 @@ import ChevronRight from "~icons/material-symbols/chevron-right";
 import Close from "~icons/material-symbols/close";
 import Backup from "~icons/material-symbols/backup-outline";
 import Cloud from "~icons/material-symbols/cloud-outline";
+import CloudOff from "~icons/material-symbols/cloud-off-outline";
 import Code from "~icons/material-symbols/code";
 import CompareArrows from "~icons/material-symbols/compare-arrows";
 import ContentCopy from "~icons/material-symbols/content-copy-outline";
@@ -52,12 +53,16 @@ import ContentPaste from "~icons/material-symbols/content-paste";
 import Delete from "~icons/material-symbols/delete-outline";
 import Download from "~icons/material-symbols/download";
 import Edit from "~icons/material-symbols/edit-outline";
+import EditNote from "~icons/material-symbols/edit-note-outline";
 import Error from "~icons/material-symbols/error-outline";
 import ErrorOutline from "~icons/material-symbols/error-outline";
 import Event from "~icons/material-symbols/event-outline";
 import ExpandMore from "~icons/material-symbols/expand-more";
+import Extension from "~icons/material-symbols/extension-outline";
 import UploadFile from "~icons/material-symbols/upload-file-outline";
 import FormatListBulleted from "~icons/material-symbols/format-list-bulleted";
+import FormatBold from "~icons/material-symbols/format-bold";
+import FormatItalic from "~icons/material-symbols/format-italic";
 import Fullscreen from "~icons/material-symbols/fullscreen";
 import GroupWork from "~icons/material-symbols/group-work-outline";
 import Groups from "~icons/material-symbols/groups-outline";
@@ -87,6 +92,7 @@ import KeyboardDoubleArrowLeft from "~icons/material-symbols/keyboard-double-arr
 import KeyboardDoubleArrowRight from "~icons/material-symbols/keyboard-double-arrow-right";
 import Language from "~icons/material-symbols/language";
 import Link from "~icons/material-symbols/link";
+import LinkOff from "~icons/material-symbols/link-off";
 import LocationOn from "~icons/material-symbols/location-on-outline";
 import MoreVert from "~icons/material-symbols/more-vert";
 import MenuIcon from "~icons/material-symbols/menu";
@@ -103,6 +109,7 @@ import Replay from "~icons/material-symbols/replay";
 import Replay10 from "~icons/material-symbols/replay-10";
 import Forward10 from "~icons/material-symbols/forward-10";
 import Schedule from "~icons/material-symbols/schedule-outline";
+import Science from "~icons/material-symbols/science-outline";
 import Search from "~icons/material-symbols/search";
 import Send from "~icons/material-symbols/send-outline";
 import Share from "~icons/material-symbols/share-outline";
@@ -126,11 +133,13 @@ import Dashboard from "~icons/material-symbols/dashboard-outline";
 import AccessTime from "~icons/material-symbols/schedule-outline";
 import Activity from "~icons/material-symbols/vital-signs";
 import AlignLeft from "~icons/material-symbols/format-align-left";
+import AlignRight from "~icons/material-symbols/format-align-right";
 import AllInclusive from "~icons/material-symbols/all-inclusive";
 import AssignmentTurnedIn from "~icons/material-symbols/assignment-turned-in-outline";
 import AutoAwesome from "~icons/material-symbols/auto-awesome-outline";
 import BarChart from "~icons/material-symbols/bar-chart-4-bars";
 import Bookmark from "~icons/material-symbols/bookmark-outline";
+import BookmarkAdd from "~icons/material-symbols/bookmark-add-outline";
 import Build from "~icons/material-symbols/build-outline";
 import Business from "~icons/material-symbols/business-center-outline";
 import Chat from "~icons/material-symbols/chat-outline";
@@ -142,10 +151,12 @@ import Description from "~icons/material-symbols/description-outline";
 import Dns from "~icons/material-symbols/dns-outline";
 import ForkRight from "~icons/material-symbols/fork-right";
 import FullscreenExit from "~icons/material-symbols/fullscreen-exit";
+import FitScreen from "~icons/material-symbols/fit-screen";
 import Group from "~icons/material-symbols/group-outline";
 import HourglassEmpty from "~icons/material-symbols/hourglass-empty";
 import Label from "~icons/material-symbols/label-outline";
 import Layers from "~icons/material-symbols/layers-outline";
+import Public from "~icons/material-symbols/public";
 import Mail from "~icons/material-symbols/mail-outline";
 import ManageSearch from "~icons/material-symbols/manage-search";
 import Merge from "~icons/material-symbols/merge";
@@ -167,6 +178,8 @@ import Title from "~icons/material-symbols/title";
 import TrendingUp from "~icons/material-symbols/trending-up";
 import Undo from "~icons/material-symbols/undo";
 import UnfoldMore from "~icons/material-symbols/unfold-more";
+import ZoomIn from "~icons/material-symbols/zoom-in";
+import ZoomOut from "~icons/material-symbols/zoom-out";
 import Upload from "~icons/material-symbols/upload";
 import VerifiedUser from "~icons/material-symbols/verified-user-outline";
 import Webhook from "~icons/material-symbols/webhook";
@@ -181,6 +194,8 @@ import PhotoCamera from "~icons/material-symbols/photo-camera-outline";
 import AddCircleIcon from "~icons/material-symbols/add-circle-outline";
 import AdsClickIcon from "~icons/material-symbols/ads-click";
 import AnalyticsIcon from "~icons/material-symbols/analytics-outline";
+import DoNotDisturbOnIcon from "~icons/material-symbols/do-not-disturb-on-outline";
+import LibraryAddIcon from "~icons/material-symbols/library-add-outline";
 import ArrowBackIosIcon from "~icons/material-symbols/arrow-back-ios";
 import ArrowForwardIosIcon from "~icons/material-symbols/arrow-forward-ios";
 import ArrowRightIcon from "~icons/material-symbols/arrow-right";
@@ -233,6 +248,7 @@ import HelpIcon from "~icons/material-symbols/help-outline";
 import HistoryToggleOffIcon from "~icons/material-symbols/history-toggle-off";
 import HomeIcon from "~icons/mdi/home-outline";
 import OrganizationIcon from "~icons/octicon/organization-16";
+import Graph1Icon from "~icons/material-symbols/graph-1";
 import Graph2Icon from "~icons/material-symbols/graph-2";
 import HubIcon from "~icons/material-symbols/hub-outline";
 import ImageIcon from "~icons/material-symbols/image-outline";
@@ -263,8 +279,12 @@ import RunningWithErrorsIcon from "~icons/material-symbols/error-outline";
 import SaveIcon from "~icons/material-symbols/save-outline";
 import SavedSearchIcon from "~icons/material-symbols/saved-search";
 import SearchOffIcon from "~icons/material-symbols/search-off";
+import SensorsOff from "~icons/material-symbols/sensors-off-outline";
+import NotificationsPaused from "~icons/material-symbols/notifications-paused-outline";
+import RepeatIcon from "~icons/material-symbols/repeat";
 import SecurityIcon from "~icons/material-symbols/shield-outline";
 import SentimentVeryDissatisfiedIcon from "~icons/material-symbols/mood-bad-outline";
+import AddReactionIcon from "~icons/material-symbols/add-reaction-outline";
 import StopIcon from "~icons/material-symbols/stop-outline";
 import SwapHorizIcon from "~icons/material-symbols/swap-horiz";
 import SwapVertIcon from "~icons/material-symbols/swap-vert";
@@ -280,8 +300,10 @@ import ThumbUpOffAltIcon from "~icons/material-symbols/thumb-up-outline";
 import PersonPinCircleIcon from "~icons/material-symbols/person-pin-circle-outline";
 import ToggleOffIcon from "~icons/material-symbols/toggle-off-outline";
 import TrendingDownIcon from "~icons/material-symbols/trending-down";
+import TrendingFlatIcon from "~icons/material-symbols/trending-flat";
 import TroubleshootIcon from "~icons/material-symbols/troubleshoot";
 import UpdateIcon from "~icons/material-symbols/update";
+import TvIcon from "~icons/material-symbols/tv-outline";
 import VerifiedIcon from "~icons/material-symbols/verified-outline";
 import ViewColumnIcon from "~icons/material-symbols/view-column-outline";
 import VolumeOffIcon from "~icons/material-symbols/volume-off-outline";
@@ -337,6 +359,9 @@ import Redo from "~icons/material-symbols/redo";
 import Tab from "~icons/material-symbols/tab-outline";
 import Web from "~icons/material-symbols/web";
 import SmartDisplay from "~icons/material-symbols/smart-display-outline";
+import AndroidIcon from "~icons/material-symbols/android";
+import PhoneIphoneIcon from "~icons/material-symbols/phone-iphone-outline";
+import CallIcon from "~icons/material-symbols/call-outline";
 
 // Brand mark (not a Material Symbol) — a local inline SVG component. See McpLogo.vue.
 import McpLogo from "./McpLogo.vue";
@@ -378,6 +403,7 @@ export const iconRegistry = {
   "chevron-right": ChevronRight,
   close: Close,
   cloud: Cloud,
+  "cloud-off": CloudOff,
   code: Code,
   "compare-arrows": CompareArrows,
   "content-copy": ContentCopy,
@@ -385,12 +411,16 @@ export const iconRegistry = {
   delete: Delete,
   download: Download,
   edit: Edit,
+  "edit-note": EditNote,
   error: Error,
   "error-outline": ErrorOutline,
   event: Event,
   "expand-more": ExpandMore,
+  extension: Extension,
   "upload-file": UploadFile,
   "format-list-bulleted": FormatListBulleted,
+  "format-bold": FormatBold,
+  "format-italic": FormatItalic,
   fullscreen: Fullscreen,
   "group-work": GroupWork,
   "group-add": GroupAdd,
@@ -420,6 +450,7 @@ export const iconRegistry = {
   "keyboard-double-arrow-right": KeyboardDoubleArrowRight,
   language: Language,
   link: Link,
+  "link-off": LinkOff,
   "location-on": LocationOn,
   "more-vert": MoreVert,
   menu: MenuIcon,
@@ -437,6 +468,7 @@ export const iconRegistry = {
   "replay-10": Replay10,
   "forward-10": Forward10,
   schedule: Schedule,
+  science: Science,
   search: Search,
   send: Send,
   share: Share,
@@ -460,11 +492,13 @@ export const iconRegistry = {
   "access-time": AccessTime,
   activity: Activity,
   "align-left": AlignLeft,
+  "align-right": AlignRight,
   "all-inclusive": AllInclusive,
   "assignment-turned-in": AssignmentTurnedIn,
   "auto-awesome": AutoAwesome,
   "bar-chart": BarChart,
   bookmark: Bookmark,
+  "bookmark-add": BookmarkAdd,
   build: Build,
   business: Business,
   chat: Chat,
@@ -476,6 +510,7 @@ export const iconRegistry = {
   dns: Dns,
   "fork-right": ForkRight,
   "git-branch": ForkRight,
+  "graph-1": Graph1Icon,
   "graph-2": Graph2Icon,
   flame: Whatshot,
   whatshot: Whatshot,
@@ -506,10 +541,12 @@ export const iconRegistry = {
   "navigate-before": ChevronLeft,
   "navigate-next": ChevronRight,
   "fullscreen-exit": FullscreenExit,
+  "fit-screen": FitScreen,
   group: Group,
   "hourglass-empty": HourglassEmpty,
   label: Label,
   layers: Layers,
+  public: Public,
   mail: Mail,
   "manage-search": ManageSearch,
   merge: Merge,
@@ -531,6 +568,8 @@ export const iconRegistry = {
   "trending-up": TrendingUp,
   undo: Undo,
   "unfold-more": UnfoldMore,
+  "zoom-in": ZoomIn,
+  "zoom-out": ZoomOut,
   upload: Upload,
   "verified-user": VerifiedUser,
   webhook: Webhook,
@@ -540,6 +579,8 @@ export const iconRegistry = {
   "add-circle": AddCircleIcon,
   "add-circle-outline": AddCircleIcon,
   "ads-click": AdsClickIcon,
+  "do-not-disturb-on": DoNotDisturbOnIcon,
+  "library-add": LibraryAddIcon,
   analytics: AnalyticsIcon,
   "arrow-back-ios": ArrowBackIosIcon,
   "arrow-forward-ios": ArrowForwardIosIcon,
@@ -626,6 +667,7 @@ export const iconRegistry = {
   "search-off": SearchOffIcon,
   security: SecurityIcon,
   "sentiment-very-dissatisfied": SentimentVeryDissatisfiedIcon,
+  "add-reaction": AddReactionIcon,
   stop: StopIcon,
   "swap-horiz": SwapHorizIcon,
   "swap-vert": SwapVertIcon,
@@ -643,8 +685,10 @@ export const iconRegistry = {
   // "group-work": GroupWorkIcon,
   "toggle-off": ToggleOffIcon,
   "trending-down": TrendingDownIcon,
+  "trending-flat": TrendingFlatIcon,
   troubleshoot: TroubleshootIcon,
   update: UpdateIcon,
+  tv: TvIcon,
   verified: VerifiedIcon,
   "view-column": ViewColumnIcon,
   "volume-off": VolumeOffIcon,
@@ -671,6 +715,9 @@ export const iconRegistry = {
   redo: Redo,
   tab: Tab,
   web: Web,
+  android: AndroidIcon,
+  "phone-iphone": PhoneIphoneIcon,
+  call: CallIcon,
 
   // Batch 3: Synthetics / browser-check icons (2026-06-22)
   // (duplicate "person-pin-circle" from batch 2 removed — keep the first entry at line 624)
@@ -680,6 +727,14 @@ export const iconRegistry = {
   checklist: Checklist,
   "photo-camera": PhotoCamera,
   "smart-display": SmartDisplay,
+
+  // Batch 4: Alert Library (2026-08-20)
+  // "no signal arriving" — the alert library's not-ingesting-this-stream state.
+  "sensors-off": SensorsOff,
+
+  // Batch 5: Downtimes (2026-09-24)
+  "notifications-paused": NotificationsPaused,
+  repeat: RepeatIcon,
 } as const satisfies Record<string, Component>;
 
 export type IconName = keyof typeof iconRegistry;

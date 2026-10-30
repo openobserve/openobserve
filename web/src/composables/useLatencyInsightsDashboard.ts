@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { TranslateFn } from "@/types/i18n";
 import type { DimensionAnalysis, LatencyInsightsConfig } from "./useLatencyInsightsAnalysis";
 
 /** Colors shared between the dashboard chart series and the UI chips */
@@ -25,7 +26,7 @@ export const COMPARISON_COLORS = {
  * Composable for generating dashboard JSON for Latency Insights
  * Transforms DimensionAnalysis results into OpenObserve dashboard schema
  */
-export function useLatencyInsightsDashboard() {
+export function useLatencyInsightsDashboard(t: TranslateFn) {
   /**
    * Build comparison query using UNION to combine baseline and selected results
    * Supports both latency analysis (duration-based) and volume analysis (rate-based)
@@ -173,9 +174,6 @@ export function useLatencyInsightsDashboard() {
       // For volume analysis: rate filter defines time period selection, not individual trace filtering
       // No additional WHERE clause needed - we compare ALL traces in selected vs baseline periods
       filterClause = "";
-    } else if (config.durationFilter) {
-      // For latency analysis: filter by duration
-      filterClause = `duration >= ${config.durationFilter.start} AND duration <= ${config.durationFilter.end}`;
     }
 
     const selectedFiltersArray = [selectedTimeFilter, filterClause, baseFilters].filter((f) => f);
@@ -183,211 +181,64 @@ export function useLatencyInsightsDashboard() {
       ? `WHERE ${selectedFiltersArray.join(" AND ")}`
       : "";
 
-    if (isVolumeAnalysis) {
-      // Volume Analysis: Normalize both baseline and selected to the selected time window
-      // This shows: "If baseline was compressed to spike duration, how many records would it have?"
-      // Makes comparison intuitive: spike shows MORE records in same time window
+    // Volume Analysis: Normalize both baseline and selected to the selected time window
+    // This shows: "If baseline was compressed to spike duration, how many records would it have?"
+    // Makes comparison intuitive: spike shows MORE records in same time window
 
-      // Calculate durations in seconds
-      const baselineDurationSeconds =
-        (config.baselineTimeRange.endTime - config.baselineTimeRange.startTime) / 1000000;
-      const selectedDurationSeconds =
-        (config.selectedTimeRange.endTime - config.selectedTimeRange.startTime) / 1000000;
+    // Calculate durations in seconds
+    const baselineDurationSeconds =
+      (config.baselineTimeRange.endTime - config.baselineTimeRange.startTime) / 1000000;
+    const selectedDurationSeconds =
+      (config.selectedTimeRange.endTime - config.selectedTimeRange.startTime) / 1000000;
 
-      // Use count(_timestamp) for logs, approx_distinct(trace_id) for traces
-      const countExpression =
-        config.streamType === "traces" ? "approx_distinct(trace_id)" : "count(_timestamp)";
+    const countExpression = "count(_timestamp)";
 
-      // Check if we should use single query or comparison query
-      // For TRACES: Only check the rateFilter (volume-specific) — a brush on the
-      // duration or error chart must not trigger comparison mode for volume panels.
-      // For LOGS: Check if time ranges are the same (no brush selection)
-      const hasTimeBasedFilter =
-        config.rateFilter !== undefined &&
-        config.rateFilter.timeStart !== undefined &&
-        config.rateFilter.timeEnd !== undefined;
+    // A brush narrows the selected range; the same range means no comparison.
+    const useBaselineOnly =
+      config.baselineTimeRange.startTime === config.selectedTimeRange.startTime &&
+      config.baselineTimeRange.endTime === config.selectedTimeRange.endTime;
 
-      const isSameTimeRange =
-        config.streamType === "logs" &&
-        config.baselineTimeRange.startTime === config.selectedTimeRange.startTime &&
-        config.baselineTimeRange.endTime === config.selectedTimeRange.endTime;
-
-      // Use single query (baseline-only) when:
-      // - TRACES: No time-based filter exists
-      // - LOGS: Time ranges are the same (no brush selection)
-      const useBaselineOnly =
-        config.streamType === "traces" ? !hasTimeBasedFilter : isSameTimeRange;
-
-      if (useBaselineOnly) {
-        const singleQuery = `
-          SELECT
-            COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
-            ${countExpression} AS trace_count
-          FROM "${config.streamName}"
-          ${selectedWhere}
-          GROUP BY ${dimensionName}
-          ORDER BY trace_count DESC
-          LIMIT 5
-        `.trim();
-
-        return singleQuery;
-      }
-
-      // Different time ranges: use comparison query with baseline vs selected
-      // Normalize baseline to selected time window: (records/baseline_duration) * selected_duration
-      const baselineQuery = `
+    if (useBaselineOnly) {
+      const singleQuery = `
         SELECT
           COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
-          'Baseline' AS series,
-          (${countExpression} * ${selectedDurationSeconds}) / ${baselineDurationSeconds} AS trace_count
-        FROM "${config.streamName}"
-        ${baselineWhere}
-        GROUP BY ${dimensionName}
-      `.trim();
-
-      // Selected uses actual count (already in the selected time window)
-      const selectedQuery = `
-        SELECT
-          COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
-          'Selected' AS series,
           ${countExpression} AS trace_count
         FROM "${config.streamName}"
         ${selectedWhere}
         GROUP BY ${dimensionName}
+        ORDER BY trace_count DESC
+        LIMIT 5
       `.trim();
 
-      const unionQuery = `${baselineQuery} UNION ${selectedQuery} ORDER BY trace_count DESC LIMIT 5`;
-
-      return unionQuery;
-    } else if (config.analysisType === "error") {
-      // Error Analysis: Compare error percentages by dimension
-      // Error % = (error_traces / total_traces) * 100
-
-      // Check if we should use single query (baseline-only mode)
-      // For TRACES: Only check the errorFilter (error-specific) — a brush on the
-      // duration or rate chart must not trigger comparison mode for error panels.
-      // For LOGS: Check if time ranges are the same (no brush selection)
-      const hasTimeBasedFilter =
-        config.errorFilter !== undefined &&
-        config.errorFilter.timeStart !== undefined &&
-        config.errorFilter.timeEnd !== undefined;
-
-      const isSameTimeRange =
-        config.streamType === "logs" &&
-        config.baselineTimeRange.startTime === config.selectedTimeRange.startTime &&
-        config.baselineTimeRange.endTime === config.selectedTimeRange.endTime;
-
-      // Use single query (baseline-only) when:
-      // - TRACES: No time-based filter exists
-      // - LOGS: Time ranges are the same (no brush selection)
-      const useBaselineOnly =
-        config.streamType === "traces" ? !hasTimeBasedFilter : isSameTimeRange;
-
-      if (useBaselineOnly) {
-        // Baseline-only mode: single query without comparison
-        const singleQuery = `
-          SELECT
-            COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
-            (approx_distinct(trace_id) FILTER (WHERE span_status = 'ERROR') * 100.0) /
-            NULLIF(approx_distinct(trace_id), 0) AS error_percentage
-          FROM "${config.streamName}"
-          ${baselineWhere}
-          GROUP BY ${dimensionName}
-          ORDER BY error_percentage DESC
-          LIMIT 5
-        `.trim();
-
-        return singleQuery;
-      }
-
-      // Comparison mode: baseline vs selected
-      const baselineQuery = `
-        SELECT
-          COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
-          'Baseline' AS series,
-          (approx_distinct(trace_id) FILTER (WHERE span_status = 'ERROR') * 100.0) /
-          NULLIF(approx_distinct(trace_id), 0) AS error_percentage
-        FROM "${config.streamName}"
-        ${baselineWhere}
-        GROUP BY ${dimensionName}
-      `.trim();
-
-      const selectedQuery = `
-        SELECT
-          COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
-          'Selected' AS series,
-          (approx_distinct(trace_id) FILTER (WHERE span_status = 'ERROR') * 100.0) /
-          NULLIF(approx_distinct(trace_id), 0) AS error_percentage
-        FROM "${config.streamName}"
-        ${selectedWhere}
-        GROUP BY ${dimensionName}
-      `.trim();
-
-      const unionQuery = `${baselineQuery} UNION ${selectedQuery} ORDER BY error_percentage DESC LIMIT 5`;
-
-      return unionQuery;
-    } else {
-      // Latency Analysis: Compare percentile latencies by dimension
-
-      // Check if we should use single query (baseline-only mode)
-      // For TRACES: Only check the durationFilter (latency-specific) — a brush on the
-      // rate or error chart must not trigger comparison mode for latency panels.
-      // For LOGS: Check if time ranges are the same (no brush selection)
-      const hasTimeBasedFilter =
-        config.durationFilter !== undefined &&
-        config.durationFilter.timeStart !== undefined &&
-        config.durationFilter.timeEnd !== undefined;
-
-      const isSameTimeRange =
-        config.streamType === "logs" &&
-        config.baselineTimeRange.startTime === config.selectedTimeRange.startTime &&
-        config.baselineTimeRange.endTime === config.selectedTimeRange.endTime;
-
-      // Use single query (baseline-only) when:
-      // - TRACES: No time-based filter exists
-      // - LOGS: Time ranges are the same (no brush selection)
-      const useBaselineOnly =
-        config.streamType === "traces" ? !hasTimeBasedFilter : isSameTimeRange;
-
-      if (useBaselineOnly) {
-        // Baseline-only mode: single query without comparison
-        const singleQuery = `
-          SELECT
-            COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
-            approx_percentile_cont(duration, \${percentile}) AS percentile_latency
-          FROM "${config.streamName}"
-          ${baselineWhere}
-          GROUP BY ${dimensionName}
-          ORDER BY percentile_latency DESC
-          LIMIT 5
-        `.trim();
-
-        return singleQuery;
-      }
-
-      // Comparison mode: baseline vs selected
-      const baselineQuery = `
-        SELECT
-          COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
-          'Baseline' AS series,
-          approx_percentile_cont(duration, \${percentile}) AS percentile_latency
-        FROM "${config.streamName}"
-        ${baselineWhere}
-        GROUP BY ${dimensionName}
-      `.trim();
-
-      const selectedQuery = `
-        SELECT
-          COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
-          'Selected' AS series,
-          approx_percentile_cont(duration, \${percentile}) AS percentile_latency
-        FROM "${config.streamName}"
-        ${selectedWhere}
-        GROUP BY ${dimensionName}
-      `.trim();
-
-      return `${baselineQuery} UNION ${selectedQuery} ORDER BY percentile_latency DESC LIMIT 5`;
+      return singleQuery;
     }
+
+    // Different time ranges: use comparison query with baseline vs selected
+    // Normalize baseline to selected time window: (records/baseline_duration) * selected_duration
+    const baselineQuery = `
+      SELECT
+        COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
+        'Baseline' AS series,
+        (${countExpression} * ${selectedDurationSeconds}) / ${baselineDurationSeconds} AS trace_count
+      FROM "${config.streamName}"
+      ${baselineWhere}
+      GROUP BY ${dimensionName}
+    `.trim();
+
+    // Selected uses actual count (already in the selected time window)
+    const selectedQuery = `
+      SELECT
+        COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
+        'Selected' AS series,
+        ${countExpression} AS trace_count
+      FROM "${config.streamName}"
+      ${selectedWhere}
+      GROUP BY ${dimensionName}
+    `.trim();
+
+    const unionQuery = `${baselineQuery} UNION ${selectedQuery} ORDER BY trace_count DESC LIMIT 5`;
+
+    return unionQuery;
   };
 
   /**
@@ -398,18 +249,9 @@ export function useLatencyInsightsDashboard() {
     config: LatencyInsightsConfig,
     theme: "dark" | "light" = "dark",
   ) => {
-    const isVolumeAnalysis = config.analysisType === "volume";
-    const isErrorAnalysis = config.analysisType === "error";
-
-    // Check if we're using comparison mode (baseline vs selected) or single query mode
-    // Only check the filter that corresponds to the current analysis type —
-    // a brush on the duration chart must not trigger comparison mode for volume/error panels.
-    const hasTimeBasedFilter = isVolumeAnalysis
-      ? config.rateFilter?.timeStart !== undefined && config.rateFilter?.timeEnd !== undefined
-      : isErrorAnalysis
-        ? config.errorFilter?.timeStart !== undefined && config.errorFilter?.timeEnd !== undefined
-        : config.durationFilter?.timeStart !== undefined &&
-          config.durationFilter?.timeEnd !== undefined;
+    // Comparison mode (baseline vs selected) needs a brush that narrows the range.
+    const hasTimeBasedFilter =
+      config.rateFilter?.timeStart !== undefined && config.rateFilter?.timeEnd !== undefined;
     const isSameTimeRange =
       config.streamType &&
       config.baselineTimeRange.startTime === config.selectedTimeRange.startTime &&
@@ -418,44 +260,18 @@ export function useLatencyInsightsDashboard() {
 
     const panels = analyses.map((analysis, index) => {
       // Build panel description based on analysis type
-      let description = "";
-      if (isVolumeAnalysis) {
-        if (isComparisonMode) {
-          description = `Trace count comparison for dimension: ${analysis.dimensionName}. Higher Selected bars indicate this dimension value appears more frequently in high-volume periods.`;
-        } else {
-          description = `Top values by count for dimension: ${analysis.dimensionName}.`;
-        }
-      } else if (isErrorAnalysis) {
-        description = `Error percentage comparison for dimension: ${analysis.dimensionName}. Higher Selected bars indicate this dimension value has more errors in the error spike period.`;
-      } else {
-        description = `Percentile latency comparison for dimension: ${analysis.dimensionName}. Higher Selected bars indicate this dimension value correlates with slower traces.`;
-      }
+      // Panel descriptions surface in the panel info tooltip (PanelContainer
+      // renders them because this dashboard is mounted with viewOnly=false).
+      const description = isComparisonMode
+        ? t("latencyInsights.panelDescVolumeComparison", { dimension: analysis.dimensionName })
+        : t("latencyInsights.panelDescVolumeTopValues", { dimension: analysis.dimensionName });
 
       // Generate SQL query for this dimension
       const sqlQuery = buildComparisonQuery(analysis.dimensionName, config);
 
-      // Determine panel ID prefix
-      let panelPrefix = "LatencyInsights";
-      if (isVolumeAnalysis) panelPrefix = "VolumeInsights";
-      if (isErrorAnalysis) panelPrefix = "ErrorInsights";
-
-      // Determine unit and decimals
-      let unit = "microseconds";
-      let decimals = 2;
-
-      if (config.streamType === "logs") {
-        unit = "numbers";
-      } else if (isVolumeAnalysis) {
-        unit = "traces";
-      } else if (isErrorAnalysis) {
-        unit = "percent";
-      }
-
-      if (isVolumeAnalysis) {
-        decimals = 0;
-      } else if (isErrorAnalysis) {
-        decimals = 2;
-      }
+      const panelPrefix = "VolumeInsights";
+      const unit = config.streamType === "logs" ? "numbers" : "traces";
+      const decimals = 0;
 
       // Generate unique panel ID using dimension name to ensure stability
       const dimensionHash = analysis.dimensionName.replace(/[^a-zA-Z0-9]/g, "_");
@@ -561,16 +377,8 @@ export function useLatencyInsightsDashboard() {
               y: [
                 {
                   label: "",
-                  alias: isVolumeAnalysis
-                    ? "trace_count"
-                    : isErrorAnalysis
-                      ? "error_percentage"
-                      : "percentile_latency",
-                  column: isVolumeAnalysis
-                    ? "trace_count"
-                    : isErrorAnalysis
-                      ? "error_percentage"
-                      : "percentile_latency",
+                  alias: "trace_count",
+                  column: "trace_count",
                   color: null,
                   isDerived: false,
                   havingConditions: [],
@@ -621,60 +429,16 @@ export function useLatencyInsightsDashboard() {
       };
     });
 
-    let title = "Latency Insights";
-    if (isVolumeAnalysis) title = "Volume Insights";
-    if (isErrorAnalysis) title = "Error Insights";
+    const title = t("latencyInsights.dashboardTitleVolume");
+    // Two whole sentences rather than one with an optional clause spliced in.
+    const description = config.rateFilter
+      ? t("latencyInsights.dashboardDescVolumeRate", {
+          start: config.rateFilter.start,
+          end: config.rateFilter.end,
+        })
+      : t("latencyInsights.dashboardDescVolume");
 
-    let description = "";
-    if (isVolumeAnalysis) {
-      description = `Comparing trace count distribution ${config.rateFilter ? `of selected periods (rate ${config.rateFilter.start}-${config.rateFilter.end} traces)` : ""} vs baseline across dimensions`;
-    } else if (isErrorAnalysis) {
-      description = `Comparing error percentage of traces during error spike period vs baseline across dimensions`;
-    } else {
-      description = `Comparing percentile latency of selected traces (duration ${config.durationFilter?.start}-${config.durationFilter?.end}µs) vs baseline across dimensions`;
-    }
-
-    // Only include percentile variable for latency analysis
-    const percentileValue = config.percentile || "0.95";
-    const variables =
-      isVolumeAnalysis || isErrorAnalysis
-        ? { list: [], showDynamicFilters: false }
-        : {
-            list: [
-              {
-                type: "custom",
-                name: "percentile",
-                label: "Latency Percentile",
-                value: percentileValue,
-                multiSelect: false,
-                isLoading: false,
-                isVariableLoading: false,
-                options: [
-                  {
-                    label: "P50 (Median)",
-                    value: "0.50",
-                    selected: percentileValue === "0.50",
-                  },
-                  {
-                    label: "P75",
-                    value: "0.75",
-                    selected: percentileValue === "0.75",
-                  },
-                  {
-                    label: "P95",
-                    value: "0.95",
-                    selected: percentileValue === "0.95",
-                  },
-                  {
-                    label: "P99",
-                    value: "0.99",
-                    selected: percentileValue === "0.99",
-                  },
-                ],
-              },
-            ],
-            showDynamicFilters: false,
-          };
+    const variables = { list: [], showDynamicFilters: false };
 
     const dashboard = {
       version: 5,

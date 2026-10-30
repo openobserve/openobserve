@@ -17,8 +17,15 @@
 // `ColumnOverrideUI` shape and (de)serializes to/from the persisted
 // `config.override_config` array on load/save.
 
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText, type TranslateFn } from "@/types/i18n";
 import { OVERRIDE_CONFIG_TYPES } from "@/utils/dashboard/tableConfigUtils";
+import {
+  NUMBER_LOCALE_TAGS,
+  getNumberLocale,
+  localeFromUnit,
+  toLocaleUnit,
+  toSupportedNumberLocale,
+} from "@/locales/numberFormat";
 
 // null means "not set" → renderer falls back to the panel-level default.
 export interface ConditionalRuleUI {
@@ -35,10 +42,12 @@ export const emptyConditionalRule = (): ConditionalRuleUI => ({
   bgColor: null,
 });
 
+export type ColumnFieldType = "auto" | "num" | "text" | "bar_gauge" | "sparkline" | "json";
+
 export interface ColumnOverrideUI {
   field: string;
-  // "auto" detects numeric-ness from the data; "num"/"text" force it.
-  fieldType: "auto" | "num" | "text";
+  // "auto" detects numeric-ness from the data; the others force it and may pick a cell renderer.
+  fieldType: ColumnFieldType;
   unit: string | null; // null === inherit panel-level unit
   customUnit: string | null;
   alignment: string | null;
@@ -47,6 +56,17 @@ export interface ColumnOverrideUI {
   autoColor: boolean; // unique-value coloring
   conditions: ConditionalRuleUI[];
 }
+
+// A type alias, not an interface: OSelect's options are an index-signature type an interface can't satisfy.
+export type UnitOption = {
+  label: I18nText;
+  // Absent on group header rows, which are never a unit.
+  value?: string | null;
+  header?: boolean;
+  // OSelect nesting: the pinned locales are listed under the Other Locale row.
+  expandable?: boolean;
+  parentValue?: string;
+};
 
 export const TEXT_SWATCHES = [
   "#b91c1c",
@@ -176,41 +196,114 @@ export const serializeOverrides = (cols: ColumnOverrideUI[]): any[] =>
     .map((c) => serializeColumnOverride(c))
     .filter((entry) => entry != null);
 
-/** Canonical unit dropdown options shared by panel config and the dialog. */
-export const getUnitOptions = (
-  t: (key: string) => string,
-): Array<{ label: string; value: string | null }> => [
+// Nesting key of the Other Locale row; never saved as a unit.
+const OTHER_LOCALE_KEY = "other-locale";
+
+/**
+ * Canonical unit dropdown options shared by panel config and the dialog. Pass the
+ * current unit so a pinned locale outside the offered list stays selectable.
+ */
+export const getUnitOptions = (t: TranslateFn, currentUnit?: string | null): UnitOption[] => [
+  { label: t("dashboard.unitGroupNumber"), header: true },
   { label: t("dashboard.default"), value: null },
   { label: t("dashboard.numbers"), value: "numbers" },
   { label: t("dashboard.localeFormat"), value: "locale" },
-  { label: t("dashboard.bytes"), value: "bytes" },
-  { label: t("dashboard.kilobytes"), value: "kilobytes" },
-  { label: t("dashboard.megabytes"), value: "megabytes" },
-  { label: t("dashboard.bytesPerSecond"), value: "bps" },
+  { label: t("dashboard.otherLocale"), value: OTHER_LOCALE_KEY, expandable: true },
+  ...getPinnedLocaleOptions(currentUnit),
+  { label: t("dashboard.unitGroupData"), header: true },
+  { label: t("dashboard.bytesBinary"), value: "bytes" },
+  { label: t("dashboard.kilobytesBinary"), value: "kilobytes" },
+  { label: t("dashboard.megabytesBinary"), value: "megabytes" },
+  { label: t("dashboard.bytesSi"), value: "bytes-si" },
+  { label: t("dashboard.kilobytesSi"), value: "kilobytes-si" },
+  { label: t("dashboard.megabytesSi"), value: "megabytes-si" },
+  { label: t("dashboard.bits"), value: "bits" },
+  { label: t("dashboard.unitGroupDataRate"), header: true },
+  { label: t("dashboard.bytesPerSecondBinary"), value: "bps" },
+  { label: t("dashboard.bytesPerSecondSi"), value: "bps-si" },
+  { label: t("dashboard.bitsPerSecond"), value: "bits-per-sec" },
+  { label: t("dashboard.bytesPerSecondIec"), value: "bytes-per-sec" },
+  { label: t("dashboard.unitGroupThroughput"), header: true },
+  { label: t("dashboard.requestsPerSecond"), value: "req-per-sec" },
+  { label: t("dashboard.opsPerSecond"), value: "ops-per-sec" },
+  { label: t("dashboard.eventsPerSecond"), value: "events-per-sec" },
+  { label: t("dashboard.requestsPerMinute"), value: "req-per-min" },
+  { label: t("dashboard.opsPerMinute"), value: "ops-per-min" },
+  { label: t("dashboard.eventsPerMinute"), value: "events-per-min" },
+  { label: t("dashboard.perSecond"), value: "per-sec" },
+  { label: t("dashboard.perMinute"), value: "per-min" },
+  { label: t("dashboard.unitGroupTime"), header: true },
   { label: t("dashboard.seconds"), value: "seconds" },
   { label: t("dashboard.milliseconds"), value: "milliseconds" },
   { label: t("dashboard.microseconds"), value: "microseconds" },
   { label: t("dashboard.nanoseconds"), value: "nanoseconds" },
+  { label: t("dashboard.minutes"), value: "minutes" },
+  { label: t("dashboard.hours"), value: "hours" },
+  { label: t("dashboard.days"), value: "days" },
+  { label: t("dashboard.unitDateTime"), value: "datetime" },
+  { label: t("dashboard.unitFromNow"), value: "from-now" },
+  { label: t("dashboard.unitGroupTemperature"), header: true },
+  { label: t("dashboard.unitCelsius"), value: "celsius" },
+  { label: t("dashboard.unitFahrenheit"), value: "fahrenheit" },
+  { label: t("dashboard.unitGroupFrequency"), header: true },
+  { label: t("dashboard.unitHertz"), value: "hertz" },
+  { label: t("dashboard.unitGroupPercent"), header: true },
   { label: t("dashboard.percent1"), value: "percent-1" },
   { label: t("dashboard.percent"), value: "percent" },
+  { label: t("dashboard.unitGroupCurrency"), header: true },
   { label: t("dashboard.currencyDollar"), value: "currency-dollar" },
   { label: t("dashboard.currencyEuro"), value: "currency-euro" },
   { label: t("dashboard.currencyPound"), value: "currency-pound" },
   { label: t("dashboard.currencyYen"), value: "currency-yen" },
   { label: t("dashboard.currencyRupees"), value: "currency-rupee" },
+  { label: t("dashboard.currencyYuan"), value: "currency-yuan" },
+  { label: t("dashboard.currencyWon"), value: "currency-won" },
+  { label: t("dashboard.unitGroupOther"), header: true },
+  { label: t("dashboard.unitBoolean"), value: "boolean" },
+  { label: t("dashboard.unitGroupCustom"), header: true },
   { label: t("dashboard.custom"), value: "custom" },
 ];
 
+const localeDisplayName = (names: Intl.DisplayNames, tag: string): string => {
+  try {
+    // baseName drops Unicode extensions such as the Arabic UI's `-u-nu-latn`.
+    const { language, region, baseName } = new Intl.Locale(tag);
+    const name = names.of(language) ?? language;
+    const code = baseName.replaceAll("-", "_");
+    return region ? `${name} - ${region} (${code})` : `${name} (${code})`;
+  } catch {
+    return tag;
+  }
+};
+
+/** Locale Format pinned to each offered locale, labelled like "English - US (en_US)" in the viewer's language and sorted. */
+const getPinnedLocaleOptions = (currentUnit?: string | null): UnitOption[] => {
+  const current = toSupportedNumberLocale(localeFromUnit(currentUnit));
+  const tags = current ? [...new Set([...NUMBER_LOCALE_TAGS, current])] : NUMBER_LOCALE_TAGS;
+  const names = new Intl.DisplayNames([getNumberLocale()], { type: "language" });
+
+  return tags
+    .map((tag) => toSupportedNumberLocale(tag))
+    .filter((tag): tag is string => tag !== null)
+    .map((tag) => ({
+      label: raw(localeDisplayName(names, tag)),
+      value: toLocaleUnit(tag),
+      parentValue: OTHER_LOCALE_KEY,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+};
+
 /** i18n-bound option lists for the formatting controls. */
 export const useColumnFormattingOptions = () => {
-  const { t } = useI18n();
-
-  const unitOptions = getUnitOptions(t);
+  const { t } = useI18nTyped();
 
   const fieldTypeOptions = [
     { value: "auto", label: t("dashboard.auto") },
     { value: "num", label: t("dashboard.typeNumeric") },
     { value: "text", label: t("dashboard.typeText") },
+    { value: "bar_gauge", label: t("dashboard.typeBarGauge") },
+    { value: "sparkline", label: t("dashboard.typeSparkline") },
+    { value: "json", label: t("dashboard.typeJson") },
   ];
 
   // "auto" maps to null alignment (renderer auto-aligns by type).
@@ -231,7 +324,6 @@ export const useColumnFormattingOptions = () => {
   ];
 
   return {
-    unitOptions,
     fieldTypeOptions,
     alignOptions,
     conditionOperators,

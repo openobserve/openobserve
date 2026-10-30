@@ -4,7 +4,7 @@
     :open="open"
     side="right"
     :width="70"
-    :title="row?.name"
+    :title="raw(row?.name)"
     :title-data-test="'eval-job-detail-name-badge'"
     :sub-title="t('onlineEvals.job.detail.eyebrow')"
     data-test="eval-job-detail"
@@ -22,6 +22,7 @@
           ref="dateTimePickerRef"
           v-model="selectedDate"
           :auto-apply-dashboard="true"
+          calendar-presets
           class="flex-none"
           data-test="eval-job-detail-window"
         />
@@ -51,7 +52,7 @@
           v-for="card in kpiCards"
           v-else
           :key="card.label"
-          class="rounded-default bg-surface-base border-border-default flex flex-col gap-1 border px-3.5 pt-2.5 pb-2.5 transition-shadow duration-200 hover:shadow-[0_0.0625rem_0.375rem_color-mix(in_srgb,var(--color-black)_8%,transparent)]"
+          class="rounded-default bg-surface-base border-border-default flex flex-col gap-1 border px-3.5 pt-2.5 pb-2.5 transition-shadow duration-200 hover:shadow-sm"
         >
           <div class="kpi-label text-2xs text-text-secondary mb-1 leading-normal font-semibold">
             {{ card.label }}
@@ -115,7 +116,7 @@
           <!-- Target -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-[1.5] font-semibold"
+              class="text-compact text-text-heading border-b-text-secondary/12 m-0 inline-flex items-center gap-1.5 border-b pb-1.5 leading-[1.5] font-semibold"
             >
               {{ t("onlineEvals.job.detail.targetSection") }}
             </h4>
@@ -142,14 +143,15 @@
                   {{ t("onlineEvals.job.detail.idleWindowLabel") }}
                 </dt>
                 <dd class="text-compact text-text-body m-0 wrap-break-word">
-                  {{ completionWindow.idleWindowSecs }}s
+                  {{ completionWindow.idleWindowSecs
+                  }}{{ t("onlineEvals.job.detail.secondsSuffix") }}
                 </dd>
 
                 <dt class="text-text-secondary text-xs font-semibold">
                   {{ t("onlineEvals.job.detail.maxAgeLabel") }}
                 </dt>
                 <dd class="text-compact text-text-body m-0 wrap-break-word">
-                  {{ completionWindow.maxAgeSecs }}s
+                  {{ completionWindow.maxAgeSecs }}{{ t("onlineEvals.job.detail.secondsSuffix") }}
                 </dd>
               </template>
             </dl>
@@ -157,11 +159,11 @@
             <!-- Filter rendered as a code block with a header bar + copy action,
                  matching the Alert History condition view. -->
             <div
-              class="border-dialog-header-border rounded-default overflow-hidden border bg-[color-mix(in_srgb,var(--color-text-secondary)_4%,var(--color-card-bg))]"
+              class="border-dialog-header-border rounded-default bg-card-bg-tint-neutral-faint overflow-hidden border"
               data-test="eval-job-detail-filter"
             >
               <div
-                class="border-b-dialog-header-border flex items-center justify-between border-b bg-[color-mix(in_srgb,var(--color-text-secondary)_6%,var(--color-card-bg))] px-2.5 py-1.5"
+                class="border-b-dialog-header-border bg-card-bg-tint-neutral flex items-center justify-between border-b px-2.5 py-1.5"
               >
                 <span class="text-2xs text-text-secondary font-medium">{{
                   t("onlineEvals.job.detail.filterLabel")
@@ -172,7 +174,7 @@
                   size="icon-xs-sq"
                   data-test="eval-job-detail-filter-copy-btn"
                   @click="
-                    copyToClipboard(filterText, {
+                    copyToClipboard(filterText, t, {
                       successMessage: t('common.copySuccess'),
                     })
                   "
@@ -184,15 +186,14 @@
               <!-- Hard cap the filter condition height; longer conditions scroll. -->
               <pre
                 class="text-compact text-text-body m-0 max-h-50 overflow-x-auto overflow-y-auto px-3.5 py-2.5 font-mono leading-[1.6] whitespace-pre-wrap"
-                >{{ filterText || t("onlineEvals.job.detail.filterEmpty") }}</pre
-              >
+                >{{ filterText || t("onlineEvals.job.detail.filterEmpty") }}</pre>
             </div>
           </section>
 
           <!-- Scorers -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-[1.5] font-semibold"
+              class="text-compact text-text-heading border-b-text-secondary/12 m-0 inline-flex items-center gap-1.5 border-b pb-1.5 leading-[1.5] font-semibold"
             >
               {{ t("onlineEvals.job.detail.scorersSection") }}
               <OTag type="fieldTag" value="soft">{{ resolvedScorers.length }}</OTag>
@@ -208,7 +209,7 @@
                  scrollbar off the card edges. -->
             <ul
               v-else
-              class="m-0 flex max-h-100 list-none flex-col gap-2.5 overflow-y-auto p-0 pt-2.5 pr-1"
+              class="m-0 flex max-h-100 list-none flex-col gap-2.5 overflow-y-auto p-0 pe-1 pt-2.5"
             >
               <li v-for="item in resolvedScorers" :key="item.id">
                 <!-- `group` drives the card's hover affordances on the CTA /
@@ -217,7 +218,7 @@
                      must not light up on hover. -->
                 <button
                   type="button"
-                  class="group bg-card-bg rounded-default flex w-full cursor-pointer items-center gap-3.5 border border-[color-mix(in_srgb,var(--color-text-secondary)_16%,transparent)] px-4 py-3.5 text-left transition-[border-color,background,box-shadow,transform] duration-150 enabled:hover:-translate-y-px enabled:hover:border-[color-mix(in_srgb,var(--color-primary-600)_45%,transparent)] enabled:hover:bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))] enabled:hover:shadow-[0_0.0625rem_0.1875rem_color-mix(in_srgb,var(--color-primary-600)_12%,transparent)] disabled:cursor-not-allowed disabled:opacity-55"
+                  class="group bg-card-bg rounded-default border-text-secondary/16 enabled:hover:border-accent/45 enabled:hover:bg-card-bg-tint-subtle enabled:hover:shadow-accent/12 flex w-full cursor-pointer items-center gap-3.5 border px-4 py-3.5 text-left transition-[border-color,background,box-shadow,transform] duration-150 enabled:hover:-translate-y-px enabled:hover:shadow-xs disabled:cursor-not-allowed disabled:opacity-55"
                   :data-test="`eval-job-detail-scorer-item-${item.name}`"
                   :disabled="!findScorerById(item.id)"
                   @click="onScorerClick(item.id)"
@@ -229,8 +230,7 @@
                         item.scorerType === 'llm_judge',
                       'bg-badge-orange-soft-bg text-badge-orange-soft-text':
                         item.scorerType === 'remote',
-                      'text-text-secondary bg-[color-mix(in_srgb,var(--color-text-secondary)_14%,transparent)]':
-                        item.scorerType === 'unknown',
+                      'text-text-secondary bg-text-secondary/14': item.scorerType === 'unknown',
                     }"
                   >
                     <OIcon :name="item.scorerType === 'remote' ? 'cloud' : 'smart-toy'" size="sm" />
@@ -243,7 +243,9 @@
                         type="scorerType"
                         :value="item.scorerType"
                       />
-                      <span class="text-2xs text-text-secondary">v{{ item.version }}</span>
+                      <span class="text-2xs text-text-secondary"
+                        >{{ t("onlineEvals.job.detail.versionPrefix") }}{{ item.version }}</span
+                      >
                     </div>
                     <div
                       v-if="item.scoreConfigName"
@@ -294,7 +296,7 @@
           <!-- Sampling -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-[1.5] font-semibold"
+              class="text-compact text-text-heading border-b-text-secondary/12 m-0 inline-flex items-center gap-1.5 border-b pb-1.5 leading-[1.5] font-semibold"
             >
               {{ t("onlineEvals.job.detail.samplingSection") }}
             </h4>
@@ -321,7 +323,7 @@
           <!-- Metadata -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-[1.5] font-semibold"
+              class="text-compact text-text-heading border-b-text-secondary/12 m-0 inline-flex items-center gap-1.5 border-b pb-1.5 leading-[1.5] font-semibold"
             >
               {{ t("onlineEvals.job.detail.metadataSection") }}
             </h4>
@@ -329,7 +331,9 @@
               <dt class="text-text-secondary text-xs font-semibold">
                 {{ t("onlineEvals.job.detail.versionLabel") }}
               </dt>
-              <dd class="text-compact text-text-body m-0 wrap-break-word">v{{ row.version }}</dd>
+              <dd class="text-compact text-text-body m-0 wrap-break-word">
+                {{ t("onlineEvals.job.detail.versionPrefix") }}{{ row.version }}
+              </dd>
               <dt v-if="pipelineId" class="text-text-secondary text-xs font-semibold">
                 {{ t("onlineEvals.job.detail.pipelineLabel") }}
               </dt>
@@ -368,28 +372,23 @@
             :page-size="20"
             :page-size-options="[20, 50, 100, 250, 500]"
             :empty-message="t('onlineEvals.job.detail.runs.empty')"
-            :footer-title="t('onlineEvals.job.detail.tabs.runs')"
             show-index
             width="100%"
             class="w-full"
             @row-click="openEvaluationRun"
           >
             <template #cell-timestampMs="{ row }">
-              <span class="text-text-secondary">{{ relativeTime(row.timestampMs) }}</span>
+              <span class="text-text-secondary">{{ relativeTime(row.timestampMs, t) }}</span>
             </template>
             <template #cell-scorerId="{ row }">
               <span>{{ scorerNameFor(row.scorerId) }}</span>
             </template>
             <template #cell-targetSpanId="{ row }">
-              <span v-if="row.targetSpanId" class="block truncate" :title="row.targetSpanId">{{
-                row.targetSpanId
-              }}</span>
+              <span v-if="row.targetSpanId">{{ row.targetSpanId }}</span>
               <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-targetTraceId="{ row }">
-              <span v-if="row.targetTraceId" class="block truncate" :title="row.targetTraceId">{{
-                row.targetTraceId
-              }}</span>
+              <span v-if="row.targetTraceId">{{ row.targetTraceId }}</span>
               <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-scoreDisplay="{ row }">
@@ -421,28 +420,23 @@
             :page-size="20"
             :page-size-options="[20, 50, 100, 250, 500]"
             :empty-message="t('onlineEvals.job.detail.failures.recentEmpty')"
-            :footer-title="t('onlineEvals.job.detail.tabs.failures')"
             show-index
             width="100%"
             class="w-full"
             @row-click="openEvaluationRun"
           >
             <template #cell-timestampMs="{ row }">
-              <span class="text-text-secondary">{{ relativeTime(row.timestampMs) }}</span>
+              <span class="text-text-secondary">{{ relativeTime(row.timestampMs, t) }}</span>
             </template>
             <template #cell-scorerId="{ row }">
               <span>{{ scorerNameFor(row.scorerId) }}</span>
             </template>
             <template #cell-targetSpanId="{ row }">
-              <span v-if="row.targetSpanId" class="block truncate" :title="row.targetSpanId">{{
-                row.targetSpanId
-              }}</span>
+              <span v-if="row.targetSpanId">{{ row.targetSpanId }}</span>
               <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-targetTraceId="{ row }">
-              <span v-if="row.targetTraceId" class="block truncate" :title="row.targetTraceId">{{
-                row.targetTraceId
-              }}</span>
+              <span v-if="row.targetTraceId">{{ row.targetTraceId }}</span>
               <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-scoreDisplay="{ row }">
@@ -463,7 +457,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -479,7 +473,8 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import KpiCardsSkeleton from "./KpiCardsSkeleton.vue";
 import { copyToClipboard } from "@/utils/clipboard";
-import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
+import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import type {
   EvalJob,
   EvalTargetScope,
@@ -487,6 +482,7 @@ import type {
   ScoreConfig,
 } from "@/services/online-evals.service";
 import { entityId, targetScopeOf } from "../utils/evalEntity";
+import { relativeTime } from "../utils/evalFormat";
 import { normalizeJobFilterCondition } from "../utils/jobFilter";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import { useEvalJobRuns, type JobRunRow, type JobRunsWindow } from "../composables/useEvalJobRuns";
@@ -519,7 +515,7 @@ function handleOpenChange(value: boolean) {
   if (!value) emit("close");
 }
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "default");
@@ -742,9 +738,9 @@ const agents = ref<AgentFilterSelection[]>([]);
 const agentKey = ref(ALL_AGENTS_VALUE);
 
 const agentOptions = computed(() => [
-  { label: "All Agents", value: ALL_AGENTS_VALUE },
+  { label: t("traces.allAgents"), value: ALL_AGENTS_VALUE },
   ...agents.value.map((agent) => ({
-    label: agentFilterLabel(agent),
+    label: raw(agentFilterLabel(agent)),
     value: agentFilterKey(agent),
   })),
 ]);
@@ -754,10 +750,19 @@ const selectedAgent = computed<AgentFilterSelection | null>(() => {
   return agents.value.find((agent) => agentFilterKey(agent) === agentKey.value) ?? null;
 });
 
-async function loadAgents() {
+async function loadAgents(force = false) {
   const { startUs, endUs } = dateWindow.value;
   try {
-    const response = await genAiAgentMappingService.listAgents(orgId.value, startUs, endUs);
+    const options = genAiAgentsQuery(orgId.value, startUs, endUs);
+    // Agents appear as they emit spans and no write expires the list, so a user refresh forces.
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const response = await queryClient.fetchQuery(options);
     agents.value = response.agents;
     if (
       agentKey.value !== ALL_AGENTS_VALUE &&
@@ -830,13 +835,15 @@ function openEvaluationRun(run: JobRunRow) {
 // (KPI strip + Runs + Failures), since one picker drives the whole view.
 async function refreshAll() {
   syncDateWindow();
+  // The window watcher's own read is not forced, and does not run at all when the window is unchanged.
+  void loadAgents(true);
   await refreshRunsData();
 }
 
 // — KPI strip cards —
 // value/unit split mirrors the SessionDetails KPI cards (big value + small
 // trailing unit) so the AI module's detail pages read identically.
-const kpiCards = computed<{ label: string; value: string; unit: string }[]>(() => {
+const kpiCards = computed<{ label: I18nText; value: string; unit: string }[]>(() => {
   const k = kpis.value;
   return [
     {
@@ -956,18 +963,5 @@ function splitLatency(ms: number | null): { value: string; unit: string } {
   if (ms == null) return { value: "—", unit: "" };
   if (ms >= 1000) return { value: (ms / 1000).toFixed(1), unit: "s" };
   return { value: String(Math.round(ms)), unit: "ms" };
-}
-
-function relativeTime(timestampMs: number): string {
-  const diff = Date.now() - timestampMs;
-  if (diff < 0 || !Number.isFinite(diff)) return "—";
-  const sec = Math.floor(diff / 1000);
-  if (sec < 60) return `${sec}s ago`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  const day = Math.floor(hr / 24);
-  return `${day}d ago`;
 }
 </script>

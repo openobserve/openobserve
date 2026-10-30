@@ -1,0 +1,27 @@
+{
+  "embeds": [
+    {
+      "color": 14687834,
+      "description": "Value **92.5** exceeded `80` — see [runbook](https://rb.example/x)\n\n<script>alert(1)</script>\n\n[View in OpenObserve](https://o2.example/short/abc)",
+      "fields": [
+        {
+          "inline": true,
+          "name": "host",
+          "value": "web\\-1 \\& web\\-2"
+        },
+        {
+          "inline": true,
+          "name": "cpu",
+          "value": "92\\.5"
+        },
+        {
+          "inline": false,
+          "name": "Data",
+          "value": "`host` web\\-1 · `cpu` 92\\.5"
+        }
+      ],
+      "title": "CPU \"high\" & <fire> on web-1",
+      "url": "https://rb.example/x"
+    }
+  ]
+}

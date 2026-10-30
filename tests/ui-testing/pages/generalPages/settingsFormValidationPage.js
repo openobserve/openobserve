@@ -359,17 +359,25 @@ export class SettingsFormValidationPage {
 
     /**
      * Navigate to Settings and open the Model Pricing section.
-     * The section is expected to be on the General or AI settings tab.
+     * LLM Model Pricing is an ENTERPRISE/CLOUD-only feature — the tab/route only
+     * mounts on the enterprise (or cloud) build. Probe positively for the
+     * model-pricing tab and return a boolean so callers can gate the suite to a
+     * clean SKIP on the OSS binary (mirrors navigateToDomainManagement).
      */
     async navigateToModelPricing() {
         await this.navigateToSettings(this.page);
-        const modelPricingTab = this.page.locator('[data-test="model-pricing-tab"]');
-        await modelPricingTab.waitFor({ state: 'visible', timeout: 10000 });
-        await modelPricingTab.click();
-        const addBtn = this.page.locator('[data-test="model-pricing-add-btn"]');
-        await addBtn.waitFor({ state: 'visible', timeout: 10000 });
-        await addBtn.click();
-        await this.page.locator(this.modelPricingSaveBtn).waitFor({ state: 'visible', timeout: 10000 });
+        try {
+            const modelPricingTab = this.page.locator('[data-test="model-pricing-tab"]');
+            await modelPricingTab.waitFor({ state: 'visible', timeout: 10000 });
+            await modelPricingTab.click();
+            const addBtn = this.page.locator('[data-test="model-pricing-add-btn"]');
+            await addBtn.waitFor({ state: 'visible', timeout: 10000 });
+            await addBtn.click();
+            await this.page.locator(this.modelPricingSaveBtn).waitFor({ state: 'visible', timeout: 10000 });
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     async clearModelPricingName() {

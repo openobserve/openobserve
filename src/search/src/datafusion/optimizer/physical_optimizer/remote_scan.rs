@@ -25,14 +25,17 @@ use datafusion::{
     physical_expr::{LexOrdering, PhysicalExpr, expressions::Column as PhysicalColumn},
     physical_optimizer::PhysicalOptimizerRule,
     physical_plan::{
-        ExecutionPlan, ExecutionPlanProperties, Partitioning,
+        ChildrenPropertiesMode, ExecutionPlan, ExecutionPlanProperties, Partitioning,
+        ReplaceChildrenOptions,
         aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
         coalesce_partitions::CoalescePartitionsExec,
         repartition::RepartitionExec,
         sorts::{sort::SortExec, sort_preserving_merge::SortPreservingMergeExec},
     },
 };
+use datafusion_proto::protobuf::PhysicalPlanNode;
 use hashbrown::HashMap;
+use prost::Message;
 use proto::cluster_rpc::{self, KvItem};
 
 use crate::{
@@ -123,7 +126,7 @@ impl RemoteScanRule {
         let cfg = config::get_config();
         Self {
             remote_scan_nodes,
-            single_node_optimizer_enable: cfg.common.feature_single_node_optimize_enabled,
+            single_node_optimizer_enable: cfg.search.feature_single_node_optimize_enabled,
         }
     }
 
@@ -163,14 +166,14 @@ impl PhysicalOptimizerRule for RemoteScanRule {
         }
 
         if config::get_config()
-            .common
+            .search
             .feature_enrichment_broadcast_join_enabled
             && should_use_enrichment_broadcast_join(&plan)
         {
             return enrichment_broadcast_join_rewrite(plan, self.remote_scan_nodes.clone());
         }
 
-        if config::get_config().common.feature_broadcast_join_enabled
+        if config::get_config().search.feature_broadcast_join_enabled
             && should_use_broadcast_join(&plan)
         {
             return broadcast_join_rewrite(plan, self.remote_scan_nodes.clone());
@@ -178,7 +181,15 @@ impl PhysicalOptimizerRule for RemoteScanRule {
 
         // if single node and can optimize, add remote scan to top
         if self.single_node_optimizer_enable && is_single_node_optimize(&plan) {
-            return remote_scan_to_top_if_needed(plan, self.remote_scan_nodes.clone());
+            let whole =
+                remote_scan_to_top_if_needed(Arc::clone(&plan), self.remote_scan_nodes.clone())?;
+            if follower_can_decode(&whole) {
+                return Ok(whole);
+            }
+            log::info!(
+                "[trace_id {}] RemoteScanRule: plan too deep to send whole, splitting it like a cluster plan",
+                self.remote_scan_nodes.req.trace_id
+            );
         }
 
         // if not single node, rewrite physical plan to add remote scan
@@ -212,7 +223,7 @@ impl RemoteScanRewriter {
         Self {
             remote_scan_nodes,
             is_changed: false,
-            partial_reduce_enabled: cfg.common.feature_partial_reduce_enabled,
+            partial_reduce_enabled: cfg.search.feature_partial_reduce_enabled,
         }
     }
 }
@@ -240,7 +251,10 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                     remote_scan_or_partial_reduce,
                     output_partitioning,
                 )?);
-                let new_node = node.with_new_children(vec![repartition])?;
+                let new_node = node.replace_children(
+                    vec![repartition],
+                    ReplaceChildrenOptions::new(ChildrenPropertiesMode::Recompute),
+                )?;
                 self.is_changed = true;
                 return Ok(Transformed::yes(new_node));
             }
@@ -250,14 +264,19 @@ impl TreeNodeRewriter for RemoteScanRewriter {
             if !visitor.has_remote_scan {
                 let table_name = visitor.table_name.clone().unwrap();
                 let follow_merge_node = node.clone();
-                let new_input =
-                    follow_merge_node.with_new_children(vec![node.children()[0].clone()])?;
+                let new_input = follow_merge_node.replace_children(
+                    vec![node.children()[0].clone()],
+                    ReplaceChildrenOptions::new(ChildrenPropertiesMode::Recompute),
+                )?;
 
                 let remote_scan = Arc::new(RemoteScanExec::new(
                     new_input,
                     self.remote_scan_nodes.get_remote_node(&table_name),
                 )?);
-                let new_node = node.with_new_children(vec![remote_scan])?;
+                let new_node = node.replace_children(
+                    vec![remote_scan],
+                    ReplaceChildrenOptions::new(ChildrenPropertiesMode::Recompute),
+                )?;
                 self.is_changed = true;
                 return Ok(Transformed::yes(new_node));
             }
@@ -295,7 +314,10 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                         new_children.push(remote_scan);
                     }
                 }
-                let new_node = node.with_new_children(new_children)?;
+                let new_node = node.replace_children(
+                    new_children,
+                    ReplaceChildrenOptions::new(ChildrenPropertiesMode::Recompute),
+                )?;
                 self.is_changed = true;
                 return Ok(Transformed::yes(new_node));
             }
@@ -321,7 +343,10 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                     new_children.push(child.clone());
                 }
             }
-            let new_node = node.with_new_children(new_children)?;
+            let new_node = node.replace_children(
+                new_children,
+                ReplaceChildrenOptions::new(ChildrenPropertiesMode::Recompute),
+            )?;
             self.is_changed = true;
             return Ok(Transformed::yes(new_node));
         }
@@ -415,6 +440,12 @@ fn is_single_node_optimize(plan: &Arc<dyn ExecutionPlan>) -> bool {
     empty_exec_count <= 1 && config::cluster::LOCAL_NODE.is_single_node()
 }
 
+// prost caps decode nesting at a fixed depth, so the follower rejects any deeper plan.
+fn follower_can_decode(plan: &Arc<dyn ExecutionPlan>) -> bool {
+    plan.downcast_ref::<RemoteScanExec>()
+        .is_none_or(|scan| PhysicalPlanNode::decode(scan.encoded_plan()).is_ok())
+}
+
 pub fn remote_scan_to_top_if_needed(
     plan: Arc<dyn ExecutionPlan>,
     remote_scan_nodes: Arc<RemoteScanNodes>,
@@ -502,11 +533,18 @@ impl<'n> TreeNodeVisitor<'n> for NewEmptyExecCountVisitor {
 mod tests {
     use datafusion::{
         arrow::datatypes::{DataType, Field, Schema},
+        execution::{SessionStateBuilder, runtime_env::RuntimeEnvBuilder},
         physical_optimizer::PhysicalOptimizerRule,
         physical_plan::{empty::EmptyExec, expressions::col},
+        prelude::{SessionConfig, SessionContext},
     };
+    use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 
     use super::*;
+    use crate::datafusion::{
+        distributed_plan::codec::get_physical_extension_codec,
+        table_provider::empty_table::NewEmptyTable,
+    };
 
     #[test]
     fn test_remote_scan_rule_name() {
@@ -843,5 +881,201 @@ mod tests {
             );
         }
         Ok(())
+    }
+
+    fn window_chain_sql(stages: usize) -> String {
+        let key = (0..20).fold("name".to_string(), |x, _| {
+            format!("regexp_replace({x}, 'a', 'b')")
+        });
+        let mut ctes = vec![format!(
+            "c1 AS (SELECT name, {key} AS k, _timestamp AS t, _timestamp AS a1 FROM t)"
+        )];
+        for i in 2..=stages {
+            let p = i - 1;
+            ctes.push(format!(
+                "c{i} AS (SELECT *, MAX(a{p}) OVER (PARTITION BY k ORDER BY t RANGE BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS a{i} FROM c{p})"
+            ));
+        }
+        format!(
+            "WITH {} SELECT k, a{stages} FROM c{stages}",
+            ctes.join(", ")
+        )
+    }
+
+    async fn single_node_plan(sql: &str) -> (SessionContext, Arc<dyn ExecutionPlan>) {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+        ]));
+        let mut file_id_lists = HashMap::new();
+        file_id_lists.insert(TableReference::from("t"), vec![]);
+        let state = SessionStateBuilder::new()
+            .with_config(SessionConfig::new().with_target_partitions(4))
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
+            .with_physical_optimizer_rule(Arc::new(RemoteScanRule::new_test(file_id_lists, true)))
+            .with_default_features()
+            .build();
+        let ctx = SessionContext::new_with_state(state);
+        let table = NewEmptyTable::new("t", schema).with_partitions(4);
+        ctx.register_table("t", Arc::new(table)).unwrap();
+        let logical = ctx.state().create_logical_plan(sql).await.unwrap();
+        let plan = ctx.state().create_physical_plan(&logical).await.unwrap();
+        (ctx, plan)
+    }
+
+    fn decode_every_remote_scan(ctx: &SessionContext, plan: &Arc<dyn ExecutionPlan>) -> usize {
+        let mut sent = vec![];
+        plan.apply(|node| {
+            if let Some(scan) = node.downcast_ref::<RemoteScanExec>() {
+                sent.push(scan.encoded_plan().to_vec());
+            }
+            Ok(TreeNodeRecursion::Continue)
+        })
+        .unwrap();
+        let codec = get_physical_extension_codec();
+        for bytes in &sent {
+            physical_plan_from_bytes_with_extension_codec(bytes, &ctx.task_ctx(), &codec)
+                .expect("the follower must decode the plan it is sent");
+        }
+        sent.len()
+    }
+
+    // Server planning runs on 16 MiB threads; this plan overflows the 2 MiB test thread.
+    fn on_server_stack(test: impl Future<Output = ()> + Send + 'static) {
+        std::thread::Builder::new()
+            .stack_size(16 * 1024 * 1024)
+            .spawn(move || {
+                tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .unwrap()
+                    .block_on(test)
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[test]
+    fn test_single_node_keeps_whole_plan_in_one_remote_scan_when_it_decodes() {
+        on_server_stack(async {
+            let (ctx, plan) = single_node_plan(&window_chain_sql(3)).await;
+            assert_eq!(plan.name(), "RemoteScanExec");
+            assert_eq!(decode_every_remote_scan(&ctx, &plan), 1);
+        });
+    }
+
+    #[test]
+    fn test_single_node_splits_plan_too_deep_for_the_follower_to_decode() {
+        on_server_stack(async {
+            let (ctx, plan) = single_node_plan(&window_chain_sql(30)).await;
+            assert!(decode_every_remote_scan(&ctx, &plan) >= 1);
+            assert_ne!(plan.name(), "RemoteScanExec");
+        });
+    }
+
+    async fn cluster_plan(sql: &str) -> (SessionContext, Arc<dyn ExecutionPlan>) {
+        use tracing_opentelemetry::OpenTelemetrySpanExt;
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("k8s_cluster", DataType::Utf8, true),
+            Field::new("k8s_resource_name", DataType::Utf8, true),
+            Field::new("k8s_namespace_name", DataType::Utf8, true),
+            Field::new("event_name", DataType::Utf8, true),
+            Field::new("value", DataType::Int64, true),
+        ]));
+        let mut file_id_lists = HashMap::new();
+        file_id_lists.insert(TableReference::from("t"), vec![]);
+        let nodes = (0..3)
+            .map(|_| Arc::new(config::meta::cluster::Node::default()) as Arc<dyn NodeInfo>)
+            .collect();
+        let remote_scan_nodes = Arc::new(RemoteScanNodes::new(
+            Request::default(),
+            nodes,
+            file_id_lists,
+            HashMap::new(),
+            false,
+            tracing::Span::current().context(),
+            None,
+        ));
+        let rule = RemoteScanRule {
+            remote_scan_nodes,
+            single_node_optimizer_enable: false,
+        };
+        let state = SessionStateBuilder::new()
+            .with_config(SessionConfig::new().with_target_partitions(4))
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
+            .with_physical_optimizer_rule(Arc::new(rule))
+            .with_default_features()
+            .build();
+        let ctx = SessionContext::new_with_state(state);
+        let table = NewEmptyTable::new("t", schema)
+            .with_partitions(4)
+            .with_sort_order(crate::datafusion::sort_order::FileSortOrder::TimestampDesc);
+        ctx.register_table("t", Arc::new(table)).unwrap();
+        let logical = ctx.state().create_logical_plan(sql).await.unwrap();
+        let plan = ctx.state().create_physical_plan(&logical).await.unwrap();
+        (ctx, plan)
+    }
+
+    #[tokio::test]
+    async fn test_cluster_window_partitioned_by_filtered_constants_executes() {
+        use datafusion::physical_plan::windows::BoundedWindowAggExec;
+        let latest = "SELECT event_name, _timestamp FROM (SELECT event_name, _timestamp, \
+            ROW_NUMBER() OVER (PARTITION BY k8s_cluster, k8s_resource_name, \
+            COALESCE(k8s_namespace_name, ''), event_name ORDER BY _timestamp DESC) AS rn \
+            FROM t WHERE k8s_resource_name = 'nodes' AND k8s_cluster = 'c1'{terms}) \
+            WHERE rn = 1 ORDER BY _timestamp DESC LIMIT {limit}";
+        for (terms, limit) in [
+            ("", "5000"),
+            (" AND event_name = 'n1' AND k8s_namespace_name = 'ns1'", "1"),
+        ] {
+            let sql = latest.replace("{terms}", terms).replace("{limit}", limit);
+            let (ctx, plan) = cluster_plan(&sql).await;
+            let mut windows = vec![];
+            plan.apply(|node| {
+                if node.downcast_ref::<BoundedWindowAggExec>().is_some() {
+                    windows.push(Arc::clone(node));
+                }
+                Ok(TreeNodeRecursion::Continue)
+            })
+            .unwrap();
+            assert_eq!(windows.len(), 1, "{sql}");
+            assert!(decode_every_remote_scan(&ctx, &plan) >= 1, "{sql}");
+            if let Err(e) = windows[0].execute(0, ctx.task_ctx()) {
+                panic!("{sql}: {e}");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_cluster_union_literal_column_keeps_sort_requirement() {
+        let sql = "SELECT event_name, value, 'a' AS origin FROM t WHERE value > 1 \
+            UNION ALL SELECT event_name, value, 'b' AS origin FROM t WHERE value < 0 \
+            ORDER BY origin, value DESC LIMIT 15";
+        let (ctx, plan) = cluster_plan(sql).await;
+        assert!(decode_every_remote_scan(&ctx, &plan) >= 2);
+        plan.apply(|node| {
+            for (child, required) in node
+                .children()
+                .into_iter()
+                .zip(node.required_input_ordering())
+            {
+                // A merge over a remote scan trusts each follower's stream to be sorted.
+                let Some(required) =
+                    required.filter(|_| child.downcast_ref::<RemoteScanExec>().is_none())
+                else {
+                    continue;
+                };
+                let (alternatives, _) = required.into_alternatives();
+                let eq = child.equivalence_properties();
+                let satisfied = alternatives
+                    .iter()
+                    .any(|r| eq.ordering_satisfy_requirement(r.iter().cloned()).unwrap());
+                assert!(satisfied, "{} <- {}", node.name(), child.name());
+            }
+            Ok(TreeNodeRecursion::Continue)
+        })
+        .unwrap();
     }
 }

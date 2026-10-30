@@ -21,8 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <EmptyState
-    title="No panels here yet"
-    description="Add a panel to start visualizing logs, metrics, and traces."
+    :title="t('emptyState.noPanels.title')"
+    :description="t('emptyState.noPanels.description')"
   >
     <template #illustration>
       <EmptyPanel data-test="empty-panel-art" />
@@ -30,10 +30,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template #actions>
       <QuickStartCard
-        v-if="!viewOnly"
+        v-if="!viewOnly && !hideAddAction"
         icon="add"
-        label="Add panel"
-        sublabel="Charts, tables &amp; more"
+        :label="t('emptyState.noPanels.action')"
+        :sublabel="t('emptyState.noPanels.actionDesc')"
         data-test="dashboard-if-no-panel-add-panel-btn"
         @click="$emit('add')"
       />
@@ -42,10 +42,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { useI18nTyped } from "@/types/i18n";
 import EmptyState from "./EmptyState.vue";
 import EmptyPanel from "../illustrations/EmptyPanel.vue";
 import QuickStartCard from "./QuickStartCard.vue";
 
-defineProps<{ viewOnly?: boolean }>();
+const { t } = useI18nTyped();
+
+defineProps<{ viewOnly?: boolean; hideAddAction?: boolean }>();
 defineEmits<{ add: [] }>();
 </script>
