@@ -672,6 +672,11 @@ describe("AnalyticsFunnels", () => {
     expect((decodeDef(router.currentRoute.value.query.funnel as string) as { b: string }).b).toBe(
       "context_missing",
     );
+    useProductAnalytics().funnelView.value = "trend";
+    await settle();
+    expect(text("rum-analytics-funnel-breakdown-start")).toBe(
+      "context_missing is not a field in this app's data, so all sessions read as not set.",
+    );
   });
 
   it("a drop-off opens the drawer for that step in one click and See paths hands over the cohort (AC-16, AC-25)", async () => {
@@ -3187,6 +3192,26 @@ describe("AnalyticsFunnels", () => {
       expect(wrapper!.find('[data-test="rum-analytics-funnel-steps-table"]').exists()).toBe(true);
     });
 
+    it("View as reads Steps while too few steps hide the trend, and keeps the Trend choice", async () => {
+      await mountFunnels({ fv: "trend" });
+      await setSteps([["p", "/a"]]);
+      const state = (dt: string) => wrapper!.find(`[data-test="${dt}"]`).attributes("data-state");
+      expect(state("rum-analytics-funnel-view-steps")).toBe("on");
+      expect(state("rum-analytics-funnel-view-trend")).toBe("off");
+      expect(useProductAnalytics().funnelView.value).toBe("trend");
+      await setSteps(fourSteps);
+      expect(state("rum-analytics-funnel-view-trend")).toBe("on");
+    });
+
+    it("the Interval select shows Auto for a pick the range rules out, keeping the pick", async () => {
+      await mountFunnels({ fv: "trend" });
+      await setSteps(fourSteps);
+      useProductAnalytics().funnelInterval.value = "month";
+      await settle();
+      expect(sel("rum-analytics-funnel-trend-interval-select").props("modelValue")).toBe("auto");
+      expect(useProductAnalytics().funnelInterval.value).toBe("month");
+    });
+
     it("an attribute breakdown's lines rank at its pinned step, or wait for the funnel's start step", async () => {
       const PAY = "context_payment_method";
       const { performanceState } = usePerformance();
@@ -3505,6 +3530,15 @@ describe("AnalyticsFunnels", () => {
         expect(useProductAnalytics().funnel.value.breakdown).toBeFalsy();
         expect(warn().exists()).toBe(false);
         expect(wrapper!.text()).not.toContain("The chart has no comparison line");
+      });
+
+      it("stays hidden for a breakdown on a field this app's data lacks, since the chart compares", async () => {
+        await mountFunnels({ fv: "trend", fc: "prev" });
+        await setSteps(fourSteps);
+        const pa = useProductAnalytics();
+        pa.funnel.value = { ...pa.funnel.value, breakdown: { f: "context_missing" } };
+        await settle();
+        expect(warn().exists()).toBe(false);
       });
     });
 
