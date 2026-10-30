@@ -19,8 +19,12 @@ export function severityCounts(findings) {
 }
 
 // A reviewer that returned nothing parseable counts as unfinished, or its silence would read as a clean pass.
+export function reviewerFinished(r) {
+  return !r.skipped && !r.error && r.parsed === true;
+}
+
 export function unfinishedReviewers(ranResults) {
-  return ranResults.filter(r => r.error || r.parsed !== true).map(r => r.agentName);
+  return ranResults.filter(r => !reviewerFinished(r)).map(r => r.agentName);
 }
 
 function plural(count, noun) {

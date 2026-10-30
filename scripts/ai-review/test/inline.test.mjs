@@ -112,6 +112,17 @@ test("a second inline block is never read, so it leaves the count unknown", () =
   assert.equal(out.text.includes("ai-review-inline"), false);
 });
 
+test("an unterminated opener leaves the count unknown wherever it sits, and its text stays readable", () => {
+  const dangling = `<!-- ai-review-inline [{"title":"truncated blocker","severity":"p1"}]`;
+  for (const [text, findings] of [[`Text\n<!-- ai-review-inline [] -->\n${dangling}`, 0], [dangling, 0], [`${dangling}\n${dangling}`, 0]]) {
+    const out = extractInlineBlock(text);
+    assert.ok(out.error, text);
+    assert.equal(out.findings.length, findings);
+    assert.equal(out.text.includes("<!--"), false, text);
+    assert.ok(out.text.includes("truncated blocker"), text);
+  }
+});
+
 test("only p0, p1 and p2 findings on valid anchors are selected, most severe first, capped", () => {
   const lines = rightSideLines(DIFF);
   const f = (severity, file, line, title) => ({ severity, file, line, title, body: "" });

@@ -5,6 +5,7 @@ import {
   ANY_REVIEW_MARKER,
   REVIEW_HEADING,
   bodyAtPassLimit,
+  bodyAtUnreviewedHead,
   claimedReviewBody,
   finishReviewBody,
   parseMaxPasses,
@@ -231,6 +232,19 @@ test("at a set cap a skipped push names both commits, once, and marks confidence
   assert.ok(next.includes("`ccccccc` and later pushes"));
   assert.ok(next.includes("`ccccccc` has not been reviewed"));
   assert.equal(next.includes("bbbbbbb"), false);
+});
+
+test("a head the last review did not cover loses the verdict once, and a covered head or a placeholder is left alone", () => {
+  const body = finishReviewBody(sanitize(REVIEW), { key: SHA_A, passes: 1, maxPasses: 0, reviewed: true, confidence: HIGH, gateLine: "**Auto-approved** — small change, all gates passed." });
+  const stale = bodyAtUnreviewedHead(body, SHA_B);
+  assert.equal(stale.includes("Auto-approved"), false);
+  assert.equal(stale.match(/Merge confidence/g).length, 1);
+  assert.ok(stale.includes("`bbbbbbb` has not been reviewed"));
+  assert.equal(reviewedKey(stale), SHA_A);
+  assert.equal(reviewPassCount(stale), 1);
+  assert.equal(bodyAtUnreviewedHead(stale, SHA_B), stale);
+  assert.equal(bodyAtUnreviewedHead(body, SHA_A), body);
+  assert.equal(bodyAtUnreviewedHead(REVIEW, SHA_B), REVIEW);
 });
 
 test("a full review replaces the stale line and the limit note", () => {

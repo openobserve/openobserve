@@ -1,5 +1,5 @@
 import { REVIEW_HEADING } from "./comments.mjs";
-import { shortName } from "./confidence.mjs";
+import { reviewerFinished, shortName } from "./confidence.mjs";
 import { SEVERITIES, SEVERITY_CAPS, normalizeSeverity, severityRank } from "./severity.mjs";
 
 export { insertAfterCallout } from "./comments.mjs";
@@ -131,7 +131,9 @@ function severityCountLine(counts) {
 function fallbackFindingLine(f) {
   const glyph = CATEGORY_GLYPH[(f.category || "").toLowerCase()] || "•";
   const loc = f.file && f.line && f.line !== "0" ? `\`${f.file}:${f.line}\` ` : f.file ? `\`${f.file}\` ` : "";
-  const cat = f.category ? `**[${f.category.charAt(0).toUpperCase() + f.category.slice(1)}]** ` : "";
+  // The sanitizer keeps a line it can read as a finding, so the tag is always present and cannot close early.
+  const category = (f.category || "general").replace(/[\]\n]+/g, " ");
+  const cat = `**[${category.charAt(0).toUpperCase() + category.slice(1)}]** `;
   const fix = f.suggestion ? ` (→ ${f.suggestion})` : "";
   return `- ${glyph} ${loc}${cat}${f.summary}${fix}`;
 }
@@ -192,7 +194,7 @@ ${sections.join("\n")}
 ---
 
 - Risk tier: ${tier}
-- Reviewers completed: ${agentResults.filter(r => !r.error && !r.skipped).map(r => r.agentName).join(", ") || "none"}
+- Reviewers completed: ${agentResults.filter(reviewerFinished).map(r => r.agentName).join(", ") || "none"}
 ${failedLine}
 
 </details>`;

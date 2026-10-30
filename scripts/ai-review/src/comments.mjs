@@ -150,11 +150,14 @@ export function claimedReviewBody(body, count, key) {
 }
 
 // A head the review did not cover must not keep showing that review's confidence.
-export function bodyAtPassLimit(body, maxPasses, head) {
+export function bodyAtUnreviewedHead(body, head) {
   const reviewed = reviewedKey(body);
-  const noted = withPassLimitNote(body, passLimitNote(maxPasses, reviewed, head));
-  const covered = reviewed ? reviewed === head : noted.search(MERGE_CONFIDENCE_LINE_RE) === -1;
-  return head && !covered ? withConfidenceLine(noted, staleConfidenceLine(shortKey(head))) : noted;
+  const covered = reviewed ? reviewed === head : body.search(MERGE_CONFIDENCE_LINE_RE) === -1;
+  return head && !covered ? withConfidenceLine(body, staleConfidenceLine(shortKey(head))) : body;
+}
+
+export function bodyAtPassLimit(body, maxPasses, head) {
+  return bodyAtUnreviewedHead(withPassLimitNote(body, passLimitNote(maxPasses, reviewedKey(body), head)), head);
 }
 
 // The sha tag says that exact commit was read and stops it being reviewed again, so a run that cannot prove that leaves it off.
