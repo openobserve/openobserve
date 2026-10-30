@@ -169,6 +169,8 @@ test.describe('Alerts — Additional Settings Help Drawer', {
         tag: ['@alerts-help-drawer', '@smoke', '@alerts'],
     }, async ({ page }) => {
         await navigateToAdvancedTab(page, pm);
+        // Variables is a one-click "+ add" setting now, not part of the always-visible settings.
+        await pm.alertsPage.revealAlertVariables();
 
         // Open the Additional Variables "Learn more" trigger
         const learnMore = pm.alertsPage.getHelpDrawerVariablesInfoBtn();
