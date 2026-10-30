@@ -228,120 +228,81 @@ describe("ShortcutManager", () => {
     });
   });
 
-  // o2-enterprise#3127: `x` inside the Public links drawer exported the dashboard behind it.
-  describe("dialog-focus guard", () => {
-    let dialog: HTMLDivElement;
-    let insideDialog: HTMLButtonElement;
-
-    beforeEach(() => {
-      dialog = document.createElement("div");
-      dialog.setAttribute("role", "dialog");
-      insideDialog = document.createElement("button");
-      dialog.appendChild(insideDialog);
-      document.body.appendChild(dialog);
-    });
+  describe("skipInOverlay", () => {
+    const inside = (role: string | null, attr?: string): HTMLButtonElement => {
+      const overlay = document.createElement("div");
+      if (role) overlay.setAttribute("role", role);
+      if (attr) overlay.setAttribute(attr, "");
+      const button = document.createElement("button");
+      overlay.appendChild(button);
+      document.body.appendChild(overlay);
+      return button;
+    };
 
     afterEach(() => {
-      dialog.remove();
+      document.body.innerHTML = "";
     });
 
-    it("should not fire a plain-key page shortcut while focus is inside a dialog", () => {
+    it.each([
+      ["dialog", undefined],
+      ["alertdialog", undefined],
+      ["listbox", undefined],
+      ["menu", undefined],
+      [null, "data-o-popover-content"],
+    ])("leaves Space to a button inside a %s %s", (role, attr) => {
       const handler = vi.fn();
-      manager.register({ key: "x", handler, description: "export" });
+      manager.register({ key: "space", handler, skipInOverlay: true });
+      const event = fakeEvent({ key: " ", target: inside(role, attr) });
 
-      manager.handleKeyDown(fakeEvent({ key: "x", target: insideDialog }));
+      manager.handleKeyDown(event);
+
+      expect(handler).not.toHaveBeenCalled();
+      expect(event.preventDefault).not.toHaveBeenCalled();
+    });
+
+    it("leaves a modifier combo to an editable element", () => {
+      const handler = vi.fn();
+      manager.register({ key: "alt+down", handler, skipInOverlay: true });
+      const event = fakeEvent({
+        key: "ArrowDown",
+        altKey: true,
+        target: document.createElement("textarea"),
+      });
+
+      manager.handleKeyDown(event);
+
+      expect(handler).not.toHaveBeenCalled();
+      expect(event.preventDefault).not.toHaveBeenCalled();
+    });
+
+    it("leaves a key a widget already handled", () => {
+      const handler = vi.fn();
+      manager.register({ key: "pagedown", handler, skipInOverlay: true });
+      const event = fakeEvent({ key: "PageDown", target: document.body, defaultPrevented: true });
+
+      manager.handleKeyDown(event);
 
       expect(handler).not.toHaveBeenCalled();
     });
 
-    it("should not fire a plain-key shortcut when the dialog element itself has focus", () => {
+    it("still fires on the page itself", () => {
       const handler = vi.fn();
-      manager.register({ key: "f", handler, description: "fullscreen" });
+      manager.register({ key: "pagedown", handler, skipInOverlay: true });
+      const event = fakeEvent({ key: "PageDown", target: inside(null) });
 
-      manager.handleKeyDown(fakeEvent({ key: "f", target: dialog }));
-
-      expect(handler).not.toHaveBeenCalled();
-    });
-
-    it("should not fire a plain-key shortcut inside an alert dialog", () => {
-      const handler = vi.fn();
-      manager.register({ key: "r", handler, description: "refresh" });
-      dialog.setAttribute("role", "alertdialog");
-
-      manager.handleKeyDown(fakeEvent({ key: "r", target: insideDialog }));
-
-      expect(handler).not.toHaveBeenCalled();
-    });
-
-    it("should not fire a plain-key shortcut inside a dropdown portalled out of a drawer", () => {
-      const handler = vi.fn();
-      manager.register({ key: "x", handler, description: "export" });
-      const popper = document.createElement("div");
-      popper.setAttribute("data-reka-popper-content-wrapper", "");
-      const option = document.createElement("div");
-      option.setAttribute("role", "option");
-      popper.appendChild(option);
-      document.body.appendChild(popper);
-
-      manager.handleKeyDown(fakeEvent({ key: "x", target: option }));
-
-      expect(handler).not.toHaveBeenCalled();
-      popper.remove();
-    });
-
-    it("control: should still fire the same shortcut outside any dialog", () => {
-      const handler = vi.fn();
-      manager.register({ key: "x", handler, description: "export" });
-
-      manager.handleKeyDown(fakeEvent({ key: "x", target: document.body }));
+      manager.handleKeyDown(event);
 
       expect(handler).toHaveBeenCalledOnce();
+      expect(event.preventDefault).toHaveBeenCalledOnce();
     });
 
-    it("control: should still fire Escape inside a dialog so it can close", () => {
+    it("does not change shortcuts without the flag", () => {
       const handler = vi.fn();
-      manager.register({ key: "escape", handler, description: "close" });
+      manager.register({ key: "pagedown", handler });
 
-      manager.handleKeyDown(fakeEvent({ key: "Escape", target: insideDialog }));
+      manager.handleKeyDown(fakeEvent({ key: "PageDown", target: inside("dialog") }));
 
       expect(handler).toHaveBeenCalledOnce();
-    });
-
-    it("control: should still fire command-modifier shortcuts inside a dialog", () => {
-      const handler = vi.fn();
-      manager.register({ key: "ctrl+s", handler, description: "save" });
-
-      manager.handleKeyDown(fakeEvent({ key: "s", ctrlKey: true, target: insideDialog }));
-
-      expect(handler).toHaveBeenCalledOnce();
-    });
-
-    it("should fire an allowInDialog shortcut inside a dialog", () => {
-      const handler = vi.fn();
-      manager.register({ key: "j", handler, description: "next row", allowInDialog: true });
-
-      manager.handleKeyDown(fakeEvent({ key: "j", target: insideDialog }));
-
-      expect(handler).toHaveBeenCalledOnce();
-    });
-
-    it("should carry allowInDialog from the registry through useShortcuts", async () => {
-      const handler = vi.fn();
-      const wrapper = mount(
-        defineComponent({
-          setup() {
-            useShortcuts([{ id: "logsNextRow", handler }]);
-            return () => h("div");
-          },
-        }),
-      );
-      await nextTick();
-
-      getManager()!.handleKeyDown(fakeEvent({ key: "j", target: insideDialog }));
-
-      expect(handler).toHaveBeenCalledOnce();
-      wrapper.unmount();
-      resetManager();
     });
   });
 });
