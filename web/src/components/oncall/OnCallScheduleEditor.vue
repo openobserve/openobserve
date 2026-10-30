@@ -88,7 +88,7 @@
             variant="ghost"
             size="icon-sm"
             icon-left="delete-outline"
-            :aria-label="t('oncall.removeRotation')"
+            :aria-label="t('oncall.laneDelete')"
             :data-test="`oncall-schedule-remove-${row.id}`"
             @click.stop="removeRotation(row)"
           />
@@ -347,7 +347,7 @@
             data-test="oncall-rotation-delete"
             @click="confirmRemove = true"
           >
-            {{ t("oncall.removeRotation") }}
+            {{ t("oncall.laneDelete") }}
           </OButton>
           <OButton variant="outline" size="sm-action" class="ms-auto" @click="cancelDrawer">
             {{ t("oncall.cancel") }}
@@ -377,16 +377,15 @@
       focus-cancel
       @update:ok="discardAndClose"
     />
-    <ConfirmDialog
-      v-model="confirmRemove"
+    <OnCallRemoveRotationDialog
+      v-model:open="confirmRemove"
       data-test="oncall-rotation-remove-confirm"
-      :title="t('oncall.removeRotationTitle', { name: raw(active?.name ?? '') })"
-      message-keypath="oncall.removeRotationMessage"
-      :message-name="active?.name"
-      :ok-label="t('oncall.removeRotation')"
-      ok-variant="destructive"
-      focus-cancel
-      @update:ok="deleteActive"
+      :rotation-id="active?.id ?? ''"
+      :rotations="draft"
+      :holders="removeHolders"
+      :policy="policy ?? null"
+      @confirm="confirmDelete"
+      @open-policy="openPolicy"
     />
   </div>
 </template>
@@ -418,12 +417,14 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OnCallShiftRuleFields from "./OnCallShiftRuleFields.vue";
 import OnCallDraftPreview from "./OnCallDraftPreview.vue";
 import OnCallRuleTabMenu from "./OnCallRuleTabMenu.vue";
+import OnCallRemoveRotationDialog from "./OnCallRemoveRotationDialog.vue";
 import { useRotationPreview } from "@/composables/useRotationPreview";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import { queryClient } from "@/composables/query/queryClient";
 import { setTeamScheduleMutation, unavailabilityQuery } from "@/services/oncall.queries";
 import { useMutation } from "@tanstack/vue-query";
 import type {
+  OnCallPolicy,
   OnCallSchedule,
   OnCallTeamMember,
   Rotation,
@@ -444,6 +445,7 @@ import {
   coverageHoursSummary,
   effectiveRivals,
   effectiveWeekCoverage,
+  formatInZone,
   formatMinuteOfDay,
   formatStamp,
   overlappingRules,
@@ -473,12 +475,16 @@ const props = defineProps<{
    * add ONE rotation put a page-sized mode between the button and the form.
    */
   drawerOnly?: boolean;
+  /** The team's policy, so removing a rotation can say which escalation steps it takes. */
+  policy?: OnCallPolicy | null;
 }>();
 const emit = defineEmits<{
   saved: [];
   "intent-handled": [];
   /** Nothing here can add a person, so the roster is asked for by name. */
   "open-members": [];
+  /** A hand-edited policy pages the rotation being removed; it has to be edited first. */
+  "open-policy": [];
 }>();
 
 const { t } = useI18nTyped();
@@ -624,10 +630,9 @@ function awayClashesFor(rule: ShiftRule): Unavailability[] {
 
 const stamp = (micros: number) => formatStamp(micros, props.timezone);
 
+// The team's clock, the same one the roster's away chip uses.
 function shortDate(micros: number): string {
-  return new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" }).format(
-    new Date(micros / 1000),
-  );
+  return formatInZone(micros, props.timezone, { day: "numeric", month: "short" });
 }
 
 function editRotation(rotation: Rotation) {
@@ -1064,6 +1069,26 @@ watch(editing, (isOpen) => {
   if (abandoned) draft.value = draft.value.filter((r) => r !== abandoned);
 });
 
+/// Who each rotation puts on call now, by name, for the delete confirm.
+const removeHolders = computed(() =>
+  draft.value
+    .map((rotation) => ({ rotation_id: rotation.id, email: holderOf(rotation) }))
+    .filter((holder) => holder.email)
+    .map((holder) => ({ rotation_id: holder.rotation_id, name: nameOf(holder.email) })),
+);
+
+function confirmDelete() {
+  confirmRemove.value = false;
+  void deleteActive();
+}
+
+/// The drawer closes first: the policy editor is a drawer too, and one flow gets one surface.
+function openPolicy() {
+  confirmRemove.value = false;
+  editing.value = false;
+  emit("open-policy");
+}
+
 /// Deletion is a save: the drawer is the only surface, so there is no separate
 /// "now press Save" step to forget.
 async function deleteActive() {
@@ -1090,6 +1115,7 @@ async function save(): Promise<boolean> {
     });
     return false;
   }
+  // `setTeamScheduleMutation` clears the default-staffing marker: a schedule a human saved is no longer the one nobody chose.
   const rotations = draft.value;
   saving.value = true;
   try {

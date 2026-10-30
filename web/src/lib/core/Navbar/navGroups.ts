@@ -225,9 +225,9 @@ export const NAV_GROUPS: NavGroupDef[] = [
         beta: true,
       },
       // A page is where an alert escalates to a person, so On-Call sits in the
-      // same workflow tile rather than as its own rail entry. Pages, Teams and
-      // Routing share the "On-Call" category header so the flyout reads as one
-      // module with three destinations, not three unrelated reliability
+      // same workflow tile rather than as its own rail entry. Pages, Teams,
+      // Routing and My on-call share the "On-Call" category header so the flyout reads as one
+      // module with four destinations, not four unrelated reliability
       // entries. `gate: "oncall"` is a FeatureKey, so it resolves via
       // checkFeatureAccess (edition only) — the on-call routes are always
       // registered and separately redirect home on the oncall_enabled flag.
@@ -249,6 +249,14 @@ export const NAV_GROUPS: NavGroupDef[] = [
         titleKey: "oncall.routingNav",
         icon: "alt-route",
         name: "onCallRouting",
+        categoryKey: "menu.onCall",
+        gate: "oncall",
+      },
+      // Same icon as the page's own header, so the menu and the page read as one place.
+      {
+        titleKey: "oncall.mineTitle",
+        icon: "person",
+        name: "onCallMine",
         categoryKey: "menu.onCall",
         gate: "oncall",
       },

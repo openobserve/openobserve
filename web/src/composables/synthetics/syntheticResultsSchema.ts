@@ -290,7 +290,8 @@ export interface RecordedStep {
 
 export interface StepExecution {
   step_id: string;
-  status: "ok" | "fail" | "skipped";
+  /** `unknown`: a status string this UI does not recognise; never shown as a pass. */
+  status: "ok" | "fail" | "skipped" | "unknown";
   duration_ms: number;
   error: string | null;
   start_time: number;
@@ -1847,7 +1848,13 @@ export function mapRun(rawHit: Record<string, unknown>): SyntheticRun {
 
 function normaliseStepStatus(status: unknown): StepExecution["status"] {
   if (status === "ok" || status === "passed") return "ok";
-  return status === "skipped" ? "skipped" : "fail";
+  if (status === "skipped") return "skipped";
+  // An absent status keeps the historical reading (the step did not finish),
+  // but a value we do not recognise is shown as unknown, not folded into fail.
+  if (typeof status === "string" && status !== "" && status !== "fail" && status !== "failed") {
+    return "unknown";
+  }
+  return "fail";
 }
 
 /** `start_load` arrives nested on an attempt or as a JSON string on the record; both map here. */

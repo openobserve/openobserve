@@ -189,6 +189,20 @@ export const publicLinkDefaults = (): PublicLinkForm => ({
   expires: "",
 });
 
+/** The window that covers every range at once, relative ones ending at `nowMs`; no ranges reads as the default ones. */
+export const rangesWindow = (
+  ranges: PublicLinkRange[],
+  nowMs: number,
+): { start_time: Date; end_time: Date } => {
+  const spans = (ranges.length ? ranges : publicLinkDefaults().ranges).map((r) =>
+    r.type === "relative" ? [nowMs - r.secs * 1000, nowMs] : [r.start / 1000, r.end / 1000],
+  );
+  return {
+    start_time: new Date(Math.min(...spans.map(([start]) => start))),
+    end_time: new Date(Math.max(...spans.map(([, end]) => end))),
+  };
+};
+
 /** An expiry in UTC microseconds as the YYYY-MM-DD date it falls on in the author's timezone. */
 export const expiryDate = (micros: number, timezone: string): string =>
   formatInTimeZone(micros / 1000, timezone, "yyyy-MM-dd");
