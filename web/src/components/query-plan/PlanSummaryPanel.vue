@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :loading="running"
         data-test="query-plan-run-profile"
         @click="emit('run')"
-        >{{ t("search.queryProfile.runProfile") }}</OButton
+        >{{ t("search.queryProfile.runAnalyze") }}</OButton
       >
     </div>
   </div>
