@@ -16,12 +16,12 @@
 use std::sync::Arc;
 
 use arrow::{
-    array::{Int32Builder, StringBuilder},
+    array::{ArrayBuilder, Int32Builder, StringArray, StringBuilder},
     datatypes::SchemaRef,
     record_batch::RecordBatch,
 };
 use arrow_schema::{DataType, Field, Schema};
-use config::{cluster::LOCAL_NODE, meta::cluster::NodeInfo};
+use config::{cluster::LOCAL_NODE, meta::cluster::NodeInfo, utils::time::now_micros};
 use datafusion::{
     common::{DataFusionError, Result, internal_err, tree_node::TreeNodeRecursion},
     execution::TaskContext,
@@ -32,11 +32,15 @@ use datafusion::{
         stream::RecordBatchStreamAdapter,
     },
 };
-use flight::common::Metrics;
+use flight::{
+    common::Metrics,
+    profile::{PROFILE_VERSION, QueryProfile},
+};
 use futures::StreamExt;
 
 use crate::datafusion::{
-    distributed_plan::display::DisplayableExecutionPlan, plan_metrics::get_cluster_metrics,
+    distributed_plan::{display::DisplayableExecutionPlan, profile::build_profile},
+    plan_metrics::get_cluster_metrics,
 };
 
 /// query EXPLAIN ANALYZE in distributed mode
@@ -44,6 +48,7 @@ use crate::datafusion::{
 /// phase: current we have three phase
 /// node: the ip or partition id
 /// plan: plan with metrics
+/// profile: the structured profile as JSON, on the first row only
 #[derive(Debug)]
 pub struct DistributeAnalyzeExec {
     /// Control how much extra to print
@@ -65,6 +70,7 @@ impl DistributeAnalyzeExec {
             Field::new("node_address", DataType::Utf8, false),
             Field::new("node_name", DataType::Utf8, false),
             Field::new("plan", DataType::Utf8, false),
+            Field::new("profile", DataType::Utf8, true),
         ];
         let schema = Arc::new(Schema::new(fields));
         let cache = Self::compute_properties(&input, Arc::clone(&schema));
@@ -147,6 +153,7 @@ impl ExecutionPlan for DistributeAnalyzeExec {
 
         // Create future that computes the final output
         let start = std::time::Instant::now();
+        let start_us = now_micros();
         let captured_input = Arc::clone(&self.input);
         let captured_schema = Arc::clone(&self.schema);
         let verbose = self.verbose;
@@ -164,7 +171,7 @@ impl ExecutionPlan for DistributeAnalyzeExec {
                 verbose,
                 show_statistics,
                 total_rows,
-                duration,
+                (start_us, duration),
                 captured_input,
                 captured_schema,
             )
@@ -181,7 +188,7 @@ fn create_output_batch(
     verbose: bool,
     _show_statistics: bool,
     total_rows: usize,
-    duration: std::time::Duration,
+    (start_us, duration): (i64, std::time::Duration),
     input: Arc<dyn ExecutionPlan>,
     schema: SchemaRef,
 ) -> Result<RecordBatch> {
@@ -198,6 +205,18 @@ fn create_output_batch(
         .indent(verbose)
         .to_string();
     plan_builder.append_value(annotated_plan);
+
+    let profile = QueryProfile {
+        version: PROFILE_VERSION,
+        node_name: LOCAL_NODE.get_name(),
+        node_address: LOCAL_NODE.get_grpc_addr(),
+        start_us,
+        end_us: start_us + duration.as_micros() as i64,
+        output_rows: total_rows,
+        plan: build_profile(input.as_ref()),
+    };
+    let profile =
+        serde_json::to_string(&profile).map_err(|e| DataFusionError::External(e.into()))?;
 
     // add metrics from remote scan
     let metrics = collect_metrics(input);
@@ -221,6 +240,11 @@ fn create_output_batch(
         plan_builder.append_value(format!("{duration:?}"));
     }
 
+    let rows = phase_builder.len();
+    let profile_array = StringArray::from_iter(
+        std::iter::once(Some(profile)).chain(std::iter::repeat_n(None, rows - 1)),
+    );
+
     RecordBatch::try_new(
         schema,
         vec![
@@ -228,6 +252,7 @@ fn create_output_batch(
             Arc::new(address_builder.finish()),
             Arc::new(name_builder.finish()),
             Arc::new(plan_builder.finish()),
+            Arc::new(profile_array),
         ],
     )
     .map_err(DataFusionError::from)
@@ -246,6 +271,7 @@ fn collect_metrics(plan: Arc<dyn ExecutionPlan>) -> Vec<Metrics> {
 mod tests {
     use std::sync::Arc;
 
+    use arrow::array::Array;
     use arrow_schema::{DataType, Field, Schema};
     use datafusion::physical_plan::empty::EmptyExec;
 
@@ -272,11 +298,31 @@ mod tests {
     }
 
     #[test]
-    fn test_distribute_analyze_exec_schema_has_four_fields() {
+    fn test_distribute_analyze_exec_schema_has_five_fields() {
         let input = empty_input();
         let exec = DistributeAnalyzeExec::new(false, false, input);
-        assert_eq!(exec.schema().fields().len(), 4);
+        assert_eq!(exec.schema().fields().len(), 5);
         assert_eq!(exec.schema().field(0).name(), "phase");
         assert_eq!(exec.schema().field(1).name(), "node_address");
+        assert!(exec.schema().field(4).is_nullable());
+    }
+
+    #[tokio::test]
+    async fn test_distribute_analyze_exec_emits_profile_on_first_row() {
+        let exec = Arc::new(DistributeAnalyzeExec::new(true, false, empty_input()));
+        let batches = datafusion::physical_plan::collect(exec, Arc::new(TaskContext::default()))
+            .await
+            .unwrap();
+        let profile = batches[0]
+            .column(4)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert!(profile.is_valid(0));
+        assert!((1..profile.len()).all(|i| profile.is_null(i)));
+        let parsed: QueryProfile = serde_json::from_str(profile.value(0)).unwrap();
+        assert_eq!(parsed.version, PROFILE_VERSION);
+        assert_eq!(parsed.plan.name, "EmptyExec");
+        assert!(parsed.end_us >= parsed.start_us);
     }
 }

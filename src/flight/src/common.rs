@@ -39,6 +39,8 @@ use datafusion::{
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
+use crate::profile::ProfileNode;
+
 #[derive(Debug, Clone)]
 pub struct RemoteScanMetrics {
     /// Time in nanos to execute child operator and fetch batches
@@ -119,6 +121,9 @@ pub struct Metrics {
     pub node_address: String,
     pub node_name: String,
     pub metrics: String,
+    /// Older nodes do not send it, so the leader falls back to the text plan.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profile: Option<ProfileNode>,
 }
 
 /// the CustomMessage is not ready, so we need to use this struct to store
@@ -143,6 +148,7 @@ pub struct MetricsInfo {
     pub plan: Arc<dyn ExecutionPlan>,
     pub is_super_cluster: bool,
     pub func: Box<dyn Fn() -> bool + Send>,
+    pub build_profile: fn(&dyn ExecutionPlan) -> ProfileNode,
 }
 
 impl PreCustomMessage {
@@ -165,7 +171,12 @@ impl PreCustomMessage {
                 .as_ref()
                 .map(|metrics_info| CustomMessage::Metrics(collect_metrics(metrics_info))),
             PreCustomMessage::MetricsRef(metrics) => {
-                let metrics: Vec<Metrics> = metrics.iter().flat_map(|m| m.lock().clone()).collect();
+                // forwarded profiles are already nested inside this node's own profile
+                let metrics: Vec<Metrics> = metrics
+                    .iter()
+                    .flat_map(|m| m.lock().clone())
+                    .map(|m| Metrics { profile: None, ..m })
+                    .collect();
                 (!metrics.is_empty()).then_some(CustomMessage::Metrics(metrics))
             }
             PreCustomMessage::PeakMemoryRef(peak_memory_ref) => peak_memory_ref
@@ -207,6 +218,7 @@ fn collect_metrics(metrics_info: &MetricsInfo) -> Vec<Metrics> {
         node_address: LOCAL_NODE.get_grpc_addr().to_string(),
         node_name: LOCAL_NODE.get_name().to_string(),
         metrics: plan_with_metrics,
+        profile: Some((metrics_info.build_profile)(plan.as_ref())),
     }]
 }
 
@@ -283,6 +295,10 @@ mod tests {
             peak_memory_usage: 1024000,
             wait_in_queue: 0,
         }
+    }
+
+    fn test_profile(plan: &dyn ExecutionPlan) -> ProfileNode {
+        crate::profile::build_profile(plan, &|_| None)
     }
 
     fn create_test_execution_plan() -> Arc<dyn ExecutionPlan> {
@@ -431,6 +447,7 @@ mod tests {
             plan,
             is_super_cluster: false,
             func: Box::new(|| true),
+            build_profile: test_profile,
         };
 
         let pre_msg = PreCustomMessage::Metrics(Some(metrics_info));
@@ -462,12 +479,14 @@ mod tests {
             node_address: "node1".to_string(),
             node_name: "Node 1".to_string(),
             metrics: "metrics1".to_string(),
+            profile: None,
         }];
         let metrics2 = vec![Metrics {
             stage: 2,
             node_address: "node2".to_string(),
             node_name: "Node 2".to_string(),
             metrics: "metrics2".to_string(),
+            profile: None,
         }];
 
         let metrics_refs = vec![
@@ -489,6 +508,39 @@ mod tests {
     }
 
     #[test]
+    fn test_metrics_ref_strips_forwarded_profiles() {
+        let forwarded = vec![Metrics {
+            stage: 2,
+            profile: Some(ProfileNode::default()),
+            ..Default::default()
+        }];
+        let pre_msg = PreCustomMessage::MetricsRef(vec![Arc::new(Mutex::new(forwarded))]);
+        let Some(CustomMessage::Metrics(metrics)) = pre_msg.get_custom_message() else {
+            panic!("Expected Metrics variant");
+        };
+        assert!(metrics[0].profile.is_none());
+    }
+
+    #[test]
+    fn test_collect_metrics_attaches_own_profile() {
+        let metrics_info = MetricsInfo {
+            plan: create_test_execution_plan(),
+            is_super_cluster: false,
+            func: Box::new(|| false),
+            build_profile: test_profile,
+        };
+        let metrics = collect_metrics(&metrics_info);
+        assert_eq!(metrics[0].profile.as_ref().unwrap().name, "EmptyExec");
+    }
+
+    #[test]
+    fn test_metrics_without_profile_deserializes() {
+        let json = r#"{"stage":1,"node_address":"a","node_name":"b","metrics":"m"}"#;
+        let metrics: Metrics = serde_json::from_str(json).unwrap();
+        assert!(metrics.profile.is_none());
+    }
+
+    #[test]
     fn test_pre_custom_message_get_custom_message_metrics_ref_empty() {
         let metrics_refs = vec![Arc::new(Mutex::new(vec![]))];
 
@@ -504,6 +556,7 @@ mod tests {
             plan,
             is_super_cluster: true,
             func: Box::new(|| true),
+            build_profile: test_profile,
         };
 
         let metrics = collect_metrics(&metrics_info);
@@ -520,6 +573,7 @@ mod tests {
             plan,
             is_super_cluster: false,
             func: Box::new(|| true),
+            build_profile: test_profile,
         };
 
         let metrics = collect_metrics(&metrics_info);
@@ -534,6 +588,7 @@ mod tests {
             plan,
             is_super_cluster: true,
             func: Box::new(|| false),
+            build_profile: test_profile,
         };
 
         let metrics = collect_metrics(&metrics_info);
@@ -552,6 +607,7 @@ mod tests {
             plan: region_leader_plan,
             is_super_cluster: true,
             func: Box::new(|| true),
+            build_profile: test_profile,
         };
 
         let metrics = collect_metrics(&metrics_info);
@@ -572,6 +628,7 @@ mod tests {
             plan: region_leader_plan,
             is_super_cluster: false,
             func: Box::new(|| true),
+            build_profile: test_profile,
         };
 
         let metrics = collect_metrics(&metrics_info);
@@ -603,6 +660,7 @@ mod tests {
             node_address: "test_node".to_string(),
             node_name: "Test Node".to_string(),
             metrics: "test_metrics".to_string(),
+            profile: None,
         }];
         let custom_msg = CustomMessage::Metrics(metrics);
 

@@ -91,6 +91,11 @@ const metricsSummaryCardStub = {
   props: ["metrics"],
 };
 
+const queryProfileViewStub = {
+  template: '<div data-test="query-profile-view" />',
+  props: ["profile", "stream", "sql"],
+};
+
 const oButtonStub = {
   template:
     '<button data-test="o-button" :disabled="loading" @click="$emit(\'click\')"><slot /></button>',
@@ -134,6 +139,7 @@ function mountDialog(props: Record<string, unknown> = {}) {
         OTabPanel: oTabPanelStub,
         QueryPlanTree: queryPlanTreeStub,
         MetricsSummaryCard: metricsSummaryCardStub,
+        QueryProfileView: queryProfileViewStub,
         OIcon: true,
       },
     },
@@ -433,6 +439,42 @@ describe("QueryPlanDialog", () => {
       await nextTick();
 
       expect(wrapper.find('[data-test="metrics-summary-card"]').exists()).toBe(true);
+    });
+
+    it("should render the profile view when the analyze response carries a profile", async () => {
+      wrapper = mountDialog({ modelValue: true });
+      await flushPromises();
+
+      const profile = {
+        version: 1,
+        node_name: "q-0",
+        node_address: "10.0.0.1:5081",
+        start_us: 1,
+        end_us: 2,
+        output_rows: 1,
+        plan: { name: "ProjectionExec", detail: "ProjectionExec", partitions: 1 },
+      };
+      const meta = { results: { took_detail: { total: 9 }, hits: [], total: 1 } };
+      const sse =
+        "event: search_response_metadata\ndata: " +
+        JSON.stringify(meta) +
+        "\n\nevent: search_response_hits\ndata: " +
+        JSON.stringify({
+          hits: [
+            { phase: 0, plan: "ProjectionExec\n", profile: JSON.stringify(profile) },
+            { phase: 1, plan: "DataSourceExec\n", profile: null },
+          ],
+        }) +
+        "\n\n";
+      mockStreamingSearch.mockResolvedValue({ data: sse });
+
+      await (wrapper.vm as any).runAnalyze();
+      await flushPromises();
+
+      expect((wrapper.vm as any).showProfile).toBe(true);
+      expect((wrapper.vm as any).streamResult.took_detail.total).toBe(9);
+      expect(wrapper.find('[data-test="query-profile-view"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="metrics-summary-card"]').exists()).toBe(false);
     });
 
     it("should render OTabs for logical/physical when not in analyze mode", async () => {

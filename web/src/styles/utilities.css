@@ -111,3 +111,9 @@
     transparent var(--hatch-line) 0.3125rem
   );
 }
+
+/* Dotted canvas behind a pannable node graph. Consumer: components/query-plan/ProfileCanvas.vue. */
+@utility bg-dot-grid {
+  background-image: radial-gradient(var(--color-border-strong) 0.0625rem, transparent 0.0625rem);
+  background-size: 1.125rem 1.125rem;
+}
