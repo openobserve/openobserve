@@ -185,6 +185,39 @@ export const usePanelAggregation = ({
         dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
         break;
 
+      case "boxplot":
+        // A box plot summarises the raw values of one y field per x category, so nothing is aggregated.
+        dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.y.forEach((itemY: any) => {
+            if (itemY.isDerived) return;
+            itemY.functionName = null;
+            itemY.args = itemY?.args?.length ? [itemY?.args?.[0]] : [];
+            itemY.havingConditions = [];
+          });
+          keepRawValueFields(
+            query,
+            dashboardPanelData.meta?.streamFields?.groupedFields ?? [],
+            getTimestampColumn(),
+          );
+          query.fields.x = query.fields.x.slice(0, 1);
+          query.fields.y = query.fields.y.slice(0, 1);
+          query.fields.z = [];
+          query.fields.breakdown = [];
+          query.fields.latitude = null;
+          query.fields.longitude = null;
+          query.fields.weight = null;
+          query.fields.name = null;
+          query.fields.value_for_maps = null;
+          query.fields.source = null;
+          query.fields.target = null;
+          query.fields.value = null;
+          query.config.time_shift = [];
+        });
+        dashboardPanelData.data.htmlContent = "";
+        dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
+        break;
+
       case "hostmap":
         dashboardPanelData.data.queries?.forEach((query: any) => {
           // A time bucket cannot name a cell, so only a plain field stays as the entity.

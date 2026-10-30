@@ -643,7 +643,7 @@ export default defineComponent({
           });
         });
       } else if (
-        ["pie", "donut", "gauge", "bar-gauge", "treemap", "sunburst", "funnel"].includes(
+        ["pie", "donut", "gauge", "bar-gauge", "treemap", "sunburst", "funnel", "boxplot"].includes(
           dashboardPanelData.data.type,
         )
       ) {
