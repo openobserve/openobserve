@@ -1645,18 +1645,13 @@ export class AlertDestinationsPage {
     }
 
     /**
-     * Verify destination type cards are visible
-     * @param {number} minCount - Minimum expected count
+     * Verify the picker shows exactly this many destination type cards
+     * @param {number} count - Expected card count
      */
-    async expectDestinationCardsVisible(minCount = 6) {
-        // Wait for cards to load
+    async expectDestinationCardsVisible(count) {
         await this.page.waitForSelector(this.destinationTypeCard, { state: 'visible', timeout: 10000 });
-        await this.page.waitForTimeout(1000);
-
-        const cards = this.page.locator(this.destinationTypeCard);
-        const count = await cards.count();
-        expect(count).toBeGreaterThanOrEqual(minCount);
-        testLogger.debug('Destination cards visible', { count, minCount });
+        await expect(this.page.locator(this.destinationTypeCard)).toHaveCount(count, { timeout: 10000 });
+        testLogger.debug('Destination cards visible', { count });
     }
 
     /**
