@@ -44,8 +44,8 @@ export interface ShortcutEntry {
   allowInInput?: boolean;
   /** Never fire while a text input has focus, even as a modifier combo (see `Shortcut.skipInInput`). */
   skipInInput?: boolean;
-  /** Fire even while focus is inside a dialog or drawer (see `Shortcut.allowInDialog`). */
-  allowInDialog?: boolean;
+  /** Yield to dialogs, drawers, popovers, menus and fields (see `Shortcut.skipInOverlay`). */
+  skipInOverlay?: boolean;
   /** Hide this entry in the cheatsheet unless the edition/config exposes it. */
   visible?: (caps: ShortcutCapabilities) => boolean;
 }
@@ -105,7 +105,10 @@ const cloudMetaAdmin = (c: ShortcutCapabilities) => c.isCloud && c.isMetaOrg;
  * is one chip + one block in the listing; its `pages` render as sub-sections.
  */
 export const SHORTCUT_MODULES: ShortcutModule[] = [
-  { titleKey: "shortcuts.modules.global", pages: ["shortcuts.pages.global"] },
+  {
+    titleKey: "shortcuts.modules.global",
+    pages: ["shortcuts.pages.global"],
+  },
   {
     titleKey: "shortcuts.modules.logs",
     pages: [
@@ -133,6 +136,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
     titleKey: "shortcuts.modules.alerts",
     pages: [
       "shortcuts.pages.alerts",
+      "shortcuts.pages.alertEditor",
       "shortcuts.pages.alertDestinations",
       "shortcuts.pages.alertSources",
       "shortcuts.pages.alertTemplates",
@@ -536,6 +540,46 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         display: "K / ↑",
         descriptionKey: "shortcuts.actions.tracePrevVisibleSpan",
         allowInDialog: true,
+      },
+    ],
+  },
+
+  // ── Alert editor (OSnapScroll) ─────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.alertEditor",
+    scope: "sectioned-form",
+    shortcuts: [
+      {
+        id: "sectionedFormNextStop",
+        keys: ["pagedown", "space"],
+        display: "PgDn / Space",
+        descriptionKey: "shortcuts.actions.sectionedFormNextStop",
+        skipInOverlay: true,
+      },
+      {
+        id: "sectionedFormPrevStop",
+        keys: ["pageup", "shift+space"],
+        display: "PgUp / ⇧ Space",
+        descriptionKey: "shortcuts.actions.sectionedFormPrevStop",
+        skipInOverlay: true,
+      },
+      {
+        id: "sectionedFormNextSection",
+        key: "alt+down",
+        descriptionKey: "shortcuts.actions.sectionedFormNextSection",
+        skipInOverlay: true,
+      },
+      {
+        id: "sectionedFormPrevSection",
+        key: "alt+up",
+        descriptionKey: "shortcuts.actions.sectionedFormPrevSection",
+        skipInOverlay: true,
+      },
+      {
+        id: "sectionedFormFind",
+        key: "/",
+        descriptionKey: "shortcuts.actions.sectionedFormFind",
+        skipInOverlay: true,
       },
     ],
   },
@@ -1294,7 +1338,7 @@ export interface ShortcutDef {
   keys?: string[];
   allowInInput?: boolean;
   skipInInput?: boolean;
-  allowInDialog?: boolean;
+  skipInOverlay?: boolean;
 }
 
 function isRegisterable(e: ShortcutEntry): boolean {
@@ -1319,7 +1363,7 @@ const DEFS: Map<string, ShortcutDef> = (() => {
         keys: e.keys,
         allowInInput: e.allowInInput,
         skipInInput: e.skipInInput,
-        allowInDialog: e.allowInDialog,
+        skipInOverlay: e.skipInOverlay,
       });
     }
   }
