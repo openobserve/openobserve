@@ -396,6 +396,7 @@ fn thresholds_by_check(data: &TickData) -> HashMap<&str, engine::Thresholds> {
     out
 }
 
+// One auto notice per check is shared by every page, so the strictest page's thresholds win.
 fn stricter(a: &engine::Thresholds, b: &engine::Thresholds) -> engine::Thresholds {
     engine::Thresholds {
         confirm_failures: a.confirm_failures.max(b.confirm_failures),
