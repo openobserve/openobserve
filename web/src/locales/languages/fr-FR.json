@@ -1817,6 +1817,8 @@
     "apiEmptyTitle": "Aucune donnée réseau pour cette vue",
     "apiEmptyDescription": "Le flux sélectionné ne contient aucune ressource ni requête réseau dans cette plage horaire. Les métriques réseau apparaissent une fois que l'application instrumente ses appels HTTP.",
     "skipInactivity": "Ignorer l'inactivité",
+    "fullScreen": "Plein écran",
+    "exitFullScreen": "Quitter le plein écran",
     "error": "Erreur",
     "errorCount": "Nombre d'erreurs",
     "all": "Tous",

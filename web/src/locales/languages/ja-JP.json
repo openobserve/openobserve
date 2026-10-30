@@ -1817,6 +1817,8 @@
     "apiEmptyTitle": "このビューのネットワークデータがありません",
     "apiEmptyDescription": "選択したストリームには、この時間範囲のリソースまたはネットワーク リクエストがありません。ネットワーク メトリクスは、アプリが HTTP 呼び出しを計測すると表示されます。",
     "skipInactivity": "非アクティブ期間をスキップ",
+    "fullScreen": "全画面表示",
+    "exitFullScreen": "全画面表示を終了",
     "error": "エラー",
     "errorCount": "エラー数",
     "all": "すべて",

@@ -1817,6 +1817,8 @@
     "apiEmptyTitle": "Bu görünüm için ağ verisi yok",
     "apiEmptyDescription": "Seçilen akışta bu zaman aralığında hiçbir kaynak veya ağ isteği yok. Uygulama HTTP çağrılarını enstrümante ettiğinde ağ metrikleri görünür.",
     "skipInactivity": "Hareketsizliği Atla",
+    "fullScreen": "Tam ekran",
+    "exitFullScreen": "Tam ekrandan çık",
     "error": "Hata",
     "errorCount": "Hata Sayısı",
     "all": "Hepsi",

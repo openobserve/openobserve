@@ -1817,6 +1817,8 @@
     "apiEmptyTitle": "Geen netwerkgegevens voor deze weergave",
     "apiEmptyDescription": "De geselecteerde stream heeft geen resource- of netwerkverzoeken in dit tijdsbereik. Netwerkmetrieken verschijnen zodra de app zijn HTTP-aanroepen instrumenteert.",
     "skipInactivity": "Inactiviteit overslaan",
+    "fullScreen": "Volledig scherm",
+    "exitFullScreen": "Volledig scherm sluiten",
     "error": "Fout",
     "errorCount": "Aantal fouten",
     "all": "Alles",
