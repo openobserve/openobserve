@@ -694,12 +694,18 @@ describe("validatePanel on metric, gauge, pie, table, heatmap, state timeline an
   it("rejects out-of-range numbers", () => {
     expect(run("gauge", { gauge_segments: 1 })).toEqual([
       gt("dashboard.utils.configValueOutOfRange", {
-        setting: "gauge_segments",
+        setting: gt("dashboard.gaugeSegments"),
         min: "2",
         max: "100",
       }),
     ]);
-    expect(run("donut", { donut_inner_radius: 99 })).toHaveLength(1);
+    expect(run("donut", { donut_inner_radius: 99 })).toEqual([
+      gt("dashboard.utils.configValueOutOfRange", {
+        setting: gt("dashboard.donutInnerRadius"),
+        min: "0",
+        max: "95",
+      }),
+    ]);
     expect(run("pie", { pie_other_threshold: -1 })).toHaveLength(1);
     expect(run("metric", { value_font_size: 0 })).toHaveLength(1);
     expect(run("geomap", { map_cluster_radius: 0 })).toHaveLength(1);
