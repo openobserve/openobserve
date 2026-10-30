@@ -37,6 +37,7 @@ export interface NodeBar {
 export interface NodeNameRow {
   id: string;
   name: string;
+  cluster: string;
   role: string;
   straggler: boolean;
   active: boolean;

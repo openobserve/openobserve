@@ -123,7 +123,7 @@ const summary = computed(() => summarizeProfile(props.model, props.stream ?? {})
 const nodeOptions = computed(() =>
   clusterNodes(props.model).map((n) => {
     const role = roleLabel(t, n.role);
-    return { label: raw(role ? `${n.name} · ${role}` : n.name), value: n.key };
+    return { label: raw([n.name, n.cluster, role].filter(Boolean).join(" · ")), value: n.key };
   }),
 );
 

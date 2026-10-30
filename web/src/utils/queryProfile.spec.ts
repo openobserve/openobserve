@@ -27,6 +27,7 @@ import {
   layoutProfile,
   metricSections,
   metricsForScope,
+  nodeLabel,
   nodeScope,
   operatorCategory,
   operatorLabel,
@@ -499,6 +500,86 @@ describe("layoutProfile", () => {
     const layout = layoutProfile(model);
     expectNoCardOverlap(layout);
     expect(layout.stages).toHaveLength(0);
+  });
+});
+
+describe("super-cluster node identity", () => {
+  const PODS: [string, string][] = [
+    ["o2-ingester-0", "ingester"],
+    ["o2-ingester-1", "ingester"],
+    ["o2-querier-0", "querier"],
+    ["o2-querier-1", "querier"],
+    ["o2-querier-2", "querier"],
+  ];
+  const inCluster = (r: RemoteNodeProfile, cluster: string) => ({ ...r, cluster });
+  const clusterScan = (cluster: string): ProfileNode => ({
+    name: "RemoteScanExec",
+    detail: "RemoteScanExec",
+    partitions: PODS.length,
+    remote: PODS.map(([pod, role], i) =>
+      inCluster(plainRemote(pod, role, i, scanPlan(role === "querier" ? 3 : 1)), cluster),
+    ),
+  });
+  const clusterScanExec = (): ProfileNode => ({
+    name: "RemoteScanExec",
+    detail: "RemoteScanExec",
+    partitions: 3,
+    remote: ["cluster-a", "cluster-b", "cluster-c"].map((c, i) =>
+      inCluster(plainRemote(c, "querier", i, clusterScan(c)), c),
+    ),
+  });
+  const joinOfClusters = (): QueryProfile => ({
+    ...singleStageProfile([]),
+    plan: {
+      name: "HashJoinExec",
+      detail: "HashJoinExec: mode=Partitioned",
+      partitions: 1,
+      children: [clusterScanExec(), clusterScanExec()],
+    },
+  });
+
+  it("keys repeated pod names by their cluster, the same way in both join inputs", () => {
+    const model = buildProfileModel(joinOfClusters());
+    const nested = model.stages.filter((s) => s.parentStageId);
+    expect(nested).toHaveLength(2);
+    const keys = ["cluster-a", "cluster-b", "cluster-c"].flatMap((c) =>
+      PODS.map(([pod]) => `${c}/${pod}`),
+    );
+    expect(nested[0].nodes.map((n) => n.key)).toEqual(keys);
+    expect(nested[1].nodes.map((n) => n.key)).toEqual(keys);
+    expect(clusterNodes(model)).toHaveLength(3 + 15);
+    expect(new Set(clusterNodes(model).map((n) => n.key)).size).toBe(18);
+  });
+
+  it("labels nodes with their cluster but not the per-cluster entries", () => {
+    const model = buildProfileModel(joinOfClusters());
+    const entry = model.stages[0].nodes[0];
+    expect(entry).toMatchObject({ name: "cluster-a", cluster: "", clusterEntry: true });
+    const pod = model.stages[1].nodes[0];
+    expect(pod).toMatchObject({ name: "o2-ingester-0", cluster: "cluster-a" });
+    expect(nodeLabel(pod)).toBe("o2-ingester-0 · cluster-a");
+    const scan = model.operators[model.stages[1].variants[0].rootOpId];
+    const rows = operatorNodeRows(model, scan);
+    expect(new Set(rows.map((r) => r.cluster))).toEqual(
+      new Set(["cluster-a", "cluster-b", "cluster-c"]),
+    );
+  });
+
+  it("counts only real nodes, not the cluster entries", () => {
+    const summary = summarizeProfile(buildProfileModel(joinOfClusters()));
+    expect(summary.nodeCounts).toEqual({ queriers: 9, ingesters: 6, other: 0, total: 15 });
+  });
+
+  it("keeps plain node keys inside a single cluster", () => {
+    const model = buildProfileModel(singleStageProfile(clusterScan("zo1").remote!));
+    expect(model.stages[0].nodes.map((n) => n.key)).toEqual(PODS.map(([pod]) => pod));
+    expect(model.stages[0].nodes.every((n) => n.cluster === "" && !n.clusterEntry)).toBe(true);
+  });
+
+  it("never gives two nodes of one stage the same key", () => {
+    const remotes = [0, 1, 2].map(() => plainRemote("dup", "querier", 0, scanPlan(1)));
+    const model = buildProfileModel(singleStageProfile(remotes));
+    expect(model.stages[0].nodes.map((n) => n.key)).toEqual(["dup", "dup#1", "dup#2"]);
   });
 });
 
