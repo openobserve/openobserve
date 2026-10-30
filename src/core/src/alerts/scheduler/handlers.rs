@@ -3061,6 +3061,45 @@ pub(crate) async fn correlate_muted_incident(
     }
 }
 
+/// A repeat still correlates, or a continuous firing lets its incident go stale and auto-resolve.
+#[cfg(feature = "enterprise")]
+async fn correlate_repeated_incident(
+    trace_id: &str,
+    alert: &config::meta::alerts::alert::Alert,
+    rows: &[config::utils::json::Map<String, config::utils::json::Value>],
+    triggered_at: i64,
+    eval_level: Option<config::meta::alerts::level::AlertLevel>,
+    actual_value: Option<f64>,
+) {
+    let Some(first_row) = rows.first() else {
+        return;
+    };
+    let incidents_enabled = o2_enterprise::enterprise::common::config::get_config()
+        .incidents
+        .enabled;
+    if !correlates_repeated_firing(alert.creates_incident, incidents_enabled) {
+        return;
+    }
+    // Correlation itself stays silent on a repeat and only notifies a new or escalated incident.
+    if let Err(e) = crate::alerts::incidents::correlate_alert_to_incident(
+        alert,
+        first_row,
+        rows,
+        triggered_at,
+        eval_level,
+        actual_value,
+        None,
+    )
+    .await
+    {
+        log::error!(
+            "[SCHEDULER trace_id {trace_id}] repeat incident correlation failed for {}/{}: {e}",
+            alert.org_id,
+            alert.name
+        );
+    }
+}
+
 /// Whether a matched single-series run is still inside its pending period.
 fn holds_pending(
     alert: &config::meta::alerts::alert::Alert,
@@ -3140,6 +3179,12 @@ fn correlates_muted_firing(
     downtime: &config::meta::downtimes::ActiveDowntime,
 ) -> bool {
     creates_incident && incidents_enabled && downtime.incident_mode.is_muted()
+}
+
+/// Whether a firing withheld as a repeat still feeds its incident.
+#[cfg(feature = "enterprise")]
+fn correlates_repeated_firing(creates_incident: bool, incidents_enabled: bool) -> bool {
+    creates_incident && incidents_enabled
 }
 
 /// Who acked a single-row alert's current firing, when that ack withholds this run's send.
@@ -4057,6 +4102,20 @@ async fn handle_alert_triggers(
             triggered_at,
             eval_level,
             &downtime,
+        )
+        .await;
+    }
+    #[cfg(feature = "enterprise")]
+    if delivery == DeliveryDecision::SuppressedAsRepeat
+        && let Some(rows) = trigger_results.data.as_deref()
+    {
+        correlate_repeated_incident(
+            &scheduler_trace_id,
+            &alert,
+            rows,
+            triggered_at,
+            eval_level,
+            trigger_results.actual_value,
         )
         .await;
     }
@@ -8992,6 +9051,14 @@ mod tests {
             IncidentMode::Muted,
             "an Alerts target without the field keeps today's muted incident"
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_repeat_still_feeds_its_incident_only_when_incidents_apply() {
+        assert!(correlates_repeated_firing(true, true));
+        assert!(!correlates_repeated_firing(false, true));
+        assert!(!correlates_repeated_firing(true, false));
     }
 
     #[cfg(feature = "enterprise")]
