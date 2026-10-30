@@ -84,6 +84,12 @@ pub async fn save_enrichment_data(
             format!("enrichment table [{stream_name}] is being deleted"),
         ));
     }
+    // checked before a replace deletes the table's current data
+    if let Some(violation) =
+        infra::file_list::stream_key_violation(org_id, StreamType::EnrichmentTables, &stream_name)
+    {
+        return Ok(MetaHttpResponse::bad_request(violation));
+    }
 
     // Estimate the size of the payload in json format in bytes
     let mut bytes_in_payload = 0;
@@ -554,6 +560,26 @@ mod tests {
     use futures_util::stream;
 
     use super::*;
+
+    #[tokio::test]
+    async fn test_save_enrichment_data_rejects_a_table_key_too_long() {
+        let name = "e".repeat(infra::file_list::STREAM_KEY_MAX_LEN);
+        let bounded =
+            infra::file_list::stream_key_violation("org1", StreamType::EnrichmentTables, &name)
+                .is_some();
+        let mut row = json::Map::new();
+        row.insert("city".to_string(), json::Value::String("x".to_string()));
+        let resp = save_enrichment_data("org1", &name, vec![row], false)
+            .await
+            .unwrap();
+        let status = resp.status();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let rejected = status == StatusCode::BAD_REQUEST
+            && String::from_utf8_lossy(&body).contains("Stream name too long");
+        assert_eq!(rejected, bounded);
+    }
 
     // Since axum::Multipart has a private inner field and no public constructor,
     // we use unsafe transmute to convert multer::Multipart to axum::Multipart.
