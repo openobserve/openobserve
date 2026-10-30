@@ -812,7 +812,11 @@ pub async fn correlate_alert_to_incident(
         let priority = alert
             .priority
             .unwrap_or(config::meta::oncall::DEFAULT_PAGING_PRIORITY);
-        let title = alert.name.clone();
+        // The stored title, so a templated or reopened incident pages under the name it shows.
+        let title = match infra::table::alert_incidents::get(&alert.org_id, incident_id).await {
+            Ok(Some(incident)) => incident.title.unwrap_or_else(|| alert.name.clone()),
+            _ => alert.name.clone(),
+        };
         match o2_enterprise::enterprise::oncall::escalation::start_for_incident(
             &alert.org_id,
             &incident_id.to_string(),

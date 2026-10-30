@@ -20,7 +20,10 @@ use config::{
     utils::json::{Map, Value},
 };
 
-use super::alert::{format_alert_time, get_alert_start_end_time, get_row_column_map};
+use super::{
+    alert::{format_alert_time, get_alert_start_end_time, get_row_column_map},
+    notifications::resolve::UNMATCHED_MARKER,
+};
 
 const MAX_TITLE_CHARS: usize = 255;
 
@@ -32,7 +35,7 @@ pub struct TitleInputs<'a> {
     pub labels: &'a HashMap<String, String>,
 }
 
-/// `None` when the template is unset, renders blank, or has any unresolved variable.
+/// `None` when the template is unset or nothing in it resolves; unresolved variables render `–`.
 pub fn render(
     inputs: &TitleInputs<'_>,
     org_name: &str,
@@ -78,8 +81,7 @@ pub fn render(
     ] {
         vars.insert(key.to_string(), Value::String(value.to_string()));
     }
-    let mut unknown = Vec::new();
-    let title = super::notifications::resolve::substitute_raw_row(template, &vars, &mut unknown);
+    let title = super::notifications::resolve::substitute_raw_row(template, &vars, &mut Vec::new());
     // Row values may hold newlines, and Postgres `title` is varchar(500).
     let title: String = title
         .split_whitespace()
@@ -89,7 +91,8 @@ pub fn render(
         .filter(|c| !c.is_control())
         .take(MAX_TITLE_CHARS)
         .collect();
-    (unknown.is_empty() && !title.is_empty()).then_some(title)
+    let has_content = !title.replace(UNMATCHED_MARKER, "").trim().is_empty();
+    has_content.then_some(title)
 }
 
 #[cfg(test)]
@@ -142,7 +145,13 @@ mod tests {
             Some("checkout on web-1")
         );
 
-        alert.incident_title_template = Some("{service} {missing}".into());
+        alert.incident_title_template = Some("{service} on {missing}".into());
+        assert_eq!(
+            render_with(&alert, &r, &none, 0).as_deref(),
+            Some("checkout on –")
+        );
+
+        alert.incident_title_template = Some("{missing} {other}".into());
         assert_eq!(render_with(&alert, &r, &none, 0), None);
 
         alert.incident_title_template = Some("   ".into());
