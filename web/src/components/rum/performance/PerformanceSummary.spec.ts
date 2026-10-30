@@ -50,7 +50,26 @@ const mockHasMobile = ref(false);
 const mockResolvedKey = ref<string | null>("0-0");
 const mockDetectPlatforms = vi.fn().mockResolvedValue(undefined);
 
+vi.mock("@/components/dashboards/PanelSchemaRenderer.vue", () => ({
+  default: { name: "PanelSchemaRenderer", template: "<div />" },
+}));
+
 vi.mock("@/composables/rum/useRumPlatforms", () => ({
+  BROWSER_ONLY_FIELDS: [
+    "view_largest_contentful_paint",
+    "view_cumulative_layout_shift",
+    "view_interaction_to_next_paint",
+    "view_first_contentful_paint",
+    "view_first_byte",
+    "view_loading_time",
+  ],
+  MOBILE_ONLY_FIELDS: [
+    "view_slow_frames_rate",
+    "view_freeze_rate",
+    "view_frozen_frame_count",
+    "view_refresh_rate_average",
+    "error_is_crash",
+  ],
   default: () => ({
     hasBrowser: mockHasBrowser,
     hasMobile: mockHasMobile,
@@ -153,10 +172,21 @@ function mountComponent(routeQuery: Record<string, any> = {}, props: Record<stri
         $route: { query: { dashboard: "test-dashboard", folder: "test-folder", ...routeQuery } },
       },
       stubs: {
+        PerformanceOverview: {
+          name: "PerformanceOverview",
+          props: ["dateTime", "schema", "selectedDate"],
+          template: "<div />",
+        },
         OSpinner: { template: '<div data-test="spinner" v-bind="$attrs" />', inheritAttrs: false },
         OEmptyState: {
           name: "OEmptyState",
-          template: '<div><slot name="title" /><slot name="description" /></div>',
+          props: ["preset"],
+          template:
+            '<div :data-preset="preset"><slot name="title" /><slot name="description" /><slot name="actions" /></div>',
+        },
+        OButton: {
+          name: "OButton",
+          template: '<button v-bind="$attrs"><slot /></button>',
         },
       },
     },
@@ -181,8 +211,16 @@ function seedRumSchema(schemaMap: Record<string, any> | null) {
 async function mountResolved(
   routeQuery: Record<string, any> = {},
   props: Record<string, any> = {},
+  platform: "mobile" | "mixed" = "mobile",
 ) {
-  seedRumSchema({ view_name: { name: "view_name" } });
+  // Mobile-only keeps the whole tile dashboard; a mixed stream adds the native overview above the mobile tiles.
+  mockHasBrowser.value = platform === "mixed";
+  mockHasMobile.value = true;
+  seedRumSchema(
+    platform === "mixed"
+      ? { view_largest_contentful_paint: { name: "x" }, error_is_crash: { name: "y" } }
+      : { view_name: { name: "view_name" } },
+  );
   const mounted = mountComponent(routeQuery, props);
   await flushPromises();
   return mounted;
@@ -282,43 +320,77 @@ describe("PerformanceSummary", () => {
   // RenderDashboardCharts integration
   // -------------------------------------------------------------------------
 
-  it("renders RenderDashboardCharts component", async () => {
-    // Arrange
-    wrapper = await mountResolved();
+  describe.each(["mobile", "mixed"] as const)(
+    "RenderDashboardCharts on a %s stream",
+    (platform) => {
+      it("renders the dashboard", async () => {
+        wrapper = await mountResolved({}, {}, platform);
+        expect(wrapper.findComponent({ name: "RenderDashboardCharts" }).exists()).toBe(true);
+      });
 
-    // Assert
-    expect(wrapper.findComponent({ name: "RenderDashboardCharts" }).exists()).toBe(true);
-  });
+      it("passes viewOnly=true and searchType=RUM", async () => {
+        wrapper = await mountResolved({}, {}, platform);
+        expect(wrapper.findComponent({ name: "RenderDashboardCharts" }).props()).toMatchObject({
+          viewOnly: true,
+          searchType: "RUM",
+        });
+      });
+    },
+  );
 
-  it("passes viewOnly=true to RenderDashboardCharts", async () => {
-    // Arrange
-    wrapper = await mountResolved();
+  it("hands the overview the real-millisecond range, the schema and the picker value", async () => {
+    mockHasBrowser.value = true;
+    mockHasMobile.value = false;
+    seedRumSchema({ view_largest_contentful_paint: { name: "view_largest_contentful_paint" } });
+    const startUs = 1_700_000_000_000_000;
 
-    // Assert
-    const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
-    expect(charts.props("viewOnly")).toBe(true);
-  });
-
-  it("passes searchType=RUM to RenderDashboardCharts", async () => {
-    // Arrange
-    wrapper = await mountResolved();
-
-    // Assert
-    const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
-    expect(charts.props("searchType")).toBe("RUM");
-  });
-
-  it("integrates with RenderDashboardCharts with correct props", async () => {
-    // Arrange
-    wrapper = await mountResolved();
-
-    // Assert
-    const chartsComponent = wrapper.findComponent({ name: "RenderDashboardCharts" });
-    expect(chartsComponent.exists()).toBe(true);
-    expect(chartsComponent.props()).toMatchObject({
-      viewOnly: true,
-      searchType: "RUM",
+    wrapper = mount(PerformanceSummary, {
+      props: {
+        dateTime: {
+          __global: { start_time: new Date(startUs), end_time: new Date(startUs + 3.6e9) },
+        },
+        selectedDate: { valueType: "relative", relativeTimePeriod: "1d" },
+      },
+      global: {
+        provide: { store: mockStore },
+        mocks: { $store: mockStore, $router: mockRouter, $route: { query: {} } },
+        stubs: {
+          PerformanceOverview: {
+            name: "PerformanceOverview",
+            props: ["dateTime", "schema", "selectedDate"],
+            template: "<div />",
+          },
+          OSpinner: true,
+          OEmptyState: true,
+        },
+      },
     });
+    await flushPromises();
+
+    const overview = wrapper.findComponent({ name: "PerformanceOverview" });
+    expect((overview.props("dateTime") as { start_time: Date }).start_time.getTime()).toBe(
+      1_700_000_000_000,
+    );
+    expect((overview.props("schema") as Set<string>).has("view_largest_contentful_paint")).toBe(
+      true,
+    );
+    expect(overview.props("selectedDate")).toEqual({
+      valueType: "relative",
+      relativeTimePeriod: "1d",
+    });
+  });
+
+  it("keeps the native overview visible while the mobile tiles are loading", async () => {
+    wrapper = await mountResolved({}, {}, "mixed");
+    wrapper.vm.isLoading.push("loading");
+    await nextTick();
+
+    const overview = wrapper.findComponent({ name: "PerformanceOverview" });
+    expect(overview.exists()).toBe(true);
+    expect(overview.element.closest(".invisible")).toBeNull();
+    expect(
+      wrapper.findComponent({ name: "RenderDashboardCharts" }).element.closest(".invisible"),
+    ).not.toBeNull();
   });
 
   // -------------------------------------------------------------------------
@@ -414,7 +486,7 @@ describe("PerformanceSummary", () => {
     expect(charts.props("dashboardData")).toEqual(convertedDashboard);
   });
 
-  it("renders the full dashboard when getStream rejects and the schema stays inconclusive", async () => {
+  it("shows an error state with Retry when the schema fetch fails", async () => {
     // Arrange
     mockGetStream.mockRejectedValueOnce(new Error("network error"));
 
@@ -422,9 +494,104 @@ describe("PerformanceSummary", () => {
     wrapper = mountComponent();
     await flushPromises();
 
-    // Assert — a transient error must never degrade a working dashboard.
-    expect(wrapper.find('[data-test="performance-summary-empty"]').exists()).toBe(false);
+    // Assert — the failure is surfaced instead of silently rendering the full dashboard
+    expect(wrapper.find('[data-test="performance-summary-schema-error"]').exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "RenderDashboardCharts" }).exists()).toBe(false);
+  });
+
+  it("shows the no-permission state without Retry when the schema read is forbidden", async () => {
+    mockGetStream.mockRejectedValueOnce(
+      Object.assign(new Error("forbidden"), { response: { status: 403 } }),
+    );
+    wrapper = mountComponent();
+    await flushPromises();
+    const state = wrapper.find('[data-test="performance-summary-schema-forbidden"]');
+    expect(state.attributes("data-preset")).toBe("no-access");
+    expect(state.text()).toContain("No permission to view the performance overview");
+    expect(wrapper.find('[data-test="performance-summary-schema-retry"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="performance-summary-schema-error"]').exists()).toBe(false);
+  });
+
+  it("retries the schema fetch from the error state", async () => {
+    // Arrange
+    mockGetStream.mockRejectedValueOnce(new Error("network error"));
+    wrapper = mountComponent();
+    await flushPromises();
+
+    // Act
+    await wrapper.find('[data-test="performance-summary-schema-retry"]').trigger("click");
+    await flushPromises();
+
+    // Assert
+    expect(mockGetStream).toHaveBeenCalledTimes(2);
+    expect(wrapper.find('[data-test="performance-summary-schema-error"]').exists()).toBe(false);
+  });
+
+  it("renders the native overview, not the tile dashboard, for a browser-only stream", async () => {
+    // Arrange
+    seedRumSchema({ view_largest_contentful_paint: { name: "view_largest_contentful_paint" } });
+
+    // Act
+    wrapper = mountComponent();
+    await flushPromises();
+
+    // Assert
+    expect(wrapper.findComponent({ name: "PerformanceOverview" }).exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "RenderDashboardCharts" }).exists()).toBe(false);
+  });
+
+  it("shows the overview empty state for a browser stream with no platform data in range", async () => {
+    mockHasBrowser.value = false;
+    mockHasMobile.value = false;
+    seedRumSchema({ view_largest_contentful_paint: { name: "view_largest_contentful_paint" } });
+
+    wrapper = mountComponent();
+    await flushPromises();
+
+    expect(wrapper.findComponent({ name: "PerformanceOverview" }).exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "RenderDashboardCharts" }).exists()).toBe(false);
+  });
+
+  it("keeps the legacy dashboard for a mobile-only stream with no data in range", async () => {
+    mockHasBrowser.value = false;
+    mockHasMobile.value = false;
+    seedRumSchema({ error_is_crash: { name: "error_is_crash" } });
+
+    wrapper = mountComponent();
+    await flushPromises();
+
+    expect(wrapper.findComponent({ name: "PerformanceOverview" }).exists()).toBe(false);
+  });
+
+  it("does not show the overview for a stream with no browser fields and no data", async () => {
+    mockHasBrowser.value = false;
+    mockHasMobile.value = false;
+    seedRumSchema({ view_name: { name: "view_name" } });
+
+    wrapper = mountComponent();
+    await flushPromises();
+
+    expect(wrapper.findComponent({ name: "PerformanceOverview" }).exists()).toBe(false);
+  });
+
+  it("keeps the mobile tiles under the overview on a mixed stream", async () => {
+    // Arrange
+    mockHasMobile.value = true;
+    seedRumSchema({ view_largest_contentful_paint: { name: "view_largest_contentful_paint" } });
+
+    // Act
+    wrapper = mountComponent();
+    await flushPromises();
+
+    // Assert
+    expect(wrapper.findComponent({ name: "PerformanceOverview" }).exists()).toBe(true);
     expect(wrapper.findComponent({ name: "RenderDashboardCharts" }).exists()).toBe(true);
+    expect(wrapper.find('[data-test="performance-summary-browser-only-note"]').text()).toBe(
+      "This overview counts browser sessions only. Mobile app metrics are below.",
+    );
+    expect(wrapper.find('[data-test="performance-summary-mobile-filters-note"]').text()).toBe(
+      "The filters below apply to the mobile app metrics only.",
+    );
   });
 
   // -------------------------------------------------------------------------
@@ -678,7 +845,7 @@ describe("PerformanceSummary", () => {
     };
 
     // Act
-    wrapper.vm.selectedDate = newDate;
+    wrapper.vm.pickerDate = newDate;
     await nextTick();
 
     // Assert
@@ -695,7 +862,7 @@ describe("PerformanceSummary", () => {
     };
 
     // Act
-    wrapper.vm.selectedDate = dateRange;
+    wrapper.vm.pickerDate = dateRange;
     await nextTick();
 
     // Assert
@@ -731,7 +898,7 @@ describe("PerformanceSummary", () => {
 
     // Act
     wrapper.vm.refreshInterval = 0;
-    wrapper.vm.selectedDate = { relativeTimePeriod: "1h" };
+    wrapper.vm.pickerDate = { relativeTimePeriod: "1h" };
     await nextTick();
     await nextTick();
 
@@ -766,7 +933,7 @@ describe("PerformanceSummary", () => {
     expect(wrapper.vm.showEmptyState).toBe(false);
     expect(wrapper.vm.showDashboardSettingsDialog).toBe(false);
     expect(wrapper.vm.variablesData).toBeDefined();
-    expect(wrapper.vm.selectedDate).toBeDefined();
+    expect(wrapper.vm.pickerDate).toBeDefined();
     expect(wrapper.vm.currentTimeObj).toBeDefined();
     expect(wrapper.vm.refreshInterval).toBeDefined();
     expect(wrapper.vm.isLoading).toEqual([]);
