@@ -19,6 +19,15 @@ import ChartRenderer from "./ChartRenderer.vue";
 import i18n from "@/locales";
 import { raw } from "@/types/i18n";
 import store from "@/test/unit/helpers/store";
+import { use as echartsUse } from "echarts/core";
+import {
+  FunnelChart,
+  GraphChart,
+  LineChart,
+  PictorialBarChart,
+  TreemapChart,
+  SunburstChart,
+} from "echarts/charts";
 import { applyLegendConfiguration } from "@/utils/dashboard/legendConfiguration";
 import { applySeriesOverrides } from "@/utils/dashboard/seriesOverrides";
 
@@ -64,6 +73,10 @@ vi.mock("echarts/charts", () => ({
   SankeyChart: vi.fn(),
   TreeChart: vi.fn(),
   GraphChart: vi.fn(),
+  PictorialBarChart: vi.fn(),
+  TreemapChart: vi.fn(),
+  SunburstChart: vi.fn(),
+  FunnelChart: vi.fn(),
 }));
 
 vi.mock("echarts/features", () => ({
@@ -111,6 +124,31 @@ vi.mock("lodash-es", () => ({
   }),
   cloneDeep: vi.fn((obj) => JSON.parse(JSON.stringify(obj))),
 }));
+
+// ChartRenderer registers its series at import, before any beforeEach clears the mock.
+const registeredAtImport = vi.mocked(echartsUse).mock.calls.flat(2);
+
+describe("ChartRenderer series registration", () => {
+  it("registers the line series", () => {
+    expect(registeredAtImport).toContain(LineChart);
+  });
+
+  it("registers the pictorial bar series the bar gauge draws in LCD mode", () => {
+    expect(registeredAtImport).toContain(PictorialBarChart);
+  });
+  it("registers the treemap series", () => {
+    expect(registeredAtImport).toContain(TreemapChart);
+  });
+  it("registers the sunburst series", () => {
+    expect(registeredAtImport).toContain(SunburstChart);
+  });
+  it("registers the funnel series", () => {
+    expect(registeredAtImport).toContain(FunnelChart);
+  });
+  it("registers the graph series the node graph draws", () => {
+    expect(registeredAtImport).toContain(GraphChart);
+  });
+});
 
 describe("ChartRenderer", () => {
   let wrapper: any;

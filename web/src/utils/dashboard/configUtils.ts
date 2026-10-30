@@ -4,6 +4,21 @@
 
 import { isRowTimeline } from "./chartTypeGroups";
 
+// These draw no axes and no legend.
+const NO_AXIS_TYPES: string[] = ["bar-gauge", "treemap", "sunburst", "funnel", "node-graph"];
+// One series per panel, so a legend has nothing to tell apart.
+const NO_LEGEND_TYPES: string[] = [...NO_AXIS_TYPES];
+// These lay out their own legend and axes, so the shared legend layout and axis width do not apply.
+const OWN_LAYOUT_TYPES: string[] = [
+  "bar-gauge",
+  "hostmap",
+  "distribution",
+  "treemap",
+  "sunburst",
+  "funnel",
+  "node-graph",
+];
+
 interface PanelQueriesState {
   data: { queries?: Array<{ config?: { query_type?: string } } | null> };
   layout?: { hiddenQueries?: number[] };
@@ -61,6 +76,7 @@ export const shouldShowGridlines = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.type != "donut" &&
     dashboardPanelData.data.type != "sankey" &&
     dashboardPanelData.data.type != "maps" &&
+    !NO_AXIS_TYPES.includes(dashboardPanelData.data.type) &&
     dashboardPanelData.data.type != "hostmap"
   );
 };
@@ -79,6 +95,7 @@ export const shouldShowLegendsToggle = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.type !== "geomap" &&
     dashboardPanelData.data.type !== "sankey" &&
     dashboardPanelData.data.type !== "maps" &&
+    !NO_LEGEND_TYPES.includes(dashboardPanelData.data.type) &&
     dashboardPanelData.data.config.trellis?.layout === null
   );
 };
@@ -99,7 +116,7 @@ export const shouldShowLegendPosition = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.type !== "sankey" &&
     dashboardPanelData.data.type !== "maps" &&
     dashboardPanelData.data.type !== "state-timeline" &&
-    dashboardPanelData.data.type !== "hostmap" &&
+    !OWN_LAYOUT_TYPES.includes(dashboardPanelData.data.type) &&
     dashboardPanelData.data.config.trellis?.layout === null
   );
 };
@@ -120,7 +137,7 @@ export const shouldShowLegendType = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.type !== "sankey" &&
     dashboardPanelData.data.type !== "maps" &&
     dashboardPanelData.data.type !== "state-timeline" &&
-    dashboardPanelData.data.type !== "hostmap" &&
+    !OWN_LAYOUT_TYPES.includes(dashboardPanelData.data.type) &&
     dashboardPanelData.data.config.trellis?.layout === null
   );
 };
@@ -142,7 +159,7 @@ export const shouldShowLegendWidth = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.type !== "sankey" &&
     dashboardPanelData.data.type !== "maps" &&
     dashboardPanelData.data.type !== "state-timeline" &&
-    dashboardPanelData.data.type !== "hostmap" &&
+    !OWN_LAYOUT_TYPES.includes(dashboardPanelData.data.type) &&
     dashboardPanelData.data.config.trellis?.layout === null
   );
 };
@@ -166,7 +183,7 @@ export const shouldShowLegendHeight = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.type !== "sankey" &&
     dashboardPanelData.data.type !== "maps" &&
     dashboardPanelData.data.type !== "state-timeline" &&
-    dashboardPanelData.data.type !== "hostmap" &&
+    !OWN_LAYOUT_TYPES.includes(dashboardPanelData.data.type) &&
     dashboardPanelData.data.config.trellis?.layout === null
   );
 };
@@ -199,12 +216,10 @@ export const shouldShowNoValueReplacement = (
   dashboardPanelData: any,
   promqlMode: boolean,
 ): boolean => {
+  const type = dashboardPanelData.data.type;
   // A host map cell with no data shows this text in both query modes.
-  if (dashboardPanelData.data.type === "hostmap") return true;
-  return (
-    ["area", "line", "area-stacked", "bar", "stacked"].includes(dashboardPanelData.data.type) &&
-    !promqlMode
-  );
+  if (["metric", "gauge", "bar-gauge", "table", "hostmap"].includes(type)) return true;
+  return ["area", "line", "area-stacked", "bar", "stacked"].includes(type) && !promqlMode;
 };
 
 /** True for panels that draw a "No Data" state the user can reword; HTML and Markdown panels show none. */
@@ -263,7 +278,7 @@ export const shouldShowAxisConfig = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.type != "sankey" &&
     dashboardPanelData.data.type != "maps" &&
     dashboardPanelData.data.type != "state-timeline" &&
-    dashboardPanelData.data.type != "hostmap"
+    !OWN_LAYOUT_TYPES.includes(dashboardPanelData.data.type)
   );
 };
 
@@ -387,4 +402,53 @@ export const shouldShowTimeShift = (
 /** Whether the PromQL range/instant selector applies; a state timeline always runs a range query. */
 export const shouldShowPromQLQueryType = (dashboardPanelData: any): boolean => {
   return !isRowTimeline(dashboardPanelData.data.type);
+};
+
+/** Whether Stack mode applies; percent stacking needs stacked series. */
+export const shouldShowStackMode = (dashboardPanelData: any): boolean =>
+  ["area-stacked", "stacked", "h-stacked"].includes(dashboardPanelData?.data?.type);
+
+/** Whether category Sort order applies; only plain bars have one value per category. */
+export const shouldShowSortOrder = (dashboardPanelData: any): boolean =>
+  ["bar", "h-bar"].includes(dashboardPanelData?.data?.type);
+
+export const shouldShowBarRadius = (dashboardPanelData: any): boolean =>
+  ["bar", "h-bar", "stacked", "h-stacked"].includes(dashboardPanelData?.data?.type);
+
+/** Whether the scatter size/color fields apply; they pick other y fields, which PromQL has none of. */
+export const shouldShowScatterEncoding = (dashboardPanelData: any, promqlMode: boolean): boolean =>
+  !promqlMode && dashboardPanelData?.data?.type === "scatter";
+
+/** Whether the gap threshold applies; it only splits lines that connect nulls. */
+export const shouldShowConnectNullsThreshold = (dashboardPanelData: any): boolean =>
+  shouldShowAreaLineStyleConfig(dashboardPanelData) &&
+  !!dashboardPanelData?.data?.config?.connect_nulls;
+
+/** Whether the panel-level cartesian series settings (tooltip, scale, soft range, mark areas) apply. */
+export const shouldShowCartesianSeriesConfig = (dashboardPanelData: any): boolean =>
+  ["area", "area-stacked", "bar", "h-bar", "line", "scatter", "stacked", "h-stacked"].includes(
+    dashboardPanelData?.data?.type,
+  );
+
+// Options that only apply while their parent option is set; once hidden they must not stay saved.
+const DEPENDENT_OPTIONS: { keys: string[]; applies: (config: any) => boolean }[] = [
+  {
+    keys: ["scatter_size_min", "scatter_size_max"],
+    applies: (config) => !!config?.scatter_size_field,
+  },
+  { keys: ["y_axis_log_base"], applies: (config) => config?.y_axis_scale === "log" },
+  { keys: ["map_cluster_radius"], applies: (config) => config?.map_cluster === true },
+  { keys: ["connect_nulls_threshold"], applies: (config) => !!config?.connect_nulls },
+];
+
+/** Which parent options currently apply, as a watch source for pruneDependentOptions. */
+export const dependentOptionState = (config: any): boolean[] =>
+  DEPENDENT_OPTIONS.map((rule) => rule.applies(config));
+
+/** Deletes the saved values of options whose parent option no longer applies. */
+export const pruneDependentOptions = (config: any): void => {
+  if (!config) return;
+  DEPENDENT_OPTIONS.forEach((rule) => {
+    if (!rule.applies(config)) rule.keys.forEach((key) => delete config[key]);
+  });
 };

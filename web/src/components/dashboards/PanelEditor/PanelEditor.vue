@@ -32,7 +32,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Query-related chart content (not html/markdown/custom_chart) -->
       <div
-        v-if="!['html', 'markdown', 'custom_chart'].includes(dashboardPanelData.data.type)"
+        v-if="
+          !['html', 'markdown', 'custom_chart', 'alert-list'].includes(dashboardPanelData.data.type)
+        "
         :class="mainContentContainerClass"
         :style="mainContentContainerStyle"
       >
@@ -198,9 +200,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       v-if="
                         !panelSchemaRendererRef?.noData &&
-                        !['table', 'heatmap', 'metric', 'gauge', 'geomap', 'maps'].includes(
-                          dashboardPanelData.data.type,
-                        )
+                        ![
+                          'table',
+                          'heatmap',
+                          'metric',
+                          'gauge',
+                          'bar-gauge',
+                          'treemap',
+                          'sunburst',
+                          'funnel',
+                          'node-graph',
+                          'flame-graph',
+                          'geomap',
+                          'maps',
+                        ].includes(dashboardPanelData.data.type)
                       "
                       variant="ghost"
                       size="icon"
@@ -434,6 +447,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :panelId="panelId"
           />
           <DashboardErrorsComponent :errors="errorData" class="shrink-0" />
+        </div>
+      </div>
+
+      <!-- Alert list: no query, so only the preview and its settings -->
+      <div
+        v-if="dashboardPanelData.data.type === 'alert-list'"
+        class="flex"
+        :style="{ height: contentHeight, flex: 1, overflow: 'hidden' }"
+        data-test="panel-editor-alert-list"
+      >
+        <div class="bg-card-glass-bg flex min-w-0 flex-1 flex-col">
+          <div class="relative min-h-0 flex-1 overflow-hidden p-2">
+            <PanelSchemaRenderer
+              v-if="chartData"
+              ref="panelSchemaRendererRef"
+              :key="dashboardPanelData.data.type"
+              :panelSchema="chartData"
+              :dashboard-id="dashboardId"
+              :folder-id="folderId"
+              :selectedTimeObj="dashboardPanelData.meta.dateTime"
+              :variablesData="resolvedVariablesData"
+              :width="6"
+              :showLegendsButton="false"
+              :searchType="searchType"
+              @error="handleChartApiError"
+              @loading-state-change="handleLoadingStateChange"
+            />
+          </div>
+          <DashboardErrorsComponent :errors="errorData" class="shrink-0" />
+        </div>
+        <OSeparator vertical />
+        <div :class="configPanelClass">
+          <PanelSidebar
+            :title="t('dashboard.configLabel')"
+            v-model="dashboardPanelData.layout.isConfigPanelOpen"
+          >
+            <ConfigPanel :variablesData="resolvedVariablesData" :panelData="seriesData" />
+          </PanelSidebar>
         </div>
       </div>
 
