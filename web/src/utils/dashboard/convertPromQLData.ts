@@ -92,7 +92,7 @@ import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
 import { getPropsByChartTypeForSeries, getSeriesItemOpacity } from "./promqlChartSeriesProps";
 import { applyMeasuredYAxisLeftInset } from "./chartDimensionUtils";
 import { buildSeriesMarkLine } from "./promql/shared/markLines";
-import { legendFallbackOf } from "@/utils/dashboard/promql/formula";
+import { legendExprOf, legendFallbackOf } from "@/utils/dashboard/promql/formula";
 import { sortTooltipParams } from "./tooltipSort";
 import { fitStackedAxisBounds, stackTotalRows } from "./stackTotals";
 
@@ -1067,7 +1067,7 @@ export const convertPromQLData = async (
       metrics: (it?.result ?? []).map((m: any) => m?.metric).filter(Boolean),
       template: panelSchema.queries?.[parentQueryIndex[index]]?.config?.promql_legend,
       fallback: legendFallbackOf(panelSchema.queries, parentQueryIndex[index]),
-      expr: panelSchema.queries?.[parentQueryIndex[index]]?.query,
+      expr: legendExprOf(panelSchema.queries, metadata, parentQueryIndex[index]),
     })),
     getCachedSemanticGroups(store?.state?.selectedOrganization?.identifier ?? "") ?? [],
   );
@@ -1420,7 +1420,7 @@ export const convertPromQLData = async (
               panelSchema,
               seriesOverrides,
               metricColors,
-              panelSchema.queries?.[parentQueryIndex[index]]?.query,
+              legendExprOf(panelSchema.queries, metadata, parentQueryIndex[index]),
             ),
           );
       }

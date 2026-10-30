@@ -26,7 +26,7 @@ import { getContrastColor } from "./chartColorUtils";
 import { getColorPalette, getGridLineStyle, getSeriesHash } from "./colorPalette";
 import { formatDate } from "./dateTimeUtils";
 import { buildPromqlSeriesNames } from "./promql/shared/legendBuilder";
-import { legendFallbackOf } from "./promql/formula";
+import { legendExprOf, legendFallbackOf } from "./promql/formula";
 import { buildValueMappingCache, lookupValueMappingFull } from "./tableConfigUtils";
 import { normalizeThresholds, resolveStepValues, stepColorFor } from "./thresholds";
 import { getAnnotationsData } from "./getAnnotationsData";
@@ -267,7 +267,7 @@ const promqlRows = (
       metrics: (entry?.result ?? []).map((m: any) => m?.metric).filter(Boolean),
       template: panelSchema.queries?.[queryIndexOf(index)]?.config?.promql_legend,
       fallback: legendFallbackOf(panelSchema.queries, queryIndexOf(index)),
-      expr: panelSchema.queries?.[queryIndexOf(index)]?.query,
+      expr: legendExprOf(panelSchema.queries, metadata, queryIndexOf(index)),
     })),
     getCachedSemanticGroups(store?.state?.selectedOrganization?.identifier ?? "") ?? [],
   );

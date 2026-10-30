@@ -472,6 +472,7 @@ function extractJoinConditions(onClause: any, conditions: any[]): void {
 // The builder treats an empty value as "no value yet" and skips the condition.
 // `x != ''` in SQL is a real filter, so mark it to keep it.
 const emptyLiteralFlag = (condition: any) =>
+  ["=", "!=", "<>"].includes(condition?.operator) &&
   ["single_quote_string", "string"].includes(condition?.right?.type) &&
   condition?.right?.value === ""
     ? { emptyLiteral: true }

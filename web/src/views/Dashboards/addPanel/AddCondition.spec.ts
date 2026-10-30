@@ -588,7 +588,7 @@ describe("AddCondition.vue", () => {
       expect(wrapper.vm.$props.condition.values).toEqual(["value1", "value2"]);
     });
 
-    it("should clear emptyLiteral when the value is edited", async () => {
+    it("should clear emptyLiteral when the user types a value", async () => {
       const condition = {
         ...defaultProps.condition,
         operator: "<>",
@@ -597,13 +597,18 @@ describe("AddCondition.vue", () => {
       };
 
       wrapper = createWrapper({ condition });
-      await nextTick();
-      expect(wrapper.vm.$props.condition.emptyLiteral).toBe(true);
+      wrapper.vm.onValueInput("api");
 
-      wrapper.vm.$props.condition.value = "api";
-      await nextTick();
-
+      expect(wrapper.vm.$props.condition.value).toBe("api");
       expect(wrapper.vm.$props.condition.emptyLiteral).toBeUndefined();
+    });
+
+    it("should keep emptyLiteral when a different condition is passed in", async () => {
+      wrapper = createWrapper({ condition: { ...defaultProps.condition, value: "x" } });
+      const next = { ...defaultProps.condition, operator: "<>", value: "", emptyLiteral: true };
+      await wrapper.setProps({ condition: next });
+
+      expect(next.emptyLiteral).toBe(true);
     });
   });
 

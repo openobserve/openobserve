@@ -79,6 +79,11 @@ describe("Visualize keeps empty-string filters from SQL", () => {
     expect(await roundTrip("service_name = ''")).toContain("WHERE service_name = '' GROUP BY");
   });
 
+  it("does not flag a range comparison with ''", async () => {
+    const filter = await parseWhereClauseToFilter("service_name > ''");
+    expect(filter.conditions[0].emptyLiteral).toBeUndefined();
+  });
+
   it("does not flag a non-empty literal", async () => {
     const filter = await parseWhereClauseToFilter("service_name != 'api'");
     expect(filter.conditions[0].emptyLiteral).toBeUndefined();
