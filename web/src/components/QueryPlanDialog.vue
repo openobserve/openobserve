@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :inert="analyzeBusy"
                 data-test="query-plan-analyze-results"
               >
-                <QueryProfileView v-if="profile" :profile="profile" :stream="streamResult" />
+                <QueryProfileView v-if="resultModel" :model="resultModel" :stream="streamResult" />
                 <div
                   v-else
                   class="flex h-full flex-col gap-3 overflow-y-auto p-4"
@@ -180,8 +180,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <QueryPlanView
-          v-else-if="mode === 'plan' && planProfile"
-          :profile="planProfile"
+          v-else-if="mode === 'plan' && planModel"
+          :model="planModel"
           @analyze="mode = 'analyze'"
         />
 
@@ -305,6 +305,7 @@ let requestEpoch = 0;
 // bumped on cancel and reset so a response that lands afterwards is dropped
 let analyzeEpoch = 0;
 let analyzeTraceId = "";
+let analyzeAbort: AbortController | null = null;
 let ticker: ReturnType<typeof setInterval> | null = null;
 
 const showDialog = computed({
@@ -317,12 +318,11 @@ const sqlOneLine = computed(() => raw(sqlQuery.value.replace(/\s+/g, " ").trim()
 const planProfile = computed(() =>
   physicalPlan.value ? physicalPlanToProfile(physicalPlan.value) : null,
 );
-// a join reads streams the logs page did not select, so prefer the ones the plan scans
-const planStreams = computed(() =>
-  planProfile.value
-    ? summarizePlan(buildProfileModel(planProfile.value, [], { planOnly: true })).streams
-    : [],
+const planModel = computed(() =>
+  planProfile.value ? buildProfileModel(planProfile.value, [], { planOnly: true }) : null,
 );
+// a join reads streams the logs page did not select, so prefer the ones the plan scans
+const planStreams = computed(() => (planModel.value ? summarizePlan(planModel.value).streams : []));
 const hasResults = computed(() => !!profile.value || !!analyzePlan.value);
 const analyzeBusy = computed(
   () => analyzeState.value === "running" || analyzeState.value === "rerunning",
@@ -333,8 +333,11 @@ const summaryMetrics = computed<SummaryMetrics | null>(() =>
   analyzePlan.value ? calculateSummaryMetrics(analyzePlan.value) : null,
 );
 
+const resultModel = computed(() =>
+  profile.value ? buildProfileModel(profile.value, streamResult.value?.hits ?? []) : null,
+);
 const resultNodes = computed(() =>
-  profile.value ? clusterNodes(buildProfileModel(profile.value)).length : 0,
+  resultModel.value ? clusterNodes(resultModel.value).length : 0,
 );
 
 const analyzeText = computed<string | null>(() => {
@@ -386,7 +389,11 @@ const analyzeFacts = computed<AnalyzeFact[]>(() => {
 const analyzeNotice = computed<AnalyzeNotice | null>(() => {
   const elapsed = formatElapsed(stoppedAfterMs.value);
   if (analyzeState.value === "cancelled") {
-    return { variant: "info", text: t("search.queryProfile.cancelledAfter", { elapsed }) };
+    const text =
+      stoppedAfterMs.value >= TICK_MS
+        ? t("search.queryProfile.cancelledAfter", { elapsed })
+        : t("search.queryProfile.cancelledNow");
+    return { variant: "info", text };
   }
   if (analyzeState.value !== "failed") return null;
   const message = analyzeError.value.replace(/[.\s]+$/, "");
@@ -407,6 +414,7 @@ function explainPayload(prefix: string) {
 async function search(
   query: Record<string, unknown>,
   traceId: string,
+  signal?: AbortSignal,
 ): Promise<SearchStreamResult | null> {
   const response = await streamingSearch.search({
     org_identifier: store.state.selectedOrganization.identifier,
@@ -414,6 +422,7 @@ async function search(
     page_type: logsState.data.stream.streamType || "logs",
     search_type: "ui",
     traceId,
+    signal,
   });
   return parseSearchStream(response.data);
 }
@@ -501,8 +510,9 @@ async function fetchExplainPlan() {
     const parsed = payload ? await search(payload, generateTraceContext().traceId) : null;
     if (epoch !== requestEpoch) return;
     if (!payload) planError.value = t("search.errorFetchingPlan");
+    else if (parsed?.error) planError.value = parsed.error;
     else if (parsed) parseExplainHits(parsed.hits);
-    if (payload && !logicalPlan.value && !physicalPlan.value) {
+    if (payload && !planError.value && !logicalPlan.value && !physicalPlan.value) {
       planError.value = t("search.noPlanFound");
     }
   } catch (err: unknown) {
@@ -516,13 +526,19 @@ async function fetchExplainPlan() {
 
 function failAnalyze(message: string) {
   stopTicker();
-  stoppedAfterMs.value = analyzeBusy.value ? now.value - runStartedAt.value : 0;
+  const elapsedMs = analyzeBusy.value ? now.value - runStartedAt.value : 0;
+  // under a second "Failed after 0:00" reads as if nothing ran
+  stoppedAfterMs.value = elapsedMs >= TICK_MS ? elapsedMs : 0;
   clearResults();
   analyzeError.value = message;
   analyzeState.value = "failed";
 }
 
 function finishAnalyze(parsed: SearchStreamResult | null) {
+  if (parsed?.error !== undefined) {
+    failAnalyze(parsed.error || t("search.errorRunningAnalyze"));
+    return;
+  }
   stopTicker();
   const elapsedMs = now.value - runStartedAt.value;
   if (parsed) {
@@ -548,11 +564,12 @@ async function runAnalyze() {
   }
   const epoch = ++analyzeEpoch;
   analyzeTraceId = generateTraceContext().traceId;
+  analyzeAbort = new AbortController();
   analyzeError.value = "";
   analyzeState.value = hasResults.value ? "rerunning" : "running";
   startTicker();
   try {
-    const parsed = await search(payload, analyzeTraceId);
+    const parsed = await search(payload, analyzeTraceId, analyzeAbort.signal);
     if (epoch === analyzeEpoch) finishAnalyze(parsed);
   } catch (err: unknown) {
     if (epoch !== analyzeEpoch) return;
@@ -564,6 +581,9 @@ async function runAnalyze() {
 function stopServerQuery() {
   analyzeEpoch++;
   stopTicker();
+  // closing the request stops the query even when the cancel below races its registration
+  analyzeAbort?.abort();
+  analyzeAbort = null;
   const traceId = analyzeTraceId;
   analyzeTraceId = "";
   if (!traceId) return;
@@ -586,7 +606,10 @@ function cancelAnalyze() {
     analyzeState.value = "done";
     toast({
       variant: "info",
-      message: t("search.queryProfile.rerunCancelled", { elapsed: formatElapsed(afterMs) }),
+      message:
+        afterMs >= TICK_MS
+          ? t("search.queryProfile.rerunCancelled", { elapsed: formatElapsed(afterMs) })
+          : t("search.queryProfile.rerunCancelledNow"),
     });
     return;
   }

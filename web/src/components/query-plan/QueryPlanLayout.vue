@@ -98,6 +98,11 @@ import { reactive } from "vue";
 
 // shared by the Plan and Analyze views so a hidden panel stays hidden when switching modes
 const panels = reactive({ summary: true, detail: true });
+
+/** Picking an operator is a request to read about it, so a hidden detail panel comes back. */
+export function revealDetail() {
+  panels.detail = true;
+}
 </script>
 
 <script setup lang="ts">
@@ -110,8 +115,6 @@ const MOBILE_INSET = 16;
 const PANEL_GAP = 24;
 // the canvas keeps clear of the show-summary button that replaces the hidden panel
 const COLLAPSED_INSET = 56;
-
-const props = defineProps<{ selectedId: string | null }>();
 
 const { t } = useI18nTyped();
 const { isDesktop } = useBreakpoint();
@@ -131,14 +134,6 @@ function measure() {
 }
 
 watch(summaryOpen, (open) => open && nextTick(measure));
-
-// picking an operator is a request to read about it, so a hidden detail panel comes back
-watch(
-  () => props.selectedId,
-  (id, prev) => {
-    if (id && prev !== undefined && id !== prev) panels.detail = true;
-  },
-);
 
 onMounted(measure);
 </script>

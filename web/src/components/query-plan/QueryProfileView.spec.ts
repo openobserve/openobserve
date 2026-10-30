@@ -32,7 +32,7 @@ const took = {
 
 function mountView() {
   return mount(QueryProfileView, {
-    props: { profile: joinProfile(), stream: { hits: [], took_detail: took } },
+    props: { model: buildProfileModel(joinProfile()), stream: { hits: [], took_detail: took } },
     global: { plugins: [store, i18n] },
     attachTo: document.body,
   });

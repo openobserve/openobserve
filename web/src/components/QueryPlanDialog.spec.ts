@@ -100,6 +100,8 @@ function sse(payload: unknown) {
   return `event: search_response_hits\ndata: ${JSON.stringify(payload)}\n\n`;
 }
 
+const STREAM_ERROR_SSE = `event: error\ndata: ${JSON.stringify({ code: 500, message: "Resources exhausted: Failed to allocate 512 MB", error_detail: null })}\n\n`;
+
 const EXPLAIN_SSE = sse({
   hits: [
     { plan_type: "logical_plan", plan: AGG_LOGICAL_PLAN },
@@ -172,10 +174,10 @@ function mountDialog(props: Record<string, unknown> = {}) {
         QueryPlanView: {
           name: "QueryPlanView",
           template: '<div data-test="query-plan-view-stub" @click="$emit(\'analyze\')" />',
-          props: ["profile"],
+          props: ["model"],
           emits: ["analyze"],
         },
-        QueryProfileView: stub("QueryProfileView", "query-profile-view", ["profile", "stream"]),
+        QueryProfileView: stub("QueryProfileView", "query-profile-view", ["model", "stream"]),
         QueryPlanText: stub("QueryPlanText", "query-plan-text", [
           "physicalPlan",
           "logicalPlan",
@@ -282,7 +284,7 @@ describe("QueryPlanDialog", () => {
       expect(sentSql(0)).toBe("EXPLAIN SELECT * FROM logs");
       expect(find(wrapper, "query-plan-mode").attributes("data-value")).toBe("plan");
       const view = wrapper.findComponent({ name: "QueryPlanView" });
-      expect(view.props("profile").plan.name).toBe("SortPreservingMergeExec");
+      expect(view.props("model").profile.plan.name).toBe("SortPreservingMergeExec");
     });
 
     it("moves to the Analyze tab from the plan's call to action without running", async () => {
@@ -304,6 +306,12 @@ describe("QueryPlanDialog", () => {
       mockStreamingSearch.mockRejectedValue(new Error("network down"));
       wrapper = await openDialog();
       expect(find(wrapper, "query-plan-error").text()).toContain("network down");
+    });
+
+    it("shows the error the stream reports instead of a generic one", async () => {
+      mockStreamingSearch.mockResolvedValue({ data: STREAM_ERROR_SSE });
+      wrapper = await openDialog();
+      expect(find(wrapper, "query-plan-error").text()).toContain("Resources exhausted");
     });
   });
 
@@ -335,7 +343,7 @@ describe("QueryPlanDialog", () => {
       expect(sentSql(1)).toBe("EXPLAIN ANALYZE SELECT * FROM logs");
       expect(find(wrapper, "query-plan-analyze-elapsed").text()).toBe("0:00");
       expect(find(wrapper, "query-plan-analyze-running").text()).toContain(
-        "elapsed · last search took 1.84s",
+        "elapsed · results on the page took 1.84s",
       );
       await tick(wrapper, 65_000);
       expect(find(wrapper, "query-plan-analyze-elapsed").text()).toBe("1:05");
@@ -368,12 +376,52 @@ describe("QueryPlanDialog", () => {
       expect(find(wrapper, "query-plan-analyze-start").exists()).toBe(true);
     });
 
+    it("leaves the elapsed time out of a cancel under a second", async () => {
+      wrapper = await openAndRun(deferred().promise);
+      await tick(wrapper, 200);
+      await click(wrapper, "query-plan-analyze-cancel");
+      expect(find(wrapper, "query-plan-analyze-notice").text()).toBe(
+        "Cancelled. The query was stopped on every node.",
+      );
+    });
+
+    it("aborts the analyze request itself on cancel", async () => {
+      wrapper = await openAndRun(deferred().promise);
+      const signal = mockStreamingSearch.mock.calls[1][0].signal as AbortSignal;
+      expect(signal.aborted).toBe(false);
+      await click(wrapper, "query-plan-analyze-cancel");
+      expect(signal.aborted).toBe(true);
+    });
+
+    it("shows the error the analyze stream reports", async () => {
+      const pending = deferred();
+      wrapper = await openAndRun(pending.promise);
+      await tick(wrapper, 3_000);
+      pending.resolve({ data: STREAM_ERROR_SSE });
+      await flushPromises();
+      expect(find(wrapper, "query-plan-analyze-notice").text()).toContain(
+        "Failed after 0:03: Resources exhausted",
+      );
+    });
+
+    it("leaves the elapsed time out of a failure under a second", async () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const pending = deferred();
+      wrapper = await openAndRun(pending.promise);
+      await tick(wrapper, 300);
+      pending.reject(new Error("bad SQL"));
+      await flushPromises();
+      expect(find(wrapper, "query-plan-analyze-notice").text()).not.toContain("0:00");
+      expect(find(wrapper, "query-plan-analyze-notice").text()).toContain("bad SQL");
+      errorSpy.mockRestore();
+    });
+
     it("still lands in cancelled when the cancel call itself fails", async () => {
       mockCancelStream.mockRejectedValue(new Error("cancel failed"));
       const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       wrapper = await openAndRun(deferred().promise);
       await click(wrapper, "query-plan-analyze-cancel");
-      expect(find(wrapper, "query-plan-analyze-notice").text()).toContain("Cancelled after");
+      expect(find(wrapper, "query-plan-analyze-notice").text()).toContain("Cancelled");
       errorSpy.mockRestore();
     });
 
