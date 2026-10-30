@@ -10100,6 +10100,7 @@
       "dashboardDeletedAction": "9af86340789ed912",
       "dashboardMissing": "5a625c76e6145acc",
       "defaultNotAvailable": "f100490863c82d99",
+      "disabledPaused": "4a436bdcf4fbf5d4",
       "editAccessRequired": "085cd7d51f0b9062",
       "editForbidden": "3a3a55d6afcabfbe",
       "editNote": "604f60afa00cb59c",
@@ -10122,6 +10123,7 @@
       "newLink": "39890d5b20848a6b",
       "openDashboard": "803f2313cdf44275",
       "openPublicPage": "193b919d4957430f",
+      "orgDisabledBanner": "b3c3f4ddc639449b",
       "orgDisabledHint": "76b67d3fe9918c0b",
       "pageSubtitle": "69e8f1d6eb64b08b",
       "pageTitle": "b4bee918655d4e11",
@@ -20782,6 +20784,8 @@
     "lastRefreshed": "81969c7ddc3eb624",
     "minutesAgo": "33f4d52fdfa39099",
     "notYetRefreshed": "cde59065c4a2f1a1",
+    "refresh": "0e91610117029a62",
+    "refreshWithAge": "964aef05f56113a1",
     "secondsAgo": "8a421d3a725aacf9"
   },
   "regex_patterns": {

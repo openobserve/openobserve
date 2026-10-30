@@ -8520,6 +8520,8 @@
       "urlHidden": "無存取權限",
       "urlHiddenHint": "您無法檢視此連結的儀表板，因此其公開 URL 已隱藏。",
       "orgDisabledHint": "此組織已關閉公開連結",
+      "orgDisabledBanner": "此組織已關閉公開連結，因此不會提供連結。管理員可以重新開啟。",
+      "disabledPaused": "已停用 · 已暫停",
       "takeOver": "接管",
       "takeOverTitle": "要接管此連結嗎？",
       "takeOverBody": "您將成為發佈者。公開頁面會顯示您有權檢視的內容，可能比之前多或少。擁有該 URL 的任何人仍可存取，且連結會立即生效。",
@@ -18779,7 +18781,9 @@
     "dataFresh": "資料為最新",
     "dataGettingStale": "資料逐漸過時",
     "dataStale": "資料已過時",
-    "lastRefreshed": "上次重新整理：{time}"
+    "lastRefreshed": "上次重新整理：{time}",
+    "refresh": "重新整理",
+    "refreshWithAge": "重新整理，上次重新整理於 {age}"
   },
   "synthetics": {
     "variables": {

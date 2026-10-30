@@ -8525,6 +8525,8 @@
       "urlHidden": "Không có quyền truy cập",
       "urlHiddenHint": "Bạn không thể xem bảng điều khiển của liên kết này nên URL công khai của nó bị ẩn.",
       "orgDisabledHint": "Liên kết công khai đã bị tắt cho tổ chức này",
+      "orgDisabledBanner": "Liên kết công khai đã bị tắt cho tổ chức này, vì vậy không có liên kết nào được phục vụ. Quản trị viên có thể bật lại.",
+      "disabledPaused": "Đã tắt · Tạm dừng",
       "takeOver": "Tiếp quản",
       "takeOverTitle": "Tiếp quản liên kết này?",
       "takeOverBody": "Bạn sẽ trở thành người xuất bản. Trang công khai sẽ hiển thị những gì bạn được phép xem, có thể nhiều hơn hoặc ít hơn trước đây. Ai có URL vẫn giữ quyền truy cập, và liên kết hoạt động ngay bây giờ.",
@@ -18784,7 +18786,9 @@
     "dataFresh": "Dữ liệu mới",
     "dataGettingStale": "Dữ liệu đang trở nên cũ",
     "dataStale": "Dữ liệu đã cũ",
-    "lastRefreshed": "Cập nhật lần cuối: {time}"
+    "lastRefreshed": "Cập nhật lần cuối: {time}",
+    "refresh": "Làm mới",
+    "refreshWithAge": "Làm mới, lần làm mới cuối {age}"
   },
   "synthetics": {
     "variables": {
