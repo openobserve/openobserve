@@ -16,7 +16,10 @@
 //! Jira destination: one open issue per alert or incident, found by label, then commented on.
 
 use std::{
-    sync::{Arc, LazyLock},
+    sync::{
+        Arc, LazyLock,
+        atomic::{AtomicI64, Ordering},
+    },
     time::{Duration, Instant},
 };
 
@@ -78,10 +81,15 @@ const CREATED_TTL: Duration = Duration::from_secs(30 * 60);
 /// The key and creation time of the issue this node last made for one (site, project, label).
 type CreatedSlot = Arc<tokio::sync::Mutex<Option<(String, Instant)>>>;
 
-/// Sends for one slot run one at a time, so a search that cannot see a new issue yet adds no twin.
+/// Find-or-create runs one send per slot at a time, so a lagging search adds no twin.
 // ponytail: per node, so two cluster nodes can still both create; a shared lock if that bites.
 static CREATED: LazyLock<DashMap<(String, String, String), CreatedSlot>> =
     LazyLock::new(DashMap::new);
+
+/// Unix second after which the next send sweeps idle slots out of `CREATED`.
+static NEXT_SWEEP: AtomicI64 = AtomicI64::new(0);
+
+const SWEEP_EVERY_SECS: i64 = 60;
 
 /// Filled by OpenObserve or by its own form controls, so setup never asks for them.
 const SETUP_SKIPPED_FIELDS: [&str; 7] = [
@@ -228,12 +236,15 @@ pub async fn send(endpoint: &Endpoint, ctx: &NotificationContext) -> Result<Stri
 
     let slot = created_slot(&jira.base, project_key, &label);
     let mut created = slot.lock().await;
-    if let Some((key, _)) = created
+    let remembered = created
         .as_ref()
         .filter(|(_, at)| at.elapsed() < CREATED_TTL)
-        && still_open(&jira, key).await
+        .map(|(key, _)| key.clone());
+    if let Some(key) = remembered
+        && still_open(&jira, &key).await
     {
-        return comment_on(&jira, key, ctx).await;
+        drop(created);
+        return comment_on(&jira, &key, ctx).await;
     }
     *created = None;
 
@@ -246,6 +257,7 @@ pub async fn send(endpoint: &Endpoint, ctx: &NotificationContext) -> Result<Stri
     let found = jira.call(Method::POST, search, Some(query)).await?;
     let open = &found["issues"][0];
     if let Some(key) = open["key"].as_str().or_else(|| open["id"].as_str()) {
+        drop(created);
         return comment_on(&jira, key, ctx).await;
     }
     if ctx.alert_status == STATUS_RESOLVED {
@@ -280,18 +292,33 @@ pub async fn send(endpoint: &Endpoint, ctx: &NotificationContext) -> Result<Stri
     Ok(format!("created {key}"))
 }
 
-/// The slot for one issue identity; idle slots with nothing fresh are dropped so the map stays
-/// small.
+/// The slot for one issue identity; idle slots are swept once a minute so the map stays small.
 fn created_slot(base: &str, project_key: &str, label: &str) -> CreatedSlot {
-    CREATED.retain(|_, slot| {
-        Arc::strong_count(slot) > 1
-            || slot.try_lock().is_ok_and(|held| {
-                held.as_ref()
-                    .is_some_and(|(_, at)| at.elapsed() < CREATED_TTL)
-            })
-    });
+    if sweep_due(&NEXT_SWEEP, chrono::Utc::now().timestamp()) {
+        CREATED.retain(|_, slot| {
+            Arc::strong_count(slot) > 1
+                || slot.try_lock().is_ok_and(|held| {
+                    held.as_ref()
+                        .is_some_and(|(_, at)| at.elapsed() < CREATED_TTL)
+                })
+        });
+    }
     let key = (base.to_string(), project_key.to_string(), label.to_string());
     Arc::clone(&CREATED.entry(key).or_default())
+}
+
+/// True for the one caller that moves `next` past `now`, so concurrent sends sweep once.
+fn sweep_due(next: &AtomicI64, now: i64) -> bool {
+    let due = next.load(Ordering::Relaxed);
+    now >= due
+        && next
+            .compare_exchange(
+                due,
+                now + SWEEP_EVERY_SECS,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            )
+            .is_ok()
 }
 
 /// An issue that cannot be read counts as gone, so the search decides instead.
@@ -1617,6 +1644,49 @@ mod tests {
                 );
             },
         );
+    }
+
+    #[test]
+    fn a_slow_comment_does_not_hold_up_the_next_send() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::a_slow_comment_does_not_hold_up_the_next_send"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let both_commenting = Arc::new(tokio::sync::Barrier::new(2));
+                let app = axum::Router::new().fallback(move |uri: axum::http::Uri| {
+                    let both_commenting = both_commenting.clone();
+                    async move {
+                        if uri.path().ends_with("/comment") {
+                            both_commenting.wait().await;
+                        }
+                        axum::Json(json!({"issues": [{"key": "OPS-142"}]}))
+                    }
+                });
+                let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+                let endpoint = endpoint(format!("http://{}", listener.local_addr().unwrap()));
+                tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+                let ctx = alert_ctx();
+                let (first, second) = tokio::time::timeout(Duration::from_secs(10), async {
+                    tokio::join!(send(&endpoint, &ctx), send(&endpoint, &ctx))
+                })
+                .await
+                .expect("the second send waited for the first comment");
+                assert_eq!(first.unwrap(), "commented on OPS-142");
+                assert_eq!(second.unwrap(), "commented on OPS-142");
+            },
+        );
+    }
+
+    #[test]
+    fn idle_slots_are_swept_at_most_once_a_minute() {
+        let next = AtomicI64::new(0);
+        assert!(sweep_due(&next, 1_000));
+        assert!(!sweep_due(&next, 1_000));
+        assert!(!sweep_due(&next, 1_059));
+        assert!(sweep_due(&next, 1_060));
     }
 
     #[test]
